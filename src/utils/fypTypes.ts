@@ -159,6 +159,8 @@ export interface FypEntry {
     /** False when this entry is showing because the viewer was named as a co-author on someone else's
      * submitted record, not because they own it — gates edit/delete access on the frontend. */
     isOwner?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export const EMPTY_FYP: FypEntry = {

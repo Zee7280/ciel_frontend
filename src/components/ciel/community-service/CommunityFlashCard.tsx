@@ -39,8 +39,14 @@ export default function CommunityFlashCard({
                         {COMMUNITY_LEVEL_LABEL[card.level]}
                     </span>
                 )}
-                <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[7px] font-extrabold text-[#0e7d74]">✅ FACULTY-APPROVED</span>
-                <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII EVALUATED</span>
+                {card.faculty_status === "approved" || card.faculty_status === "verified" ? (
+                    <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[7px] font-extrabold text-[#0e7d74]">✅ FACULTY-APPROVED</span>
+                ) : (
+                    <span className="rounded-full bg-[#fbf0d7] px-2 py-0.5 text-[7px] font-extrabold text-[#9b6700]">⏳ AWAITING FACULTY</span>
+                )}
+                {card.cii != null ? (
+                    <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII EVALUATED</span>
+                ) : null}
                 <span className="rounded-full bg-[#e3f4fa] px-2 py-0.5 text-[7px] font-extrabold text-[#0891b2]">📸 {card.evidenceCount} EVIDENCE</span>
             </div>
         </div>

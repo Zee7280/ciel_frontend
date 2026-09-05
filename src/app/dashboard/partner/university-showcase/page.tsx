@@ -30,6 +30,7 @@ export default function UniversityShowcasePage() {
     const [entries, setEntries] = useState<MeritEntry[]>([]);
     const [inProgress, setInProgress] = useState<MeritEntry[]>([]);
     const [fypEntries, setFypEntries] = useState<FypMeritEntry[]>([]);
+    const [inProgressFyp, setInProgressFyp] = useState<FypMeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [fypLoading, setFypLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -42,10 +43,16 @@ export default function UniversityShowcasePage() {
     const [fSemester, setFSemester] = useState("all");
     const [fYear, setFYear] = useState("all");
 
+    const [fFypDept, setFFypDept] = useState("all");
+    const [fFypSupervisor, setFFypSupervisor] = useState("all");
+    const [fFypRoute, setFFypRoute] = useState("all");
+    const [fFypYear, setFFypYear] = useState("all");
+
     useEffect(() => {
         void fetchEntries();
         void fetchInProgress();
         void fetchFypEntries();
+        void fetchInProgressFyp();
     }, []);
 
     const fetchEntries = async () => {
@@ -99,6 +106,18 @@ export default function UniversityShowcasePage() {
         }
     };
 
+    const fetchInProgressFyp = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/fyp-thesis/university?status=draft");
+            if (response?.ok) {
+                const data = await response.json();
+                setInProgressFyp(Array.isArray(data.data) ? data.data : []);
+            }
+        } catch {
+            // Non-fatal — the "FYP in Progress" tile just shows 0 until the next load.
+        }
+    };
+
     const approved = useMemo(() => entries.filter(isFacultyApproved), [entries]);
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
     const approvedFyp = useMemo(() => fypEntries.filter(isPathEntryApproved), [fypEntries]);
@@ -140,8 +159,23 @@ export default function UniversityShowcasePage() {
             entry.course?.toLowerCase().includes(q)
         );
     });
-    const fypPool = view === "pending" ? waitingFyp : approvedFyp;
+    const fypDepartment = (e: FypMeritEntry) => e.projectInfo?.school || e.student?.department || "Unspecified";
+    const fypSupervisor = (e: FypMeritEntry) => e.projectInfo?.supervisorName || "Unassigned";
+    const fypRoute = (e: FypMeritEntry) => e.projectInfo?.leadRoute || e.projectInfo?.projectTypes?.[0] || "Unspecified";
+    const fypYear = (e: FypMeritEntry) => {
+        const d = e.updatedAt || e.createdAt;
+        return d ? String(new Date(d).getFullYear()) : "";
+    };
+    const fypPool = view === "progress" ? inProgressFyp : view === "pending" ? waitingFyp : approvedFyp;
+    const fypDepartments = useMemo(() => [...new Set(fypPool.map(fypDepartment))].sort(), [fypPool]);
+    const fypSupervisors = useMemo(() => [...new Set(fypPool.map(fypSupervisor))].sort(), [fypPool]);
+    const fypRoutes = useMemo(() => [...new Set(fypPool.map(fypRoute))].sort(), [fypPool]);
+    const fypYears = useMemo(() => [...new Set(fypPool.map(fypYear).filter(Boolean))].sort().reverse(), [fypPool]);
     const filteredFyp = fypPool.filter((entry) => {
+        if (fFypDept !== "all" && fypDepartment(entry) !== fFypDept) return false;
+        if (fFypSupervisor !== "all" && fypSupervisor(entry) !== fFypSupervisor) return false;
+        if (fFypRoute !== "all" && fypRoute(entry) !== fFypRoute) return false;
+        if (fFypYear !== "all" && fypYear(entry) !== fFypYear) return false;
         if (!q) return true;
         return (
             entry.student?.name?.toLowerCase().includes(q) ||
@@ -278,6 +312,53 @@ export default function UniversityShowcasePage() {
                     </div>
                 )}
 
+                {mode === "fyp-thesis" && view !== "rank" && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs font-black uppercase tracking-wide text-slate-500">Final Year Project (FYP) Filters</p>
+                            <p className="text-[11px] text-slate-400">Use one or more filters to refine the institutional view.</p>
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                            <select value={fFypDept} onChange={(e) => setFFypDept(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Departments</option>
+                                {fypDepartments.map((d) => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                            <select value={fFypSupervisor} onChange={(e) => setFFypSupervisor(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Faculty Members</option>
+                                {fypSupervisors.map((f) => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                            <select value={fFypRoute} onChange={(e) => setFFypRoute(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Project Types</option>
+                                {fypRoutes.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                            <select value={fFypYear} onChange={(e) => setFFypYear(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Academic Years</option>
+                                {fypYears.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFFypDept("all");
+                                    setFFypSupervisor("all");
+                                    setFFypRoute("all");
+                                    setFFypYear("all");
+                                }}
+                                className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-slate-300"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {view !== "home" && <HubBackButton onClick={() => setView("home")} label="← Back to showcase" />}
 
                 {view === "home" && (
@@ -288,27 +369,29 @@ export default function UniversityShowcasePage() {
                         pill="UNIVERSITY VIEW"
                     />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        {mode === "course-project" && (
-                            <HubTile
-                                onClick={() => setView("progress")}
-                                badge={`${inProgress.length} IN PROGRESS`}
-                                badgeClass="text-[#c76000]"
-                                emoji="🧩"
-                                title="Coursework in Progress"
-                                subtitle="Students still filling the form across departments — completion bar, last activity, Email / WhatsApp reminders."
-                                background="linear-gradient(135deg,#15988b,#2ec8bd)"
-                            />
-                        )}
+                        <HubTile
+                            onClick={() => setView("progress")}
+                            badge={`${mode === "course-project" ? inProgress.length : inProgressFyp.length} IN PROGRESS`}
+                            badgeClass="text-[#c76000]"
+                            emoji="🧩"
+                            title={mode === "course-project" ? "Coursework in Progress" : "FYP in Progress"}
+                            subtitle={
+                                mode === "course-project"
+                                    ? "Students still filling the form across departments — completion bar, last activity, Email / WhatsApp reminders."
+                                    : "Students still building their Final Year Project across departments — completion bar, last activity, Email / WhatsApp reminders."
+                            }
+                            background="linear-gradient(135deg,#15988b,#2ec8bd)"
+                        />
                         <HubTile
                             onClick={() => setView("pending")}
-                            badge={`${mode === "course-project" ? waiting.length : waitingFyp.length} ${mode === "course-project" ? "UNDER REVIEW" : "IN QUEUE"}`}
+                            badge={`${mode === "course-project" ? waiting.length : waitingFyp.length} UNDER REVIEW`}
                             badgeClass="text-[#b45309]"
                             emoji={mode === "course-project" ? "📝" : "⏳"}
-                            title={mode === "course-project" ? "Coursework Under Review" : "Waiting for Approval"}
+                            title={mode === "course-project" ? "Coursework Under Review" : "FYP Under Review"}
                             subtitle={
                                 mode === "course-project"
                                     ? "Submitted flashcards waiting for faculty approval, or returned for revision — remind the faculty member or the student."
-                                    : "Submitted FYP / thesis records still waiting for supervisor sign-off."
+                                    : "Submitted flashcards waiting for supervisor approval, or returned for revision — remind the supervisor or the student."
                             }
                             background="linear-gradient(135deg,#b45309,#fbbf24)"
                         />
@@ -316,39 +399,41 @@ export default function UniversityShowcasePage() {
                             onClick={() => setView("deck")}
                             badge={`${mode === "course-project" ? approved.length : approvedFyp.length} APPROVED`}
                             badgeClass="text-[#0e7d74]"
-                            emoji={mode === "course-project" ? "📚" : "⭐"}
-                            title={mode === "course-project" ? "Coursework Impact Wall" : "Approved flash cards"}
+                            emoji={mode === "course-project" ? "📚" : "🎓"}
+                            title={mode === "course-project" ? "Coursework Impact Wall" : "FYP Impact Wall"}
                             subtitle={
                                 mode === "course-project"
                                     ? "Faculty-approved coursework flashcards from every department — the same record the student, faculty and CIEL PK see."
-                                    : "Faculty-approved cards only — the live institutional deck."
+                                    : "Supervisor-approved Final Year Project flashcards from every department — the same record the student, supervisor and CIEL PK see."
                             }
                             background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
                         />
                         <HubTile
                             onClick={() => setView("rank")}
-                            badge={mode === "course-project" ? "AI RANKINGS" : "SAME FORMULA"}
+                            badge="AI RANKINGS"
                             badgeClass="text-[#6d28d9]"
                             emoji="🤖"
-                            title={mode === "course-project" ? "AI Rankings" : "Merit model — rank this deck"}
+                            title={mode === "course-project" ? "AI Rankings" : "FYP AI Rankings"}
                             subtitle={
                                 mode === "course-project"
                                     ? "Ranking Studio — filter a cohort, preview anytime, publish a final ranking up to 3× a year (3 left) to badge students."
-                                    : "Approved cards only. Waiting submissions stay out of the live ranking."
+                                    : "FYP Ranking Studio — filter a cohort, preview anytime (unofficial & confidential), publish an official ranking up to 3× per semester to badge students."
                             }
                             background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                         />
-                        {mode === "course-project" && (
-                            <HubTile
-                                href="/dashboard/partner/university-analytics"
-                                badge="LOCKED"
-                                badgeClass="text-[#0f172a]"
-                                emoji="🔒"
-                                title="Coursework Analytics"
-                                subtitle="Department comparisons, rubric trends and downloadable institutional reports — CIEL PK Analytics."
-                                background="linear-gradient(135deg,#334155,#64748b)"
-                            />
-                        )}
+                        <HubTile
+                            href="/dashboard/partner/university-analytics"
+                            badge="LOCKED"
+                            badgeClass="text-[#0f172a]"
+                            emoji="🔒"
+                            title={mode === "course-project" ? "Coursework Analytics" : "FYP Analytics"}
+                            subtitle={
+                                mode === "course-project"
+                                    ? "Department comparisons, rubric trends and downloadable institutional reports — CIEL PK Analytics."
+                                    : "Unlock supervisor, department, programme, research-theme, SDG and batch trends — CIEL PK Analytics."
+                            }
+                            background="linear-gradient(135deg,#334155,#64748b)"
+                        />
                     </div>
                     <ActionKpiGrid
                         items={
@@ -439,22 +524,31 @@ export default function UniversityShowcasePage() {
                         </div>
                     ))}
 
-                {mode === "fyp-thesis" && (view === "pending" || view === "deck") &&
+                {mode === "fyp-thesis" && (view === "progress" || view === "pending" || view === "deck") &&
                     (activeLoading ? (
                         <SkeletonList />
                     ) : filteredFyp.length === 0 ? (
                         <EmptyUni
                             match={fypPool.length > 0}
                             message={
-                                view === "pending"
-                                    ? "No submitted FYP / thesis records are waiting for supervisor approval."
-                                    : "Approved FYP / thesis cards will appear here after supervisor sign-off."
+                                view === "progress"
+                                    ? "Students still filling out the FYP form will appear here."
+                                    : view === "pending"
+                                      ? "No submitted FYP / thesis records are waiting for supervisor approval."
+                                      : "Approved FYP / thesis cards will appear here after supervisor sign-off."
                             }
                         />
                     ) : (
                         <div className="space-y-4">
                             {filteredFyp.map((entry) => (
-                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                <ThesisCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    studentName={entry.student?.name}
+                                    remindDraftOwner={view === "progress" || entry.supervisorApprovalStatus === "revision_requested"}
+                                    studentReminder={view === "pending" && entry.supervisorApprovalStatus === "pending" ? "faculty" : undefined}
+                                    studentEmail={entry.student?.email}
+                                />
                             ))}
                         </div>
                     ))}

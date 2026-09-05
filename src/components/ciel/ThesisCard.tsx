@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock } from "lucide-react";
+import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock, Mail, MessageCircle } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { rankMovement } from "@/utils/courseProjectTypes";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
+import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     type FypEntry,
     type FypSectionSummaries,
@@ -52,6 +53,9 @@ export default function ThesisCard({
     studentName,
     onSupervisorReview,
     reviewing = false,
+    studentReminder,
+    remindDraftOwner = false,
+    studentEmail,
 }: {
     entry: FypEntry;
     defaultOpen?: boolean;
@@ -60,6 +64,12 @@ export default function ThesisCard({
     /** Supplying this renders Approve/Request revision/Reject actions in the footer — the supervisor-review gate that makes a submitted entry "go live" for Merit Model ranking. */
     onSupervisorReview?: (action: "approve" | "reject" | "revision", note?: string) => void;
     reviewing?: boolean;
+    /** "team" renders Email/WhatsApp buttons to nudge co-authors on a draft; "faculty" renders the same to nudge the reviewing supervisor on a submitted record. */
+    studentReminder?: "team" | "faculty";
+    /** Opposite direction from studentReminder: renders Email/WhatsApp buttons for a faculty/university/admin viewer to nudge the student who owns this (still in-progress) draft. Requires studentEmail. */
+    remindDraftOwner?: boolean;
+    /** The draft owner's email — needed for remindDraftOwner (a plain FypEntry has no joined student record of its own). */
+    studentEmail?: string;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [reviewNote, setReviewNote] = useState("");
@@ -86,6 +96,29 @@ export default function ThesisCard({
     const movement = rankMovement(ribbon);
     // A brand-new, still-empty draft reads as broken if labelled "Untitled" — it's just not started yet.
     const displayTitle = pi.title || entry.projectTitle || (entry.status === "draft" ? "New FYP / thesis record — tap to continue" : "Untitled thesis");
+
+    const teamEmails = teamMembers.map((m) => m.email).filter((e): e is string => !!e);
+    const completionPct = Math.round(((entry.stepCompleted ?? 0) / 8) * 100);
+    const reminder: { to: string; subject: string; body: string } | null =
+        studentReminder === "faculty" && pi.supervisorEmail
+            ? {
+                  to: pi.supervisorEmail,
+                  subject: `Reminder: "${displayTitle}" is awaiting your review on CIEL PK`,
+                  body: `Hi ${pi.supervisorName || "there"},\n\nJust a friendly reminder that my Final Year Project record "${displayTitle}" has been submitted and is waiting for your approval on CIEL PK.\n\nThank you,\n${displayName}`,
+              }
+            : studentReminder === "team" && teamEmails.length
+              ? {
+                    to: teamEmails.join(","),
+                    subject: `Reminder: let's finish "${displayTitle}" on CIEL PK`,
+                    body: `Hi team,\n\nA quick reminder to help finish our Final Year Project record "${displayTitle}" on CIEL PK so we can submit it for supervisor review.\n\nThanks,\n${displayName}`,
+                }
+              : remindDraftOwner && studentEmail
+                ? {
+                      to: studentEmail,
+                      subject: `Reminder: continue "${displayTitle}" on CIEL PK`,
+                      body: `Hi ${displayName},\n\nYour Final Year Project record "${displayTitle}" is ${completionPct}% complete on CIEL PK. Please continue and submit it for supervisor review when it's ready.\n\nThanks,\n${pi.supervisorName || "Your supervisor"}`,
+                  }
+                : null;
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
@@ -137,6 +170,18 @@ export default function ThesisCard({
                         </span>
                     )}
                 </div>
+
+                {entry.status === "draft" && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-ciel-text-mid">
+                            <span>{entry.stepCompleted ?? 0} of 8 steps complete</span>
+                            <span>{completionPct}%</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-page">
+                            <div className="h-full rounded-full bg-ciel-purple" style={{ width: `${completionPct}%` }} />
+                        </div>
+                    </div>
+                )}
 
                 {sm.noSdgApplies ? (
                     <div className="mt-4 flex items-center gap-2">
@@ -280,6 +325,26 @@ export default function ThesisCard({
                     <br />
                     On approval: 🧑‍🎓 co-author profiles · 🧑‍🏫 faculty deck · 🏫 university portal
                 </p>
+                {reminder && (
+                    <div className="flex shrink-0 gap-2">
+                        <a
+                            href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                        >
+                            <Mail className="h-3.5 w-3.5" /> Email
+                        </a>
+                        <a
+                            href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                        >
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                        </a>
+                    </div>
+                )}
                 {onSupervisorReview && entry.status === "submitted" && approval !== "approved" && (
                     <div className="flex w-full flex-col gap-2 pt-2">
                         <textarea

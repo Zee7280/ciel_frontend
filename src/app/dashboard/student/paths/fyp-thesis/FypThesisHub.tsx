@@ -144,7 +144,7 @@ export default function FypThesisHub({
                             }}
                             className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
                         >
-                            <ThesisCard entry={entry} />
+                            <ThesisCard entry={entry} studentReminder="team" />
                         </div>
                     ) : (
                         <EmptyState
@@ -180,7 +180,7 @@ export default function FypThesisHub({
                             }}
                             className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
                         >
-                            <ThesisCard entry={entry} />
+                            <ThesisCard entry={entry} studentReminder="faculty" />
                         </div>
                     ) : (
                         <EmptyState

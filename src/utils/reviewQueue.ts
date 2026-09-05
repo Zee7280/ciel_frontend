@@ -101,10 +101,14 @@ export function isFacultyCommunityWaiting(row: CommunityReviewRow & { hours?: nu
     return !isFacultyCommunityLiveCard(row);
 }
 
-/** Admin / national board: still waiting for CIEL admin, even if faculty already signed. */
+/** Admin / national board live deck. Mirrors the backend's community-award eligibility gate
+ * (isCommunityAwardMedalReport) — Faculty must have signed off in addition to Admin/overall,
+ * otherwise a report can show up here without ever having a real CII score (backend excludes it
+ * from award-cards, and the frontend used to fabricate a fake 0/100 card for it). */
 export function isAdminCommunityLiveCard(row: CommunityReviewRow): boolean {
     if (isCommunityReportRejected(row)) return false;
     if (normalizeReviewStatus(row.status) === "draft") return false;
+    if (!isCommunityReportFacultyApproved(row)) return false;
     return isCommunityReportAdminSignedOff(row);
 }
 

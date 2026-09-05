@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Briefcase, Calculator, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
+import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
@@ -9,6 +9,7 @@ import { sdgData } from "@/utils/sdgData";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
+import ThesisCard from "@/components/ciel/ThesisCard";
 import Tabs from "@/components/ciel/Tabs";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
 import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -93,7 +94,8 @@ interface AdminFypRow {
     wizardStepsComplete: number | null;
     wizardStepsTotal: number | null;
     status?: "draft" | "submitted";
-    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
+    supervisorApprovalNote?: string | null;
     sectionSummaries?: FypSectionSummaries | null;
     updatedAt: string;
     student: AdminStudent | null;
@@ -180,15 +182,16 @@ export default function AdminPathSubmissionsPage() {
     const [fypRows, setFypRows] = useState<AdminFypRow[]>([]);
     const [ventureRows, setVentureRows] = useState<AdminVentureRow[]>([]);
     const [courseFilter, setCourseFilter] = useState<"all" | "waiting" | "approved" | "draft">("all");
-    const [fypFilter, setFypFilter] = useState<"all" | "waiting" | "approved" | "in_progress" | "complete">("waiting");
     const [ventureFilter, setVentureFilter] = useState<"all" | "waiting" | "submitted" | "visible" | "private">("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [meritView, setMeritView] = useState(false);
     const [courseView, setCourseView] = useState<"home" | "progress" | "review" | "approved" | "stats" | "submissions" | "hec">("home");
     const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
     const [approvedSubview, setApprovedSubview] = useState<"rank" | "list">("rank");
+    const [fypView, setFypView] = useState<"home" | "progress" | "review" | "approved">("home");
+    const [fypReviewTab, setFypReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
+    const [fypApprovedSubview, setFypApprovedSubview] = useState<"rank" | "list">("rank");
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
@@ -200,7 +203,7 @@ export default function AdminPathSubmissionsPage() {
 
     useEffect(() => {
         if (pathTab !== "course-project") setCourseView("home");
-        if (pathTab !== "course-project" && pathTab !== "fyp-thesis") setMeritView(false);
+        if (pathTab !== "fyp-thesis") setFypView("home");
     }, [pathTab]);
 
     useEffect(() => {
@@ -222,7 +225,7 @@ export default function AdminPathSubmissionsPage() {
     }, [pathTab, courseView]);
 
     useEffect(() => {
-        if (pathTab !== "fyp-thesis" || !meritView) return;
+        if (pathTab !== "fyp-thesis" || fypView !== "approved") return;
         let cancelled = false;
         setFypMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/fyp-thesis")
@@ -236,11 +239,11 @@ export default function AdminPathSubmissionsPage() {
         return () => {
             cancelled = true;
         };
-    }, [pathTab, meritView]);
+    }, [pathTab, fypView]);
 
     useEffect(() => {
         setExpandedId(null);
-    }, [pathTab, courseFilter, fypFilter, ventureFilter]);
+    }, [pathTab, courseFilter, ventureFilter]);
 
     useEffect(() => {
         let cancelled = false;
@@ -290,28 +293,6 @@ export default function AdminPathSubmissionsPage() {
         });
     }, [courseRows, courseFilter, q]);
 
-    const filteredFyp = useMemo(() => {
-        return fypRows.filter((row) => {
-            if (fypFilter === "waiting" && !isPathEntryWaiting(row)) return false;
-            if (fypFilter === "approved" && !isPathEntryApproved(row)) return false;
-            if (fypFilter === "in_progress" && row.progressStatus !== "in_progress") return false;
-            if (fypFilter === "complete" && row.progressStatus !== "complete") return false;
-            if (!q) return true;
-            return [
-                row.projectTitle,
-                row.overview,
-                row.communityLinkage?.orgName,
-                row.student?.name,
-                row.student?.email,
-                row.student?.institution,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-                .includes(q);
-        });
-    }, [fypRows, fypFilter, q]);
-
     const filteredVentures = useMemo(() => {
         return ventureRows.filter((row) => {
             if (ventureFilter === "waiting" && row.status === "submitted") return false;
@@ -332,16 +313,9 @@ export default function AdminPathSubmissionsPage() {
     const emptyMessage =
         pathTab === "course-project"
             ? `No course project entries${courseFilter !== "all" ? ` with status “${courseFilter}”.` : "."}`
-            : pathTab === "fyp-thesis"
-              ? `No FYP entries${fypFilter !== "all" ? ` with progress “${fypFilter.replace("_", " ")}”.` : "."}`
-              : `No startup entries${ventureFilter !== "all" ? ` marked “${ventureFilter}”.` : "."}`;
+            : `No startup entries${ventureFilter !== "all" ? ` marked “${ventureFilter}”.` : "."}`;
 
-    const activeCount =
-        pathTab === "course-project"
-            ? filteredCourse.length
-            : pathTab === "fyp-thesis"
-              ? filteredFyp.length
-              : filteredVentures.length;
+    const activeCount = pathTab === "course-project" ? filteredCourse.length : filteredVentures.length;
 
     const courseRowsAsMerit = useMemo(() => courseRows as unknown as MeritEntry[], [courseRows]);
     const approvedCourse = useMemo(
@@ -361,6 +335,24 @@ export default function AdminPathSubmissionsPage() {
         [approvedCourse],
     );
 
+    const fypRowsAsMerit = useMemo(() => fypRows as unknown as FypMeritEntry[], [fypRows]);
+    const approvedFyp = useMemo(
+        () => fypRowsAsMerit.filter(isPathEntryApproved),
+        [fypRowsAsMerit],
+    );
+    const waitingFyp = useMemo(
+        () => fypRowsAsMerit.filter(isPathEntryWaiting),
+        [fypRowsAsMerit],
+    );
+    const draftFyp = useMemo(
+        () => fypRowsAsMerit.filter((r) => r.status === "draft"),
+        [fypRowsAsMerit],
+    );
+    const fypUniCount = useMemo(
+        () => new Set(approvedFyp.map((e) => e.student?.institution).filter(Boolean)).size,
+        [approvedFyp],
+    );
+
     return (
         <div className="space-y-6 p-6">
             {pathTab === "course-project" ? (
@@ -377,6 +369,22 @@ export default function AdminPathSubmissionsPage() {
                             { value: String(approvedCourse.length), label: "APPROVED CARDS" },
                         ]}
                         rightStat={{ value: String(uniCount || "—"), label: "universities represented" }}
+                    />
+                </div>
+            ) : pathTab === "fyp-thesis" ? (
+                <div className="mx-auto max-w-[1040px] space-y-4">
+                    <CourseworkCrumb role="CIEL PK Master" view={fypView === "home" ? undefined : fypView} />
+                    <CourseworkHero
+                        kicker="CIEL PK MASTER · FYP"
+                        title="Final Year Project (FYP) 🎓"
+                        subtitle="Track Final Year Projects from initial draft through supervisor approval and the CIEL PK AI analysis."
+                        gradient="linear-gradient(115deg,#04252b,#0e7d74 55%,#2dd4bf 115%)"
+                        stats={[
+                            { value: String(draftFyp.length), label: "IN PROGRESS" },
+                            { value: String(waitingFyp.length), label: "UNDER REVIEW" },
+                            { value: String(approvedFyp.length), label: "APPROVED CARDS" },
+                        ]}
+                        rightStat={{ value: String(fypUniCount || "—"), label: "universities represented" }}
                     />
                 </div>
             ) : (
@@ -408,18 +416,6 @@ export default function AdminPathSubmissionsPage() {
                         </button>
                     );
                 })}
-                {pathTab === "fyp-thesis" ? (
-                    <button
-                        type="button"
-                        onClick={() => setMeritView((v) => !v)}
-                        className={`ml-auto inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                            meritView ? "bg-purple-700 text-white" : "border border-purple-200 bg-white text-purple-700 hover:border-purple-400"
-                        }`}
-                    >
-                        <Calculator className="h-4 w-4" />
-                        {meritView ? "Back to submissions" : "🧮 Merit model — CIEL wide"}
-                    </button>
-                ) : null}
             </div>
 
             {pathTab === "course-project" && courseView === "home" ? (
@@ -624,14 +620,139 @@ export default function AdminPathSubmissionsPage() {
                         </div>
                     )}
                 </>
-            ) : pathTab === "fyp-thesis" && meritView ? (
-                fypMeritLoading ? (
-                    <div className="flex justify-center py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            ) : pathTab === "fyp-thesis" && fypView === "home" ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <HubTile
+                        onClick={() => setFypView("progress")}
+                        badge={`${draftFyp.length} IN PROGRESS`}
+                        badgeClass="text-[#c76000]"
+                        emoji="🔬"
+                        title="FYP in Progress"
+                        subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
+                        background="linear-gradient(135deg,#15988b,#2ec8bd)"
+                    />
+                    <HubTile
+                        onClick={() => {
+                            setFypReviewTab("all");
+                            setFypView("review");
+                        }}
+                        badge={`${waitingFyp.length} UNDER REVIEW`}
+                        badgeClass="text-[#16798c]"
+                        emoji="📝"
+                        title="FYP Under Review"
+                        subtitle="Submitted flashcards waiting for supervisor approval or returned for revision. Remind whoever holds the workflow."
+                        background="linear-gradient(135deg,#16798c,#38b8e6)"
+                    />
+                    <HubTile
+                        onClick={() => {
+                            setFypApprovedSubview("rank");
+                            setFypView("approved");
+                        }}
+                        badge={`${approvedFyp.length} APPROVED`}
+                        badgeClass="text-[#0e4d4e]"
+                        emoji="🏅"
+                        title="Approved FYP + AI Ranking"
+                        subtitle="Every supervisor-approved Final Year Project across universities, plus the live CIEL PK FYP ranking — run anytime, moves like a stock, badges the student impact wall."
+                        background="linear-gradient(135deg,#0e4d4e,#117669)"
+                    />
+                </div>
+            ) : pathTab === "fyp-thesis" && fypView === "progress" ? (
+                <>
+                    <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
+                    <p className="text-sm text-slate-500">Live workspace-linked completion status across all universities.</p>
+                    {draftFyp.length === 0 ? (
+                        <Card className="border-dashed p-10 text-center text-slate-500">Nothing in progress right now.</Card>
+                    ) : (
+                        <div className="space-y-4">
+                            {draftFyp.map((entry) => (
+                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} remindDraftOwner studentEmail={entry.student?.email} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            ) : pathTab === "fyp-thesis" && fypView === "review" ? (
+                (() => {
+                    const byTab = {
+                        pending: waitingFyp.filter((e) => e.supervisorApprovalStatus === "pending"),
+                        revision: waitingFyp.filter((e) => e.supervisorApprovalStatus === "revision_requested"),
+                        rejected: waitingFyp.filter((e) => e.supervisorApprovalStatus === "rejected"),
+                    };
+                    const visible = fypReviewTab === "all" ? waitingFyp : byTab[fypReviewTab];
+                    return (
+                        <>
+                            <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
+                            <p className="text-sm text-slate-500">
+                                The supervisor decides; the AI review score is visible only to the supervisor. CIEL PK sees status,
+                                owner and waiting time.
+                            </p>
+                            <Tabs
+                                tabs={[
+                                    { key: "all", label: `All · ${waitingFyp.length}` },
+                                    { key: "pending", label: `Waiting supervisor · ${byTab.pending.length}` },
+                                    { key: "revision", label: `Revision with student · ${byTab.revision.length}` },
+                                    { key: "rejected", label: `Rejected · ${byTab.rejected.length}` },
+                                ]}
+                                active={fypReviewTab}
+                                onChange={(key) => setFypReviewTab(key as typeof fypReviewTab)}
+                            />
+                            {visible.length === 0 ? (
+                                <Card className="border-dashed p-10 text-center text-slate-500">Nothing in this tab right now.</Card>
+                            ) : (
+                                <div className="space-y-4">
+                                    {visible.map((entry) => (
+                                        <ThesisCard
+                                            key={entry.id}
+                                            entry={entry}
+                                            studentName={entry.student?.name}
+                                            studentReminder={entry.supervisorApprovalStatus === "pending" ? "faculty" : undefined}
+                                            remindDraftOwner={entry.supervisorApprovalStatus === "revision_requested"}
+                                            studentEmail={entry.student?.email}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    );
+                })()
+            ) : pathTab === "fyp-thesis" && fypView === "approved" ? (
+                <>
+                    <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setFypApprovedSubview("rank")}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                                fypApprovedSubview === "rank" ? "bg-purple-700 text-white" : "border border-purple-200 bg-white text-purple-700"
+                            }`}
+                        >
+                            🏆 Ranking Studio (live)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFypApprovedSubview("list")}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                                fypApprovedSubview === "list" ? "bg-emerald-700 text-white" : "border border-emerald-200 bg-white text-emerald-700"
+                            }`}
+                        >
+                            ⭐ Approved list
+                        </button>
                     </div>
-                ) : (
-                    <FypMeritPanel entries={fypMeritEntries.filter(isPathEntryApproved)} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
-                )
+                    {fypMeritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : fypApprovedSubview === "rank" ? (
+                        <FypMeritPanel entries={fypMeritEntries.filter(isPathEntryApproved)} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                    ) : approvedFyp.length === 0 ? (
+                        <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
+                    ) : (
+                        <div className="space-y-4">
+                            {approvedFyp.map((entry) => (
+                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                            ))}
+                        </div>
+                    )}
+                </>
             ) : (
             <>
             {pathTab === "course-project" && <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />}
@@ -650,20 +771,6 @@ export default function AdminPathSubmissionsPage() {
                                   }`}
                               >
                                   {tab === "waiting" ? "Waiting for approval" : tab}
-                              </button>
-                          ))
-                        : null}
-                    {pathTab === "fyp-thesis"
-                        ? (["waiting", "approved", "in_progress", "complete", "all"] as const).map((tab) => (
-                              <button
-                                  key={tab}
-                                  type="button"
-                                  onClick={() => setFypFilter(tab)}
-                                  className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize transition ${
-                                      fypFilter === tab ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
-                                  }`}
-                              >
-                                  {tab === "waiting" ? "Waiting for approval" : tab.replace("_", " ")}
                               </button>
                           ))
                         : null}
@@ -793,145 +900,6 @@ export default function AdminPathSubmissionsPage() {
                                                               {members.map((member, i) => (
                                                                   <li key={`${member.name}-${i}`}>
                                                                       {member.name}
-                                                                      {member.email ? ` · ${member.email}` : ""}
-                                                                      {memberStatusLabel(member) ? ` · ${memberStatusLabel(member)}` : ""}
-                                                                  </li>
-                                                              ))}
-                                                          </ul>
-                                                      </div>
-                                                  ) : null;
-                                              })()}
-                                          </div>
-                                      ) : null}
-                                  </Card>
-                              );
-                          })
-                        : null}
-
-                    {pathTab === "fyp-thesis"
-                        ? filteredFyp.map((row) => {
-                              const expanded = expandedId === row.id;
-                              return (
-                                  <Card key={row.id} className="overflow-hidden border-slate-200">
-                                      <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
-                                          <div className="min-w-0 flex-1 space-y-2">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                  <GraduationCap className="h-4 w-4 text-emerald-700" />
-                                                  <h2 className="text-lg font-bold text-slate-900">{row.projectTitle || "Untitled FYP"}</h2>
-                                                  <Badge
-                                                      variant="outline"
-                                                      className={
-                                                          row.progressStatus === "complete"
-                                                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                                              : "border-blue-200 bg-blue-50 text-blue-800"
-                                                      }
-                                                  >
-                                                      {row.wizardStepsTotal != null
-                                                          ? row.status === "submitted"
-                                                              ? "Submitted for sign-off"
-                                                              : "In progress"
-                                                          : row.progressStatus === "complete"
-                                                            ? "All milestones done"
-                                                            : "In progress"}
-                                                  </Badge>
-                                                  <Badge variant="outline" className="border-slate-200 text-slate-600">
-                                                      {row.wizardStepsTotal != null
-                                                          ? `Step ${row.wizardStepsComplete}/${row.wizardStepsTotal}`
-                                                          : `${row.milestonesComplete}/${row.milestonesTotal} milestones`}
-                                                  </Badge>
-                                                  {row.status === "submitted" ? (
-                                                      <Badge
-                                                          variant="outline"
-                                                          className={
-                                                              isPathEntryApproved(row)
-                                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                                                  : "border-amber-200 bg-amber-50 text-amber-900"
-                                                          }
-                                                      >
-                                                          {isPathEntryApproved(row) ? "Supervisor approved" : "Waiting for approval"}
-                                                      </Badge>
-                                                  ) : null}
-                                              </div>
-                                              <p className="text-sm text-slate-600 break-words">{studentLine(row.student)}</p>
-                                              <p className="line-clamp-2 text-sm text-slate-500">
-                                                  {row.sectionSummaries?.project || row.overview || "No overview yet."}
-                                              </p>
-                                              <p className="text-xs text-slate-500">{row.deliverablesCount} deliverable(s) uploaded</p>
-                                              <p className="text-xs text-slate-400">Updated {new Date(row.updatedAt).toLocaleString()}</p>
-                                          </div>
-                                          <button
-                                              type="button"
-                                              onClick={() => setExpandedId(expanded ? null : row.id)}
-                                              className="h-10 shrink-0 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                                          >
-                                              {expanded ? "Hide details" : "View details"}
-                                          </button>
-                                      </div>
-                                      {expanded ? (
-                                          <div className="space-y-4 border-t border-slate-100 bg-slate-50/70 px-5 py-4">
-                                              {row.sectionSummaries && Object.values(row.sectionSummaries).some(Boolean) ? (
-                                                  <div>
-                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Guided wizard summary</p>
-                                                      <ul className="mt-2 space-y-2">
-                                                          {(Object.entries(row.sectionSummaries) as [string, string | undefined][])
-                                                              .filter(([, text]) => !!text)
-                                                              .map(([key, text]) => (
-                                                                  <li key={key} className="text-sm text-slate-700">
-                                                                      <span className="font-semibold capitalize">{key}:</span> {text}
-                                                                  </li>
-                                                              ))}
-                                                      </ul>
-                                                  </div>
-                                              ) : null}
-                                              <div>
-                                                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Milestones</p>
-                                                  <ul className="mt-2 space-y-2">
-                                                      {row.milestones.map((m) => (
-                                                          <li key={m.label} className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-                                                              <span className="font-semibold">{m.label}</span>
-                                                              <Badge variant="outline" className="border-slate-200 capitalize">
-                                                                  {m.status.replace("_", " ")}
-                                                              </Badge>
-                                                              {m.dueDate ? <span className="text-xs text-slate-500">Due {m.dueDate}</span> : null}
-                                                          </li>
-                                                      ))}
-                                                  </ul>
-                                              </div>
-                                              {row.deliverables.length ? (
-                                                  <div>
-                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Deliverables</p>
-                                                      <ul className="mt-2 space-y-2">
-                                                          {row.deliverables.map((d) => (
-                                                              <li key={`${d.version}-${d.fileUrl}`} className="text-sm text-slate-700">
-                                                                  <span className="font-semibold">{d.label}</span>
-                                                                  {" · "}
-                                                                  <a href={d.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">
-                                                                      v{d.version}
-                                                                      <ExternalLink className="ml-1 inline h-3.5 w-3.5" />
-                                                                  </a>
-                                                              </li>
-                                                          ))}
-                                                      </ul>
-                                                  </div>
-                                              ) : null}
-                                              {row.communityLinkage?.orgName || row.communityLinkage?.description ? (
-                                                  <div>
-                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Community linkage</p>
-                                                      <p className="mt-1 text-sm text-slate-700">{row.communityLinkage.orgName || "—"}</p>
-                                                      {row.communityLinkage.description ? (
-                                                          <p className="mt-1 text-sm text-slate-600">{row.communityLinkage.description}</p>
-                                                      ) : null}
-                                                  </div>
-                                              ) : null}
-                                              {(() => {
-                                                  const members = normalizeMembers(row.projectInfo?.teamMembers);
-                                                  return members.length ? (
-                                                      <div>
-                                                          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Co-authors</p>
-                                                          <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                                                              {members.map((member, i) => (
-                                                                  <li key={`${member.name}-${i}`}>
-                                                                      {member.role?.trim() ? `${member.name} (${member.role})` : member.name}
                                                                       {member.email ? ` · ${member.email}` : ""}
                                                                       {memberStatusLabel(member) ? ` · ${memberStatusLabel(member)}` : ""}
                                                                   </li>
