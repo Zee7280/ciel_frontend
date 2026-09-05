@@ -57,6 +57,14 @@ function semesterSelectValue(raw?: string): string {
     return SEMESTER_OPTIONS.includes(canonical) ? canonical : "";
 }
 const TEAM_MODE_OPTIONS = ["Individual", "Pair", "Group / Team", "Whole class", "Interdisciplinary team"];
+/** Same sanitizers as FypV9Workspace's team-member WhatsApp fields — keep both wizards consistent. */
+function normalizeCountryCode(v?: string) {
+    const d = String(v || "").replace(/\D/g, "").slice(0, 4);
+    return d ? `+${d}` : "";
+}
+function normalizeLocalNumber(v?: string) {
+    return String(v || "").replace(/\D/g, "").replace(/^0+/, "").slice(0, 15);
+}
 
 /** The 27 raw format choices. Each maps to one of five pathways (COURSEWORK_MODES / FORMAT_ROUTE in courseProjectTypes.ts) which supplies its module-inclusion preset, field vocabulary, and roadmap. */
 const FORMAT_OPTIONS = [
@@ -592,7 +600,10 @@ export default function CourseProjectWizardPage() {
     const updateGroupMember = (i: number, patch: Partial<CourseProjectGroupMember>) => {
         const current = normalizeGroupMembers(entry.studentInfo?.groupMembers);
         const next = [...current];
-        next[i] = { ...(next[i] ?? { name: "" }), ...patch };
+        const merged = { ...(next[i] ?? { name: "" }), ...patch };
+        if (patch.whatsappCode !== undefined) merged.whatsappCode = normalizeCountryCode(patch.whatsappCode) || "+92";
+        if (patch.whatsappNumber !== undefined) merged.whatsappNumber = normalizeLocalNumber(patch.whatsappNumber);
+        next[i] = merged;
         patchGroup("studentInfo", { groupMembers: next });
     };
 
@@ -926,23 +937,47 @@ export default function CourseProjectWizardPage() {
                                                         className={fieldClass}
                                                     />
                                                     <TeamInviteBadge kind="course_project" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
+                                                    <input
+                                                        type="tel"
+                                                        inputMode="tel"
+                                                        maxLength={5}
+                                                        value={m.whatsappCode ?? "+92"}
+                                                        onChange={(e) => updateGroupMember(i, { whatsappCode: e.target.value })}
+                                                        placeholder="+92"
+                                                        className={clsx(fieldClass, "text-center font-extrabold")}
+                                                    />
+                                                    <input
+                                                        type="tel"
+                                                        inputMode="numeric"
+                                                        maxLength={15}
+                                                        value={m.whatsappNumber ?? ""}
+                                                        onChange={(e) => updateGroupMember(i, { whatsappNumber: e.target.value })}
+                                                        placeholder="WhatsApp number (optional)"
+                                                        className={fieldClass}
+                                                    />
                                                 </div>
-                                                {m.email?.trim() ? (
+                                                {m.email?.trim() || (normalizeCountryCode(m.whatsappCode || "+92") && normalizeLocalNumber(m.whatsappNumber)) ? (
                                                     <div className="flex flex-wrap gap-2 pl-1">
+                                                        {m.email?.trim() ? (
+                                                            <a
+                                                                href={mailtoHref(
+                                                                    m.email,
+                                                                    `A quick note about "${entry.projectTitle || "our coursework"}" on CIEL PK`,
+                                                                    `Hi ${m.name || "there"},\n\nJust checking in on our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK — could you confirm your invite and add your details when you get a chance?\n\nThanks,\n${entry.studentInfo?.studentName || "Your teammate"}`,
+                                                                )}
+                                                                className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid ciel-transition hover:border-ciel-gold/40"
+                                                            >
+                                                                ✉️ Email {m.name || `Member ${i + 1}`}
+                                                            </a>
+                                                        ) : null}
                                                         <a
-                                                            href={mailtoHref(
-                                                                m.email,
-                                                                `A quick note about "${entry.projectTitle || "our coursework"}" on CIEL PK`,
-                                                                `Hi ${m.name || "there"},\n\nJust checking in on our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK — could you confirm your invite and add your details when you get a chance?\n\nThanks,\n${entry.studentInfo?.studentName || "Your teammate"}`,
-                                                            )}
-                                                            className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid ciel-transition hover:border-ciel-gold/40"
-                                                        >
-                                                            ✉️ Email {m.name || `Member ${i + 1}`}
-                                                        </a>
-                                                        <a
-                                                            href={whatsappShareHref(
-                                                                `Hi ${m.name || "there"} — quick check-in on our coursework record "${entry.projectTitle || "our coursework"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`,
-                                                            )}
+                                                            href={
+                                                                normalizeCountryCode(m.whatsappCode || "+92") && normalizeLocalNumber(m.whatsappNumber)
+                                                                    ? `https://wa.me/${normalizeCountryCode(m.whatsappCode || "+92").replace("+", "")}${normalizeLocalNumber(m.whatsappNumber)}?text=${encodeURIComponent(`Hi ${m.name || "there"} — quick check-in on our coursework record "${entry.projectTitle || "our coursework"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`)}`
+                                                                    : whatsappShareHref(
+                                                                          `Hi ${m.name || "there"} — quick check-in on our coursework record "${entry.projectTitle || "our coursework"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`,
+                                                                      )
+                                                            }
                                                             target="_blank"
                                                             rel="noreferrer"
                                                             className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid ciel-transition hover:border-ciel-gold/40"
