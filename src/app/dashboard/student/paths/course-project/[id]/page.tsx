@@ -15,6 +15,7 @@ import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { MERIT_RUBRIC } from "@/utils/courseworkMeritModel";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
@@ -1499,6 +1500,39 @@ export default function CourseProjectWizardPage() {
                                     );
                                 })}
                                 {!allAccepted && <p className="text-xs font-semibold text-ciel-text-soft">Accept every section above to unlock submission.</p>}
+                            </div>
+
+                            <div className="overflow-hidden rounded-ciel-sm border border-ciel-border bg-ciel-page/40">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ciel-border bg-ciel-purple-soft/40 px-4 py-2.5 text-xs font-bold text-ciel-purple-deep">
+                                    <span>🧮 CIEL PK Universal Coursework Quality Rubric</span>
+                                    <span className="text-[10px] font-semibold text-ciel-text-soft">Same criteria + weights across disciplines — evidence &amp; integrity are verification safeguards, not bonus points</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-px bg-ciel-border sm:grid-cols-2">
+                                    {MERIT_RUBRIC.map((c) => (
+                                        <div key={c.key} className="flex items-center justify-between gap-2 bg-white px-4 py-2 text-xs">
+                                            <span className="font-semibold text-ciel-text">{c.label}</span>
+                                            <span className="shrink-0 font-black text-ciel-purple-deep">{c.max} pts</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 border-t border-ciel-border px-4 py-2.5">
+                                    {[
+                                        ["0–39", "Insufficient"],
+                                        ["40–54", "Basic"],
+                                        ["55–64", "Developing"],
+                                        ["65–74", "Good"],
+                                        ["75–84", "Very Good"],
+                                        ["85–94", "Excellent"],
+                                        ["95–100", "Outstanding"],
+                                    ].map(([range, label]) => (
+                                        <span key={label} className="rounded-full border border-ciel-border bg-white px-2 py-1 text-[10px] font-bold text-ciel-text-mid">
+                                            <b className="text-ciel-purple-deep">{range}</b> {label}
+                                        </span>
+                                    ))}
+                                </div>
+                                <p className="border-t border-ciel-border px-4 py-2.5 text-[10.5px] leading-relaxed text-ciel-text-soft">
+                                    Scores of 90+ are not routine: the strongest criteria must themselves be at Excellent/Outstanding level. Evidence is optional and does not add automatic marks — no upload means no score penalty.
+                                </p>
                             </div>
 
                             <label className="flex items-start gap-3 rounded-ciel-sm border border-ciel-gold/40 bg-ciel-gold-soft/50 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">

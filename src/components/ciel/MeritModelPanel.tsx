@@ -24,7 +24,7 @@ export interface MeritEntry extends CourseProjectEntry {
 
 interface BackendMeritCard {
     id: string;
-    scorecard: Record<MeritCriterionResult["key"], { pts: number; max: number; note: string; flag?: string }> & { total: number };
+    scorecard: Record<MeritCriterionResult["key"], { pts: number; max: number; note: string }> & { total: number; integrityFlag?: string };
 }
 
 function scorecardFromBackend(card: BackendMeritCard): MeritScorecard {
@@ -32,12 +32,19 @@ function scorecardFromBackend(card: BackendMeritCard): MeritScorecard {
         const crit = card.scorecard[rubric.key];
         return { ...rubric, points: crit?.pts ?? 0, note: crit?.note ?? "" };
     });
-    const honestyFlag = card.scorecard.honesty?.flag;
-    const consistency: MeritConsistencyFlag = honestyFlag
-        ? { ok: honestyFlag.startsWith("✅"), message: honestyFlag.replace(/^[✅⚠️]\s*/u, "") }
+    const integrityFlag = card.scorecard.integrityFlag;
+    const consistency: MeritConsistencyFlag = integrityFlag
+        ? { ok: integrityFlag.startsWith("✅"), message: integrityFlag.replace(/^[✅⚠️]\s*/u, "") }
         : { ok: true, message: "Consistency check passed: claims match the declared evidence." };
     const total = card.scorecard.total;
-    return { criteria, total, grade: total >= 85 ? "EXEMPLARY" : total >= 70 ? "STRONG" : total >= 55 ? "DEVELOPING" : "EMERGING", gradeColor: "#6d28d9", consistency, eligible: true };
+    return {
+        criteria,
+        total,
+        grade: total >= 95 ? "OUTSTANDING" : total >= 85 ? "EXCELLENT" : total >= 75 ? "VERY GOOD" : total >= 65 ? "GOOD" : total >= 55 ? "DEVELOPING" : total >= 40 ? "BASIC" : "INSUFFICIENT",
+        gradeColor: "#6d28d9",
+        consistency,
+        eligible: true,
+    };
 }
 
 export function entryDepartment(e: MeritEntry): string {

@@ -1,31 +1,42 @@
 // Deterministic, rule-based scoring engine for coursework flash cards — the "CIEL Merit Model".
-// Replaces the earlier LLM-based "AI Curator": same seven-criterion public rubric, but every point
-// is computed from the student's own declared wizard fields, so a score is always explainable and
-// reproducible (no OpenAI call, no run-to-run variance). See courseProjectTypes.ts for field shapes.
+// Implements the "CIEL PK Universal Coursework Quality Rubric" (design reference:
+// CIEL_PK_Coursework_Form_v6_Universal_Rubric_Evidence.html) as a deterministic stand-in for its
+// AI-graded 0-5 performance levels: every point is computed from the student's own declared wizard
+// fields, so a score is always explainable and reproducible (no LLM call, no run-to-run variance).
+// Mirrors ciel_backend/src/paths/merit-model/merit-model.util.ts's scorecard() — keep both in sync.
+// See courseProjectTypes.ts for field shapes.
 
 import { type CourseProjectEntry, type CourseProjectResultsInfo, courseProjectMetricLine, stripEmoji } from "./courseProjectTypes";
 
 export interface MeritRubricCriterion {
-    key: "purpose" | "rigor" | "results" | "sdg" | "honesty" | "refl" | "ver";
+    key: "task" | "knowledge" | "method" | "output" | "analysis" | "sustainability" | "reflection";
     label: string;
     max: number;
     color: string;
     description: string;
 }
 
-/** The public rubric v3 — sustainability weighted strongest by design, plus a Verifiability criterion for the attached real work. Shown to students before they write, faculty while they review, university on publish. */
+/** The Universal Quality Rubric — same criteria + weights across disciplines, expected depth
+ * calibrated to academic level. Evidence & integrity are verification safeguards under this
+ * rubric, not bonus-point categories — there's no separate Verifiability line; a claims-vs-evidence
+ * consistency check is still surfaced via `consistency`, but never scored. Shown to students before
+ * they write, faculty while they review, university on publish. */
 export const MERIT_RUBRIC: MeritRubricCriterion[] = [
-    { key: "sdg", label: "1 · Sustainability & SDG authenticity — the anchor", max: 25, color: "#3F7E44", description: "Primary SDG + target, connection explained, integration level declared. Self-started or emergent links earn a bonus; honest \"not applicable\" scores respectably. §6." },
-    { key: "results", label: "2 · Substance of results — is it real & fruitful?", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero. §5." },
-    { key: "purpose", label: "3 · Clarity & quality of the idea", max: 14, color: "#2563eb", description: "A stated aim anyone can grasp, concrete objectives, a real issue/question/opportunity — concise beats padded. §2–3." },
-    { key: "rigor", label: "4 · Rigor of process — pathway-adjusted", max: 13, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale stated. A deep study and a brief class exercise are judged against their own scale. §4." },
-    { key: "honesty", label: "5 · Honesty & consistency", max: 15, color: "#dc2626", description: "Limitation named with its effect; numbers correctly classified; claims consistent with evidence (a \"central & demonstrated\" claim needs measurement behind it). §5–7." },
-    { key: "refl", label: "6 · Reflection & transfer", max: 8, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step. §7." },
-    { key: "ver", label: "7 · Verifiability", max: 5, color: "#0e7490", description: "The actual assignment attached (📎) and evidence files on the metrics. Optional to attach — but the real work always outranks a claim about it, and attached cards rank with higher confidence. §5." },
+    { key: "task", label: "1 · Task / purpose & alignment", max: 10, color: "#7c3aed", description: "Task is understood; purpose is clear; the work addresses the stated task with appropriate scope. §2–3." },
+    { key: "knowledge", label: "2 · Knowledge, context & contribution", max: 15, color: "#c98a04", description: "Appropriate disciplinary knowledge applied accurately, contributing real insight — not just description. §2, §5." },
+    { key: "method", label: "3 · Method / process & disciplinary rigor", max: 20, color: "#0f766e", description: "Method/process fits the task and is competently executed with reasonable depth; scale stated. §4." },
+    { key: "output", label: "4 · Quality of output / execution", max: 15, color: "#ea580c", description: "Competent, coherent and fit-for-purpose output — resolved, accurate and complete for its format. §5." },
+    { key: "analysis", label: "5 · Analysis, findings & application", max: 20, color: "#2563eb", description: "Sound analysis; conclusions follow from the work; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. §5." },
+    { key: "sustainability", label: "6 · Sustainability & SDG integration", max: 15, color: "#3F7E44", description: "Primary SDG + target, connection explained, integration level declared. Self-started or emergent links earn a bonus; honest \"not applicable\" scores respectably. §6." },
+    { key: "reflection", label: "7 · Reflection, limitations & learning", max: 5, color: "#db2777", description: "Specific learning and relevant limitations explained — what was learned, and what could and couldn't be concluded. §7." },
 ];
 
 export const MERIT_NEUTRALITY_NOTE =
     "The model never scores English polish, word count, discipline prestige, or production budget. Expectations are format-adjusted — an essay is not penalised for having no lab data, an artwork is not penalised for having no survey. What's rewarded everywhere: clear purpose, honest evidence, real SDG thinking.";
+
+/** Band calibration: 0–39 Insufficient · 40–54 Basic · 55–64 Developing · 65–74 Good · 75–84 Very
+ * Good · 85–94 Excellent · 95–100 Outstanding. 90+ is not routine — it requires the strongest
+ * criteria to themselves land at Excellent/Outstanding, which these formulas don't hand out for free. */
 
 /** Evidence-status points — mirrors the wizard's old single evidence-status labels (still used as the scoring input, now derived from the multi-metric builder). */
 const EVIDENCE_POINTS: Record<string, number> = {
@@ -102,20 +113,25 @@ export interface MeritScorecard {
 }
 
 const GRADE_BANDS: [number, string, string][] = [
-    [85, "EXEMPLARY", "#16a34a"],
-    [70, "STRONG", "#0f766e"],
+    [95, "OUTSTANDING", "#16a34a"],
+    [85, "EXCELLENT", "#22c55e"],
+    [75, "VERY GOOD", "#0f766e"],
+    [65, "GOOD", "#2563eb"],
     [55, "DEVELOPING", "#c98a04"],
-    [0, "EMERGING", "#7a8095"],
+    [40, "BASIC", "#ea580c"],
+    [0, "INSUFFICIENT", "#dc2626"],
 ];
 
 export function meritGrade(total: number): [string, string] {
     for (const [min, label, color] of GRADE_BANDS) {
         if (total >= min) return [label, color];
     }
-    return ["EMERGING", "#7a8095"];
+    return ["INSUFFICIENT", "#dc2626"];
 }
 
-/** Computes the seven-criterion scorecard for one coursework entry, deterministically, from its own wizard fields. */
+/** Computes the seven-criterion Universal Quality Rubric scorecard for one coursework entry,
+ * deterministically, from its own wizard fields — a stand-in for the design's AI-graded 0-5
+ * performance levels. Mirrors the backend's scorecard() in merit-model.util.ts; keep both in sync. */
 export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard {
     const inc = entry.moduleInclusion || {};
     const ai = entry.assignmentInfo || {};
@@ -125,101 +141,108 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const sm = entry.sdgMapping || {};
     const rf = entry.reflectionInfo || {};
     const primary = sm.entries?.[0];
+    const discipline = entry.studentInfo?.disciplineName?.trim();
 
-    // ---- 3 · Clarity & quality of the idea — 14 ----
     // Formats that skip formal aims (inc.aim=false) substitute "what were you asked to do" as the aim proxy —
     // the wizard's own format notes explain this ("your aim becomes your central argument", etc.).
     const aimText = inc.aim ? am.aimStatement : ai.whatAsked;
     const aimPts = aimText && aimText.trim().length > 12 ? 2 : aimText?.trim() ? 1 : 0;
     const objsCount = inc.aim ? (am.objectives || []).filter((o) => o.trim()).length : ai.whatAsked?.trim() ? 2 : 0;
     const issuePts = ai.realWorldIssue?.trim() ? 1 : 0;
-    const purposePts = clampPts(aimPts * 4 + Math.min(objsCount, 3) * 1.3 + issuePts * 2.3, 14);
-    const purposeNote = aimPts === 2 ? "Clear aim, concrete objectives, real issue named" : aimPts === 1 ? "Aim present but loosely framed" : "Aim missing or vague";
 
-    // ---- 4 · Rigor of process — 13 (pathway-adjusted: a module the format skips can't be marked low) ----
     const actsFilled = (pr.activities || []).filter(Boolean).length > 0;
     const methsFilled = (pr.methods || []).filter((m) => m && !/not applicable/i.test(m)).length > 0;
     const actOk = !inc.act || actsFilled;
     const methOk = !inc.meth || methsFilled;
     const fitPts = actOk && methOk ? 2 : actOk || methOk ? 1 : 0;
     const scalePts = !inc.meth || pr.sampleScale?.trim() ? 1 : 0;
-    const rigorPts = clampPts(fitPts * 4.5 + scalePts * 3 + 1, 13);
-    const rigorNote =
+
+    const outputPts = (re.outputs || []).length > 0 || re.outputDescription?.trim() ? 1 : 0;
+    const findingsCount = inc.find ? (re.findings || []).filter((f) => f.trim()).length : 2;
+    const insightPts = findingsCount >= 2 ? 2 : findingsCount === 1 ? 1 : 0;
+    const evidenceStatus = effectiveEvidenceLabel(re);
+    const topMetricLine = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean)[0];
+
+    const sdgHasTarget = (primary?.targets?.length ?? 0) > 0 ? 1 : 0;
+    const sdgHasHow = primary?.how?.trim() ? 1 : 0;
+    const integPts = integrationPoints(rf.integrationLevel || rf.sdgLinkHonesty);
+    const origPts = originPoints(sm.origin);
+
+    const limPts = !inc.lim ? 2 : re.limitationType?.trim() && (re.limitationDetail?.trim() || re.limitationInterpretation?.trim()) ? 2 : re.limitationType?.trim() ? 1 : 0;
+    const hasMetrics = (re.metrics?.length ?? 0) > 0 || !!re.metricValue?.trim();
+    const metricsClassified = re.metrics?.length ? re.metrics.every((m) => !!m.status) : !!re.numberRepresents;
+    const numOkPts = hasMetrics ? (metricsClassified ? 1 : 0) : 1;
+
+    const learnPts = rf.lessonLearned && rf.lessonLearned.trim().length > 20 ? 2 : rf.lessonLearned?.trim() ? 1 : 0;
+    const advicePts = rf.adviceNextSemester?.trim() ? 1 : 0;
+    const nextPts = rf.nextSteps?.trim() || rf.whatsNext?.trim() ? 1 : 0;
+    const skillsCount = (rf.skills || []).filter(Boolean).length;
+
+    // ---- 1 · Task / purpose & alignment — 10 ----
+    const taskPts = clampPts(aimPts * 4 + issuePts * 3 + Math.min(objsCount, 2) * 1.5, 10);
+    const taskNote = aimPts === 2 ? "Clear task, real issue named, scope defined" : aimPts === 1 ? "Task/purpose present but loosely framed" : "Task or purpose unclear";
+
+    // ---- 2 · Knowledge, context & contribution — 15 ----
+    const knowledgePts = clampPts(insightPts * 6 + (discipline ? 4 : 0) + outputPts * 5, 15);
+    const knowledgeNote = discipline
+        ? `Grounded in ${discipline.toLowerCase()}${insightPts === 2 ? " with a real contribution" : ""}`
+        : insightPts === 2
+          ? "Contributes real insight; discipline not named"
+          : "Limited disciplinary grounding or contribution";
+
+    // ---- 3 · Method / process & disciplinary rigor — 20 ----
+    const methodPts = clampPts(fitPts * 8 + scalePts * 5 + numOkPts * 5, 20);
+    const methodNote =
         fitPts === 2
             ? `Method & activities fit the declared format${scalePts ? "; scale stated" : ""}`
             : fitPts === 1
               ? "Process only partly matches the declared format"
               : "Process poorly evidenced";
 
-    // ---- 2 · Substance of results — 20 ----
-    const outputPts = (re.outputs || []).length > 0 || re.outputDescription?.trim() ? 1 : 0;
-    const findingsCount = inc.find ? (re.findings || []).filter((f) => f.trim()).length : 2;
-    const insightPts = findingsCount >= 2 ? 2 : findingsCount === 1 ? 1 : 0;
-    const evidenceStatus = effectiveEvidenceLabel(re);
-    const resultsPts = clampPts((EVIDENCE_POINTS[evidenceStatus] ?? 3) + outputPts * 3 + insightPts * 2.5, 20);
-    const topMetricLine = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean)[0];
-    const resultsNote = `${evidenceStatus}${topMetricLine ? " — " + topMetricLine : re.measurableImpact ? " — " + re.measurableImpact : ""}`;
+    // ---- 4 · Quality of output / execution — 15 ----
+    const outputQualityPts = clampPts(outputPts * 9 + insightPts * 3, 15);
+    const outputQualityNote = outputPts ? "Output produced and described" : "No output described yet";
 
-    // ---- 1 · Sustainability & SDG authenticity — 25 (the anchor) ----
-    const sdgHasTarget = (primary?.targets?.length ?? 0) > 0 ? 1 : 0;
-    const sdgHasHow = primary?.how?.trim() ? 1 : 0;
-    const integPts = integrationPoints(rf.integrationLevel || rf.sdgLinkHonesty);
-    const origPts = originPoints(sm.origin);
-    const sdgPts = sm.notApplicable
-        ? 15
-        : clampPts((primary ? 6 : 0) + sdgHasTarget * 4 + sdgHasHow * 5 + integPts + origPts - 2, 25);
-    const sdgNote = sm.notApplicable
+    // ---- 5 · Analysis, findings & application — 20 ----
+    const analysisPts = clampPts((EVIDENCE_POINTS[evidenceStatus] ?? 3) + insightPts * 5 + outputPts * 3 + numOkPts * 2, 20);
+    const analysisNote = `${evidenceStatus}${topMetricLine ? " — " + topMetricLine : re.measurableImpact ? " — " + re.measurableImpact : ""}`;
+
+    // ---- 6 · Sustainability & SDG integration — 15 ----
+    // Same shape as the earlier 25-point SDG formula, rescaled to this rubric's 15-point weight.
+    const sustainabilityPts = sm.notApplicable ? 9 : clampPts(((primary ? 6 : 0) + sdgHasTarget * 4 + sdgHasHow * 5 + integPts + origPts - 2) * 0.6, 15);
+    const sustainabilityNote = sm.notApplicable
         ? "Honestly declared not applicable — flagged for teacher confirmation, record counts fully"
         : primary
           ? `SDG ${primary.goalNumber}${sdgHasTarget ? " + target" : ""}${sdgHasHow ? " + explained link" : ""} · ${stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "").toLowerCase() || "integration not declared"} · ${stripEmoji(sm.origin || "").toLowerCase() || "origin not declared"}`
           : "No SDG selected yet";
 
-    // ---- 5 · Honesty & consistency — 15 ----
-    const limPts = !inc.lim ? 2 : re.limitationType?.trim() && (re.limitationDetail?.trim() || re.limitationInterpretation?.trim()) ? 2 : re.limitationType?.trim() ? 1 : 0;
-    const hasMetrics = (re.metrics?.length ?? 0) > 0 || !!re.metricValue?.trim();
-    const metricsClassified = re.metrics?.length ? re.metrics.every((m) => !!m.status) : !!re.numberRepresents;
-    const numOkPts = hasMetrics ? (metricsClassified ? 1 : 0) : 1;
-    let honestyPts = limPts * 4 + numOkPts * 4 + 3;
+    // ---- 7 · Reflection, limitations & learning — 5 ----
+    const reflectionPts = clampPts(learnPts * 1.3 + limPts * 1.0 + advicePts * 0.5 + nextPts * 0.5 + Math.min(skillsCount, 3) * 0.2, 5);
+    const reflectionNote =
+        learnPts === 2 && limPts === 2
+            ? "Substantive learning with limitations honestly named"
+            : learnPts === 1 || limPts === 1
+              ? "Some reflection or limitation present"
+              : "Reflection thin";
+
+    // Evidence & integrity are verification safeguards under this rubric, not a scored criterion —
+    // the claims-vs-evidence consistency check is surfaced for the reviewer, but never moves the total.
     const integrationText = stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "");
     const claimsHigh = /central to the work and demonstrated|real\s*—/i.test(integrationText);
     const evidenceLow = ["Not measured yet", "Conceptual recommendation", "Proposed target"].includes(evidenceStatus);
-    let consistency: MeritConsistencyFlag;
-    if (claimsHigh && evidenceLow) {
-        honestyPts -= 4;
-        consistency = { ok: false, message: `Consistency check: claims "central & demonstrated" integration but evidence is ${evidenceStatus.toLowerCase()} — 4 points deducted.` };
-    } else {
-        consistency = { ok: true, message: "Consistency check passed: claims match the declared evidence." };
-    }
-    const honestyPtsClamped = clampPts(honestyPts, 15);
-    const honestyNote = limPts === 2 ? "Limitation named with its effect" : limPts === 1 ? "Limitation named briefly" : !inc.lim ? "Not applicable to this format" : "No limitation acknowledged";
-
-    // ---- 6 · Reflection & transfer — 8 ----
-    const learnPts = rf.lessonLearned && rf.lessonLearned.trim().length > 20 ? 2 : rf.lessonLearned?.trim() ? 1 : 0;
-    const advicePts = rf.adviceNextSemester?.trim() ? 1 : 0;
-    const nextPts = rf.nextSteps?.trim() || rf.whatsNext?.trim() ? 1 : 0;
-    const skillsCount = (rf.skills || []).filter(Boolean).length;
-    const reflPts = clampPts(learnPts * 2.5 + advicePts * 1.5 + nextPts * 1 + Math.min(skillsCount, 4) * 0.4, 8);
-    const reflNote = learnPts === 2 ? "Substantive learning + advice to the next class" : learnPts === 1 ? "Some reflection present" : "Reflection thin";
-
-    // ---- 7 · Verifiability — 5 ----
-    const hasMainFile = !!entry.assignmentFileUrl;
-    const hasExtraFiles = (entry.evidenceUrls?.length ?? 0) > 0;
-    const verPts = clampPts((hasMainFile ? 3 : 0) + (hasExtraFiles ? 2 : 0), 5);
-    const verNote = hasMainFile
-        ? `📎 Assignment attached — reviewers can open the actual work${hasExtraFiles ? " · evidence files on metrics" : ""}`
-        : hasExtraFiles
-          ? "Evidence files attached, assignment not"
-          : "Card-only record — no files attached (optional, but attached work ranks with higher confidence)";
+    const consistency: MeritConsistencyFlag = claimsHigh && evidenceLow
+        ? { ok: false, message: `Consistency check: claims "central & demonstrated" integration but evidence is ${evidenceStatus.toLowerCase()} — noted for reviewer, not scored.` }
+        : { ok: true, message: "Consistency check passed: claims match the declared evidence." };
 
     const critFor = (key: MeritRubricCriterion["key"]) => MERIT_RUBRIC.find((c) => c.key === key)!;
     const criteria: MeritCriterionResult[] = [
-        { ...critFor("sdg"), points: sdgPts, note: sdgNote },
-        { ...critFor("results"), points: resultsPts, note: resultsNote },
-        { ...critFor("purpose"), points: purposePts, note: purposeNote },
-        { ...critFor("rigor"), points: rigorPts, note: rigorNote },
-        { ...critFor("honesty"), points: honestyPtsClamped, note: honestyNote },
-        { ...critFor("refl"), points: reflPts, note: reflNote },
-        { ...critFor("ver"), points: verPts, note: verNote },
+        { ...critFor("task"), points: taskPts, note: taskNote },
+        { ...critFor("knowledge"), points: knowledgePts, note: knowledgeNote },
+        { ...critFor("method"), points: methodPts, note: methodNote },
+        { ...critFor("output"), points: outputQualityPts, note: outputQualityNote },
+        { ...critFor("analysis"), points: analysisPts, note: analysisNote },
+        { ...critFor("sustainability"), points: sustainabilityPts, note: sustainabilityNote },
+        { ...critFor("reflection"), points: reflectionPts, note: reflectionNote },
     ];
     const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
     const [grade, gradeColor] = meritGrade(total);
@@ -235,13 +258,13 @@ function isFounderOrigin(origin?: string): boolean {
 }
 
 const CRITERION_PHRASE: Record<MeritRubricCriterion["key"], (entry: CourseProjectEntry) => string> = {
-    sdg: (entry) => (entry.sdgMapping?.notApplicable ? "an honestly declared non-claim, not decorative SDG name-dropping" : isFounderOrigin(entry.sdgMapping?.origin) ? "a self-started, authentic sustainability core" : "an authentic, explained sustainability core"),
-    results: (entry) => (effectiveEvidenceLabel(entry.resultsInfo || {}).includes("measured result") ? "real measured results — fruitful, not decorative" : "substantive, honestly-classified results"),
-    purpose: () => "a concise, real idea anyone can grasp",
-    rigor: () => "rigor true to its own format",
-    honesty: () => "honest limits & correctly classified numbers",
-    refl: () => "reflection that transfers to the next cohort",
-    ver: () => "the actual assignment attached — every claim openable and checkable",
+    task: () => "a clear task and purpose anyone can grasp",
+    knowledge: () => "real disciplinary grounding and contribution",
+    method: () => "a method and process that fit the work",
+    output: () => "a concrete, well-executed output",
+    analysis: (entry) => (effectiveEvidenceLabel(entry.resultsInfo || {}).includes("measured result") ? "analysis backed by real measured results — fruitful, not decorative" : "substantive, honestly-classified findings"),
+    sustainability: (entry) => (entry.sdgMapping?.notApplicable ? "an honestly declared non-claim, not decorative SDG name-dropping" : isFounderOrigin(entry.sdgMapping?.origin) ? "a self-started, authentic sustainability core" : "an authentic, explained sustainability core"),
+    reflection: () => "reflection and limitations that transfer to the next cohort",
 };
 
 /** Why the top-ranked entries lead — derived from their own two highest-scoring criteria, not a canned line. */
@@ -253,50 +276,50 @@ export function whyItLeads(entry: CourseProjectEntry, sc: MeritScorecard): strin
 }
 
 const CRITERION_SHORT: Record<MeritRubricCriterion["key"], string> = {
-    sdg: "sustainability & SDG authenticity",
-    results: "substance of results",
-    purpose: "clarity of the idea",
-    rigor: "pathway-adjusted rigor",
-    honesty: "honesty & consistency",
-    refl: "reflection",
-    ver: "verifiability",
+    task: "task / purpose & alignment",
+    knowledge: "knowledge, context & contribution",
+    method: "method / process rigor",
+    output: "quality of output / execution",
+    analysis: "analysis, findings & application",
+    sustainability: "sustainability & SDG integration",
+    reflection: "reflection & limitations",
 };
 
 const CRITERION_TIER: Record<MeritRubricCriterion["key"], [string, string, string]> = {
-    sdg: [
+    task: [
+        "the task and purpose are precise, coherent and well justified",
+        "the purpose is identifiable but scope or alignment is uneven",
+        "the task is only partly understood; purpose is generic or incomplete",
+    ],
+    knowledge: [
+        "strong synthesis of relevant theory, precedent or context — a clear contribution",
+        "some relevant concepts applied, with limited integration",
+        "minimal disciplinary grounding; mostly unsupported description",
+    ],
+    method: [
+        "systematic, well controlled and well justified process with strong disciplinary rigor",
+        "method/process fits the task and is competently executed",
+        "process is missing, weak or largely unexplained",
+    ],
+    output: [
+        "highly resolved, accurate and fit-for-purpose output",
+        "competent, coherent output with some quality or completeness issues",
+        "incomplete or weakly resolved output",
+    ],
+    analysis: [
+        "analysis is measured and defended — numbers that survive questioning",
+        "sound analysis; conclusions follow from the work",
+        "mostly descriptive; claims are unsupported or conclusions don't follow",
+    ],
+    sustainability: [
         "the SDG core is targeted, explained and central — authenticity, not name-dropping",
         "the SDG link is genuine, though its target could be sharper",
         "the SDG connection is thin",
     ],
-    results: [
-        "results are measured and defended — numbers that survive questioning",
-        "results are substantive, though partly qualitative",
-        "results lean on claims",
-    ],
-    purpose: [
-        "the idea is sharp enough to state in one sentence and still matter",
-        "a clear idea, loosely framed",
-        "the idea needs a tighter question",
-    ],
-    rigor: [
-        "process rigor is exemplary for its own format — on its own pathway, it excels",
-        "the process fits its format, with room to deepen",
-        "the method is under-explained",
-    ],
-    honesty: [
-        "limits are named with their effects — the honesty this rubric prizes most",
-        "honest overall, with one soft claim",
-        "claims outrun the evidence",
-    ],
-    refl: [
-        "reflection the next cohort can actually use",
-        "reflection present, transfer thin",
-        "reflection is cursory",
-    ],
-    ver: [
-        "every attached file checked against the claims — openable, checkable truth",
-        "evidence supports most claims",
-        "verifiability is the weak link",
+    reflection: [
+        "specific learning and limitations explained with real insight",
+        "some learning and limitations identified, thin on significance",
+        "reflection is cursory; limitations absent or token",
     ],
 };
 
@@ -318,54 +341,54 @@ export const RUBRIC_SCALE: Record<
     MeritRubricCriterion["key"],
     { emoji: string; title: string; exemplary: string; solid: string; developing: string }
 > = {
-    sdg: {
+    task: {
+        emoji: "🎯",
+        title: "Task / purpose & alignment",
+        exemplary: "Purpose, scope and choices are precise, coherent and well justified",
+        solid: "Purpose is identifiable but scope or alignment is uneven",
+        developing: "Task is only partly understood; purpose is generic or incomplete",
+    },
+    knowledge: {
+        emoji: "📚",
+        title: "Knowledge, context & contribution",
+        exemplary: "Strong synthesis of relevant theory, precedent or context; clear contribution",
+        solid: "Some relevant concepts applied, with limited integration",
+        developing: "Minimal disciplinary grounding; mostly unsupported description",
+    },
+    method: {
+        emoji: "🔬",
+        title: "Method / process & disciplinary rigor",
+        exemplary: "Systematic, well controlled and well justified process with strong disciplinary rigor",
+        solid: "Method/process fits the task and is competently executed with reasonable depth",
+        developing: "Process is missing, weak, inappropriate or largely unexplained",
+    },
+    output: {
+        emoji: "🛠️",
+        title: "Quality of output / execution",
+        exemplary: "Highly resolved, accurate, polished or technically strong output",
+        solid: "Functional but uneven; important quality or completeness issues remain",
+        developing: "Incomplete, weakly resolved or not fit for stated purpose",
+    },
+    analysis: {
+        emoji: "📊",
+        title: "Analysis, findings & application",
+        exemplary: "Strong synthesis; findings well supported, limitations handled, application convincing",
+        solid: "Sound analysis; conclusions follow from the work",
+        developing: "Mostly descriptive; claims are unsupported or conclusions don't follow",
+    },
+    sustainability: {
         emoji: "🌍",
-        title: "Sustainability & SDG authenticity",
+        title: "Sustainability & SDG integration",
         exemplary: "Named SDG + specific target, central to the project design; the claimed link would survive an expert asking “how, exactly?”",
         solid: "Genuine SDG connection, but the target is vague or the link is partial",
         developing: "SDG is name-dropped — the project would be identical without it",
     },
-    results: {
-        emoji: "📊",
-        title: "Substance of results",
-        exemplary: "Measured outcomes with baseline → endline, honestly counted, defensible under questioning",
-        solid: "Substantive results, but partly qualitative or missing a baseline",
-        developing: "Claims of impact without measurement",
-    },
-    purpose: {
-        emoji: "💡",
-        title: "Clarity of the idea",
-        exemplary: "Statable in one sharp sentence and still meaningful; original for its context",
-        solid: "A clear idea, loosely framed or partly borrowed",
-        developing: "Unfocused — the reader must guess what the project is",
-    },
-    rigor: {
-        emoji: "🔬",
-        title: "Rigor — pathway-adjusted",
-        exemplary: "Exemplary process for its OWN format: an artwork judged on craft, a prototype on iteration, a paper on method — never on each other’s scale",
-        solid: "Process fits the format with thin patches (skipped iteration, small sample, light sourcing)",
-        developing: "Method under-explained; the “how” is missing",
-    },
-    honesty: {
-        emoji: "🤝",
-        title: "Honesty & consistency",
-        exemplary: "Limitations named WITH their effects; numbers consistent everywhere; nothing inflated",
-        solid: "Honest overall; one soft or optimistic claim",
-        developing: "Claims outrun the evidence, or sections contradict each other",
-    },
-    refl: {
+    reflection: {
         emoji: "🪞",
-        title: "Reflection",
-        exemplary: "Lessons the next cohort could act on; growth stated with proof",
-        solid: "Reflection present but generic; transfer value thin",
-        developing: "Cursory — “I learned a lot”",
-    },
-    ver: {
-        emoji: "🔍",
-        title: "Verifiability",
-        exemplary: "Attached files match the claims — openable, checkable truth",
-        solid: "Most claims supported; some evidence indirect",
-        developing: "Evidence missing, mismatched or unverifiable",
+        title: "Reflection, limitations & learning",
+        exemplary: "Critical reflection shows how choices, limits and learning affect interpretation or future work",
+        solid: "Specific learning and relevant limitations are explained",
+        developing: "Generic reflection; limitations absent or token",
     },
 };
 
