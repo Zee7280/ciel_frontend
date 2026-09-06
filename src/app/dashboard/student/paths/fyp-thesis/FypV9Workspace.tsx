@@ -463,7 +463,7 @@ export default function FypV9Workspace() {
             />
             <div className="mt-4 flex flex-wrap gap-1.5">
                 {["HEC-wide discipline coverage", "Adaptive FYP routes", "Editable roadmap", "Quant + Qual evidence", "Carry-forward highlights", "Final AI flashcard"].map((p) => (
-                    <span key={p} className="rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-extrabold text-[#0e2a3a]">{p}</span>
+                    <span key={p} className="rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-extrabold text-white">{p}</span>
                 ))}
             </div>
 
