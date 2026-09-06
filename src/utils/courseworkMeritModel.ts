@@ -244,7 +244,15 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
         { ...critFor("sustainability"), points: sustainabilityPts, note: sustainabilityNote },
         { ...critFor("reflection"), points: reflectionPts, note: reflectionNote },
     ];
-    const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
+    // Merit gates — an anti-gaming ceiling: a top-band total requires the core execution/analysis
+    // criteria (and, at the very top, sustainability + reflection) to themselves clear a high bar,
+    // so a record can't reach Outstanding/Excellent purely by padding the smaller-weight criteria.
+    // Mirrors the backend's scorecard() in merit-model.util.ts; keep both in sync.
+    const coreAt = (min: number) => methodPts / 20 >= min && outputQualityPts / 15 >= min && analysisPts / 20 >= min;
+    let total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
+    if (total > 94 && !(coreAt(0.9) && sustainabilityPts / 15 >= 0.8 && reflectionPts / 5 >= 0.7)) total = 94;
+    else if (total > 84 && !coreAt(0.7)) total = 84;
+    else if (total > 74 && !coreAt(0.5)) total = 74;
     const [grade, gradeColor] = meritGrade(total);
     // Faculty approval is the eligibility gate for ranking/showcase — see the "faculty approve → live" flow.
     const eligible = entry.facultyApprovalStatus === "approved";

@@ -793,7 +793,7 @@ export default function CourseProjectWizardPage() {
                             Team report led by {entry.studentInfo?.studentName || "a teammate"} — you can view and edit the same file.
                         </div>
                     )}
-                    <CourseworkCard entry={entry} defaultOpen studentReminder={entry.status === "submitted" ? "faculty" : "team"} />
+                    <CourseworkCard entry={entry} defaultOpen studentReminder={entry.status === "submitted" ? "faculty" : "team"} hideScore />
                     <button
                         type="button"
                         onClick={() => {

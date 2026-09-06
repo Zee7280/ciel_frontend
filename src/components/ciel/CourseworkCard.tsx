@@ -39,6 +39,7 @@ export default function CourseworkCard({
     studentReminder,
     remindDraftOwner = false,
     studentEmail,
+    hideScore = false,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -53,6 +54,10 @@ export default function CourseworkCard({
     remindDraftOwner?: boolean;
     /** The draft owner's email — needed for remindDraftOwner (a plain CourseProjectEntry has no joined student record of its own). */
     studentEmail?: string;
+    /** The raw /100 quality score is faculty/university/CIEL-only by design — a student sees their
+     * rank badge (and, once published, the downloadable report) but never the number itself. Pass
+     * true on every student-facing render of their own card. */
+    hideScore?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [shareOpen, setShareOpen] = useState(false);
@@ -148,7 +153,7 @@ export default function CourseworkCard({
                     {ribbon.rank === 1 ? "🥇" : ribbon.rank === 2 ? "🥈" : ribbon.rank === 3 ? "🥉" : "🏅"}{" "}
                     Ranked #{ribbon.rank} of {ribbon.of}
                     {ribbon.scope ? ` · ${ribbon.scope}` : ""}
-                    {ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
+                    {!hideScore && ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
                     {ribbon.badgeLevel ? ` · ${BADGE_EMOJI[ribbon.badgeLevel]} ${ribbon.badgeLevel}` : ""}
                     {movement ? ` · ${movement.symbol} ${movement.label}` : ""}
                 </div>

@@ -238,7 +238,7 @@ function CourseProjectHub() {
                             {drafts.map((entry) => (
                                 <div key={entry.id} className="relative">
                                     <CardOpenTarget entryId={entry.id!} router={router}>
-                                        <CourseworkCard entry={entry} studentReminder="team" />
+                                        <CourseworkCard entry={entry} studentReminder="team" hideScore />
                                     </CardOpenTarget>
                                     {entry.isOwner !== false && (
                                         <button
@@ -297,7 +297,7 @@ function CourseProjectHub() {
                                     ) : (
                                         visible.map((entry) => (
                                             <CardOpenTarget key={entry.id} entryId={entry.id!} router={router}>
-                                                <CourseworkCard entry={entry} studentReminder="faculty" />
+                                                <CourseworkCard entry={entry} studentReminder="faculty" hideScore />
                                             </CardOpenTarget>
                                         ))
                                     )}
