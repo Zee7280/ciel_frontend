@@ -3,30 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { usePlatformStats } from "@/utils/usePlatformStats";
 
 const TRUST_BADGES = ["HEC-recognized certificates", "Verified by partners, one tap", "Every hour valued at PKR 500"];
 
-/** Illustrative platform-scale figures for the hero ledger — same "marketing-safe" convention as
- * ImpactSnapshot's live-stats fallback: real numbers where an endpoint exists, an honest
- * aspirational snapshot here since there's no ledger-wide stats API yet. */
-const LEDGER_METRICS: { key: string; value: number; label: string; sub: string; prefix?: string; sparkColor?: string; sparkPoints?: string }[] = [
-    { key: "serving", value: 312, label: "People serving", sub: "students on verified activities", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
-    { key: "served", value: 4860, label: "People in communities served", sub: "beneficiaries reached", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
-    { key: "hours", value: 1840, label: "Verified hours", sub: "approved by faculty & partners" },
-    { key: "resources", value: 797000, label: "Resources deployed", sub: "cash + in-kind, partner-verified", prefix: "PKR " },
-];
-const DIVIDEND = { value: 1134500, label: "Community dividend", sub: "1,840 hrs × PKR 500 + PKR 214,500 out-of-pocket", prefix: "PKR " };
-
-const FEED_ITEMS: { icon: string; name: string; rest: string }[] = [
-    { icon: "✅", name: "Lahore", rest: "4 hrs verified by SOS Children's Villages · +PKR 2,000 dividend" },
-    { icon: "📍", name: "Kasur", rest: "session logged · 62 people served · Clean Water Week" },
-    { icon: "🏅", name: "Islamabad", rest: "HEC certificate issued · Girls' STEM Saturdays" },
-    { icon: "📦", name: "Karachi", rest: "PKR 38,000 resources confirmed by Nawab Cats" },
-    { icon: "🌱", name: "Multan", rest: "new need posted · Solar cold-storage · 4 seats" },
-    { icon: "✅", name: "Peshawar", rest: "350 ration packs verified by Alkhidmat" },
-];
-
-/** Eases from 0 to `target` once on mount — same effect as the reference design's data-count tiles. */
+/** Eases from 0 to `target` — re-runs whenever `target` changes, so it animates once the real
+ * number arrives from usePlatformStats() instead of animating a placeholder. */
 function useCountUp(target: number, durationMs = 1200) {
     const [value, setValue] = useState(0);
     useEffect(() => {
@@ -43,22 +25,42 @@ function useCountUp(target: number, durationMs = 1200) {
     return value;
 }
 
-export default function Hero() {
-    const serving = useCountUp(LEDGER_METRICS[0].value);
-    const served = useCountUp(LEDGER_METRICS[1].value);
-    const hours = useCountUp(LEDGER_METRICS[2].value);
-    const resources = useCountUp(LEDGER_METRICS[3].value);
-    const dividend = useCountUp(DIVIDEND.value);
-    const animatedValues = [serving, served, hours, resources];
+function fmt(n: number): string {
+    return n.toLocaleString("en-US");
+}
 
-    // Newest-first rotation through the live feed — starts on the same frame shown in the design.
-    const [feedIndex, setFeedIndex] = useState(FEED_ITEMS.length - 1);
+export default function Hero() {
+    const { stats } = usePlatformStats();
+
+    const peopleServing = useCountUp(stats?.people_serving ?? 0);
+    const peopleReached = useCountUp(stats?.people_reached ?? 0);
+    const verifiedHours = useCountUp(stats?.report_verified_hours ?? 0);
+    const resourcesDeployed = useCountUp(stats?.resources_deployed_pkr ?? 0);
+    const dividend = useCountUp(stats?.community_dividend_pkr ?? 0);
+
+    const rate = stats?.dividend_hourly_rate_pkr ?? 500;
+    const outOfPocket = stats?.out_of_pocket_pkr ?? 0;
+    const dividendSub = `${fmt(stats?.report_verified_hours ?? 0)} hrs × PKR ${fmt(rate)} + PKR ${fmt(outOfPocket)} out-of-pocket`;
+
+    const tiles = [
+        { key: "serving", value: peopleServing, label: "People serving", sub: "students on verified activities", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
+        { key: "served", value: peopleReached, label: "People in communities served", sub: "beneficiaries reached", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
+        { key: "hours", value: verifiedHours, label: "Verified hours", sub: "logged by students, faculty-approved" },
+        { key: "resources", value: resourcesDeployed, label: "Resources deployed", sub: "cash + in-kind, partner-verified", prefix: "PKR " },
+    ];
+
+    // Rotates through the real recent-verification feed the backend returns (newest first).
+    const feed = stats?.recent_activity ?? [];
+    const [feedIndex, setFeedIndex] = useState(0);
     useEffect(() => {
-        const id = setInterval(() => setFeedIndex((i) => (i + 1) % FEED_ITEMS.length), 3400);
+        if (feed.length <= 1) return;
+        const id = setInterval(() => setFeedIndex((i) => (i + 1) % feed.length), 3400);
         return () => clearInterval(id);
-    }, []);
-    const topFeed = FEED_ITEMS[feedIndex];
-    const prevFeed = FEED_ITEMS[(feedIndex - 1 + FEED_ITEMS.length) % FEED_ITEMS.length];
+    }, [feed.length]);
+    const visibleFeed =
+        feed.length <= 1
+            ? feed
+            : [feed[feedIndex % feed.length], feed[(feedIndex + 1) % feed.length]];
 
     return (
         <section className="relative overflow-hidden bg-ciel-navy">
@@ -111,7 +113,7 @@ export default function Hero() {
                         </div>
                     </div>
 
-                    {/* RIGHT - LIVE IMPACT LEDGER */}
+                    {/* RIGHT - LIVE IMPACT LEDGER (real, backend-computed numbers — see usePlatformStats) */}
                     <div
                         aria-label="Live impact ledger"
                         className="rounded-[28px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.03] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.28)] sm:p-6"
@@ -125,11 +127,11 @@ export default function Hero() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-2.5">
-                            {LEDGER_METRICS.map((m, i) => (
+                            {tiles.map((m) => (
                                 <div key={m.key} className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4">
                                     <span className="block text-[26px] font-black leading-none text-white sm:text-[32px]">
                                         {m.prefix}
-                                        {animatedValues[i].toLocaleString("en-US")}
+                                        {fmt(m.value)}
                                     </span>
                                     <span className="mt-2 block text-xs font-semibold text-white/65">{m.label}</span>
                                     <span className="mt-0.5 block font-mono text-[10.5px] text-white/40">{m.sub}</span>
@@ -142,28 +144,38 @@ export default function Hero() {
                             ))}
                             <div className="col-span-2 rounded-2xl border border-ciel-gold/35 bg-gradient-to-br from-ciel-gold/20 to-ciel-gold/5 p-4">
                                 <span className="block text-[34px] font-black leading-none text-[#F5C56E] sm:text-[42px]">
-                                    {DIVIDEND.prefix}
-                                    {dividend.toLocaleString("en-US")}
+                                    PKR {fmt(dividend)}
                                 </span>
-                                <span className="mt-2 block text-xs font-semibold text-white/65">{DIVIDEND.label}</span>
-                                <span className="mt-0.5 block font-mono text-[10.5px] text-white/40">{DIVIDEND.sub}</span>
+                                <span className="mt-2 block text-xs font-semibold text-white/65">Community dividend</span>
+                                <span className="mt-0.5 block font-mono text-[10.5px] text-white/40">{dividendSub}</span>
                             </div>
                         </div>
 
-                        <div className="mt-3 h-[68px] overflow-hidden border-t border-white/10 pt-2.5">
-                            {[topFeed, prevFeed].map((item, idx) => (
-                                <div
-                                    key={`${feedIndex}-${idx}`}
-                                    className="animate-fade-in-up flex items-center gap-2.5 py-1 text-[12.5px] text-white/65"
-                                >
+                        <div className="mt-3 min-h-[68px] overflow-hidden border-t border-white/10 pt-2.5">
+                            {visibleFeed.length ? (
+                                visibleFeed.map((item, idx) => (
+                                    <div
+                                        key={`${feedIndex}-${idx}`}
+                                        className="animate-fade-in-up flex items-center gap-2.5 py-1 text-[12.5px] text-white/65"
+                                    >
+                                        <span aria-hidden className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] bg-white/[0.06] text-xs">
+                                            ✅
+                                        </span>
+                                        <span>
+                                            <b className="font-semibold text-white">{item.city ?? "A student"}</b> · {item.hours} hrs verified
+                                            {item.partnerName ? ` by ${item.partnerName}` : ""}
+                                            {item.beneficiaries ? ` · ${fmt(item.beneficiaries)} people served` : ""}
+                                        </span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex items-center gap-2.5 py-1 text-[12.5px] text-white/50">
                                     <span aria-hidden className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] bg-white/[0.06] text-xs">
-                                        {item.icon}
+                                        🌱
                                     </span>
-                                    <span>
-                                        <b className="font-semibold text-white">{item.name}</b> · {item.rest}
-                                    </span>
+                                    <span>Pilot is live — the first verified activity will appear here.</span>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
 
