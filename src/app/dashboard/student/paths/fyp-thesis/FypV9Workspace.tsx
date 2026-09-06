@@ -9,6 +9,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import { mailtoHref } from "@/utils/reminderLinks";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import {
@@ -296,16 +297,7 @@ export default function FypV9Workspace() {
         setUploading(true);
         setError(null);
         try {
-            const presignRes = await authenticatedFetch(
-                "/api/v1/paths/evidence/presign",
-                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
-                { redirectToLogin: false },
-            );
-            const presign = presignRes?.ok ? await presignRes.json() : null;
-            const { uploadUrl, publicUrl } = presign?.data ?? {};
-            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-            if (!putRes.ok) throw new Error("Upload failed — please try again");
+            const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const res = await authenticatedFetch(
                 "/api/v1/paths/fyp-thesis/deliverables",
                 { method: "POST", body: JSON.stringify({ label: file.name, fileUrl: publicUrl }) },
@@ -313,8 +305,8 @@ export default function FypV9Workspace() {
             );
             const result = res?.ok ? await res.json() : null;
             if (result?.data?.deliverables) setEntry((e) => ({ ...e, deliverables: result.data.deliverables }));
-        } catch {
-            setError("Upload failed. Try again.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Upload failed. Try again.");
         } finally {
             setUploading(false);
         }

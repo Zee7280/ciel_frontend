@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, UploadCloud } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import { sdgData } from "@/utils/sdgData";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
@@ -400,16 +401,7 @@ export default function StartupBusinessWorkspace() {
         setUploading(type);
         setError(null);
         try {
-            const presignRes = await authenticatedFetch(
-                "/api/v1/paths/evidence/presign",
-                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
-                { redirectToLogin: false },
-            );
-            const presign = presignRes?.ok ? await presignRes.json() : null;
-            const { uploadUrl, publicUrl } = presign?.data ?? {};
-            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-            if (!putRes.ok) throw new Error("Upload failed — please try again");
+            const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const res = await authenticatedFetch(
                 "/api/v1/paths/startup-business/documents",
                 { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) },
@@ -417,8 +409,8 @@ export default function StartupBusinessWorkspace() {
             );
             const result = res?.ok ? await res.json() : null;
             if (result?.data?.documents) setEntry((e) => ({ ...e, documents: result.data.documents }));
-        } catch {
-            setError("Upload failed. Try again.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Upload failed. Try again.");
         } finally {
             setUploading(null);
         }

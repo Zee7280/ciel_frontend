@@ -16,6 +16,7 @@ import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { MERIT_RUBRIC } from "@/utils/courseworkMeritModel";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
@@ -627,21 +628,12 @@ export default function CourseProjectWizardPage() {
         setUploading(true);
         setError(null);
         try {
-            const presignRes = await authenticatedFetch(
-                "/api/v1/paths/evidence/presign",
-                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
-                { redirectToLogin: false },
-            );
-            const presign = presignRes?.ok ? await presignRes.json() : null;
-            const { uploadUrl, publicUrl } = presign?.data ?? {};
-            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-            if (!putRes.ok) throw new Error("Upload failed — please try again");
+            const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const nextUrls = [...(entry.evidenceUrls ?? []), publicUrl];
             setEntry((e) => ({ ...e, evidenceUrls: nextUrls }));
             await save({ evidenceUrls: nextUrls });
-        } catch {
-            setError("Evidence upload failed. Try again.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Evidence upload failed. Try again.");
         } finally {
             setUploading(false);
         }
@@ -657,20 +649,11 @@ export default function CourseProjectWizardPage() {
         setUploading(true);
         setError(null);
         try {
-            const presignRes = await authenticatedFetch(
-                "/api/v1/paths/evidence/presign",
-                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
-                { redirectToLogin: false },
-            );
-            const presign = presignRes?.ok ? await presignRes.json() : null;
-            const { uploadUrl, publicUrl } = presign?.data ?? {};
-            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-            if (!putRes.ok) throw new Error("Upload failed — please try again");
+            const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             setEntry((e) => ({ ...e, assignmentFileUrl: publicUrl }));
             await save({ assignmentFileUrl: publicUrl });
-        } catch {
-            setError("Assignment upload failed. Try again.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Assignment upload failed. Try again.");
         } finally {
             setUploading(false);
         }

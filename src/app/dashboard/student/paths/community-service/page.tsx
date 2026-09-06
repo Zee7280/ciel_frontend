@@ -7,6 +7,7 @@ import { Clock, FileText, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 }
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
@@ -479,18 +480,10 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
         setUploading(true);
         setError(null);
         try {
-            const presignRes = await authenticatedFetch(
-                "/api/v1/engagement/attendance/evidence/presign",
-                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
-                { redirectToLogin: false },
-            );
-            const presign = presignRes?.ok ? await presignRes.json() : null;
-            const { uploadUrl, publicUrl } = presign?.data ?? {};
-            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+            const publicUrl = await uploadFileViaPresign("/api/v1/engagement/attendance/evidence/presign", file);
             setEvidenceUrl(publicUrl);
-        } catch {
-            setError("Evidence upload failed. You can still log hours without it.");
+        } catch (err) {
+            setError(err instanceof Error ? `${err.message} You can still log hours without it.` : "Evidence upload failed. You can still log hours without it.");
         } finally {
             setUploading(false);
         }
