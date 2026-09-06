@@ -1425,17 +1425,11 @@ export default function CourseProjectWizardPage() {
                             </Field>
 
                             <div className="rounded-ciel-sm border border-ciel-border bg-ciel-page/40 p-4 text-[11.5px] leading-relaxed text-ciel-text">
-                                <p className="mb-2 text-xs font-black uppercase tracking-widest text-ciel-text-soft">🧮 How your flash card will be judged <span className="normal-case font-semibold text-ciel-text-soft/80">(same rubric for every discipline)</span></p>
+                                <p className="mb-1 text-xs font-black uppercase tracking-widest text-ciel-text-soft">🧮 How your flash card will be judged <span className="normal-case font-semibold text-ciel-text-soft/80">(same rubric for every discipline)</span></p>
                                 <p>
-                                    <b className="text-[#3F7E44]">Sustainability &amp; SDG quality — 25</b> (genuine, targeted, explained; honest &ldquo;not applicable&rdquo; scores respectably) ·{" "}
-                                    <b className="text-[#c98a04]">Substance of results — 20</b> (measured &gt; qualitative &gt; target; depth of evidence earns more, within your pathway) ·{" "}
-                                    <b className="text-[#2563eb]">Clarity of the idea — 14</b> ·{" "}
-                                    <b className="text-[#0f766e]">Rigor, pathway-adjusted — 13</b> (a deep study and a brief class exercise are judged against their own scale) ·{" "}
-                                    <b className="text-[#dc2626]">Honesty &amp; consistency — 15</b> ·{" "}
-                                    <b className="text-[#7c3aed]">Reflection — 8</b> ·{" "}
-                                    <b className="text-[#0e7490]">Verifiability — 5</b> (attach your actual assignment — optional, but the real work always outranks a claim about it)
+                                    The CIEL PK Universal Coursework Quality Rubric — 7 criteria, 100 points, calibrated to your academic level. Evidence is optional and never adds automatic marks; attaching your actual assignment is optional, but the real work always outranks a claim about it.
                                 </p>
-                                <p className="mt-1.5 text-[10.5px] text-ciel-text-soft">After your teacher approves, the AI ranks all flash cards best → least on this rubric — with a written reason for every top pick. Depth is rewarded; honesty is never punished.</p>
+                                <p className="mt-1.5 text-[10.5px] text-ciel-text-soft">See the full breakdown and band calibration at the end of this step. After your teacher approves, the AI ranks all flash cards best → least on this rubric — with a written reason for every top pick. Depth is rewarded; honesty is never punished.</p>
                             </div>
 
                             <Field label="➕ Anything the summary missed?">

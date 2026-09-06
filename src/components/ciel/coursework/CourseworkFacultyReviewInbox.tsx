@@ -120,20 +120,23 @@ export default function CourseworkFacultyReviewInbox({
                                     </span>
                                 </div>
                                 <p className="mt-1.5 text-[9.5px] leading-relaxed text-[#4c3a78]">
-                                    Assists your decision — the same standard rubric used by the AI Ranking studio, computed instantly
-                                    from what the student declared. It never overrides your judgment.
+                                    CIEL PK Universal Coursework Quality Rubric — the same standard rubric used by the AI Ranking
+                                    studio, computed instantly from what the student declared. It never overrides your judgment.
                                 </p>
-                                <div className="mt-2.5 space-y-1">
+                                <div className="mt-2.5 space-y-1.5">
                                     {scorecard.criteria.map((c) => {
                                         const band = rubricBand(c.points, c.max);
                                         return (
-                                            <div key={c.key} className="flex items-center gap-2 border-b border-dashed border-[#e2d9f7] py-1 text-[9px] last:border-0">
-                                                <span className="w-24 shrink-0 truncate font-extrabold text-[#4c3a78]">{RUBRIC_SCALE[c.key].title.split(" — ")[0].split(" &")[0]}</span>
-                                                <span className="h-[6px] w-[70px] shrink-0 overflow-hidden rounded-full bg-[#eef4f6]">
-                                                    <span className="block h-full rounded-full" style={{ width: `${Math.round((c.points / c.max) * 100)}%`, background: BAND_FILL[band] }} />
-                                                </span>
-                                                <span className="w-9 shrink-0 font-extrabold text-[#6d28d9]">{Math.round(c.points * 10) / 10}/{c.max}</span>
-                                                <span className={clsx("shrink-0 rounded-full px-1.5 py-0.5 text-[6.5px] font-extrabold", BAND_CHIP[band])}>{band}</span>
+                                            <div key={c.key} className="border-b border-dashed border-[#e2d9f7] py-1 text-[9px] last:border-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-24 shrink-0 truncate font-extrabold text-[#4c3a78]">{RUBRIC_SCALE[c.key].title.split(" — ")[0].split(" &")[0]}</span>
+                                                    <span className="h-[6px] w-[70px] shrink-0 overflow-hidden rounded-full bg-[#eef4f6]">
+                                                        <span className="block h-full rounded-full" style={{ width: `${Math.round((c.points / c.max) * 100)}%`, background: BAND_FILL[band] }} />
+                                                    </span>
+                                                    <span className="w-9 shrink-0 font-extrabold text-[#6d28d9]">{Math.round(c.points * 10) / 10}/{c.max}</span>
+                                                    <span className={clsx("shrink-0 rounded-full px-1.5 py-0.5 text-[6.5px] font-extrabold", BAND_CHIP[band])}>{band}</span>
+                                                </div>
+                                                <p className="mt-0.5 pl-0.5 text-[8.5px] leading-snug text-[#70808a]">{c.note}</p>
                                             </div>
                                         );
                                     })}
