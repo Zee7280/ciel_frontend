@@ -18,7 +18,7 @@ import {
     rankMovement,
 } from "@/utils/courseProjectTypes";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappShareHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import { courseworkApprovedFiles, fileNameFromUrl } from "@/utils/courseworkFlashCard";
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
@@ -81,29 +81,42 @@ export default function CourseworkCard({
     const verifyPath = entry.verificationPublicSlug ? `/coursework/verify/${entry.verificationPublicSlug}` : null;
     const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;
 
-    const teamEmails = groupMembers.map((m) => m.email).filter((e): e is string => !!e);
     const sectionsDone = Math.min(entry.stepCompleted ?? 0, 7);
     const completionPct = Math.round((sectionsDone / 7) * 100);
-    const reminder: { to: string; subject: string; body: string } | null =
+    const facultyReminder: { name: string; to: string; subject: string; body: string } | null =
         studentReminder === "faculty" && si.teacherEmail
             ? {
+                  name: (si.teacherName || "there").split(" ")[0],
                   to: si.teacherEmail,
                   subject: `Reminder: "${entry.projectTitle || "my coursework"}" is awaiting your review on CIEL PK`,
                   body: `Hi ${si.teacherName || "there"},\n\nJust a friendly reminder that my coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) has been submitted and is waiting for your approval on CIEL PK.\n\nThank you,\n${displayName}`,
               }
-            : studentReminder === "team" && teamEmails.length
-              ? {
-                    to: teamEmails.join(","),
-                    subject: `Reminder: let's finish "${entry.projectTitle || "our coursework"}" on CIEL PK`,
-                    body: `Hi team,\n\nA quick reminder to help finish our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK so we can submit it for faculty review.\n\nThanks,\n${displayName}`,
-                }
-              : remindDraftOwner && studentEmail
-                ? {
-                      to: studentEmail,
-                      subject: `Reminder: continue "${entry.projectTitle || "your coursework"}" on CIEL PK`,
-                      body: `Hi ${displayName},\n\nYour coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) is ${completionPct}% complete on CIEL PK. Please continue and submit it for faculty review when it's ready.\n\nThanks,\n${si.teacherName || "Your instructor"}`,
-                  }
-                : null;
+            : null;
+    // One Email + WhatsApp pair per named teammate, each targeting that member's own number —
+    // matches FYP's ThesisCard reminder pattern instead of one combined nudge to the whole team.
+    const teamReminders = studentReminder === "team"
+        ? groupMembers
+              .filter((m) => m.email?.trim())
+              .map((m) => {
+                  const first = (m.name || "there").split(" ")[0];
+                  const body = `Hi ${first},\n\nA quick reminder to help finish our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK so we can submit it for faculty review.\n\nThanks,\n${displayName}`;
+                  return {
+                      name: first,
+                      to: m.email as string,
+                      subject: `Reminder: let's finish "${entry.projectTitle || "our coursework"}" on CIEL PK`,
+                      body,
+                      waHref: whatsappTargetedHref(m.whatsappCode, m.whatsappNumber, `Reminder: let's finish "${entry.projectTitle || "our coursework"}" on CIEL PK\n\n${body}`),
+                  };
+              })
+        : [];
+    const remindOwnerReminder: { to: string; subject: string; body: string } | null =
+        remindDraftOwner && studentEmail
+            ? {
+                  to: studentEmail,
+                  subject: `Reminder: continue "${entry.projectTitle || "your coursework"}" on CIEL PK`,
+                  body: `Hi ${displayName},\n\nYour coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) is ${completionPct}% complete on CIEL PK. Please continue and submit it for faculty review when it's ready.\n\nThanks,\n${si.teacherName || "Your instructor"}`,
+              }
+            : null;
 
     const shareBadge = async () => {
         if (typeof window === "undefined" || !verifyPath) return;
@@ -363,19 +376,39 @@ export default function CourseworkCard({
                         Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
                     </p>
                 </div>
-                {(reminder || canShareBadge || (onFacultyReview && entry.status === "submitted" && approval !== "approved")) && (
+                {(facultyReminder || remindOwnerReminder || canShareBadge || (onFacultyReview && entry.status === "submitted" && approval !== "approved")) && (
                     <div className="flex flex-wrap gap-2">
-                        {reminder ? (
+                        {facultyReminder ? (
                             <>
                                 <a
-                                    href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
+                                    href={mailtoHref(facultyReminder.to, facultyReminder.subject, facultyReminder.body)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <Mail className="h-3.5 w-3.5" /> Email {facultyReminder.name}
+                                </a>
+                                <a
+                                    href={whatsappShareHref(`${facultyReminder.subject}\n\n${facultyReminder.body}`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {facultyReminder.name}
+                                </a>
+                            </>
+                        ) : null}
+                        {remindOwnerReminder ? (
+                            <>
+                                <a
+                                    href={mailtoHref(remindOwnerReminder.to, remindOwnerReminder.subject, remindOwnerReminder.body)}
                                     onClick={(e) => e.stopPropagation()}
                                     className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
                                 >
                                     <Mail className="h-3.5 w-3.5" /> Email
                                 </a>
                                 <a
-                                    href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
+                                    href={whatsappShareHref(`${remindOwnerReminder.subject}\n\n${remindOwnerReminder.body}`)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
@@ -425,6 +458,34 @@ export default function CourseworkCard({
                     </div>
                 )}
             </div>
+
+            {teamReminders.length > 0 && (
+                <div className="space-y-2 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">Remind your team — each button names its recipient</span>
+                    <div className="flex flex-wrap gap-2">
+                        {teamReminders.map((r) => (
+                            <div key={r.to} className="flex flex-wrap gap-2">
+                                <a
+                                    href={mailtoHref(r.to, r.subject, r.body)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <Mail className="h-3.5 w-3.5" /> Email {r.name}
+                                </a>
+                                <a
+                                    href={r.waHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {r.name}
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {canShareBadge && shareOpen && (
                 <div className="flex flex-col items-center gap-3 border-t border-ciel-border bg-white px-5 py-4">

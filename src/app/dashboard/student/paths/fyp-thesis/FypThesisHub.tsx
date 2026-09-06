@@ -9,6 +9,7 @@ import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/compo
 import PathHubGuide from "@/components/ciel/PathHubGuide";
 import EmptyState from "@/components/ciel/EmptyState";
 import ThesisCard from "@/components/ciel/ThesisCard";
+import Tabs from "@/components/ciel/Tabs";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { type FypEntry, EMPTY_FYP, mergeFypEntry } from "@/utils/fypTypes";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
@@ -51,6 +52,7 @@ export default function FypThesisHub({
     const [entry, setEntry] = useState<FypEntry>(EMPTY_FYP);
     const [hasEntry, setHasEntry] = useState(false);
     const [name, setName] = useState("there");
+    const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
 
     useEffect(() => {
         setName(firstName());
@@ -158,41 +160,72 @@ export default function FypThesisHub({
                 </div>
             )}
 
-            {view === "under-review" && (
-                <div className="mt-4">
-                    <HubBackButton href={BASE} label="← FYP hub" />
-                    <div className="mb-3">
-                        <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">FYP Under Review</h2>
-                        <p className="mt-1 text-[12.5px] text-[#70808a]">
-                            Your submitted flashcard is with your supervisor. You&apos;ll receive the outcome after they review it.
-                        </p>
-                    </div>
-                    {underReview ? (
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => router.push(WORKSPACE_HREF)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    router.push(WORKSPACE_HREF);
-                                }
-                            }}
-                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
-                        >
-                            <ThesisCard entry={entry} studentReminder="faculty" />
+            {view === "under-review" && (() => {
+                const approval = entry.supervisorApprovalStatus;
+                const byTab = {
+                    pending: underReview && (approval === "pending" || !approval) ? 1 : 0,
+                    revision: underReview && approval === "revision_requested" ? 1 : 0,
+                    rejected: underReview && approval === "rejected" ? 1 : 0,
+                };
+                const matchesTab =
+                    reviewTab === "all" ||
+                    (reviewTab === "pending" && byTab.pending) ||
+                    (reviewTab === "revision" && byTab.revision) ||
+                    (reviewTab === "rejected" && byTab.rejected);
+                return (
+                    <div className="mt-4">
+                        <HubBackButton href={BASE} label="← FYP hub" />
+                        <div className="mb-3">
+                            <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">FYP Under Review</h2>
+                            <p className="mt-1 text-[12.5px] text-[#70808a]">
+                                Your submitted flashcard is with your supervisor. You&apos;ll receive the outcome after they review it.
+                            </p>
                         </div>
-                    ) : (
-                        <EmptyState
-                            emoji="📤"
-                            heading="Nothing under review"
-                            line="Submit your completed FYP flashcard and it lands here while your supervisor reviews it."
-                            actionLabel="Open FYP form"
-                            onAction={() => router.push(WORKSPACE_HREF)}
-                        />
-                    )}
-                </div>
-            )}
+                        {underReview ? (
+                            <>
+                                <Tabs
+                                    tabs={[
+                                        { key: "all", label: "All · 1" },
+                                        { key: "pending", label: `Pending supervisor · ${byTab.pending}` },
+                                        { key: "revision", label: `Revision required · ${byTab.revision}` },
+                                        { key: "rejected", label: `Not accepted · ${byTab.rejected}` },
+                                    ]}
+                                    active={reviewTab}
+                                    onChange={(key) => setReviewTab(key as typeof reviewTab)}
+                                />
+                                <div className="mt-3">
+                                    {matchesTab ? (
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => router.push(WORKSPACE_HREF)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    router.push(WORKSPACE_HREF);
+                                                }
+                                            }}
+                                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
+                                        >
+                                            <ThesisCard entry={entry} studentReminder="faculty" />
+                                        </div>
+                                    ) : (
+                                        <p className="px-1 text-sm text-[#70808a]">Nothing in this tab right now.</p>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <EmptyState
+                                emoji="📤"
+                                heading="Nothing under review"
+                                line="Submit your completed FYP flashcard and it lands here while your supervisor reviews it."
+                                actionLabel="Open FYP form"
+                                onAction={() => router.push(WORKSPACE_HREF)}
+                            />
+                        )}
+                    </div>
+                );
+            })()}
 
             {view === "home" && (
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">

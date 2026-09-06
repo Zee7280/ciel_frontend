@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock, Mail, MessageCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock, Mail, MessageCircle, Paperclip, Zap } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { rankMovement } from "@/utils/courseProjectTypes";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappShareHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import {
     type FypEntry,
     type FypSectionSummaries,
@@ -19,6 +19,7 @@ import {
 } from "@/utils/fypTypes";
 import { hydrateV9 } from "@/app/dashboard/student/paths/fyp-thesis/FypV9FormUi";
 import { composeFypV9Summaries } from "@/utils/fypV9Catalog";
+import { fileNameFromUrl } from "@/utils/courseworkFlashCard";
 
 const ROUTE_EMOJI: Record<string, string> = {
     scholar: "📜",
@@ -29,6 +30,22 @@ const ROUTE_EMOJI: Record<string, string> = {
 };
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
+
+/** "last updated …" copy for the auto-save line — coarse buckets, no library needed. */
+function timeAgo(iso?: string | null): string {
+    if (!iso) return "";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return "";
+    const min = Math.floor(ms / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day === 1) return "yesterday";
+    if (day < 7) return `${day}d ago`;
+    return new Date(iso).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" });
+}
 
 /** Same 7-summary → section-key mapping FypV9Workspace's own step-7 preview uses (no "literature"
  * key — V9's route model covers non-research work too, so there's no literature-review step). */
@@ -97,27 +114,66 @@ export default function ThesisCard({
     // A brand-new, still-empty draft reads as broken if labelled "Untitled" — it's just not started yet.
     const displayTitle = pi.title || entry.projectTitle || (entry.status === "draft" ? "New FYP / thesis record — tap to continue" : "Untitled thesis");
 
-    const teamEmails = teamMembers.map((m) => m.email).filter((e): e is string => !!e);
     const completionPct = Math.round(((entry.stepCompleted ?? 0) / 8) * 100);
-    const reminder: { to: string; subject: string; body: string } | null =
+    const facultyFirst = (pi.supervisorName || "your supervisor").split(" ")[0];
+    // One Email + WhatsApp pair per named recipient — mirrors the design's "each button names its
+    // recipient" reminder box instead of one combined nudge to everyone at once.
+    const facultyReminder: { name: string; to: string; subject: string; body: string } | null =
         studentReminder === "faculty" && pi.supervisorEmail
             ? {
+                  name: facultyFirst,
                   to: pi.supervisorEmail,
                   subject: `Reminder: "${displayTitle}" is awaiting your review on CIEL PK`,
                   body: `Hi ${pi.supervisorName || "there"},\n\nJust a friendly reminder that my Final Year Project record "${displayTitle}" has been submitted and is waiting for your approval on CIEL PK.\n\nThank you,\n${displayName}`,
               }
-            : studentReminder === "team" && teamEmails.length
-              ? {
-                    to: teamEmails.join(","),
-                    subject: `Reminder: let's finish "${displayTitle}" on CIEL PK`,
-                    body: `Hi team,\n\nA quick reminder to help finish our Final Year Project record "${displayTitle}" on CIEL PK so we can submit it for supervisor review.\n\nThanks,\n${displayName}`,
-                }
-              : remindDraftOwner && studentEmail
-                ? {
-                      to: studentEmail,
-                      subject: `Reminder: continue "${displayTitle}" on CIEL PK`,
-                      body: `Hi ${displayName},\n\nYour Final Year Project record "${displayTitle}" is ${completionPct}% complete on CIEL PK. Please continue and submit it for supervisor review when it's ready.\n\nThanks,\n${pi.supervisorName || "Your supervisor"}`,
-                  }
+            : null;
+    const teamReminders = studentReminder === "team"
+        ? teamMembers
+              .filter((m) => m.email?.trim())
+              .map((m) => {
+                  const first = (m.name || "there").split(" ")[0];
+                  const body = `Hi ${first},\n\nA quick reminder to help finish our Final Year Project record "${displayTitle}" on CIEL PK so we can submit it for supervisor review.\n\nThanks,\n${displayName}`;
+                  return {
+                      name: first,
+                      to: m.email as string,
+                      subject: `Reminder: let's finish "${displayTitle}" on CIEL PK`,
+                      body,
+                      waHref: whatsappTargetedHref(m.whatsappCode, m.whatsappNumber, `Reminder: let's finish "${displayTitle}" on CIEL PK\n\n${body}`),
+                  };
+              })
+        : [];
+    const remindOwnerReminder: { to: string; subject: string; body: string } | null =
+        remindDraftOwner && studentEmail
+            ? {
+                  to: studentEmail,
+                  subject: `Reminder: continue "${displayTitle}" on CIEL PK`,
+                  body: `Hi ${displayName},\n\nYour Final Year Project record "${displayTitle}" is ${completionPct}% complete on CIEL PK. Please continue and submit it for supervisor review when it's ready.\n\nThanks,\n${pi.supervisorName || "Your supervisor"}`,
+              }
+            : null;
+
+    // "One master record — auto-connected" — every stakeholder linked to this single FYP entry.
+    const stakeholders: { emoji: string; label: string }[] = [
+        { emoji: "🧑‍🎓", label: displayName },
+        ...teamMembers.map((m) => ({ emoji: "👥", label: m.name })),
+        ...(pi.supervisorName ? [{ emoji: "🧑‍🏫", label: pi.supervisorName }] : []),
+        ...(pi.university ? [{ emoji: "🏫", label: pi.university }] : []),
+        { emoji: "🌐", label: "CIEL PK" },
+    ];
+    const actionWith: "Student" | "Faculty" | null =
+        entry.status === "draft"
+            ? "Student"
+            : entry.status === "submitted" && (approval === "pending" || !approval)
+              ? "Faculty"
+              : entry.status === "submitted" && approval === "revision_requested"
+                ? "Student"
+                : null;
+    const actionWithNote =
+        actionWith === "Student" && entry.status === "draft"
+            ? "Continue and submit your FYP for supervisor review."
+            : actionWith === "Faculty"
+              ? "Wait for your supervisor's decision — a polite reminder is fine."
+              : actionWith === "Student" && approval === "revision_requested"
+                ? "Fix the flagged section(s) and resubmit — nothing is penalised."
                 : null;
 
     return (
@@ -180,8 +236,18 @@ export default function ThesisCard({
                         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-page">
                             <div className="h-full rounded-full bg-ciel-purple" style={{ width: `${completionPct}%` }} />
                         </div>
+                        {entry.updatedAt ? (
+                            <p className="mt-1.5 text-[10px] font-semibold text-ciel-text-soft">💾 Auto-saved continuously · last updated {timeAgo(entry.updatedAt)}</p>
+                        ) : null}
                     </div>
                 )}
+
+                {actionWith && actionWithNote ? (
+                    <div className="mt-3 flex items-center gap-1.5 rounded-ciel-xs bg-ciel-page px-2.5 py-1.5 text-[10.5px] font-bold text-ciel-text-mid">
+                        <Zap className="h-3 w-3 shrink-0 text-ciel-amber" />
+                        <span>Action with {actionWith === "Student" ? "you" : "your supervisor"} — {actionWithNote}</span>
+                    </div>
+                ) : null}
 
                 {sm.noSdgApplies ? (
                     <div className="mt-4 flex items-center gap-2">
@@ -218,6 +284,18 @@ export default function ThesisCard({
                         📎 {summaries.findings}
                     </p>
                 ) : null}
+
+                <div className="mt-3 rounded-ciel-xs border border-dashed border-ciel-border bg-ciel-page/60 px-3 py-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">🔗 One master record — auto-connected</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {stakeholders.map((s, i) => (
+                            <span key={`${s.label}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold text-ciel-text-mid">
+                                {s.emoji} {s.label}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="mt-3 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-ciel-purple-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-purple-deep">
                         {FYP_MODES[route].name}
@@ -228,11 +306,20 @@ export default function ThesisCard({
                         </span>
                     )
                     : null}
-                    {entry.deliverables?.length ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-green-deep">
-                            <CheckCircle2 className="h-3 w-3" /> Repository attached
-                        </span>
-                    ) : null}
+                    {(entry.deliverables || []).map((d, i) => (
+                        <a
+                            key={`${d.fileUrl}-${i}`}
+                            href={d.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title={d.label || fileNameFromUrl(d.fileUrl, 80)}
+                            className="inline-flex max-w-[12.5rem] items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold text-ciel-green-deep hover:underline"
+                        >
+                            <Paperclip className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{d.label || fileNameFromUrl(d.fileUrl, 22)}</span>
+                        </a>
+                    ))}
                     {isTeam && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
                             <Users className="h-3 w-3" /> {teamMembers.length + 1} co-authors
@@ -248,8 +335,8 @@ export default function ThesisCard({
                     }}
                     className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40 hover:text-ciel-purple-deep"
                 >
-                    <span>📖</span>
-                    <span>{open ? "Close" : "View all — the whole thesis, summarised"}</span>
+                    <span>{entry.status === "submitted" ? "📇" : "📖"}</span>
+                    <span>{open ? "Close" : entry.status === "submitted" ? "View FYP Flashcard" : "View all — the whole thesis, summarised"}</span>
                     <ChevronDown className={clsx("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
                 </button>
 
@@ -325,17 +412,17 @@ export default function ThesisCard({
                     <br />
                     On approval: 🧑‍🎓 co-author profiles · 🧑‍🏫 faculty deck · 🏫 university portal
                 </p>
-                {reminder && (
+                {remindOwnerReminder && (
                     <div className="flex shrink-0 gap-2">
                         <a
-                            href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
+                            href={mailtoHref(remindOwnerReminder.to, remindOwnerReminder.subject, remindOwnerReminder.body)}
                             onClick={(e) => e.stopPropagation()}
                             className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
                         >
                             <Mail className="h-3.5 w-3.5" /> Email
                         </a>
                         <a
-                            href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
+                            href={whatsappShareHref(`${remindOwnerReminder.subject}\n\n${remindOwnerReminder.body}`)}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -343,6 +430,61 @@ export default function ThesisCard({
                         >
                             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                         </a>
+                    </div>
+                )}
+                {entry.status === "submitted" && (approval === "pending" || !approval) && studentReminder === "faculty" && (
+                    <div className="w-full space-y-2 border-t border-ciel-border pt-3">
+                        <p className="text-[10.5px] font-semibold text-ciel-text-mid">
+                            🔒 Your record is locked while under review — it reopens automatically if your supervisor requests a revision.
+                        </p>
+                        {facultyReminder && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">Remind {facultyReminder.name} to review</span>
+                                <a
+                                    href={mailtoHref(facultyReminder.to, facultyReminder.subject, facultyReminder.body)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                                >
+                                    <Mail className="h-3.5 w-3.5" /> Email {facultyReminder.name}
+                                </a>
+                                <a
+                                    href={whatsappShareHref(`${facultyReminder.subject}\n\n${facultyReminder.body}`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {facultyReminder.name}
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
+                {teamReminders.length > 0 && (
+                    <div className="w-full space-y-2 border-t border-ciel-border pt-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">Stakeholder reminders — each button names its recipient</span>
+                        <div className="flex flex-wrap gap-2">
+                            {teamReminders.map((r) => (
+                                <div key={r.to} className="flex flex-wrap gap-2">
+                                    <a
+                                        href={mailtoHref(r.to, r.subject, r.body)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                                    >
+                                        <Mail className="h-3.5 w-3.5" /> Email {r.name}
+                                    </a>
+                                    <a
+                                        href={r.waHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
+                                    >
+                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {r.name}
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
                 {onSupervisorReview && entry.status === "submitted" && approval !== "approved" && (

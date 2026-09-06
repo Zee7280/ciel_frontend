@@ -5,7 +5,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { mailtoHref } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     isCommunityReportOnLiveDeck,
     isCommunityReportRejected,
@@ -31,6 +31,10 @@ type OpportunityRow = {
     admin_approval_status?: ApprovalLineStatus;
     requires_partner_approval?: boolean;
     created_at?: string;
+    faculty_contact_name?: string | null;
+    faculty_contact_email?: string | null;
+    partner_contact_name?: string | null;
+    partner_contact_email?: string | null;
 };
 
 type ReportRow = {
@@ -42,6 +46,8 @@ type ReportRow = {
     status?: string;
     faculty_status?: string;
     admin_status?: string;
+    faculty_name?: string | null;
+    faculty_email?: string | null;
 };
 
 type JourneyNode = { title: string; detail: string; state: NodeState };
@@ -124,12 +130,23 @@ function approvalsDone(nodes: JourneyNode[]): number {
     return nodes.filter((n) => n.state === "complete").length;
 }
 
-function reminderHref(title: string, who: string): string {
-    return mailtoHref(
-        "",
-        `CIEL PK reminder — ${title}`,
-        `Hi,\n\nA polite reminder that "${title}" is waiting for ${who} on CIEL PK.\n`,
-    );
+/** One Email + one WhatsApp action, each addressed to the actual contact when we have one on file
+ * (falls back to an unaddressed mailto: / the generic WhatsApp share sheet when we don't) —
+ * mirrors the named-recipient reminder pattern used in Coursework/FYP's cards. */
+function buildReminderActions(
+    title: string,
+    role: string,
+    contactName: string | null | undefined,
+    contactEmail: string | null | undefined,
+    style: WorkCard["actions"][number]["style"] = "blue",
+): WorkCard["actions"] {
+    const who = contactName?.trim() || role;
+    const subject = `CIEL PK reminder — ${title}`;
+    const body = `Hi ${who},\n\nA polite reminder that "${title}" is waiting for ${role} on CIEL PK.\n`;
+    return [
+        { label: `Email ${who}`, href: mailtoHref(contactEmail || "", subject, body), style },
+        { label: `WhatsApp ${who}`, href: whatsappShareHref(`${subject}\n\n${body}`), style },
+    ];
 }
 
 function reportBucket(row: ReportRow): Exclude<WsFilter, "all"> {
@@ -210,6 +227,10 @@ export default function CommunityServiceWorkspace({
                         admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
                         requires_partner_approval: Boolean(r.requires_partner_approval),
                         created_at: typeof r.created_at === "string" ? r.created_at : undefined,
+                        faculty_contact_name: (r.faculty_contact_name as string | null) ?? null,
+                        faculty_contact_email: (r.faculty_contact_email as string | null) ?? null,
+                        partner_contact_name: (r.partner_contact_name as string | null) ?? null,
+                        partner_contact_email: (r.partner_contact_email as string | null) ?? null,
                     })),
             );
             setReports(Array.isArray(reportJson?.data) ? reportJson.data : []);
@@ -244,21 +265,21 @@ export default function CommunityServiceWorkspace({
                         : current.title.includes("Partner")
                           ? "Partner"
                           : "CIEL PK";
-                const remind =
-                    current.state === "current"
-                        ? {
-                              label: who === "Partner" ? "Remind Partner" : who === "CIEL PK" ? "View Status" : "Send Reminder",
-                              href:
-                                  who === "CIEL PK"
-                                      ? `/dashboard/student/browse/${encodeURIComponent(op.id)}`
-                                      : reminderHref(op.title, `${who} approval`),
-                              style: "blue" as const,
-                          }
-                        : {
-                              label: "View Status",
-                              href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`,
-                              style: "blue" as const,
-                          };
+                const remindActions: WorkCard["actions"] =
+                    current.state === "current" && who !== "CIEL PK"
+                        ? buildReminderActions(
+                              op.title,
+                              `${who} approval`,
+                              who === "Partner" ? op.partner_contact_name : op.faculty_contact_name,
+                              who === "Partner" ? op.partner_contact_email : op.faculty_contact_email,
+                          )
+                        : [
+                              {
+                                  label: "View Status",
+                                  href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`,
+                                  style: "blue" as const,
+                              },
+                          ];
                 out.push({
                     id: `opp-${op.id}`,
                     filter: "opportunity",
@@ -291,7 +312,7 @@ export default function CommunityServiceWorkspace({
                             : `Pending ${who} ${who === "CIEL PK" ? "Approval" : "approval"}`,
                     actions: [
                         { label: "View Opportunity", href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`, style: "soft" },
-                        remind,
+                        ...remindActions,
                     ],
                 });
                 continue;
@@ -379,7 +400,7 @@ export default function CommunityServiceWorkspace({
                     sideDetail: "Pending Faculty Approval",
                     actions: [
                         { label: "View Submitted Report", href, style: "soft" },
-                        { label: "Send Reminder", href: reminderHref(title, "Faculty review"), style: "blue" },
+                        ...buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email),
                     ],
                 });
                 continue;
@@ -632,6 +653,16 @@ export default function CommunityServiceWorkspace({
                                     {card.actions.map((action) =>
                                         action.href.startsWith("mailto:") ? (
                                             <a key={action.label} href={action.href} className={actionClass(action.style)}>
+                                                {action.label}
+                                            </a>
+                                        ) : /^https?:\/\//.test(action.href) ? (
+                                            <a
+                                                key={action.label}
+                                                href={action.href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={actionClass(action.style)}
+                                            >
                                                 {action.label}
                                             </a>
                                         ) : (
