@@ -15,17 +15,47 @@ const LOG_HOURS_HREF = `${HUB}?tab=log-hours`;
 const GUIDE_HREF = `${HUB}?view=guide`;
 const PORTFOLIO_HREF = "/dashboard/student/impact";
 const CS_IMPACT_HREF = "/dashboard/student/impact?area=Community%20Service";
+const RANKINGS_HREF = `${HUB}?view=rankings`;
+
+export type CommunityServiceAttentionItem = {
+    key: string;
+    n: number;
+    title: string;
+    sub: string;
+    href: string;
+    urgent: boolean;
+};
+
+function AttentionRow({ items }: { items: CommunityServiceAttentionItem[] }) {
+    return (
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {items.map((item) => (
+                <Link
+                    key={item.key}
+                    href={item.href}
+                    className="rounded-2xl border border-[#dde5ea] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(23,49,57,.08)]"
+                >
+                    <span className={`text-2xl font-black ${item.urgent ? "text-[#b13e49]" : "text-[#16313d]"}`}>{item.n}</span>
+                    <p className="mt-1 text-[12px] font-bold text-[#16313d]">{item.title}</p>
+                    <p className="mt-0.5 text-[10.5px] leading-relaxed text-[#70808a]">{item.sub}</p>
+                </Link>
+            ))}
+        </div>
+    );
+}
 
 export default function CommunityServiceHub({
     projects,
     verifiedHours,
     wallCount,
     completion,
+    attention,
 }: {
     projects: ActiveProject[];
     verifiedHours: number;
     wallCount: number;
     completion: number;
+    attention?: CommunityServiceAttentionItem[];
 }) {
     const [helpOpen, setHelpOpen] = useState(false);
     const [name, setName] = useState("");
@@ -52,6 +82,8 @@ export default function CommunityServiceHub({
                 title="Community Service"
                 subtitle="Create an opportunity, track sequential approvals, complete your report and build a verified Community Service record."
             />
+
+            {attention && attention.length ? <AttentionRow items={attention} /> : null}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <MockupActionCard
@@ -98,6 +130,15 @@ export default function CommunityServiceHub({
                     subtitle="View the permanent consolidated portfolio where every approved impact record is transferred automatically."
                     badge="MY PORTFOLIO"
                     background={MOCKUP_GRADIENTS.navy}
+                />
+                <MockupActionCard
+                    href={RANKINGS_HREF}
+                    emoji="🧠"
+                    ghost="🧠"
+                    title="My Rankings"
+                    subtitle="See where your verified projects stand against your faculty's students, your university and the CIEL PK network."
+                    badge="VIEW ONLY"
+                    background={MOCKUP_GRADIENTS.gold}
                 />
                 <MockupActionCard
                     href={GUIDE_HREF}

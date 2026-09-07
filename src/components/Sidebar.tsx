@@ -632,7 +632,7 @@ export default function Sidebar() {
                 {isStudent ? (
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
-                        <NavRow href={dashboardHref} label="Home" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
+                        <NavRow href={dashboardHref} label="Dashboard" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
                         <NavSectionLabel collapsed={collapsed}>My Impact Areas</NavSectionLabel>
                         {CIEL_PATHS.map((path) => (
                             <NavRow

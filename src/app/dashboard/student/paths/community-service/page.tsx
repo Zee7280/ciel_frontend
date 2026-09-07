@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, FileText, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
@@ -16,6 +16,7 @@ import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import CommunityServiceHub, { CommunityCreateOpportunityView } from "./CommunityServiceHub";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
+import CommunityServiceRankings from "./CommunityServiceRankings";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
@@ -55,6 +56,8 @@ function hourStatus(log: AttendanceLog): CielHourStatus {
     return "logged";
 }
 
+const HUB = "/dashboard/student/paths/community-service";
+
 const TABS = [
     { key: "engagements", label: "My engagements" },
     { key: "log-hours", label: "Log hours" },
@@ -71,6 +74,7 @@ function CommunityServiceContent() {
     const guideView = searchParams.get("view") === "guide";
     const createView = searchParams.get("view") === "create";
     const workspaceView = searchParams.get("view") === "workspace";
+    const rankingsView = searchParams.get("view") === "rankings";
     const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
     const [loading, setLoading] = useState(true);
@@ -78,13 +82,17 @@ function CommunityServiceContent() {
     const [verifiedHours, setVerifiedHours] = useState(0);
     const [wallCount, setWallCount] = useState(0);
     const [completion, setCompletion] = useState(0);
+    const [myOpportunities, setMyOpportunities] = useState<CreatedOpportunity[]>([]);
 
     useEffect(() => {
         let cancelled = false;
         Promise.all([
             fetchStudentDashboardData({ redirectToLogin: false }),
             fetchImpactSummary({ redirectToLogin: false }),
-        ]).then(([data, summary]) => {
+            authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false })
+                .then((res) => (res?.ok ? res.json() : null))
+                .catch(() => null),
+        ]).then(([data, summary, oppResult]) => {
             if (cancelled) return;
             setProjects(data?.activeProjects ?? []);
             setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
@@ -95,12 +103,81 @@ function CommunityServiceContent() {
                         (CIEL_PATHS.length || 1)) || 0,
                 ),
             );
+            const rows = Array.isArray(oppResult?.data) ? (oppResult.data as Record<string, unknown>[]) : [];
+            setMyOpportunities(
+                rows
+                    .filter((r) => r.status !== "draft")
+                    .map((r) => ({
+                        id: String(r.id),
+                        title: String(r.title ?? "Untitled opportunity"),
+                        status: typeof r.status === "string" ? r.status : undefined,
+                        workflow_stage: (r.workflow_stage as string | null) ?? null,
+                        faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
+                        partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
+                        admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
+                        requires_partner_approval: Boolean(r.requires_partner_approval),
+                    })),
+            );
             setLoading(false);
         });
         return () => {
             cancelled = true;
         };
     }, []);
+
+    const attention = useMemo(() => {
+        const oppAction = myOpportunities.filter((o) => o.workflow_stage === "revision").length;
+        const oppApprovals = myOpportunities.filter((o) =>
+            ["pending_faculty", "pending_partner", "pending_admin"].includes(o.workflow_stage ?? ""),
+        ).length;
+        const readyProjects = projects.filter((p) => !p.report_status);
+        const reportAction = projects.filter((p) => p.report_status === "rejected").length;
+        const reportsInProgress = projects.filter(
+            (p) => p.report_status && !["verified", "paid", "rejected"].includes(p.report_status),
+        ).length;
+        return [
+            {
+                key: "oppAction",
+                n: oppAction,
+                title: "Opportunity action",
+                sub: oppAction ? "Revision waiting inside Create Opportunity" : "No proposal revision waiting",
+                href: `${HUB}?tab=engagements`,
+                urgent: oppAction > 0,
+            },
+            {
+                key: "oppApprovals",
+                n: oppApprovals,
+                title: "Opportunity approvals",
+                sub: "Faculty / Partner / CIEL PK decisions tracked in Create Opportunity",
+                href: `${HUB}?tab=engagements`,
+                urgent: false,
+            },
+            {
+                key: "readyToStart",
+                n: readyProjects.length,
+                title: "Ready to start",
+                sub: "Approved projects waiting to begin a report",
+                href: readyProjects[0] ? `/dashboard/student/report?projectId=${readyProjects[0].id}` : `${HUB}?tab=engagements`,
+                urgent: false,
+            },
+            {
+                key: "reportAction",
+                n: reportAction,
+                title: "Report action",
+                sub: reportAction ? "Faculty requested a report revision" : "No report revision waiting",
+                href: `${HUB}?tab=reports`,
+                urgent: reportAction > 0,
+            },
+            {
+                key: "reportsInProgress",
+                n: reportsInProgress,
+                title: "Reports in progress",
+                sub: reportsInProgress ? `${reportsInProgress} report(s) in progress` : "No active reports",
+                href: `${HUB}?tab=reports`,
+                urgent: false,
+            },
+        ];
+    }, [myOpportunities, projects]);
 
     useEffect(() => {
         if (rawTab === "find") {
@@ -156,6 +233,15 @@ function CommunityServiceContent() {
         );
     }
 
+    if (showHub && rankingsView) {
+        return (
+            <div className="mx-auto max-w-[1500px] pb-16">
+                <HubBackButton href={HUB} />
+                <CommunityServiceRankings />
+            </div>
+        );
+    }
+
     if (showHub) {
         return (
             <CommunityServiceHub
@@ -163,6 +249,7 @@ function CommunityServiceContent() {
                 verifiedHours={verifiedHours}
                 wallCount={wallCount}
                 completion={completion}
+                attention={attention}
             />
         );
     }
