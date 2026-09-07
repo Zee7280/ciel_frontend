@@ -39,6 +39,25 @@ export interface CourseProjectStudentInfo {
 export function normalizeGroupMembers(raw: (string | CourseProjectGroupMember)[] | undefined): CourseProjectGroupMember[] {
     return (raw ?? []).map((m) => (typeof m === "string" ? { name: m } : m));
 }
+
+/** Drops empty/ghost entries and splits a legacy CSV/JSON string if the API ever returns one. */
+export function normalizeUrlList(raw: unknown): string[] {
+    const parts = Array.isArray(raw)
+        ? raw
+        : typeof raw === "string" && raw.trim()
+          ? raw.trim().startsWith("[")
+              ? (() => {
+                    try {
+                        const parsed = JSON.parse(raw) as unknown;
+                        return Array.isArray(parsed) ? parsed : [raw];
+                    } catch {
+                        return raw.split(/,(?=https?:\/\/)/i);
+                    }
+                })()
+              : raw.split(/,(?=https?:\/\/)/i)
+          : [];
+    return [...new Set(parts.map((u) => String(u ?? "").trim()).filter(Boolean))];
+}
 export interface CourseProjectAssignmentInfo {
     format?: string;
     formatOther?: string;
@@ -252,7 +271,7 @@ export function mergeCourseProjectEntry(base: CourseProjectEntry, data: Partial<
         reflectionInfo: { ...base.reflectionInfo, ...data.reflectionInfo },
         moduleInclusion: { ...base.moduleInclusion, ...data.moduleInclusion },
         sectionSummaries: { ...base.sectionSummaries, ...data.sectionSummaries },
-        evidenceUrls: data.evidenceUrls ?? base.evidenceUrls,
+        evidenceUrls: data.evidenceUrls !== undefined ? normalizeUrlList(data.evidenceUrls) : normalizeUrlList(base.evidenceUrls),
         evidenceTypes: data.evidenceTypes ?? base.evidenceTypes,
     };
 }

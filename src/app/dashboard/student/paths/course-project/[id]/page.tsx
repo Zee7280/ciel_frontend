@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, UploadCloud, X, ChevronDown, Star } from "lucide-react";
@@ -17,6 +17,9 @@ import RichSummaryText from "@/components/ciel/RichSummaryText";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { MERIT_RUBRIC } from "@/utils/courseworkMeritModel";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
+import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "@/app/dashboard/student/report/utils/fileUploadLimits";
+import { fileNameFromUrl } from "@/utils/courseworkFlashCard";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
@@ -31,6 +34,7 @@ import {
     composeCourseProjectSummaries,
     courseProjectMetricLine,
     normalizeGroupMembers,
+    normalizeUrlList,
     stripBoldMarkup,
     activeSectionKeys,
     SECTION_LABELS,
@@ -525,7 +529,16 @@ export default function CourseProjectWizardPage() {
     const [declarationChecked, setDeclarationChecked] = useState(false);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const entryRef = useRef(entry);
+    const evidenceUrlsRef = useRef<string[]>([]);
+    const saveTailRef = useRef(Promise.resolve());
+    entryRef.current = entry;
+    useEffect(() => {
+        if (uploading) return;
+        evidenceUrlsRef.current = normalizeUrlList(entry.evidenceUrls);
+    }, [entry.evidenceUrls, uploading]);
 
     useEffect(() => {
         authenticatedFetch(`/api/v1/paths/course-projects/${id}`, {}, { redirectToLogin: false })
@@ -574,25 +587,36 @@ export default function CourseProjectWizardPage() {
 
     const inc: CourseProjectModuleInclusion = entry.moduleInclusion || {};
 
-    const save = async (patch: Partial<CourseProjectEntry>, advanceTo?: number) => {
-        setSaving(true);
-        setError(null);
-        const nextStepCompleted = advanceTo !== undefined ? Math.max(entry.stepCompleted, advanceTo) : entry.stepCompleted;
-        try {
-            const res = await authenticatedFetch(
-                `/api/v1/paths/course-projects/${id}`,
-                { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
-                { redirectToLogin: false },
-            );
-            const result = res?.ok ? await res.json() : null;
-            if (!result?.data) throw new Error("Could not save your progress");
-            setEntry((e) => mergeCourseProjectEntry(e, result.data as Partial<CourseProjectEntry>));
-            if (advanceTo !== undefined) setStep(Math.min(7, advanceTo));
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Could not save your progress");
-        } finally {
-            setSaving(false);
-        }
+    const save = (patch: Partial<CourseProjectEntry>, advanceTo?: number): Promise<boolean> => {
+        const run = async () => {
+            setSaving(true);
+            setError(null);
+            const current = entryRef.current;
+            const nextStepCompleted = advanceTo !== undefined ? Math.max(current.stepCompleted, advanceTo) : current.stepCompleted;
+            try {
+                const res = await authenticatedFetch(
+                    `/api/v1/paths/course-projects/${id}`,
+                    { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
+                    { redirectToLogin: false },
+                );
+                const result = res?.ok ? await res.json() : null;
+                if (!result?.data) throw new Error("Could not save your progress");
+                setEntry((e) => mergeCourseProjectEntry(e, result.data as Partial<CourseProjectEntry>));
+                if (advanceTo !== undefined) setStep(Math.min(7, advanceTo));
+                return true;
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not save your progress");
+                return false;
+            } finally {
+                setSaving(false);
+            }
+        };
+        const queued = saveTailRef.current.then(run, run);
+        saveTailRef.current = queued.then(
+            () => undefined,
+            () => undefined,
+        );
+        return queued;
     };
 
     const patchGroup = <K extends keyof CourseProjectEntry>(key: K, patch: Partial<NonNullable<CourseProjectEntry[K]>>) => {
@@ -624,29 +648,55 @@ export default function CourseProjectWizardPage() {
         }
     };
 
-    const handleEvidenceFile = async (file: File) => {
+    const handleEvidenceFiles = async (fileList: FileList | null) => {
+        if (!fileList?.length) return;
+        const { accepted, rejected } = splitReportFilesByImageSize(Array.from(fileList));
+        const failures: string[] = [];
+        if (rejected.length) {
+            failures.push(`${rejected.length} file(s) exceed ${MAX_REPORT_UPLOAD_LABEL} and were skipped.`);
+        }
+        if (!accepted.length) {
+            setError(failures.join(" "));
+            return;
+        }
         setUploading(true);
         setError(null);
         try {
-            const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
-            const nextUrls = [...(entry.evidenceUrls ?? []), publicUrl];
-            setEntry((e) => ({ ...e, evidenceUrls: nextUrls }));
-            await save({ evidenceUrls: nextUrls });
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Evidence upload failed. Try again.");
+            for (let i = 0; i < accepted.length; i++) {
+                const file = accepted[i];
+                setUploadProgress(`Uploading ${i + 1} of ${accepted.length}: ${file.name}`);
+                try {
+                    const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
+                    evidenceUrlsRef.current = normalizeUrlList([...evidenceUrlsRef.current, publicUrl]);
+                    setEntry((e) => ({ ...e, evidenceUrls: evidenceUrlsRef.current }));
+                } catch (err) {
+                    failures.push(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
+                }
+            }
+            const saved = await save({ evidenceUrls: evidenceUrlsRef.current });
+            if (failures.length) setError(failures.join(" "));
+            else if (!saved) setError((prev) => prev || "Files reached S3 but the record could not be saved. Try again.");
         } finally {
             setUploading(false);
+            setUploadProgress(null);
         }
     };
     const removeEvidence = (url: string) => {
-        const nextUrls = (entry.evidenceUrls ?? []).filter((u) => u !== url);
+        const nextUrls = normalizeUrlList(evidenceUrlsRef.current).filter((u) => u !== url);
+        evidenceUrlsRef.current = nextUrls;
         setEntry((e) => ({ ...e, evidenceUrls: nextUrls }));
-        save({ evidenceUrls: nextUrls });
+        void save({ evidenceUrls: nextUrls });
     };
 
     /** The primary assignment file — distinct from evidenceUrls' supporting files, drives half the Verifiability score. */
     const handleAssignmentFile = async (file: File) => {
+        const { accepted, rejected } = splitReportFilesByImageSize([file]);
+        if (rejected.length || !accepted[0]) {
+            setError(`File exceeds ${MAX_REPORT_UPLOAD_LABEL}. Use a smaller file or compress it.`);
+            return;
+        }
         setUploading(true);
+        setUploadProgress(`Uploading assignment: ${file.name}`);
         setError(null);
         try {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
@@ -656,7 +706,12 @@ export default function CourseProjectWizardPage() {
             setError(err instanceof Error ? err.message : "Assignment upload failed. Try again.");
         } finally {
             setUploading(false);
+            setUploadProgress(null);
         }
+    };
+    const removeAssignmentFile = () => {
+        setEntry((e) => ({ ...e, assignmentFileUrl: null }));
+        void save({ assignmentFileUrl: null });
     };
 
     if (loading) return <WorkspaceSkeleton />;
@@ -697,6 +752,9 @@ export default function CourseProjectWizardPage() {
         reflectionInfo: entry.reflectionInfo ?? undefined,
         moduleInclusion: entry.moduleInclusion ?? undefined,
         addedNote: entry.addedNote ?? undefined,
+        assignmentFileUrl: entry.assignmentFileUrl ?? null,
+        evidenceUrls: normalizeUrlList(evidenceUrlsRef.current.length ? evidenceUrlsRef.current : entry.evidenceUrls),
+        evidenceTypes: entry.evidenceTypes ?? [],
     });
 
     const isOwner = entry.isOwner !== false;
@@ -1370,23 +1428,58 @@ export default function CourseProjectWizardPage() {
                                 ))}
                             </div>
 
-                            <Field label="📎 Upload your files" hint="Optional — PDF · DOCX · PPTX · images · links. Files stay with this record for faculty review.">
-                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
+                            <Field label="📎 Upload your files" hint={`Optional — select multiple supporting files. PDF · DOCX · PPTX · images · video · sheets, up to ${MAX_REPORT_UPLOAD_LABEL} each. Files stay with this record for faculty review.`}>
+                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "pointer-events-none opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
-                                    {entry.assignmentFileUrl ? "✅ Assignment uploaded — travels privately with your card" : "📄 Upload your assignment — the essay, deck, design file. Lifts your Verifiability score (+3)."}
-                                    <input type="file" accept="image/*,application/pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => e.target.files?.[0] && handleAssignmentFile(e.target.files[0])} />
+                                    {entry.assignmentFileUrl ? "✅ Assignment uploaded — tap to replace" : "📄 Upload your assignment — the essay, deck, design file. Lifts your Verifiability score (+3)."}
+                                    <input
+                                        type="file"
+                                        accept={REPORT_ATTACHMENT_ACCEPT}
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            e.target.value = "";
+                                            if (file) void handleAssignmentFile(file);
+                                        }}
+                                    />
                                 </label>
-                                <label className={clsx("ciel-transition mt-2 flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.evidenceUrls?.length ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
+                                {entry.assignmentFileUrl ? (
+                                    <ul className="mt-2 space-y-1.5">
+                                        <li className="flex items-center justify-between gap-2 rounded-ciel-xs bg-ciel-page px-3 py-2 text-xs font-semibold text-ciel-text-mid">
+                                            <a href={entry.assignmentFileUrl} target="_blank" rel="noreferrer" className="truncate hover:underline">
+                                                Assignment · {fileNameFromUrl(entry.assignmentFileUrl, 48)}
+                                            </a>
+                                            <button type="button" onClick={removeAssignmentFile} aria-label="Remove assignment file" className="text-ciel-text-soft hover:text-red-600">
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </li>
+                                    </ul>
+                                ) : null}
+                                <label className={clsx("ciel-transition mt-2 flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.evidenceUrls?.length ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "pointer-events-none opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
-                                    {uploading ? "Uploading..." : entry.evidenceUrls?.length ? "✅ Supporting files uploaded" : "🖼️ Upload supporting files — photos, data, video, survey sheets (+2)."}
-                                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleEvidenceFile(e.target.files[0])} />
+                                    {uploading
+                                        ? uploadProgress || "Uploading..."
+                                        : entry.evidenceUrls?.length
+                                          ? `✅ ${entry.evidenceUrls.length} supporting file${entry.evidenceUrls.length === 1 ? "" : "s"} — tap to add more`
+                                          : "🖼️ Upload supporting files — photos, data, video, survey sheets (+2). You can select several at once."}
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept={REPORT_ATTACHMENT_ACCEPT}
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const files = e.target.files;
+                                            e.target.value = "";
+                                            void handleEvidenceFiles(files);
+                                        }}
+                                    />
                                 </label>
                                 <p className="mt-1.5 text-xs text-ciel-text-soft">🔒 Files stay private — visible to your teacher and reviewers only, never on the public card.</p>
                                 {!!entry.evidenceUrls?.length && (
                                     <ul className="mt-2 space-y-1.5">
                                         {entry.evidenceUrls.map((url) => (
                                             <li key={url} className="flex items-center justify-between gap-2 rounded-ciel-xs bg-ciel-page px-3 py-2 text-xs font-semibold text-ciel-text-mid">
-                                                <a href={url} target="_blank" rel="noreferrer" className="truncate hover:underline">{url.split("/").pop()}</a>
+                                                <a href={url} target="_blank" rel="noreferrer" className="truncate hover:underline">{fileNameFromUrl(url, 56)}</a>
                                                 <button type="button" onClick={() => removeEvidence(url)} aria-label="Remove" className="text-ciel-text-soft hover:text-red-600">
                                                     <X className="h-3.5 w-3.5" />
                                                 </button>
@@ -1543,7 +1636,7 @@ export default function CourseProjectWizardPage() {
                         {step < 7 ? (
                             <button
                                 type="button"
-                                disabled={saving}
+                                disabled={saving || uploading}
                                 onClick={() => save(saveAllFields(), step + 1)}
                                 className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
                             >
@@ -1552,9 +1645,11 @@ export default function CourseProjectWizardPage() {
                         ) : (
                             <button
                                 type="button"
-                                disabled={saving || !allAccepted || !declarationChecked || missingRequiredFields}
+                                disabled={saving || uploading || !allAccepted || !declarationChecked || missingRequiredFields}
                                 title={
-                                    !allAccepted
+                                    uploading
+                                        ? "Wait for files to finish uploading"
+                                        : !allAccepted
                                         ? "Accept every section above first"
                                         : missingRequiredFields
                                           ? "Go back and fill in the course name, title, SDG stance and sustainability integration level first"
@@ -1563,12 +1658,12 @@ export default function CourseProjectWizardPage() {
                                             : undefined
                                 }
                                 onClick={async () => {
-                                    await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 8);
-                                    router.push("/dashboard/student/paths/course-project");
+                                    const ok = await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 8);
+                                    if (ok) router.push("/dashboard/student/paths/course-project");
                                 }}
                                 className="ciel-transition rounded-ciel-sm bg-ciel-gold px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-gold/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
                             >
-                                {saving ? "Submitting..." : "Submit project"}
+                                {saving || uploading ? "Submitting..." : "Submit project"}
                             </button>
                         )}
                     </div>

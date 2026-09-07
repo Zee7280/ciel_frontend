@@ -19,6 +19,7 @@ import {
 } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CourseworkFacultyReviewInbox from "@/components/ciel/coursework/CourseworkFacultyReviewInbox";
 import { isFacultyApproved, pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
+import { mergeCourseProjectEntry } from "@/utils/courseProjectTypes";
 
 const BASE = "/dashboard/faculty/coursework-projects";
 const VIEWS = ["home", "progress", "review", "rank"] as const;
@@ -91,7 +92,13 @@ function FacultyCourseworkHub() {
             });
             if (response?.ok) {
                 const data = await response.json();
-                setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.data } : e)));
+                setEntries((prev) =>
+                    prev.map((e) =>
+                        e.id === id
+                            ? { ...mergeCourseProjectEntry(e, data.data as Partial<typeof e>), student: (data.data as { student?: typeof e.student })?.student ?? e.student }
+                            : e,
+                    ),
+                );
                 toast.success(
                     action === "approve"
                         ? "Approved — reflected on student, university and CIEL decks. No score given."
@@ -150,7 +157,7 @@ function FacultyCourseworkHub() {
               ? {
                     title: "Coursework Review",
                     subtitle:
-                        "Each submission arrives as the student's flashcard. The AI runs the CIEL PK Universal Coursework Rubric for your assistance only — you decide, and the student never sees the score.",
+                        "Each submission arrives as the complete review package. Run the AI Coursework Score + Global Benchmark analyser, then approve, request revision or reject. The student never sees the score.",
                     stats: [
                         { value: String(pending.length), label: "Pending your review" },
                         { value: String(revision.length), label: "Revision with student" },
@@ -179,7 +186,7 @@ function FacultyCourseworkHub() {
                   };
 
     return (
-        <div className="mx-auto max-w-[1240px]">
+        <div className={view === "review" ? "mx-auto max-w-[1380px]" : "mx-auto max-w-[1240px]"}>
             <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : VIEW_CRUMB[view]} pathLabel="Coursework Project" />
             <CourseworkHero kicker="FACULTY IMPACT DASHBOARD" title={hero.title} subtitle={hero.subtitle} stats={hero.stats} />
 
@@ -210,7 +217,7 @@ function FacultyCourseworkHub() {
                             badge={pending.length ? `${pending.length} PENDING` : "INBOX"}
                             emoji="✅"
                             title="Coursework Review"
-                            subtitle="Submitted flashcards with AI score & per-section comments (faculty-only). Approve, request revision or reject."
+                            subtitle="Submitted flashcards with AI score, evidence map, global benchmark and faculty moderation. Approve, request revision or reject."
                             background="linear-gradient(135deg,#149f8f,#2bcbb8)"
                         />
                         <HubTile
@@ -281,7 +288,7 @@ function FacultyCourseworkHub() {
                 <div className="mt-2">
                     <PathSectionHead
                         title="Coursework submissions"
-                        subtitle="Open the flashcard to read all seven summaries with the AI score and comment beside each one, then approve, request revision or reject."
+                        subtitle="Open the AI Coursework Score + Global Benchmark workspace: flashcard, primary file, evidence, 7-criterion rubric, then approve, request revision or reject."
                     />
                     <div className="mb-4 rounded-[15px] border border-[#d5eee8] bg-[#eef8f6] px-4 py-3 text-[11px] leading-relaxed text-[#4b6f68]">
                         🔒 <b>AI score = faculty assistance only.</b> It helps you mark a grade; it is never shown to the student, the university or CIEL PK at review stage. Approving publishes the flashcard (not the score) to the student&apos;s My Coursework Impact, your Approved Coursework, the University Coursework Impact Wall and CIEL PK.

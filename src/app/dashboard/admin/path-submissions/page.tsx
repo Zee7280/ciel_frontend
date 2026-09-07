@@ -41,6 +41,7 @@ interface AdminCourseProjectRow {
     projectDescription: string | null;
     sdgs: number[] | null;
     evidenceUrls: string[] | null;
+    assignmentFileUrl?: string | null;
     stepCompleted: number;
     status: "draft" | "submitted";
     facultyApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
@@ -842,7 +843,7 @@ export default function AdminPathSubmissionsPage() {
                                                       </Badge>
                                                   ) : null}
                                                   <Badge variant="outline" className="border-slate-200 text-slate-600">
-                                                      Step {row.stepCompleted}/4
+                                                      Step {row.stepCompleted}/8
                                                   </Badge>
                                               </div>
                                               <p className="text-sm font-semibold text-slate-700">{row.course || "Course not set"}</p>
@@ -874,11 +875,19 @@ export default function AdminPathSubmissionsPage() {
                                               ) : (
                                                   <p className="text-sm text-slate-500">No SDGs selected.</p>
                                               )}
-                                              {row.evidenceUrls?.length ? (
+                                              {row.assignmentFileUrl || row.evidenceUrls?.length ? (
                                                   <div>
-                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Evidence</p>
+                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Files</p>
                                                       <ul className="mt-2 space-y-2">
-                                                          {row.evidenceUrls.map((url) => (
+                                                          {row.assignmentFileUrl ? (
+                                                              <li>
+                                                                  <a href={row.assignmentFileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline break-all">
+                                                                      Assignment · {row.assignmentFileUrl.split("/").pop() || row.assignmentFileUrl}
+                                                                      <ExternalLink className="h-3.5 w-3.5" />
+                                                                  </a>
+                                                              </li>
+                                                          ) : null}
+                                                          {(row.evidenceUrls || []).filter(Boolean).map((url) => (
                                                               <li key={url}>
                                                                   <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline break-all">
                                                                       {url.split("/").pop() || url}
@@ -889,7 +898,7 @@ export default function AdminPathSubmissionsPage() {
                                                       </ul>
                                                   </div>
                                               ) : (
-                                                  <p className="text-sm text-slate-500">No evidence uploaded.</p>
+                                                  <p className="text-sm text-slate-500">No files uploaded.</p>
                                               )}
                                               {(() => {
                                                   const members = normalizeMembers(row.studentInfo?.groupMembers);

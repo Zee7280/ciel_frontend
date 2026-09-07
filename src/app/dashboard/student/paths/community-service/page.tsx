@@ -20,7 +20,7 @@ import CommunityServiceRankings from "./CommunityServiceRankings";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
-import { CIEL_PATHS } from "@/utils/cielPaths";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 type ApprovalLineStatus = "pending" | "approved" | "rejected" | null | undefined;
 
@@ -70,6 +70,15 @@ function CommunityServiceContent() {
     const searchParams = useSearchParams();
     const rawTab = searchParams.get("tab");
     const showHub = !rawTab;
+    const rawFilter = searchParams.get("filter");
+    const workspaceFilter =
+        rawFilter === "opportunity" ||
+        rawFilter === "report" ||
+        rawFilter === "review" ||
+        rawFilter === "revision" ||
+        rawFilter === "closed"
+            ? rawFilter
+            : "all";
     const wallView = searchParams.get("view") === "wall";
     const guideView = searchParams.get("view") === "guide";
     const createView = searchParams.get("view") === "create";
@@ -82,6 +91,8 @@ function CommunityServiceContent() {
     const [verifiedHours, setVerifiedHours] = useState(0);
     const [wallCount, setWallCount] = useState(0);
     const [completion, setCompletion] = useState(0);
+    const [bestCii, setBestCii] = useState<number | null>(null);
+    const [displayName, setDisplayName] = useState("");
     const [myOpportunities, setMyOpportunities] = useState<CreatedOpportunity[]>([]);
 
     useEffect(() => {
@@ -92,17 +103,26 @@ function CommunityServiceContent() {
             authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false })
                 .then((res) => (res?.ok ? res.json() : null))
                 .catch(() => null),
-        ]).then(([data, summary, oppResult]) => {
+            authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
+                .then((res) => (res?.ok ? res.json() : null))
+                .catch(() => null),
+        ]).then(([data, summary, oppResult, rankingsResult]) => {
             if (cancelled) return;
             setProjects(data?.activeProjects ?? []);
             setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
             setWallCount(data?.overview?.impactHistoryBadgeCount ?? data?.overview?.completedCount ?? 0);
-            setCompletion(
-                Math.round(
-                    (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) /
-                        (CIEL_PATHS.length || 1)) || 0,
-                ),
-            );
+            setCompletion(Math.round(summary?.pathsStatus.communityService?.progress ?? 0));
+            const rankingRows = Array.isArray(rankingsResult?.data)
+                ? (rankingsResult.data as { cii?: number }[])
+                : [];
+            const rankingBest = rankingRows.reduce<number | null>((max, row) => {
+                const n = typeof row.cii === "number" ? row.cii : null;
+                if (n == null) return max;
+                return max == null ? n : Math.max(max, n);
+            }, null);
+            setBestCii(rankingBest);
+            const storedName = readStoredCurrentUser()?.name;
+            setDisplayName(typeof storedName === "string" ? storedName.trim() : "");
             const rows = Array.isArray(oppResult?.data) ? (oppResult.data as Record<string, unknown>[]) : [];
             setMyOpportunities(
                 rows
@@ -119,6 +139,8 @@ function CommunityServiceContent() {
                     })),
             );
             setLoading(false);
+        }).catch(() => {
+            if (!cancelled) setLoading(false);
         });
         return () => {
             cancelled = true;
@@ -126,6 +148,7 @@ function CommunityServiceContent() {
     }, []);
 
     const attention = useMemo(() => {
+        const revisionOpp = myOpportunities.find((o) => o.workflow_stage === "revision");
         const oppAction = myOpportunities.filter((o) => o.workflow_stage === "revision").length;
         const oppApprovals = myOpportunities.filter((o) =>
             ["pending_faculty", "pending_partner", "pending_admin"].includes(o.workflow_stage ?? ""),
@@ -141,40 +164,47 @@ function CommunityServiceContent() {
                 n: oppAction,
                 title: "Opportunity action",
                 sub: oppAction ? "Revision waiting inside Create Opportunity" : "No proposal revision waiting",
-                href: `${HUB}?tab=engagements`,
+                href: revisionOpp
+                    ? `/dashboard/student/create-opportunity?edit=${encodeURIComponent(revisionOpp.id)}`
+                    : `${HUB}?view=create`,
                 urgent: oppAction > 0,
+                tone: oppAction > 0 ? ("bad" as const) : ("default" as const),
             },
             {
                 key: "oppApprovals",
                 n: oppApprovals,
                 title: "Opportunity approvals",
                 sub: "Faculty / Partner / CIEL PK decisions tracked in Create Opportunity",
-                href: `${HUB}?tab=engagements`,
+                href: `${HUB}?view=workspace&filter=opportunity`,
                 urgent: false,
+                tone: "default" as const,
             },
             {
                 key: "readyToStart",
                 n: readyProjects.length,
                 title: "Ready to start",
-                sub: "Approved projects waiting to begin a report",
-                href: readyProjects[0] ? `/dashboard/student/report?projectId=${readyProjects[0].id}` : `${HUB}?tab=engagements`,
+                sub: "Approved projects waiting in Workspace",
+                href: `${HUB}?view=workspace&filter=report`,
                 urgent: false,
+                tone: readyProjects.length > 0 ? ("warn" as const) : ("default" as const),
             },
             {
                 key: "reportAction",
                 n: reportAction,
                 title: "Report action",
                 sub: reportAction ? "Faculty requested a report revision" : "No report revision waiting",
-                href: `${HUB}?tab=reports`,
+                href: `${HUB}?view=workspace&filter=revision`,
                 urgent: reportAction > 0,
+                tone: reportAction > 0 ? ("bad" as const) : ("default" as const),
             },
             {
                 key: "reportsInProgress",
                 n: reportsInProgress,
                 title: "Reports in progress",
-                sub: reportsInProgress ? `${reportsInProgress} report(s) in progress` : "No active reports",
-                href: `${HUB}?tab=reports`,
+                sub: reportsInProgress ? "Continue your active report(s)" : "No active reports",
+                href: `${HUB}?view=workspace&filter=report`,
                 urgent: false,
+                tone: reportsInProgress > 0 ? ("warn" as const) : ("default" as const),
             },
         ];
     }, [myOpportunities, projects]);
@@ -205,7 +235,7 @@ function CommunityServiceContent() {
     if (showHub && guideView) {
         return (
             <div className="mx-auto max-w-[980px] pb-16">
-                <HubBackButton href="/dashboard/student/paths/community-service" />
+                <HubBackButton href="/dashboard/student/paths/community-service" label="← Back to Community Service" />
                 <StudentCommunityGuide showHero />
             </div>
         );
@@ -229,6 +259,7 @@ function CommunityServiceContent() {
                 verifiedHours={verifiedHours}
                 wallCount={wallCount}
                 completion={completion}
+                initialFilter={workspaceFilter}
             />
         );
     }
@@ -236,13 +267,16 @@ function CommunityServiceContent() {
     if (showHub && rankingsView) {
         return (
             <div className="mx-auto max-w-[1500px] pb-16">
-                <HubBackButton href={HUB} />
+                <HubBackButton href={HUB} label="← Back to Community Service" />
                 <CommunityServiceRankings />
             </div>
         );
     }
 
     if (showHub) {
+        const reportInProgress = attention.some((item) => item.key === "reportsInProgress" && item.n > 0);
+        const recordIds = new Set(projects.map((p) => p.id));
+        myOpportunities.forEach((o) => recordIds.add(o.id));
         return (
             <CommunityServiceHub
                 projects={projects}
@@ -250,6 +284,10 @@ function CommunityServiceContent() {
                 wallCount={wallCount}
                 completion={completion}
                 attention={attention}
+                displayName={displayName}
+                bestCii={bestCii}
+                reportInProgress={reportInProgress}
+                recordCount={recordIds.size}
             />
         );
     }

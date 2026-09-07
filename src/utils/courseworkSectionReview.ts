@@ -20,7 +20,7 @@ export function reviewCourseProjectSections(entry: CourseProjectEntry): SectionC
     const inc = entry.moduleInclusion || {};
     const formats = ai.formats?.length ? ai.formats : ai.format ? [ai.format] : [];
     const metrics = re.metrics || [];
-    const files = [...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])];
+    const files = [...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])].filter(Boolean);
     const claimedMeasured = metrics.some((m) => m.status === "Actual — measured");
 
     const courseOk = !!(entry.course?.trim() && si.teacherEmail?.trim());

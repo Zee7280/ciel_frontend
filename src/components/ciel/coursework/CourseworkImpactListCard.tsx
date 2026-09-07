@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { sdgData } from "@/utils/sdgData";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import {
+    courseworkApprovedFiles,
     courseworkApprovedMetaLine,
     courseworkFlashHeadline,
     courseworkRankTrend,
@@ -12,7 +13,7 @@ import {
 } from "@/utils/courseworkFlashCard";
 
 function openApprovedFile(entry: CourseProjectEntry) {
-    const files = [...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])].filter(Boolean);
+    const files = courseworkApprovedFiles(entry);
     if (!files.length) {
         toast.message("No files attached (optional)");
         return;

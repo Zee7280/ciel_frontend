@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
@@ -191,13 +192,25 @@ export default function CommunityServiceWorkspace({
     verifiedHours,
     wallCount,
     completion,
+    initialFilter = "all",
 }: {
     projects: ActiveProject[];
     verifiedHours: number;
     wallCount: number;
     completion: number;
+    initialFilter?: WsFilter;
 }) {
-    const [filter, setFilter] = useState<WsFilter>("all");
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const filterParam = searchParams.get("filter");
+    const filter: WsFilter = FILTERS.some((item) => item.key === filterParam) ? (filterParam as WsFilter) : initialFilter;
+    const setFilter = (next: WsFilter) => {
+        const qs = new URLSearchParams(searchParams.toString());
+        qs.set("view", "workspace");
+        if (next === "all") qs.delete("filter");
+        else qs.set("filter", next);
+        router.replace(`${HUB}?${qs.toString()}`, { scroll: false });
+    };
     const [opportunities, setOpportunities] = useState<OpportunityRow[]>([]);
     const [reports, setReports] = useState<ReportRow[]>([]);
     const [loading, setLoading] = useState(true);

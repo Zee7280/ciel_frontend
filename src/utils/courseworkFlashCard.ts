@@ -4,6 +4,7 @@ import {
     type CourseProjectSectionSummaries,
     courseProjectMetricLine,
     normalizeGroupMembers,
+    normalizeUrlList,
     rankMovement,
     resolveSectionSummaries,
     stripBoldMarkup,
@@ -43,7 +44,7 @@ export function courseworkRecordCode(entry: CourseProjectEntry): string {
 }
 
 export function courseworkApprovedFiles(entry: CourseProjectEntry): string[] {
-    return [...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])].filter(Boolean);
+    return normalizeUrlList([...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])]);
 }
 
 export function fileNameFromUrl(url: string, maxLen = 36): string {

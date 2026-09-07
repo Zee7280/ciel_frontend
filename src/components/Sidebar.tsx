@@ -554,6 +554,7 @@ export default function Sidebar() {
         if (hrefPath === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
         if (hrefPath === "/dashboard/student/impact" && pathname.startsWith("/dashboard/student/analytics")) return true;
         if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/create-opportunity")) return true;
+        if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/browse")) return true;
         if (pathname === hrefPath) return true;
         const longerChild = allRoleHrefs.some(
             (other) => other !== hrefPath && other.startsWith(`${hrefPath}/`) && (pathname === other || pathname.startsWith(`${other}/`)),
@@ -642,6 +643,7 @@ export default function Sidebar() {
                                 emoji={path.emoji}
                                 active={isNavActive(path.href)}
                                 needsAction={impactSummary?.pathsStatus?.[path.key]?.needsAction}
+                                countPill={path.key === "communityService" ? impactSummary?.activeEngagements : undefined}
                                 collapsed={collapsed}
                             />
                         ))}

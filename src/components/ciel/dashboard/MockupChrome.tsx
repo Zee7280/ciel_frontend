@@ -104,6 +104,7 @@ export function MockupActionCard({
     background,
     locked,
     full,
+    hot,
 }: {
     href?: string;
     onClick?: () => void;
@@ -115,11 +116,16 @@ export function MockupActionCard({
     background: string;
     locked?: boolean;
     full?: boolean;
+    hot?: boolean;
 }) {
-    const className = `relative min-h-[170px] overflow-hidden rounded-[28px] px-6 py-[22px] text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-[22px] after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION']" : ""}`;
+    const className = `relative min-h-[158px] overflow-hidden rounded-[24px] px-[22px] py-5 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-[22px] after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION']" : ""}`;
     const inner = (
         <>
-            <span className="absolute right-[17px] top-[15px] rounded-[18px] bg-white px-3 py-[7px] text-[9.5px] font-[950] tracking-[0.04em] text-[#0e756e]">
+            <span
+                className={`absolute right-4 top-3.5 rounded-[18px] px-2.5 py-1.5 text-[9.5px] font-[950] tracking-[0.04em] ${
+                    hot ? "bg-[#ffe7b3] text-[#7a4b00]" : "bg-white text-[#0e756e]"
+                }`}
+            >
                 {badge}
             </span>
             <span className="mb-[18px] block text-[29px] leading-none">{emoji}</span>
