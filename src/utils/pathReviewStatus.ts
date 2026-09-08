@@ -9,6 +9,11 @@ export function reviewStatusLabel(
     status: string | undefined,
     approvalStatus: string | null | undefined,
     revisionValue: string,
+    /** The student sees "Revision requested" (their own to-do); every other role watching the same
+     * record — faculty, university/partner, CIEL PK — sees "Revision in progress" (someone else's
+     * to-do, already handed back). Defaults to the student wording so every existing caller that
+     * hasn't been updated to pass this keeps its current behaviour. */
+    audience: "student" | "other" = "student",
 ): { tone: PathReviewStatusTone; label: string } {
     if (status !== "submitted") return { tone: "draft", label: "Draft" };
     switch (approvalStatus) {
@@ -17,7 +22,10 @@ export function reviewStatusLabel(
         case "rejected":
             return { tone: "rejected", label: "Rejected" };
         case revisionValue:
-            return { tone: "revision_requested", label: "Revision requested" };
+            return {
+                tone: "revision_requested",
+                label: audience === "student" ? "Revision requested" : "Revision in progress",
+            };
         default:
             return { tone: "under_review", label: "Under review" };
     }

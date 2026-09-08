@@ -519,6 +519,7 @@ export default function UniversityShowcasePage() {
                                     remindDraftOwner={view === "progress" || entry.facultyApprovalStatus === "revision_requested"}
                                     studentReminder={view === "pending" && entry.facultyApprovalStatus === "pending" ? "faculty" : undefined}
                                     studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
+                                    hideScore={view !== "deck"}
                                 />
                             ))}
                         </div>

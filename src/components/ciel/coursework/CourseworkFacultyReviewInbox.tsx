@@ -21,7 +21,12 @@ export default function CourseworkFacultyReviewInbox({
 }: {
     entries: MeritEntry[];
     reviewingId: string | null;
-    onReview: (id: string, action: "approve" | "reject" | "revision", note?: string) => void;
+    onReview: (
+        id: string,
+        action: "approve" | "reject" | "revision",
+        note?: string,
+        moderation?: { levels: Record<string, number>; notes?: Record<string, string>; facultyScore: number; band?: string; lockHash?: string },
+    ) => void;
 }) {
     const queue = useMemo(() => entries.filter(pendingFacultyReview), [entries]);
     const [sel, setSel] = useState(0);
@@ -43,7 +48,7 @@ export default function CourseworkFacultyReviewInbox({
                 <div className="mt-2 space-y-2">
                     {queue.map((q, i) => {
                         const qIssues = reviewCourseProjectSections(q).filter((c) => !c.ok).length;
-                        const st = courseworkStatusLabel(q);
+                        const st = courseworkStatusLabel(q, "other");
                         const fileCount = (q.assignmentFileUrl ? 1 : 0) + normalizeUrlList(q.evidenceUrls).length;
                         return (
                             <button

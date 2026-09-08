@@ -83,12 +83,17 @@ function FacultyCourseworkHub() {
         }
     };
 
-    const reviewEntry = async (id: string, action: "approve" | "reject" | "revision", note?: string) => {
+    const reviewEntry = async (
+        id: string,
+        action: "approve" | "reject" | "revision",
+        note?: string,
+        moderation?: { levels: Record<string, number>; notes?: Record<string, string>; facultyScore: number; band?: string; lockHash?: string },
+    ) => {
         setReviewingId(id);
         try {
             const response = await authenticatedFetch(`/api/v1/paths/course-projects/${id}/faculty-review`, {
                 method: "PATCH",
-                body: JSON.stringify({ action, note }),
+                body: JSON.stringify({ action, note, moderation }),
             });
             if (response?.ok) {
                 const data = await response.json();
@@ -273,6 +278,7 @@ function FacultyCourseworkHub() {
                                         studentName={entry.student?.name}
                                         remindDraftOwner
                                         studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
+                                        hideScore={false}
                                     />
                                     <p className="mt-1.5 px-1 text-[10px] text-slate-400">
                                         Last activity {formatDistanceToNow(new Date(entry.updatedAt ?? entry.createdAt ?? Date.now()), { addSuffix: true })}
@@ -331,7 +337,7 @@ function FacultyCourseworkHub() {
                                 ) : (
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                         {filteredApproved.map((entry) => (
-                                            <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                            <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
                                         ))}
                                     </div>
                                 )}

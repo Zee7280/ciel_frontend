@@ -39,7 +39,7 @@ export default function CourseworkCard({
     studentReminder,
     remindDraftOwner = false,
     studentEmail,
-    hideScore = false,
+    hideScore = true,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -55,8 +55,9 @@ export default function CourseworkCard({
     /** The draft owner's email — needed for remindDraftOwner (a plain CourseProjectEntry has no joined student record of its own). */
     studentEmail?: string;
     /** The raw /100 quality score is faculty/university/CIEL-only by design — a student sees their
-     * rank badge (and, once published, the downloadable report) but never the number itself. Pass
-     * true on every student-facing render of their own card. */
+     * rank badge (and, once published, the downloadable report) but never the number itself.
+     * Defaults to hidden (safe-by-default) — pass false explicitly on every faculty/university/CIEL
+     * render where the score should show. */
     hideScore?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
@@ -81,7 +82,7 @@ export default function CourseworkCard({
     const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
     const approval = entry.facultyApprovalStatus;
     const ribbon = entry.meritRibbon;
-    const statusLabel = courseworkStatusLabel(entry);
+    const statusLabel = courseworkStatusLabel(entry, hideScore ? "student" : "other");
     const movement = rankMovement(ribbon);
     const verifyPath = entry.verificationPublicSlug ? `/coursework/verify/${entry.verificationPublicSlug}` : null;
     const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;

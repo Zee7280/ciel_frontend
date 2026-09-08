@@ -838,6 +838,14 @@ export default function CourseProjectWizardPage() {
                     <button
                         type="button"
                         onClick={() => {
+                            if (
+                                entry.facultyApprovalStatus === "approved" &&
+                                !window.confirm(
+                                    "This report is already approved and ranked. Editing it will send it back for faculty re-review and temporarily remove it from rankings and impact walls until it's approved again. Continue?",
+                                )
+                            ) {
+                                return;
+                            }
                             setStep(0);
                             setEditing(true);
                         }}
@@ -855,9 +863,14 @@ export default function CourseProjectWizardPage() {
                         Shared team report — you and {entry.studentInfo?.studentName || "your teammates"} can all edit this same file.
                     </div>
                 )}
-                {entry.facultyApprovalStatus !== "approved" && entry.facultyApprovalNote ? (
+                {entry.facultyApprovalStatus === "rejected" && entry.facultyApprovalNote ? (
+                    <div className="mb-4 rounded-ciel-sm border border-red-200 bg-red-50 px-4 py-3 text-xs leading-relaxed text-red-900">
+                        <b>Rejected by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
+                        {entry.facultyApprovalNote} You can revise this report and resubmit it for another review.
+                    </div>
+                ) : entry.facultyApprovalStatus === "revision_requested" && entry.facultyApprovalNote ? (
                     <div className="mb-4 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
-                        <b>{courseworkStatusLabel(entry).label} by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
+                        <b>Revision requested by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
                         {entry.facultyApprovalNote} Fix and resubmit — nothing is penalised.
                     </div>
                 ) : null}

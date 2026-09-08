@@ -118,9 +118,12 @@ export type CourseworkStatusTone = "draft" | "under_review" | "revision_requeste
 /** Single source of truth for how a coursework entry's lifecycle status reads to a human — every
  * card/pill/badge across student/faculty/university/admin views should call this instead of
  * re-deriving its own copy from status+facultyApprovalStatus. */
-export function courseworkStatusLabel(entry: {
-    status?: string;
-    facultyApprovalStatus?: string | null;
-}): { tone: CourseworkStatusTone; label: string } {
-    return reviewStatusLabel(entry.status, entry.facultyApprovalStatus, "revision_requested");
+export function courseworkStatusLabel(
+    entry: {
+        status?: string;
+        facultyApprovalStatus?: string | null;
+    },
+    audience: "student" | "other" = "student",
+): { tone: CourseworkStatusTone; label: string } {
+    return reviewStatusLabel(entry.status, entry.facultyApprovalStatus, "revision_requested", audience);
 }

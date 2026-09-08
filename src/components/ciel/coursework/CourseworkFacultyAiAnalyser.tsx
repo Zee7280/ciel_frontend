@@ -50,10 +50,16 @@ export default function CourseworkFacultyAiAnalyser({
 }: {
     entry: MeritEntry;
     reviewingId: string | null;
-    onReview: (id: string, action: "approve" | "reject" | "revision", note?: string) => void;
+    onReview: (
+        id: string,
+        action: "approve" | "reject" | "revision",
+        note?: string,
+        moderation?: { levels: Record<string, number>; notes?: Record<string, string>; facultyScore: number; band?: string; lockHash?: string },
+    ) => void;
 }) {
     const model = useMemo(() => buildAnalyserModel(entry), [entry]);
     const alreadyApproved = entry.facultyApprovalStatus === "approved";
+    const savedModeration = entry.facultyModeration;
     const [tab, setTab] = useState<TabId>("Intake");
     const [analysed, setAnalysed] = useState(alreadyApproved);
     const [scanning, setScanning] = useState(false);
@@ -61,12 +67,12 @@ export default function CourseworkFacultyAiAnalyser({
     const [scanText, setScanText] = useState(
         alreadyApproved ? "Faculty decision already recorded on this submission." : "Ready for automatic analysis.",
     );
-    const [facultyLevels, setFacultyLevels] = useState<Record<string, number>>(model.aiLevels);
-    const [notes, setNotes] = useState<Record<string, string>>({});
+    const [facultyLevels, setFacultyLevels] = useState<Record<string, number>>(savedModeration?.levels || model.aiLevels);
+    const [notes, setNotes] = useState<Record<string, string>>(savedModeration?.notes || {});
     const [overallNote, setOverallNote] = useState(entry.facultyApprovalNote || "");
     const [returnNote, setReturnNote] = useState("");
     const [locked, setLocked] = useState(alreadyApproved);
-    const [lockHash, setLockHash] = useState("");
+    const [lockHash, setLockHash] = useState(savedModeration?.lockHash || "");
     const [lockedAt, setLockedAt] = useState(entry.facultyApprovalAt || "");
     const [openCriterion, setOpenCriterion] = useState<string | null>(null);
 
@@ -80,21 +86,22 @@ export default function CourseworkFacultyAiAnalyser({
                 ? "Faculty decision already recorded on this submission."
                 : "Ready for automatic analysis.",
         );
-        setFacultyLevels(model.aiLevels);
-        setNotes({});
+        setFacultyLevels(entry.facultyModeration?.levels || model.aiLevels);
+        setNotes(entry.facultyModeration?.notes || {});
         setOverallNote(entry.facultyApprovalNote || "");
         setReturnNote("");
         setLocked(entry.facultyApprovalStatus === "approved");
-        setLockHash("");
+        setLockHash(entry.facultyModeration?.lockHash || "");
         setLockedAt(entry.facultyApprovalAt || "");
         setOpenCriterion(null);
-    }, [entry.id, entry.facultyApprovalAt, entry.facultyApprovalNote, entry.facultyApprovalStatus, model.aiLevels]);
+    }, [entry.id, entry.facultyApprovalAt, entry.facultyApprovalNote, entry.facultyApprovalStatus, entry.facultyModeration, model.aiLevels]);
 
     const facultyScore = scoreFromLevels(model.scorecard, facultyLevels);
     const facultyBand = bandForScore(facultyScore);
     const delta = facultyScore - model.aiScore;
     const changed = model.scorecard.criteria.filter((c) => (facultyLevels[c.key] ?? 0) !== model.aiLevels[c.key]);
     const missingReason = changed.some((c) => !String(notes[c.key] || "").trim());
+    const missingReturnReason = !returnNote.trim() && !overallNote.trim();
     const busy = reviewingId === entry.id || scanning;
 
     const runAnalysis = () => {
@@ -152,7 +159,13 @@ export default function CourseworkFacultyAiAnalyser({
             at: new Date().toISOString(),
         };
         const hash = await sha256Hex(record);
-        onReview(entry.id, "approve", overallNote.trim() || undefined);
+        onReview(entry.id, "approve", overallNote.trim() || undefined, {
+            levels: facultyLevels,
+            notes,
+            facultyScore,
+            band: facultyBand.name,
+            lockHash: hash,
+        });
         setLockHash(hash);
         setLocked(true);
         setLockedAt(new Date().toLocaleString());
@@ -345,6 +358,7 @@ export default function CourseworkFacultyAiAnalyser({
                                 defaultOpen={false}
                                 remindDraftOwner
                                 studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
+                                hideScore={false}
                             />
                         </div>
                     </article>
@@ -368,6 +382,7 @@ export default function CourseworkFacultyAiAnalyser({
                     busy={busy}
                     analysed={analysed}
                     missingReason={missingReason}
+                    missingReturnReason={missingReturnReason}
                     facultyScore={facultyScore}
                     facultyBand={facultyBand}
                     delta={delta}
@@ -849,6 +864,7 @@ function ModerationPane({
     busy,
     analysed,
     missingReason,
+    missingReturnReason,
     facultyScore,
     facultyBand,
     delta,
@@ -873,6 +889,7 @@ function ModerationPane({
     busy: boolean;
     analysed: boolean;
     missingReason: boolean;
+    missingReturnReason: boolean;
     facultyScore: number;
     facultyBand: ReturnType<typeof bandForScore>;
     delta: number;
@@ -1036,13 +1053,13 @@ function ModerationPane({
                             disabled={locked}
                             value={returnNote}
                             onChange={(e) => onReturnNote(e.target.value)}
-                            placeholder="State exactly what needs clarification or review…"
+                            placeholder="Required — state exactly what needs clarification or review…"
                             className="mt-2 min-h-[72px] w-full rounded-[10px] border border-[#dce3ea] p-2 text-[12px]"
                         />
                         <div className="mt-2 flex flex-wrap gap-2">
                             <button
                                 type="button"
-                                disabled={locked || busy}
+                                disabled={locked || busy || missingReturnReason}
                                 onClick={onReturn}
                                 className="rounded-[11px] border border-[#e4e9ef] bg-white px-3 py-2 text-[11px] font-black text-[#405461] disabled:opacity-45"
                             >
@@ -1050,13 +1067,18 @@ function ModerationPane({
                             </button>
                             <button
                                 type="button"
-                                disabled={locked || busy}
+                                disabled={locked || busy || missingReturnReason}
                                 onClick={onReject}
                                 className="rounded-[11px] border border-[#efcbd1] bg-[#fff7f8] px-3 py-2 text-[11px] font-black text-[#a34254] disabled:opacity-45"
                             >
                                 ❌ Reject record
                             </button>
                         </div>
+                        <p className="mt-1.5 text-[11px] text-[#7a6674]">
+                            {missingReturnReason
+                                ? "A reason is required before returning or rejecting a submission — the student is entitled to know why."
+                                : "This reason will be sent to the student."}
+                        </p>
                     </div>
                 </div>
                 <div className="mt-2.5 rounded-2xl border border-[#ddd7f0] bg-[linear-gradient(135deg,#faf9ff,#fff)] p-3.5">
@@ -1064,7 +1086,7 @@ function ModerationPane({
                     <p className="mt-1 text-[12px] leading-relaxed text-[#706982]">
                         {locked
                             ? `AI proposal, Faculty overrides, reasons and final score are frozen${lockedAt ? ` · ${lockedAt}` : ""}. Any later correction should create a new version rather than silently rewriting academic judgement.`
-                            : "Approval creates a decision hash and an audit trail preserving both the machine recommendation and human moderation. The existing faculty-review API still publishes or returns the flashcard."}
+                            : "Approval creates a decision hash and an audit trail preserving both the machine recommendation and human moderation — saved with the record, so it's still here on reload."}
                     </p>
                     {lockHash ? <p className="mt-2 break-all rounded-lg bg-[#f0eef9] p-2 font-mono text-[10px] text-[#605975]">{lockHash}</p> : null}
                 </div>

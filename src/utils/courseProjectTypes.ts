@@ -224,6 +224,16 @@ export interface CourseProjectEntry {
         previousRank?: number | null;
         at: string;
     } | null;
+    /** Faculty's own per-criterion override of the AI-proposed rubric levels, frozen at approval —
+     * faculty-only, never present on a student-facing response (see backend redactMeritScoreForStudent). */
+    facultyModeration?: {
+        levels: Record<string, number>;
+        notes?: Record<string, string>;
+        facultyScore: number;
+        band?: string;
+        lockHash?: string;
+        at: string;
+    } | null;
     /** Unique public key for the badge's QR/share verify link — see /coursework/verify/[key]. */
     verificationPublicSlug?: string | null;
     createdAt?: string;

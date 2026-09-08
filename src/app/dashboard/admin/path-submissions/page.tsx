@@ -500,7 +500,7 @@ export default function AdminPathSubmissionsPage() {
                             ) : (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     {meritEntries.filter(isFacultyApproved).map((entry) => (
-                                        <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                        <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
                                     ))}
                                 </div>
                             )}
@@ -550,8 +550,9 @@ export default function AdminPathSubmissionsPage() {
                         <>
                             <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
                             <p className="text-sm text-slate-500">
-                                Faculty decides; the AI review score is visible only to the faculty member. CIEL PK sees status, owner
-                                and waiting time.
+                                Faculty decides; while a submission is waiting on faculty, the AI review score is visible only to that
+                                faculty member — CIEL PK sees status, owner and waiting time here. Once approved, scores and rankings
+                                become visible to CIEL PK and the university under Ranking Studio, for cross-university benchmarking.
                             </p>
                             <Tabs
                                 tabs={[
@@ -616,7 +617,7 @@ export default function AdminPathSubmissionsPage() {
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {meritEntries.filter(isFacultyApproved).map((entry) => (
-                                <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
                             ))}
                         </div>
                     )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
@@ -158,6 +158,15 @@ export default function MeritModelPanel({
             return true;
         });
     }, [approved, showDepartmentFilter, department, showFacultyFilter, faculty, showUniversityFilter, university, format, year, dfrom, dto, semesters, from, to]);
+
+    /** A published "✓ SENT" badge must describe exactly what's on screen — if a filter changes after
+     * publishing, the pool/ranking recompute live and the old top 3 may no longer match, so the
+     * stale "sent" state has to clear rather than keep claiming this (new) view was the one notified. */
+    useEffect(() => {
+        setNotifiedIds([]);
+        setNotifyState("idle");
+        setNotifyErrorMessage(null);
+    }, [department, faculty, university, format, year, dfrom, dto, semFrom, semTo]);
 
     const clearFilters = () => {
         setDepartment("all");
@@ -584,7 +593,7 @@ export default function MeritModelPanel({
                                     )}
                                     <p className="mt-2.5 text-[8.5px] font-extrabold tracking-[0.1em] text-[#6d28d9]">⭐ THE FLASH CARD — ATTACHED</p>
                                     <div className="mt-1.5 max-w-[400px]">
-                                        <CourseworkCard entry={x.entry} studentName={x.entry.student?.name} />
+                                        <CourseworkCard entry={x.entry} studentName={x.entry.student?.name} hideScore={false} />
                                     </div>
                                 </div>
                                 <span className="shrink-0 text-[16px] font-extrabold text-[#6d28d9]">

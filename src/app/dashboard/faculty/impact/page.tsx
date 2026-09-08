@@ -175,7 +175,7 @@ export default function FacultyImpactWallPage() {
                         ))}
                     {showCoursework &&
                         coursework.map((entry) => (
-                            <CourseworkCard key={`cw-${entry.id}`} entry={entry} studentName={entry.student?.name} />
+                            <CourseworkCard key={`cw-${entry.id}`} entry={entry} studentName={entry.student?.name} hideScore={false} />
                         ))}
                     {showFyp &&
                         fyp.map((entry) => (
