@@ -160,6 +160,10 @@ function ReportFormContent() {
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
+    // Stays true from the moment submit succeeds through the redirect below — isSaving alone isn't
+    // enough, since it resets in `finally` well before the 2s setTimeout actually navigates away,
+    // leaving a window where the Submit button re-enables and a second click can double-POST.
+    const [submitSucceeded, setSubmitSucceeded] = React.useState(false);
     const [aiStatus, setAiStatus] = React.useState<string | null>(null);
     const [projectDetails, setProjectDetails] = React.useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -620,6 +624,7 @@ function ReportFormContent() {
     };
 
     const confirmSubmit = async () => {
+        if (submitSucceeded) return;
         const hoursOk =
             (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
         const stillIncomplete = getIncompleteSectionsSummary(data);
@@ -696,6 +701,7 @@ function ReportFormContent() {
             }
 
             toast.success('Report submitted! Redirecting to payment...');
+            setSubmitSucceeded(true);
             setTimeout(() => {
                 window.location.href = `/dashboard/student/payment?projectId=${projectId}`;
             }, 2000);
@@ -1012,6 +1018,7 @@ function ReportFormContent() {
                                 onClick={handleNext}
                                 disabled={
                                     isSaving ||
+                                    submitSucceeded ||
                                     (isFlashCardStep(activeStep) && !canFinalizeSubmit && !needsRevision) ||
                                     (isTeamMemberAttendanceOnly && activeStep === 1)
                                 }
@@ -1045,7 +1052,7 @@ function ReportFormContent() {
                         <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
                             Cancel
                         </Button>
-                        <Button className="bg-[#0e7d74] hover:bg-[#0f5e57] text-white" onClick={confirmSubmit} disabled={isSaving}>
+                        <Button className="bg-[#0e7d74] hover:bg-[#0f5e57] text-white" onClick={confirmSubmit} disabled={isSaving || submitSucceeded}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Yes, Submit Report
                         </Button>
@@ -1069,6 +1076,15 @@ function ReportFormContent() {
                                     {data.section1.metrics?.total_verified_hours || 0} / {data.required_hours || 16}
                                 </span>
                                 . Complete and verify attendance in Section 1 until the minimum is met.
+                                {Array.isArray(data.section1.metrics?.individual_metrics) &&
+                                data.section1.metrics.individual_metrics.some((m: any) => m?.gateway_status !== "ELIGIBLE") &&
+                                (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16) ? (
+                                    <>
+                                        {" "}
+                                        The team total meets the goal, but every teammate needs their own individual
+                                        hours logged and verified — hours can&apos;t be pooled from one member to cover another.
+                                    </>
+                                ) : null}
                             </p>
                         )}
                         {incompleteSectionsSummary.length > 0 && (

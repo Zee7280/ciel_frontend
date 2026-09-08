@@ -113,6 +113,24 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
 
     const rule = (scope.rule as ParticipationRule) || "open_all_universities";
     const uniNames = Array.isArray(scope.university_names) ? (scope.university_names as string[]) : [];
+    const applyScopeFromPayload = typeof scope.apply_scope === "string" ? scope.apply_scope : "";
+    const applyScope =
+        applyScopeFromPayload ||
+        (rule === "open_all_universities"
+            ? "all"
+            : rule === "own_university_only"
+              ? "own_uni_all"
+              : rule === "own_university_departments"
+                ? "own_dept"
+                : rule === "restricted_specific_universities"
+                  ? uniNames.length <= 1
+                      ? "one_all"
+                      : "multi_all"
+                  : rule === "departments_across_universities"
+                    ? uniNames.length <= 1
+                      ? "one_depts"
+                      : "multi_depts"
+                    : "all");
     const departments = Array.isArray(deptRest.departments)
         ? (deptRest.departments as string[]).filter(Boolean)
         : [""];
@@ -134,6 +152,7 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
 
     const formDataPatch: Record<string, unknown> = {
         title: typeof d.title === "string" ? d.title : "",
+        hook: typeof objectives.hook === "string" ? objectives.hook : "",
         opportunityType,
         isOtherTypeChecked,
         otherTypeSpecs: otherSpecs.length ? otherSpecs : [""],
@@ -149,6 +168,8 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             fromTime: typeof timeline.from_time === "string" ? timeline.from_time : "",
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
+        applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
+        scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
             hours:
                 timeline.expected_hours != null ? String(timeline.expected_hours) : "",
@@ -158,6 +179,7 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
         indicator: typeof sdgInfo.indicator_id === "string" ? sdgInfo.indicator_id : "",
+        sdgWhy: typeof sdgInfo.why_relevant === "string" ? sdgInfo.why_relevant : "",
         secondarySdgs: Array.isArray(d.secondary_sdgs)
             ? (d.secondary_sdgs as Record<string, string>[]).map((s) => ({
                   sdgId: s.sdg_id || "",
@@ -168,6 +190,8 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             : [],
         objectives: {
             description: typeof objectives.description === "string" ? objectives.description : "",
+            outputs: typeof objectives.outputs === "string" ? objectives.outputs : "",
+            outcome: typeof objectives.outcome === "string" ? objectives.outcome : "",
             beneficiariesCount:
                 objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
             beneficiariesType,
@@ -182,7 +206,10 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             skills: Array.isArray(activity.skills_gained) ? (activity.skills_gained as string[]) : [],
             isOtherSkillChecked: false,
             otherSkills: [""] as string[],
+            prerequisites: typeof activity.prerequisites === "string" ? activity.prerequisites : "",
+            resources: typeof activity.resources === "string" ? activity.resources : "",
         },
+        applyScope,
         academicLead: {
             designation: typeof sup.role === "string" ? sup.role : "",
             department: typeof sup.faculty_department === "string" ? sup.faculty_department : "",
@@ -197,7 +224,10 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             orgName: typeof extOrg === "string" ? extOrg : "",
             contactPerson: typeof extContact === "string" ? extContact : "",
             email: typeof extEmail === "string" ? extEmail : "",
+            designation: "",
+            function: "",
         },
+        electronicSignature: typeof sup.electronic_signature === "string" ? sup.electronic_signature : "",
         safetyDeclarations: {
             safeAppropriate: safety.environment_safe_and_appropriate === true,
             guidedSupervised: safety.students_guided_and_supervised === true,

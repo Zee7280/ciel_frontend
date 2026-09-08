@@ -29,6 +29,11 @@ import {
     TIMELINE_EMOJI,
     VERIFICATION_EMOJI,
 } from "@/components/opportunities/CreateOpportunityChrome";
+import {
+    resolveStudentFlashEligibility,
+    StudentOpportunityFlashcard,
+    type FlashViewer,
+} from "./StudentOpportunityFlashcard";
 import "@/components/opportunities/create-opportunity.css";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 
@@ -43,16 +48,25 @@ const ACTIVITY_TYPES_MAIN = [
     "Research", "Technical Support", "Environmental Action",
 ] as const;
 
-/** Left-rail wizard steps for the create-opportunity form. Presentational only — does not affect field data. */
+type ApplyScope =
+    | "student_uni_all"
+    | "student_own_dept"
+    | "student_selected_depts"
+    | "all"
+    | "multi_all"
+    | "multi_depts";
+
+/** Left-rail wizard steps — 9-step Opportunity Builder (private-candidate pathway included). */
 const WIZARD_STEPS = [
-    { key: "A", label: "Student details", sub: "From your profile", icon: "👤", color: "#0d2b33" },
-    { key: "B", label: "Project overview", sub: "Title, type, mode, timing", icon: "📝", color: "#0891b2" },
-    { key: "C", label: "SDG selection", sub: "Link it to the global goals", icon: "🌍", color: "#6d28d9" },
-    { key: "D", label: "Objectives", sub: "What & for whom", icon: "🎯", color: "#0e7d74" },
-    { key: "E", label: "Activity details", sub: "The plan & skills gained", icon: "🛠️", color: "#38bdf8" },
-    { key: "F", label: "Supervision & safety", sub: "Faculty, partner, safety", icon: "🛡️", color: "#b45309" },
-    { key: "G", label: "Evidence & verification", sub: "Set expectations now", icon: "✅", color: "#f472b6" },
-    { key: "SUBMIT", label: "Review & submit", sub: "Confirm & send for approval", icon: "🚀", color: "#0e7d74" },
+    { key: "A", label: "Creator", sub: "Profile & pathway", icon: "🎓", color: "#0d2b33" },
+    { key: "B", label: "Opportunity", sub: "Title, type, mode", icon: "🚀", color: "#0891b2" },
+    { key: "SCHED", label: "Schedule", sub: "Dates, seats, hours", icon: "📅", color: "#b88313" },
+    { key: "C", label: "SDG & impact", sub: "Goals, objective, outputs", icon: "🌍", color: "#6d28d9" },
+    { key: "E", label: "Student experience", sub: "Plan & skills gained", icon: "🛠️", color: "#38bdf8" },
+    { key: "F", label: "Verification", sub: "Faculty or CIEL PK", icon: "✅", color: "#18755f" },
+    { key: "VIS", label: "Visibility", sub: "Who can Apply Now", icon: "📣", color: "#b24f85" },
+    { key: "SAFE", label: "Safety", sub: "Declarations & signature", icon: "🛡️", color: "#b45309" },
+    { key: "SUBMIT", label: "Flashcard", sub: "Review & submit", icon: "🃏", color: "#0e7d74" },
 ] as const;
 
 /** Timeline modes that collect start/end date + daily from/to time (sent as timeline.* on create). */
@@ -201,18 +215,22 @@ export default function StudentOpportunityCreationPage() {
     const [formData, setFormData] = useState({
         // Section B
         title: "",
+        hook: "",
         opportunityType: [] as string[],
         otherActivitySpecs: [""] as string[],
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
-        timelineType: "", // fixed, flexible, ongoing
+        timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
+        applicationDeadline: "",
+        scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
         // Section C
         sdg: "",
         target: "",
         indicator: "",
+        sdgWhy: "",
         secondarySdg: "",
         secondaryTarget: "",
         secondaryIndicator: "",
@@ -220,6 +238,8 @@ export default function StudentOpportunityCreationPage() {
         // Section D
         objectives: {
             description: "",
+            outputs: "",
+            outcome: "",
             beneficiariesCount: "",
             beneficiariesType: [] as string[],
             isOtherBeneficiaryChecked: false,
@@ -231,8 +251,24 @@ export default function StudentOpportunityCreationPage() {
             responsibilities: "",
             skills: [] as string[],
             isOtherSkillChecked: false,
-            otherSkills: [""] as string[]
+            otherSkills: [""] as string[],
+            prerequisites: "",
+            resources: "",
         },
+
+        privateCandidate: false,
+        privateProgramme: "",
+        privateAwardingBody: "",
+        privateCandidateId: "",
+        privateCountry: "",
+        privateContactPref: "",
+        privatePhoneKey: DEFAULT_PHONE_COUNTRY_KEY,
+        privatePhone: "",
+
+        applyScope: "student_uni_all" as ApplyScope,
+        selectedUniversities: [""] as string[],
+        electronicSignature: "",
+        flashApprove: false,
 
         // Section F — student-created opportunity (controlled)
         supervision: {
@@ -267,15 +303,24 @@ export default function StudentOpportunityCreationPage() {
             sectionsNote: "",
         },
 
+        extraSafety: {
+            communicateChanges: false,
+            visibilityIntentional: false,
+            cielNotGuarantee: false,
+            signatureAck: false,
+        },
+
         // Section G
         verification: [] as string[],
 
-        // Section H — student opportunities: own university only (locked in UI)
-        visibility: "restricted" as const,
+        // University-linked defaults to restricted apply; private "all unis" uses public.
+        visibility: "restricted" as "restricted" | "public",
     });
+    const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
 
     const validateForm = () => {
-        if (!studentDetails.contact.trim()) {
+        const privatePath = formData.privateCandidate;
+        if (!studentDetails.contact.trim() && !privatePath) {
             toast.error("Contact No. is missing from your profile. Add it under Student Profile, then try again.");
             return false;
         }
@@ -283,98 +328,135 @@ export default function StudentOpportunityCreationPage() {
             toast.error("A valid email on your profile is required. Update your profile, then try again.");
             return false;
         }
-        if (!studentDetails.department.trim()) {
+        if (!privatePath && !studentDetails.department.trim()) {
             toast.error("Department is missing from your profile. Update your profile, then try again.");
             return false;
         }
+        if (privatePath) {
+            if (!formData.privateProgramme.trim()) {
+                toast.error("Private candidates must state their undergraduate programme / qualification.");
+                return false;
+            }
+            if (!formData.privateAwardingBody.trim()) {
+                toast.error("Private candidates must state the awarding body / university / programme provider.");
+                return false;
+            }
+            if (!formData.privateCountry.trim()) {
+                toast.error("Private candidates must state their country / location.");
+                return false;
+            }
+            if (!formData.privateContactPref.trim()) {
+                toast.error("Private candidates must select how CIEL PK should contact them for verification.");
+                return false;
+            }
+            const privatePhoneFull = composeInternationalPhone(
+                formData.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                formData.privatePhone,
+            ).trim();
+            if (!privatePhoneFull) {
+                toast.error("Private candidates must provide a private mobile / WhatsApp number for CIEL PK verification.");
+                return false;
+            }
+        }
         if (!formData.title.trim()) {
-            toast.error("Please enter an Opportunity Title (Section B)");
+            toast.error("Please enter an Opportunity Title");
+            return false;
+        }
+        if (!formData.hook.trim()) {
+            toast.error("Please add a one-line student hook.");
             return false;
         }
         if (formData.opportunityType.length === 0) {
-            toast.error("Please select at least one Opportunity Type (Section B)");
+            toast.error("Please select at least one Opportunity Type");
             return false;
         }
         if (formData.opportunityType.includes("Other")) {
             const specs = formData.otherActivitySpecs.map((s) => s.trim()).filter(Boolean);
             if (specs.length === 0) {
-                toast.error("Please add at least one Other activity description (Section B)");
+                toast.error("Please add at least one Other activity description");
                 return false;
             }
         }
         if (!formData.mode) {
-            toast.error("Please select a Mode of Engagement (Section B)");
+            toast.error("Please select a Mode of Engagement");
             return false;
         }
         if (formData.mode !== 'Remote') {
             if (!formData.location.city.trim()) {
-                toast.error("Please enter a City/Area (Section B)");
+                toast.error("Please enter a City/Area");
                 return false;
             }
-            // Exant Venue validation removed; it is now optional
         }
         if (!formData.timelineType) {
-            toast.error("Please select a Timeline Type (Section B)");
+            toast.error("Please select a Timeline Type");
             return false;
         }
-        if (formData.timelineType === "Fixed dates") {
-            if (!formData.dates.start.trim() || !formData.dates.end.trim()) {
-                toast.error("Fixed dates requires both a start date and an end date (Section B5)");
-                return false;
-            }
-            if (formData.dates.start > formData.dates.end) {
-                toast.error("End date must be on or after the start date (Section B5)");
-                return false;
-            }
+        if (!formData.applicationDeadline.trim()) {
+            toast.error("Please set an application deadline.");
+            return false;
+        }
+        if (!formData.dates.start.trim() || !formData.dates.end.trim()) {
+            toast.error("Please set both a start date and an end date.");
+            return false;
+        }
+        if (formData.dates.start > formData.dates.end) {
+            toast.error("End date must be on or after the start date.");
+            return false;
+        }
+        if (formData.applicationDeadline > formData.dates.start) {
+            toast.error("Application deadline cannot be after the start date.");
+            return false;
         }
 
         const hoursNum = parseInt(formData.capacity.hours, 10);
-        if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0) {
-            toast.error("Please enter expected hours per student as a positive number (Section B5)");
+        if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
+            toast.error("Required hours per student must be between 1 and 500.");
             return false;
         }
 
         const volNum = parseInt(formData.capacity.volunteers, 10);
-        if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 2 || volNum > 20) {
-            toast.error("Team size must be between 2 and 20 (Section B5)");
+        if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
+            toast.error("Available seats must be between 1 and 5000.");
             return false;
         }
 
-        // Section C
         if (!formData.sdg) {
-            toast.error("Please select a Primary SDG (Section C)");
+            toast.error("Please select a Primary SDG");
             return false;
         }
-        if (!formData.target) {
-            toast.error("Please select an SDG Target (Section C)");
+        if (!formData.sdgWhy.trim()) {
+            toast.error("Please explain why this SDG is genuinely relevant.");
             return false;
         }
         if (formData.secondarySdg) {
             if (formData.secondarySdg === formData.sdg) {
-                toast.error("Secondary SDG must be different from the Primary SDG (Section C)");
+                toast.error("Secondary SDG must be different from the Primary SDG");
                 return false;
             }
             if (!formData.secondaryTarget) {
-                toast.error("Please select an SDG Target for your Secondary SDG (Section C)");
+                toast.error("Please select an SDG Target for your Secondary SDG");
                 return false;
             }
         }
 
-        // Section D
         if (!formData.objectives.description.trim()) {
-            toast.error("Please enter Project Objectives (Section D)");
+            toast.error("Please enter the primary objective");
+            return false;
+        }
+        if (!formData.objectives.outputs.trim()) {
+            toast.error("Please describe expected outputs.");
             return false;
         }
         const benStr = formData.objectives.beneficiariesCount.trim();
         const benNum = parseInt(benStr, 10);
-        if (!benStr || Number.isNaN(benNum) || benNum < 1) {
-            toast.error("Please enter the expected number of beneficiaries (at least 1) in Section D2");
+        if (benStr && (Number.isNaN(benNum) || benNum < 0)) {
+            toast.error("Expected beneficiaries must be a number of 0 or more.");
             return false;
         }
         if (formData.objectives.isOtherBeneficiaryChecked) {
             const ob = formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean);
             if (ob.length === 0) {
-                toast.error("Please add at least one other beneficiary type (Section D)");
+                toast.error("Please add at least one other beneficiary type");
                 return false;
             }
         }
@@ -385,95 +467,112 @@ export default function StudentOpportunityCreationPage() {
             formData.objectives.isOtherBeneficiaryChecked &&
             formData.objectives.otherBeneficiarySpecs.some((s) => s.trim().length > 0);
         if (predefinedSelected.length === 0 && !otherFilled) {
-            toast.error("Select at least one beneficiary type or add an “Other” type (Section D)");
+            toast.error("Select at least one beneficiary type or add an “Other” type");
             return false;
         }
 
-        // Section E
         if (!formData.activity.responsibilities.trim()) {
-            toast.error("Please list Student Responsibilities (Section E)");
+            toast.error("Please list Student Responsibilities");
             return false;
         }
         if (formData.activity.responsibilities.length > 12_000) {
             toast.error("Detailed plan is too long (max 12,000 characters). Use a concise bullet summary.");
             return false;
         }
-        const mergedSkills = formData.activity.isOtherSkillChecked
-            ? [
-                  ...formData.activity.skills,
-                  ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
-              ]
-            : formData.activity.skills;
-        if (mergedSkills.length === 0) {
-            toast.error("Select at least one skill to be gained, or add skills under Other (Section E)");
-            return false;
-        }
 
-        if (!studentDetails.institution.trim()) {
+        if (!privatePath && !studentDetails.institution.trim()) {
             toast.error("Your university/institution is missing from your profile. Complete your profile, then try again.");
             return false;
         }
 
-        // Section F1 — Faculty approval
         const s = formData.supervision;
-        if (!s.facultyName.trim() || !s.facultyDesignation.trim() || !s.facultyDepartment.trim()) {
-            toast.error("Please complete Faculty Approval details (Section F1)");
-            return false;
-        }
-        if (!s.facultyOfficialEmail.trim() || !isValidEmail(s.facultyOfficialEmail)) {
-            toast.error("Please enter a valid faculty official email (Section F1)");
-            return false;
+        if (!privatePath) {
+            if (!s.facultyName.trim() || !s.facultyDesignation.trim() || !s.facultyDepartment.trim()) {
+                toast.error("Please complete Faculty Approval details");
+                return false;
+            }
+            if (!s.facultyOfficialEmail.trim() || !isValidEmail(s.facultyOfficialEmail)) {
+                toast.error("Please enter a valid faculty official email");
+                return false;
+            }
         }
 
-        // Section F2 — Executing context
-        if (s.executingContext !== "partner" && s.executingContext !== "independent") {
-            toast.error("Please choose an executing context: partner organization or independent community activity (Section F2)");
-            return false;
-        }
         if (s.executingContext === "partner") {
             if (!s.partnerOrgName.trim() || !s.partnerContactPerson.trim() || !s.partnerEmail.trim()) {
-                toast.error("Please provide complete partner organization details (Section F2)");
+                toast.error("Please provide complete partner organization details");
                 return false;
             }
             if (!isValidEmail(s.partnerEmail)) {
-                toast.error("Please enter a valid partner organization email (Section F2)");
+                toast.error("Please enter a valid partner organization email");
                 return false;
             }
-        } else {
+        } else if (!privatePath) {
+            if (s.executingContext !== "independent") {
+                toast.error("Please choose an executing context: partner organization or independent community activity");
+                return false;
+            }
             const independentPhoneFull = composeInternationalPhone(
                 s.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
                 s.independentContactPhone,
             ).trim();
             if (!s.independentSiteDescription.trim() || !s.independentLocalContact.trim() || !independentPhoneFull) {
-                toast.error("Please provide activity site, local contact, and contact number for your independent activity (Section F2)");
+                toast.error("Please provide activity site, local contact, and contact number for your independent activity");
                 return false;
             }
         }
 
-        // Section F3 — Safety & responsibility
         if (!s.declSafeEnvironment || !s.declNoHazardous || !s.declFacultyOversight || !s.declEthicalLawful) {
-            toast.error("Please confirm all items in Safety & Responsibility (Section F3)");
+            toast.error("Please confirm all items in Safety & Responsibility");
+            return false;
+        }
+        if (!formData.extraSafety.communicateChanges || !formData.extraSafety.visibilityIntentional || !formData.extraSafety.cielNotGuarantee || !formData.extraSafety.signatureAck) {
+            toast.error("Please confirm all safety and accountability declarations.");
+            return false;
+        }
+        if (!formData.electronicSignature.trim()) {
+            toast.error("Please type your full name as electronic signature.");
+            return false;
+        }
+        if (studentDetails.name.trim() && formData.electronicSignature.trim().toLowerCase() !== studentDetails.name.trim().toLowerCase()) {
+            toast.error("Electronic signature should match your profile name.");
             return false;
         }
 
-        // Section F5 — Department scope
-        if (formData.participation.departmentScope === "specific") {
+        if (privatePath) {
+            if (formData.applyScope === "multi_all" || formData.applyScope === "multi_depts") {
+                const unis = formData.selectedUniversities.map((d) => d.trim()).filter(Boolean);
+                if (unis.length === 0) {
+                    toast.error("Add at least one university for the selected Apply Now scope.");
+                    return false;
+                }
+            }
+            if (formData.applyScope === "multi_depts") {
+                const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
+                if (deps.length === 0) {
+                    toast.error("Add at least one department for the selected Apply Now scope.");
+                    return false;
+                }
+            }
+        } else if (formData.applyScope === "student_selected_depts" || formData.participation.departmentScope === "specific") {
             const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
             if (deps.length === 0) {
-                toast.error("Add at least one department or choose “all departments” (Section F5)");
+                toast.error("Add at least one department or choose all departments");
                 return false;
             }
         }
 
-        // Section F6 — Required confirmations
         const c = formData.sectionFConfirmations;
         if (!c.facultyApproval || !c.genuineAccurate || !c.safeAppropriate || !c.truthfulVerifiable) {
             toast.error("Please accept all required confirmations before submitting");
             return false;
         }
+        if (!formData.flashApprove) {
+            toast.error("Please review and approve the flashcard before submitting.");
+            return false;
+        }
 
         if (formData.verification.length === 0) {
-            toast.error("Select at least one verification method in Section G");
+            toast.error("Select at least one verification method");
             return false;
         }
 
@@ -500,17 +599,76 @@ export default function StudentOpportunityCreationPage() {
                   ]
                 : formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t));
 
+            const privatePath = formData.privateCandidate;
+            const executingType =
+                formData.supervision.executingContext === "partner"
+                    ? "partner"
+                    : "independent";
+            const selectedUnis = formData.selectedUniversities.map((u) => u.trim()).filter(Boolean);
+            const selectedDepts = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
+            const ownUni = studentDetails.institution.trim();
+            const ownDept = studentDetails.department.trim();
+
+            let participationRule = "own_university_only";
+            let universityNames: string[] = ownUni ? [ownUni] : [];
+            let departmentScope: "all" | "specific" = formData.participation.departmentScope;
+            let departments = departmentScope === "specific" ? selectedDepts : [];
+            let restricted: string[] = ownUni ? [ownUni] : [];
+
+            if (privatePath) {
+                if (formData.applyScope === "all") {
+                    participationRule = "open_all_universities";
+                    universityNames = [];
+                    restricted = [];
+                    departmentScope = "all";
+                    departments = [];
+                } else if (formData.applyScope === "multi_all") {
+                    participationRule = "restricted_specific_universities";
+                    universityNames = selectedUnis;
+                    restricted = selectedUnis;
+                    departmentScope = "all";
+                    departments = [];
+                } else if (formData.applyScope === "multi_depts") {
+                    participationRule = "departments_across_universities";
+                    universityNames = selectedUnis;
+                    restricted = selectedUnis;
+                    departmentScope = "specific";
+                    departments = selectedDepts;
+                }
+            } else if (formData.applyScope === "student_own_dept") {
+                participationRule = "own_university_departments";
+                departmentScope = "specific";
+                departments = ownDept ? [ownDept] : selectedDepts;
+            } else if (formData.applyScope === "student_selected_depts") {
+                participationRule = "own_university_departments";
+                departmentScope = "specific";
+                departments = selectedDepts;
+            }
+
+            // "restricted" only drives the Browse filter/badge here — the backend still lists a
+            // student-created card publicly either way and gates Apply Now off participation_scope
+            // separately (see OpportunitiesService.isPubliclyVisibleOpportunity). Computed after every
+            // branch above so it always reflects the final restricted-universities list.
+            const visibility: "restricted" | "public" = restricted.length > 0 ? "restricted" : "public";
+
+            const privatePhoneFull = composeInternationalPhone(
+                formData.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                formData.privatePhone,
+            ).trim();
+
             // Transform state to match API Spec
             const payload = {
                 title: formData.title,
                 types: typesPayload,
-                student_contact: studentDetails.contact.trim(),
+                student_contact: privatePath ? (privatePhoneFull || studentDetails.contact.trim()) : studentDetails.contact.trim(),
                 mode: formData.mode,
                 location: formData.mode === 'Remote' ? null : formData.location,
                 timeline: {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
+                    application_deadline: formData.applicationDeadline || undefined,
+                    schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
                               ...(formData.dates.fromTime.trim() ? { from_time: formData.dates.fromTime.trim() } : {}),
@@ -523,7 +681,8 @@ export default function StudentOpportunityCreationPage() {
                 sdg_info: {
                     sdg_id: formData.sdg,
                     target_id: formData.target,
-                    indicator_id: formData.indicator
+                    indicator_id: formData.indicator,
+                    why_relevant: formData.sdgWhy.trim(),
                 },
                 ...(formData.secondarySdg && formData.secondaryTarget
                     ? {
@@ -539,25 +698,28 @@ export default function StudentOpportunityCreationPage() {
                     : {}),
                 objectives: {
                     description: formData.objectives.description,
+                    hook: formData.hook.trim(),
+                    outputs: formData.objectives.outputs.trim(),
+                    outcome: formData.objectives.outcome.trim() || undefined,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
                     beneficiaries_type: otherBeneficiaryMerged,
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    // Append `otherSkills` if checked and not empty
                     skills_gained: formData.activity.isOtherSkillChecked
                         ? [...formData.activity.skills, ...formData.activity.otherSkills.filter(s => s.trim() !== "")]
-                        : formData.activity.skills
+                        : formData.activity.skills,
+                    prerequisites: formData.activity.prerequisites.trim() || undefined,
+                    resources: formData.activity.resources.trim() || undefined,
                 },
-                // Legacy supervision block (keys preserved for existing admin/API consumers)
-                // Faculty-created flow also sends `external_partner_*` + `external_partner_collaboration`;
-                // backend email/verification jobs expect those names, so mirror them for student + partner.
                 supervision: {
-                    supervisor_name: formData.supervision.facultyName.trim(),
-                    role: formData.supervision.facultyDesignation.trim(),
-                    contact: formData.supervision.facultyOfficialEmail.trim(),
-                    faculty_department: formData.supervision.facultyDepartment.trim(),
-                    faculty_university_name: studentDetails.institution.trim(),
+                    supervisor_name: privatePath ? "CIEL PK Verification Team" : formData.supervision.facultyName.trim(),
+                    role: privatePath ? "CIEL PK direct verification" : formData.supervision.facultyDesignation.trim(),
+                    contact: privatePath ? "" : formData.supervision.facultyOfficialEmail.trim(),
+                    faculty_department: privatePath ? "Private / independent candidate" : formData.supervision.facultyDepartment.trim(),
+                    faculty_university_name: privatePath ? formData.privateAwardingBody.trim() : studentDetails.institution.trim(),
+                    private_candidate: privatePath,
+                    electronic_signature: formData.electronicSignature.trim(),
                     ...(formData.supervision.executingContext === "partner"
                         ? {
                               partner_org_name: formData.supervision.partnerOrgName.trim(),
@@ -584,7 +746,6 @@ export default function StudentOpportunityCreationPage() {
                               contact_person: formData.supervision.partnerContactPerson.trim(),
                               official_email: formData.supervision.partnerEmail.trim(),
                           },
-                          // Backend partner email resolution includes partner_organization.official_email
                           partner_organization: {
                               organization_name: formData.supervision.partnerOrgName.trim(),
                               contact_person: formData.supervision.partnerContactPerson.trim(),
@@ -593,8 +754,21 @@ export default function StudentOpportunityCreationPage() {
                       }
                     : { external_partner_collaboration: null }),
                 executing_context: {
-                    type: formData.supervision.executingContext,
-                    ...(formData.supervision.executingContext === "partner"
+                    type: executingType,
+                    student_pathway: privatePath ? "private" : "university",
+                    ...(privatePath
+                        ? {
+                              private_candidate: {
+                                  programme: formData.privateProgramme.trim(),
+                                  awarding_body: formData.privateAwardingBody.trim(),
+                                  candidate_id: formData.privateCandidateId.trim() || undefined,
+                                  country: formData.privateCountry.trim(),
+                                  contact_pref: formData.privateContactPref.trim(),
+                                  phone: privatePhoneFull,
+                              },
+                          }
+                        : {}),
+                    ...(executingType === "partner"
                         ? {
                               partner: {
                                   organization_name: formData.supervision.partnerOrgName.trim(),
@@ -604,16 +778,20 @@ export default function StudentOpportunityCreationPage() {
                           }
                         : {
                               independent_community_activity: {
-                                  activity_site_description: formData.supervision.independentSiteDescription.trim(),
-                                  local_contact_person: formData.supervision.independentLocalContact.trim(),
-                                  contact_number: composeInternationalPhone(
-                                      formData.supervision.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
-                                      formData.supervision.independentContactPhone,
-                                  ).trim(),
+                                  activity_site_description:
+                                      formData.supervision.independentSiteDescription.trim() ||
+                                      (privatePath ? "Private / independent candidate" : ""),
+                                  local_contact_person:
+                                      formData.supervision.independentLocalContact.trim() ||
+                                      (privatePath ? studentDetails.name.trim() : ""),
+                                  contact_number:
+                                      composeInternationalPhone(
+                                          formData.supervision.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                                          formData.supervision.independentContactPhone,
+                                      ).trim() || (privatePath ? privatePhoneFull : ""),
                               },
                           }),
                 },
-                // Must match ciel_backend OpportunitiesService.validateSafetyDeclaration / validateSubmissionConfirmations
                 safety_declaration: {
                     environment_safe_and_appropriate: formData.supervision.declSafeEnvironment,
                     students_guided_and_supervised: formData.supervision.declFacultyOversight,
@@ -627,20 +805,19 @@ export default function StudentOpportunityCreationPage() {
                     information_correct_and_verifiable: formData.sectionFConfirmations.truthfulVerifiable,
                 },
                 participation_scope: {
-                    rule: "own_university_only",
-                    creator_university_name: studentDetails.institution.trim(),
+                    rule: participationRule,
+                    apply_scope: formData.applyScope,
+                    creator_university_name: ownUni || (privatePath ? formData.privateAwardingBody.trim() : ""),
+                    university_names: universityNames,
                     department_restriction: {
-                        scope: formData.participation.departmentScope,
-                        departments:
-                            formData.participation.departmentScope === "specific"
-                                ? formData.participation.departments.map((d) => d.trim()).filter(Boolean)
-                                : [],
+                        scope: departmentScope,
+                        departments,
                         sections_or_class_note: formData.participation.sectionsNote.trim() || null,
                     },
                 },
                 verification_method: formData.verification,
-                visibility: formData.visibility,
-                restricted_universities: [studentDetails.institution.trim()],
+                visibility,
+                restricted_universities: restricted,
             };
         return payload;
     };
@@ -649,7 +826,7 @@ export default function StudentOpportunityCreationPage() {
         if (isLoadingEdit) return;
         if (!validateForm()) return;
 
-        if (!editingOpportunityId && similarMatches.length > 0) {
+        if (!editingOpportunityId && similarMatches.length > 0 && !formData.privateCandidate) {
             toast.error(
                 "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
                 { duration: 6000 },
@@ -776,7 +953,7 @@ export default function StudentOpportunityCreationPage() {
         });
     };
 
-    const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B", "C", "D", "E", "F", "G"]);
+    const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B", "SCHED", "C", "E", "F", "VIS", "SAFE", "G"]);
 
     const [activeStep, setActiveStep] = useState<string>("A");
     const activeStepIndex = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
@@ -793,6 +970,24 @@ export default function StudentOpportunityCreationPage() {
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
     }, [activeStep, goToStep]);
 
+    const setPrivateCandidate = (on: boolean) => {
+        setFormData((prev) => ({
+            ...prev,
+            privateCandidate: on,
+            applyScope: on
+                ? (prev.applyScope === "all" || prev.applyScope === "multi_all" || prev.applyScope === "multi_depts"
+                    ? prev.applyScope
+                    : "all")
+                : (prev.applyScope === "student_uni_all" || prev.applyScope === "student_own_dept" || prev.applyScope === "student_selected_depts"
+                    ? prev.applyScope
+                    : "student_uni_all"),
+            supervision: {
+                ...prev.supervision,
+                executingContext: on && !prev.supervision.executingContext ? "independent" : prev.supervision.executingContext,
+            },
+        }));
+    };
+
     const displayStudentContact = useMemo(
         () => parsePhoneForDisplay(studentDetails.contact),
         [studentDetails.contact],
@@ -806,6 +1001,88 @@ export default function StudentOpportunityCreationPage() {
         () => weekdayLabelFromDateInput(formData.dates.end),
         [formData.dates.end],
     );
+
+    const flashcardModel = useMemo(() => {
+        const privatePath = formData.privateCandidate;
+        const partnerOn = formData.supervision.executingContext === "partner";
+        const scopeMap: Record<string, string> = {
+            all: "All Universities · All Departments",
+            multi_all: "Selected Universities · All Departments",
+            multi_depts: "Selected Universities · Selected Departments",
+            student_uni_all: "My University · All Departments",
+            student_own_dept: "My Department / Programme Only",
+            student_selected_depts: "Selected Departments in My University",
+        };
+        const selectedUnis = formData.selectedUniversities.map((u) => u.trim()).filter(Boolean).join(", ");
+        const selectedDepts = formData.participation.departments.map((d) => d.trim()).filter(Boolean).join(", ");
+        const orgLabel = privatePath
+            ? (formData.privateAwardingBody.trim() || "Private / independent undergraduate programme")
+            : (studentDetails.institution || "—");
+        const unitLabel = privatePath
+            ? (formData.privateProgramme.trim() || "Independent undergraduate candidate")
+            : (studentDetails.department || "—");
+        let scopeDetail = "CIEL PK network";
+        if (formData.applyScope === "student_selected_depts") scopeDetail = selectedDepts || "Selected departments";
+        else if (formData.applyScope === "multi_all") scopeDetail = selectedUnis || "Selected universities";
+        else if (formData.applyScope === "multi_depts") scopeDetail = `${selectedUnis} · ${selectedDepts}`;
+        else if (formData.applyScope === "student_uni_all") scopeDetail = studentDetails.institution || "Your university";
+        else if (formData.applyScope === "student_own_dept") scopeDetail = `${studentDetails.institution} · ${studentDetails.department}`;
+        const elig = resolveStudentFlashEligibility({
+            viewer: flashViewer,
+            privateCandidate: privatePath,
+            applyScope: formData.applyScope,
+            creatorUniversity: studentDetails.institution,
+        });
+        const types = formData.opportunityType.filter((t) => t !== "Other");
+        const skills = [
+            ...formData.activity.skills,
+            ...(formData.activity.isOtherSkillChecked ? formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean) : []),
+        ].join(", ");
+        const bens = [
+            ...formData.objectives.beneficiariesType,
+            ...(formData.objectives.isOtherBeneficiaryChecked ? formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean) : []),
+        ].join(", ");
+        return {
+            title: formData.title,
+            hook: formData.hook,
+            summary: formData.objectives.description,
+            activityType: types[0] || "Community Service",
+            mode: formData.mode,
+            city: formData.location.city,
+            hours: formData.capacity.hours,
+            seats: formData.capacity.volunteers,
+            start: formData.dates.start,
+            end: formData.dates.end,
+            deadline: formData.applicationDeadline,
+            beneficiariesCount: formData.objectives.beneficiariesCount || "—",
+            beneficiaryType: bens || "Community",
+            responsibilities: formData.activity.responsibilities,
+            scheduleNotes: formData.scheduleNotes,
+            skills,
+            resources: formData.activity.resources,
+            prerequisites: formData.activity.prerequisites,
+            sdg: formData.sdg,
+            objective: formData.objectives.description,
+            outputs: formData.objectives.outputs,
+            creatorName: studentDetails.name,
+            orgLabel,
+            unitLabel,
+            badgeLabel: privatePath ? "PRIVATE / INDEPENDENT CANDIDATE" : "STUDENT CREATOR",
+            privateCandidate: privatePath,
+            facultyName: privatePath ? "Not required · CIEL PK direct verification" : formData.supervision.facultyName,
+            facultyEmail: privatePath ? "Candidate contacted directly by CIEL PK" : formData.supervision.facultyOfficialEmail,
+            host: partnerOn ? formData.supervision.partnerOrgName : "No external partner",
+            partnerEmail: partnerOn ? formData.supervision.partnerEmail : "",
+            verification: formData.verification.join(", "),
+            scopeLabel: scopeMap[formData.applyScope] || formData.applyScope,
+            scopeDetail,
+            approvalText: privatePath
+                ? (partnerOn ? "Pending CIEL PK Private Candidate Verification → Host Acknowledgement → Final Review" : "Pending CIEL PK Private Candidate Verification")
+                : "Pending Faculty Approval",
+            eligible: elig.eligible,
+            eligibilityWhy: elig.why,
+        };
+    }, [formData, studentDetails, flashViewer]);
 
     const handleSaveDraft = async () => {
         try {
@@ -1144,7 +1421,7 @@ export default function StudentOpportunityCreationPage() {
         }
         const title = formData.title.trim();
         const uni = studentDetails.institution.trim();
-        if (title.length < 6 || !uni) {
+        if (title.length < 6 || !uni || formData.privateCandidate) {
             setSimilarMatches([]);
             return;
         }
@@ -1152,7 +1429,7 @@ export default function StudentOpportunityCreationPage() {
             void checkSimilarTitles(title, uni);
         }, 500);
         return () => window.clearTimeout(timer);
-    }, [formData.title, studentDetails.institution, editingOpportunityId, checkSimilarTitles]);
+    }, [formData.title, formData.privateCandidate, studentDetails.institution, editingOpportunityId, checkSimilarTitles]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -1232,18 +1509,20 @@ export default function StudentOpportunityCreationPage() {
                         {editingOpportunityId ? "EDIT STUDENT OPPORTUNITY · SDG-ALIGNED" : "CIEL PK · COMMUNITY SERVICE"}
                     </p>
                     <h1>
-                        {editingOpportunityId ? "Update your listing" : "Your idea, your crew — let’s build it 🚀"}
+                        {editingOpportunityId ? "Update your listing" : "Create an opportunity — with the right checks for student creators."}
                     </h1>
                     <p>
                         {editingOpportunityId
                             ? "Update your opportunity and submit again for review."
-                            : "Build a clear, safe and SDG-aligned opportunity step by step. Your details are already filled, chips do most of the typing, and your listing preview builds itself as you go."}
+                            : formData.privateCandidate
+                              ? "You are using the Private Candidate pathway. No faculty link is required. CIEL PK will contact you directly to verify your identity / programme status and the opportunity before approval."
+                              : "Choose the verification pathway that matches your status. University-linked students connect a faculty member; private / independent candidates are verified directly by CIEL PK."}
                     </p>
                     <div className="co-hero-chips">
-                        <span className="co-hero-chip">📍 Location transparency</span>
-                        <span className="co-hero-chip">🌍 SDG aligned</span>
-                        <span className="co-hero-chip">🛡️ Safety acknowledgement</span>
-                        <span className="co-hero-chip">🔄 Auto-saved draft</span>
+                        <span className="co-hero-chip">🧭 Guided 9-step form</span>
+                        <span className="co-hero-chip">🃏 Final flashcard</span>
+                        <span className="co-hero-chip">🎯 Role-aware Apply Now</span>
+                        <span className="co-hero-chip">🔒 Private contacts protected</span>
                     </div>
                     {isLoadingEdit ? (
                         <p className="mt-2 flex items-center gap-2 text-sm text-[#70808a]">
@@ -1285,12 +1564,16 @@ export default function StudentOpportunityCreationPage() {
                         </div>
                     </div>
                     <div className="co-fun-tip">
-                        <b>💡 Make it easy to trust</b>
-                        <p>Clear responsibilities, realistic hours, accurate locations and honest safety information help students make better participation decisions.</p>
+                        <b>Design rule</b>
+                        <p>Visibility and application eligibility are separate. A student can see a card without necessarily being able to use Apply Now.</p>
                     </div>
                     <div className="co-side-card">
                         <h3>Approval path</h3>
-                        <p>You submit → Faculty verification → CIEL Admin review → Opportunity goes live.</p>
+                        <p>
+                            {formData.privateCandidate
+                                ? "Private Candidate → CIEL PK identity/contact verification → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity"
+                                : "University-linked Student → Faculty approval → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity"}
+                        </p>
                     </div>
                 </aside>
 
@@ -1324,6 +1607,99 @@ export default function StudentOpportunityCreationPage() {
                         </span>
                     </div>
                 )}
+                <div className="mt-4">
+                    <label className="co-label">Student verification pathway</label>
+                    <button
+                        type="button"
+                        className={`co-safe w-full text-left${formData.privateCandidate ? " on" : ""}`}
+                        onClick={() => setPrivateCandidate(!formData.privateCandidate)}
+                    >
+                        <span className="co-tick">{formData.privateCandidate ? "✓" : ""}</span>
+                        <span>
+                            <b>I am a Private / Independent Candidate</b>
+                            <span className="mt-1 block text-[10px] font-medium text-[#7a919a]">
+                                Use this if you are completing an undergraduate programme privately / independently and do not have a faculty member who can approve this opportunity.
+                            </span>
+                        </span>
+                    </button>
+                    <div className="co-note aqua mt-3">
+                        {formData.privateCandidate
+                            ? <span><b>Private candidate:</b> faculty is not required. CIEL PK will verify you directly using the details below.</span>
+                            : <span><b>University-linked student:</b> leave this unchecked. You will connect a faculty member in Verification.</span>}
+                    </div>
+                    {formData.privateCandidate ? (
+                        <div className="mt-3 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <p className="text-xs leading-relaxed text-amber-950">
+                                <b>CIEL PK direct verification:</b> before this opportunity can be approved, CIEL PK may contact you to confirm your identity, undergraduate programme / registration status and the authenticity of the opportunity.
+                            </p>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Undergraduate programme / qualification *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. BSc Business Administration, LLB, BBA"
+                                        value={formData.privateProgramme}
+                                        onChange={(e) => setFormData({ ...formData, privateProgramme: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Awarding body / university / provider *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. University of London, private degree provider"
+                                        value={formData.privateAwardingBody}
+                                        onChange={(e) => setFormData({ ...formData, privateAwardingBody: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Candidate / registration ID <span className="font-medium normal-case tracking-normal text-[#7a919a]">optional</span></label>
+                                    <input
+                                        type="text"
+                                        placeholder="If available"
+                                        value={formData.privateCandidateId}
+                                        onChange={(e) => setFormData({ ...formData, privateCandidateId: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Country / location *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Pakistan"
+                                        value={formData.privateCountry}
+                                        onChange={(e) => setFormData({ ...formData, privateCountry: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Preferred CIEL PK contact method *</label>
+                                    <select
+                                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                                        value={formData.privateContactPref}
+                                        onChange={(e) => setFormData({ ...formData, privateContactPref: e.target.value })}
+                                    >
+                                        <option value="">Select</option>
+                                        <option>Email</option>
+                                        <option>WhatsApp</option>
+                                        <option>Phone Call</option>
+                                        <option>Email + WhatsApp</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>Mobile / WhatsApp for verification * · private</label>
+                                    <PhoneConnectivityRow
+                                        phoneCountryKey={formData.privatePhoneKey}
+                                        nationalDigits={formData.privatePhone}
+                                        onPhoneCountryKeyChange={(privatePhoneKey) => setFormData({ ...formData, privatePhoneKey })}
+                                        onNationalDigitsChange={(privatePhone) => setFormData({ ...formData, privatePhone })}
+                                        maxNationalDigits={15}
+                                        selectClassName="rounded-xl border border-slate-200 py-3 text-xs font-semibold"
+                                        inputClassName="rounded-xl border border-slate-200 py-3 text-sm font-medium"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-[#7a919a]">🔒 These verification contact details stay private. They are not displayed on the public opportunity flashcard.</p>
+                        </div>
+                    ) : null}
+                </div>
             </div>
 
             )}
@@ -1333,7 +1709,7 @@ export default function StudentOpportunityCreationPage() {
             <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
                 <CoSectionHead
                     letter="B"
-                    title="Project overview"
+                    title="Opportunity overview"
                     tag="THE BASICS"
                     color="#0891b2"
                     expanded={expandedSections.includes("B")}
@@ -1343,14 +1719,14 @@ export default function StudentOpportunityCreationPage() {
                 <div className={`${!expandedSections.includes('B') ? 'hidden' : ''}`}>
                     {/* B1. Title */}
                     <div>
-                        <label className="co-label" style={{ marginTop: 4 }}>B1 · Project title</label>
+                        <label className="co-label" style={{ marginTop: 4 }}>Opportunity title *</label>
                         <input
                             type="text"
                             placeholder="e.g. Community Clean Up Drive"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         />
-                        {!editingOpportunityId && (similarCheckLoading || similarMatches.length > 0) ? (
+                        {!formData.privateCandidate && !editingOpportunityId && (similarCheckLoading || similarMatches.length > 0) ? (
                             <div
                                 className={`mt-3 rounded-xl border p-4 ${
                                     similarMatches.length > 0
@@ -1411,6 +1787,16 @@ export default function StudentOpportunityCreationPage() {
                                 )}
                             </div>
                         ) : null}
+                    </div>
+                    <div>
+                        <label className="co-label">One-line student hook *</label>
+                        <input
+                            type="text"
+                            maxLength={180}
+                            placeholder="Why would a student want to join?"
+                            value={formData.hook}
+                            onChange={(e) => setFormData({ ...formData, hook: e.target.value })}
+                        />
                     </div>
                     {/* B2. Type */}
                     <div>
@@ -1549,99 +1935,118 @@ export default function StudentOpportunityCreationPage() {
                         )}
                     </div>
 
+                </div>
+            </div>
+
+            )}
+
+            {/* SECTION: SCHEDULE */}
+            {activeStep === "SCHED" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b88313" }}>
+                <CoSectionHead
+                    letter="3"
+                    title="Dates, capacity & service commitment"
+                    tag="COMMITMENT"
+                    color="#b88313"
+                    expanded={expandedSections.includes("SCHED")}
+                    onToggle={() => toggleSection("SCHED")}
+                />
+                <div className={`${!expandedSections.includes('SCHED') ? 'hidden' : ''}`}>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
+                            <input
+                                type="date"
+                                value={formData.applicationDeadline}
+                                onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Start date *</label>
+                            <input
+                                type="date"
+                                value={formData.dates.start}
+                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                            />
+                            {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>End date *</label>
+                            <input
+                                type="date"
+                                value={formData.dates.end}
+                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                            />
+                            {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
+                        </div>
+                    </div>
                     {/* B5. Timeline */}
                     <div className="pt-2">
-                        <label className="co-label">B5 · Duration &amp; commitment</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label className="co-label">Duration type</label>
+                        <div className="co-chips mb-3">
+                            {['Fixed dates', 'Flexible', 'Ongoing'].map((t) => (
+                                <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
+                                    {TIMELINE_EMOJI[t] || ""} {t}
+                                </CoChip>
+                            ))}
+                        </div>
+                        {(TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) && (
+                            <div className="flex gap-2 flex-wrap items-center">
+                                <div className="flex-1 min-w-[140px]">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From Time</label>
+                                    <input
+                                        type="time"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                        value={formData.dates.fromTime}
+                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-[140px]">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">End Time</label>
+                                    <input
+                                        type="time"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                        value={formData.dates.endTime}
+                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <div className="co-chips mb-3">
-                                    {['Fixed dates', 'Flexible', 'Ongoing'].map((t) => (
-                                        <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
-                                            {TIMELINE_EMOJI[t] || ""} {t}
-                                        </CoChip>
-                                    ))}
-                                </div>
-
-                                {(TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) && (
-                                    <div className="space-y-3 animate-in fade-in zoom-in-95">
-                                        <p className="text-xs text-slate-500">
-                                            Start/end dates and daily times are optional for all timeline types.
-                                        </p>
-                                        <div className="flex gap-2 flex-wrap items-start">
-                                            <div className="flex-1 min-w-[140px] space-y-1">
-                                                <input
-                                                    type="date"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.start}
-                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
-                                                />
-                                                {timelineStartWeekdayLabel && (
-                                                    <p className="text-xs font-medium text-slate-500 pl-0.5" aria-live="polite">
-                                                        {timelineStartWeekdayLabel}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <span className="text-slate-400 pt-2.5 shrink-0" aria-hidden>
-                                                -
-                                            </span>
-                                            <div className="flex-1 min-w-[140px] space-y-1">
-                                                <input
-                                                    type="date"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.end}
-                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
-                                                />
-                                                {timelineEndWeekdayLabel && (
-                                                    <p className="text-xs font-medium text-slate-500 pl-0.5" aria-live="polite">
-                                                        {timelineEndWeekdayLabel}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 flex-wrap items-center">
-                                            <div className="flex-1 min-w-[140px]">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From Time</label>
-                                                <input
-                                                    type="time"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.fromTime}
-                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
-                                                />
-                                            </div>
-                                            <div className="flex-1 min-w-[140px]">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">End Time</label>
-                                                <input
-                                                    type="time"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.endTime}
-                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={500}
+                                    placeholder="e.g. 16"
+                                    value={formData.capacity.hours}
+                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                />
                             </div>
-
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label className="co-label" style={{ marginTop: 0 }}>⏱️ Expected hours · per student</label>
-                                    <input
-                                        type="number"
-                                        placeholder="e.g. 20"
-                                        value={formData.capacity.hours}
-                                        onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="co-label" style={{ marginTop: 0 }}>👥 Team size · min 2, max 20</label>
-                                    <input
-                                        type="number"
-                                        placeholder="e.g. 5"
-                                        value={formData.capacity.volunteers}
-                                        onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
-                                    />
-                                </div>
+                            <div>
+                                <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={5000}
+                                    placeholder="e.g. 20"
+                                    value={formData.capacity.volunteers}
+                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                />
                             </div>
+                        </div>
+                        <div className="mt-3">
+                            <label className="co-label" style={{ marginTop: 0 }}>Schedule / attendance notes</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="e.g. Saturdays 10am–2pm; four sessions"
+                                value={formData.scheduleNotes}
+                                onChange={(e) => setFormData({ ...formData, scheduleNotes: e.target.value })}
+                            />
+                        </div>
+                        <div className="co-note aqua mt-3">
+                            <span><b>Checks:</b> deadline must be on/before start date; end date cannot be before start date; hours and seats must be positive.</span>
                         </div>
                     </div>
                 </div>
@@ -1654,8 +2059,8 @@ export default function StudentOpportunityCreationPage() {
             <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
                 <CoSectionHead
                     letter="C"
-                    title="SDG selection"
-                    tag="LINK IT TO THE GLOBAL GOALS"
+                    title="SDG & impact"
+                    tag="IMPACT"
                     color="#6d28d9"
                     expanded={expandedSections.includes("C")}
                     onToggle={() => toggleSection("C")}
@@ -1696,7 +2101,7 @@ export default function StudentOpportunityCreationPage() {
 
                     {/* C2. SDG Target */}
                     <div className={!formData.sdg ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="co-label">C2 · SDG target</label>
+                        <label className="co-label">Relevant SDG target · optional</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                             value={formData.target}
@@ -1805,24 +2210,33 @@ export default function StudentOpportunityCreationPage() {
                             </select>
                         </div>
                     </div>
+                    <div>
+                        <label className="co-label">Why is this SDG genuinely relevant? *</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="Explain the actual connection instead of selecting an SDG only because it sounds related."
+                            value={formData.sdgWhy}
+                            onChange={(e) => setFormData({ ...formData, sdgWhy: e.target.value })}
+                        />
+                    </div>
                 </div>
             </div>
 
             )}
 
             {/* SECTION D: OBJECTIVES */}
-            {activeStep === "D" && (
+            {activeStep === "C" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#0e7d74" }}>
                 <CoSectionHead
                     letter="D"
                     title="Objectives"
                     tag="WHAT & FOR WHOM"
                     color="#0e7d74"
-                    expanded={expandedSections.includes("D")}
+                    expanded
                     onToggle={() => toggleSection("D")}
                 />
 
-                <div className={`${!expandedSections.includes('D') ? 'hidden' : ''}`}>
+                <div>
                     <div>
                         <label className="co-label" style={{ marginTop: 4 }}>D1 · Project objective</label>
                         <textarea spellCheck={true}
@@ -1831,6 +2245,24 @@ export default function StudentOpportunityCreationPage() {
                             value={formData.objectives.description}
                             onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, description: e.target.value } })}
                         ></textarea>
+                    </div>
+                    <div>
+                        <label className="co-label">Expected outputs *</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="What will be produced or delivered?"
+                            value={formData.objectives.outputs}
+                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, outputs: e.target.value } })}
+                        />
+                    </div>
+                    <div>
+                        <label className="co-label">Expected outcome / success measure</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="How will you know this worked?"
+                            value={formData.objectives.outcome}
+                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, outcome: e.target.value } })}
+                        />
                     </div>
                     <div>
                         <label className="co-label">D2 · Expected outreach</label>
@@ -2066,6 +2498,26 @@ export default function StudentOpportunityCreationPage() {
                                 </div>
                             )}
                     </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="co-label">Prerequisites / eligibility notes</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="Any skills, year, or language needed?"
+                                value={formData.activity.prerequisites}
+                                onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, prerequisites: e.target.value } })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label">Resources / support provided</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="Orientation, transport, materials…"
+                                value={formData.activity.resources}
+                                onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, resources: e.target.value } })}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2073,23 +2525,39 @@ export default function StudentOpportunityCreationPage() {
 
             {/* SECTION F: STUDENT-CREATED OPPORTUNITY (CONTROLLED) */}
             {activeStep === "F" && (
-            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
+            <div className="co-card co-accent" style={{ borderTopColor: "#18755f" }}>
                 <CoSectionHead
                     letter="F"
-                    title="Supervision, safety & participation scope"
-                    tag="MANDATORY"
-                    color="#b45309"
+                    title="Verification & collaboration"
+                    tag="ROLE-SMART"
+                    color="#18755f"
                     expanded={expandedSections.includes("F")}
                     onToggle={() => toggleSection("F")}
                 />
                 <div className={`${!expandedSections.includes('F') ? 'hidden' : ''}`}>
+                    {formData.privateCandidate ? (
+                        <>
+                            <div className="co-note aqua mb-3">
+                                <span><b>✓ Private Candidate pathway active:</b> no faculty connection is required. This opportunity is routed directly to CIEL PK Verification.</span>
+                            </div>
+                            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#c9e5da] bg-[linear-gradient(135deg,#f0faf6,#fff)] p-3">
+                                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#15988b] text-[10px] font-black text-white">CIEL</div>
+                                <div>
+                                    <div className="text-[8px] font-black tracking-[0.12em] text-[#15988b]">DIRECT VERIFICATION OWNER</div>
+                                    <b className="block text-[12px]">CIEL PK Verification Team</b>
+                                    <p className="m-0 text-[10px] text-[#7a919a]">Candidate identity / programme status + opportunity authenticity. CIEL PK will contact you using the private details from Step 1.</p>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                    <>
                     <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">
-                        Student-created opportunities stay within your university, require faculty verification by email, and are reviewed by CIEL Admin before going live.
+                        University-linked student opportunities require a faculty member from your university. The faculty receives the first approval request.
                     </p>
 
                     {/* F1 Faculty approval */}
                     <div>
-                        <label className="co-label">F1 · Faculty approval — a verification email is sent; <b className="text-[#b45309]">nothing proceeds without it</b></label>
+                        <label className="co-label">Faculty approval — a verification email is sent; <b className="text-[#b45309]">nothing proceeds without it</b></label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Faculty name <span className="text-red-500">*</span></label>
@@ -2135,9 +2603,11 @@ export default function StudentOpportunityCreationPage() {
                             📧 <span>This confirms the opportunity is valid, supervised, and academically acceptable. Faculty approval is required before the opportunity can proceed.</span>
                         </div>
                     </div>
+                    </>
+                    )}
 
                     <div>
-                        <label className="co-label" style={{ marginTop: 14 }}>F2 · Executing context · choose one</label>
+                        <label className="co-label" style={{ marginTop: 14 }}>External partner / host · optional</label>
                         <PartnerOrganizationGuidance context="create" />
                         <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                             <button
@@ -2192,7 +2662,7 @@ export default function StudentOpportunityCreationPage() {
                                 <p className="text-xs text-slate-500">A verification email may be sent to the partner contact.</p>
                             </div>
                         )}
-                        {formData.supervision.executingContext === "independent" && (
+                        {formData.supervision.executingContext === "independent" && !formData.privateCandidate && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Independent community activity</p>
                                 <textarea spellCheck={true}
@@ -2238,151 +2708,273 @@ export default function StudentOpportunityCreationPage() {
                         )}
                     </div>
 
-                    {/* F3 Safety declaration */}
                     <div className="pt-2">
-                        <label className="co-label" style={{ marginTop: 14 }}>F3 · Safety &amp; responsibility · tap all four to confirm</label>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <button type="button" className={`co-safe${formData.supervision.declSafeEnvironment ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declSafeEnvironment: !formData.supervision.declSafeEnvironment } })}>
-                                <span className="co-tick">{formData.supervision.declSafeEnvironment ? "✓" : ""}</span>
-                                <span>This activity environment is safe and appropriate</span>
-                            </button>
-                            <button type="button" className={`co-safe${formData.supervision.declNoHazardous ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declNoHazardous: !formData.supervision.declNoHazardous } })}>
-                                <span className="co-tick">{formData.supervision.declNoHazardous ? "✓" : ""}</span>
-                                <span>No hazardous or high-risk tasks are involved</span>
-                            </button>
-                            <button type="button" className={`co-safe${formData.supervision.declFacultyOversight ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declFacultyOversight: !formData.supervision.declFacultyOversight } })}>
-                                <span className="co-tick">{formData.supervision.declFacultyOversight ? "✓" : ""}</span>
-                                <span>Faculty oversight is ensured</span>
-                            </button>
-                            <button type="button" className={`co-safe${formData.supervision.declEthicalLawful ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declEthicalLawful: !formData.supervision.declEthicalLawful } })}>
-                                <span className="co-tick">{formData.supervision.declEthicalLawful ? "✓" : ""}</span>
-                                <span>All activities are ethical and lawful</span>
-                            </button>
+                        <label className="co-label">Participation verification</label>
+                        <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will your crew log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
+                        <div className="co-chips">
+                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
+                                <CoChip
+                                    key={v}
+                                    selected={formData.verification.includes(v)}
+                                    onClick={() => {
+                                        const vers = formData.verification.includes(v)
+                                            ? formData.verification.filter(i => i !== v)
+                                            : [...formData.verification, v];
+                                        setFormData({ ...formData, verification: vers });
+                                    }}
+                                >
+                                    {VERIFICATION_EMOJI[v] || ""} {v}
+                                </CoChip>
+                            ))}
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    {/* F4 Admin */}
-                    <div className="co-note aqua" style={{ marginTop: 12 }}>
-                        🛡️ <span><b>F4 · Admin approval:</b> CIEL Admin will review feasibility and clarity, SDG alignment, risk level, and authenticity before this is published at your institution.</span>
-                    </div>
+            )}
 
-                    {/* F5 Visibility & participation */}
-                    <div>
-                        <label className="co-label" style={{ marginTop: 14 }}>F5 · Visibility &amp; participation scope</label>
-                        <span className="co-locked w-full">🔒 <b>Restricted to your university only</b> — only {studentDetails.institution || "your university"} students can view and apply. Cross-university participation is not allowed.</span>
-                        <div className="co-chips mt-2">
-                            <CoChip
-                                selected={formData.participation.departmentScope === "all"}
-                                onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "all" } })}
-                            >
-                                🌐 Open to all departments within the university
-                            </CoChip>
-                            <CoChip
-                                selected={formData.participation.departmentScope === "specific"}
-                                onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "specific" } })}
-                            >
-                                🎯 Restricted to specific departments / programs
-                            </CoChip>
-                        </div>
-                        {formData.participation.departmentScope === "specific" && (
-                            <div className="pl-1 space-y-3 border-l-2 border-orange-100">
-                                <p className="text-xs text-slate-500">Add each department or program (multi-entry).</p>
-                                {formData.participation.departments.map((dep, idx) => (
-                                    <div key={idx} className="flex gap-2">
+            {/* STEP 7: VISIBILITY & APPLY NOW */}
+            {activeStep === "VIS" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b24f85" }}>
+                <CoSectionHead
+                    letter="7"
+                    title="Who can see this card — and who can Apply Now?"
+                    tag="PUBLIC CARD"
+                    color="#b24f85"
+                    expanded
+                />
+                <div>
+                    {formData.privateCandidate ? (
+                        <>
+                            <div className="rounded-2xl border border-[#cfe6df] bg-[linear-gradient(135deg,#edf8f4,#fff)] p-3 text-[11px] leading-relaxed text-[#376b60]">
+                                🌐 <b>Private Candidate application scope:</b> because you are not attached to a home university, the approved card can be publicly discoverable and Apply Now can be opened across the CIEL PK network or restricted to selected universities / departments.
+                            </div>
+                            <div className="co-policy-grid">
+                                <div className="co-policy"><small>Card visibility</small><b>Publicly discoverable</b><p>Students across institutions may discover the opportunity.</p></div>
+                                <div className="co-policy"><small>Apply Now eligibility</small><b>Candidate-defined after CIEL PK verification</b><p>Default is all universities; targeting is optional.</p></div>
+                            </div>
+                            <div className="co-aud-grid">
+                                {([
+                                    ["all", "🌍", "All Universities · All Departments", "Open applications across the CIEL PK network."],
+                                    ["multi_all", "🏛️", "Selected Universities · All Departments", "Choose the universities that may apply."],
+                                    ["multi_depts", "🎯", "Selected Universities · Selected Departments", "Target defined disciplines / programmes."],
+                                ] as const).map(([scope, ico, title, sub]) => (
+                                    <button
+                                        key={scope}
+                                        type="button"
+                                        className={`co-aud${formData.applyScope === scope ? " on" : ""}`}
+                                        onClick={() => setFormData({ ...formData, applyScope: scope })}
+                                    >
+                                        <div className="ai">{ico}</div>
+                                        <div><b>{title}</b><small>{sub}</small></div>
+                                        <div className="ck">{formData.applyScope === scope ? "✓" : ""}</div>
+                                    </button>
+                                ))}
+                            </div>
+                            {(formData.applyScope === "multi_all" || formData.applyScope === "multi_depts") && (
+                                <div className="mt-3 space-y-3">
+                                    <label className="co-label">Selected universities *</label>
+                                    {formData.selectedUniversities.map((uni, idx) => (
                                         <input
+                                            key={idx}
                                             type="text"
-                                            placeholder="Department or program name"
-                                            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
+                                            placeholder="University name"
+                                            value={uni}
+                                            onChange={(e) => {
+                                                const next = [...formData.selectedUniversities];
+                                                next[idx] = e.target.value;
+                                                setFormData({ ...formData, selectedUniversities: next });
+                                            }}
+                                        />
+                                    ))}
+                                    <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, selectedUniversities: [...formData.selectedUniversities, ""] })}>+ Add university</button>
+                                </div>
+                            )}
+                            {formData.applyScope === "multi_depts" && (
+                                <div className="mt-3 space-y-3">
+                                    <label className="co-label">Departments / programmes *</label>
+                                    {formData.participation.departments.map((dep, idx) => (
+                                        <input
+                                            key={idx}
+                                            type="text"
+                                            placeholder="Department or programme"
                                             value={dep}
                                             onChange={(e) => {
                                                 const next = [...formData.participation.departments];
                                                 next[idx] = e.target.value;
-                                                setFormData({ ...formData, participation: { ...formData.participation, departments: next } });
+                                                setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
                                             }}
                                         />
-                                        {formData.participation.departments.length > 1 && (
-                                            <button
-                                                type="button"
-                                                className="p-2 text-slate-400 hover:text-red-500"
-                                                aria-label="Remove department"
-                                                onClick={() => {
-                                                    const next = formData.participation.departments.filter((_, i) => i !== idx);
-                                                    setFormData({ ...formData, participation: { ...formData.participation, departments: next.length ? next : [""] } });
-                                                }}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setFormData({
-                                            ...formData,
-                                            participation: { ...formData.participation, departments: [...formData.participation.departments, ""] },
-                                        })
-                                    }
-                                    className="text-xs font-bold text-orange-600 flex items-center gap-1"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Add department
-                                </button>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sections / class (optional)</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
-                                        placeholder="e.g. BBA Section A"
-                                        value={formData.participation.sectionsNote}
-                                        onChange={(e) => setFormData({ ...formData, participation: { ...formData.participation, sectionsNote: e.target.value } })}
-                                    />
+                                    ))}
+                                    <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departments: [...formData.participation.departments, ""], departmentScope: "specific" } })}>+ Add department</button>
                                 </div>
+                            )}
+                            <div className="co-note aqua mt-3"><span><b>Verification rule:</b> publishing and application activation remain locked until CIEL PK has completed the private-candidate verification step.</span></div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="rounded-2xl border border-[#cfe6df] bg-[linear-gradient(135deg,#edf8f4,#fff)] p-3 text-[11px] leading-relaxed text-[#376b60]">
+                                🌐 <b>Visibility and Apply Now are different.</b> The approved card is publicly discoverable, but only students from <b>{studentDetails.institution || "your university"}</b> can apply. You may restrict applications further by department/programme.
                             </div>
-                        )}
-                    </div>
+                            <div className="co-policy-grid">
+                                <div className="co-policy"><small>Card visibility</small><b>Publicly discoverable</b><p>Other universities can see and save the opportunity.</p></div>
+                                <div className="co-policy"><small>Apply Now eligibility</small><b>{studentDetails.institution || "Your university"} only</b><p>Other universities see View Only — Not Eligible.</p></div>
+                            </div>
+                            <div className="co-aud-grid">
+                                {([
+                                    ["student_uni_all", "🎓", "All Students in My University", `All eligible departments/programmes in ${studentDetails.institution || "your university"} may apply.`],
+                                    ["student_own_dept", "👥", "My Department / Programme Only", `Apply Now is limited to ${studentDetails.department || "your department"}.`],
+                                    ["student_selected_depts", "🏫", "Selected Departments in My University", "Choose permitted departments/programmes."],
+                                ] as const).map(([scope, ico, title, sub]) => (
+                                    <button
+                                        key={scope}
+                                        type="button"
+                                        className={`co-aud${formData.applyScope === scope ? " on" : ""}`}
+                                        onClick={() => setFormData({
+                                            ...formData,
+                                            applyScope: scope,
+                                            participation: {
+                                                ...formData.participation,
+                                                departmentScope: scope === "student_uni_all" ? "all" : "specific",
+                                            },
+                                        })}
+                                    >
+                                        <div className="ai">{ico}</div>
+                                        <div><b>{title}</b><small>{sub}</small></div>
+                                        <div className="ck">{formData.applyScope === scope ? "✓" : ""}</div>
+                                    </button>
+                                ))}
+                            </div>
+                            {formData.applyScope === "student_selected_depts" && (
+                                <div className="mt-3 space-y-3">
+                                    <label className="co-label">Permitted departments / programmes *</label>
+                                    {formData.participation.departments.map((dep, idx) => (
+                                        <input
+                                            key={idx}
+                                            type="text"
+                                            placeholder="Department or program name"
+                                            value={dep}
+                                            onChange={(e) => {
+                                                const next = [...formData.participation.departments];
+                                                next[idx] = e.target.value;
+                                                setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
+                                            }}
+                                        />
+                                    ))}
+                                    <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departments: [...formData.participation.departments, ""], departmentScope: "specific" } })}>+ Add department</button>
+                                </div>
+                            )}
+                            <div className="co-note mt-3"><span><b>Cross-university rule:</b> another university can view the card but cannot Apply Now.</span></div>
+                        </>
+                    )}
                 </div>
             </div>
-
             )}
 
-            {/* SECTION G: VERIFICATION */}
-            {activeStep === "G" && (
-            <div className="co-card co-accent" style={{ borderTopColor: "#f472b6" }}>
+            {/* STEP 8: SAFETY */}
+            {activeStep === "SAFE" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
                 <CoSectionHead
-                    letter="G"
-                    title="Evidence & verification"
-                    tag="SET EXPECTATIONS NOW"
-                    tagAuto
-                    color="#f472b6"
-                    expanded={expandedSections.includes("G")}
-                    onToggle={() => toggleSection("G")}
+                    letter="8"
+                    title="Safety & accountability"
+                    tag="DECLARATION"
+                    color="#b45309"
+                    expanded
                 />
-                <div className={`${!expandedSections.includes('G') ? 'hidden' : ''}`}>
-                    <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will your crew log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
-                    <div className="co-chips">
-                        {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
-                            <CoChip
-                                key={v}
-                                selected={formData.verification.includes(v)}
-                                onClick={() => {
-                                    const vers = formData.verification.includes(v)
-                                        ? formData.verification.filter(i => i !== v)
-                                        : [...formData.verification, v];
-                                    setFormData({ ...formData, verification: vers });
-                                }}
+                <div>
+                    <div className="co-note mt-1">
+                        <span><b>CIEL PK role:</b> CIEL PK provides opportunity publication, workflow, reporting, verification and facilitation. Unless expressly stated otherwise, it does not itself operate or physically supervise independently created third-party activities.</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <button type="button" className={`co-safe${formData.supervision.declSafeEnvironment ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declSafeEnvironment: !formData.supervision.declSafeEnvironment } })}>
+                                <span className="co-tick">{formData.supervision.declSafeEnvironment ? "✓" : ""}</span>
+                                <span>The opportunity, dates, location, contacts and supervision information are accurate to the best of my knowledge.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declNoHazardous ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declNoHazardous: !formData.supervision.declNoHazardous } })}>
+                                <span className="co-tick">{formData.supervision.declNoHazardous ? "✓" : ""}</span>
+                                <span>Where physical participation is involved, reasonable steps have been taken to consider the suitability of the location and activity.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declFacultyOversight ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declFacultyOversight: !formData.supervision.declFacultyOversight } })}>
+                                <span className="co-tick">{formData.supervision.declFacultyOversight ? "✓" : ""}</span>
+                                <span>Students should follow relevant university, host-organization and venue safety procedures and exercise reasonable personal judgment.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declEthicalLawful ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declEthicalLawful: !formData.supervision.declEthicalLawful } })}>
+                                <span className="co-tick">{formData.supervision.declEthicalLawful ? "✓" : ""}</span>
+                                <span>I will follow applicable safeguarding, consent, privacy and institutional requirements, particularly where children, minors or vulnerable groups are involved.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.extraSafety.communicateChanges ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, communicateChanges: !formData.extraSafety.communicateChanges } })}>
+                                <span className="co-tick">{formData.extraSafety.communicateChanges ? "✓" : ""}</span>
+                                <span>I agree to communicate material changes in location, activity, supervision, dates, capacity or safety arrangements.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.extraSafety.visibilityIntentional ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, visibilityIntentional: !formData.extraSafety.visibilityIntentional } })}>
+                                <span className="co-tick">{formData.extraSafety.visibilityIntentional ? "✓" : ""}</span>
+                                <span>The visibility and Apply Now eligibility scope selected in Step 7 is intentional and accurate.</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.extraSafety.cielNotGuarantee ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, cielNotGuarantee: !formData.extraSafety.cielNotGuarantee } })}>
+                                <span className="co-tick">{formData.extraSafety.cielNotGuarantee ? "✓" : ""}</span>
+                                <span>Publication or approval on CIEL PK is not by itself a guarantee by CIEL PK regarding a third-party location or activity.</span>
+                            </button>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="co-label">Electronic signature — type full name *</label>
+                            <input
+                                type="text"
+                                placeholder={studentDetails.name || "Your full name"}
+                                value={formData.electronicSignature}
+                                onChange={(e) => setFormData({ ...formData, electronicSignature: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label">Signed date & time</label>
+                            <input type="text" readOnly value={new Date().toLocaleString()} className="bg-slate-50" />
+                        </div>
+                    </div>
+                    <button type="button" className={`co-safe mt-3 w-full text-left${formData.extraSafety.signatureAck ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, signatureAck: !formData.extraSafety.signatureAck } })}>
+                        <span className="co-tick">{formData.extraSafety.signatureAck ? "✓" : ""}</span>
+                        <span>I confirm typing my name records my electronic acknowledgement of these declarations for this opportunity record.</span>
+                    </button>
+                </div>
+            </div>
+            )}
+
+            {/* SECTION: FLASHCARD + CONFIRM */}
+            {activeStep === "SUBMIT" && (
+            <>
+            <div className="co-card mb-3">
+                <CoSectionHead letter="9" title="Review the student-facing opportunity flashcard" tag="FLASHCARD" color="#0e7d74" />
+                <div className="previewTools mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dfe7ea] bg-[#f8fafb] p-3">
+                    <div>
+                        <b className="text-[12px]">Eligibility preview</b>
+                        <small className="mt-0.5 block text-[10px] text-[#70818a]">See how Apply Now changes by viewer. Phone/WhatsApp stays private.</small>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {([
+                            ["eligible", "Eligible Student"],
+                            ["wrongdept", "Wrong Department"],
+                            ["otheruni", "Other University"],
+                        ] as const).map(([id, label]) => (
+                            <button
+                                key={id}
+                                type="button"
+                                className={`rounded-full border px-3 py-1.5 text-[10px] font-black ${flashViewer === id ? "border-[#102f3d] bg-[#102f3d] text-white" : "border-[#dfe7ea] bg-white text-[#52646c]"}`}
+                                onClick={() => setFlashViewer(id)}
                             >
-                                {VERIFICATION_EMOJI[v] || ""} {v}
-                            </CoChip>
+                                {label}
+                            </button>
                         ))}
                     </div>
                 </div>
+                <StudentOpportunityFlashcard model={flashcardModel} />
+                <button
+                    type="button"
+                    className={`co-safe mt-3 w-full text-left${formData.flashApprove ? " on" : ""}`}
+                    onClick={() => setFormData({ ...formData, flashApprove: !formData.flashApprove })}
+                >
+                    <span className="co-tick">{formData.flashApprove ? "✓" : ""}</span>
+                    <span>I have reviewed this flashcard and confirm it accurately represents the opportunity being submitted.</span>
+                </button>
             </div>
-
-            )}
-
-            {/* SECTION: F6 REQUIRED CONFIRMATIONS + DECLARATION */}
-            {activeStep === "SUBMIT" && (
             <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
                 <div className="mb-1 flex items-center gap-2.5">
                     <span className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] bg-[#2dd4bf] px-2 text-[11px] font-extrabold text-[#04252b]">✓</span>
@@ -2400,7 +2992,7 @@ export default function StudentOpportunityCreationPage() {
                     }
                 >
                     <span className="co-tick">{formData.sectionFConfirmations.facultyApproval ? "✓" : ""}</span>
-                    <span>Faculty approval has been obtained or will be obtained — the verification email will be sent.</span>
+                    <span>{formData.privateCandidate ? "I understand CIEL PK will verify this private-candidate opportunity directly — no faculty approval is required." : "Faculty approval has been obtained or will be obtained — the verification email will be sent."}</span>
                 </button>
                 <button
                     type="button"
@@ -2446,7 +3038,7 @@ export default function StudentOpportunityCreationPage() {
                         🧑‍🎓 <b style={{ color: "#fff" }}>{studentDetails.name || "—"}</b><span className="co-lock-badge">🔒</span>
                     </span>
                     <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
-                        🏛️ {studentDetails.institution || "—"} · LOCKED SCOPE<span className="co-lock-badge">🔒</span>
+                        🏛️ {formData.privateCandidate ? (formData.privateAwardingBody || "Private / independent") : (studentDetails.institution || "—")} · {formData.privateCandidate ? "CIEL PK VERIFY" : "UNI APPLY SCOPE"}<span className="co-lock-badge">🔒</span>
                     </span>
                 </div>
                 <div className="mt-3.5 flex gap-2.5">
@@ -2473,6 +3065,7 @@ export default function StudentOpportunityCreationPage() {
                     </button>
                 </div>
             </div>
+            </>
             )}
 
                     <div className="co-form-nav">

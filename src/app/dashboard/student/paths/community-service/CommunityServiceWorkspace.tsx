@@ -18,7 +18,18 @@ const HUB = "/dashboard/student/paths/community-service";
 const GUIDE = `${HUB}?view=guide`;
 const WALL = "/dashboard/student/impact?area=Community%20Service";
 
-type ApprovalLineStatus = "pending" | "approved" | "rejected" | null | undefined;
+/** Mirrors backend LINE_STATUS (opportunity-workflow.service.ts) — includes the values a line takes
+ * when that stage doesn't apply (private-candidate has no faculty line; no partner named, etc.). */
+type ApprovalLineStatus =
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "revision_requested"
+    | "skipped"
+    | "not_applicable"
+    | "not_required"
+    | null
+    | undefined;
 type WsFilter = "all" | "opportunity" | "report" | "review" | "revision" | "closed";
 type NodeState = "complete" | "current" | "locked" | "rejected";
 
@@ -101,6 +112,13 @@ function opportunityRejected(op: OpportunityRow): boolean {
 function facultyNode(op: OpportunityRow): JourneyNode {
     if (op.faculty_approval_status === "rejected") return { title: "1. Faculty", detail: "Rejected", state: "rejected" };
     if (op.faculty_approval_status === "approved") return { title: "1. Faculty ✓", detail: "Approved", state: "complete" };
+    if (
+        op.faculty_approval_status === "not_applicable" ||
+        op.faculty_approval_status === "not_required" ||
+        op.faculty_approval_status === "skipped"
+    ) {
+        return { title: "1. Faculty ✓", detail: "Not required", state: "complete" };
+    }
     return { title: "1. Faculty", detail: "Pending approval", state: "current" };
 }
 

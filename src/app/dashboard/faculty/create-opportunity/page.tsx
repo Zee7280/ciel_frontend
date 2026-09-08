@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Clock, AlertCircle, ChevronDown, Loader2, Plus, Users } from "lucide-react";
+import Link from "next/link";
+import { Info, MapPin, AlertCircle, ChevronDown, Loader2, Plus } from "lucide-react";
 import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import {
     ACTIVITY_TYPE_EMOJI,
     BENEFICIARY_EMOJI,
     CoChip,
-    CoFormHero,
-    CoLivePreview,
     CoSectionHead,
     MODE_EMOJI,
     SKILL_EMOJI,
@@ -27,6 +26,11 @@ import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompl
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import {
+    resolveFacultyFlashEligibility,
+    StudentOpportunityFlashcard,
+    type FlashViewer,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -37,13 +41,67 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 /** Optional schedule fields for these timeline types. */
 const TIMELINES_WITH_SCHEDULE_UI = ["Fixed dates", "Flexible", "Ongoing"] as const;
 
-/** F5.1 participation scope (faculty-created opportunity). */
+const WIZARD_STEPS = [
+    { key: "A", label: "Creator", sub: "Faculty profile", icon: "👩‍🏫" },
+    { key: "B", label: "Opportunity", sub: "Title, type, mode", icon: "🚀" },
+    { key: "SCHED", label: "Schedule", sub: "Dates, seats, hours", icon: "📅" },
+    { key: "C", label: "SDG & impact", sub: "Goals, objective, outputs", icon: "🌍" },
+    { key: "E", label: "Student experience", sub: "Plan & skills gained", icon: "🛠️" },
+    { key: "F", label: "Verification", sub: "You + optional partner", icon: "✅" },
+    { key: "VIS", label: "Visibility", sub: "Who can Apply Now", icon: "📣" },
+    { key: "SAFE", label: "Safety", sub: "Declarations & signature", icon: "🛡️" },
+    { key: "SUBMIT", label: "Flashcard", sub: "Review & submit", icon: "🃏" },
+] as const;
+
+/** "Save draft" only persists locally on this device — there is no faculty draft endpoint on the
+ * backend (unlike the student flow), so this must never call the real submit API. */
+const FACULTY_OPPORTUNITY_DRAFT_KEY = "ciel_faculty_opportunity_draft_v1";
+
 type ParticipationRule =
     | "open_all_universities"
     | "restricted_specific_universities"
     | "own_university_only"
     | "departments_across_universities"
     | "own_university_departments";
+
+type FacultyApplyScope =
+    | "all"
+    | "multi_all"
+    | "multi_depts"
+    | "one_all"
+    | "one_depts"
+    | "own_uni_all"
+    | "own_dept";
+
+function applyScopeToRule(scope: FacultyApplyScope): ParticipationRule {
+    switch (scope) {
+        case "all":
+            return "open_all_universities";
+        case "multi_all":
+        case "one_all":
+            return "restricted_specific_universities";
+        case "multi_depts":
+        case "one_depts":
+            return "departments_across_universities";
+        case "own_uni_all":
+            return "own_university_only";
+        case "own_dept":
+            return "own_university_departments";
+    }
+}
+
+function weekdayLabelFromDateInput(value: string): string | null {
+    const v = value.trim();
+    if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+    const [ys, ms, ds] = v.split("-");
+    const y = Number(ys);
+    const m = Number(ms);
+    const d = Number(ds);
+    if (!y || !m || !d) return null;
+    const date = new Date(y, m - 1, d);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+}
 
 function isValidEmail(s: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -76,24 +134,30 @@ export default function FacultyOpportunityCreationPage() {
     const [formData, setFormData] = useState({
         // Section B
         title: "",
+        hook: "",
         opportunityType: [] as string[],
         isOtherTypeChecked: false,
         otherTypeSpecs: [""] as string[],
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
-        timelineType: "", // fixed, flexible, ongoing
+        timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
+        applicationDeadline: "",
+        scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
         // Section C
         sdg: "",
         target: "",
         indicator: "",
+        sdgWhy: "",
         secondarySdgs: [] as { sdgId: string, targetId: string, indicatorId: string, justification: string }[],
 
         // Section D
         objectives: {
             description: "",
+            outputs: "",
+            outcome: "",
             beneficiariesCount: "",
             beneficiariesType: [] as string[],
             isOtherBeneficiaryChecked: false,
@@ -105,7 +169,9 @@ export default function FacultyOpportunityCreationPage() {
             responsibilities: "",
             skills: [] as string[],
             isOtherSkillChecked: false,
-            otherSkills: [""] as string[]
+            otherSkills: [""] as string[],
+            prerequisites: "",
+            resources: "",
         },
 
         // Section F — Verification & safety (faculty academic lead)
@@ -121,6 +187,8 @@ export default function FacultyOpportunityCreationPage() {
             orgName: "",
             contactPerson: "",
             email: "",
+            designation: "",
+            function: "",
         },
         safetyDeclarations: {
             safeAppropriate: false,
@@ -128,6 +196,15 @@ export default function FacultyOpportunityCreationPage() {
             lawfulEthical: false,
             precautionsInPlace: false,
         },
+        extraSafety: {
+            communicateChanges: false,
+            visibilityIntentional: false,
+            cielNotGuarantee: false,
+            signatureAck: false,
+        },
+        electronicSignature: "",
+        flashApprove: false,
+        applyScope: "all" as FacultyApplyScope,
 
         // Section G
         verification: [] as string[],
@@ -154,6 +231,50 @@ export default function FacultyOpportunityCreationPage() {
             correctVerifiable: false,
         },
     });
+    const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
+    const [activeStep, setActiveStep] = useState<string>("A");
+    const activeStepIndex = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+    const goToStep = useCallback((key: string) => {
+        setActiveStep(key);
+        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+    const goNextStep = useCallback(() => {
+        const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        if (i >= 0 && i < WIZARD_STEPS.length - 1) goToStep(WIZARD_STEPS[i + 1].key);
+    }, [activeStep, goToStep]);
+    const goBackStep = useCallback(() => {
+        const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
+    }, [activeStep, goToStep]);
+
+    const chooseApplyScope = useCallback((scope: FacultyApplyScope) => {
+        setFormData((prev) => {
+            const rule = applyScopeToRule(scope);
+            let selectedUniversities = prev.participationScope.selectedUniversities;
+            if (scope === "all" || scope === "own_uni_all" || scope === "own_dept") {
+                selectedUniversities = [];
+            } else if ((scope === "one_all" || scope === "one_depts") && selectedUniversities.length > 1) {
+                selectedUniversities = selectedUniversities.slice(0, 1);
+            }
+            let departments = prev.participationScope.departments;
+            if (scope === "own_dept") {
+                const ownDept = prev.academicLead.department.trim();
+                if (ownDept && !departments.some((d) => d.trim())) {
+                    departments = [ownDept];
+                }
+            }
+            return {
+                ...prev,
+                applyScope: scope,
+                participationScope: {
+                    ...prev.participationScope,
+                    rule,
+                    selectedUniversities,
+                    departments,
+                },
+            };
+        });
+    }, []);
 
     const displayFacultyContact = useMemo(
         () => parsePhoneForDisplay(facultyDetails.contact),
@@ -170,7 +291,11 @@ export default function FacultyOpportunityCreationPage() {
             return false;
         }
         if (!formData.title.trim()) {
-            toast.error("Please enter an Opportunity Title (Section B)");
+            toast.error("Please enter an Opportunity Title");
+            return false;
+        }
+        if (!formData.hook.trim()) {
+            toast.error("Please add a one-line student hook.");
             return false;
         }
         if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
@@ -195,23 +320,53 @@ export default function FacultyOpportunityCreationPage() {
             }
         }
         if (!formData.timelineType) {
-            toast.error("Please select a Timeline Type (Section B)");
+            toast.error("Please select a Timeline Type");
+            return false;
+        }
+        if (!formData.applicationDeadline.trim()) {
+            toast.error("Please set an application deadline.");
+            return false;
+        }
+        if (!formData.dates.start.trim() || !formData.dates.end.trim()) {
+            toast.error("Please set both a start date and an end date.");
+            return false;
+        }
+        if (formData.dates.start > formData.dates.end) {
+            toast.error("End date must be on or after the start date.");
+            return false;
+        }
+        if (formData.applicationDeadline > formData.dates.start) {
+            toast.error("Application deadline cannot be after the start date.");
+            return false;
+        }
+        const hoursNum = parseInt(formData.capacity.hours, 10);
+        if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
+            toast.error("Required hours per student must be between 1 and 500.");
+            return false;
+        }
+        const volNum = parseInt(formData.capacity.volunteers, 10);
+        if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
+            toast.error("Available seats must be between 1 and 5000.");
             return false;
         }
         // Section C
         if (!formData.sdg) {
-            toast.error("Please select a Primary SDG (Section C)");
+            toast.error("Please select a Primary SDG");
             return false;
         }
-        if (!formData.target) {
-            toast.error("Please select an SDG Target (Section C)");
+        if (!formData.sdgWhy.trim()) {
+            toast.error("Please explain why this SDG is genuinely relevant.");
             return false;
         }
         // Secondary SDGs (C4): optional; rows without a target are not sent in secondary_sdgs (see payload filter).
 
         // Section D
         if (!formData.objectives.description.trim()) {
-            toast.error("Please enter Project Objectives (Section D)");
+            toast.error("Please enter the primary objective");
+            return false;
+        }
+        if (!formData.objectives.outputs.trim()) {
+            toast.error("Please describe expected outputs.");
             return false;
         }
 
@@ -245,11 +400,11 @@ export default function FacultyOpportunityCreationPage() {
             return false;
         }
         if (!formData.academicLead.designation.trim() || !formData.academicLead.department.trim()) {
-            toast.error("Please enter your designation and department (Section F — F1)");
+            toast.error("Please enter your designation and department so students know the academic owner.");
             return false;
         }
         if (!formData.academicLead.officialEmail.trim() || !isValidEmail(formData.academicLead.officialEmail)) {
-            toast.error("Please enter a valid official email address (Section F — F1)");
+            toast.error("Please enter a valid official email address");
             return false;
         }
 
@@ -266,40 +421,56 @@ export default function FacultyOpportunityCreationPage() {
             }
         }
 
-        // Section F3 — Safety & supervision declaration
         const sd = formData.safetyDeclarations;
         if (!sd.safeAppropriate || !sd.guidedSupervised || !sd.lawfulEthical || !sd.precautionsInPlace) {
-            toast.error("Please confirm all items in Safety & Supervision Declaration (Section F — F3)");
+            toast.error("Please confirm all items in Safety & Supervision Declaration");
+            return false;
+        }
+        if (!formData.extraSafety.communicateChanges || !formData.extraSafety.visibilityIntentional || !formData.extraSafety.cielNotGuarantee || !formData.extraSafety.signatureAck) {
+            toast.error("Please confirm all safety and accountability declarations.");
+            return false;
+        }
+        if (!formData.electronicSignature.trim()) {
+            toast.error("Please type your full name as an electronic signature.");
             return false;
         }
 
-        // Section H — F5 participation scope
-        const rule = formData.participationScope.rule;
+        const applyScope = formData.applyScope;
         const ownUni = facultyDetails.institution.trim();
-        if (rule === "restricted_specific_universities" || rule === "departments_across_universities") {
-            if (formData.participationScope.selectedUniversities.length === 0) {
-                toast.error("Please add at least one university (Section H — F5.1)");
+        const selectedUnis = formData.participationScope.selectedUniversities.map((u) => u.trim()).filter(Boolean);
+        if (applyScope === "multi_all" || applyScope === "multi_depts") {
+            if (selectedUnis.length === 0) {
+                toast.error("Please add at least one university for this Apply Now scope.");
                 return false;
             }
         }
-        if (rule === "own_university_only" || rule === "own_university_departments") {
+        if (applyScope === "one_all" || applyScope === "one_depts") {
+            if (selectedUnis.length !== 1) {
+                toast.error("Please select exactly one university for this Apply Now scope.");
+                return false;
+            }
+        }
+        if (applyScope === "own_uni_all" || applyScope === "own_dept") {
             if (!ownUni) {
-                toast.error("Your university is not set in your profile; complete Section A first (Section H — F5.1)");
+                toast.error("Your university is not set in your profile. Complete your profile first.");
                 return false;
             }
         }
-        if (rule === "departments_across_universities" || rule === "own_university_departments") {
+        if (applyScope === "multi_depts" || applyScope === "one_depts" || applyScope === "own_dept") {
             const deps = formData.participationScope.departments.map((d) => d.trim()).filter(Boolean);
             if (deps.length === 0) {
-                toast.error("Please add at least one department or program (Section H — F5.1)");
+                toast.error("Please add at least one department or programme.");
                 return false;
             }
         }
 
-        // Section I — F6 required confirmations
         const fc = formData.finalConfirmations;
         if (!fc.academicallyValid || !fc.properlySupervised || !fc.safeEnvironment || !fc.correctVerifiable) {
-            toast.error("Please accept all required confirmations (Section I — F6)");
+            toast.error("Please accept all required confirmations");
+            return false;
+        }
+        if (!formData.flashApprove) {
+            toast.error("Please review and approve the opportunity flashcard.");
             return false;
         }
 
@@ -336,10 +507,20 @@ export default function FacultyOpportunityCreationPage() {
                   ]
                 : formData.activity.skills;
 
-            const participationRule = formData.participationScope.rule;
+            const participationRule = applyScopeToRule(formData.applyScope);
             const ownInstitution = facultyDetails.institution.trim();
-            const selectedUnis = formData.participationScope.selectedUniversities;
-            const deptList = formData.participationScope.departments.map((d) => d.trim()).filter(Boolean);
+            const selectedUnis = formData.participationScope.selectedUniversities.map((u) => u.trim()).filter(Boolean);
+            const ownDept = formData.academicLead.department.trim();
+            const deptList = (
+                formData.applyScope === "own_dept" && !formData.participationScope.departments.some((d) => d.trim())
+                    ? (ownDept ? [ownDept] : [])
+                    : formData.participationScope.departments.map((d) => d.trim()).filter(Boolean)
+            );
+            // Browse's "Restricted"/"Open to all" badge and filter read this — must reflect the actual
+            // participation scope, not always claim "public"/"open all". Apply Now eligibility is
+            // still separately gated by participation_scope; the directory card itself stays visible
+            // either way (backend OpportunitiesService.isPubliclyVisibleOpportunity), this only fixes
+            // the label/filter being wrong.
             const visibility = participationRule === "open_all_universities" ? "public" : "restricted";
             const restrictedUniversitiesPayload =
                 participationRule === "open_all_universities"
@@ -368,6 +549,8 @@ export default function FacultyOpportunityCreationPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
+                    application_deadline: formData.applicationDeadline || undefined,
+                    schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
                               ...(formData.dates.fromTime.trim() ? { from_time: formData.dates.fromTime.trim() } : {}),
@@ -382,6 +565,7 @@ export default function FacultyOpportunityCreationPage() {
                     sdg_id: formData.sdg,
                     target_id: formData.target,
                     indicator_id: formData.indicator,
+                    why_relevant: formData.sdgWhy.trim(),
                 },
                 secondary_sdgs: formData.secondarySdgs
                     .filter((s) => s.sdgId && s.targetId)
@@ -393,12 +577,17 @@ export default function FacultyOpportunityCreationPage() {
                     })),
                 objectives: {
                     description: formData.objectives.description,
+                    hook: formData.hook.trim(),
+                    outputs: formData.objectives.outputs.trim(),
+                    outcome: formData.objectives.outcome.trim() || undefined,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
                     beneficiaries_type: otherBeneficiaryMerged
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    skills_gained: skillsPayload
+                    skills_gained: skillsPayload,
+                    prerequisites: formData.activity.prerequisites.trim() || undefined,
+                    resources: formData.activity.resources.trim() || undefined,
                 },
                 supervision: {
                     supervisor_name: facultyDetails.name.trim(),
@@ -425,6 +614,7 @@ export default function FacultyOpportunityCreationPage() {
                     supervised: allSafetyConfirmed,
                     information_accurate:
                         formData.finalConfirmations.academicallyValid && formData.finalConfirmations.correctVerifiable,
+                    electronic_signature: formData.electronicSignature.trim(),
                 },
                 safety_declaration: {
                     environment_safe_and_appropriate: formData.safetyDeclarations.safeAppropriate,
@@ -441,6 +631,7 @@ export default function FacultyOpportunityCreationPage() {
                     : null,
                 participation_scope: {
                     rule: participationRule,
+                    apply_scope: formData.applyScope,
                     creator_university_name: ownInstitution,
                     university_names:
                         participationRule === "open_all_universities"
@@ -473,7 +664,11 @@ export default function FacultyOpportunityCreationPage() {
                     ? [...formData.verification, formData.otherVerification.trim()]
                     : formData.verification,
                 visibility,
-                restricted_universities: visibility === "restricted" ? restrictedUniversitiesPayload : null
+                visibility_and_academic_linkage: {
+                    visibility_type: participationRule,
+                    restricted_university_names: restrictedUniversitiesPayload || [],
+                },
+                restricted_universities: restrictedUniversitiesPayload
             };
 
             const isEdit = Boolean(editingOpportunityId);
@@ -494,6 +689,11 @@ export default function FacultyOpportunityCreationPage() {
                             ? "Opportunity updated successfully."
                             : "Opportunity submitted. Track partner (if any) and admin approval under My Opportunities.",
                     );
+                    try {
+                        localStorage.removeItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
+                    } catch {
+                        // best-effort cleanup only
+                    }
                     router.push(isEdit ? "/dashboard/faculty/my-opportunities" : "/dashboard/faculty");
                 } else {
                     toast.error(data.message || (isEdit ? "Failed to update opportunity" : "Failed to create opportunity"));
@@ -510,9 +710,18 @@ export default function FacultyOpportunityCreationPage() {
     };
 
     const handleSaveDraft = () => {
-        // For now, treat draft as a submit but maybe with a 'draft' status if supported later.
-        // The user just wants it to work.
-        handleSubmit();
+        // There is no faculty draft endpoint on the backend — this must stay a local-only save and
+        // must never call handleSubmit(), which posts a real, live opportunity into the approval queue.
+        try {
+            localStorage.setItem(
+                FACULTY_OPPORTUNITY_DRAFT_KEY,
+                JSON.stringify({ v: 1, savedAt: Date.now(), formData }),
+            );
+            toast.success("Draft saved on this device — resume it next time you open this page.");
+        } catch (e) {
+            console.error("Draft save failed", e);
+            toast.error("Could not save draft. Check browser storage.");
+        }
     };
 
     const toggleType = (type: string) => {
@@ -641,7 +850,24 @@ export default function FacultyOpportunityCreationPage() {
         if (typeof window === "undefined") return;
         const p = new URLSearchParams(window.location.search);
         const e = p.get("edit")?.trim();
-        if (e) setEditingOpportunityId(e);
+        if (e) {
+            setEditingOpportunityId(e);
+            return;
+        }
+        try {
+            const raw = localStorage.getItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as { formData?: typeof formData; savedAt?: number };
+            if (!parsed?.formData) return;
+            const savedAt = parsed.savedAt ? new Date(parsed.savedAt).toLocaleString() : "earlier";
+            if (window.confirm(`Resume the opportunity draft you saved on this device (${savedAt})?`)) {
+                setFormData(parsed.formData);
+            } else {
+                localStorage.removeItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
+            }
+        } catch (err) {
+            console.error("Failed to restore local draft", err);
+        }
     }, []);
 
     useEffect(() => {
@@ -705,6 +931,10 @@ export default function FacultyOpportunityCreationPage() {
                         ...prev.safetyDeclarations,
                         ...(formDataPatch.safetyDeclarations as typeof prev.safetyDeclarations),
                     },
+                    extraSafety: {
+                        ...prev.extraSafety,
+                        ...(formDataPatch.extraSafety as typeof prev.extraSafety),
+                    },
                     participationScope: {
                         ...prev.participationScope,
                         ...(formDataPatch.participationScope as typeof prev.participationScope),
@@ -748,27 +978,177 @@ export default function FacultyOpportunityCreationPage() {
     ].filter(Boolean);
     const previewPrimarySdg = formData.sdg ? findSdgById(formData.sdg) : null;
     const previewSecondarySdg = formData.secondarySdgs[0] ? findSdgById(formData.secondarySdgs[0].sdgId) : null;
+    const timelineStartWeekdayLabel = weekdayLabelFromDateInput(formData.dates.start);
+    const timelineEndWeekdayLabel = weekdayLabelFromDateInput(formData.dates.end);
+
+    const flashcardModel = useMemo(() => {
+        const scopeMap: Record<FacultyApplyScope, string> = {
+            all: "All Universities · All Departments",
+            multi_all: "Selected Universities · All Departments",
+            multi_depts: "Selected Universities · Selected Departments",
+            one_all: "One University · All Departments",
+            one_depts: "One University · Selected Departments",
+            own_uni_all: "My University · All Departments",
+            own_dept: "My Department / Programme Only",
+        };
+        const selectedUnis = formData.participationScope.selectedUniversities.map((u) => u.trim()).filter(Boolean).join(", ");
+        const selectedDepts = formData.participationScope.departments.map((d) => d.trim()).filter(Boolean).join(", ");
+        let scopeDetail = "CIEL PK network";
+        if (formData.applyScope === "multi_all") scopeDetail = selectedUnis || "Selected universities";
+        else if (formData.applyScope === "multi_depts") scopeDetail = `${selectedUnis} · ${selectedDepts}`;
+        else if (formData.applyScope === "one_all") scopeDetail = selectedUnis || "One university";
+        else if (formData.applyScope === "one_depts") scopeDetail = `${selectedUnis} · ${selectedDepts}`;
+        else if (formData.applyScope === "own_uni_all") scopeDetail = facultyDetails.institution || "Your university";
+        else if (formData.applyScope === "own_dept") {
+            scopeDetail = `${facultyDetails.institution || "Your university"} · ${formData.academicLead.department || selectedDepts || "Your department"}`;
+        }
+        const elig = resolveFacultyFlashEligibility({
+            viewer: flashViewer,
+            applyScope: formData.applyScope,
+            creatorUniversity: facultyDetails.institution,
+        });
+        const types = formData.opportunityType;
+        const skills = [
+            ...formData.activity.skills,
+            ...(formData.activity.isOtherSkillChecked ? formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean) : []),
+        ].join(", ");
+        const bens = [
+            ...formData.objectives.beneficiariesType,
+            ...(formData.objectives.isOtherBeneficiaryChecked ? formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean) : []),
+        ].join(", ");
+        const partnerOn = formData.partnerCollaboration.hasPartner;
+        return {
+            title: formData.title,
+            hook: formData.hook,
+            summary: formData.objectives.description,
+            activityType: types[0] || "Community Service",
+            mode: formData.mode,
+            city: formData.location.city,
+            hours: formData.capacity.hours,
+            seats: formData.capacity.volunteers,
+            start: formData.dates.start,
+            end: formData.dates.end,
+            deadline: formData.applicationDeadline,
+            beneficiariesCount: formData.objectives.beneficiariesCount || "—",
+            beneficiaryType: bens || "Community",
+            responsibilities: formData.activity.responsibilities,
+            scheduleNotes: formData.scheduleNotes,
+            skills,
+            resources: formData.activity.resources,
+            prerequisites: formData.activity.prerequisites,
+            sdg: formData.sdg,
+            objective: formData.objectives.description,
+            outputs: formData.objectives.outputs,
+            creatorName: facultyDetails.name,
+            orgLabel: facultyDetails.institution || "—",
+            unitLabel: formData.academicLead.department || "—",
+            badgeLabel: "FACULTY CREATOR",
+            privateCandidate: false,
+            facultyName: facultyDetails.name,
+            facultyEmail: formData.academicLead.officialEmail || facultyDetails.email,
+            host: partnerOn ? formData.partnerCollaboration.orgName : "No external partner",
+            partnerEmail: partnerOn ? formData.partnerCollaboration.email : "",
+            verification: formData.verification.join(", "),
+            scopeLabel: scopeMap[formData.applyScope] || formData.applyScope,
+            scopeDetail,
+            approvalText: partnerOn
+                ? "Pending partner acknowledgement → CIEL PK final review"
+                : "Pending CIEL PK final review",
+            eligible: elig.eligible,
+            eligibilityWhy: elig.why,
+        };
+    }, [formData, facultyDetails, flashViewer]);
 
     return (
         <div className="co-form">
-            <CoFormHero
-                crumb={
-                    <>
+            <div className="mb-3.5 flex items-center gap-3">
+                <div>
+                    <p className="text-[10px] text-[#7a919a]">
                         Community Service → <b className="text-[#0e7d74]">Create an Opportunity</b>
-                    </>
-                }
-                backHref="/dashboard/faculty/community-service"
-                kicker={editingOpportunityId ? "EDIT FACULTY OPPORTUNITY · SDG-ALIGNED" : "CREATE FACULTY OPPORTUNITY · SDG-ALIGNED"}
-                title={editingOpportunityId ? "Update your listing" : "Post for your students — let’s build it 🚀"}
-                subtitle={
-                    editingOpportunityId
-                        ? "Update your posting. Some fields may be restricted after approval."
-                        : "Same form as students. Your profile is already filled. If you add an external partner they confirm first, then CIEL Admin publishes it live."
-                }
-                loading={isLoadingEdit}
-            />
+                    </p>
+                </div>
+                <Link
+                    href="/dashboard/faculty/community-service"
+                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
+                >
+                    ← Back
+                </Link>
+            </div>
+
+            <div className="co-hero">
+                <div className="co-hero-copy">
+                    <p className="co-hero-eyebrow">
+                        {editingOpportunityId ? "EDIT FACULTY OPPORTUNITY · SDG-ALIGNED" : "CIEL PK · FACULTY COMMUNITY SERVICE"}
+                    </p>
+                    <h1>
+                        {editingOpportunityId ? "Update your listing" : "Create an opportunity — you are the academic owner."}
+                    </h1>
+                    <p>
+                        {editingOpportunityId
+                            ? "Update your posting. Some fields may be restricted after approval."
+                            : "You are auto-linked as the faculty owner. Partner acknowledgement is optional. CIEL PK completes final review before the opportunity is published."}
+                    </p>
+                    <div className="co-hero-chips">
+                        <span className="co-hero-chip">🧭 Guided 9-step form</span>
+                        <span className="co-hero-chip">🃏 Final flashcard</span>
+                        <span className="co-hero-chip">🎯 Role-aware Apply Now</span>
+                        <span className="co-hero-chip">🔒 Private contacts protected</span>
+                    </div>
+                    {isLoadingEdit ? (
+                        <p className="mt-2 flex items-center gap-2 text-sm text-[#70808a]">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
+                        </p>
+                    ) : null}
+                </div>
+                <div
+                    className="co-progress-ring"
+                    style={{
+                        background: `conic-gradient(#15988b ${Math.max(0, Math.min(100, Math.round((activeStepIndex / (WIZARD_STEPS.length - 1)) * 100)))}%, #e8edef 0)`,
+                    }}
+                >
+                    <strong>{Math.max(0, Math.min(100, Math.round((activeStepIndex / (WIZARD_STEPS.length - 1)) * 100)))}%</strong>
+                    <span>COMPLETE</span>
+                </div>
+            </div>
+
+            <div className="co-wizard-layout">
+                <aside className="co-wizard-side">
+                    <div className="co-side-card">
+                        <h3>Opportunity Builder</h3>
+                        <div className="co-step-list">
+                            {WIZARD_STEPS.map((step, idx) => (
+                                <button
+                                    key={step.key}
+                                    type="button"
+                                    className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
+                                    onClick={() => goToStep(step.key)}
+                                >
+                                    <span className="co-step-ico">{step.icon}</span>
+                                    <span className="co-step-copy">
+                                        <b>{step.label}</b>
+                                        <span>{step.sub}</span>
+                                    </span>
+                                    <span className="co-step-num">{idx < activeStepIndex ? "✓" : idx + 1}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="co-fun-tip">
+                        <b>Design rule</b>
+                        <p>The card can be publicly discoverable while Apply Now stays limited to the universities or departments you select.</p>
+                    </div>
+                    <div className="co-side-card">
+                        <h3>Approval path</h3>
+                        <p>
+                            Faculty (auto-linked academic owner) → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity
+                        </p>
+                    </div>
+                </aside>
+
+                <div className="co-wizard-main">
 
             {/* SECTION A: FACULTY DETAILS */}
+            {activeStep === "A" && (
             <div className="co-card">
                 <CoSectionHead letter="A" title="Faculty details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
                 {isLoadingProfile ? (
@@ -795,8 +1175,10 @@ export default function FacultyOpportunityCreationPage() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* SECTION B: OPPORTUNITY OVERVIEW */}
+            {activeStep === "B" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
                 <CoSectionHead
                     letter="B"
@@ -819,6 +1201,16 @@ export default function FacultyOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         />
                         <p className="text-xs text-slate-500 mt-2 flex items-center gap-1"><Info className="w-3 h-3" /> Give a clear, simple title that describes the activity.</p>
+                    </div>
+                    <div>
+                        <label className="co-label">One-line student hook *</label>
+                        <input
+                            type="text"
+                            maxLength={180}
+                            placeholder="Why would a student want to join?"
+                            value={formData.hook}
+                            onChange={(e) => setFormData({ ...formData, hook: e.target.value })}
+                        />
                     </div>
 
                     {/* B2. Type */}
@@ -981,124 +1373,131 @@ export default function FacultyOpportunityCreationPage() {
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+            )}
 
-                    {/* B5. Timeline */}
-                    <div className="pt-6 border-t border-slate-100">
-                        <label className="block text-sm font-bold text-slate-900 mb-4">B5. Duration & Commitment <span className="text-red-500">*</span></label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {activeStep === "SCHED" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b88313" }}>
+                <CoSectionHead
+                    letter="3"
+                    title="Dates, capacity & service commitment"
+                    tag="COMMITMENT"
+                    color="#b88313"
+                    expanded
+                />
+                <div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
+                            <input
+                                type="date"
+                                value={formData.applicationDeadline}
+                                onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Start date *</label>
+                            <input
+                                type="date"
+                                value={formData.dates.start}
+                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                            />
+                            {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>End date *</label>
+                            <input
+                                type="date"
+                                value={formData.dates.end}
+                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                            />
+                            {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
+                        </div>
+                    </div>
+                    <div className="pt-2">
+                        <label className="co-label">Duration type</label>
+                        <div className="co-chips mb-3">
+                            {(["Fixed dates", "Flexible", "Ongoing"] as const).map((t) => (
+                                <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
+                                    {TIMELINE_EMOJI[t]} {t}
+                                </CoChip>
+                            ))}
+                        </div>
+                        {(TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) && (
+                            <div className="flex gap-2 flex-wrap items-center">
+                                <div className="flex-1 min-w-[140px]">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From Time</label>
+                                    <input
+                                        type="time"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                        value={formData.dates.fromTime}
+                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-[140px]">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">End Time</label>
+                                    <input
+                                        type="time"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                        value={formData.dates.endTime}
+                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Timeline Type</label>
-                                <div className="co-chips mb-4">
-                                    {(["Fixed dates", "Flexible", "Ongoing"] as const).map((t) => (
-                                        <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
-                                            {TIMELINE_EMOJI[t]} {t}
-                                        </CoChip>
-                                    ))}
-                                </div>
-
-                                {(TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) && (
-                                    <div className="space-y-3 animate-in fade-in zoom-in-95">
-                                        <p className="text-xs text-slate-500">
-                                            Start/end dates and daily times are optional for all timeline types.
-                                        </p>
-                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                                            <input
-                                                type="date"
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                                value={formData.dates.start}
-                                                onChange={(e) =>
-                                                    setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })
-                                                }
-                                            />
-                                            <span className="self-center text-slate-400">-</span>
-                                            <input
-                                                type="date"
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                                value={formData.dates.end}
-                                                onChange={(e) =>
-                                                    setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-center">
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From time</label>
-                                                <input
-                                                    type="time"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.fromTime}
-                                                    onChange={(e) =>
-                                                        setFormData({
-                                                            ...formData,
-                                                            dates: { ...formData.dates, fromTime: e.target.value },
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">To time</label>
-                                                <input
-                                                    type="time"
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                    value={formData.dates.endTime}
-                                                    onChange={(e) =>
-                                                        setFormData({
-                                                            ...formData,
-                                                            dates: { ...formData.dates, endTime: e.target.value },
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={500}
+                                    placeholder="e.g. 16"
+                                    value={formData.capacity.hours}
+                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                />
                             </div>
-
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                <div className="mb-3">
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Expected Hours (Per Student)</label>
-                                    <div className="relative">
-                                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="number"
-                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                                            placeholder="Min 16 hours"
-                                            value={formData.capacity.hours}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Volunteers Required</label>
-                                    <div className="relative">
-                                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="number"
-                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                                            placeholder="e.g. 15"
-                                            value={formData.capacity.volunteers}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
-                                        />
-                                    </div>
-                                </div>
+                            <div>
+                                <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={5000}
+                                    placeholder="e.g. 20"
+                                    value={formData.capacity.volunteers}
+                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                />
                             </div>
+                        </div>
+                        <div className="mt-3">
+                            <label className="co-label" style={{ marginTop: 0 }}>Schedule / attendance notes</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="e.g. Saturdays 10am–2pm; four sessions"
+                                value={formData.scheduleNotes}
+                                onChange={(e) => setFormData({ ...formData, scheduleNotes: e.target.value })}
+                            />
+                        </div>
+                        <div className="co-note aqua mt-3">
+                            <span><b>Checks:</b> deadline must be on/before start date; end date cannot be before start date; hours 1–500; seats 1–5000.</span>
                         </div>
                     </div>
                 </div>
             </div>
+            )}
 
-            {/* SECTION C: SDG SELECTION */}
+            {activeStep === "C" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
                 <CoSectionHead
                     letter="C"
-                    title="SDG selection"
-                    tag="LOCKED FOR STUDENTS"
+                    title="SDG & impact"
+                    tag="IMPACT"
                     color="#6d28d9"
-                    expanded={expandedSections.includes("C")}
-                    onToggle={() => toggleSection("C")}
+                    expanded
                 />
 
-                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
+                <div>
                     <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 text-sm text-amber-800 mb-6">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
                         <div>
@@ -1127,7 +1526,7 @@ export default function FacultyOpportunityCreationPage() {
 
                     {/* C2. SDG Target */}
                     <div className={!formData.sdg ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C2. Select SDG Target <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C2. Select SDG Target <span className="font-medium normal-case tracking-normal text-[#7a919a]">optional</span></label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                             value={formData.target}
@@ -1175,6 +1574,16 @@ export default function FacultyOpportunityCreationPage() {
                                 SDG 13 → Target 13.3 → Indicator 13.3.1
                             </div>
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="co-label">Why is this SDG genuinely relevant? *</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="Explain the actual connection instead of selecting an SDG only because it sounds related."
+                            value={formData.sdgWhy}
+                            onChange={(e) => setFormData({ ...formData, sdgWhy: e.target.value })}
+                        />
                     </div>
 
                     {/* C4. Secondary SDGs */}
@@ -1287,18 +1696,18 @@ export default function FacultyOpportunityCreationPage() {
                     </div>
                 </div>
             </div>
-            {/* SECTION D: SDG ALIGNED OBJECTIVES */}
+            )}
+            {activeStep === "C" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#0e7d74" }}>
                 <CoSectionHead
                     letter="D"
                     title="SDG-aligned objectives"
                     tag="LOCAL ACTION"
                     color="#0e7d74"
-                    expanded={expandedSections.includes("D")}
-                    onToggle={() => toggleSection("D")}
+                    expanded
                 />
 
-                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
+                <div>
                     {/* D1. Project Objective */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
@@ -1309,6 +1718,24 @@ export default function FacultyOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, description: e.target.value } })}
                         ></textarea>
                         <p className="text-xs text-slate-500 mt-2">Do not use phrases like "achieve SDG" or "solve poverty". Focus on local impact.</p>
+                    </div>
+                    <div>
+                        <label className="co-label">Expected outputs *</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="What will be produced or delivered?"
+                            value={formData.objectives.outputs}
+                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, outputs: e.target.value } })}
+                        />
+                    </div>
+                    <div>
+                        <label className="co-label">Expected outcome / success measure</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="How will you know this worked?"
+                            value={formData.objectives.outcome}
+                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, outcome: e.target.value } })}
+                        />
                     </div>
 
                     {/* D2. Local Targets */}
@@ -1453,19 +1880,19 @@ export default function FacultyOpportunityCreationPage() {
                     </div>
                 </div>
             </div>
+            )}
 
-            {/* SECTION E: ACTIVITY DETAILS */}
+            {activeStep === "E" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
                 <CoSectionHead
                     letter="E"
-                    title="Activity details"
+                    title="Student experience"
                     tag="WHAT STUDENTS DO"
                     color="#6d28d9"
-                    expanded={expandedSections.includes("E")}
-                    onToggle={() => toggleSection("E")}
+                    expanded
                 />
 
-                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
+                <div>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Student Responsibilities (Bullet List) <span className="text-red-500">*</span></label>
                         <textarea spellCheck={true}
@@ -1574,20 +2001,51 @@ export default function FacultyOpportunityCreationPage() {
                             )}
                         </div>
                     </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="co-label">Prerequisites / eligibility notes</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="Any skills, year, or language needed?"
+                                value={formData.activity.prerequisites}
+                                onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, prerequisites: e.target.value } })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label">Resources / support provided</label>
+                            <textarea
+                                spellCheck={true}
+                                placeholder="Orientation, transport, materials…"
+                                value={formData.activity.resources}
+                                onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, resources: e.target.value } })}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
+            )}
 
-            {/* SECTION F: VERIFICATION & SAFETY (FACULTY-CREATED) */}
-            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
+            {activeStep === "F" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#18755f" }}>
                 <CoSectionHead
                     letter="F"
-                    title="Verification & safety"
-                    tag="ACADEMIC LEAD"
-                    color="#b45309"
-                    expanded={expandedSections.includes("F")}
-                    onToggle={() => toggleSection("F")}
+                    title="Verification & collaboration"
+                    tag="AUTO-LINKED"
+                    color="#18755f"
+                    expanded
                 />
-                <div className={`space-y-10 p-5 sm:p-8 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
+                <div className="space-y-8 p-5 sm:p-8">
+                    <div className="mb-1 flex items-center gap-3 rounded-2xl border border-[#c9e5da] bg-[linear-gradient(135deg,#f0faf6,#fff)] p-3">
+                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#15988b] text-lg">👩‍🏫</div>
+                        <div className="min-w-0 flex-1">
+                            <div className="text-[8px] font-black tracking-[0.12em] text-[#15988b]">ACADEMIC OWNER</div>
+                            <b className="block text-[12px]">{facultyDetails.name || "—"}</b>
+                            <p className="m-0 text-[10px] text-[#7a919a]">
+                                {facultyDetails.institution || "Your university"}{formData.academicLead.department ? ` · ${formData.academicLead.department}` : ""}. You are automatically the faculty owner/reviewer.
+                            </p>
+                        </div>
+                        <span className="rounded-full bg-[#15988b] px-2.5 py-1 text-[8px] font-black text-white">AUTO-LINKED</span>
+                    </div>
                     <p className="text-sm text-slate-600">
                         Academic validity, supervision, and optional external collaboration. The opportunity is treated as institutionally verified from your official credentials as Academic Lead.
                     </p>
@@ -1707,6 +2165,8 @@ export default function FacultyOpportunityCreationPage() {
                                                 orgName: "",
                                                 contactPerson: "",
                                                 email: "",
+                                                designation: "",
+                                                function: "",
                                             },
                                         })
                                     }
@@ -1771,192 +2231,95 @@ export default function FacultyOpportunityCreationPage() {
                         )}
                     </div>
 
-                    {/* F3 */}
-                    <div className="space-y-4 border-t border-slate-100 pt-8">
-                        <h3 className="text-sm font-black text-orange-700 uppercase tracking-wide">F3. Safety &amp; supervision declaration (mandatory)</h3>
-                        <p className="text-xs text-slate-600 mb-2">
-                            Responsibility: you hold responsibility for academic supervision and oversight. If a partner organization is involved, operational safety is shared accordingly.
-                        </p>
-                        <div className="space-y-3 bg-orange-50 p-6 rounded-xl border border-orange-100">
-                            {(
-                                [
-                                    {
-                                        key: "safeAppropriate" as const,
-                                        label:
-                                            "The activity environment is safe and appropriate for student participation.",
-                                    },
-                                    {
-                                        key: "guidedSupervised" as const,
-                                        label: "Students will be guided and supervised throughout the activity.",
-                                    },
-                                    {
-                                        key: "lawfulEthical" as const,
-                                        label: "Activities are lawful, ethical, and non-hazardous.",
-                                    },
-                                    {
-                                        key: "precautionsInPlace" as const,
-                                        label: "Necessary precautions and basic safety measures are in place.",
-                                    },
-                                ] as const
-                            ).map(({ key, label }) => (
-                                <label key={key} className="flex items-start gap-3 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        className="mt-1 rounded text-orange-600 focus:ring-orange-500"
-                                        checked={formData.safetyDeclarations[key]}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                safetyDeclarations: {
-                                                    ...formData.safetyDeclarations,
-                                                    [key]: e.target.checked,
-                                                },
-                                            })
-                                        }
-                                    />
-                                    <span className="text-sm font-medium text-orange-950">{label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* F4 */}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-2">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">F4. Admin approval (platform validation)</h3>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">CIEL PK final review</h3>
                         <p className="text-sm text-slate-600">
-                            CIEL Admin will review this opportunity for clear scope and feasibility, alignment with SDGs and academic objectives, accuracy, and ethical engagement before it is published.
+                            After you submit, a named partner (if any) acknowledges first. CIEL PK then completes final review before the opportunity is published.
                         </p>
                     </div>
-                </div>
-            </div>
 
-            {/* SECTION G: VERIFICATION */}
-            <div className="co-card co-accent" style={{ borderTopColor: "#f472b6" }}>
-                <CoSectionHead
-                    letter="G"
-                    title="Evidence & verification"
-                    tag="SET EXPECTATIONS NOW"
-                    tagAuto
-                    color="#f472b6"
-                    expanded={expandedSections.includes("G")}
-                    onToggle={() => toggleSection("G")}
-                />
-                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
-                    <label className="co-label">G1 · How will student participation be verified?</label>
-                    <div className="co-chips">
-                        {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
-                            <CoChip
-                                key={v}
-                                selected={formData.verification.includes(v)}
-                                onClick={() => {
-                                    const vers = formData.verification.includes(v)
-                                        ? formData.verification.filter((i) => i !== v)
-                                        : [...formData.verification, v];
-                                    setFormData({ ...formData, verification: vers });
-                                }}
-                            >
-                                {VERIFICATION_EMOJI[v] || ""} {v}
-                            </CoChip>
-                        ))}
-                    </div>
-                    <div className="mt-4">
-                        <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherVerificationChecked ? 'bg-cyan-50 border-cyan-200' : 'border-slate-100'}`}>
-                            <input
-                                type="checkbox"
-                                className="rounded text-cyan-600 focus:ring-cyan-500"
-                                checked={formData.isOtherVerificationChecked}
-                                onChange={(e) => setFormData({ ...formData, isOtherVerificationChecked: e.target.checked })}
-                            />
-                            <span className={`text-sm font-medium ${formData.isOtherVerificationChecked ? 'text-cyan-700' : 'text-slate-600'}`}>Other</span>
-                        </label>
-                        {formData.isOtherVerificationChecked && (
-                            <input
-                                type="text"
-                                placeholder="Please specify other verification method..."
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-500 outline-none text-sm transition-all"
-                                value={formData.otherVerification}
-                                onChange={(e) => setFormData({ ...formData, otherVerification: e.target.value })}
-                            />
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION H: VISIBILITY & INSTITUTIONAL ACCESS (F5) */}
-            <div className="co-card co-accent" style={{ borderTopColor: "#db2777" }}>
-                <CoSectionHead
-                    letter="H"
-                    title="Visibility & institutional access"
-                    tag="WHO CAN JOIN"
-                    color="#db2777"
-                    expanded={expandedSections.includes("H")}
-                    onToggle={() => toggleSection("H")}
-                />
-                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
-                    <div>
-                        <h3 className="text-sm font-black text-pink-700 uppercase tracking-wide mb-1">F5.1 Participation scope</h3>
-                        <p className="text-xs text-slate-500 mb-4">Select who can view and apply. One option required.</p>
-                        <div className="space-y-3">
-                            {(
-                                [
-                                    {
-                                        rule: "open_all_universities" as ParticipationRule,
-                                        title: "1. Open to all universities (default)",
-                                        hint: "All universities are treated as in scope. Students from all universities and departments can apply.",
-                                    },
-                                    {
-                                        rule: "restricted_specific_universities" as ParticipationRule,
-                                        title: "2. Restricted to specific universities",
-                                        hint: "Add universities. All departments within those universities can apply.",
-                                    },
-                                    {
-                                        rule: "own_university_only" as ParticipationRule,
-                                        title: "3. Restricted to own university only",
-                                        hint: "Your university from your profile is locked. All departments within your university can apply.",
-                                    },
-                                    {
-                                        rule: "departments_across_universities" as ParticipationRule,
-                                        title: "4. Restricted to specific departments/programs (across universities)",
-                                        hint: "Select universities, then departments/programs (filtered by your selection). Optional sections/classes.",
-                                    },
-                                    {
-                                        rule: "own_university_departments" as ParticipationRule,
-                                        title: "5. Restricted to departments/programs of own university",
-                                        hint: "Your university is locked. Select departments/programs; optional sections/classes.",
-                                    },
-                                ] as const
-                            ).map(({ rule, title, hint }) => (
-                                <label
-                                    key={rule}
-                                    className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
-                                        formData.participationScope.rule === rule
-                                            ? "border-pink-300 bg-pink-50/50"
-                                            : "border-slate-200 hover:bg-slate-50"
-                                    }`}
+                    <div className="pt-2">
+                        <label className="co-label">Participation verification</label>
+                        <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will students log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
+                        <div className="co-chips">
+                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
+                                <CoChip
+                                    key={v}
+                                    selected={formData.verification.includes(v)}
+                                    onClick={() => {
+                                        const vers = formData.verification.includes(v)
+                                            ? formData.verification.filter((i) => i !== v)
+                                            : [...formData.verification, v];
+                                        setFormData({ ...formData, verification: vers });
+                                    }}
                                 >
-                                    <input
-                                        type="radio"
-                                        name="participation_scope_faculty"
-                                        className="w-5 h-5 text-pink-600 mt-0.5 shrink-0"
-                                        checked={formData.participationScope.rule === rule}
-                                        onChange={() =>
-                                            setFormData({
-                                                ...formData,
-                                                participationScope: {
-                                                    ...formData.participationScope,
-                                                    rule,
-                                                    ...(rule === "open_all_universities" ? { selectedUniversities: [] } : {}),
-                                                },
-                                            })
-                                        }
-                                    />
-                                    <div>
-                                        <span className="block font-bold text-slate-900 text-sm">{title}</span>
-                                        <span className="text-xs text-slate-500">{hint}</span>
-                                    </div>
-                                </label>
+                                    {VERIFICATION_EMOJI[v] || ""} {v}
+                                </CoChip>
                             ))}
                         </div>
+                        <div className="mt-4">
+                            <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherVerificationChecked ? 'bg-cyan-50 border-cyan-200' : 'border-slate-100'}`}>
+                                <input
+                                    type="checkbox"
+                                    className="rounded text-cyan-600 focus:ring-cyan-500"
+                                    checked={formData.isOtherVerificationChecked}
+                                    onChange={(e) => setFormData({ ...formData, isOtherVerificationChecked: e.target.checked })}
+                                />
+                                <span className={`text-sm font-medium ${formData.isOtherVerificationChecked ? 'text-cyan-700' : 'text-slate-600'}`}>Other</span>
+                            </label>
+                            {formData.isOtherVerificationChecked && (
+                                <input
+                                    type="text"
+                                    placeholder="Please specify other verification method..."
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-500 outline-none text-sm transition-all"
+                                    value={formData.otherVerification}
+                                    onChange={(e) => setFormData({ ...formData, otherVerification: e.target.value })}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            )}
+
+            {activeStep === "VIS" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b24f85" }}>
+                <CoSectionHead
+                    letter="7"
+                    title="Who can see this card — and who can Apply Now?"
+                    tag="PUBLIC CARD"
+                    color="#b24f85"
+                    expanded
+                />
+                <div>
+                    <div className="rounded-2xl border border-[#cfe6df] bg-[linear-gradient(135deg,#edf8f4,#fff)] p-3 text-[11px] leading-relaxed text-[#376b60]">
+                        🌍 <b>Public by default:</b> approved faculty opportunities are publicly discoverable. The selection below controls who can use Apply Now.
+                    </div>
+                    <div className="co-policy-grid">
+                        <div className="co-policy"><small>Card visibility</small><b>Public across CIEL PK</b><p>Students can discover the opportunity across institutions.</p></div>
+                        <div className="co-policy"><small>Apply Now eligibility</small><b>Creator-defined</b><p>Default is all universities; targeting is optional.</p></div>
+                    </div>
+                    <div className="co-aud-grid">
+                        {([
+                            ["all", "🌍", "All Universities · All Departments", "Default public opportunity."],
+                            ["multi_all", "🏛️", "Selected Universities · All Departments", "Choose multiple universities."],
+                            ["multi_depts", "🎯", "Selected Universities · Selected Departments", "Target selected disciplines across universities."],
+                            ["one_all", "🎓", "One University · All Departments", "Restrict applications to one university."],
+                            ["one_depts", "🏫", "One University · Selected Departments", "Restrict to defined programmes."],
+                            ["own_uni_all", "🏠", "My University · All Departments", `Open applications to all eligible students in ${facultyDetails.institution || "your university"}.`],
+                            ["own_dept", "👩‍🏫", "My Department / Programme Only", "Restrict applications to your academic unit."],
+                        ] as const).map(([scope, ico, title, sub]) => (
+                            <button
+                                key={scope}
+                                type="button"
+                                className={`co-aud${formData.applyScope === scope ? " on" : ""}`}
+                                onClick={() => chooseApplyScope(scope)}
+                            >
+                                <div className="ai">{ico}</div>
+                                <div><b>{title}</b><small>{sub}</small></div>
+                                <div className="ck">{formData.applyScope === scope ? "✓" : ""}</div>
+                            </button>
+                        ))}
                     </div>
 
                     {(formData.participationScope.rule === "restricted_specific_universities" ||
@@ -1972,11 +2335,14 @@ export default function FacultyOpportunityCreationPage() {
                                 onChange={(e) => {
                                     const val = e.target.value;
                                     if (val && !formData.participationScope.selectedUniversities.includes(val)) {
+                                        const oneOnly = formData.applyScope === "one_all" || formData.applyScope === "one_depts";
                                         setFormData({
                                             ...formData,
                                             participationScope: {
                                                 ...formData.participationScope,
-                                                selectedUniversities: [...formData.participationScope.selectedUniversities, val],
+                                                selectedUniversities: oneOnly
+                                                    ? [val]
+                                                    : [...formData.participationScope.selectedUniversities, val],
                                             },
                                         });
                                     }
@@ -2163,8 +2529,113 @@ export default function FacultyOpportunityCreationPage() {
                     </div>
                 </div>
             </div>
+            )}
 
-            {/* SECTION I: F6 REQUIRED CONFIRMATIONS */}
+            {activeStep === "SAFE" && (
+            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
+                <CoSectionHead
+                    letter="8"
+                    title="Safety & accountability"
+                    tag="DECLARATION"
+                    color="#b45309"
+                    expanded
+                />
+                <div>
+                    <div className="co-note mt-1">
+                        <span><b>CIEL PK role:</b> CIEL PK provides opportunity publication, workflow, reporting, verification and facilitation. Unless expressly stated otherwise, it does not itself operate or physically supervise independently created third-party activities.</span>
+                    </div>
+                    <p className="mb-2 text-xs text-slate-600">
+                        You hold responsibility for academic supervision and oversight. If a partner organization is involved, operational safety is shared accordingly.
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button type="button" className={`co-safe${formData.safetyDeclarations.safeAppropriate ? " on" : ""}`} onClick={() => setFormData({ ...formData, safetyDeclarations: { ...formData.safetyDeclarations, safeAppropriate: !formData.safetyDeclarations.safeAppropriate } })}>
+                            <span className="co-tick">{formData.safetyDeclarations.safeAppropriate ? "✓" : ""}</span>
+                            <span>The activity environment is safe and appropriate for student participation.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.safetyDeclarations.guidedSupervised ? " on" : ""}`} onClick={() => setFormData({ ...formData, safetyDeclarations: { ...formData.safetyDeclarations, guidedSupervised: !formData.safetyDeclarations.guidedSupervised } })}>
+                            <span className="co-tick">{formData.safetyDeclarations.guidedSupervised ? "✓" : ""}</span>
+                            <span>Students will be guided and supervised throughout the activity.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.safetyDeclarations.lawfulEthical ? " on" : ""}`} onClick={() => setFormData({ ...formData, safetyDeclarations: { ...formData.safetyDeclarations, lawfulEthical: !formData.safetyDeclarations.lawfulEthical } })}>
+                            <span className="co-tick">{formData.safetyDeclarations.lawfulEthical ? "✓" : ""}</span>
+                            <span>Activities are lawful, ethical, and non-hazardous.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.safetyDeclarations.precautionsInPlace ? " on" : ""}`} onClick={() => setFormData({ ...formData, safetyDeclarations: { ...formData.safetyDeclarations, precautionsInPlace: !formData.safetyDeclarations.precautionsInPlace } })}>
+                            <span className="co-tick">{formData.safetyDeclarations.precautionsInPlace ? "✓" : ""}</span>
+                            <span>Necessary precautions and basic safety measures are in place.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.extraSafety.communicateChanges ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, communicateChanges: !formData.extraSafety.communicateChanges } })}>
+                            <span className="co-tick">{formData.extraSafety.communicateChanges ? "✓" : ""}</span>
+                            <span>I agree to communicate material changes in location, activity, supervision, dates, capacity or safety arrangements.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.extraSafety.visibilityIntentional ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, visibilityIntentional: !formData.extraSafety.visibilityIntentional } })}>
+                            <span className="co-tick">{formData.extraSafety.visibilityIntentional ? "✓" : ""}</span>
+                            <span>The visibility and Apply Now eligibility scope selected in Step 7 is intentional and accurate.</span>
+                        </button>
+                        <button type="button" className={`co-safe${formData.extraSafety.cielNotGuarantee ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, cielNotGuarantee: !formData.extraSafety.cielNotGuarantee } })}>
+                            <span className="co-tick">{formData.extraSafety.cielNotGuarantee ? "✓" : ""}</span>
+                            <span>Publication or approval on CIEL PK is not by itself a guarantee by CIEL PK regarding a third-party location or activity.</span>
+                        </button>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="co-label">Electronic signature — type full name *</label>
+                            <input
+                                type="text"
+                                placeholder={facultyDetails.name || "Your full name"}
+                                value={formData.electronicSignature}
+                                onChange={(e) => setFormData({ ...formData, electronicSignature: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="co-label">Signed date & time</label>
+                            <input type="text" readOnly value={new Date().toLocaleString()} className="bg-slate-50" />
+                        </div>
+                    </div>
+                    <button type="button" className={`co-safe mt-3 w-full text-left${formData.extraSafety.signatureAck ? " on" : ""}`} onClick={() => setFormData({ ...formData, extraSafety: { ...formData.extraSafety, signatureAck: !formData.extraSafety.signatureAck } })}>
+                        <span className="co-tick">{formData.extraSafety.signatureAck ? "✓" : ""}</span>
+                        <span>I confirm typing my name records my electronic acknowledgement of these declarations for this opportunity record.</span>
+                    </button>
+                </div>
+            </div>
+            )}
+
+            {activeStep === "SUBMIT" && (
+            <>
+            <div className="co-card mb-3">
+                <CoSectionHead letter="9" title="Review the student-facing opportunity flashcard" tag="FLASHCARD" color="#0e7d74" />
+                <div className="previewTools mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dfe7ea] bg-[#f8fafb] p-3">
+                    <div>
+                        <b className="text-[12px]">Eligibility preview</b>
+                        <small className="mt-0.5 block text-[10px] text-[#70818a]">See how Apply Now changes by viewer. Phone/WhatsApp stays private.</small>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {([
+                            ["eligible", "Eligible Student"],
+                            ["wrongdept", "Wrong Department"],
+                            ["otheruni", "Other University"],
+                        ] as const).map(([id, label]) => (
+                            <button
+                                key={id}
+                                type="button"
+                                className={`rounded-full border px-3 py-1.5 text-[10px] font-black ${flashViewer === id ? "border-[#102f3d] bg-[#102f3d] text-white" : "border-[#dfe7ea] bg-white text-[#52646c]"}`}
+                                onClick={() => setFlashViewer(id)}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <StudentOpportunityFlashcard model={flashcardModel} />
+                <button
+                    type="button"
+                    className={`co-safe mt-3 w-full text-left${formData.flashApprove ? " on" : ""}`}
+                    onClick={() => setFormData({ ...formData, flashApprove: !formData.flashApprove })}
+                >
+                    <span className="co-tick">{formData.flashApprove ? "✓" : ""}</span>
+                    <span>I have reviewed this flashcard and confirm it accurately represents the opportunity being submitted.</span>
+                </button>
+            </div>
             <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
                 <div className="mb-1 flex items-center gap-2.5">
                     <span className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] bg-[#2dd4bf] px-2 text-[11px] font-extrabold text-[#04252b]">✓</span>
@@ -2225,17 +2696,39 @@ export default function FacultyOpportunityCreationPage() {
                     </button>
                 </div>
             </div>
+            </>
+            )}
 
-            <CoLivePreview
-                emoji={previewEmoji}
-                title={formData.title}
-                bits={previewBits}
-                sdgs={
-                    <>
+                    <div className="co-form-nav">
+                        {activeStepIndex > 0 ? (
+                            <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
+                        ) : <span />}
+                        {activeStep !== "SUBMIT" ? (
+                            <button
+                                type="button"
+                                className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
+                                onClick={goNextStep}
+                            >
+                                {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
+            </div>
+
+            <div className="sticky bottom-3.5 z-40 mt-4 overflow-hidden rounded-[20px] border border-[#dcebee] bg-white shadow-[0_-8px_30px_rgba(4,37,43,.10)]">
+                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+                    <span className="text-[22px]">{previewEmoji}</span>
+                    <div className="min-w-0 flex-1">
+                        <b className="block text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
+                        <span className="text-[9.5px] text-[#cdf5f0]">
+                            {previewBits.length ? previewBits.join(" · ") : "fill the form above and watch this card come alive"}
+                        </span>
+                    </div>
+                    <div className="flex gap-1">
                         {previewPrimarySdg ? (
                             <span className="co-sdg" style={{ background: previewPrimarySdg.color ?? "#0e7d74" }}>
-                                SDG {previewPrimarySdg.number}
-                                {formData.target ? ` · ${formData.target}` : ""}
+                                SDG {previewPrimarySdg.number}{formData.target ? ` · ${formData.target}` : ""}
                             </span>
                         ) : null}
                         {previewSecondarySdg ? (
@@ -2243,9 +2736,10 @@ export default function FacultyOpportunityCreationPage() {
                                 SDG {previewSecondarySdg.number}
                             </span>
                         ) : null}
-                    </>
-                }
-            />
+                    </div>
+                    <span className="rounded-full bg-white/18 px-2.5 py-1 text-[7.5px] font-extrabold">● LIVE PREVIEW</span>
+                </div>
+            </div>
         </div>
     );
 }

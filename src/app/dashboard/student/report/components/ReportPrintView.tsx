@@ -1761,7 +1761,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     <QandA q="Media visibility" a={data.section8.media_visible} />
                     <QandA q="Primary evidence types" a={data.section8.evidence_types} />
                     <QandA q="Evidence description" a={data.section8.description} fullWidth />
-                    <FileListQA q="Evidence files" files={data.section8.evidence_files} fullWidth />
+                    {data.section8.media_visible === "public" ? (
+                        <FileListQA q="Evidence files" files={data.section8.evidence_files} fullWidth />
+                    ) : (
+                        <QandA
+                            q="Evidence files"
+                            a={`Not included in this export — visibility set to "${data.section8.media_visible === "internal" ? "Private" : "Institutional"}".`}
+                            fullWidth
+                        />
+                    )}
                     <QandA
                         q="Ethical declaration compliance"
                         a={
@@ -1773,7 +1781,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     />
                     <QandA q="Partner verification" a={data.section8.partner_verification} />
                     <QandA q="Partner verification type" a={data.section8.partner_verification_type} />
-                    <FileListQA q="Partner verification files" files={data.section8.partner_verification_files} fullWidth />
+                    {data.section8.media_visible === "public" ? (
+                        <FileListQA q="Partner verification files" files={data.section8.partner_verification_files} fullWidth />
+                    ) : (
+                        <QandA
+                            q="Partner verification files"
+                            a={`Not included in this export — visibility set to "${data.section8.media_visible === "internal" ? "Private" : "Institutional"}".`}
+                            fullWidth
+                        />
+                    )}
                     <QandA q="Section summary" a={data.section8.summary_text} fullWidth />
                     </div>
                 </div>

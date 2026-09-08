@@ -358,7 +358,7 @@ function approvalStages(op: CreatedOpportunity): ApprovalStagePill[] {
             : "waiting";
 
     return [
-        { label: "Faculty", state: facultyState },
+        { label: facultyState === "done" && op.faculty_approval_status !== "approved" ? "Faculty — not required" : "Faculty", state: facultyState },
         { label: needsPartner ? "Partner" : "Partner — not required", state: partnerState },
         { label: "CIEL PK", state: adminState },
     ];

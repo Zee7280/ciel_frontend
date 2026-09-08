@@ -580,10 +580,22 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [isParticipationUnlocked, setParticipationUnlocked] = useState(false);
     
     // Eligibility for Submission (Progress vs Submission Mode)
+    // Hours must clear the bar for EVERY team member individually, not just the pooled team total —
+    // otherwise one member logging all the hours lets the whole team qualify for the payout while
+    // others contribute (and are credited for) zero verified hours.
     const isEligibleForSubmission = useMemo(() => {
         const metHours = (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
-        return metHours;
-    }, [data.section1.metrics?.total_verified_hours, data.required_hours]);
+        const individualMetrics = data.section1.metrics?.individual_metrics;
+        const everyoneMetTheirOwnHours =
+            !Array.isArray(individualMetrics) || individualMetrics.length === 0
+                ? true
+                : individualMetrics.every((m: any) => m?.gateway_status === "ELIGIBLE");
+        return metHours && everyoneMetTheirOwnHours;
+    }, [
+        data.section1.metrics?.total_verified_hours,
+        data.section1.metrics?.individual_metrics,
+        data.required_hours,
+    ]);
 
     const areAllSectionsComplete = useMemo(() => {
         const checks = [

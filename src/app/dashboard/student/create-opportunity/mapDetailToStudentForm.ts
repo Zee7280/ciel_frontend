@@ -132,8 +132,37 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         contact: typeof d.student_contact === "string" ? d.student_contact : "",
     };
 
+    const privateBlock =
+        ex.private_candidate && typeof ex.private_candidate === "object"
+            ? (ex.private_candidate as Record<string, unknown>)
+            : {};
+    const privateCandidate =
+        String(ex.student_pathway || "").toLowerCase() === "private" ||
+        Object.keys(privateBlock).length > 0 ||
+        sup.private_candidate === true;
+
+    const applyScopeRaw = typeof scope.apply_scope === "string" ? scope.apply_scope : "";
+    const rule = String(scope.rule || "");
+    let applyScope = "student_uni_all";
+    if (privateCandidate) {
+        if (rule === "open_all_universities" || applyScopeRaw === "all") applyScope = "all";
+        else if (rule === "departments_across_universities" || applyScopeRaw === "multi_depts") applyScope = "multi_depts";
+        else if (rule === "restricted_specific_universities" || applyScopeRaw === "multi_all") applyScope = "multi_all";
+        else applyScope = "all";
+    } else if (applyScopeRaw === "student_own_dept" || (rule === "own_university_departments" && deptScope === "specific" && departments.length === 1)) {
+        applyScope = applyScopeRaw === "student_selected_depts" ? "student_selected_depts" : "student_own_dept";
+        if (applyScopeRaw === "student_selected_depts") applyScope = "student_selected_depts";
+    } else if (applyScopeRaw === "student_selected_depts" || (rule === "own_university_departments" && deptScope === "specific")) {
+        applyScope = "student_selected_depts";
+    }
+
+    const uniNames = Array.isArray(scope.university_names)
+        ? (scope.university_names as string[]).filter(Boolean)
+        : [];
+
     const formDataPatch: Record<string, unknown> = {
         title: typeof d.title === "string" ? d.title : "",
+        hook: typeof objectives.hook === "string" ? objectives.hook : "",
         opportunityType: opportunityType.length ? opportunityType : [],
         otherActivitySpecs: otherSpecs.length ? otherSpecs : [""],
         mode: typeof d.mode === "string" ? d.mode : "",
@@ -141,13 +170,15 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             d.location && typeof d.location === "object"
                 ? d.location
                 : { city: "", venue: "", pin: "" },
-        timelineType: typeof timeline.type === "string" ? timeline.type : "",
+        timelineType: typeof timeline.type === "string" ? timeline.type : "Fixed dates",
         dates: {
             start: typeof timeline.start_date === "string" ? timeline.start_date : "",
             end: typeof timeline.end_date === "string" ? timeline.end_date : "",
             fromTime: typeof timeline.from_time === "string" ? timeline.from_time : "",
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
+        applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
+        scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
             hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",
             volunteers: timeline.volunteers_required != null ? String(timeline.volunteers_required) : "",
@@ -155,11 +186,31 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
         indicator: typeof sdgInfo.indicator_id === "string" ? sdgInfo.indicator_id : "",
+        sdgWhy: typeof sdgInfo.why_relevant === "string" ? sdgInfo.why_relevant : "",
         secondarySdg: typeof sec0.sdg_id === "string" ? sec0.sdg_id : "",
         secondaryTarget: typeof sec0.target_id === "string" ? sec0.target_id : "",
         secondaryIndicator: typeof sec0.indicator_id === "string" ? sec0.indicator_id : "",
+        privateCandidate,
+        privateProgramme: typeof privateBlock.programme === "string" ? privateBlock.programme : "",
+        privateAwardingBody: typeof privateBlock.awarding_body === "string" ? privateBlock.awarding_body : "",
+        privateCandidateId: typeof privateBlock.candidate_id === "string" ? privateBlock.candidate_id : "",
+        privateCountry: typeof privateBlock.country === "string" ? privateBlock.country : "",
+        privateContactPref: typeof privateBlock.contact_pref === "string" ? privateBlock.contact_pref : "",
+        ...(() => {
+            const raw = typeof privateBlock.phone === "string" ? privateBlock.phone : "";
+            const parsed = parsePhoneForDisplay(raw);
+            return {
+                privatePhoneKey: parsed.phoneCountryKey,
+                privatePhone: parsed.national,
+            };
+        })(),
+        applyScope,
+        selectedUniversities: uniNames.length ? uniNames : [""],
+        electronicSignature: typeof sup.electronic_signature === "string" ? sup.electronic_signature : "",
         objectives: {
             description: typeof objectives.description === "string" ? objectives.description : "",
+            outputs: typeof objectives.outputs === "string" ? objectives.outputs : "",
+            outcome: typeof objectives.outcome === "string" ? objectives.outcome : "",
             beneficiariesCount:
                 objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
             beneficiariesType: beneficiariesPredefined,
@@ -172,6 +223,8 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             skills: Array.isArray(activity.skills_gained) ? [...(activity.skills_gained as string[])] : [],
             isOtherSkillChecked: false,
             otherSkills: [""] as string[],
+            prerequisites: typeof activity.prerequisites === "string" ? activity.prerequisites : "",
+            resources: typeof activity.resources === "string" ? activity.resources : "",
         },
         supervision: {
             facultyName: typeof sup.supervisor_name === "string" ? sup.supervisor_name : "",

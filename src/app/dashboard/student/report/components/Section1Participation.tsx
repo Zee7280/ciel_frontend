@@ -853,6 +853,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
         let serverNotified = false;
         let requestType = "created";
+        let draftPersisted = true;
         try {
             const res = await authenticatedFetch(
                 `/api/v1/engagement/project/${encodeURIComponent(projectIdFromUrl)}/attendance/verify-request`,
@@ -905,8 +906,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     ? { attendance_faculty_email: facultyEmailTrimmed }
                     : {}),
             });
-            await saveReport(true);
+            draftPersisted = await saveReport(true);
             setIsRequestingAttendanceVerification(false);
+        }
+
+        if (!draftPersisted) {
+            toast.error(
+                "Verification was requested, but saving your report draft failed — please check your connection and reopen this page to confirm the lock took effect.",
+            );
+            return;
         }
 
         if (requestType === "already_requested") {
