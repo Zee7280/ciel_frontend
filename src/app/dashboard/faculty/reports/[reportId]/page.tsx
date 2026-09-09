@@ -8,6 +8,7 @@ import {
     type ExecutiveReportDossierConfig,
 } from "@/components/verify/ExecutiveReportDossierPage";
 import FacultyAiEvaluationConsole from "./FacultyAiEvaluationConsole";
+import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 
 function FacultyReportView() {
     const params = useParams();
@@ -25,6 +26,10 @@ function FacultyReportView() {
             notFoundMessage: "Executive dossier unavailable",
         };
         return <ExecutiveReportDossierPage config={facultyDossierConfig} />;
+    }
+
+    if (view === "cii-v2") {
+        return <CommunityCiiAnalyser />;
     }
 
     return <FacultyAiEvaluationConsole />;

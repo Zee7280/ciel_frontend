@@ -171,6 +171,9 @@ export default function FacultyAiEvaluationConsole() {
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
                         Open full dossier
                     </Link>
+                    <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v2`}>
+                        Open CII v2 Analyser
+                    </Link>
                 </div>
 
                 <div className="fae-pipe">
