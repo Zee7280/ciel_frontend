@@ -352,7 +352,7 @@ const COURSE_PROJECT_TOTAL_STEPS = 8;
 /** Must match the frontend FYP wizard's STEPS.length (paths/fyp-thesis/page.tsx). */
 const FYP_TOTAL_STEPS = 9;
 /** Must match the frontend Enterprise Path wizard's STEPS.length (paths/startup-business/page.tsx). */
-const VENTURE_TOTAL_STEPS = 8;
+const VENTURE_TOTAL_STEPS = 6;
 
 interface FypSummary {
     projectTitle: string | null;
@@ -360,6 +360,7 @@ interface FypSummary {
     milestones: { status: "pending" | "in_progress" | "complete" }[];
     stepCompleted: number;
     status: "draft" | "submitted";
+    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
 }
 
 interface VentureSummary {
@@ -377,7 +378,12 @@ function coursProjectStatusLabel(entry: CourseProjectSummary): string {
 /** Mirrors the backend's fypThesisPathStatus (impact-summary.service.ts) — stepCompleted/status once the
  * guided wizard has been used at all; falls back to the legacy milestone count only for older entries. */
 function fypStatusLabel(entry: FypSummary): string {
-    if (entry.status === "submitted") return "Submitted";
+    if (entry.status === "submitted") {
+        if (entry.supervisorApprovalStatus === "approved") return "Approved";
+        if (entry.supervisorApprovalStatus === "rejected") return "Rejected";
+        if (entry.supervisorApprovalStatus === "revision_requested") return "Revision requested";
+        return "Under review";
+    }
     if (entry.stepCompleted > 0) return `Draft · step ${entry.stepCompleted}/${FYP_TOTAL_STEPS}`;
     const total = entry.milestones?.length || 5;
     const complete = entry.milestones?.filter((m) => m.status === "complete").length || 0;
@@ -389,7 +395,15 @@ function pathWorkspaceActionLabel(key: string, status: string, stepCompleted?: n
         return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/${COURSE_PROJECT_TOTAL_STEPS}`;
     }
     if (key === "fyp-thesis") {
-        return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/${FYP_TOTAL_STEPS}`;
+        return (
+            status === "Submitted" ||
+            status === "Approved" ||
+            status === "Rejected" ||
+            status === "Revision requested" ||
+            status === "Under review"
+        )
+            ? "View & edit"
+            : `Continue · step ${stepCompleted ?? 0}/${FYP_TOTAL_STEPS}`;
     }
     if (key === "startup-business" && !status.startsWith("Submitted") && stepCompleted !== undefined) {
         return `Continue · step ${stepCompleted}/${VENTURE_TOTAL_STEPS}`;

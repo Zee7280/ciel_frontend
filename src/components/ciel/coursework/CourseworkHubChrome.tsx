@@ -34,13 +34,15 @@ export function CourseworkHero({
     gradient = FACULTY_HERO_GRADIENT,
     stats,
     rightStat,
+    roleBadge,
 }: {
     kicker: string;
     title: string;
     subtitle: string;
     gradient?: string;
-    stats: { value: string; label: string }[];
+    stats: { value: string; label: string; href?: string }[];
     rightStat?: { value: string; label: string };
+    roleBadge?: string;
 }) {
     return (
         <div
@@ -48,18 +50,35 @@ export function CourseworkHero({
             style={{ background: gradient }}
         >
             <div className="pointer-events-none absolute -right-20 -top-24 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0)_67%)]" />
+            {roleBadge ? (
+                <span className="absolute right-[34px] top-[26px] rounded-full border border-white/20 bg-white/14 px-3.5 py-2 text-[12.5px] font-bold tracking-wide">
+                    {roleBadge}
+                </span>
+            ) : null}
             <div className="relative min-w-0">
                 <p className="text-[11px] font-black tracking-[0.13em] text-white/80">{kicker}</p>
                 <h1 className="mt-1.5 text-[1.7rem] font-semibold leading-tight tracking-tight sm:text-[31px]">{title}</h1>
                 <p className="mt-2 max-w-[640px] text-sm leading-relaxed text-[#d9fbf6]">{subtitle}</p>
                 {stats.length > 0 && (
                     <div className="mt-5 flex flex-wrap gap-3">
-                        {stats.map((s) => (
-                            <div key={s.label} className="min-w-[150px] rounded-[17px] border border-white/22 bg-white/8 px-[18px] py-3.5">
-                                <div className="text-[19px] font-semibold">{s.value}</div>
-                                <div className="mt-0.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#a8fff0]">{s.label}</div>
-                            </div>
-                        ))}
+                        {stats.map((s) => {
+                            const box = (
+                                <>
+                                    <div className="text-[19px] font-semibold">{s.value}</div>
+                                    <div className="mt-0.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#a8fff0]">{s.label}</div>
+                                </>
+                            );
+                            const cls = "min-w-[150px] rounded-[17px] border border-white/22 bg-white/8 px-[18px] py-3.5";
+                            return s.href ? (
+                                <Link key={s.label} href={s.href} className={`${cls} transition hover:bg-white/14`}>
+                                    {box}
+                                </Link>
+                            ) : (
+                                <div key={s.label} className={cls}>
+                                    {box}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>

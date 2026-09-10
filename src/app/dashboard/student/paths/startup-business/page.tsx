@@ -9,17 +9,25 @@ import StartupBusinessWorkspace from "./StartupBusinessWorkspace";
 
 function StartupBusinessRouter() {
     const view = useSearchParams().get("view");
-    if (view === "workspace") {
-    return (
+    if (view === "workspace" || view === "create") {
+        return (
             <div>
-                <div className="mx-auto max-w-[1040px]">
-                    <HubBackButton href="/dashboard/student/paths/startup-business" label="← Startup / Business hub" />
-        </div>
+                <div className="mx-auto max-w-[1240px] px-[18px]">
+                    <HubBackButton href="/dashboard/student/paths/startup-business" label="← Startup / Venture hub" />
+                </div>
                 <StartupBusinessWorkspace />
-        </div>
+            </div>
+        );
+    }
+    return (
+        <StartupBusinessHub
+            view={
+                view === "guide" || view === "wall" || view === "in-progress" || view === "under-review"
+                    ? view
+                    : "home"
+            }
+        />
     );
-}
-    return <StartupBusinessHub view={view === "guide" || view === "wall" ? view : "home"} />;
 }
 
 export default function StartupBusinessPage() {

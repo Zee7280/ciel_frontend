@@ -140,7 +140,13 @@ function pathApprovalGate(entry: PathReviewEntry): string | null | undefined {
 
 /** Once faculty/supervisor has rejected or sent something back for revision, the ball is with the
  * student again — it must not keep inflating the "waiting for my review" queue/badge forever. */
-const PATH_RETURNED_TO_STUDENT_KEYS = new Set(["rejected", "declined", "revision_requested", "changes_requested"]);
+const PATH_RETURNED_TO_STUDENT_KEYS = new Set([
+    "rejected",
+    "declined",
+    "revision_requested",
+    "revisions_requested",
+    "changes_requested",
+]);
 
 export function isPathEntryWaiting(entry: PathReviewEntry): boolean {
     if (normalizeReviewStatus(entry.status) !== "submitted") return false;

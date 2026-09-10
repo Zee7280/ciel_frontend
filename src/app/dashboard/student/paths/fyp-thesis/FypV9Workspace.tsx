@@ -77,8 +77,9 @@ function emptyTeamMember(): FypTeamMember {
     return { name: "", rollNumber: "", email: "", whatsappCode: "+92", whatsappNumber: "" };
 }
 
-export default function FypV9Workspace() {
+export default function FypV9Workspace({ id }: { id: string }) {
     const [loading, setLoading] = useState(true);
+    const [notFound, setNotFound] = useState(false);
     const [entry, setEntry] = useState<FypEntry>(EMPTY_FYP);
     const [v9, setV9] = useState<FypV9FormState>(EMPTY_FYP_V9);
     const [step, setStep] = useState(0);
@@ -94,12 +95,14 @@ export default function FypV9Workspace() {
     const saveTailRef = useRef(Promise.resolve());
 
     useEffect(() => {
-        authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false })
+        authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, {}, { redirectToLogin: false })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
-                const data = result?.data
-                    ? mergeFypEntry(EMPTY_FYP, result.data as Partial<FypEntry>)
-                    : EMPTY_FYP;
+                if (!result?.data) {
+                    setNotFound(true);
+                    return;
+                }
+                const data = mergeFypEntry(EMPTY_FYP, result.data as Partial<FypEntry>);
                 // The graduation-year field only ever showed "2026" as a placeholder fallback in the
                 // input's value prop — nothing persisted it until the student actually touched the
                 // field. Default it into state so what's visibly filled in is actually saved.
@@ -111,7 +114,7 @@ export default function FypV9Workspace() {
                 setStep(Math.min(7, data.stepCompleted ?? 0));
             })
             .finally(() => setLoading(false));
-    }, []);
+    }, [id]);
 
     const patchV9 = (patch: Partial<FypV9FormState>) => setV9((s) => ({ ...s, ...patch }));
     const pathwayStr = (id: string) => {
@@ -290,7 +293,7 @@ export default function FypV9Workspace() {
         const patch = buildPatch(sectionSummaries);
         try {
             const res = await authenticatedFetch(
-                "/api/v1/paths/fyp-thesis",
+                `/api/v1/paths/fyp-theses/${id}`,
                 {
                     method: "PATCH",
                     body: JSON.stringify({
@@ -344,7 +347,7 @@ export default function FypV9Workspace() {
         try {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const res = await authenticatedFetch(
-                "/api/v1/paths/fyp-thesis/deliverables",
+                `/api/v1/paths/fyp-theses/${id}/deliverables`,
                 { method: "POST", body: JSON.stringify({ label: file.name, fileUrl: publicUrl }) },
                 { redirectToLogin: false },
             );
@@ -358,6 +361,15 @@ export default function FypV9Workspace() {
     };
 
     if (loading) return <WorkspaceSkeleton />;
+
+    if (notFound) {
+        return (
+            <div className="mx-auto max-w-xl space-y-4 py-16 text-center">
+                <p className="text-lg font-black text-ciel-text">This FYP record doesn&apos;t exist, or isn&apos;t yours.</p>
+                <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← Back to my FYP records" />
+            </div>
+        );
+    }
 
     const isOwner = entry.isOwner !== false;
     const showCard = (entry.status === "submitted" && !editing) || !isOwner;

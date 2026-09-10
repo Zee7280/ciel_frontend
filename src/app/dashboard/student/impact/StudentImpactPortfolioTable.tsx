@@ -229,7 +229,7 @@ export default function StudentImpactPortfolioTable() {
                 authenticatedFetch("/api/v1/paths/course-projects", {}, { redirectToLogin: false })
                     .then((r) => (r?.ok ? r.json() : null))
                     .catch(() => null),
-                authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false })
+                authenticatedFetch("/api/v1/paths/fyp-theses", {}, { redirectToLogin: false })
                     .then((r) => (r?.ok ? r.json() : null))
                     .catch(() => null),
                 authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: false })
@@ -330,14 +330,15 @@ export default function StudentImpactPortfolioTable() {
                 });
             }
 
-            const fypEntry = fyp?.data;
-            if (fypEntry && isPathEntryApproved(fypEntry)) {
+            const fypRows = Array.isArray(fyp?.data) ? fyp.data : [];
+            for (const fypEntry of fypRows) {
+                if (!isPathEntryApproved(fypEntry)) continue;
                 const total = fypEntry.meritRibbon?.total;
                 const year = yearOf(fypEntry.updatedAt || fypEntry.createdAt);
                 const sdgs = sdgNumbers(fypEntry.sdgMapping?.entries);
                 const school = fypEntry.projectInfo?.school || "FYP";
                 out.push({
-                    id: "fyp",
+                    id: `fyp-${fypEntry.id}`,
                     title: fypEntry.projectTitle || "Final Year Project",
                     meta: school,
                     area: "FYP",
@@ -349,7 +350,7 @@ export default function StudentImpactPortfolioTable() {
                     year,
                     dateIso: asIso(fypEntry.updatedAt || fypEntry.createdAt),
                     sdgs,
-                    href: "/dashboard/student/paths/fyp-thesis?view=wall",
+                    href: `/dashboard/student/paths/fyp-thesis/${encodeURIComponent(String(fypEntry.id))}`,
                     flash: {
                         type: "FYP / FINAL YEAR PROJECT",
                         title: fypEntry.projectTitle || "Final Year Project",
