@@ -8,7 +8,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
-import { isStudentProfileComplete, isValidEmailFormat, pickProfileEmail } from "@/utils/profileCompletion";
+import { isStudentProfileComplete, isValidEmailFormat, missingProfileFieldsForRole, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuidance";
@@ -1224,7 +1224,14 @@ export default function StudentOpportunityCreationPage() {
                 };
 
                 if (!isStudentProfileComplete(mergedForGate)) {
-                    router.replace("/dashboard/student/profile");
+                    const missing = missingProfileFieldsForRole("student", mergedForGate);
+                    toast.error(
+                        missing.length > 0
+                            ? `Complete your profile before creating an opportunity — missing: ${missing.join(", ")}.`
+                            : "Complete your profile before creating an opportunity.",
+                        { duration: 7000 },
+                    );
+                    router.replace("/dashboard/student/profile?incomplete=1");
                     return;
                 }
 
