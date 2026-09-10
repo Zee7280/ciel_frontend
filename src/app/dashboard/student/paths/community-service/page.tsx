@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, FileText, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
@@ -22,7 +22,17 @@ import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 
-type ApprovalLineStatus = "pending" | "approved" | "rejected" | null | undefined;
+/** Mirrors Nest `LINE_STATUS` (opportunity-workflow.service.ts) — every value the API can send. */
+type ApprovalLineStatus =
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "revision_requested"
+    | "skipped"
+    | "not_applicable"
+    | "not_required"
+    | null
+    | undefined;
 
 interface CreatedOpportunity {
     id: string;
@@ -41,7 +51,8 @@ interface AttendanceLog {
     dateOfEngagement: string;
     startTime: string;
     endTime: string;
-    sessionHours: number;
+    /** Postgres `decimal` — TypeORM serialises it as a string ("3.00"), so never render it raw. */
+    sessionHours: number | string;
     organizationName: string;
     activityType: string;
     description: string;
@@ -50,6 +61,18 @@ interface AttendanceLog {
     approvalStatus: string | null;
     /** Reviewer's note recorded alongside a reject/flag decision. */
     approvalActionReason?: string | null;
+}
+
+/** "3.00" → "3", "2.50" → "2.5". */
+function formatHours(value: number | string): string {
+    const n = Number(value);
+    return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : String(value);
+}
+
+/** Postgres `time` comes back as "09:00:00" — students read HH:mm. */
+function formatClock(value: string): string {
+    const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
+    return match ? `${match[1].padStart(2, "0")}:${match[2]}` : String(value ?? "");
 }
 
 function hourStatus(log: AttendanceLog): CielHourStatus {
@@ -91,6 +114,7 @@ function CommunityServiceContent() {
     const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
     const [loading, setLoading] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [projects, setProjects] = useState<ActiveProject[]>([]);
     const [verifiedHours, setVerifiedHours] = useState(0);
     const [wallCount, setWallCount] = useState(0);
@@ -112,10 +136,13 @@ function CommunityServiceContent() {
                 .catch(() => null),
         ]).then(([data, summary, oppResult, rankingsResult]) => {
             if (cancelled) return;
+            // `data === null` means the dashboard call failed (offline / expired session) — say so
+            // instead of rendering a hub full of confident zeros.
+            setLoadFailed(!data);
             setProjects(data?.activeProjects ?? []);
             setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
             setWallCount(data?.overview?.impactHistoryBadgeCount ?? data?.overview?.completedCount ?? 0);
-            setCompletion(Math.round(summary?.pathsStatus.communityService?.progress ?? 0));
+            setCompletion(Math.round(summary?.pathsStatus?.communityService?.progress ?? 0));
             const rankingRows = Array.isArray(rankingsResult?.data)
                 ? (rankingsResult.data as { cii?: number }[])
                 : [];
@@ -144,7 +171,9 @@ function CommunityServiceContent() {
             );
             setLoading(false);
         }).catch(() => {
-            if (!cancelled) setLoading(false);
+            if (cancelled) return;
+            setLoadFailed(true);
+            setLoading(false);
         });
         return () => {
             cancelled = true;
@@ -282,22 +311,26 @@ function CommunityServiceContent() {
         const recordIds = new Set(projects.map((p) => p.id));
         myOpportunities.forEach((o) => recordIds.add(o.id));
         return (
-            <CommunityServiceHub
-                projects={projects}
-                verifiedHours={verifiedHours}
-                wallCount={wallCount}
-                completion={completion}
-                attention={attention}
-                displayName={displayName}
-                bestCii={bestCii}
-                reportInProgress={reportInProgress}
-                recordCount={recordIds.size}
-            />
+            <>
+                <LoadFailedBanner show={loadFailed} />
+                <CommunityServiceHub
+                    projects={projects}
+                    verifiedHours={verifiedHours}
+                    wallCount={wallCount}
+                    completion={completion}
+                    attention={attention}
+                    displayName={displayName}
+                    bestCii={bestCii}
+                    reportInProgress={reportInProgress}
+                    recordCount={recordIds.size}
+                />
+            </>
         );
     }
 
     return (
         <div>
+            <LoadFailedBanner show={loadFailed} />
             <Link
                 href="/dashboard/student/paths/community-service"
                 className="mb-3 inline-flex items-center text-xs font-extrabold text-[#0e7d74] hover:underline"
@@ -316,7 +349,13 @@ function CommunityServiceContent() {
                 activeTab={activeTab}
                 onTabChange={setTab}
             >
-                {activeTab === "engagements" && <EngagementsTab projects={projects} />}
+                {activeTab === "engagements" && (
+                    <EngagementsTab
+                        projects={projects}
+                        createdOpportunities={myOpportunities}
+                        onOpportunityDeleted={(id) => setMyOpportunities((prev) => prev.filter((o) => o.id !== id))}
+                    />
+                )}
                 {activeTab === "log-hours" && <LogHoursTab projects={projects} />}
                 {activeTab === "reports" && <ReportsTab projects={projects} />}
             </PathWorkspaceShell>
@@ -324,45 +363,80 @@ function CommunityServiceContent() {
     );
 }
 
-type ApprovalStagePill = { label: string; state: "done" | "current" | "waiting" | "rejected" };
+/** Shown when the dashboard call failed, so an empty hub never masquerades as "you have nothing". */
+function LoadFailedBanner({ show }: { show: boolean }) {
+    if (!show) return null;
+    return (
+        <div className="mx-auto mb-3 flex max-w-[1500px] flex-wrap items-center justify-between gap-3 rounded-ciel-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+            <span>We couldn&apos;t load your Community Service data just now, so counts below may be incomplete.</span>
+            <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="ciel-transition rounded-ciel-xs border border-amber-300 bg-white px-3 py-1.5 font-bold text-amber-900 hover:bg-amber-100"
+            >
+                Retry
+            </button>
+        </div>
+    );
+}
+
+type ApprovalStagePill = { label: string; state: "done" | "current" | "waiting" | "rejected" | "revision" };
+
+/** Lines the backend marks as never applying to this proposal (e.g. a private candidate has no faculty line). */
+function lineNotRequired(status: ApprovalLineStatus): boolean {
+    return status === "not_applicable" || status === "not_required" || status === "skipped";
+}
 
 /** Faculty → Partner → CIEL PK, one pill per stage, derived from the same workflow fields the
  * admin/faculty dashboards already key off (`workflow_stage`, `*_approval_status`). */
 function approvalStages(op: CreatedOpportunity): ApprovalStagePill[] {
     const stage = op.workflow_stage ?? "";
-    const facultyDone = op.faculty_approval_status === "approved" || (stage !== "pending_faculty" && stage !== "");
-    const facultyRejected = op.faculty_approval_status === "rejected";
-    const facultyState: ApprovalStagePill["state"] = facultyRejected
-        ? "rejected"
-        : facultyDone
-          ? "done"
-          : "current";
+    const facultyNotRequired = lineNotRequired(op.faculty_approval_status);
+    const facultyDone =
+        op.faculty_approval_status === "approved" ||
+        facultyNotRequired ||
+        (stage !== "pending_faculty" && stage !== "" && stage !== "revision");
+    const facultyState: ApprovalStagePill["state"] =
+        op.faculty_approval_status === "rejected"
+            ? "rejected"
+            : // A revision request is neither done nor a rejection — it needs the student to act.
+              op.faculty_approval_status === "revision_requested"
+              ? "revision"
+              : facultyDone
+                ? "done"
+                : "current";
 
-    const needsPartner = op.requires_partner_approval;
-    const partnerDone = op.partner_approval_status === "approved";
-    const partnerRejected = op.partner_approval_status === "rejected";
+    const needsPartner = op.requires_partner_approval && !lineNotRequired(op.partner_approval_status);
     const partnerState: ApprovalStagePill["state"] = !needsPartner
         ? "done"
-        : partnerRejected
+        : op.partner_approval_status === "rejected"
           ? "rejected"
-          : partnerDone
+          : op.partner_approval_status === "revision_requested"
+            ? "revision"
+            : op.partner_approval_status === "approved"
+              ? "done"
+              : facultyState === "done"
+                ? "current"
+                : "waiting";
+
+    const adminDone = op.admin_approval_status === "approved" || op.status === "live";
+    // Only blame the CIEL PK line for an overall `rejected` status when no earlier line owns the
+    // rejection — otherwise a faculty/partner rejection painted all three pills red.
+    const earlierLineRejected = facultyState === "rejected" || partnerState === "rejected";
+    const adminRejected =
+        op.admin_approval_status === "rejected" || (op.status === "rejected" && !earlierLineRejected);
+    const adminState: ApprovalStagePill["state"] = adminRejected
+        ? "rejected"
+        : op.admin_approval_status === "revision_requested"
+          ? "revision"
+          : adminDone
             ? "done"
-            : facultyState === "done"
+            : facultyState === "done" && partnerState === "done"
               ? "current"
               : "waiting";
 
-    const adminDone = op.admin_approval_status === "approved" || op.status === "live";
-    const adminRejected = op.admin_approval_status === "rejected" || op.status === "rejected";
-    const adminState: ApprovalStagePill["state"] = adminRejected
-        ? "rejected"
-        : adminDone
-          ? "done"
-          : facultyState === "done" && partnerState === "done"
-            ? "current"
-            : "waiting";
-
     return [
-        { label: facultyState === "done" && op.faculty_approval_status !== "approved" ? "Faculty — not required" : "Faculty", state: facultyState },
+        { label: facultyNotRequired ? "Faculty — not required" : "Faculty", state: facultyState },
         { label: needsPartner ? "Partner" : "Partner — not required", state: partnerState },
         { label: "CIEL PK", state: adminState },
     ];
@@ -373,6 +447,7 @@ const APPROVAL_PILL_CLASS: Record<ApprovalStagePill["state"], string> = {
     current: "border-amber-200 bg-amber-50 text-amber-700",
     waiting: "border-ciel-border bg-ciel-page text-ciel-text-soft",
     rejected: "border-rose-200 bg-rose-50 text-rose-700",
+    revision: "border-orange-300 bg-orange-50 text-orange-800",
 };
 
 const APPROVAL_PILL_ICON: Record<ApprovalStagePill["state"], string> = {
@@ -380,6 +455,7 @@ const APPROVAL_PILL_ICON: Record<ApprovalStagePill["state"], string> = {
     current: "…",
     waiting: "·",
     rejected: "✕",
+    revision: "↺",
 };
 
 function ApprovalJourney({ opportunity }: { opportunity: CreatedOpportunity }) {
@@ -405,40 +481,17 @@ function ApprovalJourney({ opportunity }: { opportunity: CreatedOpportunity }) {
     );
 }
 
-function EngagementsTab({ projects }: { projects: ActiveProject[] }) {
-    const [createdOpportunities, setCreatedOpportunities] = useState<CreatedOpportunity[]>([]);
-    const [createdLoading, setCreatedLoading] = useState(true);
+function EngagementsTab({
+    projects,
+    createdOpportunities,
+    onOpportunityDeleted,
+}: {
+    projects: ActiveProject[];
+    /** Already fetched once by the page — never re-request `/student/opportunity/mine` here. */
+    createdOpportunities: CreatedOpportunity[];
+    onOpportunityDeleted: (id: string) => void;
+}) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => {
-                if (cancelled || !result?.success) return;
-                const rows = Array.isArray(result.data) ? (result.data as Record<string, unknown>[]) : [];
-                // Drafts belong on the Create Opportunity screen's drafts list, not the approval tracker here.
-                const submitted = rows.filter((r) => r.status !== "draft");
-                setCreatedOpportunities(
-                    submitted.map((r) => ({
-                        id: String(r.id),
-                        title: String(r.title ?? "Untitled opportunity"),
-                        status: typeof r.status === "string" ? r.status : undefined,
-                        workflow_stage: (r.workflow_stage as string | null) ?? null,
-                        faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
-                        partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
-                        admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
-                        requires_partner_approval: Boolean(r.requires_partner_approval),
-                    })),
-                );
-            })
-            .finally(() => {
-                if (!cancelled) setCreatedLoading(false);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
 
     const handleDelete = async (id: string, title: string) => {
         if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -449,7 +502,7 @@ function EngagementsTab({ projects }: { projects: ActiveProject[] }) {
                 const err = await res?.json().catch(() => null);
                 throw new Error((err?.error as string) || (err?.message as string) || "Could not delete this listing");
             }
-            setCreatedOpportunities((prev) => prev.filter((o) => o.id !== id));
+            onOpportunityDeleted(id);
             toast.success("Listing deleted");
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Could not delete this listing");
@@ -459,7 +512,7 @@ function EngagementsTab({ projects }: { projects: ActiveProject[] }) {
     };
 
     const createdSection =
-        !createdLoading && createdOpportunities.length > 0 ? (
+        createdOpportunities.length > 0 ? (
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">Community Service Workspace · Opportunity approval</h3>
@@ -548,6 +601,10 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
     const [resolvingParticipation, setResolvingParticipation] = useState(false);
     const [logs, setLogs] = useState<AttendanceLog[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
+    const [logsError, setLogsError] = useState<string | null>(null);
+    const [attendanceLocked, setAttendanceLocked] = useState(false);
+    /** Ignores an in-flight logs response once the student has switched engagement. */
+    const activeParticipationRef = useRef<string | null>(null);
 
     const [form, setForm] = useState({
         dateOfEngagement: "",
@@ -562,15 +619,34 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
     const [uploading, setUploading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [sendingVerificationId, setSendingVerificationId] = useState<string | null>(null);
 
     const loadLogs = useCallback((id: string) => {
         if (!id) return;
         setLogsLoading(true);
+        setLogsError(null);
         authenticatedFetch(`/api/v1/engagement/${id}/attendance`, {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => setLogs(Array.isArray(result?.data) ? result.data : []))
-            .finally(() => setLogsLoading(false));
+            .then(async (res) => {
+                if (!res?.ok) throw new Error("load failed");
+                return res.json();
+            })
+            .then((result) => {
+                if (activeParticipationRef.current !== id) return;
+                const rows: AttendanceLog[] = Array.isArray(result?.data) ? result.data : [];
+                // The API returns relation order, not newest-first — this list is headed "Recent entries".
+                setLogs(
+                    [...rows].sort((a, b) =>
+                        String(b.dateOfEngagement ?? "").localeCompare(String(a.dateOfEngagement ?? "")),
+                    ),
+                );
+            })
+            .catch(() => {
+                if (activeParticipationRef.current !== id) return;
+                setLogs([]);
+                setLogsError("We couldn't load your logged sessions for this engagement.");
+            })
+            .finally(() => {
+                if (activeParticipationRef.current === id) setLogsLoading(false);
+            });
     }, []);
 
     /** `/engagement/:id/attendance` expects the participation id, not the opportunity id — resolve it first. */
@@ -581,6 +657,9 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
         setParticipationError(null);
         setParticipationId(null);
         setLogs([]);
+        setLogsError(null);
+        setAttendanceLocked(false);
+        activeParticipationRef.current = null;
         authenticatedFetch(`/api/v1/student/projects/${selectedProjectId}/my-participation`, {}, { redirectToLogin: false })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
@@ -588,6 +667,8 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                 const id = result?.data?.participation_id;
                 if (id) {
                     setParticipationId(id);
+                    setAttendanceLocked(result?.data?.attendance_locked === true);
+                    activeParticipationRef.current = id;
                     loadLogs(id);
                 } else {
                     setParticipationError("Could not find your enrollment record for this engagement.");
@@ -641,7 +722,10 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
             const res = await authenticatedFetch(`/api/v1/engagement/${participationId}/attendance`, { method: "POST", body }, { redirectToLogin: false });
             if (!res?.ok) {
                 const err = await res?.json().catch(() => null);
-                throw new Error(err?.message || "Could not log hours");
+                // Nest validation errors arrive as `message: string[]` — never show "[object Object]".
+                const raw = err?.message ?? err?.error;
+                const detail = Array.isArray(raw) ? raw.join(" ") : typeof raw === "string" ? raw : "";
+                throw new Error(detail || "Could not log hours");
             }
             setForm({ dateOfEngagement: "", startTime: "", endTime: "", organizationName: "", activityType: "", description: "" });
             setEvidenceFile(null);
@@ -651,27 +735,6 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
             setError(err instanceof Error ? err.message : "Could not log hours");
         } finally {
             setSubmitting(false);
-        }
-    };
-
-    const sendForVerification = async (log: AttendanceLog) => {
-        setSendingVerificationId(log.id);
-        try {
-            const res = await authenticatedFetch(
-                `/api/v1/engagement/project/${log.projectId}/attendance/verify-request`,
-                { method: "POST", body: JSON.stringify({ projectId: log.projectId, requestedAt: new Date().toISOString() }) },
-                { redirectToLogin: false },
-            );
-            if (!res?.ok) {
-                const err = await res?.json().catch(() => null);
-                throw new Error((err?.message as string) || (err?.error as string) || "Could not send these hours for verification");
-            }
-            toast.success("Sent for verification — your reviewer has been notified");
-            if (participationId) loadLogs(participationId);
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Could not send these hours for verification");
-        } finally {
-            setSendingVerificationId(null);
         }
     };
 
@@ -732,14 +795,28 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                         <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
                     </label>
                 </div>
+                {/* Attendance is locked once verification has been requested — say so instead of
+                    letting the student fill the form and hit a server-side refusal. */}
+                {attendanceLocked && (
+                    <div className="rounded-ciel-xs border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                        <b>Attendance is locked for this engagement.</b> You have already sent these hours for
+                        verification, so no new sessions can be added until your reviewer decides.
+                    </div>
+                )}
                 {participationError && <p className="text-xs font-semibold text-red-600">{participationError}</p>}
                 {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
                 <button
                     type="submit"
-                    disabled={submitting || uploading || resolvingParticipation || !participationId}
+                    disabled={submitting || uploading || resolvingParticipation || !participationId || attendanceLocked}
                     className="ciel-transition flex w-full items-center justify-center gap-2 rounded-ciel-sm bg-ciel-navy px-5 py-3 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
                 >
-                    {resolvingParticipation ? "Loading engagement..." : submitting ? "Logging..." : "Log hours"}
+                    {resolvingParticipation
+                        ? "Loading engagement..."
+                        : attendanceLocked
+                          ? "Attendance locked"
+                          : submitting
+                            ? "Logging..."
+                            : "Log hours"}
                 </button>
             </form>
 
@@ -747,6 +824,17 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">Recent entries</h3>
                 {logsLoading ? (
                     <div className="h-32 animate-pulse rounded-ciel-lg bg-ciel-border/50" />
+                ) : logsError ? (
+                    <div className="rounded-ciel-md border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800">
+                        {logsError}{" "}
+                        <button
+                            type="button"
+                            onClick={() => participationId && loadLogs(participationId)}
+                            className="underline"
+                        >
+                            Try again
+                        </button>
+                    </div>
                 ) : !logs.length ? (
                     <EmptyState emoji="📋" heading="No hours logged yet" line="Entries you log for this engagement appear here." />
                 ) : (
@@ -756,8 +844,8 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                         <div key={log.id} className="rounded-ciel-md border border-ciel-border bg-white p-4">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-bold text-ciel-text">{log.activityType} · {log.sessionHours}h</p>
-                                    <p className="text-xs text-ciel-text-soft">{log.dateOfEngagement} · {log.startTime}–{log.endTime}</p>
+                                    <p className="text-sm font-bold text-ciel-text">{log.activityType} · {formatHours(log.sessionHours)}h</p>
+                                    <p className="text-xs text-ciel-text-soft">{log.dateOfEngagement} · {formatClock(log.startTime)}–{formatClock(log.endTime)}</p>
                                 </div>
                                 <StatusPill status={status} />
                             </div>
@@ -781,14 +869,21 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                                     Nothing is penalised — your reviewer will follow up.
                                 </div>
                             )}
+                            {status === "pending" && (
+                                <p className="mt-3 text-xs leading-relaxed text-ciel-text-soft">
+                                    Waiting on your reviewer — approved sessions are the only ones that count toward your
+                                    verified hours.
+                                </p>
+                            )}
+                            {/* Requesting verification runs the oath + approver choice in the report's
+                                Section 1; posting the bare legacy request from here would skip both gates. */}
                             {status === "logged" && (
-                                <button
-                                    onClick={() => sendForVerification(log)}
-                                    disabled={sendingVerificationId === log.id}
-                                    className="ciel-transition mt-3 inline-flex items-center gap-1.5 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green hover:text-ciel-green-deep disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                                <Link
+                                    href={`/dashboard/student/report?projectId=${encodeURIComponent(log.projectId)}`}
+                                    className="ciel-transition mt-3 inline-flex items-center gap-1.5 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green hover:text-ciel-green-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
                                 >
-                                    <Send className="h-3 w-3" /> {sendingVerificationId === log.id ? "Sending..." : "Send for verification"}
-                                </button>
+                                    <Send className="h-3 w-3" /> Request verification in your report
+                                </Link>
                             )}
                         </div>
                         );

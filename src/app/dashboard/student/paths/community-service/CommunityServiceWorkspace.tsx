@@ -109,6 +109,20 @@ function opportunityRejected(op: OpportunityRow): boolean {
     );
 }
 
+/** A reviewer sent the proposal back for changes (backend WORKFLOW_STAGE.REVISION /
+ * LINE_STATUS.REVISION_REQUESTED). The next action is the student's, not the reviewer's —
+ * without this the card rendered as "Pending Faculty approval" with a reminder button, so the
+ * student sat waiting on a queue nobody was going to act on. */
+function opportunityNeedsRevision(op: OpportunityRow): boolean {
+    return (
+        op.workflow_stage === "revision" ||
+        op.status === "revision" ||
+        op.faculty_approval_status === "revision_requested" ||
+        op.partner_approval_status === "revision_requested" ||
+        op.admin_approval_status === "revision_requested"
+    );
+}
+
 function facultyNode(op: OpportunityRow): JourneyNode {
     if (op.faculty_approval_status === "rejected") return { title: "1. Faculty", detail: "Rejected", state: "rejected" };
     if (op.faculty_approval_status === "approved") return { title: "1. Faculty ✓", detail: "Approved", state: "complete" };
@@ -168,12 +182,23 @@ function buildReminderActions(
     ];
 }
 
+/** Submitting a report sets the backend status to `payment_pending` (public `pending_payment`) —
+ * the reporting fee is the student's own next action, and Partner/CIEL PK verification is blocked
+ * until it clears. Treating it as "Pending Faculty Approval" sent students to nag a reviewer who
+ * could not move the record. Status strings mirror `utils/studentBrowseReportCta.ts`. */
+const REPORT_FEE_STATUSES = new Set(["pending_payment", "payment_pending", "payment_under_review"]);
+
+function reportAwaitingFee(row: ReportRow): boolean {
+    return REPORT_FEE_STATUSES.has(normalizeReviewStatus(row.status));
+}
+
 function reportBucket(row: ReportRow): Exclude<WsFilter, "all"> {
     if (isCommunityReportRejected(row)) return "closed";
     if (isCommunityReportOnLiveDeck(row)) return "closed";
     const fac = normalizeReviewStatus(row.faculty_status);
     const st = normalizeReviewStatus(row.status);
     if (fac.includes("revision") || st.includes("revision")) return "revision";
+    if (reportAwaitingFee(row)) return "report";
     if (!isReviewDraftStatus(row.status)) return "review";
     return "report";
 }
@@ -181,6 +206,11 @@ function reportBucket(row: ReportRow): Exclude<WsFilter, "all"> {
 function reportHref(row: Pick<ReportRow, "project_id" | "opportunity_id" | "id">): string {
     const id = row.project_id || row.opportunity_id || row.id;
     return `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}`;
+}
+
+function reportPaymentHref(row: Pick<ReportRow, "project_id" | "opportunity_id" | "id">): string {
+    const id = row.project_id || row.opportunity_id || row.id;
+    return `/dashboard/student/payment?projectId=${encodeURIComponent(String(id))}`;
 }
 
 function actionClass(style: WorkCard["actions"][number]["style"]): string {
@@ -266,6 +296,10 @@ export default function CommunityServiceWorkspace({
             );
             setReports(Array.isArray(reportJson?.data) ? reportJson.data : []);
             setLoading(false);
+        }).catch(() => {
+            // A network failure must still clear the spinner — otherwise the workspace hangs
+            // on "Loading workspace…" forever and reads as a broken page.
+            if (!cancelled) setLoading(false);
         });
         return () => {
             cancelled = true;
@@ -283,6 +317,33 @@ export default function CommunityServiceWorkspace({
         for (const op of opportunities) {
             const linked = reportByKey.get(op.id);
             if (linked) continue;
+            if (!opportunityFullyApproved(op) && !opportunityRejected(op) && opportunityNeedsRevision(op)) {
+                out.push({
+                    id: `opp-${op.id}`,
+                    filter: "revision",
+                    stageLabel: "Stage 1 — Opportunity Approval",
+                    title: op.title,
+                    meta: formatSubmitted(op.created_at),
+                    journeyHead: "REVISION REQUIRED",
+                    journeySub: "Update the proposal and resubmit",
+                    pills: [{ label: "Revision Required", kind: "rev" }],
+                    note: {
+                        kind: "comment",
+                        body: "A reviewer asked for changes to this opportunity. Open it in Create Opportunity, update the requested details and resubmit — it will not move forward until you do.",
+                    },
+                    sideTitle: "Your Next Action",
+                    sideDetail: "Edit the proposal and resubmit",
+                    actions: [
+                        {
+                            label: "Edit & Resubmit",
+                            href: `/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`,
+                            style: "primary",
+                        },
+                        { label: "View Opportunity", href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`, style: "soft" },
+                    ],
+                });
+                continue;
+            }
             if (!opportunityFullyApproved(op) || opportunityRejected(op)) {
                 const faculty = facultyNode(op);
                 const partner = partnerNode(op, faculty);
@@ -386,6 +447,43 @@ export default function CommunityServiceWorkspace({
             const bucket = reportBucket(report);
             const title = report.project_title || "Community service report";
             const href = reportHref(report);
+            if (bucket === "report" && reportAwaitingFee(report)) {
+                const underReview = normalizeReviewStatus(report.status) === "payment_under_review";
+                out.push({
+                    id: `rep-${report.id}`,
+                    filter: "report",
+                    stageLabel: "Stage 2 — Reporting Fee",
+                    title,
+                    meta: "Report submitted",
+                    journeyHead: "REPORTING FEE",
+                    journeySub: underReview ? "Payment proof under review" : "Payment required",
+                    pills: [
+                        { label: "Report Submitted", kind: "ok" },
+                        {
+                            label: underReview ? "Payment Under Review" : "Reporting Fee Due",
+                            kind: underReview ? "wait" : "rev",
+                        },
+                    ],
+                    note: {
+                        kind: "notify",
+                        title: "Reporting Fee",
+                        body: underReview
+                            ? "Your payment proof is with CIEL PK. Partner and CIEL PK verification continues once it is approved."
+                            : "Your report is submitted. The reporting fee must be submitted and approved before Partner and CIEL PK can verify this report.",
+                    },
+                    sideTitle: underReview ? "Current Status" : "Your Next Action",
+                    sideDetail: underReview ? "Payment proof under review" : "Submit the reporting fee",
+                    actions: [
+                        {
+                            label: underReview ? "View Payment" : "Pay Reporting Fee",
+                            href: reportPaymentHref(report),
+                            style: underReview ? "soft" : "primary",
+                        },
+                        { label: "View Submitted Report", href, style: "soft" },
+                    ],
+                });
+                continue;
+            }
             if (bucket === "report") {
                 out.push({
                     id: `rep-${report.id}`,

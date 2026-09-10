@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { isCommunityReportOnLiveDeck, isPathEntryApproved } from "@/utils/reviewQueue";
+import { isCommunityReportOnLiveDeck, isCommunityReportRejected, isPathEntryApproved } from "@/utils/reviewQueue";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -242,7 +242,7 @@ export default function StudentImpactPortfolioTable() {
 
             const communityRows = Array.isArray(community?.data) ? community.data : [];
             for (const r of communityRows) {
-                if (!isCommunityReportOnLiveDeck(r)) continue;
+                if (!isCommunityReportOnLiveDeck(r) || isCommunityReportRejected(r)) continue;
                 const level = r.level as CommunityServiceLevel | undefined;
                 const extraBadge = Array.isArray(r.awardBadges)
                     ? (r.awardBadges as CommunityAwardBadge[])[0]

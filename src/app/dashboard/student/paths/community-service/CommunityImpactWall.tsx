@@ -7,7 +7,7 @@ import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
-import { isCommunityReportOnLiveDeck } from "@/utils/reviewQueue";
+import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 
@@ -214,8 +214,16 @@ export default function CommunityImpactWall({
             .then((reports) => {
                 if (cancelled) return;
                 const list = Array.isArray(reports?.data) ? reports.data : [];
-                setRows(list.filter((r: WallRow) => isCommunityReportOnLiveDeck(r)));
+                // Mirrors the backend live-deck gate (isCommunityAwardLiveReport): a late
+                // Faculty/Admin rejection blocks the record even when an earlier stage had
+                // approved it — without the rejected check such a row still rendered here as
+                // "✓ VERIFIED".
+                setRows(list.filter((r: WallRow) => isCommunityReportOnLiveDeck(r) && !isCommunityReportRejected(r)));
                 setLoading(false);
+            })
+            .catch(() => {
+                // Never leave the wall stuck on "Loading verified records…" after a network error.
+                if (!cancelled) setLoading(false);
             });
         return () => {
             cancelled = true;

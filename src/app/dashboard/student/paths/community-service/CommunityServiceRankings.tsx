@@ -36,14 +36,24 @@ function RankCard({ label, band }: { label: string; band: RankBand }) {
 export default function CommunityServiceRankings() {
     const [rows, setRows] = useState<RankingRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [failed, setFailed] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
-                if (cancelled || !result?.success) return;
+                if (cancelled) return;
+                // A failed/expired-session call must not masquerade as "you have no rankings" —
+                // that reads as verified work having silently disappeared.
+                if (!result?.success) {
+                    setFailed(true);
+                    return;
+                }
                 setRows(Array.isArray(result.data) ? result.data : []);
+            })
+            .catch(() => {
+                if (!cancelled) setFailed(true);
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -64,6 +74,12 @@ export default function CommunityServiceRankings() {
                 <div className="py-14 text-center text-[#7a919a]">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading rankings…
                 </div>
+            ) : failed ? (
+                <EmptyState
+                    emoji="⚠️"
+                    heading="Rankings could not be loaded"
+                    line="We could not reach the rankings service. Refresh the page — your verified reports and their scores are unaffected."
+                />
             ) : rows.length === 0 ? (
                 <EmptyState
                     emoji="🧠"
