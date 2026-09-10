@@ -562,17 +562,6 @@
     padding: 3px 8px;
 }
 
-/* Faculty / partner leftover slate labels pick up the student form type. */
-.co-form .co-card label.block.text-sm.font-bold {
-    display: block;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--co-muted);
-    text-transform: uppercase;
-    margin: 12px 0 5px;
-}
-
 .co-form .co-card .text-blue-600,
 .co-form .co-card .text-blue-700 {
     color: var(--co-teal);
