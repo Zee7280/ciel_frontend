@@ -25,6 +25,17 @@ function settingsRowsToMap(rows: SettingRow[]): Record<string, string> {
     return map;
 }
 
+/** Keys persisted by the "Save Changes" button. The backend stores one key/value row per call. */
+const GENERAL_SETTING_KEYS = ["site_name", "contact_email", "maintenance_mode", "allow_registrations"] as const;
+
+function parseBooleanSetting(raw: string | undefined, fallback: boolean): boolean {
+    if (raw === undefined) return fallback;
+    const v = raw.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(v)) return true;
+    if (["false", "0", "no", "off"].includes(v)) return false;
+    return fallback;
+}
+
 export default function AdminSettingsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -42,8 +53,8 @@ export default function AdminSettingsPage() {
         max_upload_size: "5MB",
     });
 
-    const fetchSettings = useCallback(async () => {
-        setIsLoading(true);
+    const fetchSettings = useCallback(async (options?: { silent?: boolean }) => {
+        if (!options?.silent) setIsLoading(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/settings`);
             if (res?.ok) {
@@ -59,15 +70,26 @@ export default function AdminSettingsPage() {
                     setPartnerMembershipFeePkr(
                         String(parseMembershipFeePkrSettingValue(map[MEMBERSHIP_FEE_PARTNER_PKR_KEY], 1000)),
                     );
+                    // The general settings live in the same flat key/value array.
+                    setSettings((prev) => ({
+                        ...prev,
+                        site_name: map.site_name ?? prev.site_name,
+                        contact_email: map.contact_email ?? prev.contact_email,
+                        maintenance_mode: parseBooleanSetting(map.maintenance_mode, prev.maintenance_mode),
+                        allow_registrations: parseBooleanSetting(map.allow_registrations, prev.allow_registrations),
+                        max_upload_size: map.max_upload_size ?? prev.max_upload_size,
+                    }));
                 } else if (data.success && data.data && typeof data.data === "object" && !Array.isArray(data.data)) {
                     setSettings((prev) => ({ ...prev, ...data.data }));
                 }
             }
         } catch (error) {
             console.error("Failed to fetch settings", error);
-            toast.error("Could not load platform settings");
+            // A silent refetch (e.g. right after a successful save) shouldn't surface a scary
+            // error toast on top of the save's own success toast — just log it.
+            if (!options?.silent) toast.error("Could not load platform settings");
         } finally {
-            setIsLoading(false);
+            if (!options?.silent) setIsLoading(false);
         }
     }, []);
 
@@ -184,18 +206,31 @@ export default function AdminSettingsPage() {
 
     const handleSave = async () => {
         setIsSaving(true);
+        // POST /admin/settings upserts a single { key, value } row, so send one request per key.
+        const failedKeys: string[] = [];
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(settings),
-            });
-
-            if (res?.ok) {
-                console.log("Settings saved");
+            for (const key of GENERAL_SETTING_KEYS) {
+                const value = String(settings[key]);
+                try {
+                    const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key, value }),
+                    });
+                    if (!res?.ok) failedKeys.push(key);
+                } catch (error) {
+                    console.error(`Failed to save setting ${key}`, error);
+                    failedKeys.push(key);
+                }
             }
-        } catch (error) {
-            console.error("Failed to save settings", error);
+
+            if (failedKeys.length > 0) {
+                toast.error(`Failed to save: ${failedKeys.join(", ")}`);
+            } else {
+                toast.success("Settings saved");
+            }
+            // Re-read so the form shows what was actually persisted.
+            await fetchSettings({ silent: true });
         } finally {
             setIsSaving(false);
         }

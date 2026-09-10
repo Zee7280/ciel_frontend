@@ -1,9 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { Circle, Clock, CheckCircle2 } from "lucide-react";
+import { Circle, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
-export type CielHourStatus = "logged" | "pending" | "verified";
+export type CielHourStatus = "logged" | "pending" | "verified" | "rejected" | "flagged";
 
 const CONFIG: Record<CielHourStatus, { label: string; icon: typeof Circle; classes: string }> = {
     logged: {
@@ -20,6 +20,16 @@ const CONFIG: Record<CielHourStatus, { label: string; icon: typeof Circle; class
         label: "Verified",
         icon: CheckCircle2,
         classes: "bg-ciel-green-soft text-ciel-green-deep border-ciel-green/30",
+    },
+    rejected: {
+        label: "Rejected",
+        icon: XCircle,
+        classes: "bg-rose-50 text-rose-700 border-rose-200",
+    },
+    flagged: {
+        label: "Flagged",
+        icon: AlertTriangle,
+        classes: "bg-amber-50 text-amber-800 border-amber-300",
     },
 };
 

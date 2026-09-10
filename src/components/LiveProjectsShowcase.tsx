@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Sparkles, Check } from "lucide-react";
 import clsx from "clsx";
+import { usePlatformStats } from "@/utils/usePlatformStats";
 
 interface ProjectPill {
     label: string;
@@ -59,6 +60,10 @@ const PROJECTS: ShowcaseProject[] = [
 ];
 
 export default function LiveProjectsShowcase() {
+    /** Real backend-computed count of live public opportunities — same ledger the hero/stats strip read. */
+    const { stats } = usePlatformStats();
+    const liveProjectCount = stats?.active_projects;
+
     return (
         <section className="py-20 px-6 bg-white">
             <div className="max-w-6xl mx-auto">
@@ -121,7 +126,10 @@ export default function LiveProjectsShowcase() {
                         href="/projects"
                         className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-slate-800"
                     >
-                        Browse all 24 live projects <ArrowRight className="h-4 w-4" />
+                        {liveProjectCount != null
+                            ? `Browse all ${liveProjectCount} live projects`
+                            : "Browse all live projects"}{" "}
+                        <ArrowRight className="h-4 w-4" />
                     </Link>
                     <Link
                         href="/signup"

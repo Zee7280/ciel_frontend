@@ -110,6 +110,17 @@ function readIsStudentCreated(row: Record<string, unknown> | null | undefined): 
     return row.is_student_created === true || row.isStudentCreated === true;
 }
 
+/**
+ * Mirrors `OpportunitiesService.revise()`, which rejects anything that is neither student-created
+ * nor already admin-approved. Faculty/partner-created pending rows can never be revised.
+ */
+const REVISION_INELIGIBLE_HINT =
+    "Revision is only available for student-created submissions or to correct a completed approval.";
+
+function canRequestOpportunityRevision(row: Record<string, unknown> | null | undefined): boolean {
+    return readIsStudentCreated(row) || readAdminApproved(row);
+}
+
 function approvalPillClass(status: string): string {
     if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (status === "rejected" || status === "returned") return "border-rose-200 bg-rose-50 text-rose-700";
@@ -1017,6 +1028,7 @@ export default function AdminApprovalsPage() {
                             opportunityQueue === "approved" ||
                             opportunityQueue === "all";
                         const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow);
+                        const canRequestRevision = canRequestOpportunityRevision(projRow);
                         return (
                         <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
                             <div className="min-w-0">
@@ -1090,11 +1102,18 @@ export default function AdminApprovalsPage() {
                                 )}
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
-                                    className="px-4 py-2.5 bg-amber-50 text-amber-800 rounded-lg text-sm font-bold hover:bg-amber-100 flex items-center gap-2 transition-colors border border-amber-200"
+                                    disabled={!canRequestRevision}
+                                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border ${
+                                        canRequestRevision
+                                            ? "bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200"
+                                            : "bg-slate-100 text-slate-400 border-slate-100 cursor-not-allowed"
+                                    }`}
                                     title={
-                                        showPostApprovalActions
-                                            ? "Send back for revision after mistaken approval"
-                                            : "Ask student to revise before final approval"
+                                        !canRequestRevision
+                                            ? REVISION_INELIGIBLE_HINT
+                                            : showPostApprovalActions
+                                              ? "Send back for revision after mistaken approval"
+                                              : "Ask student to revise before final approval"
                                     }
                                 >
                                     <XCircle className="w-4 h-4" /> Request revision
@@ -1754,7 +1773,17 @@ export default function AdminApprovalsPage() {
                                         setOpportunityDetail(null);
                                         handleRejectClick(selectedOpportunity.id, "opportunity", "revise");
                                     }}
-                                    className="px-4 py-2.5 bg-amber-50 text-amber-800 rounded-lg font-bold hover:bg-amber-100 border border-amber-200"
+                                    disabled={!canRequestOpportunityRevision(adminDetailView)}
+                                    title={
+                                        canRequestOpportunityRevision(adminDetailView)
+                                            ? undefined
+                                            : REVISION_INELIGIBLE_HINT
+                                    }
+                                    className={`px-4 py-2.5 rounded-lg font-bold border ${
+                                        canRequestOpportunityRevision(adminDetailView)
+                                            ? "bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200"
+                                            : "bg-slate-100 text-slate-400 border-slate-100 cursor-not-allowed"
+                                    }`}
                                 >
                                     Request revision
                                 </button>

@@ -352,11 +352,13 @@ export default function CourseworkFacultyAiAnalyser({
                         </div>
                         <p className="mt-1.5 text-[11px] text-[#71808d]">{scanText}</p>
                         <div className="mt-4">
+                            {/* The "continue your draft" nudge is only truthful for an unsubmitted draft —
+                                this Intake tab lists entries already submitted and under faculty review. */}
                             <CourseworkCard
                                 entry={entry}
                                 studentName={model.name}
                                 defaultOpen={false}
-                                remindDraftOwner
+                                remindDraftOwner={entry.status !== "submitted"}
                                 studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
                                 hideScore={false}
                             />

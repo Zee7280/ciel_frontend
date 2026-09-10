@@ -62,7 +62,7 @@ const PATHS: PathDef[] = [
             lineOne: "The pilot is live — every hour above is faculty-verified",
             lineTwo: "New opportunities and partners added weekly",
             cta: "Browse opportunities",
-            href: "/opportunities",
+            href: "/projects",
         },
     },
     {

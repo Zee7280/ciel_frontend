@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 interface Notification {
     id: number;
-    type: "approval" | "reminder" | "update" | "alert";
+    type: "approval" | "reminder" | "update" | "alert" | "attendance_escalation";
     title: string;
     message: string;
     isRead: boolean;
@@ -101,6 +101,8 @@ export default function AdminNotificationsPage() {
                     icon: <Info className="h-5 w-5" strokeWidth={2} />,
                 };
             case "alert":
+            // Partner attendance queue pending >7 days — urgent, same treatment as a plain alert.
+            case "attendance_escalation":
                 return {
                     bar: "bg-amber-500",
                     iconWrap: "bg-amber-50 text-amber-700 ring-1 ring-amber-100/80",

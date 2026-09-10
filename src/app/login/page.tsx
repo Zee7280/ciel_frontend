@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
 
 import Image from "next/image";
-import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import {
     isPartnerOrganizationComplete,
@@ -190,33 +189,20 @@ function LoginContent() {
     const searchParams = useSearchParams();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    /** "Remember me" — the backend reads this flag to issue a long-lived (30d) token instead of 10h. */
     const [isMobile, setIsMobile] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
 
 
-    // ── Forgot / Reset Password ──────────────────────────────────────────
-    const [view, setView] = useState<"login" | "forgot" | "reset">("login");
+    // ── Forgot Password ──────────────────────────────────────────────────
+    // Actually resetting the password lives on /reset-password (that is where the emailed link points).
+    const [view, setView] = useState<"login" | "forgot">("login");
     const [forgotEmail, setForgotEmail] = useState("");
     const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
-    const [resetToken, setResetToken] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [resetSuccess, setResetSuccess] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [fpError, setFpError] = useState<string | null>(null);
-
-    // Auto-fill token from URL
-    useEffect(() => {
-        const tokenFromUrl = searchParams.get("token");
-        if (tokenFromUrl) {
-            setResetToken(tokenFromUrl);
-            setView("reset");
-        }
-    }, [searchParams]);
 
     const handleForgotPassword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -247,32 +233,6 @@ function LoginContent() {
         }
     };
 
-    const handleResetPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newPassword !== confirmPassword) {
-            setFpError("Passwords do not match.");
-            return;
-        }
-        setIsLoading(true);
-        setFpError(null);
-        try {
-            const res = await fetch("/api/v1/auth/reset-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: resetToken, newPassword }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.success) {
-                setResetSuccess(true);
-            } else {
-                setFpError(data.message || "Reset failed. Token may have expired.");
-            }
-        } catch {
-            setFpError("Network error. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
     // ────────────────────────────────────────────────────────────────────
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -282,18 +242,13 @@ function LoginContent() {
 
         try {
             const loginUrl = "/api/v1/auth/login";
-            console.log("Login URL:", loginUrl);
             const response = await fetch(loginUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email.trim().toLowerCase(), password, isMobile }),
             });
 
-            console.log("Response Status:", response.status, response.statusText);
-            console.log("Response Type:", response.type);
-
             const jsonResponse = await response.json().catch(() => ({}));
-            console.log("Login API Response Data:", jsonResponse); // Debugging
 
             // Handle standard response format { success: boolean, data: ... }
             // or legacy format which might return data directly
@@ -311,15 +266,12 @@ function LoginContent() {
             const payload = (isStandardResponse && jsonResponse.data) ? jsonResponse.data : jsonResponse;
 
             // Extract role from response (support both payload.role and payload.user.role)
-            // Debugging: explicitly log what we are looking for
-            console.log("Extracting role from payload:", payload);
             const role = payload.role || payload.user?.role;
-            console.log("Extracted role:", role);
 
             // Redirect based on role
             if (!role) {
-                console.error("Missing role in response:", payload);
-                setError("Login failed: Missing role information. Please check console for details.");
+                console.error("Login response did not include a role.");
+                setError("Login failed: Missing role information. Please contact support.");
                 return;
             }
 
@@ -511,7 +463,7 @@ function LoginContent() {
                                 <ArrowLeft className="w-3 h-3" /> Back to Portal
                             </Link>
                         ) : (
-                            <button onClick={() => { setView("login"); setFpError(null); setResetSuccess(false); }} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-all mb-12 hover:-translate-x-1">
+                            <button onClick={() => { setView("login"); setFpError(null); }} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-all mb-12 hover:-translate-x-1">
                                 <ArrowLeft className="w-3 h-3" /> Back to Login
                             </button>
                         )}
@@ -586,6 +538,16 @@ function LoginContent() {
 
                                     </div>
 
+                                    <label className="flex items-center gap-3 ml-1 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={isMobile}
+                                            onChange={(e) => setIsMobile(e.target.checked)}
+                                            className="w-4 h-4 rounded border-2 border-slate-200 text-emerald-600 accent-emerald-600 cursor-pointer"
+                                        />
+                                        <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Remember me</span>
+                                    </label>
+
                                     {error && (
                                         <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
                                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -627,7 +589,7 @@ function LoginContent() {
                             <>
                                 <div className="mb-10 text-center lg:text-left">
                                     <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Forgot Password</h3>
-                                    <p className="text-slate-500 font-medium">Enter your email to receive a reset token.</p>
+                                    <p className="text-slate-500 font-medium">Enter your email and we&apos;ll send you a password reset link.</p>
                                 </div>
 
                                 <form onSubmit={handleForgotPassword} className="space-y-6">
@@ -665,124 +627,12 @@ function LoginContent() {
                                         disabled={isLoading}
                                         className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3 group"
                                     >
-                                        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : <>Send Reset Token <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                                        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : <>Send Reset Link <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
                                     </button>
                                 </form>
                             </>
                         )}
 
-                        {/* ══════════════════════════════════════════ */}
-                        {/* VIEW: RESET PASSWORD                      */}
-                        {/* ══════════════════════════════════════════ */}
-                        {view === "reset" && (
-                            <>
-                                {resetSuccess ? (
-                                    <div className="text-center py-8 space-y-4">
-                                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
-                                            <CheckCircle className="w-10 h-10 text-emerald-600" />
-                                        </div>
-                                        <h3 className="text-2xl font-black text-slate-900">Password Reset!</h3>
-                                        <p className="text-slate-500 font-medium">Your password has been updated successfully.</p>
-                                        <button
-                                            onClick={() => { setView("login"); setResetSuccess(false); setNewPassword(""); setConfirmPassword(""); setResetToken(""); }}
-                                            className="mt-4 w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white bg-emerald-600 hover:bg-emerald-700 transition-all"
-                                        >
-                                            Back to Login
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="mb-10 text-center lg:text-left">
-                                            <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Reset Password</h3>
-                                            <p className="text-slate-500 font-medium">
-                                                {searchParams.get("token") ? "Choose a new password." : "Enter your token and choose a new password."}
-                                            </p>
-                                        </div>
-
-                                        <form onSubmit={handleResetPassword} className="space-y-5">
-                                            {!searchParams.get("token") && (
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Reset Token</label>
-                                                    <input
-                                                        type="text"
-                                                        required
-                                                        placeholder="Paste token from email"
-                                                        value={resetToken}
-                                                        onChange={(e) => setResetToken(e.target.value)}
-                                                        className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-mono text-sm text-slate-800"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">New Password</label>
-                                                <div className="group relative">
-                                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                                                    <input
-                                                        type={showNewPassword ? "text" : "password"}
-                                                        required
-                                                        minLength={8}
-                                                        placeholder="Min 8 characters"
-                                                        value={newPassword}
-                                                        onChange={(e) => setNewPassword(e.target.value)}
-                                                        className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowNewPassword(!showNewPassword)}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                                                    >
-                                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                                    </button>
-                                                </div>
-
-                                            </div>
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Confirm Password</label>
-                                                <div className="group relative">
-                                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                                                    <input
-                                                        type={showConfirmPassword ? "text" : "password"}
-                                                        required
-                                                        placeholder="Repeat new password"
-                                                        value={confirmPassword}
-                                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                                        className={clsx(
-                                                            "w-full pl-12 pr-12 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800",
-                                                            confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                        )}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                                                    >
-                                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                                    </button>
-                                                </div>
-
-                                            </div>
-
-                                            {fpError && (
-                                                <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
-                                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                    <span>{fpError}</span>
-                                                </div>
-                                            )}
-
-                                            <button
-                                                type="submit"
-                                                disabled={isLoading || (!!confirmPassword && confirmPassword !== newPassword)}
-                                                className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3 group"
-                                            >
-                                                {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Resetting...</> : <>Reset Password <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
-                                            </button>
-                                        </form>
-                                    </>
-                                )}
-                            </>
-                        )}
 
                     </div>
                 </div>

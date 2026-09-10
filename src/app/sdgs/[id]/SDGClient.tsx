@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { SDG } from "@/utils/sdgDetailedData";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export default function SDGClient({ sdg }: { sdg: SDG }) {
     const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -16,9 +18,11 @@ export default function SDGClient({ sdg }: { sdg: SDG }) {
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+            <Navbar />
+
             {/* HERO */}
             <section
-                className="text-white py-16 px-6 shadow-lg relative"
+                className="text-white pt-32 pb-16 px-6 shadow-lg relative"
                 style={{ backgroundColor: sdg.color }}
             >
                 <div className="absolute inset-0 bg-black/10 mix-blend-multiply pointer-events-none" />
@@ -28,7 +32,7 @@ export default function SDGClient({ sdg }: { sdg: SDG }) {
                         className="inline-flex items-center text-white/90 hover:text-white mb-8 transition-colors font-medium"
                     >
                         <ArrowLeft className="w-5 h-5 mr-2" />
-                        Back to Dashboard
+                        Back to Home
                     </Link>
 
                     <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -134,10 +138,7 @@ export default function SDGClient({ sdg }: { sdg: SDG }) {
                 </a>
             </section>
 
-            {/* FOOTER */}
-            <footer className="bg-white py-8 text-center text-gray-500 text-sm border-t border-gray-100 font-medium">
-                © 2026 SDG Institutional Dashboard
-            </footer>
+            <Footer />
         </div>
     );
 }

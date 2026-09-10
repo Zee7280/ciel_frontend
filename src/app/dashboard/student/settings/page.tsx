@@ -1,22 +1,130 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../report/components/ui/button";
-import { Bell, Lock } from "lucide-react";
+import { Bell, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 
-export default function StudentSettingsPage() {
-    const [notifications, setNotifications] = useState({
-        email: true,
-        sms: false,
-        promotions: false,
-        updates: true
-    });
+import { authenticatedFetch } from "@/utils/api";
 
-    const handleSave = () => {
-        // Mock save functionality
-        toast.success("Settings saved successfully!");
+interface StudentNotifications {
+    email: boolean;
+    sms: boolean;
+    promotions: boolean;
+    updates: boolean;
+}
+
+const defaultNotifications: StudentNotifications = {
+    email: true,
+    sms: false,
+    promotions: false,
+    updates: true
+};
+
+export default function StudentSettingsPage() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [notifications, setNotifications] = useState<StudentNotifications>(defaultNotifications);
+
+    const [showPasswordChange, setShowPasswordChange] = useState(false);
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const res = await authenticatedFetch("/api/v1/settings");
+
+                if (res?.ok) {
+                    const data = await res.json();
+                    if (data.success && data.data) {
+                        setNotifications({
+                            ...defaultNotifications,
+                            ...data.data.notifications
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch settings", error);
+                toast.error("Failed to load settings");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchSettings();
+    }, []);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+
+        try {
+            const res = await authenticatedFetch("/api/v1/settings", {
+                method: "PUT",
+                body: JSON.stringify({ notifications })
+            });
+
+            if (res?.ok) {
+                toast.success("Settings saved successfully");
+            } else {
+                toast.error("Failed to save settings");
+            }
+        } catch (error) {
+            console.error("Failed to save settings", error);
+            toast.error("Failed to save settings");
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    const handlePasswordChange = async () => {
+        if (!passwords.current || !passwords.new) {
+            toast.error("Enter your current and new password");
+            return;
+        }
+        if (passwords.new.length < 8) {
+            toast.error("New password must be at least 8 characters");
+            return;
+        }
+        if (passwords.new !== passwords.confirm) {
+            toast.error("Passwords don't match");
+            return;
+        }
+
+        setIsChangingPassword(true);
+
+        try {
+            const res = await authenticatedFetch("/api/v1/profile/change-password", {
+                method: "POST",
+                body: JSON.stringify({
+                    currentPassword: passwords.current,
+                    newPassword: passwords.new
+                })
+            });
+
+            if (res?.ok) {
+                toast.success("Password changed successfully");
+                setShowPasswordChange(false);
+                setPasswords({ current: "", new: "", confirm: "" });
+            } else {
+                const data = await res?.json().catch(() => null);
+                toast.error(data?.message || "Failed to change password");
+            }
+        } catch (error) {
+            console.error("Failed to change password", error);
+            toast.error("Failed to change password");
+        } finally {
+            setIsChangingPassword(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="mx-auto max-w-4xl space-y-6 pb-20 sm:space-y-8">
@@ -96,14 +204,60 @@ export default function StudentSettingsPage() {
                             <h3 className="font-medium text-slate-900">Change Password</h3>
                             <p className="text-sm text-slate-500">Update your password regularly to keep your account secure.</p>
                         </div>
-                        <Button variant="outline" className="w-full sm:w-auto">Update Password</Button>
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            onClick={() => setShowPasswordChange((prev) => !prev)}
+                        >
+                            {showPasswordChange ? "Cancel" : "Update Password"}
+                        </Button>
                     </div>
+
+                    {showPasswordChange && (
+                        <div className="space-y-4">
+                            <input
+                                type="password"
+                                placeholder="Current Password"
+                                autoComplete="current-password"
+                                value={passwords.current}
+                                onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                            />
+                            <input
+                                type="password"
+                                placeholder="New Password"
+                                autoComplete="new-password"
+                                value={passwords.new}
+                                onChange={(e) => setPasswords((prev) => ({ ...prev, new: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                            />
+                            <input
+                                type="password"
+                                placeholder="Confirm New Password"
+                                autoComplete="new-password"
+                                value={passwords.confirm}
+                                onChange={(e) => setPasswords((prev) => ({ ...prev, confirm: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                            />
+                            <Button
+                                onClick={handlePasswordChange}
+                                disabled={isChangingPassword}
+                                className="w-full bg-slate-900 text-white hover:bg-slate-800"
+                            >
+                                {isChangingPassword ? "Updating..." : "Update Password"}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <div className="flex justify-end">
-                <Button onClick={handleSave} className="w-full min-w-[120px] bg-blue-600 text-white hover:bg-blue-700 sm:w-auto">
-                    Save Changes
+                <Button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="w-full min-w-[120px] bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+                >
+                    {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
         </div>

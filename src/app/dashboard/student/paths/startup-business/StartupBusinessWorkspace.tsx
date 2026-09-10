@@ -417,7 +417,7 @@ export default function StartupBusinessWorkspace() {
     };
 
     const saveAllFields = () => ({
-        ventureName: entry.ideaInfo?.pitch !== undefined ? (entry.ventureName ?? undefined) : entry.ventureName ?? undefined,
+        ventureName: entry.ventureName ?? undefined,
         description: entry.description ?? undefined,
         stage: entry.stage ?? undefined,
         team: entry.team ?? undefined,

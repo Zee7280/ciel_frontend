@@ -409,17 +409,22 @@ export default function AdminPaymentsPage() {
                 setFeedback("");
                 await refreshPendingCount();
             } else {
-                // Mock success for now
-                toast.success(`Payment ${actionType}d (Simulated)`);
-                setPayments(prev => prev.filter(p => p.id !== selectedPayment.id));
-                setIsActionOpen(false);
-                setSelectedPayment(null);
-                setFeedback("");
-                await refreshPendingCount();
+                // Never fake a success here: the payment is still pending server-side, so keep it
+                // in the queue and surface the real error instead.
+                const errText = res ? await res.text().catch(() => '') : '';
+                let message = errText;
+                try {
+                    const parsed = errText ? JSON.parse(errText) : null;
+                    const raw = parsed?.message || parsed?.error;
+                    message = Array.isArray(raw) ? raw.join(', ') : (raw || errText);
+                } catch {
+                    // errText was not JSON; use it as-is
+                }
+                toast.error(message || `Could not ${actionType} payment. Please try again.`);
             }
         } catch (error) {
             console.error("Action failed", error);
-            toast.error("Failed to process action");
+            toast.error(error instanceof Error ? error.message : "Failed to process action");
         } finally {
             setIsSubmitting(false);
         }
@@ -449,6 +454,33 @@ export default function AdminPaymentsPage() {
             toast.error("Failed to revert approval");
         } finally {
             setIsRevertSubmitting(false);
+        }
+    };
+
+    const handleDownloadProof = async () => {
+        const proofUrl = previewPayment?.proofUrl;
+        if (!proofUrl) return;
+        const filename = `payment-proof-${previewPayment?.id ?? 'file'}${(proofUrl.split('?')[0].match(/\.[a-zA-Z0-9]{1,5}$/) || [''])[0]}`;
+        try {
+            const res = await fetch(proofUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = objectUrl;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(objectUrl);
+            toast.success("Payment proof downloaded");
+        } catch (error) {
+            // Cross-origin storage buckets can block the blob fetch; fall back to opening the file.
+            console.error("Proof download failed", error);
+            const opened = window.open(proofUrl, '_blank', 'noopener');
+            if (!opened) {
+                toast.error("Couldn't open the proof file — your browser may be blocking the popup. Allow popups for this site and try again.");
+            }
         }
     };
 
@@ -871,7 +903,12 @@ export default function AdminPaymentsPage() {
                             >
                                 <ExternalLink className="w-4 h-4" /> Open Full
                             </Button>
-                            <Button variant="outline" className="gap-2">
+                            <Button
+                                variant="outline"
+                                className="gap-2"
+                                disabled={!previewPayment?.proofUrl}
+                                onClick={() => void handleDownloadProof()}
+                            >
                                 <Download className="w-4 h-4" /> Download
                             </Button>
                         </div>

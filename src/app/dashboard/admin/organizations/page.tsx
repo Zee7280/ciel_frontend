@@ -91,7 +91,7 @@ export default function AdminOrganizationsPage() {
         }
     };
 
-    const handleAction = async (id: string, action: 'approve' | 'suspend' | 'delete') => {
+    const handleAction = async (id: string, action: 'approve' | 'suspend' | 'delete', currentStatus?: string) => {
         try {
             if (action === 'delete') {
                 const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}`, {
@@ -103,18 +103,43 @@ export default function AdminOrganizationsPage() {
                 } else {
                     toast.error("Failed to delete organization");
                 }
-            } else {
-                const status = action === 'approve' ? 'approve' : 'suspended';
-                const res = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
-                    method: 'POST',
-                    body: JSON.stringify({ id, status })
+            } else if (action === 'approve') {
+                // Use the real approve endpoint so verifiedBy/verifiedAt are recorded (audit trail);
+                // the generic status update cannot set verifiedBy.
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/approve`, {
+                    method: 'PATCH'
                 });
 
                 if (res && res.ok) {
-                    toast.success(`Organization ${status} successfully`);
+                    // Approving a suspended organization must also lift the block; the approve
+                    // endpoint only touches verification fields.
+                    let unblockFailed = false;
+                    if (String(currentStatus || '').toLowerCase() === 'suspended') {
+                        const unblockRes = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
+                            method: 'POST',
+                            body: JSON.stringify({ id, status: 'active' })
+                        });
+                        unblockFailed = !unblockRes || !unblockRes.ok;
+                    }
+                    if (unblockFailed) {
+                        toast.error("Organization was approved but is still suspended — please retry lifting the suspension.");
+                    } else {
+                        toast.success("Organization approved successfully");
+                    }
                     fetchOrganizations();
                 } else {
-                    toast.error(`Failed to update organization status`);
+                    toast.error("Failed to approve organization");
+                }
+            } else {
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/block`, {
+                    method: 'PATCH'
+                });
+
+                if (res && res.ok) {
+                    toast.success("Organization suspended successfully");
+                    fetchOrganizations();
+                } else {
+                    toast.error("Failed to suspend organization");
                 }
             }
         } catch (error) {
@@ -311,7 +336,7 @@ export default function AdminOrganizationsPage() {
                                                         View Details
                                                     </button>
                                                     <button
-                                                        onClick={() => handleAction(org.id, 'approve')}
+                                                        onClick={() => handleAction(org.id, 'approve', org.status || org.verification_status)}
                                                         className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 font-medium"
                                                     >
                                                         Approve Organization

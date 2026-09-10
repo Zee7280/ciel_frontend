@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, GraduationCap, Heart, Leaf, Users, Target, Search } from "lucide-react";
+import { ArrowRight, GraduationCap, Heart, Leaf, Users, Target, Search, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 /** Landing “Live projects” grid: backend returns all public live rows; we cap here for layout/perf (override via env). */
@@ -38,9 +38,14 @@ export default function StoriesGrid() {
     const router = useRouter();
     const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
     const [loading, setLoading] = useState(true);
+    /** True when the last load failed — keeps a real outage distinguishable from a genuinely empty list. */
+    const [fetchError, setFetchError] = useState(false);
+    const [reloadNonce, setReloadNonce] = useState(0);
 
     useEffect(() => {
         const fetchOpportunities = async () => {
+            setLoading(true);
+            setFetchError(false);
             try {
                 const response = await fetch("/api/v1/public/opportunities", {
                     headers: { Accept: "application/json" },
@@ -50,17 +55,25 @@ export default function StoriesGrid() {
                     const result = await response.json();
                     if (result.success && Array.isArray(result.data)) {
                         setOpportunities(result.data.slice(0, HOME_OPPORTUNITIES_LIMIT));
+                    } else {
+                        setOpportunities([]);
+                        setFetchError(true);
                     }
+                } else {
+                    setOpportunities([]);
+                    setFetchError(true);
                 }
             } catch (error) {
                 console.error("Failed to fetch opportunities for landing page", error);
+                setOpportunities([]);
+                setFetchError(true);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchOpportunities();
-    }, []);
+    }, [reloadNonce]);
 
     const cardShell =
         "flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition duration-300 hover:-translate-y-1 hover:border-slate-300/90 hover:shadow-[0_16px_36px_rgba(58,114,170,0.12)]";
@@ -164,7 +177,7 @@ export default function StoriesGrid() {
 
                                         <button
                                             type="button"
-                                            onClick={() => router.push(`/opportunities/${opp.id}`)}
+                                            onClick={() => router.push(`/projects/${opp.id}`)}
                                             className="mt-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#4285F4] px-7 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-100/80 transition hover:bg-blue-600 hover:shadow-lg"
                                         >
                                             View Project
@@ -174,6 +187,23 @@ export default function StoriesGrid() {
                                 </article>
                             );
                         })
+                    ) : fetchError ? (
+                        <div className="w-full max-w-lg rounded-2xl border-2 border-dashed border-red-200 bg-slate-50/80 py-14 text-center">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
+                                <AlertTriangle className="h-8 w-8 text-red-400" aria-hidden />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800">
+                                Something went wrong loading projects
+                            </h3>
+                            <p className="mt-1 text-slate-500">We couldn&apos;t reach the server — please try again.</p>
+                            <button
+                                type="button"
+                                onClick={() => setReloadNonce((n) => n + 1)}
+                                className="mt-5 inline-flex items-center justify-center rounded-full bg-[#3A72AA] px-7 py-2.5 text-sm font-bold text-white transition hover:bg-[#31618f]"
+                            >
+                                Try again
+                            </button>
+                        </div>
                     ) : (
                         <div className="w-full max-w-lg rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/80 py-14 text-center">
                             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">

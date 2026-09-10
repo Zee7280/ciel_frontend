@@ -48,10 +48,14 @@ interface AttendanceLog {
     evidenceUrl: string | null;
     entryStatus: "pending" | "verified" | "flagged";
     approvalStatus: string | null;
+    /** Reviewer's note recorded alongside a reject/flag decision. */
+    approvalActionReason?: string | null;
 }
 
 function hourStatus(log: AttendanceLog): CielHourStatus {
     if (log.entryStatus === "verified" || log.approvalStatus === "approved") return "verified";
+    if (log.approvalStatus === "rejected") return "rejected";
+    if (log.entryStatus === "flagged" || log.approvalStatus === "flagged") return "flagged";
     if (log.approvalStatus === "pending") return "pending";
     return "logged";
 }
@@ -653,12 +657,19 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
     const sendForVerification = async (log: AttendanceLog) => {
         setSendingVerificationId(log.id);
         try {
-            await authenticatedFetch(
+            const res = await authenticatedFetch(
                 `/api/v1/engagement/project/${log.projectId}/attendance/verify-request`,
                 { method: "POST", body: JSON.stringify({ projectId: log.projectId, requestedAt: new Date().toISOString() }) },
                 { redirectToLogin: false },
             );
+            if (!res?.ok) {
+                const err = await res?.json().catch(() => null);
+                throw new Error((err?.message as string) || (err?.error as string) || "Could not send these hours for verification");
+            }
+            toast.success("Sent for verification — your reviewer has been notified");
             if (participationId) loadLogs(participationId);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not send these hours for verification");
         } finally {
             setSendingVerificationId(null);
         }
@@ -739,16 +750,38 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                 ) : !logs.length ? (
                     <EmptyState emoji="📋" heading="No hours logged yet" line="Entries you log for this engagement appear here." />
                 ) : (
-                    logs.map((log) => (
+                    logs.map((log) => {
+                        const status = hourStatus(log);
+                        return (
                         <div key={log.id} className="rounded-ciel-md border border-ciel-border bg-white p-4">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-bold text-ciel-text">{log.activityType} · {log.sessionHours}h</p>
                                     <p className="text-xs text-ciel-text-soft">{log.dateOfEngagement} · {log.startTime}–{log.endTime}</p>
                                 </div>
-                                <StatusPill status={hourStatus(log)} />
+                                <StatusPill status={status} />
                             </div>
-                            {hourStatus(log) === "logged" && (
+                            {/* A rejected/flagged session must never look like a fresh entry — surface the
+                                reviewer's decision (and note) instead of silently re-offering "Send for verification". */}
+                            {status === "rejected" && (
+                                <div className="mt-3 rounded-ciel-xs border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-900">
+                                    <b>Rejected by your reviewer.</b>{" "}
+                                    {log.approvalActionReason
+                                        ? `${log.approvalActionReason} `
+                                        : "No reason was recorded. "}
+                                    These hours won&apos;t count — log a corrected session, or speak to your reviewer before re-logging.
+                                </div>
+                            )}
+                            {status === "flagged" && (
+                                <div className="mt-3 rounded-ciel-xs border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                    <b>Flagged for a closer look.</b>{" "}
+                                    {log.approvalActionReason
+                                        ? `${log.approvalActionReason} `
+                                        : "Your reviewer needs more detail or clearer evidence. "}
+                                    Nothing is penalised — your reviewer will follow up.
+                                </div>
+                            )}
+                            {status === "logged" && (
                                 <button
                                     onClick={() => sendForVerification(log)}
                                     disabled={sendingVerificationId === log.id}
@@ -758,7 +791,8 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                                 </button>
                             )}
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

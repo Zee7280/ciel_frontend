@@ -141,8 +141,6 @@ export default function AdminSupportPage() {
     const [activeTicket, setActiveTicket] = useState<AdminSupportTicket | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [statusDraft, setStatusDraft] = useState("open");
-    const [internalNoteDraft, setInternalNoteDraft] = useState("");
-    const [replyDraft, setReplyDraft] = useState("");
     const [savingTicket, setSavingTicket] = useState(false);
     const [ticketDeletingId, setTicketDeletingId] = useState<string | number | null>(null);
 
@@ -231,8 +229,6 @@ export default function AdminSupportPage() {
     const openTicketDetail = async (row: AdminSupportTicket) => {
         setActiveTicket(row);
         setStatusDraft((row.status || "open").toLowerCase());
-        setInternalNoteDraft(row.internalNote || "");
-        setReplyDraft("");
         setDetailOpen(true);
         setDetailLoading(true);
         try {
@@ -247,7 +243,6 @@ export default function AdminSupportPage() {
                 if (one) {
                     setActiveTicket(one);
                     setStatusDraft((one.status || "open").toLowerCase());
-                    setInternalNoteDraft(one.internalNote || "");
                 }
             }
         } catch {
@@ -263,11 +258,9 @@ export default function AdminSupportPage() {
         try {
             const res = await authenticatedFetch(`/api/v1/admin/support/tickets/${encodeURIComponent(String(activeTicket.id))}`, {
                 method: "PATCH",
-                body: JSON.stringify({
-                    status: statusDraft,
-                    internalNote: internalNoteDraft.trim() || undefined,
-                    reply: replyDraft.trim() || undefined,
-                }),
+                // UpdateSupportTicketDto only accepts `status`; anything else is stripped by the
+                // global whitelist ValidationPipe, so don't pretend it was saved.
+                body: JSON.stringify({ status: statusDraft }),
             });
             if (res?.status === 404 || res?.status === 501) {
                 toast.message("API not available", { description: "Implement PATCH /api/v1/admin/support/tickets/:id on the server." });
@@ -674,28 +667,10 @@ export default function AdminSupportPage() {
                                     <p className="text-xs text-slate-500">{activeTicket.studentEmail || ""}</p>
                                 </div>
                             </div>
-                            <div>
-                                <Label htmlFor="adm-internal">Internal note</Label>
-                                <Textarea
-                                    id="adm-internal"
-                                    value={internalNoteDraft}
-                                    onChange={(e) => setInternalNoteDraft(e.target.value)}
-                                    rows={3}
-                                    className="mt-1.5"
-                                    placeholder="Visible to admins only (if backend stores it)"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="adm-reply">Reply to student (optional)</Label>
-                                <Textarea
-                                    id="adm-reply"
-                                    value={replyDraft}
-                                    onChange={(e) => setReplyDraft(e.target.value)}
-                                    rows={3}
-                                    className="mt-1.5"
-                                    placeholder="If your API accepts a reply in the same PATCH body"
-                                />
-                            </div>
+                            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                Only the status is saved from this dialog. Internal notes and student replies are not
+                                supported by the ticket API yet.
+                            </p>
                         </div>
                     ) : null}
                     <DialogFooter className="gap-2 sm:gap-0">

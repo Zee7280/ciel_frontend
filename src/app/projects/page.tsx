@@ -16,7 +16,6 @@ import {
     LayoutGrid,
     Map as MapIcon,
     Clock,
-    Bookmark,
     GraduationCap,
     Sparkles,
 } from "lucide-react";
@@ -187,14 +186,20 @@ export default function ProjectsPage() {
     const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
     const [activeTab, setActiveTab] = useState<ListingTab>("open");
     const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+    /** True when the last load failed — keeps a real outage distinguishable from a genuine zero-result filter. */
+    const [fetchError, setFetchError] = useState(false);
+    const [reloadNonce, setReloadNonce] = useState(0);
 
     useEffect(() => {
         const fetchProjects = async () => {
+            setIsLoading(true);
+            setFetchError(false);
             try {
                 const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/$/, "");
                 if (!backendUrl) {
                     console.error("NEXT_PUBLIC_BACKEND_BASE_URL is not set");
                     setProjects([]);
+                    setFetchError(true);
                     return;
                 }
                 const url = `${backendUrl}/public/opportunities`;
@@ -202,6 +207,7 @@ export default function ProjectsPage() {
                 if (!response.ok) {
                     console.error("GET /public/opportunities failed:", response.status, response.statusText);
                     setProjects([]);
+                    setFetchError(true);
                     return;
                 }
                 const rawText = await response.text();
@@ -211,6 +217,7 @@ export default function ProjectsPage() {
                 } catch {
                     console.error("Invalid JSON from /public/opportunities");
                     setProjects([]);
+                    setFetchError(true);
                     return;
                 }
 
@@ -281,16 +288,19 @@ export default function ProjectsPage() {
                     setProjects(mappedProjects);
                 } else {
                     setProjects([]);
+                    setFetchError(true);
                 }
             } catch (err) {
                 console.error("Failed to fetch projects:", err);
+                setProjects([]);
+                setFetchError(true);
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchProjects();
-    }, []);
+    }, [reloadNonce]);
 
     const universityOptions = useMemo(() => {
         const s = new Set<string>();
@@ -782,6 +792,22 @@ export default function ProjectsPage() {
                                 <Loader2 className="h-10 w-10 animate-spin text-[#0F8F83]" />
                                 <p className="text-sm font-bold uppercase tracking-widest">Loading opportunities…</p>
                             </div>
+                        ) : fetchError ? (
+                            <div className="rounded-2xl border border-dashed border-red-200 bg-white px-6 py-20 text-center">
+                                <p className="font-semibold text-slate-700">
+                                    Something went wrong loading opportunities — please try again.
+                                </p>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    This is a connection problem on our side, not an empty search.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setReloadNonce((n) => n + 1)}
+                                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
+                                >
+                                    Retry
+                                </button>
+                            </div>
                         ) : tabFilteredProjects.length === 0 ? (
                             <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-20 text-center">
                                 <p className="font-semibold text-slate-700">No opportunities match your filters.</p>
@@ -916,15 +942,6 @@ export default function ProjectsPage() {
                                                     onClick={() => void copyPublicProjectShareLink(project.id)}
                                                 >
                                                     <Share2 className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-400"
-                                                    aria-label="Save opportunity"
-                                                    title="Save (coming soon)"
-                                                    onClick={() => toast.message("Save feature coming soon")}
-                                                >
-                                                    <Bookmark className="h-4 w-4" />
                                                 </button>
                                             </div>
                                         </article>

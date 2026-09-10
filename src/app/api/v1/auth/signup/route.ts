@@ -7,8 +7,6 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        console.log("Signup Request Received:", body);
-
         const requiredFields = ["email", "password", "role"];
         for (const field of requiredFields) {
             if (!body[field]) {

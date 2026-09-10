@@ -14,7 +14,10 @@ export default function AdminReportsPage() {
         const fetchReports = async () => {
             setIsLoading(true);
             try {
-                const res = await authenticatedFetch(`/api/v1/admin/reports`);
+                // NOTE: `/admin/reports` returns community-service StudentReport rows, which do
+                // not have subject/type/reporter/severity. This page renders the legacy generic
+                // moderation Report shape, which lives at its own explicit route.
+                const res = await authenticatedFetch(`/api/v1/admin/reports/legacy-system`);
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {

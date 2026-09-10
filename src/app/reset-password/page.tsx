@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Lock, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Lock, Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 
@@ -17,6 +17,8 @@ function ResetPasswordContent() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
         // Auto-fill token from URL
@@ -43,8 +45,7 @@ function ResetPasswordContent() {
         setError(null);
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const res = await fetch(`${backendUrl}/auth/reset-password`, {
+            const res = await fetch("/api/v1/auth/reset-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token, newPassword }),
@@ -114,14 +115,21 @@ function ResetPasswordContent() {
                                 <div className="group relative">
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                     <input
-                                        type="password"
+                                        type={showNewPassword ? "text" : "password"}
                                         required
                                         minLength={8}
                                         placeholder="Min 8 characters"
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800"
+                                        className="w-full pl-12 pr-12 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPassword(!showNewPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                    >
+                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
                                 </div>
                             </div>
 
@@ -130,16 +138,23 @@ function ResetPasswordContent() {
                                 <div className="group relative">
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                     <input
-                                        type="password"
+                                        type={showConfirmPassword ? "text" : "password"}
                                         required
                                         placeholder="Repeat new password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         className={clsx(
-                                            "w-full pl-12 pr-4 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800",
+                                            "w-full pl-12 pr-12 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800",
                                             confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                         )}
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                    >
+                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
                                 </div>
                             </div>
 
