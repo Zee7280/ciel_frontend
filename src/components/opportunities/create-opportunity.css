@@ -580,6 +580,83 @@
     color: var(--co-teal);
 }
 
+.co-role-card {
+    display: flex;
+    gap: 11px;
+    align-items: center;
+    border: 1px solid #b7dbd4;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #e9f7f4, #fff);
+    padding: 12px;
+    margin-bottom: 14px;
+}
+.co-role-card .co-role-icon {
+    width: 41px;
+    height: 41px;
+    border-radius: 12px;
+    background: #15988b;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+    flex: none;
+}
+.co-role-card .k {
+    font-size: 7.2px;
+    font-weight: 950;
+    letter-spacing: 0.12em;
+    color: #15988b;
+}
+.co-role-card b { font-size: 11.5px; display: block; margin-top: 2px; }
+.co-role-card p { font-size: 8.7px; color: #70818a; margin: 2px 0 0; line-height: 1.45; }
+.co-role-badge {
+    margin-left: auto;
+    background: #fff;
+    border: 1px solid #c6e1dc;
+    color: #22685f;
+    border-radius: 99px;
+    padding: 6px 9px;
+    font-size: 7.2px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+.co-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.co-mode-card {
+    border: 1.4px solid var(--co-line, #dfe7ea);
+    border-radius: 13px;
+    padding: 10px;
+    background: #fff;
+    text-align: center;
+    cursor: pointer;
+}
+.co-mode-card .em { font-size: 20px; }
+.co-mode-card b { display: block; font-size: 9.6px; margin-top: 3px; }
+.co-mode-card small { font-size: 7.5px; color: #70818a; }
+.co-mode-card.on { border-color: #a9d6ce; background: #e9f7f4; }
+.co-sdg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 7px;
+}
+.co-sdg-pick {
+    border: 0;
+    border-radius: 11px;
+    color: #fff;
+    min-height: 64px;
+    padding: 9px;
+    text-align: left;
+    opacity: 0.46;
+    cursor: pointer;
+}
+.co-sdg-pick:hover { opacity: 0.76; }
+.co-sdg-pick.on { opacity: 1; outline: 3px solid #17323d; }
+.co-sdg-pick b { display: block; font-size: 15px; }
+.co-sdg-pick span { font-size: 7.2px; font-weight: 800; line-height: 1.2; }
+
 .co-aud-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -697,7 +774,7 @@
 @media (max-width: 980px) {
     .co-flash-facts { grid-template-columns: repeat(3, 1fr); }
     .co-flash-trustgrid { grid-template-columns: 1fr 1fr; }
-    .co-aud-grid, .co-policy-grid, .co-flash-grid, .co-flash-story, .co-flash-cta { grid-template-columns: 1fr; }
+    .co-aud-grid, .co-policy-grid, .co-flash-grid, .co-flash-story, .co-flash-cta, .co-mode-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
     .co-flash-facts { grid-template-columns: 1fr 1fr; }

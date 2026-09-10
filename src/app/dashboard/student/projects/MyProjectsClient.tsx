@@ -1145,7 +1145,7 @@ export default function MyProjectsPage() {
             ) : projects.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200/80 bg-white py-20 text-center shadow-sm">
                     <p className="mb-4 text-slate-500">You haven&apos;t joined or created any projects yet.</p>
-                    <Link href="/dashboard/student/create-opportunity">
+                    <Link href="/dashboard/student/create-opportunity?new=1">
                         <Button>Get Started</Button>
                     </Link>
                 </div>

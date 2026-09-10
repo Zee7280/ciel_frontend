@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
@@ -24,7 +24,6 @@ import {
     BENEFICIARY_EMOJI,
     CoChip,
     CoSectionHead,
-    MODE_EMOJI,
     SKILL_EMOJI,
     TIMELINE_EMOJI,
     VERIFICATION_EMOJI,
@@ -45,7 +44,8 @@ const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
 
 const ACTIVITY_TYPES_MAIN = [
     "Community Service", "Volunteer Activity", "Awareness Campaign", "Training / Teaching",
-    "Research", "Technical Support", "Environmental Action",
+    "Research", "Research / Survey Support", "Technical Support", "Technical / Professional Support",
+    "Environmental Action", "Corporate CSR", "Fundraising / Resource Mobilization",
 ] as const;
 
 type ApplyScope =
@@ -58,7 +58,7 @@ type ApplyScope =
 
 /** Left-rail wizard steps — 9-step Opportunity Builder (private-candidate pathway included). */
 const WIZARD_STEPS = [
-    { key: "A", label: "Creator", sub: "Profile & pathway", icon: "🎓", color: "#0d2b33" },
+    { key: "A", label: "Creator", sub: "Profile & accountability", icon: "🎓", color: "#0d2b33" },
     { key: "B", label: "Opportunity", sub: "Title, type, mode", icon: "🚀", color: "#0891b2" },
     { key: "SCHED", label: "Schedule", sub: "Dates, seats, hours", icon: "📅", color: "#b88313" },
     { key: "C", label: "SDG & impact", sub: "Goals, objective, outputs", icon: "🌍", color: "#6d28d9" },
@@ -144,6 +144,11 @@ function isPlainObject(x: unknown): x is Record<string, unknown> {
     return typeof x === "object" && x !== null && !Array.isArray(x);
 }
 
+/** Wizard opens only with ?new=1 or ?edit=<id>. Bare /create-opportunity is the drafts hub. */
+function hasCreateOpportunityWizardIntent(search: URLSearchParams): boolean {
+    return Boolean(search.get("edit")?.trim() || search.get("new") === "1");
+}
+
 /** Merge saved draft over current form state (nested objects, arrays replaced from draft). */
 function normalizeSupervisionIndependentPhone<T extends { supervision: Record<string, unknown> }>(fd: T): T {
     const s = fd.supervision as { independentContactPhoneKey?: unknown; independentContactPhone?: unknown };
@@ -175,29 +180,39 @@ function deepMergeDraft<T extends Record<string, unknown>>(target: T, source: Re
     return out as T;
 }
 
-export default function StudentOpportunityCreationPage() {
+function StudentOpportunityCreationPageInner() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const editFromUrl =
+        searchParams.get("edit")?.trim() ||
+        (typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("edit")?.trim() || ""
+            : "");
+    const isNewOpportunity =
+        searchParams.get("new") === "1" ||
+        (typeof window !== "undefined" &&
+            new URLSearchParams(window.location.search).get("new") === "1");
+    const isWizard =
+        hasCreateOpportunityWizardIntent(searchParams) ||
+        (typeof window !== "undefined" &&
+            hasCreateOpportunityWizardIntent(new URLSearchParams(window.location.search)));
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
-    const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(editFromUrl || null);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
     /** Opened via "Continue Draft" — the record behind editingOpportunityId is still a draft, not a
      * submitted opportunity, so Save Draft stays enabled and Submit promotes it into a fresh
      * submission instead of patching the draft row in place. */
-    const [isDraftMode, setIsDraftMode] = useState(false);
-    /** "landing" redirects to Community Service → Create Opportunity; "wizard" is the form
-     * (?new=1 or ?edit=<id>). Computed from the URL on first render so a direct `?edit=` link
-     * never flashes the drafts list first. */
-    const [mode, setMode] = useState<"landing" | "wizard">(() => {
-        if (typeof window === "undefined") return "landing";
-        const params = new URLSearchParams(window.location.search);
-        return params.get("edit")?.trim() || params.get("new") === "1" ? "wizard" : "landing";
-    });
+    const [isDraftMode, setIsDraftMode] = useState(
+        searchParams.get("draft") === "1" ||
+            (typeof window !== "undefined" &&
+                new URLSearchParams(window.location.search).get("draft") === "1"),
+    );
     const [showSubmittedReviewModal, setShowSubmittedReviewModal] = useState(false);
     const [submittedOpportunityTitle, setSubmittedOpportunityTitle] = useState("");
     /** One lead per project: show notice before the create form (skipped when ?edit= is present). */
-    const [showTeamLeadNotice, setShowTeamLeadNotice] = useState(false);
+    const [showTeamLeadNotice, setShowTeamLeadNotice] = useState(Boolean(isNewOpportunity && !editFromUrl));
     const [similarMatches, setSimilarMatches] = useState<SimilarOpportunityMatch[]>([]);
     const [similarCheckLoading, setSimilarCheckLoading] = useState(false);
 
@@ -216,10 +231,11 @@ export default function StudentOpportunityCreationPage() {
         // Section B
         title: "",
         hook: "",
+        opportunitySummary: "",
         opportunityType: [] as string[],
         otherActivitySpecs: [""] as string[],
         mode: "", // on-site, remote, hybrid
-        location: { city: "", venue: "", pin: "" },
+        location: { city: "", venue: "", pin: "", mapSearch: "", mapLink: "" },
         timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
         applicationDeadline: "",
@@ -241,6 +257,7 @@ export default function StudentOpportunityCreationPage() {
             outputs: "",
             outcome: "",
             beneficiariesCount: "",
+            beneficiaryGroup: "",
             beneficiariesType: [] as string[],
             isOtherBeneficiaryChecked: false,
             otherBeneficiarySpecs: [""] as string[],
@@ -366,6 +383,10 @@ export default function StudentOpportunityCreationPage() {
             toast.error("Please add a one-line student hook.");
             return false;
         }
+        if (!formData.opportunitySummary.trim()) {
+            toast.error("Please add an opportunity summary.");
+            return false;
+        }
         if (formData.opportunityType.length === 0) {
             toast.error("Please select at least one Opportunity Type");
             return false;
@@ -466,8 +487,8 @@ export default function StudentOpportunityCreationPage() {
         const otherFilled =
             formData.objectives.isOtherBeneficiaryChecked &&
             formData.objectives.otherBeneficiarySpecs.some((s) => s.trim().length > 0);
-        if (predefinedSelected.length === 0 && !otherFilled) {
-            toast.error("Select at least one beneficiary type or add an “Other” type");
+        if (predefinedSelected.length === 0 && !otherFilled && !formData.objectives.beneficiaryGroup.trim()) {
+            toast.error("Please describe the community / beneficiary group.");
             return false;
         }
 
@@ -504,19 +525,6 @@ export default function StudentOpportunityCreationPage() {
             }
             if (!isValidEmail(s.partnerEmail)) {
                 toast.error("Please enter a valid partner organization email");
-                return false;
-            }
-        } else if (!privatePath) {
-            if (s.executingContext !== "independent") {
-                toast.error("Please choose an executing context: partner organization or independent community activity");
-                return false;
-            }
-            const independentPhoneFull = composeInternationalPhone(
-                s.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
-                s.independentContactPhone,
-            ).trim();
-            if (!s.independentSiteDescription.trim() || !s.independentLocalContact.trim() || !independentPhoneFull) {
-                toast.error("Please provide activity site, local contact, and contact number for your independent activity");
                 return false;
             }
         }
@@ -592,12 +600,17 @@ export default function StudentOpportunityCreationPage() {
                 : formData.opportunityType;
 
             const predefinedBenef = BENEFICIARY_PREDEFINED as readonly string[];
-            const otherBeneficiaryMerged = formData.objectives.isOtherBeneficiaryChecked
-                ? [
-                      ...formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t)),
-                      ...formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean),
-                  ]
-                : formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t));
+            const groupLabel = formData.objectives.beneficiaryGroup.trim();
+            const otherSpecs = [
+                ...formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean),
+                ...(groupLabel && !formData.objectives.otherBeneficiarySpecs.some((s) => s.trim() === groupLabel)
+                    ? [groupLabel]
+                    : []),
+            ];
+            const otherBeneficiaryMerged = [
+                ...formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t)),
+                ...otherSpecs,
+            ];
 
             const privatePath = formData.privateCandidate;
             const executingType =
@@ -698,11 +711,13 @@ export default function StudentOpportunityCreationPage() {
                     : {}),
                 objectives: {
                     description: formData.objectives.description,
+                    summary: formData.opportunitySummary.trim(),
                     hook: formData.hook.trim(),
                     outputs: formData.objectives.outputs.trim(),
                     outcome: formData.objectives.outcome.trim() || undefined,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
                     beneficiaries_type: otherBeneficiaryMerged,
+                    beneficiary_group: groupLabel || undefined,
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
@@ -780,15 +795,16 @@ export default function StudentOpportunityCreationPage() {
                               independent_community_activity: {
                                   activity_site_description:
                                       formData.supervision.independentSiteDescription.trim() ||
-                                      (privatePath ? "Private / independent candidate" : ""),
+                                      [formData.location.city, formData.location.venue].map((x) => x.trim()).filter(Boolean).join(" · ") ||
+                                      (privatePath ? "Private / independent candidate" : "Student-organized community activity"),
                                   local_contact_person:
                                       formData.supervision.independentLocalContact.trim() ||
-                                      (privatePath ? studentDetails.name.trim() : ""),
+                                      studentDetails.name.trim(),
                                   contact_number:
                                       composeInternationalPhone(
                                           formData.supervision.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
                                           formData.supervision.independentContactPhone,
-                                      ).trim() || (privatePath ? privatePhoneFull : ""),
+                                      ).trim() || (privatePath ? privatePhoneFull : studentDetails.contact.trim()),
                               },
                           }),
                 },
@@ -988,11 +1004,6 @@ export default function StudentOpportunityCreationPage() {
         }));
     };
 
-    const displayStudentContact = useMemo(
-        () => parsePhoneForDisplay(studentDetails.contact),
-        [studentDetails.contact],
-    );
-
     const timelineStartWeekdayLabel = useMemo(
         () => weekdayLabelFromDateInput(formData.dates.start),
         [formData.dates.start],
@@ -1045,7 +1056,7 @@ export default function StudentOpportunityCreationPage() {
         return {
             title: formData.title,
             hook: formData.hook,
-            summary: formData.objectives.description,
+            summary: formData.opportunitySummary.trim() || formData.objectives.description,
             activityType: types[0] || "Community Service",
             mode: formData.mode,
             city: formData.location.city,
@@ -1055,7 +1066,7 @@ export default function StudentOpportunityCreationPage() {
             end: formData.dates.end,
             deadline: formData.applicationDeadline,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
-            beneficiaryType: bens || "Community",
+            beneficiaryType: formData.objectives.beneficiaryGroup.trim() || bens || "Community",
             responsibilities: formData.activity.responsibilities,
             scheduleNotes: formData.scheduleNotes,
             skills,
@@ -1125,8 +1136,18 @@ export default function StudentOpportunityCreationPage() {
                     url.searchParams.set("draft", "1");
                     window.history.replaceState(null, "", url.toString());
                 }
+                if (!res?.ok) {
+                    const msg =
+                        typeof (data as { message?: unknown } | null)?.message === "string"
+                            ? (data as { message: string }).message
+                            : "Could not sync this draft to your account.";
+                    toast.warning(`Saved on this device. ${msg}`);
+                    return;
+                }
             } catch (e) {
                 console.error("Backend draft sync failed", e);
+                toast.warning("Saved on this device. Could not sync this draft to your account yet.");
+                return;
             } finally {
                 setIsSavingDraft(false);
             }
@@ -1136,6 +1157,7 @@ export default function StudentOpportunityCreationPage() {
     };
 
     useEffect(() => {
+        if (!isWizard) return;
         const fetchProfile = async () => {
             try {
                 let base: Record<string, unknown> = {};
@@ -1231,7 +1253,13 @@ export default function StudentOpportunityCreationPage() {
                             : "Complete your profile before creating an opportunity.",
                         { duration: 7000 },
                     );
-                    router.replace("/dashboard/student/profile?incomplete=1");
+                    const returnTo =
+                        typeof window !== "undefined"
+                            ? `${window.location.pathname}${window.location.search}`
+                            : "/dashboard/student/create-opportunity?new=1";
+                    router.replace(
+                        `/dashboard/student/profile?incomplete=1&next=${encodeURIComponent(returnTo)}`,
+                    );
                     return;
                 }
 
@@ -1287,30 +1315,23 @@ export default function StudentOpportunityCreationPage() {
         };
 
         fetchProfile();
-    }, [router]);
+    }, [router, isWizard]);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        const params = new URLSearchParams(window.location.search);
-        const e = params.get("edit")?.trim();
-        if (e) {
-            setEditingOpportunityId(e);
-            setIsDraftMode(params.get("draft") === "1");
+        if (editFromUrl) {
+            setEditingOpportunityId(editFromUrl);
+            setIsDraftMode(searchParams.get("draft") === "1");
             setShowTeamLeadNotice(false);
-            setMode("wizard");
-        } else if (params.get("new") === "1") {
-            setShowTeamLeadNotice(true);
-            setMode("wizard");
-        } else {
-            setMode("landing");
         }
-    }, []);
+    }, [editFromUrl, searchParams]);
 
+    // Read window.location (not SSR-defaulted state) so ?new=1 never bounces back to the drafts hub.
     useEffect(() => {
-        if (mode === "landing") {
+        const params = new URLSearchParams(window.location.search);
+        if (!hasCreateOpportunityWizardIntent(params)) {
             router.replace("/dashboard/student/paths/community-service?view=create");
         }
-    }, [mode, router]);
+    }, [router]);
 
     useEffect(() => {
         if (!editingOpportunityId || isLoadingProfile) return;
@@ -1458,7 +1479,7 @@ export default function StudentOpportunityCreationPage() {
     const previewPrimarySdg = formData.sdg ? findSdgById(formData.sdg) : null;
     const previewSecondarySdg = formData.secondarySdg ? findSdgById(formData.secondarySdg) : null;
 
-    if (mode === "landing") {
+    if (!isWizard) {
         return <WorkspaceSkeleton />;
     }
 
@@ -1530,6 +1551,7 @@ export default function StudentOpportunityCreationPage() {
                         <span className="co-hero-chip">🃏 Final flashcard</span>
                         <span className="co-hero-chip">🎯 Role-aware Apply Now</span>
                         <span className="co-hero-chip">🔒 Private contacts protected</span>
+                        <span className="co-hero-chip">✅ Smart checks</span>
                     </div>
                     {isLoadingEdit ? (
                         <p className="mt-2 flex items-center gap-2 text-sm text-[#70808a]">
@@ -1571,16 +1593,16 @@ export default function StudentOpportunityCreationPage() {
                         </div>
                     </div>
                     <div className="co-fun-tip">
-                        <b>Design rule</b>
-                        <p>Visibility and application eligibility are separate. A student can see a card without necessarily being able to use Apply Now.</p>
-                    </div>
-                    <div className="co-side-card">
-                        <h3>Approval path</h3>
+                        <b>Approval flow</b>
                         <p>
                             {formData.privateCandidate
                                 ? "Private Candidate → CIEL PK identity/contact verification → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity"
                                 : "University-linked Student → Faculty approval → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity"}
                         </p>
+                    </div>
+                    <div className="co-fun-tip">
+                        <b>Design rule</b>
+                        <p>Visibility and application eligibility are separate. A student can see a card without necessarily being able to use Apply Now.</p>
                     </div>
                 </aside>
 
@@ -1589,30 +1611,45 @@ export default function StudentOpportunityCreationPage() {
             {/* SECTION A: STUDENT DETAILS */}
             {activeStep === "A" && (
             <div className="co-card">
-                <CoSectionHead letter="A" title="Student details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
+                <CoSectionHead letter="A" title="Creator profile & accountability" tag="PROFILE LINKED" tagAuto color="#0d2b33" />
                 {isLoadingProfile ? (
                     <div className="py-4 text-center text-[#7a919a]">
                         <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading details...
                     </div>
                 ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="co-locked">🧑‍🎓 <b>{studentDetails.name || "—"}</b><span className="co-lock-badge">🔒</span></span>
-                        <span className="co-locked">🏛️ {studentDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
-                        {studentDetails.department ? <span className="co-locked">🎓 {studentDetails.department}</span> : null}
-                        {studentDetails.email ? <span className="co-locked">📧 {studentDetails.email}</span> : null}
-                        {studentDetails.city ? <span className="co-locked">📍 {studentDetails.city}</span> : null}
-                        <span className="co-locked pointer-events-none">
-                            📱
-                            <PhoneConnectivityRow
-                                phoneCountryKey={displayStudentContact.phoneCountryKey}
-                                nationalDigits={displayStudentContact.national}
-                                readOnly
-                                placeholderNational="—"
-                                selectClassName="rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
-                                inputClassName="rounded-lg border-transparent bg-transparent py-0 text-sm font-medium text-[#0d2b33]"
-                            />
-                        </span>
+                    <>
+                    <div className="co-role-card">
+                        <div className="co-role-icon">🎓</div>
+                        <div>
+                            <div className="k">SIGNED-IN CREATOR</div>
+                            <b>{studentDetails.name || "—"}</b>
+                            <p>
+                                {formData.privateCandidate
+                                    ? "Private / independent undergraduate pathway · CIEL PK verification required"
+                                    : `${studentDetails.institution || "—"} · ${studentDetails.department || "—"}`}
+                            </p>
+                        </div>
+                        <span className="co-role-badge">{formData.privateCandidate ? "PRIVATE CANDIDATE" : "STUDENT CREATOR"}</span>
                     </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Creator name</label>
+                            <input className="bg-[#f0f4f5]" readOnly value={studentDetails.name || "—"} />
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Organization / institution</label>
+                            <input className="bg-[#f0f4f5]" readOnly value={formData.privateCandidate ? "Private / Independent Candidate" : (studentDetails.institution || "—")} />
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Department / programme / unit</label>
+                            <input className="bg-[#f0f4f5]" readOnly value={formData.privateCandidate ? (formData.privateProgramme || "Undergraduate programme · details below") : (studentDetails.department || "—")} />
+                        </div>
+                        <div>
+                            <label className="co-label" style={{ marginTop: 0 }}>Official email *</label>
+                            <input className="bg-[#f0f4f5]" readOnly value={studentDetails.email || "—"} />
+                        </div>
+                    </div>
+                    </>
                 )}
                 <div className="mt-4">
                     <label className="co-label">Student verification pathway</label>
@@ -1716,8 +1753,8 @@ export default function StudentOpportunityCreationPage() {
             <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
                 <CoSectionHead
                     letter="B"
-                    title="Opportunity overview"
-                    tag="THE BASICS"
+                    title="What are students being invited to do?"
+                    tag="OVERVIEW"
                     color="#0891b2"
                     expanded={expandedSections.includes("B")}
                     onToggle={() => toggleSection("B")}
@@ -1805,6 +1842,27 @@ export default function StudentOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, hook: e.target.value })}
                         />
                     </div>
+                    <div>
+                        <label className="co-label">Opportunity summary *</label>
+                        <textarea
+                            spellCheck={true}
+                            placeholder="Describe the community need, student contribution and why the opportunity matters."
+                            value={formData.opportunitySummary}
+                            onChange={(e) => setFormData({ ...formData, opportunitySummary: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="co-label">Community / beneficiary group *</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. public-school students, local residents"
+                            value={formData.objectives.beneficiaryGroup}
+                            onChange={(e) => setFormData({
+                                ...formData,
+                                objectives: { ...formData.objectives, beneficiaryGroup: e.target.value },
+                            })}
+                        />
+                    </div>
                     {/* B2. Type */}
                     <div>
                         <label className="co-label">B2 · Activity type · tap one or more</label>
@@ -1863,21 +1921,29 @@ export default function StudentOpportunityCreationPage() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* B3. Mode */}
-                        <div>
-                            <label className="co-label">B3 · Mode of engagement</label>
-                            <div className="co-chips">
-                                {['On site', 'Remote', 'Hybrid'].map((m) => (
-                                    <CoChip key={m} selected={formData.mode === m} onClick={() => setFormData({ ...formData, mode: m })}>
-                                        {MODE_EMOJI[m] || ""} {m === "On site" ? "On-site" : m}
-                                    </CoChip>
-                                ))}
-                            </div>
+                    <div className="pt-1">
+                        <label className="co-label">Mode of engagement *</label>
+                        <div className="co-mode-grid">
+                            {([
+                                ["On site", "📍", "On-site", "Physical participation"],
+                                ["Remote", "💻", "Remote", "Virtual participation"],
+                                ["Hybrid", "🔄", "Hybrid", "On-site + remote"],
+                            ] as const).map(([value, em, title, sub]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    className={`co-mode-card${formData.mode === value ? " on" : ""}`}
+                                    onClick={() => setFormData({ ...formData, mode: value })}
+                                >
+                                    <div className="em">{em}</div>
+                                    <b>{title}</b>
+                                    <small>{sub}</small>
+                                </button>
+                            ))}
                         </div>
+                    </div>
 
-                        {/* B4. Location */}
-                        {(formData.mode === 'On site' || formData.mode === 'Hybrid') && (
+                    {(formData.mode === "On site" || formData.mode === "Hybrid") && (
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300 col-span-1 md:col-span-2">
                                 <label className="co-label">B4 · Location details</label>
                                 <div className="space-y-4">
@@ -1931,16 +1997,35 @@ export default function StudentOpportunityCreationPage() {
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1 h-4 bg-slate-300 rounded-full"></div>
                                         <input
                                             type="text"
-                                            placeholder="Exact Venue (Optional)"
+                                            placeholder="Venue / address"
                                             className="w-full pl-6 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 text-sm"
                                             value={formData.location.venue}
                                             onChange={(e) => setFormData({ ...formData, location: { ...formData.location, venue: e.target.value } })}
                                         />
                                     </div>
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div>
+                                            <label className="co-label" style={{ marginTop: 0 }}>Google Maps search location</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Community Centre, Lahore"
+                                                value={formData.location.mapSearch}
+                                                onChange={(e) => setFormData({ ...formData, location: { ...formData.location, mapSearch: e.target.value } })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="co-label" style={{ marginTop: 0 }}>Google Maps share link</label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://maps.google.com/..."
+                                                value={formData.location.mapLink}
+                                                onChange={(e) => setFormData({ ...formData, location: { ...formData.location, mapLink: e.target.value } })}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
-                    </div>
 
                 </div>
             </div>
@@ -2019,7 +2104,7 @@ export default function StudentOpportunityCreationPage() {
                                 </div>
                             </div>
                         )}
-                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
                                 <input
@@ -2040,6 +2125,16 @@ export default function StudentOpportunityCreationPage() {
                                     placeholder="e.g. 20"
                                     value={formData.capacity.volunteers}
                                     onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                />
+                            </div>
+                            <div>
+                                <label className="co-label" style={{ marginTop: 0 }}>Expected beneficiaries</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    placeholder="e.g. 60"
+                                    value={formData.objectives.beneficiariesCount}
+                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
                                 />
                             </div>
                         </div>
@@ -2066,7 +2161,7 @@ export default function StudentOpportunityCreationPage() {
             <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
                 <CoSectionHead
                     letter="C"
-                    title="SDG & impact"
+                    title="Map the strongest genuine SDG connection"
                     tag="IMPACT"
                     color="#6d28d9"
                     expanded={expandedSections.includes("C")}
@@ -2080,30 +2175,31 @@ export default function StudentOpportunityCreationPage() {
 
                     {/* C1. Primary SDG */}
                     <div>
-                        <label className="co-label">C1 · Primary SDG</label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.sdg}
-                            onChange={(e) => {
-                                const v = e.target.value;
-                                setFormData({
-                                    ...formData,
-                                    sdg: v,
-                                    target: "",
-                                    indicator: "",
-                                    ...(formData.secondarySdg === v
-                                        ? { secondarySdg: "", secondaryTarget: "", secondaryIndicator: "" }
-                                        : {})
-                                });
-                            }}
-                        >
-                            <option value="">Select an SDG...</option>
+                        <label className="co-label">Primary SDG *</label>
+                        <div className="co-sdg-grid">
                             {opportunityFormSdgList.map((sdg) => (
-                                <option key={sdg.id} value={sdg.id}>
-                                    SDG {sdg.number} — {sdg.title}
-                                </option>
+                                <button
+                                    key={sdg.id}
+                                    type="button"
+                                    className={`co-sdg-pick${formData.sdg === sdg.id ? " on" : ""}`}
+                                    style={{ background: sdg.color }}
+                                    onClick={() => {
+                                        setFormData({
+                                            ...formData,
+                                            sdg: sdg.id,
+                                            target: formData.sdg === sdg.id ? formData.target : "",
+                                            indicator: formData.sdg === sdg.id ? formData.indicator : "",
+                                            ...(formData.secondarySdg === sdg.id
+                                                ? { secondarySdg: "", secondaryTarget: "", secondaryIndicator: "" }
+                                                : {}),
+                                        });
+                                    }}
+                                >
+                                    <b>{sdg.number}</b>
+                                    <span>{sdg.title}</span>
+                                </button>
                             ))}
-                        </select>
+                        </div>
                     </div>
 
                     {/* C2. SDG Target */}
@@ -2245,7 +2341,7 @@ export default function StudentOpportunityCreationPage() {
 
                 <div>
                     <div>
-                        <label className="co-label" style={{ marginTop: 4 }}>D1 · Project objective</label>
+                        <label className="co-label" style={{ marginTop: 4 }}>Primary objective *</label>
                         <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32"
                             placeholder="What do you aim to achieve?"
@@ -2272,38 +2368,25 @@ export default function StudentOpportunityCreationPage() {
                         />
                     </div>
                     <div>
-                        <label className="co-label">D2 · Expected outreach</label>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label className="co-label" style={{ marginTop: 0 }}>Number of beneficiaries</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    placeholder="e.g. 50"
-                                    value={formData.objectives.beneficiariesCount}
-                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
-                                />
-                            </div>
-                            <div>
-                                <label className="co-label" style={{ marginTop: 0 }}>Type of beneficiaries · tap all</label>
-                                <div className="co-chips">
-                                    {BENEFICIARY_PREDEFINED.map((b) => (
-                                        <CoChip
-                                            key={b}
-                                            selected={formData.objectives.beneficiariesType.includes(b)}
-                                            onClick={() => {
-                                                const types = formData.objectives.beneficiariesType.includes(b)
-                                                    ? formData.objectives.beneficiariesType.filter((t) => t !== b)
-                                                    : [...formData.objectives.beneficiariesType, b];
-                                                setFormData({
-                                                    ...formData,
-                                                    objectives: { ...formData.objectives, beneficiariesType: types },
-                                                });
-                                            }}
-                                        >
-                                            {BENEFICIARY_EMOJI[b] || ""} {b}
-                                        </CoChip>
-                                    ))}
+                        <label className="co-label">Type of beneficiaries · optional extra tags</label>
+                        <div className="co-chips">
+                            {BENEFICIARY_PREDEFINED.map((b) => (
+                                <CoChip
+                                    key={b}
+                                    selected={formData.objectives.beneficiariesType.includes(b)}
+                                    onClick={() => {
+                                        const types = formData.objectives.beneficiariesType.includes(b)
+                                            ? formData.objectives.beneficiariesType.filter((t) => t !== b)
+                                            : [...formData.objectives.beneficiariesType, b];
+                                        setFormData({
+                                            ...formData,
+                                            objectives: { ...formData.objectives, beneficiariesType: types },
+                                        });
+                                    }}
+                                >
+                                    {BENEFICIARY_EMOJI[b] || ""} {b}
+                                </CoChip>
+                            ))}
                                     <CoChip
                                         selected={formData.objectives.isOtherBeneficiaryChecked}
                                         onClick={() =>
@@ -2386,8 +2469,6 @@ export default function StudentOpportunityCreationPage() {
                                             </button>
                                         </div>
                                     )}
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -2399,8 +2480,8 @@ export default function StudentOpportunityCreationPage() {
             <div className="co-card co-accent" style={{ borderTopColor: "#38bdf8" }}>
                 <CoSectionHead
                     letter="E"
-                    title="Activity details"
-                    tag="THE PLAN"
+                    title="What will students actually do and learn?"
+                    tag="ACTIVITY"
                     color="#38bdf8"
                     expanded={expandedSections.includes("E")}
                     onToggle={() => toggleSection("E")}
@@ -2619,23 +2700,24 @@ export default function StudentOpportunityCreationPage() {
                         <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                             <button
                                 type="button"
+                                className={`co-choice${formData.supervision.executingContext !== "partner" ? " on" : ""}`}
+                                onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "independent" } })}
+                            >
+                                <div className="text-[22px]">🧑‍🤝‍🧑</div>
+                                <div className="mt-1 text-xs font-extrabold">No additional organization</div>
+                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">Continue without a separate host/partner.</div>
+                            </button>
+                            <button
+                                type="button"
                                 className={`co-choice${formData.supervision.executingContext === "partner" ? " on" : ""}`}
                                 onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "partner" } })}
                             >
                                 <div className="text-[22px]">🤝</div>
-                                <div className="mt-1 text-xs font-extrabold">Yes — partner organisation involved</div>
-                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">NGO, school, hospital, community group…</div>
-                            </button>
-                            <button
-                                type="button"
-                                className={`co-choice${formData.supervision.executingContext === "independent" ? " on" : ""}`}
-                                onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "independent" } })}
-                            >
-                                <div className="text-[22px]">🧑‍🤝‍🧑</div>
-                                <div className="mt-1 text-xs font-extrabold">No — independent community-based</div>
-                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">Your crew, directly with the community.</div>
+                                <div className="mt-1 text-xs font-extrabold">Add organization</div>
+                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">Acknowledgement is recorded before activation where required.</div>
                             </button>
                         </div>
+                        <p className="mt-2 text-[10px] leading-relaxed text-[#7a919a]">Add only when a separate organization is genuinely involved in hosting, delivery, supervision or verification.</p>
                         {formData.supervision.executingContext === "partner" && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Partner organization</p>
@@ -2669,57 +2751,13 @@ export default function StudentOpportunityCreationPage() {
                                 <p className="text-xs text-slate-500">A verification email may be sent to the partner contact.</p>
                             </div>
                         )}
-                        {formData.supervision.executingContext === "independent" && !formData.privateCandidate && (
-                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                <p className="text-xs font-bold text-slate-500 uppercase">Independent community activity</p>
-                                <textarea spellCheck={true}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm min-h-[88px]"
-                                    placeholder="Activity location / site description *"
-                                    value={formData.supervision.independentSiteDescription}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, independentSiteDescription: e.target.value } })}
-                                />
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input
-                                        type="text"
-                                        placeholder="Local contact person (e.g. teacher, community rep — not a family member) *"
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                        value={formData.supervision.independentLocalContact}
-                                        onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, independentLocalContact: e.target.value } })}
-                                    />
-                                    <div className="space-y-1.5">
-                                        <span className="block text-xs font-bold text-slate-500 uppercase">
-                                            Contact number <span className="text-red-500">*</span>
-                                        </span>
-                                        <PhoneConnectivityRow
-                                            phoneCountryKey={formData.supervision.independentContactPhoneKey}
-                                            nationalDigits={formData.supervision.independentContactPhone}
-                                            onPhoneCountryKeyChange={(independentContactPhoneKey) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    supervision: { ...formData.supervision, independentContactPhoneKey },
-                                                })
-                                            }
-                                            onNationalDigitsChange={(independentContactPhone) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    supervision: { ...formData.supervision, independentContactPhone },
-                                                })
-                                            }
-                                            maxNationalDigits={15}
-                                            selectClassName="rounded-xl border border-slate-200 py-3 text-xs font-semibold focus:border-orange-500"
-                                            inputClassName="rounded-xl border border-slate-200 py-3 text-sm font-medium focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <div className="pt-2">
                         <label className="co-label">Participation verification</label>
                         <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will your crew log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
                         <div className="co-chips">
-                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
+                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Photos / Media", "Assessment sheets", "Assessment / Feedback", "Digital logs", "Student Evidence"].map(v => (
                                 <CoChip
                                     key={v}
                                     selected={formData.verification.includes(v)}
@@ -3125,5 +3163,13 @@ export default function StudentOpportunityCreationPage() {
                 }}
             />
         </div>
+    );
+}
+
+export default function StudentOpportunityCreationPage() {
+    return (
+        <Suspense fallback={<WorkspaceSkeleton />}>
+            <StudentOpportunityCreationPageInner />
+        </Suspense>
     );
 }

@@ -163,13 +163,28 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
     const formDataPatch: Record<string, unknown> = {
         title: typeof d.title === "string" ? d.title : "",
         hook: typeof objectives.hook === "string" ? objectives.hook : "",
+        opportunitySummary:
+            typeof objectives.summary === "string"
+                ? objectives.summary
+                : typeof objectives.description === "string"
+                  ? objectives.description
+                  : "",
         opportunityType: opportunityType.length ? opportunityType : [],
         otherActivitySpecs: otherSpecs.length ? otherSpecs : [""],
         mode: typeof d.mode === "string" ? d.mode : "",
-        location:
-            d.location && typeof d.location === "object"
-                ? d.location
-                : { city: "", venue: "", pin: "" },
+        location: (() => {
+            const loc =
+                d.location && typeof d.location === "object"
+                    ? (d.location as Record<string, unknown>)
+                    : {};
+            return {
+                city: typeof loc.city === "string" ? loc.city : "",
+                venue: typeof loc.venue === "string" ? loc.venue : "",
+                pin: typeof loc.pin === "string" ? loc.pin : "",
+                mapSearch: typeof loc.mapSearch === "string" ? loc.mapSearch : "",
+                mapLink: typeof loc.mapLink === "string" ? loc.mapLink : typeof loc.map_link === "string" ? loc.map_link : "",
+            };
+        })(),
         timelineType: typeof timeline.type === "string" ? timeline.type : "Fixed dates",
         dates: {
             start: typeof timeline.start_date === "string" ? timeline.start_date : "",
@@ -213,6 +228,10 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             outcome: typeof objectives.outcome === "string" ? objectives.outcome : "",
             beneficiariesCount:
                 objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
+            beneficiaryGroup:
+                typeof objectives.beneficiary_group === "string"
+                    ? objectives.beneficiary_group
+                    : beneficiariesOther[0] || "",
             beneficiariesType: beneficiariesPredefined,
             isOtherBeneficiaryChecked: beneficiariesOther.length > 0,
             otherBeneficiarySpecs: beneficiariesOther.length ? beneficiariesOther : [""],

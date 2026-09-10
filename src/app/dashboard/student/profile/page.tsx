@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
 import { Loader2, Mail, MapPin, Building2, User, Save, Camera, Sparkles, ChevronDown } from "lucide-react";
@@ -9,6 +10,7 @@ import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
+import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import {
     composeInternationalPhone,
@@ -18,6 +20,7 @@ import {
 } from "@/utils/countryCallingCodes";
 
 export default function StudentProfilePage() {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [user, setUser] = useState<any>(null);
@@ -218,6 +221,24 @@ export default function StudentProfilePage() {
                         }
                         localStorage.setItem("user", JSON.stringify(storedUser));
                         localStorage.setItem("ciel_user", JSON.stringify(storedUser));
+                    }
+
+                    // If we were sent here to complete a gated action (e.g. creating an
+                    // opportunity), resume it now instead of leaving the student stranded here.
+                    const stillMissing = missingProfileFieldsForRole("student", {
+                        ...data.data,
+                        department: formData.department.trim(),
+                    });
+                    if (stillMissing.length === 0) {
+                        const params =
+                            typeof window !== "undefined"
+                                ? new URLSearchParams(window.location.search)
+                                : null;
+                        const next = params?.get("next");
+                        if (next && isSafeInternalReturnPath(next)) {
+                            router.push(next);
+                            return;
+                        }
                     }
                 } else {
                     toast.error(data.message || "Failed to update profile");

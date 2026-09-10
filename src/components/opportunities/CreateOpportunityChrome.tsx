@@ -12,6 +12,8 @@ export const ACTIVITY_TYPE_EMOJI: Record<string, string> = {
     "Technical / Professional Support": "🔧",
     "Environmental Action": "🌳",
     "Corporate CSR Activity": "🏢",
+    "Corporate CSR": "🏢",
+    "Fundraising / Resource Mobilization": "🎗️",
     Other: "✏️",
 };
 

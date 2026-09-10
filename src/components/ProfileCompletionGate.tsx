@@ -37,6 +37,8 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
 
         if (pathname.startsWith("/dashboard/student")) {
             if (pathname.startsWith("/dashboard/student/profile")) return;
+            // Create-opportunity re-checks /user/me itself and preserves a `next=` return URL.
+            if (pathname.startsWith("/dashboard/student/create-opportunity")) return;
             if (!isStudentProfileComplete(user)) {
                 router.replace("/dashboard/student/profile");
             }

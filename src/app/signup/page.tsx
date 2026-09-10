@@ -12,6 +12,7 @@ import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey } from "@/utils/coun
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
@@ -92,6 +93,7 @@ function SignUpContent() {
         contactPerson: "",
         phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
         phone: "",
+        city: "",
         cnic: "",
         token: "",
     });
@@ -177,6 +179,10 @@ function SignUpContent() {
             newErrors.phone = "Phone number must be at least 10 digits";
         }
 
+        if (!formData.city.trim()) {
+            newErrors.city = "City is required";
+        }
+
         if (!formData.email.trim()) {
             newErrors.email = "Email is required";
         } else if (!emailRegex.test(formData.email)) {
@@ -212,6 +218,7 @@ function SignUpContent() {
         if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return false;
         if (!formData.password || formData.password.length < 8) return false;
         if (!formData.phone.trim() || formData.phone.length < 10) return false;
+        if (!formData.city.trim()) return false;
         if (isOrgRole) {
             if (!formData.orgName.trim() || !formData.contactPerson.trim() || !formData.organizationCategory.trim() || !formData.legalRegistrationType.trim()) return false;
             if (proofMethod === "link") {
@@ -233,6 +240,7 @@ function SignUpContent() {
             if (!formData.orgName.trim()) return "Enter the organisation name to continue";
             if (!formData.email.trim()) return "Enter your official email to continue";
             if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+            if (!formData.city.trim()) return "Select your city to continue";
             if (!formData.password || formData.password.length < 8) return "Create a password to continue";
             if (proofMethod === "link" && !proofUrl.trim()) return "Add a verification link to continue";
             if (!consent) return "Accept the terms to continue";
@@ -245,6 +253,7 @@ function SignUpContent() {
         }
         if (!formData.email.trim()) return "Enter your email to continue";
         if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+        if (!formData.city.trim()) return "Select your city to continue";
         if (role === "student" && !formData.enrollmentYear.trim()) return "Select your enrolment year to continue";
         if (!formData.password || formData.password.length < 8) return "Create a password to continue";
         if (!consent) return "Accept the terms to continue";
@@ -651,6 +660,18 @@ function SignUpContent() {
                                             maxNationalDigits={15}
                                             inputClassName={clsx(errors.phone ? "border-red-500 focus:border-red-500" : "border-ciel-border focus:border-ciel-green")}
                                         />
+                                    </div>
+
+                                    <div>
+                                        <label className={labelClass}>City</label>
+                                        <div className="relative">
+                                            <select value={formData.city} onChange={(e) => handleGenericChange("city", e.target.value)} aria-invalid={!!errors.city} aria-label="City" className={selectClass(!!errors.city)}>
+                                                <option value="">Select city</option>
+                                                {PAKISTAN_REGION_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
+                                        </div>
+                                        {errors.city && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.city}</p>}
                                     </div>
 
                                     {isOrgRole && (
