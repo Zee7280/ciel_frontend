@@ -138,9 +138,16 @@ function pathApprovalGate(entry: PathReviewEntry): string | null | undefined {
     return entry.facultyApprovalStatus ?? entry.supervisorApprovalStatus ?? entry.reviewPipeline?.supervisorStatus;
 }
 
+/** Once faculty/supervisor has rejected or sent something back for revision, the ball is with the
+ * student again — it must not keep inflating the "waiting for my review" queue/badge forever. */
+const PATH_RETURNED_TO_STUDENT_KEYS = new Set(["rejected", "declined", "revision_requested", "changes_requested"]);
+
 export function isPathEntryWaiting(entry: PathReviewEntry): boolean {
     if (normalizeReviewStatus(entry.status) !== "submitted") return false;
-    return !isReviewApprovedStatus(pathApprovalGate(entry));
+    const gate = pathApprovalGate(entry);
+    if (isReviewApprovedStatus(gate)) return false;
+    if (PATH_RETURNED_TO_STUDENT_KEYS.has(normalizeReviewStatus(gate))) return false;
+    return true;
 }
 
 export function isPathEntryApproved(entry: PathReviewEntry): boolean {

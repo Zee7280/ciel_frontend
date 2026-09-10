@@ -72,11 +72,19 @@ export default function FypThesisHub({
     const submitted = hasEntry && entry.status === "submitted";
     const approved = hasEntry && isPathEntryApproved(entry);
     const underReview = hasEntry && submitted && isPathEntryWaiting(entry);
-    const inProgress = hasEntry && entry.status !== "submitted" && (entry.stepCompleted > 0 || !!entry.projectTitle);
+    const isOwner = !hasEntry || entry.isOwner !== false;
+    const inProgress =
+        hasEntry &&
+        entry.status !== "submitted" &&
+        (entry.stepCompleted > 0 || !!entry.projectTitle || !!entry.projectInfo?.title);
     const formTitle = submitted
-        ? "View & edit record"
+        ? isOwner
+            ? "View & edit record"
+            : "View team record"
         : inProgress
-          ? `Continue · step ${Math.min(entry.stepCompleted, 8)}/8`
+          ? isOwner
+            ? `Continue · step ${Math.min(entry.stepCompleted, 8)}/8`
+            : "View team draft"
           : "Start FYP record";
 
     return (
@@ -128,8 +136,8 @@ export default function FypThesisHub({
                 <div className="mt-4">
                     <HubBackButton href={BASE} label="← FYP hub" />
                     <div className="mb-3">
-                        <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">FYP in Progress</h2>
-                        <p className="mt-1 text-[12.5px] text-[#70808a]">
+                        <h2 className="m-0 text-[21px] font-semibold text-ciel-text">FYP in Progress</h2>
+                        <p className="mt-1 text-[12.5px] text-ciel-text-soft">
                             Live completion from your form. Open the record to continue — drafts save as you go.
                         </p>
                     </div>
@@ -144,7 +152,7 @@ export default function FypThesisHub({
                                     router.push(WORKSPACE_HREF);
                                 }
                             }}
-                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
+                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple"
                         >
                             <ThesisCard entry={entry} studentReminder="team" />
                         </div>
@@ -176,8 +184,8 @@ export default function FypThesisHub({
                     <div className="mt-4">
                         <HubBackButton href={BASE} label="← FYP hub" />
                         <div className="mb-3">
-                            <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">FYP Under Review</h2>
-                            <p className="mt-1 text-[12.5px] text-[#70808a]">
+                            <h2 className="m-0 text-[21px] font-semibold text-ciel-text">FYP Under Review</h2>
+                            <p className="mt-1 text-[12.5px] text-ciel-text-soft">
                                 Your submitted flashcard is with your supervisor. You&apos;ll receive the outcome after they review it.
                             </p>
                         </div>
@@ -205,12 +213,12 @@ export default function FypThesisHub({
                                                     router.push(WORKSPACE_HREF);
                                                 }
                                             }}
-                                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6d4aff]"
+                                            className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple"
                                         >
                                             <ThesisCard entry={entry} studentReminder="faculty" />
                                         </div>
                                     ) : (
-                                        <p className="px-1 text-sm text-[#70808a]">Nothing in this tab right now.</p>
+                                        <p className="px-1 text-sm text-ciel-text-soft">Nothing in this tab right now.</p>
                                     )}
                                 </div>
                             </>
@@ -229,13 +237,22 @@ export default function FypThesisHub({
 
             {view === "home" && (
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {!isOwner && (
+                        <div className="rounded-xl border border-ciel-indigo/25 bg-ciel-indigo-soft px-4 py-2.5 text-xs font-semibold text-ciel-indigo sm:col-span-2">
+                            👥 You&apos;re named as a co-author — this is the lead author&apos;s FYP. You can track the same draft, files and status; only they can edit or submit.
+                        </div>
+                    )}
                     <HubTile
                         href={WORKSPACE_HREF}
-                        badge="START"
+                        badge={isOwner ? "START" : "TEAM RECORD"}
                         badgeClass="text-[#c76000]"
                         emoji="🎓"
-                        title="Create FYP Record"
-                        subtitle="Open the CIEL PK Final Year Projects Form. Saving Section 1 creates your master FYP record with a unique FYP ID and auto-connects you, your team, your supervisor, your university and CIEL PK."
+                        title={hasEntry ? formTitle : "Create FYP Record"}
+                        subtitle={
+                            isOwner
+                                ? "Open the CIEL PK Final Year Projects Form. Saving Section 1 creates your master FYP record with a unique FYP ID and auto-connects you, your team, your supervisor, your university and CIEL PK."
+                                : "Open the shared team FYP. The lead author owns edits; you see the same progress, files and supervisor status."
+                        }
                         background="linear-gradient(135deg,#c76000,#f59a00)"
                     />
                     <HubTile

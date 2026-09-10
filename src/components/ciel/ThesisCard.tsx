@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock, Mail, MessageCircle, Paperclip, Zap } from "lucide-react";
+import { CheckCircle2, ChevronDown, Users, ShieldAlert, AlertTriangle, Star, Clock, Mail, MessageCircle, Paperclip, Zap } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { rankMovement } from "@/utils/courseProjectTypes";
@@ -213,8 +213,8 @@ export default function ThesisCard({
                             <ShieldAlert className="h-3 w-3" /> Rejected
                         </span>
                     ) : entry.status === "submitted" && approval === "revision_requested" ? (
-                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
-                            <ShieldAlert className="h-3 w-3" /> Revision requested
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-800">
+                            <AlertTriangle className="h-3 w-3" /> Revision requested
                         </span>
                     ) : entry.status === "submitted" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
@@ -262,13 +262,16 @@ export default function ThesisCard({
                             return (
                                 <span
                                     key={en.goalNumber}
-                                    title={`${sdg.number} ${sdg.title}`}
+                                    title={`${sdg.number} ${sdg.title}${en.targets?.length ? ` — ${en.targets.join(", ")}` : ""}`}
                                     className="inline-flex min-w-0 max-w-[9.75rem] shrink-0 items-center gap-1 whitespace-nowrap rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white"
                                     style={{ backgroundColor: sdg.color }}
                                 >
-                                    {i === 0 ? <span aria-hidden className="shrink-0">★</span> : null}
+                                    {i === 0 ? <Star className="h-2.5 w-2.5 shrink-0 fill-current" aria-hidden /> : null}
                                     <span className="shrink-0">{sdg.number}</span>
-                                    <span className="min-w-0 truncate">{sdg.title.toUpperCase()}</span>
+                                    <span className="min-w-0 truncate">
+                                        {sdg.title.toUpperCase()}
+                                        {en.targets?.length ? ` · ${en.targets.join(", ")}` : ""}
+                                    </span>
                                 </span>
                             );
                         })}
@@ -393,7 +396,7 @@ export default function ThesisCard({
             </div>
 
             {/* Footer */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
+            <div className="flex flex-col gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-center">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
                     {(pi.supervisorName || "? ?").split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?"}
                 </span>
@@ -435,7 +438,7 @@ export default function ThesisCard({
                 {entry.status === "submitted" && (approval === "pending" || !approval) && studentReminder === "faculty" && (
                     <div className="w-full space-y-2 border-t border-ciel-border pt-3">
                         <p className="text-[10.5px] font-semibold text-ciel-text-mid">
-                            🔒 Your record is locked while under review — it reopens automatically if your supervisor requests a revision.
+                            ⏳ Waiting on your supervisor. You can still reopen and edit it yourself if something needs fixing before they review it.
                         </p>
                         {facultyReminder && (
                             <div className="flex flex-wrap items-center gap-2">
@@ -487,43 +490,49 @@ export default function ThesisCard({
                         </div>
                     </div>
                 )}
-                {onSupervisorReview && entry.status === "submitted" && approval !== "approved" && (
+                {onSupervisorReview && entry.status === "submitted" && approval !== "approved" && (() => {
+                    const missingReturnReason = !reviewNote.trim();
+                    return (
                     <div className="flex w-full flex-col gap-2 pt-2">
                         <textarea
                             value={reviewNote}
                             onChange={(e) => setReviewNote(e.target.value)}
-                            placeholder="Optional note for the student (visible on reject / request revision)…"
+                            placeholder="Note for the student — required before reject / request revision, optional on approve…"
                             rows={2}
                             className="w-full rounded-ciel-xs border border-ciel-border px-2.5 py-1.5 text-xs text-ciel-text placeholder:text-ciel-text-soft focus:border-ciel-purple/50 focus:outline-none"
                         />
+                        {missingReturnReason ? (
+                            <p className="text-[10.5px] font-semibold text-ciel-text-soft">A reason is required before returning or rejecting a submission — the student is entitled to know why.</p>
+                        ) : null}
                         <div className="flex shrink-0 flex-wrap justify-end gap-2">
                             <button
                                 type="button"
-                                onClick={() => onSupervisorReview("reject", reviewNote.trim() || undefined)}
-                                disabled={reviewing}
-                                className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                onClick={() => onSupervisorReview("reject", reviewNote.trim())}
+                                disabled={reviewing || missingReturnReason}
+                                className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                ❌ Reject
+                                Reject
                             </button>
                             <button
                                 type="button"
-                                onClick={() => onSupervisorReview("revision", reviewNote.trim() || undefined)}
-                                disabled={reviewing}
-                                className="ciel-transition rounded-ciel-xs border-2 border-amber-200 bg-white px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                                onClick={() => onSupervisorReview("revision", reviewNote.trim())}
+                                disabled={reviewing || missingReturnReason}
+                                className="ciel-transition rounded-ciel-xs border-2 border-amber-200 bg-white px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                🔁 Request revision
+                                Request revision
                             </button>
                             <button
                                 type="button"
                                 onClick={() => onSupervisorReview("approve", reviewNote.trim() || undefined)}
                                 disabled={reviewing}
-                                className="ciel-transition rounded-ciel-xs border-2 border-ciel-purple bg-ciel-purple px-3 py-2 text-xs font-bold text-white hover:bg-ciel-purple-deep disabled:opacity-50"
+                                className="ciel-transition rounded-ciel-xs border-2 border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
                                 ✓ Approve — make live
                             </button>
                         </div>
                     </div>
-                )}
+                    );
+                })()}
             </div>
         </div>
     );

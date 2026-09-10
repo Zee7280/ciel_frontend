@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -12,6 +13,7 @@ import { mailtoHref } from "@/utils/reminderLinks";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { fypStatusLabel } from "@/utils/pathReviewStatus";
 import {
     type FypEntry,
     type FypSectionSummaries,
@@ -24,6 +26,7 @@ import {
 import {
     type FypV9FormState,
     type FypV9RouteKey,
+    type FypV9TableRow,
     EMPTY_FYP_V9,
     FYP_V9_AREAS,
     FYP_V9_CONTRIB,
@@ -87,17 +90,25 @@ export default function FypV9Workspace() {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [flashOpen, setFlashOpen] = useState(false);
+    const [declarationChecked, setDeclarationChecked] = useState(false);
+    const saveTailRef = useRef(Promise.resolve());
 
     useEffect(() => {
         authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
-                if (result?.data) {
-                    const data = mergeFypEntry(EMPTY_FYP, result.data as Partial<FypEntry>);
-                    setEntry(data);
-                    setV9(hydrateV9(data));
-                    setStep(Math.min(7, data.stepCompleted ?? 0));
+                const data = result?.data
+                    ? mergeFypEntry(EMPTY_FYP, result.data as Partial<FypEntry>)
+                    : EMPTY_FYP;
+                // The graduation-year field only ever showed "2026" as a placeholder fallback in the
+                // input's value prop — nothing persisted it until the student actually touched the
+                // field. Default it into state so what's visibly filled in is actually saved.
+                if (!data.projectInfo?.graduationYear) {
+                    data.projectInfo = { ...data.projectInfo, graduationYear: "2026" };
                 }
+                setEntry(data);
+                setV9(hydrateV9(data));
+                setStep(Math.min(7, data.stepCompleted ?? 0));
             })
             .finally(() => setLoading(false));
     }, []);
@@ -162,6 +173,17 @@ export default function FypV9Workspace() {
                 : v9.validationSummary.trim()
                   ? "Conceptual / proposed"
                   : undefined;
+        // The merit model reads honesty/outcome points off findings.metrics[].status — without this,
+        // picking "Measured / tested result" above with no metrics tagged "Measured" triggers a false
+        // "claims measured but has no proof" penalty regardless of how much real data was entered.
+        const metrics = v9.qRows
+            .filter((r) => r.a.trim() || r.b.trim())
+            .slice(0, 3)
+            .map((r) => ({
+                name: r.a.trim() || undefined,
+                value: r.b.trim() || undefined,
+                status: r.d || undefined,
+            }));
         const teamMembers = isTeam
             ? team.map((m) => ({
                   ...m,
@@ -175,6 +197,7 @@ export default function FypV9Workspace() {
         }));
         return {
             projectTitle: entry.projectInfo?.title || entry.projectTitle,
+            addedNote: entry.addedNote ?? undefined,
             projectInfo: {
                 ...entry.projectInfo,
                 v9Form: { ...v9 } as unknown as Record<string, unknown>,
@@ -217,6 +240,7 @@ export default function FypV9Workspace() {
                 limitation: lim,
                 limitationDetail: v9.limitationOther || undefined,
                 evidenceStatus,
+                metrics: metrics.length ? metrics : undefined,
             },
             routeDetails: {
                 ...entry.routeDetails,
@@ -242,7 +266,24 @@ export default function FypV9Workspace() {
         };
     };
 
-    const save = async (advanceTo?: number, sectionSummaries?: FypSectionSummaries, status?: "draft" | "submitted") => {
+    const save = (advanceTo?: number, sectionSummaries?: FypSectionSummaries, status?: "draft" | "submitted"): Promise<boolean> => {
+        const run = () => saveNow(advanceTo, sectionSummaries, status);
+        // Chain onto the previous save instead of firing concurrently — a double-click or an
+        // upload racing a step-advance can otherwise send overlapping PATCHes whose responses
+        // land out of order and stomp each other via the setEntry merge below.
+        const queued = saveTailRef.current.then(run, run);
+        saveTailRef.current = queued.then(
+            () => undefined,
+            () => undefined,
+        );
+        return queued;
+    };
+
+    const saveNow = async (advanceTo?: number, sectionSummaries?: FypSectionSummaries, status?: "draft" | "submitted") => {
+        if (entry.isOwner === false) {
+            setError("Only the lead author can edit this FYP record.");
+            return false;
+        }
         setSaving(true);
         setError(null);
         const nextStep = advanceTo !== undefined ? Math.max(entry.stepCompleted, advanceTo) : entry.stepCompleted;
@@ -294,6 +335,10 @@ export default function FypV9Workspace() {
     };
 
     const handleFile = async (file: File) => {
+        if (entry.isOwner === false) {
+            setError("Only the lead author can upload files on this FYP record.");
+            return;
+        }
         setUploading(true);
         setError(null);
         try {
@@ -389,22 +434,44 @@ export default function FypV9Workspace() {
         await goNext(1);
     };
 
+    // FYP_V9_REVIEW_LABELS order is ["Project & Route", "Purpose & Roadmap", "Project Pathway",
+    // "Evidence & Analysis", "Outcome & Key Findings", "Sustainability", "Reflection"] — that does NOT
+    // line up 1:1 with FypSectionSummaries' schema keys (project/background/objectives/methodology/
+    // findings/sdg/reflection). "Project Pathway" (review[2]) IS the methodology, and "Evidence &
+    // Analysis" (review[3]) is the evidence half of how the work was validated — both belong under
+    // "methodology", not under "objectives"/"methodology" by raw index, which used to show the wrong
+    // text under the wrong heading on the final flashcard. There is no dedicated V9 step for
+    // "objectives" alone, so that key is intentionally left unset rather than duplicating text.
+    const buildSectionSummaries = (): FypSectionSummaries => ({
+        project: review[0]?.text,
+        background: review[1]?.text,
+        methodology: [review[2]?.text, review[3]?.text].filter(Boolean).join(" "),
+        findings: review[4]?.text,
+        sdg: review[5]?.text,
+        reflection: review[6]?.text,
+    });
+
     const submitRecord = async () => {
-        const summariesOut: FypSectionSummaries = {
-            project: review[0]?.text,
-            background: review[1]?.text,
-            objectives: review[2]?.text,
-            methodology: review[3]?.text,
-            findings: review[4]?.text,
-            sdg: review[5]?.text,
-            reflection: review[6]?.text,
-        };
-        const ok = await save(8, summariesOut, "submitted");
+        const ok = await save(8, buildSectionSummaries(), "submitted");
         if (ok) {
             setEditing(false);
             setFlashOpen(false);
         }
     };
+
+    const statusChip = fypStatusLabel(entry);
+    const submittedSubtitle =
+        !isOwner && entry.status !== "submitted"
+            ? "Shared team record — the lead author owns edits; you can track the same progress, files and status."
+            : entry.supervisorApprovalStatus === "revision_requested"
+              ? "Your supervisor asked for revision — reopen the record to fix and resubmit."
+              : entry.supervisorApprovalStatus === "rejected"
+                ? "Your supervisor rejected this record — reopen it to fix and resubmit."
+                : entry.supervisorApprovalStatus === "approved"
+                  ? "Approved and live on your impact wall, university showcase, and CIEL PK."
+                  : isOwner
+                    ? "Submitted to your supervisor. You can reopen it if they ask for revision."
+                    : "Shared team record — the lead author owns edits; you can track the same status and files.";
 
     if (showCard) {
         return (
@@ -413,21 +480,38 @@ export default function FypV9Workspace() {
                 <CourseworkHero
                     kicker="CIEL PK · ACADEMIC PATH · FINAL YEAR PROJECTS"
                     title="Your FYP record"
-                    subtitle="Submitted to your supervisor. You can reopen it if they ask for revision."
+                    subtitle={submittedSubtitle}
                     gradient="linear-gradient(125deg,#0e2a3a,#322866 58%,#126783 120%)"
-                    stats={[{ value: entry.supervisorApprovalStatus === "approved" ? "Approved" : "Submitted", label: "STATUS" }]}
+                    stats={[{ value: statusChip.label, label: "STATUS" }]}
                 />
                 <div className="mt-5">
                     <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← FYP hub" />
                 </div>
                 {!isOwner && (
-                    <div className="mb-3 rounded-xl border border-[#cfe2ff] bg-[#eaf3ff] px-4 py-2.5 text-xs font-semibold text-[#355c88]">
+                    <div className="mb-3 rounded-xl border border-ciel-indigo/25 bg-ciel-indigo-soft px-4 py-2.5 text-xs font-semibold text-ciel-indigo">
                         👥 You&apos;re named as a co-author on this record — the lead author owns it and is the only one who can edit or submit changes.
                     </div>
                 )}
                 <ThesisCard entry={entry} defaultOpen />
                 {isOwner && entry.status === "submitted" && (
-                    <button type="button" onClick={() => { setReview(Array.from({ length: 7 }, () => ({ accepted: false, edited: false, text: "" }))); setEditing(true); setStep(0); }} className="mt-4 rounded-xl border border-[#e7eaf1] px-4 py-2.5 text-sm font-bold text-[#71809b]">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (
+                                entry.supervisorApprovalStatus === "approved" &&
+                                !window.confirm(
+                                    "This FYP is already approved and ranked. Editing it will send it back for supervisor re-review and temporarily remove it from rankings and impact walls until it's approved again. Continue?",
+                                )
+                            ) {
+                                return;
+                            }
+                            setReview(Array.from({ length: 7 }, () => ({ accepted: false, edited: false, text: "" })));
+                            setDeclarationChecked(false);
+                            setEditing(true);
+                            setStep(0);
+                        }}
+                        className="mt-4 rounded-xl border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-soft"
+                    >
                         Edit this record
                     </button>
                 )}
@@ -468,20 +552,19 @@ export default function FypV9Workspace() {
                             <button
                                 key={name}
                                 type="button"
-                                onClick={() => i <= entry.stepCompleted && setStep(i)}
-                                disabled={i > entry.stepCompleted}
+                                onClick={() => setStep(i)}
                                 title={name}
                                 className={clsx(
-                                    "relative min-w-16 flex-1 rounded-[11px] border px-1 py-[7px] text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black disabled:cursor-not-allowed disabled:opacity-40",
+                                    "relative min-w-16 flex-1 rounded-[11px] border px-1 py-[7px] text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple",
                                     active
-                                        ? "border-[#d5aa46] bg-black text-white shadow-[inset_0_0_0_1px_#d5aa46]"
+                                        ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep"
                                         : done
-                                          ? "border-black bg-black text-white"
-                                          : "border-black bg-black text-white/70 hover:text-white",
+                                          ? "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep"
+                                          : "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-purple/40",
                                 )}
                             >
                                 <div className="text-sm leading-none">{done ? "✓" : i + 1}</div>
-                                <div className={clsx("mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide", active ? "text-white" : "text-white/75")}>
+                                <div className="mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide">
                                     {name}
                                 </div>
                             </button>
@@ -489,27 +572,27 @@ export default function FypV9Workspace() {
                     })}
                 </div>
             </div>
-            <div className="mb-4 mt-2 rounded-[14px] border border-[#e7eaf1] bg-white px-3.5 py-2.5">
+            <div className="mb-4 mt-2 rounded-[14px] border border-ciel-border bg-white px-3.5 py-2.5">
                 <div className="flex items-center justify-between text-[11px] font-extrabold">
                     <span>✨ Your FYP story is taking shape</span>
-                    <span className="text-[#71809b]">{step === 0 ? "Getting started" : `Step ${step + 1} of 8`}</span>
+                    <span className="text-ciel-text-soft">{step === 0 ? "Getting started" : `Step ${step + 1} of 8`}</span>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#edf0f6]">
-                    <i className="block h-full rounded-full bg-gradient-to-r from-[#6d4aff] via-[#09a6c7] to-[#169b62]" style={{ width: `${((step + 1) / 8) * 100}%` }} />
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-border">
+                    <i className="block h-full rounded-full bg-gradient-to-r from-ciel-purple via-ciel-purple to-ciel-green" style={{ width: `${((step + 1) / 8) * 100}%` }} />
                 </div>
             </div>
 
-            {error ? <div className="mb-3 rounded-xl border border-[#f0d9b6] bg-[#fff7e8] px-3.5 py-2.5 text-xs text-[#7c561e]">{error}</div> : null}
+            {error ? <div className="mb-3 rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft px-3.5 py-2.5 text-xs text-ciel-amber">{error}</div> : null}
 
-            <div className="rounded-[18px] border border-[#e7eaf1] bg-white p-[22px] shadow-[0_4px_14px_rgba(14,42,58,.025)]">
+            <div className="rounded-[18px] border border-ciel-border bg-white p-[22px] shadow-[0_4px_14px_rgba(14,42,58,.025)]">
                 {step === 0 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 1 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 1 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Project identity & route 🧭</h2>
-                        <p className="mt-1 text-[12.5px] text-[#71809b]">Choose your academic area, discipline and the form of final work your programme expects.</p>
-                        <div className="mt-3 flex gap-2 rounded-[11px] border border-[#e7eaf1] bg-[#f8fafc] px-3 py-2.5 text-[10.8px] leading-relaxed text-[#71809b]">
+                        <p className="mt-1 text-[12.5px] text-ciel-text-soft">Choose your academic area, discipline and the form of final work your programme expects.</p>
+                        <div className="mt-3 flex gap-2 rounded-[11px] border border-ciel-border bg-ciel-page/60 px-3 py-2.5 text-[10.8px] leading-relaxed text-ciel-text-soft">
                             <span>🎓</span>
-                            <div><b className="text-[#172033]">Broad national coverage:</b> academic areas follow HEC classifications. If your programme uses a different title, choose Other and type it.</div>
+                            <div><b className="text-ciel-text">Broad national coverage:</b> academic areas follow HEC classifications. If your programme uses a different title, choose Other and type it.</div>
                         </div>
                         <Field label="Final Year Project title" required>
                             <input value={entry.projectInfo?.title ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectTitle: e.target.value, projectInfo: { ...s.projectInfo, title: e.target.value } }))} placeholder="Working or final project title" className={fieldClass} />
@@ -542,8 +625,8 @@ export default function FypV9Workspace() {
                                 <input value={entry.projectInfo?.degree ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, degree: e.target.value } }))} placeholder="e.g. BBA, BS Computer Science" className={fieldClass} />
                             </Field>
                         </div>
-                        {area ? <div className="mt-2 rounded-[10px] border border-[#e7eaf1] bg-[#f7f8fc] px-3 py-2 text-[10.7px] text-[#53647f]"><b>{area.label}</b><br />{area.council}</div> : null}
-                        <p className="mt-2 rounded-[11px] border border-[#f2dfb8] bg-[#fffaf0] px-3 py-2.5 text-[10.8px] leading-relaxed text-[#765b2c]"><b>Can&apos;t find the exact name?</b> Always preserve your university&apos;s exact programme title below.</p>
+                        {area ? <div className="mt-2 rounded-[10px] border border-ciel-border bg-ciel-page/60 px-3 py-2 text-[10.7px] text-ciel-text-mid"><b>{area.label}</b><br />{area.council}</div> : null}
+                        <p className="mt-2 rounded-[11px] border border-ciel-amber/25 bg-ciel-amber-soft/60 px-3 py-2.5 text-[10.8px] leading-relaxed text-ciel-amber"><b>Can&apos;t find the exact name?</b> Always preserve your university&apos;s exact programme title below.</p>
                         <Field label="Official programme / qualification name exactly as your university records it">
                             <input value={v9.officialProgram} onChange={(e) => patchV9({ officialProgram: e.target.value })} placeholder="e.g. BS Strategic Studies" className={fieldClass} />
                         </Field>
@@ -579,47 +662,48 @@ export default function FypV9Workspace() {
                             </Field>
                         </div>
                         {isTeam && (
-                            <div className="mt-3 rounded-[14px] border border-[#ddd8ff] bg-gradient-to-br from-white to-[#faf8ff] p-3.5">
+                            <div className="mt-3 rounded-[14px] border border-ciel-purple/25 bg-gradient-to-br from-white to-ciel-purple-soft/40 p-3.5">
                                 <div className="mb-2 flex items-start justify-between gap-2">
                                     <div>
                                         <b className="text-xs">👥 Group members</b>
-                                        <p className="text-[11px] text-[#71809b]">Add every group member so one shared FYP record connects the full team.</p>
+                                        <p className="text-[11px] text-ciel-text-soft">Add every group member so one shared FYP record connects the full team.</p>
                                     </div>
-                                    <span className="rounded-full bg-[#f1edff] px-2 py-1 text-[9px] font-black text-[#6d4aff]">SHARED PROJECT RECORD</span>
+                                    <span className="rounded-full bg-ciel-purple-soft px-2 py-1 text-[9px] font-black text-ciel-purple">SHARED PROJECT RECORD</span>
                                 </div>
                                 {(team.length ? team : [emptyTeamMember(), emptyTeamMember()]).map((m, i) => (
-                                    <div key={i} className="mb-2 grid gap-2 border-t border-dashed border-[#e7eaf1] pt-2 sm:grid-cols-2 lg:grid-cols-6">
+                                    <div key={i} className="mb-2 grid gap-2 border-t border-dashed border-ciel-border pt-2 sm:grid-cols-2 lg:grid-cols-6">
                                         <div>
-                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-[#71809b]">Name *</label>
+                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Name *</label>
                                             <input value={m.name} onChange={(e) => updateTeam(i, { name: e.target.value })} placeholder="Full name" className={fieldClass} />
                                         </div>
                                         <div>
-                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-[#71809b]">Roll No. *</label>
+                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Roll No. *</label>
                                             <input value={m.rollNumber ?? ""} onChange={(e) => updateTeam(i, { rollNumber: e.target.value })} placeholder="Roll / student ID" className={fieldClass} />
                                         </div>
                                         <div>
-                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-[#71809b]">Email *</label>
+                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Email *</label>
                                             <input type="email" value={m.email ?? ""} onChange={(e) => updateTeam(i, { email: e.target.value })} placeholder="student@university.edu.pk" className={fieldClass} />
                                             <TeamInviteBadge kind="fyp" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                         </div>
                                         <div>
-                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-[#71809b]">Country Code *</label>
+                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Country Code *</label>
                                             <input type="tel" inputMode="tel" maxLength={5} value={m.whatsappCode ?? "+92"} onChange={(e) => updateTeam(i, { whatsappCode: e.target.value })} placeholder="+92" className={clsx(fieldClass, "text-center font-extrabold")} />
                                         </div>
                                         <div>
-                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-[#71809b]">WhatsApp Number *</label>
+                                            <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">WhatsApp Number *</label>
                                             <input type="tel" inputMode="numeric" maxLength={15} value={m.whatsappNumber ?? ""} onChange={(e) => updateTeam(i, { whatsappNumber: e.target.value })} placeholder="3001234567" className={fieldClass} />
                                         </div>
                                         <button
                                             type="button"
                                             title="Remove member"
+                                            aria-label={`Remove group member ${i + 1}${m.name ? `: ${m.name}` : ""}`}
                                             onClick={() => {
                                                 const next = (team.length ? team : [emptyTeamMember(), emptyTeamMember()]).filter((_, j) => j !== i);
                                                 setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, teamMembers: next } }));
                                             }}
-                                            className="self-end rounded-[9px] border border-[#efced4] bg-[#fff5f6] px-3 py-2.5 font-black text-[#b34d5c]"
+                                            className="self-end rounded-[9px] border border-red-200 bg-red-50 px-3 py-2.5 text-red-600"
                                         >
-                                            ×
+                                            <X className="h-4 w-4" aria-hidden />
                                         </button>
                                         {(m.email?.trim() || (normalizeCountryCode(m.whatsappCode) && normalizeLocalNumber(m.whatsappNumber))) ? (
                                             <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-6">
@@ -630,7 +714,7 @@ export default function FypV9Workspace() {
                                                             `A quick note about our FYP "${entry.projectInfo?.title || "record"}" on CIEL PK`,
                                                             `Hi ${m.name || "there"},\n\nJust checking in on our FYP record "${entry.projectInfo?.title || "record"}" on CIEL PK — could you confirm your invite and add your details when you get a chance?\n\nThanks,\n${entry.projectInfo?.studentName || "Your teammate"}`,
                                                         )}
-                                                        className="rounded-full border border-[#e7eaf1] px-3 py-1 text-[10px] font-bold text-[#53647f] transition hover:border-[#6d4aff]/40"
+                                                        className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid transition hover:border-ciel-purple/40"
                                                     >
                                                         ✉️ Email {m.name || `Member ${i + 1}`}
                                                     </a>
@@ -640,7 +724,7 @@ export default function FypV9Workspace() {
                                                         href={`https://wa.me/${normalizeCountryCode(m.whatsappCode).replace("+", "")}${normalizeLocalNumber(m.whatsappNumber)}?text=${encodeURIComponent(`Hi ${m.name || "there"} — quick check-in on our FYP record "${entry.projectInfo?.title || "our FYP"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`)}`}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="rounded-full border border-[#e7eaf1] px-3 py-1 text-[10px] font-bold text-[#53647f] transition hover:border-[#6d4aff]/40"
+                                                        className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid transition hover:border-ciel-purple/40"
                                                     >
                                                         💬 WhatsApp
                                                     </a>
@@ -649,7 +733,7 @@ export default function FypV9Workspace() {
                                         ) : null}
                                     </div>
                                 ))}
-                                <button type="button" onClick={() => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, teamMembers: [...normalizeFypTeamMembers(s.projectInfo?.teamMembers), emptyTeamMember()] } }))} className="mt-1 rounded-lg border border-[#cfc6ff] bg-[#f8f5ff] px-2.5 py-1.5 text-[10.5px] font-black text-[#5d45c8]">＋ Add another member</button>
+                                <button type="button" onClick={() => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, teamMembers: [...normalizeFypTeamMembers(s.projectInfo?.teamMembers), emptyTeamMember()] } }))} className="mt-1 rounded-lg border border-ciel-purple/30 bg-ciel-purple-soft/50 px-2.5 py-1.5 text-[10.5px] font-black text-ciel-purple-deep">＋ Add another member</button>
                                 <Field label="Your role / responsibility">
                                     <input value={v9.teamRole} onChange={(e) => patchV9({ teamRole: e.target.value })} placeholder="Your main contribution to the team" className={fieldClass} />
                                 </Field>
@@ -663,13 +747,13 @@ export default function FypV9Workspace() {
                                 <input type="email" value={entry.projectInfo?.supervisorEmail ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, supervisorEmail: e.target.value } }))} placeholder="name@university.edu.pk" className={fieldClass} />
                             </Field>
                         </div>
-                        <div className="mt-3 rounded-[14px] border border-[#cfe9df] bg-gradient-to-r from-[#f6fcf9] to-[#f5f9ff] p-3.5">
+                        <div className="mt-3 rounded-[14px] border border-ciel-green/25 bg-gradient-to-r from-ciel-green-soft/40 to-ciel-indigo-soft/40 p-3.5">
                             <div className="flex items-center justify-between gap-2">
                                 <div>
                                     <b className="text-xs">🔗 Automatic Project Connections</b>
-                                    <p className="text-[11px] text-[#71809b]">After Section 1 is completed, this FYP record becomes one connected workspace.</p>
+                                    <p className="text-[11px] text-ciel-text-soft">After Section 1 is completed, this FYP record becomes one connected workspace.</p>
                                 </div>
-                                <span className={clsx("rounded-full px-2 py-1 text-[9px] font-black", connectionReady ? "bg-[#dff5eb] text-[#167052]" : "bg-[#fff4da] text-[#8b5e10]")}>{connectionReady ? "Ready to connect" : "Complete Section 1"}</span>
+                                <span className={clsx("rounded-full px-2 py-1 text-[9px] font-black", connectionReady ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-amber-soft text-ciel-amber")}>{connectionReady ? "Ready to connect" : "Complete Section 1"}</span>
                             </div>
                             <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-4">
                                 {[
@@ -678,8 +762,8 @@ export default function FypV9Workspace() {
                                     ["Group / Student", isTeam ? (team.map((m) => m.name).filter(Boolean).join(", ") || "Add group members") : "Individual project"],
                                     ["CIEL PK", "CIEL PK workspace"],
                                 ].map(([k, v]) => (
-                                    <div key={k} className="rounded-[10px] border border-[#e7eaf1] bg-white p-2">
-                                        <div className="text-[8px] font-black uppercase tracking-wide text-[#71809b]">{k}</div>
+                                    <div key={k} className="rounded-[10px] border border-ciel-border bg-white p-2">
+                                        <div className="text-[8px] font-black uppercase tracking-wide text-ciel-text-soft">{k}</div>
                                         <div className="mt-0.5 text-[10.5px] font-extrabold leading-snug">{v}</div>
                                     </div>
                                 ))}
@@ -688,10 +772,10 @@ export default function FypV9Workspace() {
                         <Field label="What is the PRIMARY form of your Final Year Project?" required hint="The route is based on what you finally produce — not simply your school name.">
                             {suggested.length ? (
                                 <div className="mb-2">
-                                    <p className="text-[10.5px] text-[#71809b]"><b>Likely routes for this area:</b> suggestions only.</p>
+                                    <p className="text-[10.5px] text-ciel-text-soft"><b>Likely routes for this area:</b> suggestions only.</p>
                                     <div className="mt-1 flex flex-wrap gap-1.5">
                                         {suggested.map((k) => (
-                                            <button key={k} type="button" onClick={() => pickRoute(k)} className="rounded-full border border-[#d8d0ff] bg-[#faf8ff] px-2.5 py-1 text-[10px] font-extrabold text-[#6048c6]">
+                                            <button key={k} type="button" onClick={() => pickRoute(k)} className="rounded-full border border-ciel-purple/25 bg-ciel-purple-soft/40 px-2.5 py-1 text-[10px] font-extrabold text-ciel-purple-deep">
                                                 {FYP_V9_ROUTES[k].icon} {FYP_V9_ROUTES[k].title}
                                             </button>
                                         ))}
@@ -703,14 +787,14 @@ export default function FypV9Workspace() {
                                     const r = FYP_V9_ROUTES[k];
                                     const sel = routeKey === k;
                                     return (
-                                        <button key={k} type="button" onClick={() => pickRoute(k)} className={clsx("relative overflow-hidden rounded-[14px] border-[1.5px] p-3.5 text-left", sel ? "border-[#6d4aff] bg-gradient-to-b from-[#fbfaff] to-[#f4f0ff]" : "border-[#e7eaf1] bg-white hover:border-[#c7befd]")}>
-                                            <span className={clsx("absolute bottom-0 left-0 top-0 w-1 bg-[#6d4aff]", sel ? "opacity-100" : "opacity-20")} />
+                                        <button key={k} type="button" onClick={() => pickRoute(k)} className={clsx("relative overflow-hidden rounded-[14px] border-[1.5px] p-3.5 text-left", sel ? "border-ciel-purple bg-gradient-to-b from-white to-ciel-purple-soft" : "border-ciel-border bg-white hover:border-ciel-purple/40")}>
+                                            <span className={clsx("absolute bottom-0 left-0 top-0 w-1 bg-ciel-purple", sel ? "opacity-100" : "opacity-20")} />
                                             <div className="flex gap-3">
                                                 <span className="text-[25px] leading-none">{r.icon}</span>
                                                 <div>
                                                     <div className="text-[13px] font-black">{r.title}</div>
-                                                    <div className="mt-0.5 text-[11.5px] leading-snug text-[#71809b]">{r.desc}</div>
-                                                    <span className="mt-1.5 inline-block rounded-full bg-[#ece6ff] px-1.5 py-0.5 text-[9px] font-black text-[#6c58c8]">{r.tag}</span>
+                                                    <div className="mt-0.5 text-[11.5px] leading-snug text-ciel-text-soft">{r.desc}</div>
+                                                    <span className="mt-1.5 inline-block rounded-full bg-ciel-purple-soft px-1.5 py-0.5 text-[9px] font-black text-ciel-purple-deep">{r.tag}</span>
                                                 </div>
                                             </div>
                                         </button>
@@ -718,7 +802,7 @@ export default function FypV9Workspace() {
                                 })}
                             </div>
                             {routeKey === "other" ? <input value={v9.v9RouteOther} onChange={(e) => patchV9({ v9RouteOther: e.target.value })} placeholder="Describe your FYP route" className={clsx(fieldClass, "mt-2")} /> : null}
-                            {routeKey ? <div className="mt-3 rounded-xl border border-[#cceede] bg-[#eaf8f2] px-3.5 py-2.5 text-[11.8px] text-[#276f53]"><b>{FYP_V9_ROUTES[routeKey].icon} Route selected:</b> {FYP_V9_ROUTES[routeKey].title}.</div> : null}
+                            {routeKey ? <div className="mt-3 rounded-xl border border-ciel-green/25 bg-ciel-green-soft px-3.5 py-2.5 text-[11.8px] text-ciel-green-deep"><b>{FYP_V9_ROUTES[routeKey].icon} Route selected:</b> {FYP_V9_ROUTES[routeKey].title}.</div> : null}
                         </Field>
                         <SummaryBox text={summaries[0]} />
                         <StepNav hideBack onNext={completeSectionOne} nextLabel="Connect project & build roadmap →" saving={saving} />
@@ -727,7 +811,7 @@ export default function FypV9Workspace() {
 
                 {step === 1 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 2 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 2 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Purpose, brief & roadmap 🎯</h2>
                         <Field label="What is the central problem, question, brief or creative intention?" required>
                             <textarea rows={3} value={v9.focus} onChange={(e) => patchV9({ focus: e.target.value })} placeholder="In 2–4 lines, what are you trying to investigate, design, build, create, improve or solve?" className={fieldClass} />
@@ -756,8 +840,8 @@ export default function FypV9Workspace() {
                                         ? v9.roadmap
                                         : (routeKey ? FYP_V9_ROADMAPS[routeKey] : FYP_V9_ROADMAPS.other).map(([stage, goal]) => ({ stage, goal }));
                                     return (
-                                    <div key={i} className="grid grid-cols-[38px_1fr] items-center gap-2 rounded-[11px] border border-[#e7eaf1] bg-[#fbfcfe] p-2 md:grid-cols-[38px_180px_1fr]">
-                                        <div className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-[#f1edff] text-[11px] font-black text-[#6d4aff]">{i + 1}</div>
+                                    <div key={i} className="grid grid-cols-[38px_1fr] items-center gap-2 rounded-[11px] border border-ciel-border bg-ciel-page/50 p-2 md:grid-cols-[38px_180px_1fr]">
+                                        <div className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-ciel-purple-soft text-[11px] font-black text-ciel-purple">{i + 1}</div>
                                         <input value={row.stage} onChange={(e) => patchV9({ roadmap: road.map((r, j) => (j === i ? { ...r, stage: e.target.value } : r)) })} className={fieldClass} />
                                         <input value={row.goal} onChange={(e) => patchV9({ roadmap: road.map((r, j) => (j === i ? { ...r, goal: e.target.value } : r)) })} className={clsx(fieldClass, "col-span-2 md:col-auto")} />
                                     </div>
@@ -772,16 +856,16 @@ export default function FypV9Workspace() {
 
                 {step === 2 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 3 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 3 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Your project pathway 🛠️</h2>
-                        <p className="mt-1 text-[12.5px] text-[#71809b]">Only the pathway relevant to your selected FYP appears here.</p>
+                        <p className="mt-1 text-[12.5px] text-ciel-text-soft">Only the pathway relevant to your selected FYP appears here.</p>
                         {!pathway ? (
-                            <div className="rounded-xl border border-[#f0d9b6] bg-[#fff7e8] p-3 text-[11.8px] text-[#7c561e]">Please go back and select your primary FYP route first.</div>
+                            <div className="rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft p-3 text-[11.8px] text-ciel-amber">Please go back and select your primary FYP route first.</div>
                         ) : (
-                            <div className="mt-3 rounded-[15px] border border-[#ded9ff] bg-[#fcfbff] p-4">
+                            <div className="mt-3 rounded-[15px] border border-ciel-purple/25 bg-ciel-purple-soft/30 p-4">
                                 <div className="mb-2 flex items-center gap-2">
                                     <b className="text-[13.5px]">{pathway.title}</b>
-                                    <span className="rounded-full bg-[#f1edff] px-2 py-0.5 text-[10px] font-black text-[#6245cf]">{pathway.tag}</span>
+                                    <span className="rounded-full bg-ciel-purple-soft px-2 py-0.5 text-[10px] font-black text-ciel-purple-deep">{pathway.tag}</span>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     {pathway.fields.map((f) => (
@@ -821,18 +905,18 @@ export default function FypV9Workspace() {
 
                 {step === 3 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 4 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 4 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Evidence, analysis & testing 🔎</h2>
                         <Field label="How did you evaluate, test or support your work?">
                             <ChipGroup options={routeKey ? FYP_V9_EVIDENCE[routeKey] : FYP_V9_EVIDENCE.other} selected={v9.evidence} onToggle={(v) => patchV9({ evidence: toggleIn(v9.evidence, v) })} otherValue={v9.evidenceOther} onOtherChange={(val) => patchV9({ evidenceOther: val })} />
                         </Field>
-                        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] border-[#e7eaf1] bg-[#fbfcfe] px-3 py-3">
-                            <input type="checkbox" checked={v9.hasQuant} onChange={(e) => patchV9({ hasQuant: e.target.checked })} className="mt-0.5 accent-[#6d4aff]" />
-                            <div><b className="text-[12.5px]">My project includes quantitative / numerical analysis</b><div className="text-[11px] text-[#71809b]">Surveys, experiments, measurements, financial analysis, model performance or user testing.</div></div>
+                        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] border-ciel-border bg-ciel-page/50 px-3 py-3">
+                            <input type="checkbox" checked={v9.hasQuant} onChange={(e) => patchV9({ hasQuant: e.target.checked })} className="mt-0.5 accent-ciel-purple" />
+                            <div><b className="text-[12.5px]">My project includes quantitative / numerical analysis</b><div className="text-[11px] text-ciel-text-soft">Surveys, experiments, measurements, financial analysis, model performance or user testing.</div></div>
                         </label>
                         {v9.hasQuant && (
-                            <div className="mt-2 rounded-[15px] border border-[#ded9ff] bg-[#fcfbff] p-4">
-                                <div className="mb-2 flex items-center gap-2"><b>📊 Quantitative analysis</b><span className="rounded-full bg-[#f1edff] px-2 py-0.5 text-[10px] font-black text-[#6245cf]">ONLY IF APPLICABLE</span></div>
+                            <div className="mt-2 rounded-[15px] border border-ciel-purple/25 bg-ciel-purple-soft/30 p-4">
+                                <div className="mb-2 flex items-center gap-2"><b>📊 Quantitative analysis</b><span className="rounded-full bg-ciel-purple-soft px-2 py-0.5 text-[10px] font-black text-ciel-purple-deep">ONLY IF APPLICABLE</span></div>
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <Field label="Population / dataset / test universe"><input value={v9.qPopulation} onChange={(e) => patchV9({ qPopulation: e.target.value })} className={fieldClass} /></Field>
                                     <Field label="Sample / observations / test runs"><input value={v9.qSample} onChange={(e) => patchV9({ qSample: e.target.value })} className={fieldClass} /></Field>
@@ -850,32 +934,44 @@ export default function FypV9Workspace() {
                                 <Field label="Analysis used">
                                     <ChipGroup options={FYP_V9_Q_ANALYSIS} selected={v9.qAnalysis} onToggle={(v) => patchV9({ qAnalysis: toggleIn(v9.qAnalysis, v) })} otherValue={v9.qAnalysisOther} onOtherChange={(val) => patchV9({ qAnalysisOther: val })} />
                                 </Field>
-                                <Field label="Key numerical result(s)">
+                                <Field label="Key numerical result(s)" hint="Mark each result's status honestly — this feeds your evidence-quality score, and claiming 'measured' with no measured results actually costs points.">
                                 <div className="overflow-x-auto">
                                     <table className="w-full border-collapse text-[11px]">
-                                        <thead><tr className="bg-[#f8f9fc] text-[9.5px] uppercase text-[#71809b]"><th className="border border-[#e7eaf1] p-2 text-left">Measure / test</th><th className="border border-[#e7eaf1] p-2 text-left">Result</th><th className="border border-[#e7eaf1] p-2 text-left">Interpretation</th></tr></thead>
+                                        <thead><tr className="bg-ciel-page/60 text-[9.5px] uppercase text-ciel-text-soft"><th className="border border-ciel-border p-2 text-left">Measure / test</th><th className="border border-ciel-border p-2 text-left">Result</th><th className="border border-ciel-border p-2 text-left">Interpretation</th><th className="border border-ciel-border p-2 text-left">Status</th></tr></thead>
                                         <tbody>
                                             {v9.qRows.map((row, i) => (
                                                 <tr key={i}>
                                                     {(["a", "b", "c"] as const).map((k) => (
-                                                        <td key={k} className="border border-[#e7eaf1] p-1"><input value={row[k]} onChange={(e) => patchV9({ qRows: v9.qRows.map((r, j) => (j === i ? { ...r, [k]: e.target.value } : r)) })} className={fieldClass} /></td>
+                                                        <td key={k} className="border border-ciel-border p-1"><input value={row[k]} onChange={(e) => patchV9({ qRows: v9.qRows.map((r, j) => (j === i ? { ...r, [k]: e.target.value } : r)) })} className={fieldClass} /></td>
                                                     ))}
+                                                    <td className="border border-ciel-border p-1">
+                                                        <select
+                                                            value={row.d || ""}
+                                                            onChange={(e) => patchV9({ qRows: v9.qRows.map((r, j) => (j === i ? { ...r, d: e.target.value as FypV9TableRow["d"] } : r)) })}
+                                                            className={fieldClass}
+                                                        >
+                                                            <option value="">Select…</option>
+                                                            <option value="Measured">Measured / tested</option>
+                                                            <option value="Estimated">Estimated</option>
+                                                            <option value="Target">Target / goal</option>
+                                                        </select>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
                                 </Field>
-                                <button type="button" onClick={() => patchV9({ qRows: [...v9.qRows, { a: "", b: "", c: "" }] })} className="mt-2 text-[11px] font-black text-[#6d4aff]">+ add another numerical result</button>
+                                <button type="button" onClick={() => patchV9({ qRows: [...v9.qRows, { a: "", b: "", c: "", d: "" }] })} className="mt-2 text-[11px] font-black text-ciel-purple">+ add another numerical result</button>
                             </div>
                         )}
-                        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] border-[#e7eaf1] bg-[#fbfcfe] px-3 py-3">
-                            <input type="checkbox" checked={v9.hasQual} onChange={(e) => patchV9({ hasQual: e.target.checked })} className="mt-0.5 accent-[#6d4aff]" />
-                            <div><b className="text-[12.5px]">My project includes qualitative / interpretive evidence</b><div className="text-[11px] text-[#71809b]">Interviews, observation, textual/visual analysis, critique or open-ended feedback.</div></div>
+                        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] border-ciel-border bg-ciel-page/50 px-3 py-3">
+                            <input type="checkbox" checked={v9.hasQual} onChange={(e) => patchV9({ hasQual: e.target.checked })} className="mt-0.5 accent-ciel-purple" />
+                            <div><b className="text-[12.5px]">My project includes qualitative / interpretive evidence</b><div className="text-[11px] text-ciel-text-soft">Interviews, observation, textual/visual analysis, critique or open-ended feedback.</div></div>
                         </label>
                         {v9.hasQual && (
-                            <div className="mt-2 rounded-[15px] border border-[#ded9ff] bg-[#fcfbff] p-4">
-                                <div className="mb-2 flex items-center gap-2"><b>💬 Qualitative / interpretive evidence</b><span className="rounded-full bg-[#f1edff] px-2 py-0.5 text-[10px] font-black text-[#6245cf]">ONLY IF APPLICABLE</span></div>
+                            <div className="mt-2 rounded-[15px] border border-ciel-purple/25 bg-ciel-purple-soft/30 p-4">
+                                <div className="mb-2 flex items-center gap-2"><b>💬 Qualitative / interpretive evidence</b><span className="rounded-full bg-ciel-purple-soft px-2 py-0.5 text-[10px] font-black text-ciel-purple-deep">ONLY IF APPLICABLE</span></div>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <Field label="Data / participants / material"><input value={v9.qualData} onChange={(e) => patchV9({ qualData: e.target.value })} className={fieldClass} /></Field>
                                     <Field label="Analysis approach">
@@ -903,7 +999,7 @@ export default function FypV9Workspace() {
                                 ))}
                                 </div>
                                 </Field>
-                                <button type="button" onClick={() => patchV9({ qualRows: [...v9.qualRows, { a: "", b: "", c: "" }] })} className="text-[11px] font-black text-[#6d4aff]">+ add another qualitative theme</button>
+                                <button type="button" onClick={() => patchV9({ qualRows: [...v9.qualRows, { a: "", b: "", c: "" }] })} className="text-[11px] font-black text-ciel-purple">+ add another qualitative theme</button>
                                 <Field label="Headline qualitative insight (optional)"><input value={v9.qualInsight} onChange={(e) => patchV9({ qualInsight: e.target.value })} className={fieldClass} /></Field>
                             </div>
                         )}
@@ -922,7 +1018,7 @@ export default function FypV9Workspace() {
 
                 {step === 4 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 5 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 5 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Final outcome, key findings & contribution ✨</h2>
                         <Field label="Describe your final outcome" required>
                             <textarea rows={3} value={v9.outcome} onChange={(e) => patchV9({ outcome: e.target.value })} placeholder="What did you finally discover, build, design, create, recommend, prove, improve or deliver?" className={fieldClass} />
@@ -952,9 +1048,9 @@ export default function FypV9Workspace() {
 
                 {step === 5 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 6 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 6 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Sustainability relevance 🌍</h2>
-                        <p className="mt-1 text-[12.5px] text-[#71809b]">This is a separate classification — it does not determine the academic quality of your FYP.</p>
+                        <p className="mt-1 text-[12.5px] text-ciel-text-soft">This is a separate classification — it does not determine the academic quality of your FYP.</p>
                         <Field label="How relevant is sustainability to this project?">
                             <ChipGroup options={FYP_V9_SUSTAIN} selected={v9.sustain ? [v9.sustain] : []} onToggle={(v) => patchV9({ sustain: v })} single />
                         </Field>
@@ -971,7 +1067,7 @@ export default function FypV9Workspace() {
                                                     const cur = entry.sdgMapping?.entries || [];
                                                     const next = picked ? cur.filter((e) => e.goalNumber !== s.number) : cur.length >= 3 ? cur : [...cur, { goalNumber: s.number, targets: [] }];
                                                     setEntry((e) => ({ ...e, sdgMapping: { ...e.sdgMapping, entries: next, noSdgApplies: false } }));
-                                                }} className={clsx("rounded-[10px] p-2 text-left text-[10px] font-extrabold text-white", picked ? "opacity-100 ring-2 ring-[#192438]" : locked ? "opacity-20" : "opacity-40")} style={{ background: s.color }}>
+                                                }} className={clsx("rounded-[10px] p-2 text-left text-[10px] font-extrabold text-white", picked ? "opacity-100 ring-2 ring-ciel-text" : locked ? "opacity-20" : "opacity-40")} style={{ background: s.color }}>
                                                     <strong className="block text-base">{s.number}</strong>{s.title}
                                                 </button>
                                             );
@@ -982,7 +1078,7 @@ export default function FypV9Workspace() {
                             </>
                         ) : null}
                         {v9.sustain === "No defensible sustainability link" ? (
-                            <div className="rounded-xl border border-[#f0d9b6] bg-[#fff7e8] p-3 text-[11.8px] text-[#7c561e]"><b>No defensible SDG link is acceptable.</b> Your project can still be academically excellent.</div>
+                            <div className="rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft p-3 text-[11.8px] text-ciel-amber"><b>No defensible SDG link is acceptable.</b> Your project can still be academically excellent.</div>
                         ) : null}
                         <SummaryBox text={summaries[5]} />
                         <StepNav onBack={() => setStep(4)} onNext={() => goNext(6)} nextLabel="Next →" saving={saving} />
@@ -991,7 +1087,7 @@ export default function FypV9Workspace() {
 
                 {step === 6 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 7 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 7 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Reflection & learning 🪞</h2>
                         <Field label="What is the most important thing you learned from this FYP?"><input value={v9.learned} onChange={(e) => patchV9({ learned: e.target.value })} className={fieldClass} /></Field>
                         <Field label="What was the hardest challenge, and what did you change or learn because of it?"><input value={v9.challenge} onChange={(e) => patchV9({ challenge: e.target.value })} className={fieldClass} /></Field>
@@ -999,9 +1095,9 @@ export default function FypV9Workspace() {
                             <ChipGroup options={FYP_V9_SKILLS} selected={v9.skills} onToggle={(v) => patchV9({ skills: toggleIn(v9.skills, v) })} otherValue={v9.skillOther} onOtherChange={(val) => patchV9({ skillOther: val })} />
                         </Field>
                         {sustainRelevant ? <Field label="Did sustainability change any project decision? (optional)"><input value={v9.sustainReflection} onChange={(e) => patchV9({ sustainReflection: e.target.value })} className={fieldClass} /></Field> : null}
-                        <div className="mt-3 rounded-[15px] border border-[#dfe6f7] bg-gradient-to-br from-white to-[#f9fbff] p-4">
+                        <div className="mt-3 rounded-[15px] border border-ciel-indigo/20 bg-gradient-to-br from-white to-ciel-indigo-soft/30 p-4">
                             <h3 className="m-0 text-sm">💡 Turn the FYP into an opportunity (optional)</h3>
-                            <p className="mt-1 text-[11.2px] text-[#71809b]">This does not affect your academic merit.</p>
+                            <p className="mt-1 text-[11.2px] text-ciel-text-soft">This does not affect your academic merit.</p>
                             <Field label="What would you like this project to lead to?">
                                 <ChipGroup options={FYP_V9_OPPORTUNITY} selected={v9.opportunities} onToggle={(v) => patchV9({ opportunities: toggleIn(v9.opportunities, v) })} otherValue={v9.opportunityOther} onOtherChange={(val) => patchV9({ opportunityOther: val })} />
                             </Field>
@@ -1028,24 +1124,24 @@ export default function FypV9Workspace() {
 
                 {step === 7 && (
                     <>
-                        <p className="text-[9.5px] font-black tracking-[0.10em] text-[#6d4aff]">STEP 8 OF 8</p>
+                        <p className="text-[9.5px] font-black tracking-[0.10em] text-ciel-purple">STEP 8 OF 8</p>
                         <h2 className="m-0 text-[17px] font-semibold">Evidence, AI review & repository 📦</h2>
-                        <div className="mt-3 rounded-2xl border border-[#d9def0] bg-gradient-to-br from-white to-[#f8fbff] p-4">
+                        <div className="mt-3 rounded-2xl border border-ciel-purple/20 bg-gradient-to-br from-white to-ciel-indigo-soft/30 p-4">
                             <div className="flex items-start justify-between gap-2">
                                 <div>
                                     <h3 className="m-0 text-sm">📎 Evidence Locker</h3>
-                                    <p className="mt-1 text-[10.8px] text-[#71809b]">Optional but recommended — images, reports, decks, datasets, portfolios.</p>
+                                    <p className="mt-1 text-[10.8px] text-ciel-text-soft">Optional but recommended — images, reports, decks, datasets, portfolios.</p>
                                 </div>
-                                <span className="rounded-full bg-[#eaf8f3] px-2 py-1 text-[9px] font-black text-[#0d7f61]">OPTIONAL · RECOMMENDED</span>
+                                <span className="rounded-full bg-ciel-green-soft px-2 py-1 text-[9px] font-black text-ciel-green-deep">OPTIONAL · RECOMMENDED</span>
                             </div>
-                            <label className="mt-3 block cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-[#b8c3df] bg-[#fbfcff] p-4 text-center hover:border-[#6d4aff] hover:bg-[#f1edff]">
+                            <label className="mt-3 block cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-ciel-border bg-ciel-page/40 p-4 text-center hover:border-ciel-purple hover:bg-ciel-purple-soft">
                                 <span className="text-2xl">＋</span>
                                 <b className="mt-1 block text-xs">{uploading ? "Uploading…" : "Add evidence files"}</b>
                                 <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
                             </label>
                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                 {groupedFiles.map((g) => (
-                                    <a key={g.label} href={g.latest.fileUrl} target="_blank" rel="noreferrer" className="rounded-[13px] border border-[#e7eaf1] bg-white p-2.5 text-[10.8px] font-black">{g.label}</a>
+                                    <a key={g.label} href={g.latest.fileUrl} target="_blank" rel="noreferrer" className="rounded-[13px] border border-ciel-border bg-white p-2.5 text-[10.8px] font-black">{g.label}</a>
                                 ))}
                             </div>
                         </div>
@@ -1057,37 +1153,44 @@ export default function FypV9Workspace() {
                                 </select>
                             </Field>
                         </div>
+                        <Field label="➕ Anything the summary missed?">
+                            <textarea rows={2} value={entry.addedNote ?? ""} onChange={(e) => setEntry((s) => ({ ...s, addedNote: e.target.value }))} placeholder="e.g. Our prototype was shortlisted for the department showcase." className={fieldClass} />
+                        </Field>
                         <h2 className="mt-6 text-[17px] font-semibold">✨ Review your AI section summaries</h2>
-                        <p className="text-[12.5px] text-[#71809b]">Accept all seven, then preview the flashcard and submit to your supervisor.</p>
-                        <div className="my-2 h-2 overflow-hidden rounded-full bg-[#edf0f5]"><i className="block h-full bg-gradient-to-r from-[#6d4aff] to-[#169b62]" style={{ width: `${(acceptedCount / 7) * 100}%` }} /></div>
-                        <p className="text-right text-[10.5px] font-extrabold text-[#71809b]">{acceptedCount} of 7 accepted</p>
+                        <p className="text-[12.5px] text-ciel-text-soft">Accept all seven, then preview the flashcard and submit to your supervisor.</p>
+                        <div className="my-2 h-2 overflow-hidden rounded-full bg-ciel-border"><i className="block h-full bg-gradient-to-r from-ciel-purple to-ciel-green-deep" style={{ width: `${(acceptedCount / 7) * 100}%` }} /></div>
+                        <p className="text-right text-[10.5px] font-extrabold text-ciel-text-soft">{acceptedCount} of 7 accepted</p>
                         {review.map((r, i) => (
-                            <div key={FYP_V9_REVIEW_LABELS[i]} className={clsx("mb-2 overflow-hidden rounded-xl border-[1.5px]", r.accepted ? "border-[#169b62]" : "border-[#e7eaf1]")}>
-                                <div className={clsx("flex items-center gap-2 px-3 py-2", r.accepted ? "bg-[#eaf8f2]" : "bg-[#fbfcfe]")}>
+                            <div key={FYP_V9_REVIEW_LABELS[i]} className={clsx("mb-2 overflow-hidden rounded-xl border-[1.5px]", r.accepted ? "border-ciel-green-deep" : "border-ciel-border")}>
+                                <div className={clsx("flex items-center gap-2 px-3 py-2", r.accepted ? "bg-ciel-green-soft" : "bg-ciel-page/50")}>
                                     <b className="text-[11px]">{FYP_V9_REVIEW_LABELS[i]}</b>
-                                    <span className={clsx("ml-auto rounded-full px-2 py-0.5 text-[9.5px] font-black", r.accepted ? "bg-[#169b62] text-white" : "bg-[#eceef3] text-[#71809b]")}>{r.accepted ? "✓ ACCEPTED" : "REVIEW"}</span>
+                                    <span className={clsx("ml-auto rounded-full px-2 py-0.5 text-[9.5px] font-black", r.accepted ? "bg-ciel-green-deep text-white" : "bg-ciel-border text-ciel-text-soft")}>{r.accepted ? "✓ ACCEPTED" : "REVIEW"}</span>
                                 </div>
                                 <textarea rows={3} value={r.text.replace(/<[^>]*>/g, " ")} onChange={(e) => setReview((prev) => prev.map((x, j) => (j === i ? { ...x, text: e.target.value, edited: true, accepted: false } : x)))} className="w-full border-0 px-3 py-2 text-[12.3px] leading-relaxed outline-none" />
                                 <div className="flex gap-1.5 px-3 pb-2.5">
-                                    <button type="button" onClick={() => setReview((prev) => prev.map((x, j) => (j === i ? { ...x, accepted: true } : x)))} className="rounded-lg border border-[#169b62] px-2.5 py-1 text-[10.5px] font-extrabold text-[#169b62]">✓ Accept</button>
-                                    <button type="button" onClick={() => setReview((prev) => prev.map((x, j) => (j === i ? { accepted: false, edited: false, text: summaries[i] || "" } : x)))} className="rounded-lg border border-[#e7eaf1] px-2.5 py-1 text-[10.5px] font-extrabold text-[#71809b]">↻ Reset</button>
+                                    <button type="button" onClick={() => setReview((prev) => prev.map((x, j) => (j === i ? { ...x, accepted: true } : x)))} className="rounded-lg border border-ciel-green-deep px-2.5 py-1 text-[10.5px] font-extrabold text-ciel-green-deep">✓ Accept</button>
+                                    <button type="button" onClick={() => setReview((prev) => prev.map((x, j) => (j === i ? { accepted: false, edited: false, text: summaries[i] || "" } : x)))} className="rounded-lg border border-ciel-border px-2.5 py-1 text-[10.5px] font-extrabold text-ciel-text-soft">↻ Reset</button>
                                 </div>
                             </div>
                         ))}
-                        <button type="button" disabled={acceptedCount < 7} onClick={() => setFlashOpen(true)} className="mt-2 w-full rounded-[11px] bg-[#6d4aff] py-3 text-[13px] font-black text-white disabled:opacity-40">All accepted → Preview final FYP flashcard</button>
+                        <button type="button" disabled={acceptedCount < 7} onClick={() => setFlashOpen(true)} className="mt-2 w-full rounded-[11px] bg-ciel-purple py-3 text-[13px] font-black text-white disabled:opacity-40">All accepted → Preview final FYP flashcard</button>
                         {flashOpen ? (
                             <div className="mt-4">
-                                <ThesisCard entry={{ ...entry, sectionSummaries: { project: review[0]?.text, background: review[1]?.text, objectives: review[2]?.text, methodology: review[3]?.text, findings: review[4]?.text, sdg: review[5]?.text, reflection: review[6]?.text } }} defaultOpen />
-                                <button type="button" onClick={submitRecord} className="mt-3 w-full rounded-[11px] bg-[#6d4aff] py-3 text-[13px] font-black text-white">{saving ? "Submitting…" : "Submit FYP record + flashcard for verification →"}</button>
+                                <ThesisCard entry={{ ...entry, sectionSummaries: buildSectionSummaries() }} defaultOpen />
+                                <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] border-ciel-border bg-ciel-page/40 px-3 py-3">
+                                    <input type="checkbox" checked={declarationChecked} onChange={(e) => setDeclarationChecked(e.target.checked)} className="mt-0.5 accent-ciel-purple" />
+                                    <span className="text-[12px] leading-relaxed text-ciel-text">I confirm this record accurately represents the Final Year Project work completed, and that the evidence and findings described are genuine.</span>
+                                </label>
+                                <button type="button" disabled={saving || !declarationChecked} onClick={submitRecord} className="mt-3 w-full rounded-[11px] bg-ciel-purple py-3 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Submitting…" : "Submit FYP record + flashcard for verification →"}</button>
                             </div>
                         ) : null}
                         <div className="mt-4 flex justify-start">
-                            <button type="button" onClick={() => setStep(6)} className="rounded-[11px] border border-[#e7eaf1] bg-white px-4 py-3 text-[13px] font-black text-[#71809b]">← Back</button>
+                            <button type="button" onClick={() => setStep(6)} className="rounded-[11px] border border-ciel-border bg-white px-4 py-3 text-[13px] font-black text-ciel-text-soft">← Back</button>
                         </div>
                     </>
                 )}
             </div>
-            <p className="mt-3.5 text-center text-[10.5px] leading-relaxed text-[#71809b]">CIEL PK · Final Year Projects · Academic evaluation and official grading remain with the university / authorized faculty.</p>
+            <p className="mt-3.5 text-center text-[10.5px] leading-relaxed text-ciel-text-soft">CIEL PK · Final Year Projects · Academic evaluation and official grading remain with the university / authorized faculty.</p>
         </div>
     );
 }

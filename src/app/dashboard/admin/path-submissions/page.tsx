@@ -642,7 +642,7 @@ export default function AdminPathSubmissionsPage() {
                         badgeClass="text-[#16798c]"
                         emoji="📝"
                         title="FYP Under Review"
-                        subtitle="Submitted flashcards waiting for supervisor approval or returned for revision. Remind whoever holds the workflow."
+                        subtitle="Submitted FYP records waiting for supervisor approval or returned for revision. Remind whoever holds the workflow."
                         background="linear-gradient(135deg,#16798c,#38b8e6)"
                     />
                     <HubTile

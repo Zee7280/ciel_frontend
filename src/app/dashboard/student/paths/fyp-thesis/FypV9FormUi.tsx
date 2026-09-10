@@ -13,9 +13,9 @@ import {
 } from "@/utils/fypV9Catalog";
 
 export const fieldClass =
-    "w-full rounded-[10px] border-[1.5px] border-[#e7eaf1] bg-[#fbfcfe] px-3 py-[11px] text-[13.5px] font-medium text-[#172033] outline-none transition focus:border-[#6d4aff] focus:bg-white focus:shadow-[0_0_0_3px_#f1edff]";
+    "w-full rounded-[10px] border-[1.5px] border-ciel-border bg-ciel-page/50 px-3 py-[11px] text-[13.5px] font-medium text-ciel-text outline-none transition focus:border-ciel-purple focus:bg-white focus:ring-2 focus:ring-ciel-purple/20";
 
-const labelClass = "text-[10.5px] font-black uppercase tracking-[0.055em] text-[#71809b]";
+const labelClass = "text-[10.5px] font-black uppercase tracking-[0.055em] text-ciel-text-soft";
 
 export function Field({
     label,
@@ -32,9 +32,9 @@ export function Field({
         <div className="space-y-1.5">
             <label className={labelClass}>
                 {label}
-                {required ? <span className="text-[#d44b62]"> *</span> : null}
+                {required ? <span className="text-red-500"> *</span> : null}
             </label>
-            {hint ? <p className="text-[11px] leading-relaxed text-[#71809b]">{hint}</p> : null}
+            {hint ? <p className="text-[11px] leading-relaxed text-ciel-text-soft">{hint}</p> : null}
             {children}
         </div>
     );
@@ -73,8 +73,8 @@ export function ChipGroup({
                             className={clsx(
                                 "rounded-full border-[1.5px] px-[13px] py-2 text-xs font-bold transition hover:-translate-y-px",
                                 isSel
-                                    ? "border-[#6d4aff] bg-[#f1edff] text-[#5736d6]"
-                                    : "border-[#e7eaf1] bg-[#fbfcfe] text-[#60708a] hover:border-[#c7befd]",
+                                    ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep"
+                                    : "border-ciel-border bg-ciel-page/50 text-ciel-text-mid hover:border-ciel-purple/40",
                             )}
                         >
                             {opt}
@@ -95,8 +95,8 @@ export function ChipGroup({
                         className={clsx(
                             "rounded-full border-[1.5px] border-dashed px-[13px] py-2 text-xs font-bold transition",
                             showOther
-                                ? "border-[#6d4aff] bg-[#f1edff] text-[#5736d6]"
-                                : "border-[#e7eaf1] bg-[#fbfcfe] text-[#60708a] hover:border-[#c7befd]",
+                                ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep"
+                                : "border-ciel-border bg-ciel-page/50 text-ciel-text-mid hover:border-ciel-purple/40",
                         )}
                     >
                         ＋ Other
@@ -119,9 +119,9 @@ export function ChipGroup({
 export function SummaryBox({ text, placeholder }: { text?: string; placeholder?: string }) {
     const filled = Boolean(text?.trim());
     return (
-        <div className="mt-4 rounded-xl border border-dashed border-[#b8a9ff] bg-[#fbfaff] px-3.5 py-3 text-[12.3px] leading-relaxed text-[#34405a]">
-            <span className="mb-1 block text-[9px] font-black tracking-[0.10em] text-[#6d4aff]">✨ AI SECTION SUMMARY</span>
-            {filled ? <RichSummaryText text={text!} /> : <span className="text-[#a4afc1]">{placeholder || "Fills as you type…"}</span>}
+        <div className="mt-4 rounded-xl border border-dashed border-ciel-purple/30 bg-ciel-purple-soft/40 px-3.5 py-3 text-[12.3px] leading-relaxed text-ciel-text">
+            <span className="mb-1 block text-[9px] font-black tracking-[0.10em] text-ciel-purple">✨ AI SECTION SUMMARY</span>
+            {filled ? <RichSummaryText text={text!} /> : <span className="text-ciel-text-soft">{placeholder || "Fills as you type…"}</span>}
         </div>
     );
 }
@@ -147,7 +147,7 @@ export function StepNav({
                 <button
                     type="button"
                     onClick={onBack}
-                    className="rounded-[11px] border-[1.5px] border-[#e7eaf1] bg-white px-[18px] py-3 text-[13px] font-black text-[#71809b] hover:border-[#c7befd]"
+                    className="rounded-[11px] border-[1.5px] border-ciel-border bg-white px-[18px] py-3 text-[13px] font-black text-ciel-text-soft hover:border-ciel-purple/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple focus-visible:ring-offset-2"
                 >
                     ← Back
                 </button>
@@ -156,7 +156,7 @@ export function StepNav({
                 type="button"
                 disabled={saving || disabled}
                 onClick={onNext}
-                className="rounded-[11px] bg-[#6d4aff] px-[18px] py-3 text-[13px] font-black text-white hover:bg-[#5b3ee6] disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-[11px] bg-ciel-purple px-[18px] py-3 text-[13px] font-black text-white hover:bg-ciel-purple-deep disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple focus-visible:ring-offset-2"
             >
                 {saving ? "Saving…" : nextLabel}
             </button>
@@ -180,9 +180,15 @@ function asBool(v: unknown, fallback = false): boolean {
 function asRows(v: unknown, fallback: FypV9TableRow[]): FypV9TableRow[] {
     if (!Array.isArray(v) || !v.length) return fallback;
     return v.map((row) => {
-        if (!row || typeof row !== "object") return { a: "", b: "", c: "" };
+        if (!row || typeof row !== "object") return { a: "", b: "", c: "", d: "" };
         const r = row as Record<string, unknown>;
-        return { a: asString(r.a), b: asString(r.b), c: asString(r.c) };
+        const d = asString(r.d);
+        return {
+            a: asString(r.a),
+            b: asString(r.b),
+            c: asString(r.c),
+            d: d === "Measured" || d === "Estimated" || d === "Target" ? d : "",
+        };
     });
 }
 function asRoadmap(v: unknown, fallback: FypV9RoadStage[]): FypV9RoadStage[] {

@@ -103,7 +103,6 @@ export default function FypMeritPanel({
     const [notifyErrorMessage, setNotifyErrorMessage] = useState<string | null>(null);
     const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
     const requestIdRef = useRef(0);
-    const lastNotified = useRef("");
 
     const schools = useMemo(() => Array.from(new Set(entries.map(entrySchool))).sort(), [entries]);
     const universities = useMemo(() => Array.from(new Set(entries.map(entryUniversity))).sort(), [entries]);
@@ -121,7 +120,6 @@ export default function FypMeritPanel({
         setNotifiedIds([]);
         setNotifyState("idle");
         setNotifyErrorMessage(null);
-        lastNotified.current = "";
         if (!meritEndpoint) return;
         const requestId = ++requestIdRef.current;
         setMeritLoading(true);
@@ -172,13 +170,15 @@ export default function FypMeritPanel({
     const eligibleRanked = useMemo(() => scored.filter((x) => x.scorecard.eligible), [scored]);
     const top3 = ranked ? eligibleRanked.slice(0, 3) : [];
 
+    const scopeLabel = showUniversityFilter ? (university === "all" ? "CIEL PK — all universities" : university) : "this cohort";
+
     const notifyTop = (ids: string[], picks: { entryId: string; rank: number; of: number; total: number }[]) => {
         if (!meritEndpoint || !ids.length) return;
         setNotifyState("sending");
         setNotifyErrorMessage(null);
         authenticatedFetch(`${meritEndpoint.replace(/\/merit-model\/?$/, "")}/merit-model/notify`, {
             method: "POST",
-            body: JSON.stringify({ entryIds: ids, picks, scopeLabel: showUniversityFilter ? (university === "all" ? "CIEL PK — all universities" : university) : "this cohort" }),
+            body: JSON.stringify({ entryIds: ids, picks, scopeLabel }),
         })
             .then(async (res) => {
                 if (!res) {
@@ -208,15 +208,15 @@ export default function FypMeritPanel({
         .filter((x) => x.entry.id)
         .map((x, i) => ({ entryId: x.entry.id as string, rank: i + 1, of: eligibleRanked.length, total: x.scorecard.total }));
     const runsExhausted = !!graderRuns && !graderRuns.unlimited && graderRuns.used >= graderRuns.limit;
-    const notifiedKey = topIds.join(",");
+    // Running the model (or changing a filter) must stay a free, unlimited preview — nothing is sent
+    // to students until the supervisor explicitly taps "Publish & notify" below. This used to fire
+    // notifyTop automatically as soon as scores settled, which silently spent one of the shared
+    // 3-runs/year notification quota on every click and every filter tweak.
     useEffect(() => {
-        if (!ranked || meritLoading || !meritEndpoint || !topIds.length || notifyState !== "idle" || runsExhausted) return;
-        if (lastNotified.current === notifiedKey) return;
-        lastNotified.current = notifiedKey;
-        notifyTop(topIds, topPicks);
-        // notify once per unique top-3 set after scores settle
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ranked, meritLoading, notifiedKey, notifyState, runsExhausted]);
+        setNotifiedIds([]);
+        setNotifyState("idle");
+        setNotifyErrorMessage(null);
+    }, [school, university, route]);
 
     return (
         <div className="space-y-4">
@@ -279,13 +279,13 @@ export default function FypMeritPanel({
                                       : "bg-ciel-purple-soft text-ciel-purple",
                             )}
                         >
-                            {graderRuns.unlimited ? "♾️ Unlimited runs" : `Runs used this year: ${graderRuns.used} of ${graderRuns.limit}`}
+                            {graderRuns.unlimited ? "♾️ Unlimited publishes" : `Publishes used this year: ${graderRuns.used} of ${graderRuns.limit}`}
                         </span>
                     )}
                     <button
                         type="button"
                         onClick={runMeritModel}
-                        disabled={runsExhausted}
+                        disabled={!pool.length}
                         className="ciel-transition rounded-ciel-sm bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90 disabled:opacity-50"
                     >
                         🧮 Run merit model →
@@ -297,18 +297,20 @@ export default function FypMeritPanel({
                 <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
                     {meritLoading ? (
                         <>⏳ <b>Syncing official scores…</b> — showing a provisional local ranking while the real Merit Model results load.</>
-                    ) : runsExhausted ? (
-                        <>🚫 <b>{notifyErrorMessage || "No AI Grader runs left this year."}</b> The ranking above is still visible, but it could not be pinned/notified.</>
                     ) : (
                         <>
                             🧮 <b>Model run complete</b> — {scored.length} FYP flash card{scored.length === 1 ? "" : "s"} scored · cohort average <b>{avg}/100</b>. Top {Math.min(10, scored.length)} are picks, each with its reason. Order is rubric merit, nothing else.{" "}
                             {topIds.length > 0 &&
                                 (notifyState === "sent" ? (
                                     <b>Top-ranked students have been notified.</b>
+                                ) : notifyState === "sending" ? (
+                                    <b>Publishing to top-ranked students…</b>
                                 ) : notifyState === "failed" ? (
-                                    <b>Ranking is saved on this screen — student notifications did not send.</b>
+                                    <b>Ranking is saved on this screen — student notifications did not send. Retry below.</b>
+                                ) : runsExhausted ? (
+                                    <b>{notifyErrorMessage || "No publishes left this year."} This run is a free preview only — nothing is pinned or sent to students.</b>
                                 ) : (
-                                    <b>Notifying top-ranked students…</b>
+                                    <b>This is a free preview — running the model again won&apos;t cost a run. Nothing is sent to students until you publish.</b>
                                 ))}
                         </>
                     )}
@@ -327,19 +329,27 @@ export default function FypMeritPanel({
 
             {ranked && top3.length > 0 && (
                 <div className="rounded-ciel-lg border-2 border-amber-200 bg-white px-4 py-4">
-                    <p className="text-[10px] font-extrabold tracking-[0.12em] text-amber-700">🔔 STUDENT NOTIFICATIONS — DISPATCHED TO THEIR DASHBOARDS</p>
-                    {notifyState === "failed" && (
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                        <p className="text-[10px] font-extrabold tracking-[0.12em] text-amber-700">
+                            🔔 TOP {top3.length} — PREVIEW ONLY, NOT SENT UNTIL PUBLISHED
+                        </p>
                         <button
                             type="button"
-                            onClick={() => {
-                                lastNotified.current = "";
-                                setNotifyState("idle");
-                            }}
-                            className="mt-2 rounded-full bg-red-50 px-3 py-1 text-[9px] font-extrabold text-red-700"
+                            onClick={() => notifyTop(topIds, topPicks)}
+                            disabled={notifyState === "sending" || notifyState === "sent" || runsExhausted}
+                            className="rounded-full bg-amber-700 px-3.5 py-1.5 text-[9.5px] font-extrabold text-white disabled:opacity-50"
                         >
-                            Retry notify
+                            {notifyState === "sent"
+                                ? "✓ Published"
+                                : notifyState === "sending"
+                                  ? "Publishing…"
+                                  : notifyState === "failed"
+                                    ? "Retry publish"
+                                    : runsExhausted
+                                      ? "No publishes left this year"
+                                      : "🔔 Publish & notify top students"}
                         </button>
-                    )}
+                    </div>
                     {top3.map((x, i) => (
                         <div key={x.entry.id} className="flex gap-2.5 border-b border-dashed border-ciel-border py-2.5 last:border-0">
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-purple text-xs font-extrabold text-white">
@@ -351,13 +361,13 @@ export default function FypMeritPanel({
                                     <span className="text-[8px] font-extrabold text-ciel-green-deep">
                                         {x.entry.id && notifiedIds.includes(x.entry.id)
                                             ? "✓ SENT · DASHBOARD"
-                                            : notifyState === "failed" || runsExhausted
-                                              ? "NOT SENT"
-                                              : "SENDING…"}
+                                            : notifyState === "sending"
+                                              ? "SENDING…"
+                                              : "PREVIEW ONLY"}
                                     </span>
                                 </div>
                                 <p className="mt-1 rounded-r-ciel-xs rounded-bl-ciel-xs bg-ciel-purple-soft/60 px-3 py-2 text-[10.5px] leading-relaxed text-ciel-text">
-                                    🎉 {entryDisplayName(x.entry).split(" ")[0]}, your thesis <b>“{x.entry.projectInfo?.title || x.entry.projectTitle || "Untitled"}”</b> just ranked #{i + 1} of {eligibleRanked.length}. Beautifully done. 💛
+                                    🎉 {entryDisplayName(x.entry).split(" ")[0]}, your thesis <b>“{x.entry.projectInfo?.title || x.entry.projectTitle || "Untitled"}”</b> just ranked #{i + 1} of {eligibleRanked.length} in the <b>{scopeLabel}</b> ranking. Beautifully done. 💛
                                 </p>
                             </div>
                         </div>

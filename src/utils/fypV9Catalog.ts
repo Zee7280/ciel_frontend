@@ -527,7 +527,10 @@ export function suggestFypV9Routes(areaKey?: string, discipline?: string): FypV9
 }
 
 export type FypV9RoadStage = { stage: string; goal: string };
-export type FypV9TableRow = { a: string; b: string; c: string };
+/** `status` is only meaningful for `qRows` (quantitative results) — it feeds `findings.metrics[].status`
+ * so the merit model can tell a genuinely measured result from an estimate/target instead of assuming
+ * every filled-in numeric row was "Measured" (which used to trigger a false dishonesty penalty). */
+export type FypV9TableRow = { a: string; b: string; c: string; d?: "Measured" | "Estimated" | "Target" | "" };
 
 export type FypV9FormState = {
     academicAreaKey: string;
@@ -635,8 +638,8 @@ export const EMPTY_FYP_V9: FypV9FormState = {
     qAnalysis: [],
     qAnalysisOther: "",
     qRows: [
-        { a: "", b: "", c: "" },
-        { a: "", b: "", c: "" },
+        { a: "", b: "", c: "", d: "" },
+        { a: "", b: "", c: "", d: "" },
     ],
     qSig: "",
     qEffect: "",

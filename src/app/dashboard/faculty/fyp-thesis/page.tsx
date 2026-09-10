@@ -4,14 +4,21 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 
-const FYP_VIEWS = ["home", "pending", "approved", "rank"] as const;
+const FYP_VIEWS = ["home", "progress", "pending", "approved", "rank"] as const;
 type FacView = (typeof FYP_VIEWS)[number];
 const FYP_BASE = "/dashboard/faculty/fyp-thesis";
+const VIEW_CRUMB: Record<Exclude<FacView, "home">, string> = {
+    progress: "FYP in Progress",
+    pending: "Waiting for Approval",
+    approved: "Approved FYP / Thesis",
+    rank: "Merit model",
+};
 
 export default function FacultyFypThesisPage() {
     return (
@@ -24,12 +31,14 @@ export default function FacultyFypThesisPage() {
 function FacultyFypThesisHub() {
     const { view, homeHref } = useFacultyHubView(FYP_VIEWS, "home");
     const [entries, setEntries] = useState<FypMeritEntry[]>([]);
+    const [inProgress, setInProgress] = useState<FypMeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [reviewingId, setReviewingId] = useState<string | null>(null);
 
     useEffect(() => {
         void fetchEntries();
+        void fetchInProgress();
     }, []);
 
     const fetchEntries = async () => {
@@ -48,6 +57,18 @@ function FacultyFypThesisHub() {
             setEntries([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchInProgress = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/fyp-thesis/in-progress");
+            if (response?.ok) {
+                const data = await response.json();
+                setInProgress(Array.isArray(data.data) ? data.data : []);
+            }
+        } catch {
+            // Non-fatal — the tile just shows 0 until the next load.
         }
     };
 
@@ -80,6 +101,10 @@ function FacultyFypThesisHub() {
 
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
     const approved = useMemo(() => entries.filter(isPathEntryApproved), [entries]);
+    const revision = useMemo(
+        () => entries.filter((e) => e.supervisorApprovalStatus === "revision_requested"),
+        [entries],
+    );
 
     const matchesSearch = (entry: FypMeritEntry) => {
         const q = searchQuery.toLowerCase();
@@ -93,20 +118,68 @@ function FacultyFypThesisHub() {
     };
     const filteredWaiting = waiting.filter(matchesSearch);
     const filteredApproved = approved.filter(matchesSearch);
+    const filteredInProgress = inProgress.filter(matchesSearch);
+
+    const hero =
+        view === "progress"
+            ? {
+                  title: "FYP in Progress",
+                  subtitle: "Students who named you as supervisor and have started but not yet submitted. Nudge anyone who has stalled.",
+                  stats: [
+                      { value: String(inProgress.length), label: "In Progress" },
+                      { value: String(revision.length), label: "Revision with student" },
+                      { value: String(waiting.length), label: "Awaiting Review" },
+                  ],
+              }
+            : view === "pending"
+              ? {
+                    title: "Waiting for Approval",
+                    subtitle: "Submitted FYP / thesis records that still need your supervisor sign-off.",
+                    stats: [
+                        { value: String(waiting.length), label: "Awaiting Review" },
+                        { value: String(revision.length), label: "Revision requested" },
+                        { value: String(approved.length), label: "Approved" },
+                    ],
+                }
+              : view === "approved"
+                ? {
+                      title: "Approved FYP / Thesis",
+                      subtitle: "Records you already approved — live on student, university and CIEL decks.",
+                      stats: [
+                          { value: String(approved.length), label: "Approved FYPs" },
+                          { value: String(approved.length), label: "On Impact Wall" },
+                          { value: String(entries.length), label: "All submitted" },
+                      ],
+                  }
+                : view === "rank"
+                  ? {
+                        title: "Merit model — my supervisees",
+                        subtitle: "Rank approved records. Waiting submissions stay out of the live picks.",
+                        stats: [
+                            { value: String(approved.length), label: "Approved Records" },
+                            { value: String(waiting.length), label: "Still waiting" },
+                            { value: String(inProgress.length), label: "In Progress" },
+                        ],
+                    }
+                  : {
+                        title: "FYP / Thesis",
+                        subtitle: "Monitor final-year projects, research evidence, supervisor review and verified impact outcomes.",
+                        stats: [
+                            { value: String(waiting.length), label: "Awaiting Review" },
+                            { value: String(approved.length), label: "Approved FYPs" },
+                            { value: String(inProgress.length), label: "In Progress" },
+                        ],
+                    };
 
     return (
         <div>
             <div className="mx-auto max-w-[1240px] space-y-4">
-                <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : view} pathLabel="FYP / Thesis" />
+                <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : VIEW_CRUMB[view]} pathLabel="FYP / Thesis" />
                 <CourseworkHero
                     kicker="FACULTY IMPACT DASHBOARD"
-                    title="FYP / Thesis"
-                    subtitle="Monitor final-year projects, research evidence, supervisor review and verified impact outcomes."
-                    stats={[
-                        { value: String(waiting.length), label: "Awaiting Review" },
-                        { value: String(approved.length), label: "Approved FYPs" },
-                        { value: String(approved.length), label: "On Impact Wall" },
-                    ]}
+                    title={hero.title}
+                    subtitle={hero.subtitle}
+                    stats={hero.stats}
                 />
 
                 {view !== "home" && <HubBackButton href={homeHref} label="← Back to FYP / Thesis" />}
@@ -118,7 +191,15 @@ function FacultyFypThesisHub() {
                         subtitle="Review final-year research impact records, evidence, SDG linkage and supervisor/faculty verification."
                         pill="FACULTY VIEW"
                     />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <HubTile
+                            href={`${FYP_BASE}?view=progress`}
+                            badge={`${inProgress.length} IN PROGRESS`}
+                            emoji="🔬"
+                            title="FYP in Progress"
+                            subtitle="Students still filling the form — completion bar, last activity, Email + WhatsApp reminders."
+                            background="linear-gradient(135deg,#16798c,#38b8e6)"
+                        />
                         <HubTile
                             href={`${FYP_BASE}?view=pending`}
                             badge={waiting.length ? `${waiting.length} IN QUEUE` : "INBOX"}
@@ -147,20 +228,20 @@ function FacultyFypThesisHub() {
                     <ActionKpiGrid
                         items={[
                             { value: String(waiting.length), label: "Awaiting Review" },
-                            { value: String(Math.max(0, entries.length - waiting.length - approved.length)), label: "Other Status" },
+                            { value: String(revision.length), label: "Revision Requested" },
+                            { value: String(inProgress.length), label: "In Progress (students)" },
                             { value: String(approved.length), label: "Approved This Year" },
-                            { value: String(entries.length), label: "All Records" },
                         ]}
                     />
                     <WorkflowSteps
                         title="FYP / Thesis Workflow"
                         subtitle="Approved work flows into the same unified Faculty Impact Wall."
-                        steps={["FYP Record Submitted", "Faculty / Supervisor Review", "Verified Approval", "AI Ranking", "Impact Wall + Badge"]}
+                        steps={["Student fills form", "FYP Record Submitted", "Faculty / Supervisor Review", "Verified Approval", "Impact Wall + Badge"]}
                     />
                     </>
                 )}
 
-                {(view === "pending" || view === "approved") && (
+                {(view === "progress" || view === "pending" || view === "approved") && (
                     <div className="relative max-w-sm">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -172,6 +253,37 @@ function FacultyFypThesisHub() {
                         />
                     </div>
                 )}
+
+                {view === "progress" &&
+                    (loading && inProgress.length === 0 ? (
+                        <SkeletonList />
+                    ) : filteredInProgress.length === 0 ? (
+                        <EmptyFyp
+                            message={
+                                inProgress.length === 0
+                                    ? "Students still filling out the FYP form will appear here — nudge anyone who's stalled."
+                                    : "No records match your search."
+                            }
+                        />
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {filteredInProgress.map((entry) => (
+                                <div key={entry.id}>
+                                    <ThesisCard
+                                        entry={entry}
+                                        studentName={entry.student?.name}
+                                        remindDraftOwner
+                                        studentEmail={entry.student?.email || entry.projectInfo?.studentEmail}
+                                    />
+                                    {entry.updatedAt ? (
+                                        <p className="mt-1.5 px-1 text-[10px] text-slate-400">
+                                            Last activity {formatDistanceToNow(new Date(entry.updatedAt), { addSuffix: true })}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
 
                 {view === "pending" &&
                     (loading ? (
@@ -185,7 +297,7 @@ function FacultyFypThesisHub() {
                             }
                         />
                     ) : (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {filteredWaiting.map((entry) => (
                                 <ThesisCard
                                     key={entry.id}
@@ -210,7 +322,7 @@ function FacultyFypThesisHub() {
                             }
                         />
                     ) : (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {filteredApproved.map((entry) => (
                                 <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
                             ))}
@@ -232,7 +344,7 @@ function FacultyFypThesisHub() {
 
 function SkeletonList() {
     return (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {[1, 2, 3].map((i) => (
                 <div key={i} className="h-40 animate-pulse rounded-2xl bg-slate-100" />
             ))}
