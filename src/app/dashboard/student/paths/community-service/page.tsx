@@ -686,6 +686,7 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
     }, [selectedProjectId, loadLogs]);
 
     const handleFile = async (file: File) => {
+        if (uploading) return;
         setEvidenceFile(file);
         setUploading(true);
         setError(null);
@@ -789,10 +790,10 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">Evidence (optional)</label>
-                    <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-green/40", uploading && "opacity-60")}>
+                    <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-green/40", uploading && "pointer-events-none opacity-60")}>
                         <UploadCloud className="h-4 w-4" />
                         {uploading ? "Uploading..." : evidenceUrl ? "Evidence attached" : evidenceFile ? evidenceFile.name : "Upload a photo"}
-                        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) handleFile(file); }} />
                     </label>
                 </div>
                 {/* Attendance is locked once verification has been requested — say so instead of

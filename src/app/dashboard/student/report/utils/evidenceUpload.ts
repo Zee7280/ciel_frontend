@@ -1,4 +1,4 @@
-import { authenticatedFetch, isTokenValid } from "@/utils/api";
+import { authenticatedFetch } from "@/utils/api";
 import {
     resolvePreferredApiV1Base,
     resolveTutorialMultipartUploadApiV1Base,
@@ -146,20 +146,9 @@ function apiV1PathToNestUrl(apiV1Path: string, nestApiV1Base: string): string {
     return `${base}${suffix.startsWith("/") ? suffix : `/${suffix}`}`;
 }
 
-async function postJsonWithAuth(url: string, body: Record<string, unknown>): Promise<Response | null> {
-    const token = typeof localStorage !== "undefined" ? localStorage.getItem("ciel_token") : null;
-    if (!isTokenValid(token)) return null;
-    return fetch(url, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-    });
-}
-
-/** Presign via same-origin BFF (small JSON), then direct Nest if needed. */
+/** Presign via same-origin BFF (small JSON), then direct Nest if needed. Both hops go through
+ * authenticatedFetch (it accepts absolute URLs unchanged) so an expired/invalid session redirects
+ * to login instead of the direct-Nest hop silently no-op'ing on a hand-rolled fetch. */
 async function requestPresign(apiV1Path: string, body: Record<string, unknown>): Promise<Response | null> {
     const viaBff = await authenticatedFetch(
         apiV1Path,
@@ -173,7 +162,7 @@ async function requestPresign(apiV1Path: string, body: Record<string, unknown>):
 
     try {
         const directUrl = apiV1PathToNestUrl(apiV1Path, directBase);
-        const direct = await postJsonWithAuth(directUrl, body);
+        const direct = await authenticatedFetch(directUrl, { method: "POST", body: JSON.stringify(body) }, { timeoutMs: PRESIGN_TIMEOUT_MS });
         if (direct?.ok) return direct;
     } catch {
         /* try multipart fallback below */
@@ -200,29 +189,14 @@ async function uploadViaMultipartDirect(
     formData.append("section", section);
     formData.append("field", field);
 
-    const token = localStorage.getItem("ciel_token");
-    if (!isTokenValid(token)) {
-        throw new Error(`Evidence upload failed for ${file.name}: session expired — sign in again.`);
-    }
-
     const url = apiV1PathToNestUrl(
         `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence`,
         nestBase,
     );
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), S3_PUT_TIMEOUT_MS);
-    let res: Response;
-    try {
-        res = await fetch(url, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-            signal: controller.signal,
-        });
-    } finally {
-        clearTimeout(timeoutId);
+    const res = await authenticatedFetch(url, { method: "POST", body: formData }, { timeoutMs: S3_PUT_TIMEOUT_MS });
+    if (!res) {
+        throw new Error(`Evidence upload failed for ${file.name}: session expired — sign in again.`);
     }
-
     if (!res.ok) {
         const detail = await extractEvidenceUploadFailureDetail(res);
         throw new Error(`Evidence upload failed for ${file.name}: ${detail}`);
@@ -380,16 +354,20 @@ async function uploadEvidenceList(
     return uploaded;
 }
 
-/** If the API only allows certain `section` values, keep draft save working with file metadata (user may re-attach). */
+/** If the API only allows certain `section` values, keep draft save working with file metadata (user may re-attach).
+ * `strict` disables that fallback — used on final submit, where silently keeping metadata instead of the
+ * real file would let the report "submit successfully" with evidence that was never actually uploaded. */
 async function uploadEvidenceListWithFallback(
     projectId: string,
     section: string,
     field: string,
     files: EvidenceItem[] | undefined,
+    strict: boolean,
 ): Promise<EvidenceItem[]> {
     try {
         return await uploadEvidenceList(projectId, section, field, files);
     } catch (err) {
+        if (strict) throw err;
         console.warn(`[reports] Evidence upload failed (${section}/${field}); saving file metadata only`, err);
         if (!Array.isArray(files) || files.length === 0) return [];
         return files.map((item) => stripRuntimeFile(item));
@@ -433,6 +411,7 @@ export function stripHeavyBinaryFromDraftPayload<T>(value: T): T {
 async function resolveAttendanceLogEvidenceFiles(
     projectId: string,
     logs: Record<string, unknown>[] | undefined,
+    strict: boolean,
 ): Promise<Record<string, unknown>[] | undefined> {
     if (!Array.isArray(logs) || logs.length === 0) return logs;
 
@@ -455,6 +434,7 @@ async function resolveAttendanceLogEvidenceFiles(
                 const url = getUrl(rec);
                 log.evidence_file = url || true;
             } catch (err) {
+                if (strict) throw err;
                 console.warn("[reports] Attendance evidence upload failed; storing file metadata only", err);
                 log.evidence_file = {
                     name: file.name,
@@ -469,14 +449,18 @@ async function resolveAttendanceLogEvidenceFiles(
     return out;
 }
 
+/** `strict`: pass true on final submit so a failed evidence upload throws (and blocks submit with a
+ * real error) instead of silently degrading to file metadata — the safe default for draft autosave,
+ * where a transient upload failure shouldn't stop the student from saving their other progress. */
 export async function prepareReportEvidenceForSave<T extends object>(
     reportData: T,
     projectId: string,
+    strict = false,
 ): Promise<T> {
     const reportRecord = reportData as Record<string, unknown>;
 
     const section1 = (reportRecord.section1 || {}) as { attendance_logs?: Record<string, unknown>[]; [key: string]: unknown };
-    const attendanceLogs = await resolveAttendanceLogEvidenceFiles(projectId, section1.attendance_logs);
+    const attendanceLogs = await resolveAttendanceLogEvidenceFiles(projectId, section1.attendance_logs, strict);
 
     const section6 = (reportRecord.section6 || {}) as {
         evidence_files?: EvidenceItem[];
@@ -487,6 +471,7 @@ export async function prepareReportEvidenceForSave<T extends object>(
         "section6",
         "evidence_files",
         section6.evidence_files,
+        strict,
     );
 
     const section7 = (reportRecord.section7 || {}) as {
@@ -498,6 +483,7 @@ export async function prepareReportEvidenceForSave<T extends object>(
         "section7",
         "formalization_files",
         section7.formalization_files,
+        strict,
     );
 
     const section8 = (reportRecord.section8 || {}) as {

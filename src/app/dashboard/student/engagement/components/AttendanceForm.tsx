@@ -22,7 +22,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
-import { uploadAttendanceEvidenceViaPresign } from "@/utils/attendanceEvidenceUpload";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import {
     ATTENDANCE_DESCRIPTION_MAX_CHARS,
     ATTENDANCE_DESCRIPTION_MAX_WORDS,
@@ -302,7 +302,7 @@ export default function AttendanceForm({
                 let presignedEvidenceUrl: string | undefined;
                 if (evidenceFile) {
                     try {
-                        presignedEvidenceUrl = await uploadAttendanceEvidenceViaPresign(evidenceFile);
+                        presignedEvidenceUrl = await uploadFileViaPresign("/api/v1/engagement/attendance/evidence/presign", evidenceFile);
                     } catch (uploadErr) {
                         const message =
                             uploadErr instanceof Error

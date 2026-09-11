@@ -329,6 +329,7 @@ export default function StartupBusinessWorkspace() {
     };
 
     const handleDocFile = async (file: File, type: string) => {
+        if (uploading) return;
         setUploading(type);
         setError(null);
         try {
@@ -477,8 +478,8 @@ export default function StartupBusinessWorkspace() {
                                 <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Start faster</div>
                                 <h2 className="mb-1 text-[23px] font-black text-[#32133a]">Already have a business plan?</h2>
                                 <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Upload it here. CIEL AI can later extract fields for you to confirm — you stay in control of every answer.</p>
-                                <label className="mb-3 block cursor-pointer rounded-2xl border-2 border-dashed border-[#bfc6d7] bg-[#fbfcff] p-5 text-center hover:border-[#a63d65]">
-                                    <input type="file" className="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleDocFile(file, "Full business plan"); }} />
+                                <label className={clsx("mb-3 block cursor-pointer rounded-2xl border-2 border-dashed border-[#bfc6d7] bg-[#fbfcff] p-5 text-center hover:border-[#a63d65]", uploading && "pointer-events-none opacity-60")}>
+                                    <input type="file" className="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void handleDocFile(file, "Full business plan"); }} />
                                     📎 <strong className="text-[#a63d65]">Upload business plan / pitch deck</strong><br /><span className="text-[11.5px] text-[#6b7280]">PDF, Word or PowerPoint · optional</span>
                                     {uploading === "Full business plan" ? <div className="mt-2 text-xs font-extrabold text-[#9b6712]">Uploading…</div> : null}
                                     {docFor("Full business plan") ? <div className="mt-2 text-xs font-extrabold text-[#25683a]">✅ Plan uploaded</div> : null}
@@ -796,8 +797,21 @@ export default function StartupBusinessWorkspace() {
                                     <p className="mb-3 text-[13px] text-[#6b7280]">These files stay attached to the same venture record.</p>
                                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                         {VAULT_DOCS.map((d) => (
-                                            <label key={d.type} className="cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-[#d6c4cf] bg-[#fffafd] p-3 text-center text-[11px] text-[#775d70]">
-                                                <input type="file" className="hidden" accept={d.accept} multiple={d.multiple} onChange={(e) => { [...(e.target.files || [])].forEach((f) => void handleDocFile(f, d.type)); }} />
+                                            <label key={d.type} className={clsx("cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-[#d6c4cf] bg-[#fffafd] p-3 text-center text-[11px] text-[#775d70]", uploading && "pointer-events-none opacity-60")}>
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept={d.accept}
+                                                    multiple={d.multiple}
+                                                    onChange={(e) => {
+                                                        const files = Array.from(e.target.files || []);
+                                                        e.target.value = "";
+                                                        if (!files.length) return;
+                                                        void (async () => {
+                                                            for (const f of files) await handleDocFile(f, d.type);
+                                                        })();
+                                                    }}
+                                                />
                                                 <span className="block font-extrabold text-[#5d3b52]">{d.label}</span>
                                                 <span className="mt-1 block text-[9.5px] font-extrabold text-[#8b3155]">{uploading === d.type ? "Uploading…" : docFor(d.type) ? "Uploaded" : ""}</span>
                                             </label>

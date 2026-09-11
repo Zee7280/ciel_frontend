@@ -678,7 +678,7 @@ function ReportFormContent() {
             }
 
             setAiStatus('Uploading Evidence...');
-            submitData = await prepareReportEvidenceForSave(submitData, projectId || submitData.project_id);
+            submitData = await prepareReportEvidenceForSave(submitData, projectId || submitData.project_id, true);
             setFullData(submitData);
 
             const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {

@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { loadStudentFyp } from "@/utils/fypStudentApi";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
@@ -350,6 +351,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
             setError("Only the lead author can upload files on this FYP record.");
             return;
         }
+        if (uploading) return;
         setUploading(true);
         setError(null);
         try {
@@ -1168,10 +1170,23 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                 </div>
                                 <span className="rounded-full bg-ciel-green-soft px-2 py-1 text-[9px] font-black text-ciel-green-deep">OPTIONAL · RECOMMENDED</span>
                             </div>
-                            <label className="mt-3 block cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-ciel-border bg-ciel-page/40 p-4 text-center hover:border-ciel-purple hover:bg-ciel-purple-soft">
+                            <label className={clsx("mt-3 block cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-ciel-border bg-ciel-page/40 p-4 text-center hover:border-ciel-purple hover:bg-ciel-purple-soft", uploading && "pointer-events-none opacity-60")}>
                                 <span className="text-2xl">＋</span>
                                 <b className="mt-1 block text-xs">{uploading ? "Uploading…" : "Add evidence files"}</b>
-                                <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept={REPORT_ATTACHMENT_ACCEPT}
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        e.target.value = "";
+                                        if (!files.length) return;
+                                        void (async () => {
+                                            for (const f of files) await handleFile(f);
+                                        })();
+                                    }}
+                                />
                             </label>
                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                 {groupedFiles.map((g) => (
