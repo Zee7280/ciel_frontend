@@ -306,7 +306,7 @@ export default function StartupBusinessHub({
 
     useEffect(() => {
         setName(firstName());
-        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: false })
+        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
                 if (result?.data) setEntry(result.data as HubVenture);

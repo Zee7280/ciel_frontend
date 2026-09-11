@@ -673,7 +673,7 @@ export default function FypThesisHub({
     const deleteDraft = async (id: string) => {
         setDeletingId(id);
         try {
-            const res = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, { method: "DELETE" }, { redirectToLogin: false });
+            const res = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, { method: "DELETE" }, { redirectToLogin: true });
             if (res?.ok) setEntries((prev) => prev.filter((e) => e.id !== id));
         } finally {
             setDeletingId(null);

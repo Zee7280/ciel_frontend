@@ -302,14 +302,14 @@ export default function FypV9Workspace({ id }: { id: string }) {
             let res = await authenticatedFetch(
                 `/api/v1/paths/fyp-theses/${id}`,
                 { method: "PATCH", body },
-                { redirectToLogin: false },
+                { redirectToLogin: true },
             );
             let result = res?.ok ? await res.json() : null;
             if (!result?.data) {
                 res = await authenticatedFetch(
                     "/api/v1/paths/fyp-thesis",
                     { method: "PATCH", body },
-                    { redirectToLogin: false },
+                    { redirectToLogin: true },
                 );
                 result = res?.ok ? await res.json() : null;
             }
@@ -357,7 +357,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
             const res = await authenticatedFetch(
                 `/api/v1/paths/fyp-theses/${id}/deliverables`,
                 { method: "POST", body: JSON.stringify({ label: file.name, fileUrl: publicUrl }) },
-                { redirectToLogin: false },
+                { redirectToLogin: true },
             );
             const result = res?.ok ? await res.json() : null;
             if (result?.data?.deliverables) setEntry((e) => ({ ...e, deliverables: result.data.deliverables }));

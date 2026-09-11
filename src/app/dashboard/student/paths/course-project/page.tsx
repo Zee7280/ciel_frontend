@@ -52,7 +52,7 @@ function CourseProjectHub() {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await authenticatedFetch("/api/v1/paths/course-projects", {}, { redirectToLogin: false });
+            const res = await authenticatedFetch("/api/v1/paths/course-projects", {}, { redirectToLogin: true });
             const result = res?.ok ? await res.json() : null;
             setEntries(Array.isArray(result?.data) ? result.data : []);
         } finally {
@@ -72,7 +72,7 @@ function CourseProjectHub() {
     const createNew = async () => {
         setCreating(true);
         try {
-            const res = await authenticatedFetch("/api/v1/paths/course-projects", { method: "POST" }, { redirectToLogin: false });
+            const res = await authenticatedFetch("/api/v1/paths/course-projects", { method: "POST" }, { redirectToLogin: true });
             const result = res?.ok ? await res.json() : null;
             if (result?.data?.id) {
                 router.push(`/dashboard/student/paths/course-project/${result.data.id}`);
@@ -86,7 +86,7 @@ function CourseProjectHub() {
     const deleteDraft = async (id: string) => {
         setDeletingId(id);
         try {
-            const res = await authenticatedFetch(`/api/v1/paths/course-projects/${id}`, { method: "DELETE" }, { redirectToLogin: false });
+            const res = await authenticatedFetch(`/api/v1/paths/course-projects/${id}`, { method: "DELETE" }, { redirectToLogin: true });
             if (res?.ok) setEntries((prev) => prev.filter((e) => e.id !== id));
         } finally {
             setDeletingId(null);

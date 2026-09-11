@@ -16,12 +16,12 @@ async function idFromResponse(res: Response | null): Promise<string | null> {
 
 /** Student FYP deck — prefers the multi-record list, falls back to the legacy singleton GET. */
 export async function listStudentFyps(): Promise<FypEntry[]> {
-    const res = await authenticatedFetch("/api/v1/paths/fyp-theses", {}, { redirectToLogin: false });
+    const res = await authenticatedFetch("/api/v1/paths/fyp-theses", {}, { redirectToLogin: true });
     const json = res?.ok ? await res.json().catch(() => null) : null;
     if (Array.isArray(json?.data)) return json.data.map(asEntry).filter(Boolean) as FypEntry[];
     const nested = asEntry(json?.data);
     if (nested) return [nested];
-    const legacy = await authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false });
+    const legacy = await authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: true });
     const one = asEntry(legacy?.ok ? (await legacy.json().catch(() => null))?.data : null);
     return one ? [one] : [];
 }
@@ -31,7 +31,7 @@ export async function createStudentFyp(): Promise<string | null> {
     const post = await authenticatedFetch(
         "/api/v1/paths/fyp-theses",
         { method: "POST", body: JSON.stringify({}) },
-        { redirectToLogin: false },
+        { redirectToLogin: true },
     );
     const fromPost = await idFromResponse(post);
     if (fromPost) return fromPost;
@@ -43,7 +43,7 @@ export async function createStudentFyp(): Promise<string | null> {
     const patch = await authenticatedFetch(
         "/api/v1/paths/fyp-thesis",
         { method: "PATCH", body: JSON.stringify({}) },
-        { redirectToLogin: false },
+        { redirectToLogin: true },
     );
     const fromPatch = await idFromResponse(patch);
     if (fromPatch) return fromPatch;
@@ -55,11 +55,11 @@ export async function createStudentFyp(): Promise<string | null> {
 }
 
 export async function loadStudentFyp(id: string): Promise<FypEntry | null> {
-    const res = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, {}, { redirectToLogin: false });
+    const res = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, {}, { redirectToLogin: true });
     if (res?.ok) {
         const entry = asEntry((await res.json().catch(() => null))?.data);
         if (entry) return entry;
     }
-    const legacy = await authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false });
+    const legacy = await authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: true });
     return asEntry(legacy?.ok ? (await legacy.json().catch(() => null))?.data : null);
 }

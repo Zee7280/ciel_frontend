@@ -243,7 +243,7 @@ export default function StartupBusinessWorkspace() {
     const [repoAck, setRepoAck] = useState(false);
 
     useEffect(() => {
-        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: false })
+        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
                 if (result?.data) {
@@ -292,7 +292,7 @@ export default function StartupBusinessWorkspace() {
             const res = await authenticatedFetch(
                 "/api/v1/paths/startup-business",
                 { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
-                { redirectToLogin: false },
+                { redirectToLogin: true },
             );
             const result = res?.ok ? await res.json() : null;
             if (!result?.data) throw new Error("Could not save your progress");
@@ -333,7 +333,7 @@ export default function StartupBusinessWorkspace() {
         setError(null);
         try {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
-            const res = await authenticatedFetch("/api/v1/paths/startup-business/documents", { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) }, { redirectToLogin: false });
+            const res = await authenticatedFetch("/api/v1/paths/startup-business/documents", { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) }, { redirectToLogin: true });
             const result = res?.ok ? await res.json() : null;
             if (result?.data?.documents) setEntry((e) => ({ ...e, documents: result.data.documents }));
         } catch (err) {

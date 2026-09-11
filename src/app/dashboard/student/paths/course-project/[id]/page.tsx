@@ -541,7 +541,7 @@ export default function CourseProjectWizardPage() {
     }, [entry.evidenceUrls, uploading]);
 
     useEffect(() => {
-        authenticatedFetch(`/api/v1/paths/course-projects/${id}`, {}, { redirectToLogin: false })
+        authenticatedFetch(`/api/v1/paths/course-projects/${id}`, {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
                 if (result?.data) {
@@ -597,7 +597,7 @@ export default function CourseProjectWizardPage() {
                 const res = await authenticatedFetch(
                     `/api/v1/paths/course-projects/${id}`,
                     { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
-                    { redirectToLogin: false },
+                    { redirectToLogin: true },
                 );
                 const result = res?.ok ? await res.json() : null;
                 if (!result?.data) throw new Error("Could not save your progress");
