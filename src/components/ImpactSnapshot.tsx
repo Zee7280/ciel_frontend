@@ -91,9 +91,12 @@ export default function ImpactSnapshot() {
 
                 if (!cancelled && response.ok && payload?.success && payload.data) {
                     setStats(buildStats(payload.data));
+                } else if (!cancelled) {
+                    console.warn("[ImpactSnapshot] platform-stats fetch did not return live data — showing marketing-safe defaults", { status: response.status, success: payload?.success });
                 }
-            } catch {
+            } catch (error) {
                 // Keep the marketing-safe defaults if live stats are temporarily unavailable.
+                if (!cancelled) console.warn("[ImpactSnapshot] platform-stats fetch failed — showing marketing-safe defaults", error);
             }
         })();
 

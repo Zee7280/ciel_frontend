@@ -96,7 +96,7 @@ export default function Hero() {
                                 Start with Community Service <ArrowRight className="h-4 w-4" />
                             </Link>
                             <Link
-                                href="/#platform-impact"
+                                href="/#impact-map"
                                 className="w-full rounded-xl border-2 border-white/20 px-8 py-4 text-center text-base font-bold text-white transition-all duration-300 hover:bg-white/5 sm:w-auto"
                             >
                                 Open the live analytics
