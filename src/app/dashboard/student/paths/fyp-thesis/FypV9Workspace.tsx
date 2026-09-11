@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { loadStudentFyp } from "@/utils/fypStudentApi";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
@@ -77,6 +78,8 @@ function emptyTeamMember(): FypTeamMember {
     return { name: "", rollNumber: "", email: "", whatsappCode: "+92", whatsappNumber: "" };
 }
 
+const FYP_V9_STEP_EMOJI = ["🧭", "🗺️", "🎯", "📊", "🏆", "♻️", "💡", "📩"];
+
 export default function FypV9Workspace({ id }: { id: string }) {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
@@ -95,14 +98,13 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const saveTailRef = useRef(Promise.resolve());
 
     useEffect(() => {
-        authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => {
-                if (!result?.data) {
+        loadStudentFyp(id)
+            .then((raw) => {
+                if (!raw) {
                     setNotFound(true);
                     return;
                 }
-                const data = mergeFypEntry(EMPTY_FYP, result.data as Partial<FypEntry>);
+                const data = mergeFypEntry(EMPTY_FYP, raw);
                 // The graduation-year field only ever showed "2026" as a placeholder fallback in the
                 // input's value prop — nothing persisted it until the student actually touched the
                 // field. Default it into state so what's visibly filled in is actually saved.
@@ -292,19 +294,25 @@ export default function FypV9Workspace({ id }: { id: string }) {
         const nextStep = advanceTo !== undefined ? Math.max(entry.stepCompleted, advanceTo) : entry.stepCompleted;
         const patch = buildPatch(sectionSummaries);
         try {
-            const res = await authenticatedFetch(
+            const body = JSON.stringify({
+                ...patch,
+                stepCompleted: nextStep,
+                ...(status ? { status } : {}),
+            });
+            let res = await authenticatedFetch(
                 `/api/v1/paths/fyp-theses/${id}`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify({
-                        ...patch,
-                        stepCompleted: nextStep,
-                        ...(status ? { status } : {}),
-                    }),
-                },
+                { method: "PATCH", body },
                 { redirectToLogin: false },
             );
-            const result = res?.ok ? await res.json() : null;
+            let result = res?.ok ? await res.json() : null;
+            if (!result?.data) {
+                res = await authenticatedFetch(
+                    "/api/v1/paths/fyp-thesis",
+                    { method: "PATCH", body },
+                    { redirectToLogin: false },
+                );
+                result = res?.ok ? await res.json() : null;
+            }
             if (!result?.data) throw new Error("Could not save your progress");
             setEntry((e) => mergeFypEntry(e, result.data as Partial<FypEntry>));
             if (advanceTo !== undefined) setStep(Math.min(7, advanceTo));
@@ -555,11 +563,18 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 ))}
             </div>
 
-            <div className="mt-4 mb-[18px]">
-                <div className="flex gap-1 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
+            <div className="mb-[18px]">
+                <div className="mb-2.5 h-[3px] w-full overflow-hidden rounded-full bg-ciel-border/60">
+                    <i
+                        className="block h-full rounded-full bg-gradient-to-r from-ciel-purple via-ciel-purple to-ciel-green transition-all"
+                        style={{ width: `${((step + 1) / 8) * 100}%` }}
+                    />
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
                     {FYP_V9_STEP_NAMES.map((name, i) => {
                         const active = i === step;
                         const done = i < entry.stepCompleted && !active;
+                        const isReview = i === FYP_V9_STEP_NAMES.length - 1;
                         return (
                             <button
                                 key={name}
@@ -567,15 +582,25 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                 onClick={() => setStep(i)}
                                 title={name}
                                 className={clsx(
-                                    "relative min-w-16 flex-1 rounded-[11px] border px-1 py-[7px] text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple",
+                                    "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 pb-[7px] pt-2.5 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple",
                                     active
-                                        ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep"
+                                        ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep shadow-[0_2px_8px_rgba(90,70,170,.25)]"
                                         : done
-                                          ? "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep"
-                                          : "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-purple/40",
+                                          ? "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep hover:border-ciel-green"
+                                          : isReview
+                                            ? "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-purple/40"
+                                            : "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-purple/40"
                                 )}
                             >
-                                <div className="text-sm leading-none">{done ? "✓" : i + 1}</div>
+                                <span
+                                    className={clsx(
+                                        "absolute -top-2 left-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] font-black text-white ring-2 ring-white",
+                                        active ? "bg-ciel-purple-deep" : done ? "bg-ciel-green-deep" : isReview ? "bg-ciel-text-mid" : "bg-ciel-text-soft/60",
+                                    )}
+                                >
+                                    {done ? "✓" : i + 1}
+                                </span>
+                                <div className="text-sm leading-none">{FYP_V9_STEP_EMOJI[i]}</div>
                                 <div className="mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide">
                                     {name}
                                 </div>
@@ -588,9 +613,6 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 <div className="flex items-center justify-between text-[11px] font-extrabold">
                     <span>✨ Your FYP story is taking shape</span>
                     <span className="text-ciel-text-soft">{step === 0 ? "Getting started" : `Step ${step + 1} of 8`}</span>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-border">
-                    <i className="block h-full rounded-full bg-gradient-to-r from-ciel-purple via-ciel-purple to-ciel-green" style={{ width: `${((step + 1) / 8) * 100}%` }} />
                 </div>
             </div>
 
