@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { loadStudentFyp } from "@/utils/fypStudentApi";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
@@ -349,6 +350,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const handleFile = async (file: File) => {
         if (entry.isOwner === false) {
             setError("Only the lead author can upload files on this FYP record.");
+            toast.error("Only the lead author can upload files on this FYP record.");
             return;
         }
         if (uploading) return;
@@ -361,10 +363,31 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 { method: "POST", body: JSON.stringify({ label: file.name, fileUrl: publicUrl }) },
                 { redirectToLogin: true },
             );
-            const result = res?.ok ? await res.json() : null;
-            if (result?.data?.deliverables) setEntry((e) => ({ ...e, deliverables: result.data.deliverables }));
+            if (!res) {
+                throw new Error("File reached storage but your session expired before it was saved. Sign in and upload again.");
+            }
+            if (!res.ok) {
+                const text = (await res.text().catch(() => "")) || "";
+                let detail = text.trim();
+                try {
+                    const parsed = JSON.parse(text) as { message?: string | string[] };
+                    if (typeof parsed.message === "string") detail = parsed.message;
+                    else if (Array.isArray(parsed.message)) detail = parsed.message.join(" ");
+                } catch {
+                    /* raw text */
+                }
+                throw new Error(detail.slice(0, 240) || `File reached storage but the FYP record was not saved (HTTP ${res.status}).`);
+            }
+            const result = await res.json().catch(() => null);
+            if (!result?.data?.deliverables) {
+                throw new Error("File reached storage but the record response was unexpected. Refresh and check Evidence Locker.");
+            }
+            setEntry((e) => ({ ...e, deliverables: result.data.deliverables }));
+            toast.success(`${file.name} uploaded`);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Upload failed. Try again.");
+            const message = err instanceof Error ? err.message : "Upload failed. Try again.";
+            setError(message);
+            toast.error(message);
         } finally {
             setUploading(false);
         }
@@ -1188,6 +1211,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                     }}
                                 />
                             </label>
+                            {error ? <p className="mt-2 text-center text-[11px] font-bold text-ciel-amber">{error}</p> : null}
                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                 {groupedFiles.map((g) => (
                                     <a key={g.label} href={g.latest.fileUrl} target="_blank" rel="noreferrer" className="rounded-[13px] border border-ciel-border bg-white p-2.5 text-[10.8px] font-black">{g.label}</a>

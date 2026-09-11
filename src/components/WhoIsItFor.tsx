@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { usePlatformStats } from "@/utils/usePlatformStats";
 
 const segments = [
     {
@@ -31,7 +32,7 @@ const segments = [
     {
         emoji: "🤝",
         label: "Partners (NGO / Govt)",
-        description: "Post real needs, receive supervised student teams, verify with one tap — 46% of partners come back.",
+        description: "Post real needs, receive supervised student teams, verify with one tap.",
         cta: "Partner with us",
         href: "/signup?role=ngo",
         border: "border-l-amber-500",
@@ -55,6 +56,16 @@ const segments = [
 ];
 
 export default function WhoIsItFor() {
+    const { stats } = usePlatformStats();
+    const comeBack = stats?.partners_come_back_pct ?? 0;
+    const cards = segments.map((seg) =>
+        seg.label === "Partners (NGO / Govt)" && comeBack > 0
+            ? {
+                  ...seg,
+                  description: `Post real needs, receive supervised student teams, verify with one tap — ${comeBack}% of partners come back.`,
+              }
+            : seg,
+    );
     return (
         <section className="py-20 px-6 bg-white">
             <div className="max-w-6xl mx-auto">
@@ -71,7 +82,7 @@ export default function WhoIsItFor() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {segments.map((seg) => (
+                    {cards.map((seg) => (
                         <div
                             key={seg.label}
                             className={`rounded-2xl border border-slate-200 border-l-4 ${seg.border} bg-white p-6 transition-shadow duration-300 hover:shadow-lg hover:shadow-slate-200/60`}

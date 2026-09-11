@@ -25,7 +25,14 @@ function StatTile({ label, value }: { label: string; value: string }) {
 
 export default function ImpactMap() {
     const { stats } = usePlatformStats();
-    const cities = useMemo(() => stats?.cities ?? [], [stats]);
+    const cities = useMemo(
+        () =>
+            (stats?.cities ?? []).map((c) => ({
+                ...c,
+                communityDividendPkr: c.verifiedHours * 192 + c.outOfPocketPkr,
+            })),
+        [stats],
+    );
     const [metric, setMetric] = useState<MetricKey>("peopleServing");
     const [sdgFilter, setSdgFilter] = useState<number | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,7 +70,7 @@ export default function ImpactMap() {
                         </h2>
                     </div>
                     <p className="max-w-md text-base font-medium text-slate-500">
-                        Bubble size follows the metric you pick. Filter by an SDG to see which cities are working on it — every number here comes from verified reports, not estimates.
+                        Bubble size follows the metric you pick. Filter by an SDG mapped on a verified report — listing tags on unverified opportunities do not count.
                     </p>
                 </div>
 
@@ -188,7 +195,7 @@ export default function ImpactMap() {
                                             PKR {selected.communityDividendPkr.toLocaleString("en-US")}
                                         </span>
                                         <span className="mt-1 block text-[10.5px] font-semibold text-slate-500">
-                                            {selected.verifiedHours} h × 500 + PKR {selected.outOfPocketPkr.toLocaleString("en-US")} out-of-pocket
+                                            {selected.verifiedHours.toLocaleString("en-US")} hrs × PKR 192 + PKR {selected.outOfPocketPkr.toLocaleString("en-US")} out-of-pocket
                                         </span>
                                     </div>
 

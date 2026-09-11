@@ -74,19 +74,20 @@ export default function SdgImpactWheel() {
                         Spin the goals. See who&apos;s working on what.
                     </h2>
                     <p className="mt-3 max-w-md text-base font-medium text-slate-500">
-                        Every CIEL record is tagged to the SDGs it serves. Click a segment — the wheel and the project list follow, straight from verified reports.
+                        Click a segment to see verified Community Service reports tagged to that goal. Untouched goals stay dim — they are in the UN list, not in our ledger yet.
                     </p>
 
                     <div className="relative mx-auto mt-8 h-[360px] w-[360px] max-w-full lg:mx-0">
                         <svg viewBox="0 0 360 360" className="h-full w-full">
                             {sdgData.map((goal, i) => {
                                 const isSelected = goal.number === selected;
+                                const hasVerified = (byNumber.get(goal.number)?.projects ?? 0) > 0;
                                 return (
                                     <path
                                         key={goal.number}
                                         d={wedgePath(i, sdgData.length)}
                                         fill={goal.color}
-                                        fillOpacity={isSelected ? 1 : 0.45}
+                                        fillOpacity={isSelected ? 1 : hasVerified ? 0.75 : 0.18}
                                         stroke={isSelected ? "#12272E" : "none"}
                                         strokeWidth={isSelected ? 2.5 : 0}
                                         className="cursor-pointer transition-all"
@@ -183,7 +184,7 @@ export default function SdgImpactWheel() {
                                 title={goal.title}
                                 style={{ backgroundColor: goal.color }}
                                 className={`flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-black text-white transition ${
-                                    goal.number === selected ? "ring-2 ring-offset-2" : "opacity-55 hover:opacity-100"
+                                    goal.number === selected ? "ring-2 ring-offset-2" : (byNumber.get(goal.number)?.projects ?? 0) > 0 ? "opacity-90 hover:opacity-100" : "opacity-25 hover:opacity-70"
                                 }`}
                             >
                                 {goal.number}

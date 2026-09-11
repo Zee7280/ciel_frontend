@@ -176,7 +176,7 @@ export default function AdminDashboard() {
                     background={MOCKUP_GRADIENTS.orange}
                 />
                 <MockupActionCard
-                    href="/dashboard/admin/path-submissions?tab=startup-business"
+                    href="/dashboard/admin/startup-business"
                     emoji="💼"
                     ghost="🚀"
                     title="Startup / Venture"

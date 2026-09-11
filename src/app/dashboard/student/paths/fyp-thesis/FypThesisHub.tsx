@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupPanel, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
-import EmptyState from "@/components/ciel/EmptyState";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
 import { createStudentFyp, listStudentFyps } from "@/utils/fypStudentApi";
@@ -124,9 +122,21 @@ function progCat(pct: number): [string, string] {
     return ["🌱", "Early Stage"];
 }
 
-function remainingSectionNames(entry: FypEntry) {
+function sectionsChecklist(entry: FypEntry) {
     const done = sectionsDone(entry);
-    return FYP_V9_STEP_NAMES.slice(done).join(", ");
+    return FYP_V9_STEP_NAMES.map((name, i) => `${name} ${i < done ? "✓" : i === done ? "⏳" : "✗"}`).join(" · ");
+}
+
+function relativeUpdated(value?: string | null) {
+    if (!value) return "just now";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return formatDay(value);
+    const start = (x: Date) => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+    const diff = Math.round((start(new Date()) - start(d)) / 86400000);
+    if (diff <= 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    if (diff < 7) return `${diff} days ago`;
+    return formatDay(value);
 }
 
 function headline(entry: FypEntry) {
@@ -168,6 +178,34 @@ function pillClass(tone: ReturnType<typeof fypStatusLabel>["tone"]) {
     return "bg-[#edf4fb] text-[#376d9f]";
 }
 
+function LoopBack() {
+    return (
+        <Link href={BASE} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
+            ← Back to module buttons
+        </Link>
+    );
+}
+
+function ConnChip({ children }: { children: React.ReactNode }) {
+    return (
+        <span className="rounded-full border border-[#d7e5e0] bg-white px-[9px] py-1 text-[9.5px] font-extrabold text-[#2d5a50]">
+            {children}
+        </span>
+    );
+}
+
+function facultyRemindLabel(name: string) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    return parts.slice(-2).join(" ") || name;
+}
+
+function studentOf(entry: FypEntry) {
+    const stored = readStoredCurrentUser();
+    const fromEntry = entry.projectInfo?.studentName?.trim();
+    if (fromEntry) return fromEntry;
+    return typeof stored?.name === "string" && stored.name.trim() ? stored.name.trim() : "Student";
+}
+
 function RemindPair({
     name,
     email,
@@ -175,6 +213,7 @@ function RemindPair({
     whatsappNumber,
     subject,
     body,
+    label,
 }: {
     name: string;
     email?: string;
@@ -182,8 +221,9 @@ function RemindPair({
     whatsappNumber?: string;
     subject: string;
     body: string;
+    label?: string;
 }) {
-    const sn = shortPerson(name);
+    const sn = label || shortPerson(name);
     const text = `${subject}\n\n${body}`;
     return (
         <>
@@ -228,8 +268,8 @@ function RankBadges({ entry }: { entry: FypEntry }) {
     if (!ribbon) {
         return (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <span className="rounded-xl border border-[#e3e8ec] bg-[#f7f8fa] px-2.5 py-1.5 text-[10.5px] font-semibold text-[#70808a]">
-                    No ranking badge yet — badges arrive when your supervisor or university publish a final FYP ranking.
+                <span className="rounded-xl border border-[#e3e8ec] bg-[#f7f8fa] px-2.5 py-1.5 text-[10.5px] font-semibold leading-snug text-[#70808a]">
+                    No ranking badge yet — badges arrive when your supervisor or university publish a final FYP ranking, and CIEL PK&apos;s live rank updates continuously.
                 </span>
             </div>
         );
@@ -264,7 +304,8 @@ function ProgressCard({
     const done = sectionsDone(entry);
     const remaining = SECTION_TOTAL - done;
     const cat = progCat(pct);
-    const st = fypStatusLabel(entry);
+    const wait = pct < 100;
+    const statusLabel = wait ? "In progress" : "Ready to submit";
     const names = teamNames(entry);
     const teamTxt = names.length ? `Team: ${names.join(", ")}` : "Individual";
     const faculty = entry.projectInfo?.supervisorName?.trim() || "your supervisor";
@@ -278,63 +319,75 @@ function ProgressCard({
         return Boolean(m.name?.trim());
     });
     const title = fypTitle(entry);
-    const remainingList = remainingSectionNames(entry);
+    const checklist = sectionsChecklist(entry);
+    const meta = [
+        displayFypId(entry),
+        entry.projectInfo?.officialProgram || entry.projectInfo?.degree || routeLabel(entry),
+        entry.projectInfo?.academicLevel,
+        entry.projectInfo?.span,
+        teamTxt,
+        `Supervisor: ${faculty}`,
+        uni,
+    ]
+        .filter(Boolean)
+        .join(" · ");
 
     return (
-        <div className="relative grid grid-cols-1 items-start gap-4 rounded-2xl border border-[#dde5ea] bg-white p-[15px] md:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="grid grid-cols-1 items-start gap-4 rounded-2xl border border-[#dde5ea] bg-white p-[15px] md:grid-cols-[minmax(0,1fr)_290px]">
             <div>
                 <h4 className="m-0 text-[15px] font-semibold text-[#14202b]">{title}</h4>
                 <p className="mt-1 text-[10.5px] text-[#70808a]">
                     <b className="font-semibold text-[#14202b]">{displayFypId(entry)}</b>
-                    {" · "}
-                    {routeLabel(entry)}
-                    {entry.projectInfo?.officialProgram ? ` · ${entry.projectInfo.officialProgram}` : ""}
-                    {entry.projectInfo?.span ? ` · ${entry.projectInfo.span}` : ""}
-                    {` · ${teamTxt} · Supervisor: ${faculty} · ${uni}`}
+                    {meta.replace(displayFypId(entry), "")}
                 </p>
-                <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5 text-[11px] leading-relaxed">
+                <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5 text-[11px] leading-relaxed">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[10.5px] font-black">
                         <span>
-                            {st.label}{" "}
-                            <span className="ml-1 inline-block rounded-[18px] bg-[#edf4fb] px-2 py-1 text-[9.5px] font-black text-[#376d9f]">
+                            <span
+                                className={`inline-block whitespace-nowrap rounded-[18px] px-2 py-[5px] text-[9.5px] font-black ${
+                                    wait ? "bg-[#fff3dc] text-[#a66d11]" : "bg-[#edf4fb] text-[#376d9f]"
+                                }`}
+                            >
+                                {statusLabel}
+                            </span>
+                            <span className="ml-1 inline-block whitespace-nowrap rounded-[18px] bg-[#edf4fb] px-2 py-[5px] text-[9.5px] font-black text-[#376d9f]">
                                 {cat[0]} {cat[1]}
                             </span>
                         </span>
                         <span>{pct}% complete</span>
                     </div>
                     <div className="mt-1.5 h-2 min-w-[120px] overflow-hidden rounded-lg bg-[#e6ecee]">
-                        <i className="block h-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#15a08e,#e4a73e)" }} />
+                        <span className="block h-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#15a08e,#e4a73e)" }} />
                     </div>
                     <p className="mt-1.5 text-[10.5px] text-[#70808a]">
-                        <b className="font-semibold text-[#14202b]">
-                            {done} of {SECTION_TOTAL} Sections Completed
+                        <b className="text-[10px] font-black uppercase tracking-[0.05em] text-[#14202b]">
+                            {done} of {SECTION_TOTAL} sections completed
                         </b>
-                        {` · ${remaining} remaining`}
-                        {remainingList ? ` · ${remainingList}` : ""}
+                        {` · ${remaining} remaining · ${checklist}`}
                     </p>
-                    <p className="mt-1 text-[10.5px] text-[#70808a]">💾 Auto-saved continuously · last updated {formatDay(entry.updatedAt) || "just now"}</p>
-                    <p className="mt-2 text-[11px] text-[#31405a]">
-                        ⚡ <b>Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
-                    </p>
+                    <p className="mt-[3px] text-[10.5px] text-[#70808a]">💾 Auto-saved continuously · last updated {relativeUpdated(entry.updatedAt)}</p>
+                    <div className="mt-[7px] rounded-[10px] border border-[#dbe7f2] bg-[#f2f7fb] px-2.5 py-[7px] text-[10.5px] leading-relaxed text-[#31405a]">
+                        ⚡ <b className="font-black uppercase tracking-[0.04em]">Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
+                    </div>
                 </div>
-                <div className="mt-2.5 rounded-xl border border-[#d5eee8] bg-[#f4faf8] px-3 py-2.5 text-[11px] leading-relaxed">
-                    <b className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#71828e]">One master record — auto-connected</b>
-                    <div className="flex flex-wrap gap-1.5">
+                <div className="mt-[11px] rounded-xl border border-[#d5eee8] bg-[#f4faf8] px-3 py-2.5 text-[11px] leading-relaxed">
+                    <b className="mb-1 block text-[10px] font-black uppercase tracking-[0.05em] text-[#71828e]">One master record — auto-connected</b>
+                    <div className="mt-1 flex flex-wrap gap-[5px]">
                         {(names.length ? names : [myName]).map((n) => (
-                            <span key={n} className="rounded-lg bg-white px-2 py-1 text-[10.5px] font-semibold text-[#16313d]">
+                            <ConnChip key={n}>
                                 {n === myName ? "🧑‍🎓" : "👥"} {n}
-                            </span>
+                            </ConnChip>
                         ))}
-                        <span className="rounded-lg bg-white px-2 py-1 text-[10.5px] font-semibold text-[#16313d]">🧑‍🏫 {faculty}</span>
-                        <span className="rounded-lg bg-white px-2 py-1 text-[10.5px] font-semibold text-[#16313d]">🏫 {uni}</span>
-                        <span className="rounded-lg bg-white px-2 py-1 text-[10.5px] font-semibold text-[#16313d]">🌐 CIEL PK</span>
+                        <ConnChip>🧑‍🏫 {faculty}</ConnChip>
+                        <ConnChip>🏫 {uni}</ConnChip>
+                        <ConnChip>🌐 CIEL PK</ConnChip>
                     </div>
                     <p className="mt-1.5 text-[9.5px] text-[#5f7a72]">
                         All stakeholders see this same live record ({displayFypId(entry)}) — no duplicates; team members share one FYP ID.
                     </p>
                 </div>
-                <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
-                    <b className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#71828e]">Stakeholder reminders — each button names its recipient</b>
+                <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
+                    <b className="mb-1 block text-[10px] font-black uppercase tracking-[0.05em] text-[#71828e]">Stakeholder reminders — each button names its recipient</b>
                     {teammates.length ? (
                         <>
                             <p className="mb-1 text-[9.5px] text-[#70808a]">Nudge a team member to finish their part:</p>
@@ -376,30 +429,34 @@ function ProgressCard({
                     </div>
                 </div>
             </div>
-            <div className="border-[#dde5ea] md:border-l md:pl-3.5">
+            <div className="border-[#dde5ea] md:border-l md:pl-3.5 max-md:border-t max-md:pt-3">
                 <div className="mb-2.5 rounded-[11px] border border-[#dde5ea] bg-[#f8fafb] px-2.5 py-2.5">
                     <b className="block text-[11px] text-[#16313d]">Current workflow owner</b>
-                    <small className="mt-1 block text-[10px] text-[#70808a]">
+                    <small className="mt-[3px] block text-[10px] text-[#70808a]">
                         Student{names.length ? " team" : ""} — {pct >= 100 ? "ready to submit" : "record in progress"}
                     </small>
                 </div>
                 {pct >= 100 ? (
                     <>
-                        <button type="button" onClick={onOpen} className="mb-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-2.5 text-[11px] font-black text-white">
+                        <button type="button" onClick={onOpen} className="mb-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
                             📤 SUBMIT FYP FOR REVIEW
                         </button>
-                        <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-3.5 py-2.5 text-[11px] font-black text-[#29454f]">
+                        <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
                             ✏️ OPEN FYP FORM
                         </button>
                     </>
                 ) : (
                     <>
-                        <button type="button" onClick={onOpen} className="mb-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
+                        <button type="button" onClick={onOpen} className="mb-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-[14px] py-[11px] text-[11px] font-black text-white">
                             ▶ CONTINUE FYP
                         </button>
-                        <Link href={BASE} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-3.5 py-2.5 text-[11px] font-black text-[#29454f]">
+                        <button
+                            type="button"
+                            onClick={() => toast.success("Draft auto-saved — return anytime from FYP in Progress")}
+                            className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
+                        >
                             💾 SAVE & CLOSE
-                        </Link>
+                        </button>
                     </>
                 )}
                 {onDelete && entry.isOwner !== false ? (
@@ -408,9 +465,9 @@ function ProgressCard({
                         onClick={onDelete}
                         disabled={deleting}
                         aria-label="Delete draft"
-                        className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-[9px] border border-[#dde5ea] bg-white px-3 py-2 text-[10px] font-extrabold text-[#70808a] hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+                        className="mt-2 w-full text-center text-[9.5px] font-extrabold text-[#70808a] hover:text-red-600 disabled:opacity-50"
                     >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete draft
+                        Delete draft
                     </button>
                 ) : null}
             </div>
@@ -425,55 +482,70 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
     const faculty = entry.projectInfo?.supervisorName?.trim() || "your supervisor";
     const uni = entry.projectInfo?.university?.trim() || "University";
     const title = fypTitle(entry);
-    const files = entry.deliverables?.length || 0;
-    const latestFile = entry.deliverables?.[entry.deliverables.length - 1];
+    const files = entry.deliverables || [];
+    const submittedOn = formatDay(entry.updatedAt);
+    const prog = entry.projectInfo?.degree || entry.projectInfo?.officialProgram || routeLabel(entry);
+    const who = names.length ? `Team — ${names.join(", ")}` : studentOf(entry);
+    const facultyLabel = facultyRemindLabel(faculty);
+
+    const openFiles = () => {
+        const withUrl = files.filter((f) => f.fileUrl);
+        if (withUrl.length === 1) {
+            window.open(withUrl[0].fileUrl, "_blank", "noopener,noreferrer");
+            return;
+        }
+        toast.message(`${files.length} evidence file(s)`, {
+            description: files.map((f) => f.label || "Attachment").join(", ") || "Open the flashcard to download.",
+        });
+        if (withUrl[0]) window.open(withUrl[0].fileUrl, "_blank", "noopener,noreferrer");
+    };
 
     return (
         <div className="grid grid-cols-1 items-start gap-4 rounded-2xl border border-[#dde5ea] bg-white p-[15px] md:grid-cols-[minmax(0,1fr)_290px]">
             <div>
-                <h4 className="m-0 text-[15px] font-semibold text-[#14202b]">
+                <h4 className="m-0 mb-[3px] text-[15px] font-semibold text-[#14202b]">
                     {title} <SdgTiles entry={entry} />
                 </h4>
-                <p className="mt-1 text-[10.5px] text-[#70808a]">
+                <p className="text-[10.5px] text-[#70808a]">
                     <b className="font-semibold text-[#14202b]">{displayFypId(entry)}</b>
-                    {` · ${routeLabel(entry)}`}
-                    {names.length ? ` · Team — ${names.join(", ")}` : ""}
-                    {entry.updatedAt ? ` · Submitted ${formatDay(entry.updatedAt)}` : ""}
+                    {` · ${prog} · ${who}`}
+                    {submittedOn ? ` · Submitted ${submittedOn}` : ""}
                     {` · Supervisor ${faculty} · ${uni}`}
                 </p>
-                <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
-                    <span className={`inline-block rounded-[18px] px-2 py-1 text-[9.5px] font-black uppercase ${pillClass(st.tone)}`}>{st.label}</span>
+                <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px]">
+                    <span className={`inline-block whitespace-nowrap rounded-[18px] px-2 py-[5px] text-[9.5px] font-black uppercase ${pillClass(st.tone)}`}>{st.label}</span>
                     <span className="ml-1.5 text-[10.5px] text-[#70808a]">
                         {pending
-                            ? `Supervisor owns the next action · waiting${entry.updatedAt ? ` since ${formatDay(entry.updatedAt)}` : ""}`
+                            ? `Supervisor owns the next action · waiting${submittedOn ? ` since ${submittedOn}` : ""}`
                             : isRevision(entry)
                               ? "You own the next action"
                               : "Decision recorded"}
                     </span>
-                    <p className="mt-2 text-[11px] text-[#31405a]">{headline(entry)}</p>
-                    <p className="mt-2 text-[11px] text-[#31405a]">
-                        ⚡ <b>Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
-                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-[#31405a]">{headline(entry)}</p>
+                    <div className="mt-[7px] rounded-[10px] border border-[#dbe7f2] bg-[#f2f7fb] px-2.5 py-[7px] text-[10.5px] leading-relaxed text-[#31405a]">
+                        ⚡ <b className="font-black uppercase tracking-[0.04em]">Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
+                    </div>
                     {pending ? (
                         <p className="mt-1.5 text-[10px] text-[#70808a]">🔒 Your record is locked while under review — it reopens automatically if your supervisor requests a revision.</p>
                     ) : null}
                 </div>
                 {pending ? (
-                    <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
-                        <b className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#71828e]">Remind your supervisor {faculty} to review</b>
+                    <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px]">
+                        <b className="mb-1 block text-[10px] font-black uppercase tracking-[0.05em] text-[#71828e]">Remind your supervisor {faculty} to review</b>
                         <div className="flex flex-wrap gap-1">
                             <RemindPair
                                 name={faculty}
+                                label={facultyLabel}
                                 email={entry.projectInfo?.supervisorEmail}
-                                subject={`Reminder: ${title} is waiting for your review`}
-                                body={`Hi ${shortPerson(faculty)},\n\nJust a nudge — my FYP flashcard "${title}" (${displayFypId(entry)}) is with you on CIEL PK.\n\nThank you.`}
+                                subject={`CIEL PK reminder — ${title}`}
+                                body={`Dear ${faculty}, a gentle reminder: the Final Year Project record "${title}" (${displayFypId(entry)}) has been awaiting your review${submittedOn ? ` since ${submittedOn}` : ""}. Please open Final Year Project (FYP) → FYP Review in your CIEL PK Faculty / Supervisor Dashboard to approve, request revision or reject. Thank you.`}
                             />
                         </div>
                     </div>
                 ) : null}
                 {isRevision(entry) ? (
-                    <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5 text-[11px] leading-relaxed">
-                        <b className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#71828e]">Supervisor comments — what to revise</b>
+                    <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px] text-[11px] leading-relaxed">
+                        <b className="mb-1 block text-[10px] font-black uppercase tracking-[0.05em] text-[#71828e]">Supervisor comments — what to revise</b>
                         “{entry.supervisorApprovalNote?.trim() || "Please revise the sections named by your supervisor, then resubmit."}”
                         {entry.supervisorApprovalAt ? ` — ${faculty}, ${formatDay(entry.supervisorApprovalAt)}` : ""}
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -487,40 +559,40 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
                         <div className="mt-1.5 flex flex-wrap gap-1">
                             <RemindPair
                                 name={faculty}
+                                label={facultyLabel}
                                 email={entry.projectInfo?.supervisorEmail}
                                 subject={`Question about revision of ${title}`}
-                                body={`Hi ${shortPerson(faculty)},\n\nI have a question about the revision requested on "${title}" (${displayFypId(entry)}).\n\nThank you.`}
+                                body={`Hi ${facultyLabel},\n\nI have a question about the revision requested on "${title}" (${displayFypId(entry)}).\n\nThank you.`}
                             />
                         </div>
                     </div>
                 ) : null}
                 {isRejected(entry) ? (
-                    <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5 text-[11px] leading-relaxed">
-                        <b className="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#71828e]">Reason (kept on record — never published)</b>
+                    <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px] text-[11px] leading-relaxed">
+                        <b className="mb-1 block text-[10px] font-black uppercase tracking-[0.05em] text-[#71828e]">Reason (kept on record — never published)</b>
                         “{entry.supervisorApprovalNote?.trim() || "Not accepted."}”
                         {entry.supervisorApprovalAt ? ` — ${faculty}, ${formatDay(entry.supervisorApprovalAt)}` : ""}
                     </div>
                 ) : null}
             </div>
-            <div className="border-[#dde5ea] md:border-l md:pl-3.5">
+            <div className="border-[#dde5ea] max-md:border-t max-md:pt-3 md:border-l md:pl-3.5">
                 <div className="mb-2.5 rounded-[11px] border border-[#dde5ea] bg-[#f8fafb] px-2.5 py-2.5">
                     <b className="block text-[11px] text-[#16313d]">Current workflow owner</b>
-                    <small className="mt-1 block text-[10px] text-[#70808a]">
+                    <small className="mt-[3px] block text-[10px] text-[#70808a]">
                         {pending ? `Supervisor — ${faculty}` : isRevision(entry) ? "Student — revise & resubmit" : `Closed — ${st.label}`}
                     </small>
                 </div>
-                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-2.5 text-[11px] font-black text-white">
+                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
                     🃏 VIEW FYP FLASHCARD
                 </button>
-                {files && latestFile?.fileUrl ? (
-                    <a
-                        href={latestFile.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-3.5 py-2.5 text-[11px] font-black text-[#29454f]"
+                {files.length ? (
+                    <button
+                        type="button"
+                        onClick={openFiles}
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
                     >
-                        📎 {files} FILE{files > 1 ? "S" : ""}
-                    </a>
+                        📎 {files.length} FILE{files.length > 1 ? "S" : ""}
+                    </button>
                 ) : null}
             </div>
         </div>
@@ -532,37 +604,45 @@ function ApprovedCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }
     const faculty = entry.projectInfo?.supervisorName?.trim() || "supervisor";
     const uni = entry.projectInfo?.university?.trim() || "University";
     const title = fypTitle(entry);
-    const latestFile = entry.deliverables?.[entry.deliverables.length - 1];
+    const files = entry.deliverables || [];
+    const latestFile = files[files.length - 1];
+    const level = entry.projectInfo?.academicLevel?.trim();
+    const course = level ? (/fyp/i.test(level) ? level : `${level} FYP`) : null;
+    const prog = entry.projectInfo?.degree || entry.projectInfo?.officialProgram || routeLabel(entry);
+    const who = names.length ? `Group — ${names.join(", ")}` : studentOf(entry);
+    const approvedOn = formatDay(entry.supervisorApprovalAt);
+    const meta = [
+        displayFypId(entry),
+        course,
+        prog,
+        who,
+        entry.projectInfo?.school || entry.projectInfo?.academicArea,
+        uni,
+        entry.projectInfo?.graduationYear ? `Batch ${entry.projectInfo.graduationYear}` : null,
+        `Approved by ${faculty}${approvedOn ? ` ${approvedOn}` : ""}`,
+    ]
+        .filter(Boolean)
+        .join(" · ");
 
     return (
         <div className="grid grid-cols-1 items-start gap-4 rounded-2xl border border-[#dde5ea] bg-white p-[15px] md:grid-cols-[minmax(0,1fr)_290px]">
             <div>
-                <h4 className="m-0 text-[15px] font-semibold text-[#14202b]">
+                <h4 className="m-0 mb-[3px] text-[15px] font-semibold text-[#14202b]">
                     {title} <SdgTiles entry={entry} />
                 </h4>
-                <p className="mt-1 text-[10.5px] text-[#70808a]">
-                    {displayFypId(entry)}
-                    {entry.projectInfo?.officialProgram ? ` · ${entry.projectInfo.officialProgram}` : ""}
-                    {` · ${routeLabel(entry)}`}
-                    {names.length ? ` · Group — ${names.join(", ")}` : ""}
-                    {entry.projectInfo?.academicArea ? ` · ${entry.projectInfo.academicArea}` : ""}
-                    {` · ${uni}`}
-                    {entry.projectInfo?.graduationYear ? ` · Batch ${entry.projectInfo.graduationYear}` : ""}
-                    {` · Approved by ${faculty}`}
-                    {entry.supervisorApprovalAt ? ` ${formatDay(entry.supervisorApprovalAt)}` : ""}
-                </p>
-                <div className="mt-2.5 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
-                    <span className="inline-block rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black text-[#1d765d]">✓ FACULTY APPROVED</span>
-                    <p className="mt-2 text-[11px] text-[#31405a]">{headline(entry)}</p>
+                <p className="text-[10.5px] text-[#70808a]">{meta}</p>
+                <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px]">
+                    <span className="inline-block whitespace-nowrap rounded-[18px] bg-[#e8f5ef] px-2 py-[5px] text-[9.5px] font-black text-[#1d765d]">✓ FACULTY APPROVED</span>
+                    <p className="mt-2 text-[11px] leading-relaxed text-[#31405a]">{headline(entry)}</p>
                 </div>
                 <RankBadges entry={entry} />
             </div>
-            <div className="border-[#dde5ea] md:border-l md:pl-3.5">
+            <div className="border-[#dde5ea] max-md:border-t max-md:pt-3 md:border-l md:pl-3.5">
                 <div className="mb-2.5 rounded-[11px] border border-[#dde5ea] bg-[#f8fafb] px-2.5 py-2.5">
                     <b className="block text-[11px] text-[#16313d]">Published to</b>
-                    <small className="mt-1 block text-[10px] text-[#70808a]">🧑‍🎓 Student · 🧑‍🏫 Supervisor · 🏫 University · 🌐 CIEL PK</small>
+                    <small className="mt-[3px] block text-[10px] leading-relaxed text-[#70808a]">🧑‍🎓 Student · 🧑‍🏫 Supervisor · 🏫 University · 🌐 CIEL PK</small>
                 </div>
-                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-2.5 text-[11px] font-black text-white">
+                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
                     🃏 OPEN FLASHCARD
                 </button>
                 {latestFile?.fileUrl ? (
@@ -570,11 +650,19 @@ function ApprovedCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }
                         href={latestFile.fileUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-3.5 py-2.5 text-[11px] font-black text-[#29454f]"
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
                     >
                         ⬇️ FILE
                     </a>
-                ) : null}
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => toast.message("Approved file will appear here when it is attached to this record.")}
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
+                    >
+                        ⬇️ FILE
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -590,18 +678,18 @@ function PillTabs({
     onChange: (key: ReviewTab) => void;
 }) {
     return (
-        <div className="flex flex-wrap gap-1.5 px-1">
+        <div className="flex flex-wrap gap-[7px]">
             {tabs.map((t) => (
                 <button
                     key={t.key}
                     type="button"
                     onClick={() => onChange(t.key)}
-                    className={`rounded-[18px] border px-2.5 py-1.5 text-[11px] font-extrabold ${
+                    className={`rounded-[18px] border px-[11px] py-[7px] text-[11px] font-extrabold ${
                         active === t.key ? "border-[#153f47] bg-[#153f47] text-white" : "border-[#dde5ea] bg-white text-[#5c6d76]"
                     }`}
                 >
                     {t.label}
-                    <span className={`ml-1.5 inline-block rounded-[9px] px-1.5 py-0.5 text-[9px] ${active === t.key ? "bg-white/20" : "bg-black/10"}`}>{t.n}</span>
+                    <span className={`ml-1.5 inline-block rounded-[9px] px-1.5 py-px text-[9px] ${active === t.key ? "bg-white/20" : "bg-black/10"}`}>{t.n}</span>
                 </button>
             ))}
         </div>
@@ -726,30 +814,26 @@ export default function FypThesisHub({
                     <MockupSectionHead
                         title="Create FYP Record"
                         subtitle="Your draft saves automatically; your supervisor only sees it after you submit."
-                        action={
-                            <Link href={BASE} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                                ← Back to module buttons
-                            </Link>
-                        }
+                        action={<LoopBack />}
                     />
-                    <section className="overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white p-5 shadow-[0_8px_22px_rgba(24,52,64,.05)]">
+                    <MockupPanel title="Create FYP Record" subtitle="No pre-approval. Saving Section 1 creates your FYP ID and master record.">
                         {createError ? <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{createError}</p> : null}
                         <div className="mb-3.5 rounded-xl border border-[#ead8b8] bg-[#fff8ec] px-3 py-3 text-[11.5px] leading-relaxed text-[#715a2d]">
                             No pre-approval is required. The button opens the <b>CIEL PK Final Year Projects Form</b> — eight sections (Route → Roadmap → Pathway → Evidence → Outcome → Sustainability → Reflection → Review).{" "}
-                            <b>Saving Section 1 creates your master FYP record</b> with a unique FYP ID (e.g. {`FYP-${new Date().getFullYear()}-00128`}) and automatically connects you, your team members, your Faculty Supervisor, your University and CIEL PK to the <b>same single record</b> — never a duplicate. Every keystroke after that is <b>auto-saved continuously</b>. Your FYP Flashcard is generated when you submit.
+                            <b>Saving Section 1 creates your master FYP record</b> with a unique FYP ID and automatically connects you, your team members, your Faculty Supervisor, your University and CIEL PK to the <b>same single record</b>. Every keystroke after that is <b>auto-saved continuously</b>.
                         </div>
-                        <button
-                            type="button"
+                                <button
+                                    type="button"
                             onClick={() => void createNew()}
-                            disabled={creating}
+                                    disabled={creating}
                             className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#174b43] px-4 py-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-70"
-                        >
-                            🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
-                        </button>
+                                >
+                                    🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
+                                </button>
                         <div className="mt-4 rounded-xl border border-[#d5eee8] bg-[#eef8f6] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#4b6f68]">
-                            Once you start, the record appears under <b>Final Year Project (FYP) → FYP in Progress</b> with a live progress bar and “Sections Completed” count. Your supervisor, university and CIEL PK see the same progress % in real time and can send reminders — never your unfinished text.
+                            Once you start, the record appears under <b>Final Year Project (FYP) → FYP in Progress</b> with a live progress bar and “Sections Completed” count.
                         </div>
-                    </section>
+                    </MockupPanel>
                 </div>
             )}
 
@@ -764,28 +848,23 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="My Final Year Project Impact"
-                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · You receive the approved file; scores and rankings stay with your supervisor.`}
-                        action={
-                            <Link href={BASE} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                                ← Back to module buttons
-                            </Link>
-                        }
+                        subtitle="Approved Final Year Projects only. These flashcards are also on your Impact Portfolio, your University's FYP Impact Wall and CIEL PK."
+                        action={<LoopBack />}
                     />
+                    <MockupPanel
+                        title="My Final Year Project Impact"
+                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · You receive the approved file; scores and rankings stay with your supervisor.`}
+                    >
                     {approved.length === 0 ? (
-                        <EmptyState
-                            emoji="🏅"
-                            heading="Your FYP impact is waiting"
-                            line="Submit an FYP and it hangs here on supervisor approval — rank, score and story."
-                            actionLabel="🎓 OPEN FYP FORM"
-                            onAction={() => void createNew()}
-                        />
-                    ) : (
-                        <div className="grid gap-3">
+                            <p className="px-1 py-8 text-center text-[12px] text-[#70808a]">No approved Final Year Project yet.</p>
+                        ) : (
+                            <div className="grid gap-3">
                             {approved.map((entry) => (
-                                <ApprovedCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />
+                                    <ApprovedCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />
                             ))}
                         </div>
                     )}
+                    </MockupPanel>
                 </div>
             )}
 
@@ -793,34 +872,39 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="FYP in Progress"
-                        subtitle={`${drafts.length} record${drafts.length === 1 ? "" : "s"} · Drafts save automatically. Remind your team, or ask your supervisor a question — by Email or WhatsApp.`}
-                        action={
-                            <Link href={BASE} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                                ← Back to module buttons
-                            </Link>
-                        }
+                        subtitle="Live completion from your form. Remind your team, or ask your supervisor a question — by Email or WhatsApp."
+                        action={<LoopBack />}
                     />
+                    <MockupPanel
+                        title="FYP in Progress"
+                        subtitle={`${drafts.length} record${drafts.length === 1 ? "" : "s"} · Drafts save automatically`}
+                    >
                     {drafts.length === 0 ? (
-                        <EmptyState
-                            emoji="🔬"
-                            heading="Nothing in progress"
-                            line="Nothing in progress — your Final Year Project is under review, or create a new record to start."
-                            actionLabel="🎓 OPEN FYP FORM"
-                            onAction={() => void createNew()}
-                        />
-                    ) : (
-                        <div className="grid gap-3">
-                            {drafts.map((entry) => (
-                                <ProgressCard
-                                    key={entry.id}
-                                    entry={entry}
-                                    onOpen={() => openRecord(entry.id)}
-                                    onDelete={entry.id ? () => void deleteDraft(entry.id!) : undefined}
-                                    deleting={deletingId === entry.id}
-                                />
+                            <div className="px-1 py-8 text-center">
+                                <p className="text-[12px] text-[#70808a]">Nothing in progress — your Final Year Project is under review, or create a new record to start.</p>
+                                        <button
+                                            type="button"
+                                    onClick={() => void createNew()}
+                                    disabled={creating}
+                                    className="mt-4 inline-flex items-center gap-1.5 rounded-[9px] bg-[#174b43] px-4 py-3 text-xs font-black text-white disabled:opacity-70"
+                                >
+                                    🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
+                                        </button>
+                                </div>
+                        ) : (
+                            <div className="grid gap-3">
+                                {drafts.map((entry) => (
+                                    <ProgressCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        onOpen={() => openRecord(entry.id)}
+                                        onDelete={entry.id ? () => void deleteDraft(entry.id!) : undefined}
+                                        deleting={deletingId === entry.id}
+                                    />
                             ))}
                         </div>
                     )}
+                    </MockupPanel>
                 </div>
             )}
 
@@ -828,44 +912,30 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="FYP Under Review"
-                        subtitle="Your supervisor owns the next action while a record is pending. Use the buttons to send a polite reminder."
-                        action={
-                            <Link href={BASE} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                                ← Back to module buttons
-                            </Link>
-                        }
+                        subtitle="Your submitted flashcard is with your supervisor. You'll receive the outcome — approved file, revision request, or not accepted — by Email and WhatsApp."
+                        action={<LoopBack />}
                     />
-                    {underReview.length === 0 ? (
-                        <EmptyState
-                            emoji="📤"
-                            heading="Nothing under review"
-                            line="Submit a completed FYP flashcard and it lands here while your supervisor reviews it."
-                            actionLabel="🎓 OPEN FYP FORM"
-                            onAction={() => void createNew()}
+                    <MockupPanel title="FYP Under Review" subtitle="Your supervisor owns the next action while a record is pending. Use the buttons to send a polite reminder.">
+                        <PillTabs
+                                    tabs={[
+                                { key: "all", label: "All", n: underReview.length },
+                                { key: "pending", label: "Pending supervisor", n: pending.length },
+                                { key: "revision", label: "Revision required", n: revision.length },
+                                { key: "rejected", label: "Not accepted", n: rejected.length },
+                                    ]}
+                                    active={reviewTab}
+                            onChange={setReviewTab}
                         />
-                    ) : (
-                        <>
-                            <PillTabs
-                                tabs={[
-                                    { key: "all", label: "All", n: underReview.length },
-                                    { key: "pending", label: "Pending supervisor", n: pending.length },
-                                    { key: "revision", label: "Revision required", n: revision.length },
-                                    { key: "rejected", label: "Not accepted", n: rejected.length },
-                                ]}
-                                active={reviewTab}
-                                onChange={setReviewTab}
-                            />
-                            <div className="mt-3 grid gap-3">
-                                {visibleReview.length === 0 ? (
-                                    <p className="rounded-2xl border border-dashed border-[#dde5ea] px-4 py-8 text-center text-[12px] text-[#70808a]">Nothing under review.</p>
-                                ) : (
-                                    visibleReview.map((entry) => <ReviewCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />)
-                                )}
-                            </div>
-                        </>
-                    )}
+                        <div className="mt-3 grid gap-3">
+                            {visibleReview.length === 0 ? (
+                                <p className="px-1 py-[30px] text-center text-[12px] text-[#70808a]">Nothing under review.</p>
+                            ) : (
+                                visibleReview.map((entry) => <ReviewCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />)
+                                    )}
+                                </div>
+                    </MockupPanel>
                 </div>
-            )}
+                        )}
 
             {view === "home" && (
                 <>
@@ -890,32 +960,32 @@ export default function FypThesisHub({
                         />
                         <MockupActionCard
                             href={IN_PROGRESS_HREF}
-                            emoji="🔬"
+                        emoji="🔬"
                             ghost="🔬"
-                            title="FYP in Progress"
-                            subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
+                        title="FYP in Progress"
+                        subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
                             badge={`${drafts.length} IN PROGRESS`}
                             background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
                             href={UNDER_REVIEW_HREF}
-                            emoji="📤"
+                        emoji="📤"
                             ghost="📤"
-                            title="FYP Under Review"
-                            subtitle="Submitted flashcards waiting for supervisor approval — with Email / WhatsApp buttons to remind your supervisor."
+                        title="FYP Under Review"
+                        subtitle="Submitted flashcards waiting for supervisor approval — with Email / WhatsApp buttons to remind your supervisor."
                             badge={`${underReviewBadge} UNDER REVIEW`}
                             background={MOCKUP_GRADIENTS.blue}
                         />
                         <MockupActionCard
                             href={WALL_HREF}
-                            emoji="🏅"
+                        emoji="🏅"
                             ghost="🏅"
-                            title="My Final Year Project Impact"
-                            subtitle="Your approved Final Year Projects — every team member sees the same approved record here, and it also appears on your University's FYP Impact Wall and CIEL PK."
+                        title="My Final Year Project Impact"
+                        subtitle="Your approved Final Year Projects — every team member sees the same approved record here, and it also appears on your University's FYP Impact Wall and CIEL PK."
                             badge={`${approved.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
-                        />
-                    </div>
+                    />
+                </div>
                     <p className="mt-4 text-center text-[11px] text-[#7a919a]">
                         Need a walkthrough?{" "}
                         <Link href={GUIDE_HREF} className="font-extrabold text-[#0e7d74] hover:underline">

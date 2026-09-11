@@ -47,6 +47,7 @@ function universityPageKicker(pathname: string): string {
     if (p === "/dashboard/partner") return "Overview";
     if (p.startsWith("/dashboard/partner/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/partner/university-showcase")) return "Coursework / FYP";
+    if (p.startsWith("/dashboard/partner/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/partner/impact")) return "My Impact Wall";
     if (p.startsWith("/dashboard/partner/university-analytics")) return "Institution analytics";
     if (p.startsWith("/dashboard/partner/analytics")) return "Analytics";
@@ -88,6 +89,7 @@ function adminPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/admin") return "Overview";
     if (p.startsWith("/dashboard/admin/community-service")) return "Community Service";
+    if (p.startsWith("/dashboard/admin/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/admin/path-submissions")) return "Path submissions";
     if (p.startsWith("/dashboard/admin/analytics")) return "Impact Intelligence Hub";
     if (p.startsWith("/dashboard/admin/master-analytics")) return "CIEL Master";

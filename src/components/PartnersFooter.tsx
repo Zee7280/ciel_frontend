@@ -5,14 +5,17 @@ import {
     HOME_PARTNER_LOGOS,
     partnerLogoPublicUrl,
 } from "@/config/homePartnerLogos";
-
-const STATS = [
-    { value: `${HOME_PARTNER_LOGOS.length}+`, label: "Partner Organisations" },
-    { value: "5+", label: "Cities Across Pakistan" },
-    { value: "100%", label: "Education & Social Impact" },
-];
+import { usePlatformStats } from "@/utils/usePlatformStats";
 
 export default function PartnersFooter() {
+    const { stats } = usePlatformStats();
+    const partnerCount = stats?.partner_organisations ?? 0;
+    const citiesLive = stats?.cities_live ?? 0;
+    const footerStats = [
+        { value: partnerCount.toLocaleString("en-US"), label: "Partner organisations" },
+        { value: citiesLive.toLocaleString("en-US"), label: "Cities across Pakistan" },
+        { value: "100%", label: "Education & social impact" },
+    ];
     const marqueeLogos = [
         ...HOME_PARTNER_LOGOS.map((p) => ({ src: partnerLogoPublicUrl(p.file), alt: p.alt, key: p.file })),
         ...HOME_PARTNER_LOGOS.map((p) => ({ src: partnerLogoPublicUrl(p.file), alt: p.alt, key: `${p.file}-dup` })),
@@ -110,7 +113,7 @@ export default function PartnersFooter() {
             {/* ── Stats strip ── */}
             <div className="relative mx-auto mt-16 max-w-3xl px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm divide-x divide-white/10">
-                    {STATS.map(({ value, label }) => (
+                    {footerStats.map(({ value, label }) => (
                         <div key={label} className="flex flex-col items-center gap-1 py-6 px-4">
                             <span className="text-2xl font-extrabold text-white sm:text-3xl">{value}</span>
                             <span className="text-center text-xs font-medium text-slate-400">{label}</span>

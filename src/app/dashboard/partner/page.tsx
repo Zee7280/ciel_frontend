@@ -175,7 +175,7 @@ export default function PartnerDashboard() {
                             background={MOCKUP_GRADIENTS.orange}
                         />
                         <MockupActionCard
-                            href="/dashboard/partner/impact"
+                            href="/dashboard/partner/startup-business"
                             emoji="💼"
                             title="Startup / Venture"
                             subtitle="View approved ventures, run AI Rankings and identify investor-ready student ventures."

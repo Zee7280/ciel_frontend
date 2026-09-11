@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { usePlatformStats } from "@/utils/usePlatformStats";
 
-const TRUST_BADGES = ["HEC-recognized certificates", "Verified by partners, one tap", "Every hour valued at PKR 500"];
+const TRUST_BADGES = ["HEC-recognized certificates", "Verified by partners, one tap", "Every hour valued at PKR 192"];
 
 /** Eases from 0 to `target` — re-runs whenever `target` changes, so it animates once the real
  * number arrives from usePlatformStats() instead of animating a placeholder. */
@@ -32,21 +32,21 @@ function fmt(n: number): string {
 export default function Hero() {
     const { stats } = usePlatformStats();
 
+    const hours = stats?.report_verified_hours ?? 0;
+    const rate = 192;
+    const outOfPocket = stats?.out_of_pocket_pkr ?? 0;
     const peopleServing = useCountUp(stats?.people_serving ?? 0);
     const peopleReached = useCountUp(stats?.people_reached ?? 0);
-    const verifiedHours = useCountUp(stats?.report_verified_hours ?? 0);
+    const verifiedHours = useCountUp(hours);
     const resourcesDeployed = useCountUp(stats?.resources_deployed_pkr ?? 0);
-    const dividend = useCountUp(stats?.community_dividend_pkr ?? 0);
-
-    const rate = stats?.dividend_hourly_rate_pkr ?? 500;
-    const outOfPocket = stats?.out_of_pocket_pkr ?? 0;
-    const dividendSub = `${fmt(stats?.report_verified_hours ?? 0)} hrs × PKR ${fmt(rate)} + PKR ${fmt(outOfPocket)} out-of-pocket`;
+    const dividend = useCountUp(hours * rate + outOfPocket);
+    const dividendSub = `${fmt(hours)} hrs × PKR ${fmt(rate)} + PKR ${fmt(outOfPocket)} out-of-pocket`;
 
     const tiles = [
-        { key: "serving", value: peopleServing, label: "People serving", sub: "students on verified activities", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
-        { key: "served", value: peopleReached, label: "People in communities served", sub: "beneficiaries reached", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
-        { key: "hours", value: verifiedHours, label: "Verified hours", sub: "logged by students, faculty-approved" },
-        { key: "resources", value: resourcesDeployed, label: "Resources deployed", sub: "cash + in-kind, partner-verified", prefix: "PKR " },
+        { key: "serving", value: peopleServing, label: "People serving", sub: "students on submitted reports", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
+        { key: "hours", value: verifiedHours, label: "Verified hours", sub: "logged on verified reports" },
+        { key: "served", value: peopleReached, label: "People in communities served", sub: "beneficiaries summed from reports", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
+        { key: "resources", value: resourcesDeployed, label: "Resources deployed", sub: "cash amounts from reports", prefix: "PKR " },
     ];
 
     // Rotates through the real recent-verification feed the backend returns (newest first).

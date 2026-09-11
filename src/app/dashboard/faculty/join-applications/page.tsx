@@ -108,6 +108,11 @@ export default function FacultyJoinApplicationsPage() {
         void loadLists();
     }, []);
 
+    useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "pending" || next === "history") setTab(next);
+    }, []);
+
     const visible = tab === "pending" ? pendingRows : historyRows;
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();

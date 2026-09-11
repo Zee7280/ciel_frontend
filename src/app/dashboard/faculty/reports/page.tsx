@@ -52,6 +52,13 @@ export default function FacultyStudentReportsPage() {
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "waiting" || next === "approved" || next === "all") {
+            setActiveTab(next);
+        }
+    }, []);
+
+    useEffect(() => {
         void fetchReports();
     }, []);
 

@@ -182,9 +182,11 @@ export function MockupPanel({
 }) {
     return (
         <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
-            <div className="border-b border-[#dde5ea] px-5 py-4">
-                <h3 className="m-0 text-base font-semibold text-[#16313d]">{title}</h3>
-                {subtitle ? <p className="mt-1 text-xs text-[#70808a]">{subtitle}</p> : null}
+            <div className="flex flex-wrap items-center justify-between gap-3.5 border-b border-[#dde5ea] px-5 py-[18px]">
+                <div>
+                    <h3 className="m-0 text-[18px] font-semibold text-[#16313d]">{title}</h3>
+                    {subtitle ? <p className="mt-1 text-xs text-[#70808a]">{subtitle}</p> : null}
+                </div>
             </div>
             <div className="p-4">{children}</div>
         </section>

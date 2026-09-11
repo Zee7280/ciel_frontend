@@ -26,11 +26,10 @@ const PROJECTS: ShowcaseProject[] = [
         emoji: "🌾",
         banner: "from-emerald-500 to-emerald-700",
         title: "Faslo Fikar",
-        description: "Pesticide-safety education for farmers — Urdu guides, PPE training, QR video tools. Lahore · 20 hrs · hybrid.",
+        description: "Pesticide-safety education for farmers — Urdu guides, PPE training, QR video tools. Lahore · hybrid.",
         pills: [
             { label: "SDG 3", className: "bg-emerald-600 text-white" },
             { label: "Student-created", className: "bg-amber-50 text-amber-700", icon: "sparkles" },
-            { label: "2 seats left", className: "bg-rose-50 text-rose-600" },
         ],
     },
     {
@@ -38,11 +37,10 @@ const PROJECTS: ShowcaseProject[] = [
         emoji: "🏫",
         banner: "from-indigo-500 to-blue-600",
         title: "SOS Classroom Transformation",
-        description: "Renovate classrooms & train caregivers with SOS Children's Villages. Lahore · 16 hrs · on-ground.",
+        description: "Renovate classrooms & train caregivers with SOS Children's Villages. Lahore · on-ground.",
         pills: [
             { label: "SDG 4", className: "bg-rose-600 text-white" },
             { label: "Verified partner", className: "bg-emerald-50 text-emerald-700", icon: "check" },
-            { label: "3 seats left", className: "bg-rose-50 text-rose-600" },
         ],
     },
     {
@@ -50,11 +48,10 @@ const PROJECTS: ShowcaseProject[] = [
         emoji: "💧",
         banner: "from-teal-600 to-sky-500",
         title: "Clean Water Awareness Week",
-        description: "Hygiene & safe-water education across 3 community schools with WaterAid. Kasur · 20 hrs.",
+        description: "Hygiene & safe-water education across community schools with WaterAid. Kasur.",
         pills: [
             { label: "SDG 6", className: "bg-sky-100 text-sky-700" },
             { label: "SDG 3", className: "bg-emerald-600 text-white" },
-            { label: "12 seats", className: "bg-blue-50 text-blue-700" },
         ],
     },
 ];
@@ -76,7 +73,7 @@ export default function LiveProjectsShowcase() {
                         Projects you can join today
                     </h2>
                     <p className="text-base text-slate-500 font-medium max-w-2xl mx-auto mt-3">
-                        Real seats, real partners, faculty-supervised — apply in one tap and your verified record starts immediately.
+                        Real partners, faculty-supervised — apply in one tap and your verified record starts immediately.
                     </p>
                 </div>
 
@@ -126,7 +123,7 @@ export default function LiveProjectsShowcase() {
                         href="/projects"
                         className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-slate-800"
                     >
-                        {liveProjectCount != null
+                        {liveProjectCount
                             ? `Browse all ${liveProjectCount} live projects`
                             : "Browse all live projects"}{" "}
                         <ArrowRight className="h-4 w-4" />

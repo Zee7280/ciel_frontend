@@ -11,8 +11,8 @@ import {
     type FacultyDashboardViewClient,
 } from "@/utils/facultyScopeSession";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
-import { ActionKpiGrid, CourseworkHero, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { MOCKUP_GRADIENTS, MockupActionCard, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { CourseworkHero, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard } from "@/components/ciel/dashboard/MockupChrome";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 
@@ -138,27 +138,22 @@ export default function FacultyDashboard() {
     };
 
     const pendingApprovals = stats?.pending_approvals ?? 0;
-    const pendingSummary: PendingSummary = stats?.pendingSummary ?? {
-        total: pendingApprovals + pendingGrading,
-        items: [
+    const pendingSummary: PendingSummary = (() => {
+        const items = (stats?.pendingSummary?.items ?? [
             {
                 key: "faculty_pending_approvals",
                 title: "Pending approvals",
                 count: pendingApprovals,
                 href: "/dashboard/faculty/approvals",
-                tone: "warning",
+                tone: "warning" as const,
                 description: "Student-created opportunities waiting for your review.",
             },
-            {
-                key: "faculty_pending_reports",
-                title: "Reports to review",
-                count: pendingGrading,
-                href: "/dashboard/faculty/reports",
-                tone: "neutral",
-                description: "Submitted student work still waiting for faculty sign-off.",
-            },
-        ],
-    };
+        ]).filter((item) => item.key !== "faculty_pending_grading" && item.title !== "Pending grading");
+        return {
+            total: items.reduce((sum, item) => sum + (item.count > 0 ? item.count : 0), 0),
+            items,
+        };
+    })();
 
     const dash = (n: number) => (isLoading ? "—" : String(n));
 
@@ -203,12 +198,13 @@ export default function FacultyDashboard() {
                 </div>
             ) : null}
 
-            <div className="mt-4">
-                <PendingActionCards summary={pendingSummary} emptyMessage="Nothing waiting — your inbox is clear." />
-            </div>
+            {pendingSummary.items.some((item) => item.count > 0) ? (
+                <div className="mt-4">
+                    <PendingActionCards summary={pendingSummary} emptyMessage="Nothing waiting — your inbox is clear." />
+                </div>
+            ) : null}
 
             <div className="mt-4">
-                <MockupSectionHead title="Community Service Management" subtitle="Approve student/community service submissions, monitor active reports and review verified evidence." />
                 <PathSectionHead title="Your paths" subtitle="Open a path to review submissions, run the grader, and publish to the Impact Wall." pill="FACULTY VIEW" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <MockupActionCard
@@ -245,15 +241,6 @@ export default function FacultyDashboard() {
                 />
                 </div>
             </div>
-
-            <ActionKpiGrid
-                items={[
-                    { value: dash(pendingApprovals), label: "Opportunity Approvals" },
-                    { value: dash(pendingGrading), label: "Reports Awaiting Review" },
-                    { value: dash(pendingSummary.total), label: "Total Action Items" },
-                    { value: dash(stats?.hours_verified ?? 0), label: "Hours Verified" },
-                ]}
-            />
 
             <WorkflowSteps
                 title="Faculty review workflow"

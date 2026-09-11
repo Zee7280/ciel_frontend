@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import clsx from "clsx";
+import { usePlatformStats } from "@/utils/usePlatformStats";
 
 interface PathDef {
     key: string;
@@ -52,12 +53,12 @@ const PATHS: PathDef[] = [
             "Join an opportunity — or create your own and get faculty approval with one tap. Attendance logs itself, evidence collects as you go, and one partner approval verifies the whole record. HEC-compliant hours, guaranteed.",
         steps: [
             { title: "Join or create an opportunity", detail: "Faculty & partner approve via one-tap links" },
-            { title: "Log sessions as you work", detail: "A photo per visit is enough — 16 hrs typical" },
+            { title: "Log sessions as you work", detail: "A photo per visit is enough" },
             { title: "Report writes itself", detail: "Guided taps, no essays" },
             { title: "One approval → verified record", detail: "Hours, certificate, CII score" },
         ],
         snapshot: {
-            value: "1,840",
+            value: "0",
             label: "VERIFIED HOURS — AND COUNTING",
             lineOne: "The pilot is live — every hour above is faculty-verified",
             lineTwo: "New opportunities and partners added weekly",
@@ -115,7 +116,7 @@ const PATHS: PathDef[] = [
         description:
             "Research paper, fabric collection, building design, or app — every school's work counts. A live Showcase Strength meter rewards rigor, and supervisor sign-off gates everything. The best get featured to universities and industry.",
         steps: [
-            { title: "Record your project", detail: "Any form — 10 forms supported" },
+            { title: "Record your project", detail: "Any form — 8 sections in the live workspace" },
             { title: "Show your research depth", detail: "Methods, data scale, honest novelty" },
             { title: "Supervisor signs off", detail: "Nothing counts without it" },
             { title: "Strong work gets showcased ⭐", detail: "Featured to industry & rankings" },
@@ -164,8 +165,19 @@ const PATHS: PathDef[] = [
 ];
 
 export default function WhereImpactLives() {
+    const { stats } = usePlatformStats();
     const [activeKey, setActiveKey] = useState(PATHS[0].key);
-    const active = PATHS.find((p) => p.key === activeKey) ?? PATHS[0];
+    const liveHours = (stats?.report_verified_hours ?? 0).toLocaleString("en-US");
+    const paths = useMemo(
+        () =>
+            PATHS.map((path) =>
+                path.key === "community-service"
+                    ? { ...path, snapshot: { ...path.snapshot, value: liveHours } }
+                    : path,
+            ),
+        [liveHours],
+    );
+    const active = paths.find((p) => p.key === activeKey) ?? paths[0];
 
     useEffect(() => {
         const requestedKey = new URLSearchParams(window.location.search).get("path");
@@ -191,7 +203,7 @@ export default function WhereImpactLives() {
 
                 {/* Tabs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    {PATHS.map((path) => {
+                    {paths.map((path) => {
                         const isActive = path.key === activeKey;
                         return (
                             <button

@@ -447,7 +447,7 @@ export default function Sidebar() {
             { label: "Community Service", href: "/dashboard/partner/community-service", emoji: "🏕️" },
             { label: "Coursework", href: "/dashboard/partner/university-showcase?mode=course-project", emoji: "📚" },
             { label: "FYP / Final Year Project", href: "/dashboard/partner/university-showcase?mode=fyp-thesis", emoji: "🎓" },
-            { label: "Startup / Venture", href: "/dashboard/partner/impact", emoji: "💼" },
+            { label: "Startup / Venture", href: "/dashboard/partner/startup-business", emoji: "🚀" },
         ],
         [],
     );
@@ -457,7 +457,7 @@ export default function Sidebar() {
             { label: "Community Service", href: "/dashboard/admin/community-service", emoji: "🏕️" },
             { label: "Coursework", href: "/dashboard/admin/path-submissions?tab=course-project", emoji: "📚" },
             { label: "FYP / Final Year Project", href: "/dashboard/admin/path-submissions?tab=fyp-thesis", emoji: "🎓" },
-            { label: "Startup / Venture", href: "/dashboard/admin/path-submissions?tab=startup-business", emoji: "💼" },
+            { label: "Startup / Venture", href: "/dashboard/admin/startup-business", emoji: "🚀" },
         ],
         [],
     );
