@@ -47,7 +47,7 @@ export async function uploadFileViaPresign(presignPath: string, file: File): Pro
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filename: file.name, contentType, size: file.size }),
         },
-        { timeoutMs: PRESIGN_TIMEOUT_MS, redirectToLogin: false },
+        { timeoutMs: PRESIGN_TIMEOUT_MS, redirectToLogin: true },
     );
 
     if (!res) {
