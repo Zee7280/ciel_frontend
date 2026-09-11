@@ -14,7 +14,8 @@ function FypThesisRouter() {
                 view === "wall" ||
                 view === "in-progress" ||
                 view === "under-review" ||
-                view === "create"
+                view === "create" ||
+                view === "workspace"
                     ? view
                     : "home"
             }
