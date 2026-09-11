@@ -51,6 +51,7 @@ export async function fetchBackendPublicJson<T>(
 ): Promise<{ ok: true; data: T } | { ok: false; reason: "no_backend" | "timeout" | "http" }> {
     const targetUrl = resolveBackendPublicUrl(pathAfterPublic);
     if (!targetUrl) {
+        logProxyFallback(options.logLabel, "no_backend", process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.trim() || "(unset)");
         return { ok: false, reason: "no_backend" };
     }
 
@@ -86,7 +87,7 @@ export async function fetchBackendPublicJson<T>(
 
 function logProxyFallback(
     label: string | undefined,
-    kind: "http" | "timeout" | "network",
+    kind: "http" | "timeout" | "network" | "no_backend",
     targetUrl: string,
     error?: unknown,
 ): void {
@@ -99,7 +100,9 @@ function logProxyFallback(
             ? "backend did not respond in time — using fallback"
             : kind === "network"
               ? "backend unreachable — using fallback"
-              : "backend returned invalid response — using fallback";
+              : kind === "no_backend"
+                ? "NEXT_PUBLIC_BACKEND_BASE_URL is unset or resolves to the frontend's own host — using fallback"
+                : "backend returned invalid response — using fallback";
     console.warn(`[${label}] ${detail} (${targetUrl})`);
     if (error && process.env.NODE_ENV !== "production") {
         console.warn(error);
