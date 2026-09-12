@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRegisterDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
 
 const FACULTY_HERO_GRADIENT = "linear-gradient(120deg,#0a4c50 0%,#0e6e6b 56%,#12aaa0 100%)";
 
@@ -14,6 +15,7 @@ export function CourseworkCrumb({
     view?: string;
     pathLabel?: string;
 }) {
+    useRegisterDashboardPageChrome();
     return (
         <p className="text-[13px] text-[#71828e]">
             {role} Dashboard / <b className="font-semibold text-[#183140]">{pathLabel}</b>
@@ -44,6 +46,7 @@ export function CourseworkHero({
     rightStat?: { value: string; label: string };
     roleBadge?: string;
 }) {
+    useRegisterDashboardPageChrome();
     return (
         <div
             className="relative mt-[-8px] flex flex-col items-start justify-between gap-6 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_16px_36px_rgba(18,48,65,.10)] sm:flex-row sm:items-center"

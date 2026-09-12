@@ -15,10 +15,12 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
-import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
+import { FACULTY_HERO, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 import {
     CIEL_FACULTY_DASHBOARD_VIEW_EVENT,
     readFacultyDashboardViewPreference,
+    readFacultyScopeSession,
     writeFacultyDashboardViewPreference,
     type FacultyDashboardViewClient,
 } from "@/utils/facultyScopeSession";
@@ -154,6 +156,13 @@ function formatNum(x: number, digits = 0) {
     return x.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 
+/** Same hourly rate as the public community ledger. */
+const DIVIDEND_HOURLY_RATE_PKR = 192;
+
+function formatPkr(amount: number) {
+    return `PKR ${Math.round(amount).toLocaleString("en-PK")}`;
+}
+
 type KpiCard = {
     label: string;
     value: string;
@@ -192,6 +201,20 @@ export default function FacultyAnalyticsPage() {
     const [draftFilters, setDraftFilters] = useState<FacultyAnalyticsFilters>(() => ({ ...EMPTY_FILTERS }));
     const [courseOptions, setCourseOptions] = useState<{ id: string; label: string }[]>([]);
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+    const [facultyName, setFacultyName] = useState("Faculty");
+    const [department, setDepartment] = useState("");
+
+    useEffect(() => {
+        const user = readStoredCurrentUser();
+        const name = typeof user?.name === "string" ? user.name.trim() : "";
+        setFacultyName(name || "Faculty");
+        const scope = readFacultyScopeSession()?.organization_name?.trim();
+        const fromUser = [user?.department, user?.school, user?.university, user?.institution, user?.organization_name].find(
+            (value) => typeof value === "string" && value.trim(),
+        );
+        setDepartment(scope || (typeof fromUser === "string" ? fromUser.trim() : ""));
+    }, []);
 
     const loadAnalytics = useCallback(async () => {
         if (typeof window !== "undefined") {
@@ -304,10 +327,16 @@ export default function FacultyAnalyticsPage() {
 
     const contradictions = useMemo(() => (data ? buildContradictions(data) : []), [data]);
 
+    const verifiedHours = Math.round(n(data?.hours_verified));
     const kpis: KpiCard[] = data
         ? [
               {
-                  label: "Students in scope",
+                  label: "Projects in scope",
+                  value: formatNum(n(data.projects_completed)),
+                  hint: "Opportunities that already have verified hours",
+              },
+              {
+                  label: "Students",
                   value: formatNum(n(data.total_students_under_faculty)),
                   hint: (() => {
                       const enrol = n(data.individual_participants) + n(data.team_participants);
@@ -315,7 +344,7 @@ export default function FacultyAnalyticsPage() {
                       if (enrol > 0 && students !== enrol) {
                           return `Enrolments total ${formatNum(enrol)} — ${formatNum(Math.abs(enrol - students))} unaccounted`;
                       }
-                      return enrol > 0 ? `${formatNum(enrol)} enrolments in this scope` : "Distinct students on assigned opportunities";
+                      return enrol > 0 ? `${formatNum(enrol)} unique participants` : "Distinct students on assigned opportunities";
                   })(),
                   warn:
                       n(data.total_students_under_faculty) > 0 &&
@@ -324,13 +353,18 @@ export default function FacultyAnalyticsPage() {
                           n(data.individual_participants) + n(data.team_participants),
               },
               {
-                  label: "Verified hours",
-                  value: formatNum(Math.round(n(data.hours_verified))),
+                  label: "Verified person-hours",
+                  value: `${formatNum(verifiedHours)}h`,
                   hint:
                       n(data.total_required_hours) > 0
                           ? `Required across enrolments: ${formatNum(n(data.total_required_hours), 1)} h`
                           : "Verified timesheet hours in scope",
-                  warn: n(data.total_required_hours) > 0 && n(data.hours_verified) === 0,
+                  warn: n(data.total_required_hours) > 0 && verifiedHours === 0,
+              },
+              {
+                  label: "Community Dividend",
+                  value: formatPkr(verifiedHours * DIVIDEND_HOURLY_RATE_PKR),
+                  hint: `@ PKR ${DIVIDEND_HOURLY_RATE_PKR}/h (verified hours only — not wages paid)`,
               },
               {
                   label: "Identity verified",
@@ -338,14 +372,9 @@ export default function FacultyAnalyticsPage() {
                   hint: `${formatNum(n(data.verified_students))} of ${formatNum(n(data.total_students_under_faculty))} students`,
               },
               {
-                  label: "Projects with hours",
-                  value: formatNum(n(data.projects_completed)),
-                  hint: "Opportunities that already have verified hours",
-              },
-              {
-                  label: "Required hours",
-                  value: formatNum(n(data.total_required_hours), 1),
-                  hint: "Summed across active enrolments",
+                  label: "Average Verified CII",
+                  value: n(data.avg_impact_score) > 0 ? String(n(data.avg_impact_score)) : "—",
+                  hint: n(data.avg_impact_score) > 10 ? "Cohort mean from AI impact score" : "Cohort mean from submitted reports",
               },
               {
                   label: "Teams",
@@ -356,11 +385,6 @@ export default function FacultyAnalyticsPage() {
                   label: "Course-linked",
                   value: `${n(data.course_linked_ce_ratio_percent)}%`,
                   hint: "of enrolments carry course credit",
-              },
-              {
-                  label: "Avg impact score",
-                  value: n(data.avg_impact_score) > 0 ? String(n(data.avg_impact_score)) : "—",
-                  hint: n(data.avg_impact_score) > 10 ? "Cohort mean from AI impact score" : "Cohort mean from submitted reports",
               },
           ]
         : [];
@@ -397,39 +421,50 @@ export default function FacultyAnalyticsPage() {
         .filter(Boolean)
         .join(" · ");
 
-    return (
-        <div className="mx-auto max-w-6xl space-y-5 p-0 pb-20 sm:p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Analytics</h1>
-                    <p className="mt-1 text-sm text-slate-500">
-                        Engagement, verification and SDG contribution across your assigned opportunities.
-                    </p>
-                    {data?.university_scope?.organization_name ? (
-                        <p className="mt-1 text-xs font-medium text-teal-800">
-                            Delegated org: {data.university_scope.organization_name}
-                        </p>
-                    ) : null}
-                </div>
-                <div className="flex shrink-0 gap-2">
-                    <button type="button" onClick={exportCsv} disabled={!data} className={btnGhost}>
-                        <Download className="h-4 w-4" />
-                        Export
-                    </button>
-                    <button type="button" onClick={() => void loadAnalytics()} disabled={loading} className={btnGhost}>
-                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                        Refresh
-                    </button>
-                </div>
-            </div>
+    const kicker = department
+        ? `CIEL PK · FACULTY · ${department.toUpperCase()}`
+        : "CIEL PK · FACULTY";
 
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    return (
+        <div className="mx-auto max-w-[1500px] pb-16">
+            <p className="text-[13px] text-[#71828e]">
+                Faculty Dashboard / <b className="font-semibold text-[#183140]">Analytics</b>
+            </p>
+            <MockupHero
+                kicker={kicker}
+                title={facultyName}
+                subtitle="Aggregated from live records in your supervision scope. Community Dividend = verified volunteer hours × PKR 192 (not wages paid)."
+                gradient={FACULTY_HERO}
+                stats={
+                    data
+                        ? [
+                              { value: formatNum(n(data.total_students_under_faculty)), label: "Students" },
+                              { value: formatNum(Math.round(n(data.hours_verified))), label: "Verified hours" },
+                              { value: `${n(data.verification_rate_percent)}%`, label: "Identity verified" },
+                              { value: formatNum(n(data.projects_completed)), label: "Projects with hours" },
+                          ]
+                        : [
+                              { value: loading ? "…" : "0", label: "Students" },
+                              { value: loading ? "…" : "0", label: "Verified hours" },
+                              { value: loading ? "…" : "0%", label: "Identity verified" },
+                              { value: loading ? "…" : "0", label: "Projects with hours" },
+                          ]
+                }
+                rightStat={{ value: "👩‍🏫", label: "" }}
+            />
+
+            <div className="mt-4 overflow-hidden rounded-[20px] border border-[#dce6ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.04)]">
                 <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Scope</span>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                             {viewLabel}
                         </span>
+                        {data?.university_scope?.organization_name ? (
+                            <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-900">
+                                {data.university_scope.organization_name}
+                            </span>
+                        ) : null}
                         {activeFilterChips.map((chip) => (
                             <span
                                 key={chip.key}
@@ -451,18 +486,27 @@ export default function FacultyAnalyticsPage() {
                             </span>
                         ))}
                     </div>
-                    <button type="button" onClick={() => setFiltersOpen((open) => !open)} className={btnGhost}>
-                        <Filter className="h-4 w-4" />
-                        {filtersOpen ? "Hide filters" : "Add filters"}
-                        <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setFiltersOpen((open) => !open)} className={btnGhost}>
+                            <Filter className="h-4 w-4" />
+                            {filtersOpen ? "Hide filters" : "Filters"}
+                            <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
+                        </button>
+                        <button type="button" onClick={exportCsv} disabled={!data} className={btnGhost}>
+                            <Download className="h-4 w-4" />
+                            Export
+                        </button>
+                        <button type="button" onClick={() => void loadAnalytics()} disabled={loading} className={btnGhost}>
+                            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </button>
+                    </div>
                 </div>
 
                 {filtersOpen ? (
                     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4">
                         <p className="mb-3 text-xs text-slate-500">
                             Narrow metrics within your faculty-assigned opportunities. Leave empty for no constraint.
-                            A specific project ignores the course/section search.
                         </p>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <label className="block text-sm font-medium text-slate-700">
@@ -598,18 +642,18 @@ export default function FacultyAnalyticsPage() {
             </div>
 
             {error ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                    Engagement overview could not be loaded ({error}). Report analytics below still work independently.
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    Could not load analytics ({error}).
                 </div>
             ) : null}
 
             {contradictions.length > 0 ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-                    <p className="flex items-center gap-2 text-sm font-semibold text-rose-950">
-                        <AlertTriangle className="h-4 w-4 text-rose-600" />
-                        Some numbers on this page contradict each other
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-amber-950">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        Some figures still need reconciling
                     </p>
-                    <ul className="mt-2 list-disc space-y-1 pl-6 text-sm text-rose-800">
+                    <ul className="mt-2 list-disc space-y-1 pl-6 text-sm text-amber-900">
                         {contradictions.map((note) => (
                             <li key={note}>{note}</li>
                         ))}
@@ -619,33 +663,40 @@ export default function FacultyAnalyticsPage() {
                             Reconcile hours
                         </Link>
                         <Link href="/dashboard/faculty/join-applications" className={btnGhost}>
-                            Check the data source
+                            Check enrolments
                         </Link>
                     </div>
                 </div>
             ) : null}
 
-            {loading && !data ? (
-                <div className="flex min-h-[120px] items-center justify-center gap-2 text-slate-600">
-                    <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
-                    <span className="text-sm font-medium">Loading engagement overview…</span>
-                </div>
-            ) : null}
-
             {loading && data ? (
-                <p className="flex items-center gap-2 text-sm text-slate-500">
+                <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Updating analytics…
                 </p>
             ) : null}
 
+            {loading && !data ? (
+                <div className="mt-8 flex min-h-[120px] items-center justify-center gap-2 text-slate-600">
+                    <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
+                    <span className="text-sm font-medium">Loading analytics…</span>
+                </div>
+            ) : null}
+
             {data ? (
                 <>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {kpis.map((stat) => (
-                            <article key={stat.label} className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-                                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
-                                <p className="mt-1 text-[28px] font-bold leading-none tabular-nums tracking-tight text-slate-900">
+                            <article
+                                key={stat.label}
+                                className="rounded-[18px] border border-[#dce6ea] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(24,52,64,.04)]"
+                            >
+                                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{stat.label}</p>
+                                <p
+                                    className={`mt-1.5 font-bold leading-none tabular-nums tracking-tight text-slate-900 ${
+                                        stat.value.length > 12 ? "text-[22px]" : "text-[28px]"
+                                    }`}
+                                >
                                     {stat.value}
                                 </p>
                                 <p className={`mt-2 text-xs leading-snug ${stat.warn ? "font-medium text-rose-600" : "text-slate-500"}`}>
@@ -655,8 +706,8 @@ export default function FacultyAnalyticsPage() {
                         ))}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <article className="rounded-[18px] border border-[#dce6ea] bg-white p-4 shadow-[0_8px_22px_rgba(24,52,64,.04)]">
                             <h2 className="text-sm font-semibold text-slate-900">SDG distribution</h2>
                             <p className="mt-0.5 text-xs text-slate-500">Goals appearing in scoped projects and reports.</p>
                             {sdgChart.length ? (
@@ -686,7 +737,7 @@ export default function FacultyAnalyticsPage() {
                             )}
                         </article>
 
-                        <article className="rounded-xl border border-slate-200 bg-white p-4">
+                        <article className="rounded-[18px] border border-[#dce6ea] bg-white p-4 shadow-[0_8px_22px_rgba(24,52,64,.04)]">
                             <h2 className="text-sm font-semibold text-slate-900">Verified hours by month</h2>
                             <p className="mt-0.5 text-xs text-slate-500">Timesheet hours on assigned opportunities.</p>
                             {hoursChart.some((p) => p.hours > 0) ? (
@@ -716,11 +767,10 @@ export default function FacultyAnalyticsPage() {
                                     <p className="text-sm font-medium text-slate-700">Nothing to plot yet</p>
                                     <p className="mt-1 text-xs text-slate-500">
                                         Verified hours appear after attendance is approved. Check{" "}
-                                        <Link href="/dashboard/faculty/join-applications" className="font-semibold text-teal-800 hover:underline">
-                                            Applications &amp; reports
-                                        </Link>
-                                        {" "}or{" "}
-                                        <Link href="/dashboard/faculty/attendance-review" className="font-semibold text-teal-800 hover:underline">
+                                        <Link
+                                            href="/dashboard/faculty/attendance-review"
+                                            className="font-semibold text-teal-800 hover:underline"
+                                        >
                                             Attendance review
                                         </Link>
                                         .
@@ -732,44 +782,43 @@ export default function FacultyAnalyticsPage() {
                 </>
             ) : null}
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                <UnifiedAnalyticsOverview
-                    apiPath="/api/v1/faculty/analytics/overview"
-                    query={{
-                        project_id: appliedFilters.project_id || undefined,
-                        scope: appliedFilters.project_id ? "project" : "aggregate",
-                    }}
-                    title="Report overview"
-                />
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                <div className="mb-4">
-                    <h2 className="text-base font-semibold tracking-tight text-slate-900">Report analytics by section</h2>
-                    <p className="mt-0.5 text-sm text-slate-500">{hubSubtitle || "Aggregate cohort"}</p>
-                </div>
-                <AnalyticsHub
-                    views={[
-                        {
-                            id: "faculty",
-                            label: "Faculty",
-                            apiPath: "/api/v1/faculty/analytics/section1",
-                            query: {
-                                project_id: appliedFilters.project_id,
-                                degree_program: appliedFilters.degree_program,
-                                year_of_study: appliedFilters.year_of_study,
-                                academic_integration_type: appliedFilters.academic_integration_type,
-                                participation_type: appliedFilters.participation_type,
-                                verification_status: appliedFilters.verification_status,
-                                period_start: appliedFilters.period_start,
-                                period_end: appliedFilters.period_end,
-                                scope: appliedFilters.project_id ? "project" : "aggregate",
-                            },
-                        },
-                    ]}
-                    hideOnError={false}
-                />
-            </div>
+            <details
+                className="mt-4 rounded-[18px] border border-[#dce6ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.04)]"
+                onToggle={(e) => setAdvancedOpen((e.currentTarget as HTMLDetailsElement).open)}
+            >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-slate-900 marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span>
+                        Advanced · report fields by section
+                        <span className="ml-2 text-xs font-medium text-slate-400">{hubSubtitle || "Aggregate cohort"}</span>
+                    </span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${advancedOpen ? "rotate-180" : ""}`} />
+                </summary>
+                {advancedOpen ? (
+                    <div className="border-t border-slate-100 px-4 py-4 sm:px-5">
+                        <AnalyticsHub
+                            views={[
+                                {
+                                    id: "faculty",
+                                    label: "Faculty",
+                                    apiPath: "/api/v1/faculty/analytics/section1",
+                                    query: {
+                                        project_id: appliedFilters.project_id,
+                                        degree_program: appliedFilters.degree_program,
+                                        year_of_study: appliedFilters.year_of_study,
+                                        academic_integration_type: appliedFilters.academic_integration_type,
+                                        participation_type: appliedFilters.participation_type,
+                                        verification_status: appliedFilters.verification_status,
+                                        period_start: appliedFilters.period_start,
+                                        period_end: appliedFilters.period_end,
+                                        scope: appliedFilters.project_id ? "project" : "aggregate",
+                                    },
+                                },
+                            ]}
+                            hideOnError={false}
+                        />
+                    </div>
+                ) : null}
+            </details>
         </div>
     );
 }

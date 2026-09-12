@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useRegisterDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
 
 export const MOCKUP_GRADIENTS = {
     teal: "linear-gradient(135deg,#15988b,#2ec8bd)",
@@ -33,6 +34,7 @@ export function MockupHero({
     rightStat?: { value: string; label: string };
     gradient?: string;
 }) {
+    useRegisterDashboardPageChrome();
     return (
         <section
             className="relative mt-[-8px] flex flex-col items-start justify-between gap-7 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_12px_30px_rgba(13,61,70,.10)] sm:flex-row sm:items-center"

@@ -17,6 +17,7 @@ import {
     isSafeInternalReturnPath,
 } from "@/utils/verificationReturnUrl";
 import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
+import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { partnerNeedsMembershipPayment, notifyCielUserUpdated } from "@/utils/membershipPayment";
 import {
     clearStudentDashboardCache,
@@ -277,6 +278,7 @@ function LoginContent() {
 
             const authToken = payload.access_token || payload.token;
             const loginUser = buildStoredUser(payload, role);
+            clearFacultyScopeSession();
 
             // Store token if available (for future API calls)
             if (authToken) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { DashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
 
 type DraftRow = {
     id: string;
@@ -116,6 +117,7 @@ export default function DraftsLandingView({ embedded = false }: { embedded?: boo
         <div>
             {!embedded ? (
                 <div className="mb-3.5 flex flex-wrap items-center gap-3">
+                    <DashboardPageChrome />
                     <p className="text-[13px] text-[#71828e]">
                         Student Dashboard / <b className="font-semibold text-[#183140]">Community Service</b>
                         {" / "}

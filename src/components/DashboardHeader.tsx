@@ -18,6 +18,7 @@ import {
     readFacultyScopeSession,
     type FacultyScopeSessionPayload,
 } from "@/utils/facultyScopeSession";
+import { useHasDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
 function facultyPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/faculty") return "Overview";
@@ -186,6 +187,8 @@ export default function DashboardHeader() {
                 : navRole === "admin"
                   ? adminPageKicker(pathname)
                   : "Overview";
+
+    const hasPageChrome = useHasDashboardPageChrome();
 
     const initials = (user?.name || "CIEL")
         .split(/\s+/)
@@ -375,9 +378,11 @@ export default function DashboardHeader() {
         <header className="ciel-transition sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-[#dde5ea] bg-white px-4 font-sans sm:px-7 lg:ml-[var(--ciel-sidebar-width)]">
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
+                    {hasPageChrome ? null : (
                     <p className="truncate text-[13px] text-[#70808a]">
                         CIEL PK / {roleCrumb} / <b className="font-semibold text-[#16313d]">{pageCrumb}</b>
                     </p>
+                    )}
                     {navRole === "faculty" && facultyDelegatedScope?.organization_name ? (
                         <span
                             className="inline-flex max-w-[min(100%,14rem)] items-center gap-1 rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-900 shadow-sm sm:max-w-[20rem]"
