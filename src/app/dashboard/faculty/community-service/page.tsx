@@ -244,14 +244,10 @@ function FacultyCommunityServiceHub() {
             href: HUB.reports,
             tone: pending.length ? "bad" : "default",
         },
-        {
-            key: "hours",
-            n: 0,
-            title: "Projects with members below hours",
-            sub: "Send a system reminder",
-            href: HUB.hours,
-            tone: "warn",
-        },
+        // "Projects with members below hours" was dropped rather than shipped as a fake stat: the
+        // faculty reports list this page fetches excludes drafts (report.status != 'draft' at the
+        // backend), so the in-progress, below-hours projects this card is meant to surface are
+        // never in `rows` to compute from — it was hardcoded to n:0 and always read "all good".
     ];
 
     return (

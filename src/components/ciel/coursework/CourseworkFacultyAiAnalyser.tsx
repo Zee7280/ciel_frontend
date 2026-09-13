@@ -20,7 +20,7 @@ type TabId = "Intake" | "Score" | "Evidence" | "Global" | "Rubric" | "Moderation
 
 const TABS: { id: TabId; label: string }[] = [
     { id: "Intake", label: "📥 Submission Package" },
-    { id: "Score", label: "◉ AI Score" },
+    { id: "Score", label: "◉ CI Score" },
     { id: "Evidence", label: "🔎 Evidence" },
     { id: "Global", label: "🌐 Global Benchmark" },
     { id: "Rubric", label: "📚 Rubric" },

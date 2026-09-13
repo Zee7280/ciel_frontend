@@ -284,6 +284,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                 : "all";
 
     const [entries, setEntries] = useState<HubVenture[]>([]);
+    const [approvedEntries, setApprovedEntries] = useState<HubVenture[]>([]);
     const [loading, setLoading] = useState(true);
     const [pipeTab, setPipeTab] = useState<PipeTab>(initialTab);
     const [query, setQuery] = useState("");
@@ -299,6 +300,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
 
     useEffect(() => {
         void loadAll();
+        void loadApproved();
     }, [variant]);
 
     useEffect(() => {
@@ -332,6 +334,22 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
         }
     };
 
+    /** The approved-only impact wall — backed by a query that only ever returns approved records
+     * (enforced server-side), so it's never at risk of a client-side filtering bug surfacing a
+     * pending/revision/rejected venture on the wall. */
+    const loadApproved = async () => {
+        try {
+            const url = isCiel
+                ? "/api/v1/admin/paths/startup-business?approvalStatus=approved"
+                : "/api/v1/paths/startup-business/university?approvalStatus=approved";
+            const res = await authenticatedFetch(url);
+            const json = res?.ok ? await res.json() : null;
+            setApprovedEntries(Array.isArray(json?.data) ? json.data : []);
+        } catch {
+            // Non-fatal — the wall just shows 0 until the next load.
+        }
+    };
+
     const toggleSpotlight = async (entry: HubVenture) => {
         if (!entry.id) return;
         setSpotlightId(entry.id);
@@ -356,7 +374,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     };
 
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
-    const approved = useMemo(() => entries.filter(isPathEntryApproved), [entries]);
+    const approved = approvedEntries;
     const rejected = useMemo(() => entries.filter(isRejected), [entries]);
     const inProcess = entries.filter((e) => pipeTabOf(e) === "just" || pipeTabOf(e) === "process" || pipeTabOf(e) === "revision");
     const investorReady = approved.filter(isInvestorOpen);

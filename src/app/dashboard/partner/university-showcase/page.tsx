@@ -11,9 +11,8 @@ import MeritModelPanel, { type MeritEntry, entryDepartment, entryFaculty, entryF
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { computeMeritScorecard } from "@/utils/courseworkMeritModel";
-import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
+import { isPathEntryWaiting } from "@/utils/reviewQueue";
 
 type DeckMode = "course-project" | "fyp-thesis";
 type UniView = "home" | "progress" | "pending" | "deck" | "rank";
@@ -28,8 +27,10 @@ export default function UniversityShowcasePage() {
         }
     }, []);
     const [entries, setEntries] = useState<MeritEntry[]>([]);
+    const [approvedEntries, setApprovedEntries] = useState<MeritEntry[]>([]);
     const [inProgress, setInProgress] = useState<MeritEntry[]>([]);
     const [fypEntries, setFypEntries] = useState<FypMeritEntry[]>([]);
+    const [approvedFypEntries, setApprovedFypEntries] = useState<FypMeritEntry[]>([]);
     const [inProgressFyp, setInProgressFyp] = useState<FypMeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [fypLoading, setFypLoading] = useState(true);
@@ -50,8 +51,10 @@ export default function UniversityShowcasePage() {
 
     useEffect(() => {
         void fetchEntries();
+        void fetchApprovedEntries();
         void fetchInProgress();
         void fetchFypEntries();
+        void fetchApprovedFypEntries();
         void fetchInProgressFyp();
     }, []);
 
@@ -74,6 +77,21 @@ export default function UniversityShowcasePage() {
             setEntries([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    /** The Coursework Impact Wall — backed by a query that only ever returns approved records
+     * (enforced server-side), so this list is never at risk of a client-side filtering bug
+     * surfacing a pending/revision/rejected record on the wall. */
+    const fetchApprovedEntries = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/course-projects/university?approvalStatus=approved");
+            if (response?.ok) {
+                const data = await response.json();
+                setApprovedEntries(Array.isArray(data.data) ? data.data : []);
+            }
+        } catch {
+            // Non-fatal — the wall just shows 0 until the next load.
         }
     };
 
@@ -106,6 +124,21 @@ export default function UniversityShowcasePage() {
         }
     };
 
+    /** The FYP Impact Wall — backed by a query that only ever returns approved records (enforced
+     * server-side), so this list is never at risk of a client-side filtering bug surfacing a
+     * pending/revision/rejected record on the wall. */
+    const fetchApprovedFypEntries = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/fyp-thesis/university?approvalStatus=approved");
+            if (response?.ok) {
+                const data = await response.json();
+                setApprovedFypEntries(Array.isArray(data.data) ? data.data : []);
+            }
+        } catch {
+            // Non-fatal — the wall just shows 0 until the next load.
+        }
+    };
+
     const fetchInProgressFyp = async () => {
         try {
             const response = await authenticatedFetch("/api/v1/paths/fyp-thesis/university?status=draft");
@@ -118,9 +151,9 @@ export default function UniversityShowcasePage() {
         }
     };
 
-    const approved = useMemo(() => entries.filter(isFacultyApproved), [entries]);
+    const approved = approvedEntries;
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
-    const approvedFyp = useMemo(() => fypEntries.filter(isPathEntryApproved), [fypEntries]);
+    const approvedFyp = approvedFypEntries;
     const waitingFyp = useMemo(() => fypEntries.filter(isPathEntryWaiting), [fypEntries]);
     const fypSchools = useMemo(
         () => [...new Set(approvedFyp.map((e) => e.projectInfo?.school || e.student?.department).filter(Boolean))].length,

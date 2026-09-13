@@ -870,6 +870,24 @@ export default function FacultyOpportunityCreationPage() {
         }
     }, []);
 
+    /** Continuous autosave — Save Draft was previously only reachable from the final wizard step,
+     * so leaving the page anywhere in Steps 1-8 silently lost all progress. This mirrors the same
+     * local-only, validation-free save handleSaveDraft already does, just fired automatically. */
+    useEffect(() => {
+        if (editingOpportunityId) return; // editing a live opportunity, not a local draft
+        const timer = setTimeout(() => {
+            try {
+                localStorage.setItem(
+                    FACULTY_OPPORTUNITY_DRAFT_KEY,
+                    JSON.stringify({ v: 1, savedAt: Date.now(), formData }),
+                );
+            } catch {
+                // Non-fatal — silent background autosave.
+            }
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [formData, editingOpportunityId]);
+
     useEffect(() => {
         if (!editingOpportunityId || isLoadingProfile) return;
         let cancelled = false;

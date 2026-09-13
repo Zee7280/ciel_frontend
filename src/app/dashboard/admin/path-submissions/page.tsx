@@ -195,6 +195,7 @@ export default function AdminPathSubmissionsPage() {
     const [fypApprovedSubview, setFypApprovedSubview] = useState<"rank" | "list">("rank");
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
+    const [approvedMeritEntries, setApprovedMeritEntries] = useState<MeritEntry[]>([]);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
     const [fypMeritLoading, setFypMeritLoading] = useState(false);
 
@@ -220,6 +221,14 @@ export default function AdminPathSubmissionsPage() {
             .finally(() => {
                 if (!cancelled) setMeritLoading(false);
             });
+        // The "Approved Coursework" wall — backed by a query that only ever returns approved
+        // records (enforced server-side), kept separate from meritEntries above since that list
+        // stays unfiltered for the analytics panel's full status breakdown.
+        authenticatedFetch("/api/v1/admin/paths/course-projects?approvalStatus=approved")
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((payload) => {
+                if (!cancelled) setApprovedMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
+            });
         return () => {
             cancelled = true;
         };
@@ -229,7 +238,9 @@ export default function AdminPathSubmissionsPage() {
         if (pathTab !== "fyp-thesis" || fypView !== "approved") return;
         let cancelled = false;
         setFypMeritLoading(true);
-        authenticatedFetch("/api/v1/admin/paths/fyp-thesis")
+        // The "Approved FYP" wall — backed by a query that only ever returns approved records
+        // (enforced server-side), never left to client-side filtering.
+        authenticatedFetch("/api/v1/admin/paths/fyp-thesis?approvalStatus=approved")
             .then((res) => (res?.ok ? res.json() : null))
             .then((payload) => {
                 if (!cancelled) setFypMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
@@ -495,11 +506,11 @@ export default function AdminPathSubmissionsPage() {
                     ) : (
                         <div className="space-y-4">
                             <CourseworkAnalyticsPanel entries={meritEntries} />
-                            {meritEntries.filter(isFacultyApproved).length === 0 ? (
+                            {approvedMeritEntries.length === 0 ? (
                                 <Card className="border-dashed p-10 text-center text-slate-500">No faculty-approved coursework cards yet.</Card>
                             ) : (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {meritEntries.filter(isFacultyApproved).map((entry) => (
+                                    {approvedMeritEntries.map((entry) => (
                                         <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
                                     ))}
                                 </div>
@@ -611,12 +622,12 @@ export default function AdminPathSubmissionsPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
                     ) : approvedSubview === "rank" ? (
-                        <MeritModelPanel entries={meritEntries.filter(isFacultyApproved)} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
-                    ) : meritEntries.filter(isFacultyApproved).length === 0 ? (
+                        <MeritModelPanel entries={approvedMeritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
+                    ) : approvedMeritEntries.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">No faculty-approved coursework cards yet.</Card>
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {meritEntries.filter(isFacultyApproved).map((entry) => (
+                            {approvedMeritEntries.map((entry) => (
                                 <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
                             ))}
                         </div>
@@ -744,12 +755,12 @@ export default function AdminPathSubmissionsPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
                     ) : fypApprovedSubview === "rank" ? (
-                        <FypMeritPanel entries={fypMeritEntries.filter(isPathEntryApproved)} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
-                    ) : approvedFyp.length === 0 ? (
+                        <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                    ) : fypMeritEntries.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
                     ) : (
                         <div className="space-y-4">
-                            {approvedFyp.map((entry) => (
+                            {fypMeritEntries.map((entry) => (
                                 <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
                             ))}
                         </div>
