@@ -380,7 +380,12 @@ export default function Sidebar() {
                     ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
                     : []),
                 { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
-                { label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus },
+                // Universities don't author Community Service opportunities directly — faculty
+                // representatives create them on the institution's behalf (see the backend's
+                // matching guard in OpportunitiesService.create).
+                ...(!isUniversityPartnerOrg
+                    ? [{ label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus }]
+                    : []),
                 { label: "Attendance review", href: "/dashboard/partner/attendance-review", icon: CalendarClock },
                 { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
