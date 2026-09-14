@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, UploadCloud, X, ChevronDown, Star } from "lucide-react";
 import clsx from "clsx";
+import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -599,13 +600,30 @@ export default function CourseProjectWizardPage() {
                     { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
                     { redirectToLogin: true },
                 );
-                const result = res?.ok ? await res.json() : null;
-                if (!result?.data) throw new Error("Could not save your progress");
+                if (!res) {
+                    throw new Error("Could not reach the server. Check your connection and try again.");
+                }
+                if (!res.ok) {
+                    const text = (await res.text().catch(() => "")) || "";
+                    let detail = text.trim();
+                    try {
+                        const parsed = JSON.parse(text) as { message?: string | string[] };
+                        if (typeof parsed.message === "string") detail = parsed.message;
+                        else if (Array.isArray(parsed.message)) detail = parsed.message.join(" ");
+                    } catch {
+                        /* raw text */
+                    }
+                    throw new Error(detail.slice(0, 240) || `Could not save your progress (HTTP ${res.status}).`);
+                }
+                const result = await res.json().catch(() => null);
+                if (!result?.data) throw new Error("Could not save your progress — unexpected response.");
                 setEntry((e) => mergeCourseProjectEntry(e, result.data as Partial<CourseProjectEntry>));
                 if (advanceTo !== undefined) setStep(Math.min(7, advanceTo));
                 return true;
             } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not save your progress");
+                const message = err instanceof Error ? err.message : "Could not save your progress";
+                setError(message);
+                toast.error(message);
                 return false;
             } finally {
                 setSaving(false);

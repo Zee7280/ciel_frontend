@@ -306,21 +306,41 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 { method: "PATCH", body },
                 { redirectToLogin: true },
             );
-            let result = res?.ok ? await res.json() : null;
-            if (!result?.data) {
+            // Only fall back to the legacy singleton endpoint when the primary id-scoped route
+            // itself seems to be missing (404) — not on a validation error, which would fail
+            // identically against the same DTO and only bury the real reason behind a second
+            // silent failure.
+            if (res && !res.ok && res.status === 404) {
                 res = await authenticatedFetch(
                     "/api/v1/paths/fyp-thesis",
                     { method: "PATCH", body },
                     { redirectToLogin: true },
                 );
-                result = res?.ok ? await res.json() : null;
             }
-            if (!result?.data) throw new Error("Could not save your progress");
+            if (!res) {
+                throw new Error("Could not reach the server. Check your connection and try again.");
+            }
+            if (!res.ok) {
+                const text = (await res.text().catch(() => "")) || "";
+                let detail = text.trim();
+                try {
+                    const parsed = JSON.parse(text) as { message?: string | string[] };
+                    if (typeof parsed.message === "string") detail = parsed.message;
+                    else if (Array.isArray(parsed.message)) detail = parsed.message.join(" ");
+                } catch {
+                    /* raw text */
+                }
+                throw new Error(detail.slice(0, 240) || `Could not save your progress (HTTP ${res.status}).`);
+            }
+            const result = await res.json().catch(() => null);
+            if (!result?.data) throw new Error("Could not save your progress — unexpected response.");
             setEntry((e) => mergeFypEntry(e, result.data as Partial<FypEntry>));
             if (advanceTo !== undefined) setStep(Math.min(7, advanceTo));
             return true;
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Could not save your progress");
+            const message = err instanceof Error ? err.message : "Could not save your progress";
+            setError(message);
+            toast.error(message);
             return false;
         } finally {
             setSaving(false);
