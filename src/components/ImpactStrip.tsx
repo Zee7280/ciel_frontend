@@ -22,9 +22,9 @@ export default function ImpactStrip() {
                 {metrics.map((m, i) => (
                     <div
                         key={m.label}
-                        className={`px-5 py-5 sm:px-6 ${i < metrics.length - 1 ? "border-b border-r border-white/10 sm:border-b-0" : "border-b border-white/10 sm:border-b-0"}`}
+                        className={`min-w-0 px-4 py-4 sm:px-6 sm:py-5 ${i < metrics.length - 1 ? "border-b border-r border-white/10 sm:border-b-0" : "border-b border-white/10 sm:border-b-0"}`}
                     >
-                        <span className="block text-[28px] font-black leading-none text-white">
+                        <span className="block text-[clamp(20px,3vw,28px)] font-black leading-none text-white">
                             {m.value.toLocaleString("en-US")}
                             {m.suffix ?? ""}
                         </span>

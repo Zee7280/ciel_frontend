@@ -8,7 +8,7 @@ export { CourseworkHero as CommunityHero, HubBackButton, HubTile };
 export function CommunityCrumb({ role, view }: { role: string; view?: string }) {
     useRegisterDashboardPageChrome();
     return (
-        <p className="text-[13px] text-[#71828e]">
+        <p className="mb-3 text-[13px] leading-[19.5px] text-[#71828e]">
             {role} Dashboard / <b className="font-semibold text-[#183140]">Community Service</b>
             {view ? (
                 <>

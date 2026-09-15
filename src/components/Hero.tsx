@@ -68,17 +68,17 @@ export default function Hero() {
             <div className="pointer-events-none absolute right-0 top-0 -z-0 h-[600px] w-[700px] bg-ciel-green/10 blur-[140px]" />
             <div className="pointer-events-none absolute bottom-0 left-0 -z-0 h-[500px] w-[500px] bg-ciel-indigo/10 blur-[120px]" />
 
-                            <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-20 md:px-10 lg:py-28">
+                            <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-16 pt-32 sm:px-6 md:px-10 md:pb-24 md:pt-36 lg:pb-28 lg:pt-40">
                 <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
 
                     {/* LEFT CONTENT */}
                     <div className="max-w-2xl text-center lg:text-left">
-                        <p className="inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-[0.2em] text-ciel-green">
+                        <p className="inline-flex max-w-full flex-wrap items-center justify-center gap-2.5 text-center text-[10px] font-black uppercase tracking-[0.14em] text-ciel-green sm:text-xs sm:tracking-[0.2em] lg:justify-start lg:text-left">
                             <span aria-hidden className="h-0.5 w-[18px] rounded-full bg-ciel-green" />
                             Verified community impact infrastructure · Pakistan
                         </p>
 
-                        <h1 className="mt-[18px] text-4xl font-black leading-[1.15] tracking-tight text-white md:text-5xl lg:text-[52px]">
+                        <h1 className="mt-[18px] text-[clamp(28px,6vw,52px)] font-black leading-[1.15] tracking-tight text-white">
                             Every contribution has a story. CIEL turns it into a{" "}
                             <span className="text-ciel-green">legacy of impact.</span>
                         </h1>
@@ -128,8 +128,8 @@ export default function Hero() {
 
                         <div className="grid grid-cols-2 gap-2.5">
                             {tiles.map((m) => (
-                                <div key={m.key} className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-                                    <span className="block text-[26px] font-black leading-none text-white sm:text-[32px]">
+                                <div key={m.key} className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-3 sm:p-4">
+                                    <span className="block break-words text-[clamp(20px,4.2vw,32px)] font-black leading-none text-white">
                                         {m.prefix}
                                         {fmt(m.value)}
                                     </span>
@@ -143,7 +143,7 @@ export default function Hero() {
                                 </div>
                             ))}
                             <div className="col-span-2 rounded-2xl border border-ciel-gold/35 bg-gradient-to-br from-ciel-gold/20 to-ciel-gold/5 p-4">
-                                <span className="block text-[34px] font-black leading-none text-[#F5C56E] sm:text-[42px]">
+                                <span className="block break-words text-[clamp(26px,5vw,42px)] font-black leading-none text-[#F5C56E]">
                                     PKR {fmt(dividend)}
                                 </span>
                                 <span className="mt-2 block text-xs font-semibold text-white/65">Community dividend</span>

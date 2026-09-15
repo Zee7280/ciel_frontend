@@ -7,10 +7,19 @@ export function timeOfDayGreeting(): "Good morning" | "Good afternoon" | "Good e
     return "Good evening";
 }
 
+function displayFirstName(name?: string | null): string {
+    const first = typeof name === "string" ? name.trim().split(/\s+/)[0] : "";
+    if (!first) return "";
+    if (first === first.toUpperCase() && /[A-Za-z]/.test(first)) {
+        return first.charAt(0) + first.slice(1).toLowerCase();
+    }
+    return first;
+}
+
 /** e.g. `Good evening, Fatima 🌍` — omit name if empty. */
 export function namedTimeGreeting(name?: string | null, emoji?: string): string {
     const phrase = timeOfDayGreeting();
-    const first = typeof name === "string" ? name.trim().split(/\s+/)[0] : "";
+    const first = displayFirstName(name);
     const base = first ? `${phrase}, ${first}` : phrase;
     return emoji ? `${base} ${emoji}` : base;
 }

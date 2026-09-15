@@ -5,7 +5,7 @@ import { homeWrap } from "@/components/home/HomeChrome";
 
 export default function FinalCTA() {
     return (
-        <section className="bg-[#F5FAF9] px-6 py-16">
+        <section className="overflow-x-clip bg-[#F5FAF9] px-4 py-12 sm:px-6 sm:py-16">
             <div className={homeWrap}>
                 <div className="flex flex-col items-center justify-center gap-8 rounded-[26px] bg-ciel-navy px-6 py-14 text-center sm:px-10 sm:py-16 md:py-20">
                     <div>

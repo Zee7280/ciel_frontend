@@ -58,7 +58,7 @@ export default function Navbar() {
                 </Link>
 
                 {/* Desktop navigation */}
-                <div className="hidden md:flex items-center gap-10 shrink-0">
+                <div className="hidden lg:flex items-center gap-6 xl:gap-10 shrink-0">
                     {navItems.map((item) => {
                         const isActive = item.prefixMatch
                             ? pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -91,13 +91,13 @@ export default function Navbar() {
                         <>
                             <Link
                                 href="/login"
-                                className="hidden md:inline-flex items-center px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
+                                className="hidden lg:inline-flex items-center px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
                             >
                                 Login
                             </Link>
                             <Link
                                 href="/login"
-                                className="inline-flex md:hidden items-center px-3 py-2 rounded-full border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
+                                className="inline-flex lg:hidden items-center px-3 py-2 rounded-full border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
                             >
                                 Login
                             </Link>
@@ -112,7 +112,7 @@ export default function Navbar() {
 
                     <button
                         type="button"
-                        className="inline-flex md:hidden h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition hover:bg-slate-50"
+                        className="inline-flex lg:hidden h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition hover:bg-slate-50"
                         aria-expanded={mobileNavOpen}
                         aria-controls="main-mobile-nav"
                         aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
@@ -128,13 +128,13 @@ export default function Navbar() {
                 <>
                     <button
                         type="button"
-                        className="fixed inset-0 top-24 z-40 bg-slate-900/40 md:hidden"
+                        className="fixed inset-0 top-24 z-40 bg-slate-900/40 lg:hidden"
                         aria-hidden
                         onClick={() => setMobileNavOpen(false)}
                     />
                     <div
                         id="main-mobile-nav"
-                        className="fixed inset-x-0 top-24 z-50 max-h-[min(32rem,calc(100vh-6rem))] overflow-y-auto border-b border-slate-200 bg-white shadow-xl md:hidden"
+                        className="fixed inset-x-0 top-24 z-50 max-h-[min(32rem,calc(100vh-6rem))] overflow-y-auto border-b border-slate-200 bg-white shadow-xl lg:hidden"
                         role="dialog"
                         aria-label="Site menu"
                     >

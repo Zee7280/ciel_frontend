@@ -64,7 +64,7 @@ export default function SdgImpactWheel() {
 
     return (
         <section className={homeSectionMint}>
-            <div className={`${homeWrap} grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center`}>
+            <div className={`${homeWrap} grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10`}>
                 {/* LEFT: intro + wheel */}
                 <div className="min-w-0">
                     <HomeHeader
@@ -73,7 +73,7 @@ export default function SdgImpactWheel() {
                         lead="Click a segment to see verified Community Service reports tagged to that goal. Untouched goals stay dim — they are in the UN list, not in our ledger yet."
                     />
 
-                    <div className="relative mx-auto mt-2 h-[360px] w-[360px] max-w-full lg:mx-0">
+                    <div className="relative mx-auto mt-2 aspect-square w-full max-w-[min(100%,280px)] overflow-hidden sm:max-w-[320px] lg:mx-0 lg:max-w-[360px]">
                         <svg viewBox="0 0 360 360" className="h-full w-full">
                             {sdgData.map((goal, i) => {
                                 const isSelected = goal.number === selected;
@@ -112,7 +112,7 @@ export default function SdgImpactWheel() {
                             })}
                         </svg>
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-5xl font-black text-slate-900">{selected}</span>
+                            <span className="text-3xl font-black text-slate-900 sm:text-5xl">{selected}</span>
                             <span className="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Goal selected</span>
                             <span className="mt-0.5 text-xs font-bold text-slate-500">
                                 {projects} {projects === 1 ? "project" : "projects"}
@@ -138,7 +138,7 @@ export default function SdgImpactWheel() {
                         )}
                     </p>
 
-                    <div className="mt-4 grid grid-cols-4 gap-2">
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                             <span className="block text-lg font-black text-slate-900">{projects}</span>
                             <span className="mt-0.5 block text-[10px] font-semibold text-slate-500">Projects</span>
@@ -160,7 +160,7 @@ export default function SdgImpactWheel() {
                     {selectedStat?.items.length ? (
                         <div className="mt-4 space-y-1.5">
                             {selectedStat.items.slice(0, 6).map((item, i) => (
-                                <div key={i} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2">
+                                <div key={i} className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                                     <span className="min-w-0 truncate text-[13px] font-bold text-slate-800">{item.title}</span>
                                     <span className="shrink-0 text-[11px] font-semibold text-slate-400">
                                         {item.city ? `${item.city} · ` : ""}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePlatformStats } from "@/utils/usePlatformStats";
-import { homeSectionMint, homeWrap } from "@/components/home/HomeChrome";
+import { homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
 
 const PRESETS = [
     { value: 800, label: "Small private (800)" },
@@ -42,12 +42,12 @@ export default function ImpactCalculator() {
     }, [students, hoursEach, completePct, teamSize, benPerHour, rate]);
 
     return (
-        <section id="impact-calculator" className={homeSectionMint}>
-            <div className={`${homeWrap} rounded-[22px] border border-[#D6E6E3] bg-white p-6 sm:p-[22px]`}>
+        <section id="impact-calculator" className={homeSectionWhite}>
+            <div className={`${homeWrap} overflow-hidden rounded-[22px] border border-[#D6E6E3] bg-white p-4 sm:p-6 lg:p-[22px]`}>
                 <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-ciel-teal">
                     Impact calculator
                 </p>
-                <h2 className="mt-1.5 text-[22px] font-black tracking-tight text-ciel-navy sm:text-[26px]">
+                <h2 className="mt-1.5 text-[clamp(20px,3.4vw,26px)] font-black tracking-tight text-ciel-navy">
                     What would one semester look like at your university?
                 </h2>
                 <p className="mt-1 max-w-[70ch] text-sm text-[#3C5560]">
@@ -56,10 +56,10 @@ export default function ImpactCalculator() {
                 </p>
 
                 <div className="mt-6 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
-                    <div>
-                        <label className="mt-0 block text-[13px] font-bold text-[#3C5560]">
-                            Students enrolled in Community Service
-                            <span className="float-right text-lg font-black text-ciel-navy">{fmtInt(students)}</span>
+                    <div className="min-w-0">
+                        <label className="mt-0 flex items-end justify-between gap-3 text-[13px] font-bold text-[#3C5560]">
+                            <span>Students enrolled in Community Service</span>
+                            <span className="shrink-0 text-lg font-black tabular-nums text-ciel-navy">{fmtInt(students)}</span>
                         </label>
                         <input
                             type="range"
@@ -71,9 +71,9 @@ export default function ImpactCalculator() {
                             className="mt-1.5 w-full accent-ciel-teal"
                         />
 
-                        <label className="mt-3.5 block text-[13px] font-bold text-[#3C5560]">
-                            Hours per student (16 is the HEC floor)
-                            <span className="float-right text-lg font-black text-ciel-navy">{hoursEach}</span>
+                        <label className="mt-3.5 flex items-end justify-between gap-3 text-[13px] font-bold text-[#3C5560]">
+                            <span>Hours per student (16 is the HEC floor)</span>
+                            <span className="shrink-0 text-lg font-black tabular-nums text-ciel-navy">{hoursEach}</span>
                         </label>
                         <input
                             type="range"
@@ -85,9 +85,9 @@ export default function ImpactCalculator() {
                             className="mt-1.5 w-full accent-ciel-teal"
                         />
 
-                        <label className="mt-3.5 block text-[13px] font-bold text-[#3C5560]">
-                            Share completing this semester
-                            <span className="float-right text-lg font-black text-ciel-navy">{completePct}%</span>
+                        <label className="mt-3.5 flex items-end justify-between gap-3 text-[13px] font-bold text-[#3C5560]">
+                            <span>Share completing this semester</span>
+                            <span className="shrink-0 text-lg font-black tabular-nums text-ciel-navy">{completePct}%</span>
                         </label>
                         <input
                             type="range"
@@ -116,29 +116,29 @@ export default function ImpactCalculator() {
                         </select>
                     </div>
 
-                    <div className="flex flex-col gap-3 rounded-[18px] bg-ciel-navy p-[22px] text-white">
+                    <div className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-[18px] bg-ciel-navy p-4 text-white sm:p-[22px]">
                         <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CC9C2]">
                             Projected community dividend
                         </p>
-                        <p className="font-black text-[44px] leading-none text-white">
+                        <p className="break-words font-black text-[clamp(28px,7vw,44px)] leading-none text-white">
                             {fmtInt(result.dividend)}
                             <small className="ml-1.5 text-base font-extrabold text-ciel-gold">PKR</small>
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                                <b className="block text-[22px] font-black text-white">{fmtInt(result.hours)}</b>
+                            <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                                <b className="block break-words text-[clamp(16px,3vw,22px)] font-black text-white">{fmtInt(result.hours)}</b>
                                 <span className="text-[11px] font-bold text-[#B9D3CF]">verified hours</span>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                                <b className="block text-[22px] font-black text-white">{fmtInt(result.people)}</b>
+                            <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                                <b className="block break-words text-[clamp(16px,3vw,22px)] font-black text-white">{fmtInt(result.people)}</b>
                                 <span className="text-[11px] font-bold text-[#B9D3CF]">people reached (at ledger ratio)</span>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                                <b className="block text-[22px] font-black text-white">{fmtInt(result.teams)}</b>
+                            <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                                <b className="block break-words text-[clamp(16px,3vw,22px)] font-black text-white">{fmtInt(result.teams)}</b>
                                 <span className="text-[11px] font-bold text-[#B9D3CF]">projects</span>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                                <b className="block text-[22px] font-black text-white">{fmtInt(result.teams)}</b>
+                            <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                                <b className="block break-words text-[clamp(16px,3vw,22px)] font-black text-white">{fmtInt(result.teams)}</b>
                                 <span className="text-[11px] font-bold text-[#B9D3CF]">student-teams</span>
                             </div>
                         </div>

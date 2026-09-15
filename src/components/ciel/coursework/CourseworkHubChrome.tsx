@@ -17,7 +17,7 @@ export function CourseworkCrumb({
 }) {
     useRegisterDashboardPageChrome();
     return (
-        <p className="text-[13px] text-[#71828e]">
+        <p className="mb-3 text-[13px] leading-[19.5px] text-[#71828e]">
             {role} Dashboard / <b className="font-semibold text-[#183140]">{pathLabel}</b>
             {view ? (
                 <>
@@ -49,7 +49,7 @@ export function CourseworkHero({
     useRegisterDashboardPageChrome();
     return (
         <div
-            className="relative mt-[-8px] flex flex-col items-start justify-between gap-6 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_16px_36px_rgba(18,48,65,.10)] sm:flex-row sm:items-center"
+            className="relative mt-2 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-[22px] px-5 py-6 text-white shadow-[0_16px_36px_rgba(18,48,65,.10)] sm:flex-row sm:items-center sm:px-[34px] sm:py-[27px]"
             style={{ background: gradient }}
         >
             <div className="pointer-events-none absolute -right-20 -top-24 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0)_67%)]" />
@@ -224,6 +224,7 @@ export function PathFilterBar({
 }
 
 export function HubBackButton({ href, onClick, label = "← Back" }: { href?: string; onClick?: () => void; label?: string }) {
+    useRegisterDashboardPageChrome();
     const className =
         "mb-3 rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]";
     if (href) {

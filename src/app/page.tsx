@@ -18,7 +18,7 @@ import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#F5FAF9] font-sans">
+    <main className="min-h-screen overflow-x-clip bg-[#F5FAF9] font-sans">
       <Navbar />
       <Hero />
       <ImpactStrip />

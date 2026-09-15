@@ -68,7 +68,7 @@ export default function ShowcaseSpotlight() {
                     lead="Faculty-approved, evidence-backed, selected by review. The pilot's first project is live — the other spots are waiting to be earned."
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {CARDS.map((card) => {
                         const body = (
                             <>

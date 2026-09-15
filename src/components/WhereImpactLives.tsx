@@ -132,7 +132,7 @@ export default function WhereImpactLives() {
                 />
 
                 <div className="mt-7 grid grid-cols-1 gap-[18px] lg:grid-cols-[1.35fr_1fr]">
-                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-[22px] bg-ciel-navy p-7 text-white">
+                    <div className="relative flex flex-col gap-4 overflow-hidden rounded-[22px] bg-ciel-navy p-4 text-white sm:p-7">
                         <div
                             aria-hidden
                             className="pointer-events-none absolute -right-[60px] -top-[60px] h-[260px] w-[260px] rounded-full border-2 border-[#E8B64A]/50"
@@ -212,7 +212,7 @@ export default function WhereImpactLives() {
                                     type="button"
                                     aria-expanded={isOpen}
                                     onClick={() => setOpenKey(isOpen ? null : path.key)}
-                                    className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3.5 rounded-[18px] border bg-white px-5 py-[18px] text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(11,37,48,.10)]"
+                                    className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[18px] border bg-white px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(11,37,48,.10)] sm:gap-3.5 sm:px-5 sm:py-[18px]"
                                     style={{ borderColor: isOpen ? path.color : "#D6E6E3" }}
                                 >
                                     <span
@@ -221,9 +221,9 @@ export default function WhereImpactLives() {
                                     >
                                         {path.verb}
                                     </span>
-                                    <span>
-                                        <b className="block text-[17px] font-black text-ciel-navy">{path.title}</b>
-                                        <span className="text-[13px] text-[#6F8790]">{path.subtitle}</span>
+                                    <span className="min-w-0">
+                                        <b className="block text-[16px] font-black text-ciel-navy sm:text-[17px]">{path.title}</b>
+                                        <span className="line-clamp-2 text-[12px] text-[#6F8790] sm:text-[13px]">{path.subtitle}</span>
                                     </span>
                                     <span className="text-right text-[22px] font-black tabular-nums text-ciel-navy">
                                         {fmtCount(count)}

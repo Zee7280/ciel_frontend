@@ -55,7 +55,7 @@ export default function ImpactSnapshot() {
     ];
 
     return (
-        <section id="platform-impact" className="relative overflow-hidden bg-ciel-navy py-24 px-6">
+        <section id="platform-impact" className="relative overflow-hidden bg-ciel-navy px-4 py-16 sm:px-6 sm:py-24">
             <div className="pointer-events-none absolute left-1/2 top-0 -z-0 h-[500px] w-[900px] -translate-x-1/2 bg-ciel-green/5 blur-[140px]" />
 
             <div className={`relative z-10 ${homeWrap}`}>
@@ -67,7 +67,7 @@ export default function ImpactSnapshot() {
                     lead="Every number on this page traces to attendance evidence, faculty sign-off, and partner confirmation."
                 />
 
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     {tiles.map((stat) => (
                         <div
                             key={stat.label}

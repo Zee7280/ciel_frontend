@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
-import { CourseworkCrumb, CourseworkHero, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
@@ -895,23 +896,21 @@ export default function StartupBusinessHub({
     };
 
     return (
-        <div className="mx-auto max-w-[1040px] pb-16">
+        <div className="mx-auto max-w-[1500px] pb-16">
             <CourseworkCrumb
                 role="Student"
                 pathLabel="Startup / Venture"
                 view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
             />
             {view === "home" ? (
-                <CourseworkHero
+                <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
                     title={namedTimeGreeting(name === "there" ? "" : name, "🚀")}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
-                    gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
-                    roleBadge="STUDENT"
                     stats={[
-                        { value: String(approved.length), label: "APPROVED", href: WALL_HREF },
-                        { value: String(underReview.length), label: "UNDER REVIEW", href: UNDER_REVIEW_HREF },
-                        { value: String(inProgress.length), label: "IN PROGRESS", href: IN_PROGRESS_HREF },
+                        { value: String(approved.length), label: "APPROVED" },
+                        { value: String(underReview.length), label: "UNDER REVIEW" },
+                        { value: String(inProgress.length), label: "IN PROGRESS" },
                     ]}
                 />
             ) : null}
@@ -1056,61 +1055,54 @@ export default function StartupBusinessHub({
             ) : null}
 
             {view === "home" && (
-                <>
-                    <div className="mt-[22px] grid grid-cols-1 gap-[22px] sm:grid-cols-2">
-                        <HubTile
-                            href={CREATE_HREF}
-                            badge="START"
-                            badgeClass="text-[#0b4b57]"
-                            emoji="🚀"
-                            title="Create Startup Record"
-                            subtitle="Open the CIEL PK Venture Studio form. Each section auto-saves; your first saved fields create a venture record shared with your team, faculty, university and CIEL PK. No pre-approval needed."
-                            background="linear-gradient(135deg,#19b8a8,#0b8b86)"
-                        />
-                        <HubTile
-                            href={IN_PROGRESS_HREF}
-                            badge={workspaceBadge}
-                            badgeClass="text-[#c65b00]"
-                            emoji="🧩"
-                            title="Startup Workspace"
-                            subtitle="Drafts you are still filling in and ventures returned for revision — completion bar, status tracker, and Email / WhatsApp reminders for your team or your faculty."
-                            background="linear-gradient(135deg,#f6a021,#e57a0f)"
-                        />
-                        <HubTile
-                            href={UNDER_REVIEW_HREF}
-                            badge={`${underReview.length} under review`}
-                            badgeClass="text-[#1f6fc2]"
-                            emoji="📬"
-                            title="Ventures Under Review"
-                            subtitle="Submitted venture cards waiting for faculty decision — Accept, Request revision or Reject — with Email / WhatsApp buttons to remind your faculty."
-                            background="linear-gradient(135deg,#3aa2e4,#1f6fc2)"
-                        />
-                        <HubTile
-                            href={WALL_HREF}
-                            badge={wallBadge}
-                            badgeClass="text-[#1c8a52]"
-                            emoji="🏅"
-                            title="My Ventures Impact Wall"
-                            subtitle="Your approved ventures with faculty score, remarks and analysis. Approved cards also appear on your University's Ventures Impact Wall, CIEL PK, and — if you opted in — the CIEL Investor Hub."
-                            background="linear-gradient(135deg,#2fb96b,#1c8a52)"
-                        />
-                    </div>
-                    <a
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <MockupActionCard
+                        href={CREATE_HREF}
+                        emoji="🚀"
+                        ghost="🚀"
+                        title="Create Startup Record"
+                        subtitle="Open the CIEL PK Venture Studio form. Each section auto-saves; your first saved fields create a venture record shared with your team, faculty, university and CIEL PK. No pre-approval needed."
+                        badge="START"
+                        background={MOCKUP_GRADIENTS.teal}
+                    />
+                    <MockupActionCard
+                        href={IN_PROGRESS_HREF}
+                        emoji="🧩"
+                        ghost="🧩"
+                        title="Startup Workspace"
+                        subtitle="Drafts you are still filling in and ventures returned for revision — completion bar, status tracker, and Email / WhatsApp reminders for your team or your faculty."
+                        badge={workspaceBadge || "0 in progress"}
+                        background={MOCKUP_GRADIENTS.orange}
+                    />
+                    <MockupActionCard
+                        href={UNDER_REVIEW_HREF}
+                        emoji="📬"
+                        ghost="📬"
+                        title="Ventures Under Review"
+                        subtitle="Submitted venture cards waiting for faculty decision — Accept, Request revision or Reject — with Email / WhatsApp buttons to remind your faculty."
+                        badge={`${underReview.length} under review`}
+                        background={MOCKUP_GRADIENTS.blue}
+                    />
+                    <MockupActionCard
+                        href={WALL_HREF}
+                        emoji="🏅"
+                        ghost="🏅"
+                        title="My Ventures Impact Wall"
+                        subtitle="Your approved ventures with faculty score, remarks and analysis. Approved cards also appear on your University's Ventures Impact Wall, CIEL PK, and — if you opted in — the CIEL Investor Hub."
+                        badge={wallBadge || "0 approved"}
+                        background={MOCKUP_GRADIENTS.green}
+                    />
+                    <MockupActionCard
                         href={GUIDE_HREF}
-                        className="relative mt-[22px] block overflow-hidden rounded-[22px] p-7 text-white shadow-[0_8px_30px_rgba(10,30,40,.08)] transition hover:-translate-y-0.5"
-                        style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}
-                    >
-                        <span className="absolute right-[22px] top-[22px] rounded-full bg-white px-4 py-2 text-[11.5px] font-extrabold tracking-wide text-[#6a35c8]">
-                            GUIDE INSIDE
-                        </span>
-                        <h3 className="m-0 pr-36 text-[22px] font-bold">📘 How the venture loop works</h3>
-                        <ol className="mt-2 mb-0 max-w-[900px] list-decimal space-y-1 pl-5 text-[14.5px] leading-relaxed">
-                            {LOOP_STEPS.map((step) => (
-                                <li key={step}>{step}</li>
-                            ))}
-                        </ol>
-                    </a>
-                </>
+                        emoji="📘"
+                        ghost="📘"
+                        title="How the venture loop works"
+                        subtitle="Create → submit → faculty decision → publish. Open the guide for the full loop, including revision and investor opt-in."
+                        badge="GUIDE INSIDE"
+                        background={MOCKUP_GRADIENTS.purple}
+                        full
+                    />
+                </div>
             )}
         </div>
     );

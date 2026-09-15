@@ -34,6 +34,56 @@ type WallRow = {
     created_at?: string;
     impact_verify_url?: string | null;
     actions?: { certificate_url?: string | null; pdf_url?: string | null; evidence_url?: string | null };
+    // Phase 3: CII v2 AI Analysis data for two-column display
+    ciiV2?: {
+        final?: number;
+        aiRecommendedScore?: number;
+        facultyApprovedScore?: number;
+        level?: { level: number; name: string; quality: string };
+        sections?: Array<{
+            id: number;
+            title: string;
+            score: number;
+            weight: number;
+            good?: string;
+            limit?: string;
+        }>;
+        bonus?: { effort: number; resources: number; partners: number; total: number };
+        integrityPenalty?: number;
+        studentFeedback?: {
+            opening_praise?: string;
+            why_score_is_high_or_low?: string;
+            encouragement?: string;
+            five_specific_actions?: string[];
+        };
+        redFlags?: Array<{ flag: string; severity?: string }>;
+    } | null;
+    ciiV2Lock?: {
+        locked?: boolean;
+        lockedAt?: string;
+        aiRecommendedScore?: number;
+        facultyApprovedScore?: number;
+        scoreWasAdjusted?: boolean;
+        scoreAdjustmentReason?: string;
+        facultyNote?: string;
+    } | null;
+    // Phase 4: Independent AI analyses from My Impact Wall
+    independentAiAnalyses?: Array<{
+        id: string;
+        runAt: string;
+        runByUserId: string;
+        runByRole: "faculty" | "university" | "ciel_admin";
+        runByName?: string;
+        score: number;
+        level?: { level: number; name: string; quality: string };
+        feedback?: {
+            opening_praise?: string;
+            why_score_is_high_or_low?: string;
+            encouragement?: string;
+            five_specific_actions?: string[];
+        };
+        note?: string;
+    }> | null;
 };
 
 type FlashState = {
@@ -47,6 +97,45 @@ type FlashState = {
     evidence?: string | null;
     certificate?: string | null;
     qr?: string | null;
+    // Phase 3: AI Analysis data for two-column display
+    aiAnalysis?: {
+        aiScore: number | null;
+        facultyScore: number | null;
+        scoreWasAdjusted: boolean;
+        scoreAdjustmentReason?: string;
+        levelName: string;
+        levelQuality: string;
+        sections: Array<{
+            id: number;
+            title: string;
+            score: number;
+            weight: number;
+            good?: string;
+            limit?: string;
+        }>;
+        bonus: { effort: number; resources: number; partners: number; total: number };
+        integrityPenalty: number;
+        feedback?: {
+            praise?: string;
+            summary?: string;
+            encouragement?: string;
+            actions?: string[];
+        };
+        redFlags?: Array<{ flag: string; severity?: string }>;
+        lockedAt?: string;
+        facultyNote?: string;
+    } | null;
+    // Phase 4: Independent AI analyses (do not overwrite faculty-approved)
+    independentAnalyses?: Array<{
+        id: string;
+        runAt: string;
+        runByName?: string;
+        runByRole: string;
+        score: number;
+        levelName?: string;
+        note?: string;
+    }>;
+    reportId?: string;
 };
 
 function yearOf(iso?: string): string {
@@ -99,6 +188,12 @@ function openOrToast(url: string | null | undefined, empty: string) {
     toast.message(empty);
 }
 
+/**
+ * Phase 3: Two-Column Modal — Flash Card | AI Analysis & Score
+ * 
+ * When student opens the record, they see the same two-column presentation
+ * that faculty used for review. Student can view but cannot edit.
+ */
 function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: () => void }) {
     useEffect(() => {
         const prev = document.body.style.overflow;
@@ -113,9 +208,12 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
         };
     }, [onClose]);
 
+    const ai = flash.aiAnalysis;
+    const hasTwoColumns = Boolean(ai);
+
     return (
         <div
-            className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(7,28,35,.58)] p-6"
+            className="fixed inset-0 z-[999] flex items-center justify-center overflow-auto bg-[rgba(7,28,35,.58)] p-4 sm:p-6"
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
@@ -125,8 +223,11 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cs-flash-title"
-                className="max-h-[90vh] w-[min(760px,96vw)] overflow-auto rounded-[26px] bg-white shadow-[0_28px_70px_rgba(0,0,0,.24)]"
+                className={`max-h-[95vh] overflow-auto rounded-[26px] bg-white shadow-[0_28px_70px_rgba(0,0,0,.24)] ${
+                    hasTwoColumns ? "w-[min(1100px,96vw)]" : "w-[min(760px,96vw)]"
+                }`}
             >
+                {/* Header */}
                 <div className="relative bg-[linear-gradient(125deg,#0e4d4e,#117669)] px-[26px] py-6 text-white">
                     <button
                         type="button"
@@ -137,56 +238,217 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                         ×
                     </button>
                     <span className="inline-block rounded-[14px] border border-white/18 bg-white/14 px-2 py-1.5 text-[9px] font-black">
-                        COMMUNITY SERVICE
+                        VERIFIED COMMUNITY SERVICE RECORD
                     </span>
                     <h3 id="cs-flash-title" className="mb-1.5 mt-1.5 text-2xl font-semibold">
                         {flash.title}
                     </h3>
                     <p className="m-0 text-xs text-[#d8efea]">{flash.subtitle}</p>
                 </div>
-                <div className="px-[26px] py-[22px]">
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                        {flash.stats.map(([label, value]) => (
-                            <div key={label} className="rounded-[13px] border border-[#dde5ea] p-3">
-                                <span className="text-[9px] font-black uppercase text-[#70808a]">{label}</span>
-                                <strong className="mt-1 block text-lg text-[#16313d]">{value}</strong>
+
+                {/* Body: Two-column layout when AI analysis exists */}
+                <div className={`grid gap-5 p-5 sm:p-[26px] ${hasTwoColumns ? "lg:grid-cols-2" : ""}`}>
+                    {/* LEFT COLUMN: Flash Card */}
+                    <div className="min-w-0">
+                        <h4 className="mb-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">
+                            Flash Card
+                        </h4>
+                        <div className="rounded-[16px] border border-[#dde5ea] bg-[#fbfcfe] p-4">
+                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                                {flash.stats.map(([label, value]) => (
+                                    <div key={label} className="rounded-[11px] border border-[#dde5ea] bg-white p-2.5">
+                                        <span className="text-[8px] font-black uppercase text-[#70808a]">{label}</span>
+                                        <strong className="mt-1 block text-base text-[#16313d]">{value}</strong>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    <div className="mt-[15px] border-t border-[#dde5ea] pt-[15px]">
-                        <h4 className="m-0 mb-1.5 text-[13px] font-semibold text-[#16313d]">Project Snapshot</h4>
-                        <p className="m-0 text-[11.5px] leading-[1.55] text-[#70808a]">{flash.summary}</p>
-                    </div>
-                    <div className="mt-[15px] border-t border-[#dde5ea] pt-[15px]">
-                        <h4 className="m-0 mb-1.5 text-[13px] font-semibold text-[#16313d]">Impact &amp; SDG Linkage</h4>
-                        <p className="m-0 text-[11.5px] leading-[1.55] text-[#70808a]">{flash.impact}</p>
-                    </div>
-                    <div className="mt-[15px] border-t border-[#dde5ea] pt-[15px]">
-                        <h4 className="m-0 mb-1.5 text-[13px] font-semibold text-[#16313d]">Verification</h4>
-                        <p className="m-0 text-[11.5px] leading-[1.55] text-[#70808a]">{flash.verify}</p>
-                    </div>
-                    <div className="mt-[15px] border-t border-[#dde5ea] pt-[15px]">
-                        <div className="flex flex-wrap gap-1.5">
-                            <button type="button" className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-2 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.pdf, "PDF is not attached yet")}>
-                                PDF Report
-                            </button>
-                            <button type="button" className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-2 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.evidence, "Evidence files open from the report")}>
-                                JPEG Evidence
-                            </button>
-                            <button type="button" className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-2 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.certificate, "Certificate is not ready yet")}>
-                                Certificate
-                            </button>
-                            <button type="button" className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-2 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.qr, "QR verification is not issued yet")}>
-                                QR Code
-                            </button>
+                            <div className="mt-4 border-t border-[#dde5ea] pt-4">
+                                <h5 className="m-0 mb-1.5 text-[12px] font-semibold text-[#16313d]">Project Snapshot</h5>
+                                <p className="m-0 text-[11px] leading-[1.55] text-[#70808a]">{flash.summary}</p>
+                            </div>
+                            <div className="mt-3 border-t border-[#dde5ea] pt-3">
+                                <h5 className="m-0 mb-1.5 text-[12px] font-semibold text-[#16313d]">Impact &amp; SDG Linkage</h5>
+                                <p className="m-0 text-[11px] leading-[1.55] text-[#70808a]">{flash.impact}</p>
+                            </div>
+                            <div className="mt-3 border-t border-[#dde5ea] pt-3">
+                                <h5 className="m-0 mb-1.5 text-[12px] font-semibold text-[#16313d]">Verification Status</h5>
+                                <p className="m-0 text-[11px] leading-[1.55] text-[#70808a]">{flash.verify}</p>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    <span className="rounded-lg bg-[#e8f5ef] px-2 py-1 text-[8px] font-black text-[#1d765d]">✓ Faculty Approved</span>
+                                    <span className="rounded-lg bg-[#e8f5ef] px-2 py-1 text-[8px] font-black text-[#1d765d]">✓ CIEL PK Verified</span>
+                                </div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-3">
+                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.pdf, "PDF is not attached yet")}>
+                                    PDF Report
+                                </button>
+                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.evidence, "Evidence files open from the report")}>
+                                    Evidence
+                                </button>
+                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.certificate, "Certificate is not ready yet")}>
+                                    Certificate
+                                </button>
+                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.qr, "QR verification is not issued yet")}>
+                                    QR Code
+                                </button>
+                            </div>
                         </div>
-                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                            <span className="rounded-xl bg-[#e8f5ef] px-2 py-1 text-[8.5px] font-black text-[#1d765d]">Faculty Approved</span>
-                            <span className="rounded-xl bg-[#e8f5ef] px-2 py-1 text-[8.5px] font-black text-[#1d765d]">Partner Verified</span>
-                            <span className="rounded-xl bg-[#e8f5ef] px-2 py-1 text-[8.5px] font-black text-[#1d765d]">CIEL PK Approved</span>
-                        </div>
-                        <p className="mt-2 text-[10px] text-[#70808a]">This verified record is also stored automatically in My Impact Portfolio.</p>
                     </div>
+
+                    {/* RIGHT COLUMN: AI Analysis & Score (only if available) */}
+                    {ai && (
+                        <div className="min-w-0">
+                            <h4 className="mb-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">
+                                AI Analysis &amp; Score
+                            </h4>
+                            <div className="rounded-[16px] border border-[#e0daf0] bg-[#faf9ff] p-4">
+                                {/* Score Display */}
+                                <div className="flex items-center gap-4">
+                                    <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-[linear-gradient(135deg,#6d28d9,#a78bfa)]">
+                                        <span className="text-[22px] font-black text-white">
+                                            {Math.round(ai.facultyScore ?? ai.aiScore ?? 0)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="inline-block rounded-full bg-[#f1ebfd] px-2.5 py-1 text-[9px] font-black text-[#6d28d9]">
+                                            {ai.levelQuality}
+                                        </span>
+                                        <div className="mt-1 text-[14px] font-bold text-[#16313d]">{ai.levelName}</div>
+                                        {ai.scoreWasAdjusted && (
+                                            <div className="mt-1 text-[10px] text-[#8b600a]">
+                                                AI {Math.round(ai.aiScore ?? 0)} → Faculty {Math.round(ai.facultyScore ?? 0)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Score Adjustment Note (if any) */}
+                                {ai.scoreWasAdjusted && ai.scoreAdjustmentReason && (
+                                    <div className="mt-3 rounded-lg border border-[#f3d9a0] bg-[#fffbf0] p-2.5">
+                                        <span className="text-[9px] font-black text-[#8b600a]">FACULTY ADJUSTMENT REASON</span>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-[#6b5b3f]">
+                                            {ai.scoreAdjustmentReason}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Section Scores */}
+                                {ai.sections.length > 0 && (
+                                    <div className="mt-4 border-t border-[#e0daf0] pt-3">
+                                        <span className="text-[9px] font-black text-[#8b82a6]">SECTION SCORES</span>
+                                        <div className="mt-2 space-y-1.5">
+                                            {ai.sections.map((s) => (
+                                                <div key={s.id} className="flex items-center justify-between gap-2 text-[10px]">
+                                                    <span className="text-[#5d5775]">S{s.id}. {s.title.slice(0, 30)}{s.title.length > 30 ? "…" : ""}</span>
+                                                    <span className="font-bold text-[#6d28d9]">{s.score.toFixed(1)}/{s.weight}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bonus & Penalty */}
+                                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#e0daf0] pt-3">
+                                    <div className="rounded-lg bg-[#e9f8f0] p-2 text-center">
+                                        <span className="text-[8px] font-black text-[#16865a]">BONUS</span>
+                                        <div className="text-[12px] font-bold text-[#16865a]">+{ai.bonus.total.toFixed(1)}</div>
+                                    </div>
+                                    <div className="rounded-lg bg-[#fff3dc] p-2 text-center">
+                                        <span className="text-[8px] font-black text-[#8b600a]">PENALTY</span>
+                                        <div className="text-[12px] font-bold text-[#8b600a]">-{ai.integrityPenalty}</div>
+                                    </div>
+                                </div>
+
+                                {/* Feedback */}
+                                {ai.feedback && (
+                                    <div className="mt-3 border-t border-[#e0daf0] pt-3">
+                                        <span className="text-[9px] font-black text-[#8b82a6]">FEEDBACK</span>
+                                        {ai.feedback.praise && (
+                                            <p className="mt-1.5 text-[10px] leading-relaxed text-[#5d5775]">
+                                                {ai.feedback.praise}
+                                            </p>
+                                        )}
+                                        {ai.feedback.summary && (
+                                            <p className="mt-1.5 text-[10px] leading-relaxed text-[#5d5775]">
+                                                {ai.feedback.summary}
+                                            </p>
+                                        )}
+                                        {ai.feedback.actions && ai.feedback.actions.length > 0 && (
+                                            <div className="mt-2">
+                                                <span className="text-[8px] font-black text-[#8b82a6]">IMPROVEMENT ACTIONS</span>
+                                                <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-[#5d5775]">
+                                                    {ai.feedback.actions.slice(0, 3).map((action, i) => (
+                                                        <li key={i}>{action}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Faculty Note */}
+                                {ai.facultyNote && (
+                                    <div className="mt-3 rounded-lg border border-[#bfe3d1] bg-[#f0faf5] p-2.5">
+                                        <span className="text-[9px] font-black text-[#16865a]">FACULTY NOTE</span>
+                                        <p className="mt-1 text-[10px] leading-relaxed text-[#2d6654]">
+                                            {ai.facultyNote}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Lock Info */}
+                                {ai.lockedAt && (
+                                    <div className="mt-3 border-t border-[#e0daf0] pt-2 text-center text-[9px] text-[#8b82a6]">
+                                        🔒 Record locked {new Date(ai.lockedAt).toLocaleDateString()}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Phase 4: Independent AI Analyses Section */}
+                {flash.independentAnalyses && flash.independentAnalyses.length > 0 && (
+                    <div className="border-t border-[#dde5ea] bg-[#fefcf8] px-5 py-4 sm:px-[26px]">
+                        <h4 className="mb-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#8b7355]">
+                            Additional AI Analyses (Do Not Override Faculty-Approved Score)
+                        </h4>
+                        <div className="space-y-2">
+                            {flash.independentAnalyses.map((ia) => (
+                                <div
+                                    key={ia.id}
+                                    className="flex items-center justify-between rounded-lg border border-[#e8dcc8] bg-white p-3"
+                                >
+                                    <div>
+                                        <span className="text-[11px] font-semibold text-[#5a4832]">
+                                            Score: {Math.round(ia.score)}
+                                            {ia.levelName && <span className="ml-2 text-[10px] text-[#8b7355]">({ia.levelName})</span>}
+                                        </span>
+                                        <div className="mt-0.5 text-[9px] text-[#8b7355]">
+                                            Run by {ia.runByName || ia.runByRole} on{" "}
+                                            {new Date(ia.runAt).toLocaleDateString()}
+                                        </div>
+                                        {ia.note && (
+                                            <div className="mt-1 text-[9px] italic text-[#6b5b3f]">{ia.note}</div>
+                                        )}
+                                    </div>
+                                    <div className="rounded-full bg-[#f5eee0] px-2 py-1 text-[8px] font-black text-[#8b7355]">
+                                        INDEPENDENT
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-[9px] text-[#8b7355]">
+                            These analyses are for reference only. The faculty-approved score remains the official record.
+                        </p>
+                    </div>
+                )}
+
+                {/* Footer */}
+                <div className="border-t border-[#dde5ea] bg-[#f8fafb] px-[26px] py-4 text-center text-[10px] text-[#70808a]">
+                    This verified record is the official approved version distributed across CIEL PK.
+                    <br />
+                    Student → Faculty → University → CIEL PK
                 </div>
             </div>
         </div>
@@ -232,6 +494,46 @@ export default function CommunityImpactWall(_props: {
         const sdgs = sdgNumbers(r.sdgs);
         const uni = r.university || r.organization_name || "Community Service";
         const reportHref = r.project_id || r.opportunity_id ? `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id))}` : null;
+
+        // Phase 3: Build AI Analysis data from ciiV2 + ciiV2Lock
+        const cii = r.ciiV2;
+        const lock = r.ciiV2Lock;
+        const aiAnalysis = cii
+            ? {
+                  aiScore: lock?.aiRecommendedScore ?? cii.aiRecommendedScore ?? cii.final ?? null,
+                  facultyScore: lock?.facultyApprovedScore ?? cii.facultyApprovedScore ?? cii.final ?? null,
+                  scoreWasAdjusted: lock?.scoreWasAdjusted ?? false,
+                  scoreAdjustmentReason: lock?.scoreAdjustmentReason,
+                  levelName: cii.level?.name || r.level || "Approved",
+                  levelQuality: cii.level?.quality || "VERIFIED",
+                  sections: cii.sections || [],
+                  bonus: cii.bonus || { effort: 0, resources: 0, partners: 0, total: 0 },
+                  integrityPenalty: cii.integrityPenalty || 0,
+                  feedback: cii.studentFeedback
+                      ? {
+                            praise: cii.studentFeedback.opening_praise,
+                            summary: cii.studentFeedback.why_score_is_high_or_low,
+                            encouragement: cii.studentFeedback.encouragement,
+                            actions: cii.studentFeedback.five_specific_actions,
+                        }
+                      : undefined,
+                  redFlags: cii.redFlags,
+                  lockedAt: lock?.lockedAt,
+                  facultyNote: lock?.facultyNote,
+              }
+            : null;
+
+        // Phase 4: Build independent analyses list
+        const independentAnalyses = (r.independentAiAnalyses || []).map((a) => ({
+            id: a.id,
+            runAt: a.runAt,
+            runByName: a.runByName,
+            runByRole: a.runByRole,
+            score: a.score,
+            levelName: a.level?.name,
+            note: a.note,
+        }));
+
         setFlash({
             title: r.project_title || "Community service",
             subtitle: `${studentName()} • ${uni}${year ? ` • ${year}` : ""}`,
@@ -250,6 +552,9 @@ export default function CommunityImpactWall(_props: {
             evidence: r.actions?.evidence_url || reportHref,
             certificate: r.actions?.certificate_url,
             qr: r.impact_verify_url,
+            aiAnalysis,
+            independentAnalyses,
+            reportId: r.id,
         });
     };
 

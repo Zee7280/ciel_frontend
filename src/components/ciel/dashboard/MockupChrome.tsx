@@ -37,7 +37,7 @@ export function MockupHero({
     useRegisterDashboardPageChrome();
     return (
         <section
-            className="relative mt-[-8px] flex flex-col items-start justify-between gap-7 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_12px_30px_rgba(13,61,70,.10)] sm:flex-row sm:items-center"
+            className="relative mt-2 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[22px] px-5 py-6 text-white shadow-[0_12px_30px_rgba(13,61,70,.10)] sm:flex-row sm:items-center sm:px-[34px] sm:py-[27px]"
             style={{
                 minHeight: 175,
                 background: `radial-gradient(circle at 92% 15%, rgba(255,255,255,.10) 0 17px, transparent 18px), radial-gradient(circle at 84% 8%, rgba(255,255,255,.06) 0 10px, transparent 11px), ${gradient}`,

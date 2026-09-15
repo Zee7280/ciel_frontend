@@ -76,7 +76,7 @@ export default function ImpactMap() {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+                    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
                         {/* MAP CARD */}
                         <div className="overflow-hidden rounded-[22px] border border-slate-100 bg-white shadow-[0_18px_50px_rgba(14,42,51,0.08)]">
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-3">
