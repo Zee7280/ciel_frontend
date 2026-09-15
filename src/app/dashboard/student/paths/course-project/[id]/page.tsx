@@ -674,7 +674,9 @@ export default function CourseProjectWizardPage() {
             failures.push(`${rejected.length} file(s) exceed ${MAX_REPORT_UPLOAD_LABEL} and were skipped.`);
         }
         if (!accepted.length) {
-            setError(failures.join(" "));
+            const message = failures.join(" ");
+            setError(message);
+            toast.error(message);
             return;
         }
         setUploading(true);
@@ -692,8 +694,21 @@ export default function CourseProjectWizardPage() {
                 }
             }
             const saved = await save({ evidenceUrls: evidenceUrlsRef.current });
-            if (failures.length) setError(failures.join(" "));
-            else if (!saved) setError((prev) => prev || "Files reached S3 but the record could not be saved. Try again.");
+            if (failures.length) {
+                const message = failures.join(" ");
+                setError(message);
+                toast.error(message);
+            } else if (!saved) {
+                const message = "Files reached S3 but the record could not be saved. Try again.";
+                setError(message);
+                toast.error(message);
+            } else {
+                toast.success(
+                    accepted.length === 1
+                        ? "Supporting file attached"
+                        : `${accepted.length} supporting files attached`,
+                );
+            }
         } finally {
             setUploading(false);
             setUploadProgress(null);
@@ -710,7 +725,9 @@ export default function CourseProjectWizardPage() {
     const handleAssignmentFile = async (file: File) => {
         const { accepted, rejected } = splitReportFilesByImageSize([file]);
         if (rejected.length || !accepted[0]) {
-            setError(`File exceeds ${MAX_REPORT_UPLOAD_LABEL}. Use a smaller file or compress it.`);
+            const message = `File exceeds ${MAX_REPORT_UPLOAD_LABEL}. Use a smaller file or compress it.`;
+            setError(message);
+            toast.error(message);
             return;
         }
         setUploading(true);
@@ -721,7 +738,9 @@ export default function CourseProjectWizardPage() {
             setEntry((e) => ({ ...e, assignmentFileUrl: publicUrl }));
             await save({ assignmentFileUrl: publicUrl });
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Assignment upload failed. Try again.");
+            const message = err instanceof Error ? err.message : "Assignment upload failed. Try again.";
+            setError(message);
+            toast.error(message);
         } finally {
             setUploading(false);
             setUploadProgress(null);
@@ -1459,7 +1478,7 @@ export default function CourseProjectWizardPage() {
                                 ))}
                             </div>
 
-                            <Field label="📎 Upload your files" hint={`Optional — select multiple supporting files. PDF · DOCX · PPTX · images · video · sheets, up to ${MAX_REPORT_UPLOAD_LABEL} each. Files stay with this record for faculty review.`}>
+                            <Field label="📎 Upload your files" hint={`Optional — assignment can be PDF/DOCX/PPTX/images; supporting files can be any document, photo, video, sheet, zip or design file, up to ${MAX_REPORT_UPLOAD_LABEL} each. Files stay with this record for faculty review.`}>
                                 <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "pointer-events-none opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
                                     {entry.assignmentFileUrl ? "✅ Assignment uploaded — tap to replace" : "📄 Upload your assignment — the essay, deck, design file. Lifts your Verifiability score (+3)."}
@@ -1492,11 +1511,10 @@ export default function CourseProjectWizardPage() {
                                         ? uploadProgress || "Uploading..."
                                         : entry.evidenceUrls?.length
                                           ? `✅ ${entry.evidenceUrls.length} supporting file${entry.evidenceUrls.length === 1 ? "" : "s"} — tap to add more`
-                                          : "🖼️ Upload supporting files — photos, data, video, survey sheets (+2). You can select several at once."}
+                                          : "🖼️ Upload supporting files — photos, data, video, sheets, zip, design files (+2). You can select several at once."}
                                     <input
                                         type="file"
                                         multiple
-                                        accept={REPORT_ATTACHMENT_ACCEPT}
                                         className="hidden"
                                         onChange={(e) => {
                                             const files = e.target.files;
