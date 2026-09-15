@@ -193,9 +193,9 @@ function FacultyCourseworkHub() {
     return (
         <div className={view === "review" ? "mx-auto max-w-[1380px]" : "mx-auto max-w-[1240px]"}>
             <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : VIEW_CRUMB[view]} pathLabel="Coursework Project" />
-            <CourseworkHero kicker="FACULTY IMPACT DASHBOARD" title={hero.title} subtitle={hero.subtitle} stats={hero.stats} />
-
-            {view !== "home" && (
+            {view === "home" ? (
+                <CourseworkHero kicker="FACULTY IMPACT DASHBOARD" title={hero.title} subtitle={hero.subtitle} stats={hero.stats} />
+            ) : (
                 <div className="mt-4">
                     <HubBackButton href={homeHref} label="← Back to Coursework Project" />
                 </div>

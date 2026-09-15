@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
-import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     isCommunityReportOnLiveDeck,
@@ -237,15 +238,12 @@ function nodeClass(state: NodeState): string {
 
 export default function CommunityServiceWorkspace({
     projects,
-    verifiedHours,
-    wallCount,
-    completion,
     initialFilter = "all",
 }: {
     projects: ActiveProject[];
-    verifiedHours: number;
-    wallCount: number;
-    completion: number;
+    verifiedHours?: number;
+    wallCount?: number;
+    completion?: number;
     initialFilter?: WsFilter;
 }) {
     const router = useRouter();
@@ -624,17 +622,7 @@ export default function CommunityServiceWorkspace({
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <MockupHero
-                title="Community Service"
-                subtitle="Create opportunities, save drafts, follow Faculty → Partner → CIEL PK approvals, complete your 9-section report and build a verified Community Service impact record."
-                stats={[
-                    { value: String(projects.length), label: "Active Records" },
-                    { value: verifiedHours ? `${Math.round(verifiedHours)}h` : "0h", label: "Verified Service" },
-                    { value: String(wallCount), label: "Impact Portfolio" },
-                ]}
-                rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
-            />
-
+            <CommunityCrumb role="Student" view="Workspace" />
             <MockupSectionHead
                 title="Community Service Workspace"
                 subtitle="Track sequential opportunity approvals, report completion, faculty decisions, revisions and final outcomes."

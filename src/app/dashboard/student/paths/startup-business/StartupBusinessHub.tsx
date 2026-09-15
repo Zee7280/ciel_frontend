@@ -901,18 +901,20 @@ export default function StartupBusinessHub({
                 pathLabel="Startup / Venture"
                 view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
             />
-            <CourseworkHero
-                kicker="MY PATHS · STARTUP / VENTURE"
-                title={namedTimeGreeting(name === "there" ? "" : name.toUpperCase(), "🚀")}
-                subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
-                gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
-                roleBadge="STUDENT"
-                stats={[
-                    { value: String(approved.length), label: "APPROVED", href: WALL_HREF },
-                    { value: String(underReview.length), label: "UNDER REVIEW", href: UNDER_REVIEW_HREF },
-                    { value: String(inProgress.length), label: "IN PROGRESS", href: IN_PROGRESS_HREF },
-                ]}
-            />
+            {view === "home" ? (
+                <CourseworkHero
+                    kicker="MY PATHS · STARTUP / VENTURE"
+                    title={namedTimeGreeting(name === "there" ? "" : name, "🚀")}
+                    subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
+                    gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
+                    roleBadge="STUDENT"
+                    stats={[
+                        { value: String(approved.length), label: "APPROVED", href: WALL_HREF },
+                        { value: String(underReview.length), label: "UNDER REVIEW", href: UNDER_REVIEW_HREF },
+                        { value: String(inProgress.length), label: "IN PROGRESS", href: IN_PROGRESS_HREF },
+                    ]}
+                />
+            ) : null}
 
             {view === "guide" && (
                 <div className="mt-[22px] rounded-[22px] p-7 text-white shadow-[0_8px_30px_rgba(10,30,40,.08)]" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}>

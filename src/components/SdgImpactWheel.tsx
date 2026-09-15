@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { sdgData } from "@/utils/sdgData";
 import { usePlatformStats } from "@/utils/usePlatformStats";
+import { HomeHeader, homeSectionMint, homeWrap } from "@/components/home/HomeChrome";
 
 const CX = 180;
 const CY = 180;
@@ -62,22 +63,17 @@ export default function SdgImpactWheel() {
     const citiesTouched = [...new Set((selectedStat?.items ?? []).map((i) => i.city).filter(Boolean))] as string[];
 
     return (
-        <section className="bg-slate-50/60 px-6 py-20">
-            <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center">
+        <section className={homeSectionMint}>
+            <div className={`${homeWrap} grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center`}>
                 {/* LEFT: intro + wheel */}
                 <div className="min-w-0">
-                    <p className="mb-3 inline-flex items-center gap-2.5 text-xs font-black uppercase tracking-widest text-emerald-600">
-                        <span aria-hidden className="h-0.5 w-[18px] rounded-full bg-emerald-500" />
-                        Sustainable Development Goals
-                    </p>
-                    <h2 className="text-3xl font-black leading-tight tracking-tight text-slate-900 md:text-4xl">
-                        Spin the goals. See who&apos;s working on what.
-                    </h2>
-                    <p className="mt-3 max-w-md text-base font-medium text-slate-500">
-                        Click a segment to see verified Community Service reports tagged to that goal. Untouched goals stay dim — they are in the UN list, not in our ledger yet.
-                    </p>
+                    <HomeHeader
+                        kicker="Sustainable Development Goals"
+                        title="Spin the goals. See who's working on what."
+                        lead="Click a segment to see verified Community Service reports tagged to that goal. Untouched goals stay dim — they are in the UN list, not in our ledger yet."
+                    />
 
-                    <div className="relative mx-auto mt-8 h-[360px] w-[360px] max-w-full lg:mx-0">
+                    <div className="relative mx-auto mt-2 h-[360px] w-[360px] max-w-full lg:mx-0">
                         <svg viewBox="0 0 360 360" className="h-full w-full">
                             {sdgData.map((goal, i) => {
                                 const isSelected = goal.number === selected;

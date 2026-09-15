@@ -5,7 +5,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
-import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -192,12 +193,7 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
     );
 }
 
-export default function CommunityImpactWall({
-    projects = [],
-    verifiedHours = 0,
-    wallCount = 0,
-    completion = 0,
-}: {
+export default function CommunityImpactWall(_props: {
     projects?: ActiveProject[];
     verifiedHours?: number;
     wallCount?: number;
@@ -259,17 +255,7 @@ export default function CommunityImpactWall({
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <MockupHero
-                title="Community Service"
-                subtitle="Create opportunities, save drafts, follow Faculty → Partner → CIEL PK approvals, complete your 9-section report and build a verified Community Service impact record."
-                stats={[
-                    { value: String(projects.length), label: "Active Records" },
-                    { value: verifiedHours ? `${Math.round(verifiedHours)}h` : "0h", label: "Verified Service" },
-                    { value: String(wallCount || rows.length), label: "Impact Portfolio" },
-                ]}
-                rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
-            />
-
+            <CommunityCrumb role="Student" view="Impact" />
             <MockupSectionHead
                 title="My Community Service Impact"
                 subtitle="Approved Community Service reports shown as verified impact flashcards."

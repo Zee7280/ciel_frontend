@@ -5,10 +5,10 @@ import Link from "next/link";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
 
 const HUB = "/dashboard/student/paths/community-service";
-const HOME_HREF = "/dashboard/student";
 const CREATE_VIEW = `${HUB}?view=create`;
 const BROWSE_HREF = "/dashboard/student/browse";
 const WORKSPACE_HREF = `${HUB}?view=workspace`;
@@ -96,6 +96,7 @@ export default function CommunityServiceHub({
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
+            <CommunityCrumb role="Student" />
             <MockupHero
                 kicker={name ? `Community Service · ${name}` : "Community Service"}
                 title="Your Community Service Hub 🏕️"
@@ -112,21 +113,6 @@ export default function CommunityServiceHub({
                         : { value: "🌱", label: "community service journey" }
                 }
             />
-
-            <MockupSectionHead
-                title="Community Service"
-                subtitle="One contained area. Proposal approval stays in Create Opportunity; applications stay in Browse; only approved work moves into Workspace."
-                action={
-                    <Link href={HOME_HREF} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                        ← Back to Home
-                    </Link>
-                }
-            />
-
-            <div className="mb-3.5 rounded-[13px] border border-[#d7e5e8] bg-[#f8fbfc] px-3 py-2.5 text-[10.5px] leading-relaxed text-[#50676f]">
-                <b className="text-[#153f47]">Where am I?</b> You entered Community Service from the left navigation. Everything
-                below belongs to this impact area; Home remains a clean overview.
-            </div>
 
             {attention?.length ? <AttentionRow items={attention} /> : null}
 
@@ -260,12 +246,7 @@ export default function CommunityServiceHub({
     );
 }
 
-export function CommunityCreateOpportunityView({
-    projects,
-    verifiedHours,
-    wallCount,
-    completion,
-}: {
+export function CommunityCreateOpportunityView(_props: {
     projects: ActiveProject[];
     verifiedHours: number;
     wallCount: number;
@@ -273,16 +254,7 @@ export function CommunityCreateOpportunityView({
 }) {
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <MockupHero
-                title="Community Service"
-                subtitle="Create opportunities, save drafts, follow Faculty → Partner → CIEL PK approvals, complete your 9-section report and build a verified Community Service impact record."
-                stats={[
-                    { value: String(projects.length), label: "Active Records" },
-                    { value: verifiedHours ? `${Math.round(verifiedHours)}h` : "0h", label: "Verified Service" },
-                    { value: String(wallCount), label: "Impact Portfolio" },
-                ]}
-                rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
-            />
+            <CommunityCrumb role="Student" view="Create" />
             <MockupSectionHead
                 title="Create Opportunity"
                 subtitle="Start a new opportunity or continue a saved draft. Drafts remain here until submission."

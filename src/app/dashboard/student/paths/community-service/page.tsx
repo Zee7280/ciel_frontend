@@ -17,7 +17,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import CommunityServiceHub, { CommunityCreateOpportunityView } from "./CommunityServiceHub";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import CommunityServiceRankings from "./CommunityServiceRankings";
-import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -268,6 +268,7 @@ function CommunityServiceContent() {
     if (showHub && guideView) {
         return (
             <div className="mx-auto max-w-[980px] pb-16">
+                <CommunityCrumb role="Student" view="Guide" />
                 <HubBackButton href="/dashboard/student/paths/community-service" label="← Back to Community Service" />
                 <StudentCommunityGuide showHero />
             </div>
@@ -300,6 +301,7 @@ function CommunityServiceContent() {
     if (showHub && rankingsView) {
         return (
             <div className="mx-auto max-w-[1500px] pb-16">
+                <CommunityCrumb role="Student" view="Rankings" />
                 <HubBackButton href={HUB} label="← Back to Community Service" />
                 <CommunityServiceRankings />
             </div>

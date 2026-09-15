@@ -1,13 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import { fetchImpactSummary, type CielImpactSummary } from "@/utils/cielImpactSummary";
 import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import { DashboardSkeleton } from "@/components/ciel/Skeleton";
-import { MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import StudentImpactPortfolioTable from "./StudentImpactPortfolioTable";
 
 export default function ImpactHistoryPage() {
@@ -46,16 +45,6 @@ export default function ImpactHistoryPage() {
                     { value: String(portfolioCount), label: "Impact Portfolio" },
                 ]}
                 rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
-            />
-
-            <MockupSectionHead
-                title="My Impact Portfolio"
-                subtitle="Your combined verified portfolio across all four impact areas."
-                action={
-                    <Link href="/dashboard/student" className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
-                        ← Back to module buttons
-                    </Link>
-                }
             />
 
             <Suspense fallback={<div className="py-10 text-center text-sm text-[#7a919a]">Loading your portfolio…</div>}>

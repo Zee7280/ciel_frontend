@@ -242,7 +242,8 @@ export default function UniversityShowcasePage() {
         <div>
             <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="University" view={crumbView} pathLabel={mode === "fyp-thesis" ? "FYP / Thesis" : "Coursework"} />
-                {mode === "course-project" ? (
+                {view === "home" ? (
+                    mode === "course-project" ? (
                     <CourseworkHero
                         kicker="UNIVERSITY IMPACT DASHBOARD"
                         title="Coursework"
@@ -264,7 +265,8 @@ export default function UniversityShowcasePage() {
                             { value: String(fypSchools || "—"), label: "Schools" },
                         ]}
                     />
-                )}
+                )
+                ) : null}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex gap-2">

@@ -105,19 +105,39 @@ function CourseProjectHub() {
         <div className="mx-auto max-w-[1040px] pb-16">
             <CourseworkCrumb
                 role="Student"
-                view={view === "home" ? undefined : view === "create" ? "Create" : view === "wall" ? "Impact" : view}
+                view={
+                    view === "home"
+                        ? undefined
+                        : view === "create"
+                          ? "Create"
+                          : view === "wall"
+                            ? "Impact"
+                            : view === "in-progress"
+                              ? "In progress"
+                              : view === "under-review"
+                                ? "Under review"
+                                : view === "guide"
+                                  ? "Guide"
+                                  : view
+                }
             />
-            <CourseworkHero
-                kicker="MY PATHS · COURSEWORK"
-                title={namedTimeGreeting(name, "📘")}
-                subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
-                gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
-                stats={[
-                    { value: String(approved.length), label: "APPROVED" },
-                    { value: String(underReview.length), label: "UNDER REVIEW" },
-                    { value: String(inProgress), label: "IN PROGRESS" },
-                ]}
-            />
+            {view === "home" ? (
+                <CourseworkHero
+                    kicker="MY PATHS · COURSEWORK"
+                    title={namedTimeGreeting(name, "📘")}
+                    subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
+                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
+                    stats={[
+                        { value: String(approved.length), label: "APPROVED" },
+                        { value: String(underReview.length), label: "UNDER REVIEW" },
+                        { value: String(inProgress), label: "IN PROGRESS" },
+                    ]}
+                />
+            ) : view !== "create" && view !== "wall" ? (
+                <div className="mt-4">
+                    <HubBackButton href={hubHref} />
+                </div>
+            ) : null}
 
             {view === "create" && (
                 <div className="mt-[23px]">
@@ -160,7 +180,6 @@ function CourseProjectHub() {
 
             {view === "guide" && (
                 <div className="mt-4">
-                    <HubBackButton href={hubHref} />
                     <CourseworkSectionGuide />
                 </div>
             )}
@@ -224,7 +243,6 @@ function CourseProjectHub() {
 
             {view === "in-progress" && (
                 <div className="mt-4">
-                    <HubBackButton href={hubHref} />
                     {drafts.length === 0 ? (
                         <EmptyState
                             emoji="🧩"
@@ -270,7 +288,6 @@ function CourseProjectHub() {
                 const visible = reviewTab === "all" ? underReview : byTab[reviewTab];
                 return (
                     <div className="mt-4">
-                        <HubBackButton href={hubHref} />
                         {underReview.length === 0 ? (
                             <EmptyState
                                 emoji="📤"

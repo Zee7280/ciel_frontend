@@ -68,8 +68,8 @@ export default function Navbar() {
                                 key={item.name}
                                 href={item.href}
                                 className={clsx(
-                                    "transition-all hover:text-blue-500",
-                                    isActive ? "text-blue-500 font-bold" : "text-slate-600 font-medium",
+                                    "transition-all hover:text-ciel-teal",
+                                    isActive ? "font-bold text-ciel-teal" : "font-medium text-slate-600",
                                 )}
                             >
                                 {item.name}
@@ -83,7 +83,7 @@ export default function Navbar() {
                     {isLoggedIn ? (
                         <Link
                             href="/dashboard"
-                            className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-xs sm:text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
+                            className="inline-flex items-center gap-2 rounded-full bg-ciel-teal px-4 py-2 text-xs font-black text-white transition hover:-translate-y-px hover:bg-[#0a635c] sm:px-6 sm:py-2.5 sm:text-sm"
                         >
                             Dashboard
                         </Link>
@@ -103,7 +103,7 @@ export default function Navbar() {
                             </Link>
                             <Link
                                 href="/signup"
-                                className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-xs sm:text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
+                                className="inline-flex items-center gap-2 rounded-full bg-ciel-teal px-4 py-2 text-xs font-black text-white transition hover:-translate-y-px hover:bg-[#0a635c] sm:px-6 sm:py-2.5 sm:text-sm"
                             >
                                 Register
                             </Link>
@@ -150,7 +150,7 @@ export default function Navbar() {
                                         onClick={() => setMobileNavOpen(false)}
                                         className={clsx(
                                             "rounded-xl px-4 py-3.5 text-base font-bold transition-colors",
-                                            isActive ? "bg-blue-50 text-blue-600" : "text-slate-800 hover:bg-slate-50",
+                                            isActive ? "bg-ciel-teal-soft text-ciel-teal" : "text-slate-800 hover:bg-slate-50",
                                         )}
                                     >
                                         {item.name}
@@ -162,7 +162,7 @@ export default function Navbar() {
                                     <Link
                                         href="/dashboard"
                                         onClick={() => setMobileNavOpen(false)}
-                                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-3.5 text-sm font-black text-white shadow-md"
+                                        className="inline-flex items-center justify-center gap-2 rounded-full bg-ciel-teal px-4 py-3.5 text-sm font-black text-white"
                                     >
                                         Go to dashboard
                                     </Link>
@@ -178,7 +178,7 @@ export default function Navbar() {
                                         <Link
                                             href="/signup"
                                             onClick={() => setMobileNavOpen(false)}
-                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-3.5 text-sm font-black text-white shadow-md"
+                                            className="inline-flex items-center justify-center gap-2 rounded-full bg-ciel-teal px-4 py-3.5 text-sm font-black text-white"
                                         >
                                             Register
                                         </Link>

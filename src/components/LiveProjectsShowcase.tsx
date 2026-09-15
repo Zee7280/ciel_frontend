@@ -1,141 +1,217 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Check } from "lucide-react";
-import clsx from "clsx";
-import { usePlatformStats } from "@/utils/usePlatformStats";
+import { findSdgById } from "@/utils/sdgData";
+import {
+    computeSeatsRemaining,
+    modeMenuLabel,
+    normalizeModeBucket,
+} from "@/utils/opportunityListing";
+import { HomeHeader, homeBtnGhost, homeBtnPrimary, homeCard, homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
 
-interface ProjectPill {
-    label: string;
-    className: string;
-    icon?: "sparkles" | "check";
-}
-
-interface ShowcaseProject {
+type OppCard = {
     id: string;
-    emoji: string;
-    banner: string;
     title: string;
-    description: string;
-    pills: ProjectPill[];
+    partner: string;
+    city: string;
+    hours: number | null;
+    mode: string;
+    seats: number | null;
+    sdgs: number[];
+    emoji: string;
+};
+
+function pickSdgNumbers(raw: Record<string, unknown>): number[] {
+    const out: number[] = [];
+    const push = (id: unknown) => {
+        const sdg = findSdgById(id as string | number);
+        if (sdg && !out.includes(sdg.number)) out.push(sdg.number);
+    };
+    const info = raw.sdg_info;
+    if (info && typeof info === "object") {
+        const o = info as Record<string, unknown>;
+        push(o.sdg_id ?? o.id);
+    }
+    push(raw.sdg);
+    const secondary = raw.secondary_sdgs;
+    if (Array.isArray(secondary)) {
+        for (const item of secondary) {
+            if (item && typeof item === "object") {
+                const o = item as Record<string, unknown>;
+                push(o.sdg_id ?? o.id ?? o.number);
+            } else {
+                push(item);
+            }
+        }
+    }
+    return out.slice(0, 4);
 }
 
-const PROJECTS: ShowcaseProject[] = [
-    {
-        id: "faslo-fikar",
-        emoji: "🌾",
-        banner: "from-emerald-500 to-emerald-700",
-        title: "Faslo Fikar",
-        description: "Pesticide-safety education for farmers — Urdu guides, PPE training, QR video tools. Lahore · hybrid.",
-        pills: [
-            { label: "SDG 3", className: "bg-emerald-600 text-white" },
-            { label: "Student-created", className: "bg-amber-50 text-amber-700", icon: "sparkles" },
-        ],
-    },
-    {
-        id: "sos-classroom-transformation",
-        emoji: "🏫",
-        banner: "from-indigo-500 to-blue-600",
-        title: "SOS Classroom Transformation",
-        description: "Renovate classrooms & train caregivers with SOS Children's Villages. Lahore · on-ground.",
-        pills: [
-            { label: "SDG 4", className: "bg-rose-600 text-white" },
-            { label: "Verified partner", className: "bg-emerald-50 text-emerald-700", icon: "check" },
-        ],
-    },
-    {
-        id: "clean-water-awareness-week",
-        emoji: "💧",
-        banner: "from-teal-600 to-sky-500",
-        title: "Clean Water Awareness Week",
-        description: "Hygiene & safe-water education across community schools with WaterAid. Kasur.",
-        pills: [
-            { label: "SDG 6", className: "bg-sky-100 text-sky-700" },
-            { label: "SDG 3", className: "bg-emerald-600 text-white" },
-        ],
-    },
-];
+function pickCity(raw: Record<string, unknown>): string {
+    const loc = raw.location;
+    if (loc && typeof loc === "object") {
+        const city = (loc as Record<string, unknown>).city;
+        if (typeof city === "string" && city.trim()) return city.trim();
+    }
+    if (typeof loc === "string" && loc.trim()) return loc.trim();
+    return "Pakistan";
+}
+
+function pickHours(raw: Record<string, unknown>): number | null {
+    const timeline = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : null;
+    const n = Number(
+        raw.hours ??
+            raw.required_hours ??
+            raw.minimum_hours ??
+            timeline?.hours_required ??
+            timeline?.minimum_hours,
+    );
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function emojiFor(sdgs: number[]): string {
+    if (sdgs.includes(2) || sdgs.includes(3)) return "🌾";
+    if (sdgs.includes(4)) return "🏫";
+    if (sdgs.includes(6)) return "💧";
+    if (sdgs.includes(15)) return "🐾";
+    if (sdgs.includes(5)) return "🧕";
+    if (sdgs.includes(7)) return "☀️";
+    return "🏕️";
+}
+
+function mapOpportunity(raw: Record<string, unknown>): OppCard | null {
+    const id = raw.id != null ? String(raw.id) : "";
+    const title = typeof raw.title === "string" ? raw.title.trim() : "";
+    if (!id || !title) return null;
+    const sdgs = pickSdgNumbers(raw);
+    const mode = modeMenuLabel(normalizeModeBucket(raw.mode));
+    return {
+        id,
+        title,
+        partner:
+            (typeof raw.partner_name === "string" && raw.partner_name.trim()) ||
+            (typeof raw.organization_name === "string" && raw.organization_name.trim()) ||
+            "Verified partner",
+        city: pickCity(raw),
+        hours: pickHours(raw),
+        mode: mode === "Unspecified" ? "" : mode.toLowerCase(),
+        seats: computeSeatsRemaining(raw),
+        sdgs,
+        emoji: emojiFor(sdgs),
+    };
+}
 
 export default function LiveProjectsShowcase() {
-    /** Real backend-computed count of live public opportunities — same ledger the hero/stats strip read. */
-    const { stats } = usePlatformStats();
-    const liveProjectCount = stats?.active_projects;
+    const [cards, setCards] = useState<OppCard[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch("/api/v1/public/opportunities", { headers: { Accept: "application/json" }, cache: "no-store" })
+            .then((res) => res.json())
+            .then((payload) => {
+                if (cancelled) return;
+                const list = Array.isArray(payload?.data) ? payload.data : [];
+                setCards(
+                    list
+                        .map((row: unknown) =>
+                            row && typeof row === "object" ? mapOpportunity(row as Record<string, unknown>) : null,
+                        )
+                        .filter((c: OppCard | null): c is OppCard => Boolean(c))
+                        .slice(0, 6),
+                );
+            })
+            .catch(() => {
+                if (!cancelled) setCards([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     return (
-        <section className="py-20 px-6 bg-white">
-            <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-12">
-                    <p className="flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-600 mb-3">
-                        <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />
-                        Live right now
-                    </p>
-                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-                        Projects you can join today
-                    </h2>
-                    <p className="text-base text-slate-500 font-medium max-w-2xl mx-auto mt-3">
-                        Real partners, faculty-supervised — apply in one tap and your verified record starts immediately.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {PROJECTS.map((project) => (
-                        <Link
-                            key={project.id}
-                            href="/projects"
-                            className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-                        >
-                            <div className={clsx("flex h-40 items-center justify-center bg-gradient-to-br", project.banner)}>
-                                <span className="text-5xl" aria-hidden>{project.emoji}</span>
-                            </div>
-                            <div className="p-6">
-                                <p className="flex items-center gap-2 text-base font-black text-slate-900">
-                                    {project.title}
-                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-emerald-600">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-                                        Live
-                                    </span>
-                                </p>
-                                <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                                    {project.description}
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {project.pills.map((pill) => (
-                                        <span
-                                            key={pill.label}
-                                            className={clsx(
-                                                "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wide",
-                                                pill.className,
-                                            )}
-                                        >
-                                            {pill.icon === "sparkles" && <Sparkles className="h-3 w-3" />}
-                                            {pill.icon === "check" && <Check className="h-3 w-3" />}
-                                            {pill.label}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
+        <section id="opps" className={homeSectionWhite}>
+            <div className={homeWrap}>
+                <HomeHeader
+                    kicker="Live opportunities"
+                    title="Real needs, posted by partners. Supervised student teams."
+                    action={
+                        <Link href="/projects" className={homeBtnGhost}>
+                            Browse all opportunities →
                         </Link>
-                    ))}
-                </div>
+                    }
+                />
 
-                <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                    <Link
-                        href="/projects"
-                        className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-slate-800"
-                    >
-                        {liveProjectCount
-                            ? `Browse all ${liveProjectCount} live projects`
-                            : "Browse all live projects"}{" "}
-                        <ArrowRight className="h-4 w-4" />
-                    </Link>
-                    <Link
-                        href="/signup"
-                        className="flex items-center gap-2 rounded-xl border-2 border-slate-200 px-6 py-3.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
-                    >
-                        <Sparkles className="h-4 w-4 text-amber-500" />
-                        Create your own opportunity
-                    </Link>
-                </div>
+                {loading ? (
+                    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: 3 }, (_, i) => (
+                            <div key={i} className={`h-48 animate-pulse ${homeCard}`} />
+                        ))}
+                    </div>
+                ) : cards.length === 0 ? (
+                    <p className="mt-8 text-sm text-[#6F8790]">
+                        No live public opportunities right now. Browse the full listing for updates.
+                    </p>
+                ) : (
+                    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {cards.map((opp) => (
+                            <article
+                                key={opp.id}
+                                className={`flex flex-col gap-2.5 p-[18px] ${homeCard}`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[22px]" aria-hidden>
+                                        {opp.emoji}
+                                    </span>
+                                    {opp.seats != null ? (
+                                        <span
+                                            className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
+                                                opp.seats <= 3
+                                                    ? "bg-[#FBF0D7] text-[#B7791F]"
+                                                    : "bg-[#DDF1EE] text-[#0A5F59]"
+                                            }`}
+                                        >
+                                            {opp.seats} seat{opp.seats === 1 ? "" : "s"} left
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <h3 className="text-lg font-black leading-snug text-ciel-navy">{opp.title}</h3>
+                                <p className="text-[13px] text-[#6F8790]">
+                                    {opp.partner} · {opp.city}
+                                    {opp.hours != null ? ` · ${opp.hours} hrs` : ""}
+                                    {opp.mode ? ` · ${opp.mode}` : ""}
+                                </p>
+                                {opp.sdgs.length > 0 ? (
+                                    <div className="flex gap-[5px]">
+                                        {opp.sdgs.map((n) => {
+                                            const sdg = findSdgById(n);
+                                            return (
+                                                <i
+                                                    key={n}
+                                                    title={sdg ? `SDG ${n} ${sdg.title}` : `SDG ${n}`}
+                                                    className="grid h-6 w-6 place-items-center rounded-md text-[11px] font-extrabold not-italic text-white"
+                                                    style={{ background: sdg?.color ?? "#0E7D74" }}
+                                                >
+                                                    {n}
+                                                </i>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
+                                <Link
+                                    href={`/projects/${encodeURIComponent(opp.id)}`}
+                                    className={`mt-auto ${homeBtnPrimary}`}
+                                >
+                                    Apply
+                                </Link>
+                            </article>
+                        ))}
+                    </div>
+                )}
             </div>
         </section>
     );

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupPanel, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
@@ -15,15 +16,10 @@ import { createStudentFyp, listStudentFyps } from "@/utils/fypStudentApi";
 import { isPathEntryApproved } from "@/utils/reviewQueue";
 import { fypStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
-import { fetchImpactSummary, readImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
-import { CIEL_PATHS } from "@/utils/cielPaths";
-import type { DashboardData } from "@/app/dashboard/student/types";
 import { FYP_V9_AREAS, FYP_V9_ROUTES, FYP_V9_STEP_NAMES, type FypV9RouteKey } from "@/utils/fypV9Catalog";
 import { SDG_COLORS } from "@/utils/ventureStudioV11";
 
 const BASE = "/dashboard/student/paths/fyp-thesis";
-const HOME_HREF = "/dashboard/student";
 const GUIDE_HREF = `${BASE}?view=guide`;
 const IN_PROGRESS_HREF = `${BASE}?view=in-progress`;
 const UNDER_REVIEW_HREF = `${BASE}?view=under-review`;
@@ -52,6 +48,12 @@ const FYP_GUIDE_STEPS = [
 
 type HubView = "home" | "guide" | "wall" | "in-progress" | "under-review" | "create" | "workspace";
 type ReviewTab = "all" | "pending" | "revision" | "rejected";
+
+function studentFirstName() {
+    const user = readStoredCurrentUser();
+    const name = typeof user?.name === "string" ? user.name.split(" ")[0] : "";
+    return name || "there";
+}
 
 function displayFypId(entry: FypEntry) {
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
@@ -708,8 +710,6 @@ export default function FypThesisHub({
     const [createError, setCreateError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<ReviewTab>("all");
-    const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-    const [summary, setSummary] = useState<CielImpactSummary | null>(null);
     const autoOpenRef = useRef(false);
 
     const load = useCallback(async () => {
@@ -722,14 +722,7 @@ export default function FypThesisHub({
     }, []);
 
     useEffect(() => {
-        setSummary(readImpactSummaryCache());
         void load();
-        void Promise.all([fetchStudentDashboardData({ redirectToLogin: false }), fetchImpactSummary({ redirectToLogin: false })]).then(
-            ([dashboardData, summaryData]) => {
-                setDashboard(dashboardData);
-                if (summaryData) setSummary(summaryData);
-            },
-        );
     }, [load]);
 
     const createNew = useCallback(async () => {
@@ -784,13 +777,6 @@ export default function FypThesisHub({
     const rejected = underReview.filter(isRejected);
     const visibleReview = reviewTab === "all" ? underReview : reviewTab === "pending" ? pending : reviewTab === "revision" ? revision : rejected;
 
-    const activeRecords = dashboard?.overview?.activeProjectsCount ?? dashboard?.activeProjects?.length ?? 0;
-    const verifiedHours = Math.round(summary?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0);
-    const portfolioCount = dashboard?.overview?.impactHistoryBadgeCount ?? dashboard?.overview?.completedCount ?? 0;
-    const completion = Math.round(
-        (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
-    );
-
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
             <CourseworkCrumb
@@ -798,16 +784,18 @@ export default function FypThesisHub({
                 pathLabel="Final Year Project (FYP)"
                 view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
             />
-            <MockupHero
-                title="Final Year Project (FYP)"
-                subtitle="Build your Final Year Project record from first draft to faculty / supervisor verification."
-                stats={[
-                    { value: String(activeRecords), label: "Active Records" },
-                    { value: verifiedHours ? `${verifiedHours}h` : "0h", label: "Verified Service" },
-                    { value: String(portfolioCount), label: "Impact Portfolio" },
-                ]}
-                rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
-            />
+            {view === "home" ? (
+                <MockupHero
+                    kicker="MY PATHS · FYP / FINAL YEAR PROJECT"
+                    title={namedTimeGreeting(studentFirstName(), "🎓")}
+                    subtitle="Build your Final Year Project record from first draft to faculty / supervisor verification."
+                    stats={[
+                        { value: String(approved.length), label: "APPROVED" },
+                        { value: String(underReviewBadge), label: "UNDER REVIEW" },
+                        { value: String(drafts.length), label: "IN PROGRESS" },
+                    ]}
+                />
+            ) : null}
 
             {(view === "create" || view === "workspace") && (
                 <div className="mt-1">
@@ -939,16 +927,7 @@ export default function FypThesisHub({
 
             {view === "home" && (
                 <>
-                    <MockupSectionHead
-                        title="Final Year Project (FYP)"
-                        subtitle="Build your Final Year Project record section by section, submit your FYP Flashcard to your supervisor, and collect the approved FYP here."
-                        action={
-                            <Link href={HOME_HREF} className="border-0 bg-transparent text-[12.5px] font-black text-[#087c75] hover:underline">
-                                ← Back to Home
-                            </Link>
-                        }
-                    />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
                             onClick={() => void createNew()}
                             emoji="🎓"

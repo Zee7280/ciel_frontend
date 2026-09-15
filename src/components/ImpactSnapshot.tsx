@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePlatformStats } from "@/utils/usePlatformStats";
+import { HomeHeader, homeWrap } from "@/components/home/HomeChrome";
 
 function AnimatedCounter({ target, suffix = "", duration = 2000 }: { target: number; suffix?: string; duration?: number }) {
     const [count, setCount] = useState(0);
@@ -57,20 +58,14 @@ export default function ImpactSnapshot() {
         <section id="platform-impact" className="relative overflow-hidden bg-ciel-navy py-24 px-6">
             <div className="pointer-events-none absolute left-1/2 top-0 -z-0 h-[500px] w-[900px] -translate-x-1/2 bg-ciel-green/5 blur-[140px]" />
 
-            <div className="relative z-10 mx-auto max-w-6xl">
-                <div className="mb-14 text-center">
-                    <p className="mb-4 text-xs font-black uppercase tracking-widest text-ciel-green">
-                        Live impact — the honest version
-                    </p>
-
-                    <h2 className="text-3xl font-black tracking-tight text-white md:text-4xl lg:text-[42px] leading-tight">
-                        We publish only what&apos;s verified. We&apos;re just getting started.
-                    </h2>
-
-                    <p className="mx-auto mt-5 max-w-xl text-base font-medium text-white/60 md:text-lg">
-                        Every number on this page traces to attendance evidence, faculty sign-off, and partner confirmation.
-                    </p>
-                </div>
+            <div className={`relative z-10 ${homeWrap}`}>
+                <HomeHeader
+                    align="center"
+                    dark
+                    kicker="Live impact — the honest version"
+                    title="We publish only what's verified. We're just getting started."
+                    lead="Every number on this page traces to attendance evidence, faculty sign-off, and partner confirmation."
+                />
 
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
                     {tiles.map((stat) => (

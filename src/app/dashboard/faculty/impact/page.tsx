@@ -151,7 +151,7 @@ export default function FacultyImpactWallPage() {
             />
 
             <PathSectionHead
-                title="Faculty Impact Wall"
+                title="Filter verified records"
                 subtitle="Filter your approved impact by pathway. The underlying flashcard remains one verified record across stakeholder dashboards."
                 pill="ALL VERIFIED IMPACT"
             />

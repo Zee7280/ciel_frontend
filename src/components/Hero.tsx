@@ -68,7 +68,7 @@ export default function Hero() {
             <div className="pointer-events-none absolute right-0 top-0 -z-0 h-[600px] w-[700px] bg-ciel-green/10 blur-[140px]" />
             <div className="pointer-events-none absolute bottom-0 left-0 -z-0 h-[500px] w-[500px] bg-ciel-indigo/10 blur-[120px]" />
 
-            <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-20 md:px-10 lg:py-28">
+                            <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-20 md:px-10 lg:py-28">
                 <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
 
                     {/* LEFT CONTENT */}
@@ -91,13 +91,13 @@ export default function Hero() {
                             <Link
                                 href="/?path=community-service#where-your-impact-lives"
                                 scroll={true}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-ciel-green px-8 py-4 text-center text-base font-bold text-ciel-navy shadow-xl shadow-black/20 transition-all duration-300 hover:bg-ciel-green-deep hover:text-white sm:w-auto"
+                                className="flex w-full items-center justify-center gap-2 rounded-full bg-ciel-green px-8 py-4 text-center text-base font-extrabold text-ciel-navy shadow-xl shadow-black/20 transition-all duration-300 hover:bg-ciel-green-deep hover:text-white sm:w-auto"
                             >
                                 Start with Community Service <ArrowRight className="h-4 w-4" />
                             </Link>
                             <Link
                                 href="/#impact-map"
-                                className="w-full rounded-xl border-2 border-white/20 px-8 py-4 text-center text-base font-bold text-white transition-all duration-300 hover:bg-white/5 sm:w-auto"
+                                className="w-full rounded-full border-[1.5px] border-white/35 px-8 py-4 text-center text-base font-extrabold text-white transition-all duration-300 hover:bg-white/10 sm:w-auto"
                             >
                                 Open the live analytics
                             </Link>

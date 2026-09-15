@@ -372,19 +372,21 @@ function FacultyStartupBusinessHub() {
         <div>
             <div className="mx-auto max-w-[1120px] space-y-4 pb-16">
                 <CourseworkCrumb role="Faculty" view={crumbView} pathLabel="Startup / Venture" />
-                <CourseworkHero
-                    kicker="MY PATHS · STARTUP / VENTURE"
-                    title={`Welcome, ${greetName}`}
-                    subtitle="One pipeline for every venture you supervise — just started, in process, under review, approved — plus your own faculty ventures, the v11 review rubric and the AI grader."
-                    gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
-                    roleBadge="FACULTY"
-                    stats={[
-                        { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
-                        { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=pipeline&tab=under_review` },
-                        { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
-                        { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
-                    ]}
-                />
+                {screen === "home" ? (
+                    <CourseworkHero
+                        kicker="MY PATHS · STARTUP / VENTURE"
+                        title={`Welcome, ${greetName}`}
+                        subtitle="One pipeline for every venture you supervise — just started, in process, under review, approved — plus your own faculty ventures, the v11 review rubric and the AI grader."
+                        gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
+                        roleBadge="FACULTY"
+                        stats={[
+                            { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
+                            { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=pipeline&tab=under_review` },
+                            { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
+                            { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
+                        ]}
+                    />
+                ) : null}
 
                 {screen === "home" && (
                     <div className="mt-[22px] grid grid-cols-1 gap-[22px] sm:grid-cols-2">

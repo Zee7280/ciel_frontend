@@ -175,14 +175,16 @@ function FacultyFypThesisHub() {
         <div>
             <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : VIEW_CRUMB[view]} pathLabel="FYP / Thesis" />
-                <CourseworkHero
-                    kicker="FACULTY IMPACT DASHBOARD"
-                    title={hero.title}
-                    subtitle={hero.subtitle}
-                    stats={hero.stats}
-                />
-
-                {view !== "home" && <HubBackButton href={homeHref} label="← Back to FYP / Thesis" />}
+                {view === "home" ? (
+                    <CourseworkHero
+                        kicker="FACULTY IMPACT DASHBOARD"
+                        title={hero.title}
+                        subtitle={hero.subtitle}
+                        stats={hero.stats}
+                    />
+                ) : (
+                    <HubBackButton href={homeHref} label="← Back to FYP / Thesis" />
+                )}
 
                 {view === "home" && (
                     <>

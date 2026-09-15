@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { usePlatformStats } from "@/utils/usePlatformStats";
+import { HomeHeader, homeCard, homeSectionMint, homeWrap } from "@/components/home/HomeChrome";
 
 const segments = [
     {
@@ -67,28 +68,23 @@ export default function WhoIsItFor() {
             : seg,
     );
     return (
-        <section className="py-20 px-6 bg-white">
-            <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-12">
-                    <p className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-3">
-                        Built for everyone in the loop
-                    </p>
-                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-                        Who is CIEL designed for?
-                    </h2>
-                    <p className="text-base text-slate-500 font-medium max-w-xl mx-auto mt-3">
-                        Six stakeholders, one verified dataset — each gets exactly the slice they need.
-                    </p>
-                </div>
+        <section className={homeSectionMint}>
+            <div className={homeWrap}>
+                <HomeHeader
+                    align="center"
+                    kicker="Built for everyone in the loop"
+                    title="Who is CIEL designed for?"
+                    lead="Six stakeholders, one verified dataset — each gets exactly the slice they need."
+                />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                     {cards.map((seg) => (
                         <div
                             key={seg.label}
-                            className={`rounded-2xl border border-slate-200 border-l-4 ${seg.border} bg-white p-6 transition-shadow duration-300 hover:shadow-lg hover:shadow-slate-200/60`}
+                            className={`${homeCard} border-l-4 ${seg.border} p-6 transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(11,37,48,.08)]`}
                         >
                             <span className="text-2xl" aria-hidden>{seg.emoji}</span>
-                            <h3 className="mt-3 text-lg font-black text-slate-900 tracking-tight">
+                            <h3 className="mt-3 text-lg font-black tracking-tight text-ciel-navy">
                                 {seg.label}
                             </h3>
                             <p className="mt-2 text-sm text-slate-500 leading-relaxed">
@@ -96,7 +92,7 @@ export default function WhoIsItFor() {
                             </p>
                             <Link
                                 href={seg.href}
-                                className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+                                className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-ciel-teal hover:text-[#0a635c]"
                             >
                                 {seg.cta} <ArrowRight className="w-3.5 h-3.5" />
                             </Link>

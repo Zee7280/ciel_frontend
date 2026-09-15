@@ -460,6 +460,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     return (
         <div className="mx-auto max-w-[1120px] space-y-4 pb-16">
             <CourseworkCrumb role={isCiel ? "CIEL PK Master Dashboard" : "University Dashboard"} view={crumbView} pathLabel="Startup / Venture" />
+            {screen === "home" ? (
             <CourseworkHero
                 kicker={isCiel ? "NETWORK · STARTUP / VENTURE" : "IMPACT AREAS · STARTUP / VENTURE"}
                 title={heroTitle}
@@ -487,6 +488,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         ]
                 }
             />
+            ) : null}
 
             {screen === "home" && (
                 <div className="mt-[22px] grid grid-cols-1 gap-[22px] sm:grid-cols-2">

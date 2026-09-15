@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import clsx from "clsx";
+import { HomeHeader, homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
 
 interface SpotlightTag {
     label: string;
@@ -58,19 +59,14 @@ const CARDS: SpotlightCard[] = [
 
 export default function ShowcaseSpotlight() {
     return (
-        <section className="py-20 px-6 bg-white">
-            <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-12">
-                    <p className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-3">
-                        Best projects showcase — season one opens now
-                    </p>
-                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-                        The first showcased projects set the bar for everyone after
-                    </h2>
-                    <p className="text-base text-slate-500 font-medium max-w-2xl mx-auto mt-3">
-                        Faculty-approved, evidence-backed, selected by review. The pilot&apos;s first project is live — the other spots are waiting to be earned.
-                    </p>
-                </div>
+        <section className={homeSectionWhite}>
+            <div className={homeWrap}>
+                <HomeHeader
+                    align="center"
+                    kicker="Best projects showcase — season one opens now"
+                    title="The first showcased projects set the bar for everyone after"
+                    lead="Faculty-approved, evidence-backed, selected by review. The pilot's first project is live — the other spots are waiting to be earned."
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {CARDS.map((card) => {
@@ -80,7 +76,7 @@ export default function ShowcaseSpotlight() {
                                     <span className="text-4xl" aria-hidden>{card.emoji}</span>
                                 </div>
                                 <div className="p-6">
-                                    <p className="text-sm font-black text-slate-900 leading-snug">{card.title}</p>
+                                    <p className="text-sm font-black leading-snug text-ciel-navy">{card.title}</p>
                                     <p className="mt-2 text-xs text-slate-500 leading-relaxed">{card.description}</p>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         {card.tags.map((tag) => (
@@ -99,7 +95,7 @@ export default function ShowcaseSpotlight() {
                             </>
                         );
                         const cardClass = clsx(
-                            "flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition-all duration-300",
+                            "flex flex-col overflow-hidden rounded-[20px] border border-[#D6E6E3] bg-white transition-all duration-300",
                             card.live ? "hover:shadow-xl hover:-translate-y-1" : "opacity-85",
                         );
                         return card.live ? (

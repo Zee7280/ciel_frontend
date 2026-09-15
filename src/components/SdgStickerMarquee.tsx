@@ -38,7 +38,7 @@ export default function SdgStickerMarquee() {
 
     return (
         <section
-            className="relative overflow-hidden border-y border-slate-100/80 bg-gradient-to-b from-emerald-50/40 via-white to-white py-6 md:py-8"
+            className="relative overflow-hidden border-y border-[#D6E6E3] bg-[#F5FAF9] py-6 md:py-8"
             aria-label="United Nations Sustainable Development Goals"
         >
             <style>{`
@@ -62,11 +62,11 @@ export default function SdgStickerMarquee() {
 
             <div className="relative">
                 <div
-                    className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-white via-white/90 to-transparent sm:w-20 md:w-28"
+                    className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-[#F5FAF9] via-[#F5FAF9]/90 to-transparent sm:w-20 md:w-28"
                     aria-hidden
                 />
                 <div
-                    className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-white via-white/90 to-transparent sm:w-20 md:w-28"
+                    className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-[#F5FAF9] via-[#F5FAF9]/90 to-transparent sm:w-20 md:w-28"
                     aria-hidden
                 />
 

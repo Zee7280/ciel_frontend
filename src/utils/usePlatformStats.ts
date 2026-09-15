@@ -64,6 +64,12 @@ export type PlatformStats = {
     dividend_hourly_rate_pkr: number;
     partner_organisations: number;
     verified_projects_all_paths: number;
+    verified_by_path?: {
+        community_service: number;
+        course_project: number;
+        fyp_thesis: number;
+        startup_business: number;
+    };
     cities_live: number;
     sdgs_touched_by_reports: number;
     partners_come_back_pct: number;

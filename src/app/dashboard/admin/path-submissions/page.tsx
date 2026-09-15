@@ -370,6 +370,7 @@ export default function AdminPathSubmissionsPage() {
             {pathTab === "course-project" ? (
                 <div className="mx-auto max-w-[1040px] space-y-4">
                     <CourseworkCrumb role="CIEL PK Master" view={courseView === "home" ? undefined : courseView} />
+                    {courseView === "home" ? (
                     <CourseworkHero
                         kicker="CIEL PK MASTER · COURSEWORK"
                         title="The national deck 🌍"
@@ -382,10 +383,12 @@ export default function AdminPathSubmissionsPage() {
                         ]}
                         rightStat={{ value: String(uniCount || "—"), label: "universities represented" }}
                     />
+                    ) : null}
                 </div>
             ) : pathTab === "fyp-thesis" ? (
                 <div className="mx-auto max-w-[1040px] space-y-4">
                     <CourseworkCrumb role="CIEL PK Master" view={fypView === "home" ? undefined : fypView} />
+                    {fypView === "home" ? (
                     <CourseworkHero
                         kicker="CIEL PK MASTER · FYP"
                         title="Final Year Project (FYP) 🎓"
@@ -398,6 +401,7 @@ export default function AdminPathSubmissionsPage() {
                         ]}
                         rightStat={{ value: String(fypUniCount || "—"), label: "universities represented" }}
                     />
+                    ) : null}
                 </div>
             ) : (
                 <header className="space-y-2">

@@ -67,6 +67,12 @@ type PlatformStatsPayload = {
         dividend_hourly_rate_pkr?: number;
         partner_organisations?: number;
         verified_projects_all_paths?: number;
+        verified_by_path?: {
+            community_service: number;
+            course_project: number;
+            fyp_thesis: number;
+            startup_business: number;
+        };
         cities_live?: number;
         sdgs_touched_by_reports?: number;
         partners_come_back_pct?: number;
@@ -99,6 +105,12 @@ const FALLBACK: PlatformStatsPayload = {
         dividend_hourly_rate_pkr: 192,
         partner_organisations: 0,
         verified_projects_all_paths: 0,
+        verified_by_path: {
+            community_service: 0,
+            course_project: 0,
+            fyp_thesis: 0,
+            startup_business: 0,
+        },
         cities_live: 0,
         sdgs_touched_by_reports: 0,
         partners_come_back_pct: 0,
@@ -113,6 +125,17 @@ function normalizeCount(value: unknown, fallback: number, max?: number): number 
     if (!Number.isFinite(numeric)) return fallback;
     const normalized = Math.max(0, Math.floor(numeric));
     return typeof max === "number" ? Math.min(max, normalized) : normalized;
+}
+
+function normalizeVerifiedByPath(value: unknown): NonNullable<PlatformStatsPayload["data"]["verified_by_path"]> | undefined {
+    if (!value || typeof value !== "object") return undefined;
+    const v = value as Record<string, unknown>;
+    return {
+        community_service: normalizeCount(v.community_service, 0),
+        course_project: normalizeCount(v.course_project, 0),
+        fyp_thesis: normalizeCount(v.fyp_thesis, 0),
+        startup_business: normalizeCount(v.startup_business, 0),
+    };
 }
 
 function normalizeCities(value: unknown): CityImpactStat[] {
@@ -240,6 +263,7 @@ export async function GET() {
             dividend_hourly_rate_pkr: normalizeCount(d.dividend_hourly_rate_pkr, FALLBACK.data.dividend_hourly_rate_pkr ?? 192),
             partner_organisations: normalizeCount(d.partner_organisations, FALLBACK.data.partner_organisations ?? 0),
             verified_projects_all_paths: normalizeCount(d.verified_projects_all_paths, FALLBACK.data.verified_projects_all_paths ?? 0),
+            verified_by_path: normalizeVerifiedByPath(d.verified_by_path),
             cities_live: normalizeCount(d.cities_live, FALLBACK.data.cities_live ?? 0),
             sdgs_touched_by_reports: normalizeCount(d.sdgs_touched_by_reports, FALLBACK.data.sdgs_touched_by_reports ?? 0, 17),
             partners_come_back_pct: normalizeCount(d.partners_come_back_pct, FALLBACK.data.partners_come_back_pct ?? 0, 100),

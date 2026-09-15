@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePlatformStats, type CityImpactStat } from "@/utils/usePlatformStats";
 import { PAKISTAN_PROVINCE_LABELS, pakistanOutlinePath, pakistanProvincePaths, projectLonLat } from "@/utils/pakistanMapGeo";
+import { HomeHeader, homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
 
 type MetricKey = "peopleServing" | "peopleServed" | "verifiedHours" | "resourcesDeployedPkr" | "communityDividendPkr";
 
@@ -60,19 +61,13 @@ export default function ImpactMap() {
     const provincePaths = useMemo(() => pakistanProvincePaths(), []);
 
     return (
-        <section id="impact-map" className="scroll-mt-24 bg-white px-6 py-20">
-            <div className="mx-auto max-w-6xl">
-                <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
-                    <div>
-                        <p className="mb-3 text-xs font-black uppercase tracking-widest text-emerald-600">Where impact lands</p>
-                        <h2 className="max-w-[22ch] text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
-                            Zoom into any city. Every pin is a verified record.
-                        </h2>
-                    </div>
-                    <p className="max-w-md text-base font-medium text-slate-500">
-                        Bubble size follows the metric you pick. Filter by an SDG mapped on a verified report — listing tags on unverified opportunities do not count.
-                    </p>
-                </div>
+        <section id="impact-map" className={homeSectionWhite}>
+            <div className={homeWrap}>
+                <HomeHeader
+                    kicker="Where impact lands"
+                    title="Zoom into any city. Every pin is a verified record."
+                    lead="Bubble size follows the metric you pick. Filter by an SDG mapped on a verified report — listing tags on unverified opportunities do not count."
+                />
 
                 {cities.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-8 py-16 text-center">
@@ -174,7 +169,7 @@ export default function ImpactMap() {
                         <div className="flex flex-col gap-4">
                             {selected ? (
                                 <div className="rounded-[18px] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(14,42,51,0.08)]">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-ciel-teal">
                                         Selected city · {selected.province}
                                     </p>
                                     <h3 className="mt-1 text-2xl font-black text-slate-900">{selected.name}</h3>
