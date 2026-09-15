@@ -1,6 +1,8 @@
 // Shared types + summary composition for the FYP / Thesis wizard, flash card, and admin views.
 // Mirrors ciel_backend/src/paths/entities/fyp-entry.entity.ts
 
+import type { FypAiAnalysis, FypAiAnalysisLock } from "@/utils/fypAiAnalysis";
+
 export interface FypTeamMember {
     name: string;
     email?: string;
@@ -145,6 +147,10 @@ export interface FypEntry {
     supervisorApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     supervisorApprovalNote?: string | null;
     supervisorApprovalAt?: string | null;
+    /** AI pre-analysis (FYP-MM 1.0 rubric) a supervisor can run before deciding — additive to
+     * meritRibbon below. Redacted to null on student-facing reads until a supervisor locks it. */
+    aiAnalysis?: FypAiAnalysis | null;
+    aiAnalysisLock?: FypAiAnalysisLock | null;
     /** Pinned by the analyzer after a ranked run — shown on the thesis card. badgeLevel is a rank-percentile
      * tier; previousRank is this card's rank the last time it was ranked (null/undefined = first run). */
     meritRibbon?: {

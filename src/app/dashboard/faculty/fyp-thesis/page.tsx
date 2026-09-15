@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ThesisCard from "@/components/ciel/ThesisCard";
+import FypAiAnalysisPanel from "@/components/ciel/FypAiAnalysisPanel";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
@@ -97,6 +98,12 @@ function FacultyFypThesisHub() {
         } finally {
             setReviewingId(null);
         }
+    };
+
+    /** Bubbles an aiAnalysis/aiAnalysisLock (or any other) patch from FypAiAnalysisPanel back into
+     * the list state — same merge shape reviewEntry already uses for supervisor-review responses. */
+    const updateEntry = (id: string, patch: Partial<FypMeritEntry>) => {
+        setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
     };
 
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
@@ -301,13 +308,15 @@ function FacultyFypThesisHub() {
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {filteredWaiting.map((entry) => (
-                                <ThesisCard
-                                    key={entry.id}
-                                    entry={entry}
-                                    studentName={entry.student?.name}
-                                    onSupervisorReview={entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
-                                    reviewing={reviewingId === entry.id}
-                                />
+                                <div key={entry.id} className="space-y-2">
+                                    {entry.id ? <FypAiAnalysisPanel entry={entry} onUpdate={updateEntry} /> : null}
+                                    <ThesisCard
+                                        entry={entry}
+                                        studentName={entry.student?.name}
+                                        onSupervisorReview={entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
+                                        reviewing={reviewingId === entry.id}
+                                    />
+                                </div>
                             ))}
                         </div>
                     ))}
