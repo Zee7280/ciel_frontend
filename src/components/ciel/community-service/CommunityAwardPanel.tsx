@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
@@ -33,8 +33,9 @@ export default function CommunityAwardPanel({
     filters?: { university?: boolean; department?: boolean; org?: boolean; faculty?: boolean };
 }) {
     const [ranked, setRanked] = useState(false);
-    const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
-    const lastNotified = useRef("");
+    const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "failed" | "exhausted">("idle");
+    const [notifyErrorMessage, setNotifyErrorMessage] = useState<string | null>(null);
+    const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
     const [uni, setUni] = useState("all");
     const [dept, setDept] = useState("all");
     const [org, setOrg] = useState("all");
@@ -70,9 +71,16 @@ export default function CommunityAwardPanel({
     const unique = (key: keyof CommunityAwardCard) =>
         Array.from(new Set(cards.map((c) => String(c[key] || "")).filter((v) => v && v !== "—"))).sort();
 
-    const notify = (picks: { reportId: string; rank: number; of: number; total: number }[]) => {
-        if (!picks.length) return;
+    // Running the model is a free, unlimited preview — nothing is sent to students until the
+    // faculty explicitly taps "Publish & notify" below. This used to fire automatically the
+    // instant ranking completed, which silently spent one of the 4-runs/year quota on every
+    // click of "Run the award model" (and every filter tweak), matching a bug already fixed for
+    // the Coursework/FYP/Venture merit panels.
+    const notify = () => {
+        if (!top.length) return;
         setNotifyState("sending");
+        setNotifyErrorMessage(null);
+        const picks = top.map((c, i) => ({ reportId: c.id, rank: i + 1, of: scored.length, total: c.total }));
         authenticatedFetch(notifyEndpoint, {
             method: "POST",
             body: JSON.stringify({
@@ -82,19 +90,29 @@ export default function CommunityAwardPanel({
                 reportIds: picks.map((p) => p.reportId),
             }),
         })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => setNotifyState(result?.success ? "sent" : "failed"))
+            .then(async (res) => {
+                if (!res) {
+                    setNotifyState("failed");
+                    return;
+                }
+                const body = await res.json().catch(() => null);
+                if (res.ok && body?.success) {
+                    setNotifyState("sent");
+                    if (body?.data?.graderRuns) setGraderRuns(body.data.graderRuns);
+                    return;
+                }
+                if (res.status === 403 && body?.code === "GRADER_RUNS_EXHAUSTED") {
+                    setNotifyState("exhausted");
+                    setNotifyErrorMessage(typeof body?.message === "string" ? body.message : "No AI Grader runs left this year.");
+                    setGraderRuns({ unlimited: false, used: body.used ?? 4, limit: body.limit ?? 4 });
+                    return;
+                }
+                setNotifyState("failed");
+            })
             .catch(() => setNotifyState("failed"));
     };
 
-    const pickKey = top.map((c) => c.id).join(",");
-    useEffect(() => {
-        if (!ranked || !top.length || notifyState !== "idle") return;
-        if (lastNotified.current === pickKey) return;
-        lastNotified.current = pickKey;
-        notify(top.map((c, i) => ({ reportId: c.id, rank: i + 1, of: scored.length, total: c.total })));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ranked, pickKey, notifyState]);
+    const runsExhausted = !!graderRuns && !graderRuns.unlimited && graderRuns.used >= graderRuns.limit;
 
     return (
         <div className="space-y-3">
@@ -128,7 +146,7 @@ export default function CommunityAwardPanel({
                             setDto("");
                             setRanked(false);
                             setNotifyState("idle");
-                            lastNotified.current = "";
+                            setNotifyErrorMessage(null);
                         }}
                         className="ml-auto rounded-full bg-[#fbf0d7] px-2.5 py-1 text-[8px] font-extrabold text-[#b45309]"
                     >
@@ -186,38 +204,68 @@ export default function CommunityAwardPanel({
                 </p>
             </div>
 
-            <button
-                type="button"
-                disabled={!pool.length}
-                onClick={() => {
-                    setRanked(true);
-                    setNotifyState("idle");
-                    lastNotified.current = "";
-                }}
-                className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white disabled:opacity-50"
-            >
-                ▶ Run the award model on {pool.length} card{pool.length === 1 ? "" : "s"} — best → least, badges issued
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+                {graderRuns && (
+                    <span
+                        className={clsx(
+                            "rounded-full px-3 py-1.5 text-[9.5px] font-extrabold",
+                            graderRuns.unlimited
+                                ? "bg-[#e6f6f4] text-[#0e7d74]"
+                                : runsExhausted
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-[#f1ebfd] text-[#6d28d9]",
+                        )}
+                    >
+                        {graderRuns.unlimited ? "♾️ Unlimited publishes" : `Publishes used this year: ${graderRuns.used} of ${graderRuns.limit}`}
+                    </span>
+                )}
+                <button
+                    type="button"
+                    disabled={!pool.length}
+                    onClick={() => {
+                        setRanked(true);
+                        setNotifyState("idle");
+                        setNotifyErrorMessage(null);
+                    }}
+                    className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white disabled:opacity-50"
+                >
+                    ▶ Run the award model on {pool.length} card{pool.length === 1 ? "" : "s"} — best → least, free preview
+                </button>
+            </div>
 
             {ranked && (
                 <div className="rounded-[13px] border border-[#e2d9f7] bg-[#f1ebfd] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#4c3a78]">
                     🧮 <b>Run complete</b> — {scored.length} cards · cohort average <b>{avg}/100</b> · evidence re-checked before any rank.{" "}
-                    {notifyState === "sent"
-                        ? "Badges are pinned to the students' Impact Walls."
-                        : notifyState === "failed"
-                          ? "Ranking is on this screen — notifications did not send."
-                          : "Notifying top-ranked students…"}
-                    {notifyState === "failed" && (
-                        <button
-                            type="button"
-                            className="ml-2 rounded-full bg-[#fdf1f4] px-2 py-0.5 text-[8px] font-extrabold text-[#e11d48]"
-                            onClick={() => {
-                                lastNotified.current = "";
-                                setNotifyState("idle");
-                            }}
-                        >
-                            Retry
-                        </button>
+                    {notifyState === "sent" ? (
+                        <b>Top {topN} badges are pinned to the students&apos; Impact Walls.</b>
+                    ) : notifyState === "sending" ? (
+                        <b>Publishing to top-ranked students…</b>
+                    ) : notifyState === "failed" ? (
+                        <b>Ranking is saved on this screen — student notifications did not send. Retry below.</b>
+                    ) : runsExhausted ? (
+                        <b>{notifyErrorMessage || "No publishes left this year."} This run is a free preview only — nothing is pinned or sent to students.</b>
+                    ) : (
+                        <b>This is a free preview — running the model again won&apos;t cost a run. Nothing is sent to students until you publish.</b>
+                    )}
+                    {top.length > 0 && (
+                        <div className="mt-2">
+                            <button
+                                type="button"
+                                onClick={notify}
+                                disabled={notifyState === "sending" || notifyState === "sent" || runsExhausted}
+                                className="rounded-full bg-[#6d28d9] px-3.5 py-1.5 text-[9.5px] font-extrabold text-white disabled:opacity-50"
+                            >
+                                {notifyState === "sent"
+                                    ? "✓ Published"
+                                    : notifyState === "sending"
+                                      ? "Publishing…"
+                                      : notifyState === "failed"
+                                        ? "Retry publish"
+                                        : runsExhausted
+                                          ? "No publishes left this year"
+                                          : `🔔 Publish & notify top ${topN}`}
+                            </button>
+                        </div>
                     )}
                 </div>
             )}
