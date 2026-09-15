@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
@@ -12,7 +13,9 @@ import CourseworkCard from "@/components/ciel/CourseworkCard";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import Tabs from "@/components/ciel/Tabs";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 
@@ -171,14 +174,56 @@ function memberStatusLabel(member: { email?: string; inviteStatus?: "pending" | 
     return member.inviteStatus === "accepted" ? "✅ confirmed" : "✉️ invited, unconfirmed";
 }
 
-function tabFromLocation(): PathTab {
-    if (typeof window === "undefined") return "course-project";
-    const tab = new URLSearchParams(window.location.search).get("tab");
+const ADMIN_PATH = "/dashboard/admin/path-submissions";
+const COURSE_VIEWS = ["home", "progress", "review", "approved", "rank", "stats", "submissions", "hec"] as const;
+const FYP_HUB_VIEWS = ["home", "progress", "review", "approved", "rank"] as const;
+type CourseView = (typeof COURSE_VIEWS)[number];
+type FypHubView = (typeof FYP_HUB_VIEWS)[number];
+const COURSE_VIEW_CRUMB: Record<Exclude<CourseView, "home">, string> = {
+    progress: "Coursework in Progress",
+    review: "Coursework Under Review",
+    approved: "Approved Coursework Impact",
+    rank: "Coursework AI Rankings",
+    stats: "Analytics",
+    submissions: "All submissions",
+    hec: "HEC / Government lens",
+};
+const FYP_VIEW_CRUMB: Record<Exclude<FypHubView, "home">, string> = {
+    progress: "FYP in Progress",
+    review: "FYP Under Review",
+    approved: "Approved FYP Impact",
+    rank: "FYP AI Rankings",
+};
+
+function tabFromSearch(tab: string | null): PathTab {
     return tab === "fyp-thesis" || tab === "startup-business" || tab === "course-project" ? tab : "course-project";
 }
 
+function tabHref(tab: PathTab, view?: string) {
+    const q = new URLSearchParams({ tab });
+    if (view && view !== "home") q.set("view", view);
+    return `${ADMIN_PATH}?${q.toString()}`;
+}
+
 export default function AdminPathSubmissionsPage() {
-    const [pathTab, setPathTab] = useState<PathTab>("course-project");
+    return (
+        <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>}>
+            <AdminPathSubmissionsHub />
+        </Suspense>
+    );
+}
+
+function AdminPathSubmissionsHub() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathTab = tabFromSearch(searchParams.get("tab"));
+    const rawView = searchParams.get("view");
+    const courseView: CourseView =
+        pathTab === "course-project" && rawView && (COURSE_VIEWS as readonly string[]).includes(rawView) ? (rawView as CourseView) : "home";
+    const fypView: FypHubView =
+        pathTab === "fyp-thesis" && rawView && (FYP_HUB_VIEWS as readonly string[]).includes(rawView) ? (rawView as FypHubView) : "home";
+    const setPathTab = (tab: PathTab) => router.push(tabHref(tab));
+
     const [courseRows, setCourseRows] = useState<AdminCourseProjectRow[]>([]);
     const [fypRows, setFypRows] = useState<AdminFypRow[]>([]);
     const [ventureRows, setVentureRows] = useState<AdminVentureRow[]>([]);
@@ -187,12 +232,8 @@ export default function AdminPathSubmissionsPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [courseView, setCourseView] = useState<"home" | "progress" | "review" | "approved" | "stats" | "submissions" | "hec">("home");
     const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
-    const [approvedSubview, setApprovedSubview] = useState<"rank" | "list">("rank");
-    const [fypView, setFypView] = useState<"home" | "progress" | "review" | "approved">("home");
     const [fypReviewTab, setFypReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
-    const [fypApprovedSubview, setFypApprovedSubview] = useState<"rank" | "list">("rank");
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [approvedMeritEntries, setApprovedMeritEntries] = useState<MeritEntry[]>([]);
@@ -200,17 +241,8 @@ export default function AdminPathSubmissionsPage() {
     const [fypMeritLoading, setFypMeritLoading] = useState(false);
 
     useEffect(() => {
-        setPathTab(tabFromLocation());
-    }, []);
-
-    useEffect(() => {
-        if (pathTab !== "course-project") setCourseView("home");
-        if (pathTab !== "fyp-thesis") setFypView("home");
-    }, [pathTab]);
-
-    useEffect(() => {
         if (pathTab !== "course-project") return;
-        if (courseView !== "approved" && courseView !== "stats" && courseView !== "hec") return;
+        if (courseView !== "approved" && courseView !== "rank" && courseView !== "stats" && courseView !== "hec") return;
         let cancelled = false;
         setMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/course-projects")
@@ -235,7 +267,7 @@ export default function AdminPathSubmissionsPage() {
     }, [pathTab, courseView]);
 
     useEffect(() => {
-        if (pathTab !== "fyp-thesis" || fypView !== "approved") return;
+        if (pathTab !== "fyp-thesis" || (fypView !== "approved" && fypView !== "rank")) return;
         let cancelled = false;
         setFypMeritLoading(true);
         // The "Approved FYP" wall — backed by a query that only ever returns approved records
@@ -342,10 +374,6 @@ export default function AdminPathSubmissionsPage() {
         () => courseRowsAsMerit.filter((r) => r.status === "draft"),
         [courseRowsAsMerit],
     );
-    const uniCount = useMemo(
-        () => new Set(approvedCourse.map((e) => e.student?.institution || e.studentInfo?.universityName).filter(Boolean)).size,
-        [approvedCourse],
-    );
 
     const fypRowsAsMerit = useMemo(() => fypRows as unknown as FypMeritEntry[], [fypRows]);
     const approvedFyp = useMemo(
@@ -360,47 +388,155 @@ export default function AdminPathSubmissionsPage() {
         () => fypRowsAsMerit.filter((r) => r.status === "draft"),
         [fypRowsAsMerit],
     );
-    const fypUniCount = useMemo(
-        () => new Set(approvedFyp.map((e) => e.student?.institution).filter(Boolean)).size,
-        [approvedFyp],
-    );
 
     return (
         <div className="space-y-6 p-6">
             {pathTab === "course-project" ? (
-                <div className="mx-auto max-w-[1040px] space-y-4">
-                    <CourseworkCrumb role="CIEL PK Master" view={courseView === "home" ? undefined : courseView} />
-                    {courseView === "home" ? (
-                    <CourseworkHero
-                        kicker="CIEL PK MASTER · COURSEWORK"
-                        title="The national deck 🌍"
-                        subtitle="Every university, every filter, the standard Analyzer — plus the analytics only the Master sees."
-                        gradient="linear-gradient(115deg,#04252b,#0e7d74 55%,#2dd4bf 115%)"
-                        stats={[
-                            { value: String(draftCourse.length), label: "IN PROGRESS" },
-                            { value: String(waitingCourse.length), label: "UNDER REVIEW" },
-                            { value: String(approvedCourse.length), label: "APPROVED CARDS" },
-                        ]}
-                        rightStat={{ value: String(uniCount || "—"), label: "universities represented" }}
+                <div className="mx-auto max-w-[1500px] space-y-4">
+                    <CourseworkCrumb
+                        role="CIEL PK"
+                        view={courseView === "home" ? undefined : COURSE_VIEW_CRUMB[courseView]}
+                        pathLabel="Coursework"
                     />
+                    {courseView === "home" ? (
+                    <>
+                    <MockupHero
+                        kicker="CIEL PK · COURSEWORK"
+                        title={namedTimeGreeting("CIEL PK", "📘")}
+                        subtitle="Track coursework records from first draft to faculty verification across every university."
+                        stats={[
+                            { value: String(approvedCourse.length), label: "APPROVED" },
+                            { value: String(waitingCourse.length), label: "UNDER REVIEW" },
+                            { value: String(draftCourse.length), label: "IN PROGRESS" },
+                        ]}
+                    />
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
+                            href={tabHref("course-project", "progress")}
+                            emoji="🧩"
+                            ghost="🧩"
+                            title="Coursework in Progress"
+                            subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
+                            badge={`${draftCourse.length} IN PROGRESS`}
+                            background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "review")}
+                            emoji="📤"
+                            ghost="📤"
+                            title="Coursework Under Review"
+                            subtitle="Submitted flashcards waiting for faculty approval or returned for student revision. Remind whoever holds the workflow."
+                            badge={`${waitingCourse.length} UNDER REVIEW`}
+                            background={MOCKUP_GRADIENTS.blue}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "approved")}
+                            emoji="🏅"
+                            ghost="🏅"
+                            title="Approved Coursework Impact"
+                            subtitle="Every faculty-approved flashcard across universities — the same record the student, faculty and university see."
+                            badge={`${approvedCourse.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.green}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "rank")}
+                            emoji="🧮"
+                            ghost="🧮"
+                            title="Coursework AI Rankings"
+                            subtitle="Rank approved coursework nationwide. Waiting submissions stay out of the live picks."
+                            badge="RANKINGS"
+                            background={MOCKUP_GRADIENTS.purple}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "stats")}
+                            emoji="📊"
+                            ghost="📊"
+                            title="Analytics"
+                            subtitle="Universities, criteria and formats — the intelligence layer only CIEL PK sees."
+                            badge="MASTER ONLY"
+                            background={MOCKUP_GRADIENTS.navy}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "submissions")}
+                            emoji="🗂️"
+                            ghost="🗂️"
+                            title="All submissions"
+                            subtitle="Drafts, waiting, and approved — search across every status in one list."
+                            badge={`${courseRows.length} ENTRIES`}
+                            background={MOCKUP_GRADIENTS.gold}
+                        />
+                        <MockupActionCard
+                            href={tabHref("course-project", "hec")}
+                            emoji="🎓"
+                            ghost="🎓"
+                            title="HEC / Government lens"
+                            subtitle="Flash cards and analytics only — no review actions, no edits."
+                            badge="READ-ONLY"
+                            background={MOCKUP_GRADIENTS.navy}
+                            full
+                        />
+                    </div>
+                    </>
                     ) : null}
                 </div>
             ) : pathTab === "fyp-thesis" ? (
-                <div className="mx-auto max-w-[1040px] space-y-4">
-                    <CourseworkCrumb role="CIEL PK Master" view={fypView === "home" ? undefined : fypView} />
-                    {fypView === "home" ? (
-                    <CourseworkHero
-                        kicker="CIEL PK MASTER · FYP"
-                        title="Final Year Project (FYP) 🎓"
-                        subtitle="Track Final Year Projects from initial draft through supervisor approval and the CIEL PK AI analysis."
-                        gradient="linear-gradient(115deg,#04252b,#0e7d74 55%,#2dd4bf 115%)"
-                        stats={[
-                            { value: String(draftFyp.length), label: "IN PROGRESS" },
-                            { value: String(waitingFyp.length), label: "UNDER REVIEW" },
-                            { value: String(approvedFyp.length), label: "APPROVED CARDS" },
-                        ]}
-                        rightStat={{ value: String(fypUniCount || "—"), label: "universities represented" }}
+                <div className="mx-auto max-w-[1500px] space-y-4">
+                    <CourseworkCrumb
+                        role="CIEL PK"
+                        view={fypView === "home" ? undefined : FYP_VIEW_CRUMB[fypView]}
+                        pathLabel="Final Year Project (FYP)"
                     />
+                    {fypView === "home" ? (
+                    <>
+                    <MockupHero
+                        kicker="CIEL PK · FYP / FINAL YEAR PROJECT"
+                        title={namedTimeGreeting("CIEL PK", "🎓")}
+                        subtitle="Track Final Year Project records from first draft to faculty / supervisor verification."
+                        stats={[
+                            { value: String(approvedFyp.length), label: "APPROVED" },
+                            { value: String(waitingFyp.length), label: "UNDER REVIEW" },
+                            { value: String(draftFyp.length), label: "IN PROGRESS" },
+                        ]}
+                    />
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
+                            href={tabHref("fyp-thesis", "progress")}
+                            emoji="🔬"
+                            ghost="🔬"
+                            title="FYP in Progress"
+                            subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
+                            badge={`${draftFyp.length} IN PROGRESS`}
+                            background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <MockupActionCard
+                            href={tabHref("fyp-thesis", "review")}
+                            emoji="📤"
+                            ghost="📤"
+                            title="FYP Under Review"
+                            subtitle="Submitted flashcards waiting for supervisor approval, or returned for revision — remind whoever holds the workflow."
+                            badge={`${waitingFyp.length} UNDER REVIEW`}
+                            background={MOCKUP_GRADIENTS.blue}
+                        />
+                        <MockupActionCard
+                            href={tabHref("fyp-thesis", "approved")}
+                            emoji="🏅"
+                            ghost="🏅"
+                            title="Approved FYP Impact"
+                            subtitle="Every supervisor-approved Final Year Project across universities — the same record the student, supervisor and university see."
+                            badge={`${approvedFyp.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.green}
+                        />
+                        <MockupActionCard
+                            href={tabHref("fyp-thesis", "rank")}
+                            emoji="🧮"
+                            ghost="🧮"
+                            title="FYP AI Rankings"
+                            subtitle="Rank approved Final Year Projects nationwide. Waiting submissions stay out of the live picks."
+                            badge="RANKINGS"
+                            background={MOCKUP_GRADIENTS.purple}
+                        />
+                    </div>
+                    </>
                     ) : null}
                 </div>
             ) : (
@@ -414,6 +550,7 @@ export default function AdminPathSubmissionsPage() {
                 </header>
             )}
 
+            {pathTab === "startup-business" ? (
             <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
                 {PATH_TABS.map((tab) => {
                     const Icon = tab.icon;
@@ -433,76 +570,11 @@ export default function AdminPathSubmissionsPage() {
                     );
                 })}
             </div>
+            ) : null}
 
-            {pathTab === "course-project" && courseView === "home" ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <HubTile
-                        onClick={() => setCourseView("progress")}
-                        badge={`${draftCourse.length} IN PROGRESS`}
-                        badgeClass="text-[#c76000]"
-                        emoji="📚"
-                        title="Coursework in Progress"
-                        subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
-                        background="linear-gradient(135deg,#15988b,#2ec8bd)"
-                    />
-                    <HubTile
-                        onClick={() => {
-                            setReviewTab("all");
-                            setCourseView("review");
-                        }}
-                        badge={`${waitingCourse.length} UNDER REVIEW`}
-                        badgeClass="text-[#16798c]"
-                        emoji="📝"
-                        title="Coursework Under Review"
-                        subtitle="Submitted flashcards waiting for faculty approval or returned for student revision. Remind whoever holds the workflow."
-                        background="linear-gradient(135deg,#16798c,#38b8e6)"
-                    />
-                    <HubTile
-                        onClick={() => {
-                            setApprovedSubview("rank");
-                            setCourseView("approved");
-                        }}
-                        badge={`${approvedCourse.length} APPROVED`}
-                        badgeClass="text-[#0e4d4e]"
-                        emoji="🏅"
-                        title="Approved Coursework + AI Ranking"
-                        subtitle="Every faculty-approved flashcard across universities, plus the live CIEL PK ranking — run anytime, moves like a stock, badges the student impact wall."
-                        background="linear-gradient(135deg,#0e4d4e,#117669)"
-                    />
-                    <HubTile
-                        onClick={() => setCourseView("stats")}
-                        badge="MASTER ONLY"
-                        badgeClass="text-[#04252b]"
-                        emoji="📊"
-                        title="Analytics"
-                        subtitle="Universities, criteria and formats — the intelligence layer."
-                        background="linear-gradient(135deg,#04252b,#0e7d74)"
-                    />
-                    <HubTile
-                        onClick={() => {
-                            setCourseFilter("all");
-                            setCourseView("submissions");
-                        }}
-                        badge={`${courseRows.length} ENTRIES`}
-                        badgeClass="text-[#b45309]"
-                        emoji="🗂️"
-                        title="All submissions"
-                        subtitle="Drafts, waiting, and approved — search across every status in one list."
-                        background="linear-gradient(135deg,#b45309,#f59e0b)"
-                    />
-                    <HubTile
-                        onClick={() => setCourseView("hec")}
-                        badge="READ-ONLY"
-                        badgeClass="text-[#0f172a]"
-                        emoji="🎓"
-                        title="HEC / Government lens"
-                        subtitle="Flash cards and analytics only — no review actions, no edits."
-                        background="linear-gradient(135deg,#334155,#64748b)"
-                    />
-                </div>
-            ) : pathTab === "course-project" && courseView === "hec" ? (
+            {pathTab === "course-project" && courseView === "home" ? null : pathTab === "course-project" && courseView === "hec" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -524,7 +596,7 @@ export default function AdminPathSubmissionsPage() {
                 </>
             ) : pathTab === "course-project" && courseView === "stats" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -535,7 +607,7 @@ export default function AdminPathSubmissionsPage() {
                 </>
             ) : pathTab === "course-project" && courseView === "progress" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                     <p className="text-sm text-slate-500">Live workspace-linked completion status across all universities.</p>
                     {draftCourse.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">Nothing in progress right now.</Card>
@@ -563,7 +635,7 @@ export default function AdminPathSubmissionsPage() {
                     const visible = reviewTab === "all" ? waitingCourse : byTab[reviewTab];
                     return (
                         <>
-                            <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
+                            <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                             <p className="text-sm text-slate-500">
                                 Faculty decides; while a submission is waiting on faculty, the AI review score is visible only to that
                                 faculty member — CIEL PK sees status, owner and waiting time here. Once approved, scores and rankings
@@ -600,33 +672,11 @@ export default function AdminPathSubmissionsPage() {
                 })()
             ) : pathTab === "course-project" && courseView === "approved" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setApprovedSubview("rank")}
-                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                                approvedSubview === "rank" ? "bg-purple-700 text-white" : "border border-purple-200 bg-white text-purple-700"
-                            }`}
-                        >
-                            🏆 Ranking Studio (live)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setApprovedSubview("list")}
-                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                                approvedSubview === "list" ? "bg-emerald-700 text-white" : "border border-emerald-200 bg-white text-emerald-700"
-                            }`}
-                        >
-                            ⭐ Approved list
-                        </button>
-                    </div>
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
-                    ) : approvedSubview === "rank" ? (
-                        <MeritModelPanel entries={approvedMeritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
                     ) : approvedMeritEntries.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">No faculty-approved coursework cards yet.</Card>
                     ) : (
@@ -637,45 +687,20 @@ export default function AdminPathSubmissionsPage() {
                         </div>
                     )}
                 </>
-            ) : pathTab === "fyp-thesis" && fypView === "home" ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <HubTile
-                        onClick={() => setFypView("progress")}
-                        badge={`${draftFyp.length} IN PROGRESS`}
-                        badgeClass="text-[#c76000]"
-                        emoji="🔬"
-                        title="FYP in Progress"
-                        subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
-                        background="linear-gradient(135deg,#15988b,#2ec8bd)"
-                    />
-                    <HubTile
-                        onClick={() => {
-                            setFypReviewTab("all");
-                            setFypView("review");
-                        }}
-                        badge={`${waitingFyp.length} UNDER REVIEW`}
-                        badgeClass="text-[#16798c]"
-                        emoji="📝"
-                        title="FYP Under Review"
-                        subtitle="Submitted FYP records waiting for supervisor approval or returned for revision. Remind whoever holds the workflow."
-                        background="linear-gradient(135deg,#16798c,#38b8e6)"
-                    />
-                    <HubTile
-                        onClick={() => {
-                            setFypApprovedSubview("rank");
-                            setFypView("approved");
-                        }}
-                        badge={`${approvedFyp.length} APPROVED`}
-                        badgeClass="text-[#0e4d4e]"
-                        emoji="🏅"
-                        title="Approved FYP + AI Ranking"
-                        subtitle="Every supervisor-approved Final Year Project across universities, plus the live CIEL PK FYP ranking — run anytime, moves like a stock, badges the student impact wall."
-                        background="linear-gradient(135deg,#0e4d4e,#117669)"
-                    />
-                </div>
+            ) : pathTab === "course-project" && courseView === "rank" ? (
+                <>
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <MeritModelPanel entries={approvedMeritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
+                    )}
+                </>
             ) : pathTab === "fyp-thesis" && fypView === "progress" ? (
                 <>
-                    <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
+                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
                     <p className="text-sm text-slate-500">Live workspace-linked completion status across all universities.</p>
                     {draftFyp.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">Nothing in progress right now.</Card>
@@ -697,7 +722,7 @@ export default function AdminPathSubmissionsPage() {
                     const visible = fypReviewTab === "all" ? waitingFyp : byTab[fypReviewTab];
                     return (
                         <>
-                            <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
+                            <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
                             <p className="text-sm text-slate-500">
                                 The supervisor decides; the AI review score is visible only to the supervisor. CIEL PK sees status,
                                 owner and waiting time.
@@ -733,33 +758,11 @@ export default function AdminPathSubmissionsPage() {
                 })()
             ) : pathTab === "fyp-thesis" && fypView === "approved" ? (
                 <>
-                    <HubBackButton onClick={() => setFypView("home")} label="← Back to path submissions" />
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setFypApprovedSubview("rank")}
-                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                                fypApprovedSubview === "rank" ? "bg-purple-700 text-white" : "border border-purple-200 bg-white text-purple-700"
-                            }`}
-                        >
-                            🏆 Ranking Studio (live)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFypApprovedSubview("list")}
-                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                                fypApprovedSubview === "list" ? "bg-emerald-700 text-white" : "border border-emerald-200 bg-white text-emerald-700"
-                            }`}
-                        >
-                            ⭐ Approved list
-                        </button>
-                    </div>
+                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
                     {fypMeritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
-                    ) : fypApprovedSubview === "rank" ? (
-                        <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                     ) : fypMeritEntries.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
                     ) : (
@@ -770,9 +773,20 @@ export default function AdminPathSubmissionsPage() {
                         </div>
                     )}
                 </>
-            ) : (
+            ) : pathTab === "fyp-thesis" && fypView === "rank" ? (
+                <>
+                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
+                    {fypMeritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                    )}
+                </>
+            ) : pathTab === "fyp-thesis" ? null : (
             <>
-            {pathTab === "course-project" && <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />}
+            {pathTab === "course-project" && <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                     {pathTab === "course-project"

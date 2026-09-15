@@ -1,5 +1,6 @@
-/** CIEL PK Venture Studio v11 — student create form catalog, live summaries and compass. */
+/** CIEL PK Venture Studio v11/v13 — student create form catalog, live summaries and compass. */
 
+/** Legacy 6-step labels — faculty/university hub chips still collapse to these. */
 export const V11_STEPS = [
     { key: "meet", label: "1 · Meet venture" },
     { key: "problem", label: "2 · Problem" },
@@ -8,6 +9,39 @@ export const V11_STEPS = [
     { key: "next", label: "5 · Next step" },
     { key: "review", label: "6 · Review" },
 ] as const;
+
+export const V13_STEPS = [
+    { key: "venture", n: 1, label: "Venture & team" },
+    { key: "problem", n: 2, label: "Problem & customer" },
+    { key: "market", n: 3, label: "Market & competition" },
+    { key: "solution", n: 4, label: "Solution, product & operations" },
+    { key: "business", n: 5, label: "Business model & marketing" },
+    { key: "finance", n: 6, label: "Finance & budget" },
+    { key: "sdg", n: 7, label: "Impact / SDG" },
+    { key: "next", n: 8, label: "Risk, team health & next step" },
+    { key: "review", n: 9, label: "Review & business plan" },
+] as const;
+
+export const V13_LAST_STEP = 8;
+export const V13_FORM_VERSION = 13;
+
+/** Map a stored stepCompleted onto the 9-step (0–8) workspace without jumping old drafts. */
+export function loadWorkspaceStep(raw: number, formVersion?: number | string | null) {
+    const n = Number(raw) || 0;
+    if (Number(formVersion) === V13_FORM_VERSION || n > 5) return Math.min(V13_LAST_STEP, Math.max(0, n));
+    const legacy = [0, 1, 3, 6, 7, 8, 8];
+    return legacy[Math.min(6, Math.max(0, n))] ?? 0;
+}
+
+/** Collapse v13 0–8 onto the 6 hub progress chips. */
+export function hubProgressIndex(raw: number, formVersion?: number | string | null) {
+    const step = loadWorkspaceStep(raw, formVersion);
+    if (step <= 1) return step;
+    if (step <= 5) return 2;
+    if (step === 6) return 3;
+    if (step === 7) return 4;
+    return 5;
+}
 
 export const V11_STAGES = [
     { id: "Idea Recorded", emoji: "💡", title: "Early idea", blurb: "I am exploring the concept." },
@@ -36,71 +70,135 @@ export function normalizeV11Stage(stage?: string | null) {
 export const FACULTY_ROLES = [
     "Course Instructor",
     "Final Year Project (FYP) Supervisor",
+    "Thesis / Research Supervisor",
     "Incubator / Entrepreneurship Faculty Mentor",
+    "ORIC / Technology Transfer Officer",
     "Programme / Department Faculty Reviewer",
+    "Head of Department / Dean",
+    "Industry Mentor assigned by university",
     "Other",
 ];
 export const DISCIPLINES = [
-    "Business / Management",
-    "Computer Science / IT",
-    "Engineering",
-    "Arts & Design",
-    "Media & Communication",
-    "Architecture",
-    "Textile / Fashion",
-    "Social Sciences",
-    "Health Sciences",
+    "Business / Management / Entrepreneurship",
+    "Accounting / Finance / Economics",
+    "Marketing",
+    "Computer Science / Software Engineering",
+    "Data Science / AI",
+    "Information Technology / Information Systems",
+    "Electrical / Electronics / Mechatronics Engineering",
+    "Mechanical / Industrial Engineering",
+    "Civil / Environmental Engineering",
+    "Chemical / Materials Engineering",
+    "Biotechnology / Life Sciences",
+    "Medicine / Nursing / Pharmacy / Allied Health",
+    "Public Health / Psychology",
+    "Architecture / Urban Planning",
+    "Fine Arts / Visual Arts",
+    "Textile / Fashion Design",
+    "Product / Industrial Design",
+    "Media / Communication / Film",
+    "Law",
+    "Social Sciences / Development Studies",
     "Education",
+    "Agriculture / Food Science / Veterinary",
+    "Mathematics / Physics / Chemistry",
+    "Hospitality / Tourism",
+    "Liberal Arts / Humanities",
+    "Multidisciplinary team",
     "Other",
 ];
 export const ORIGINS = [
     "Course assignment / business plan",
     "Final Year Project (FYP)",
+    "Thesis / research project",
+    "University incubator / accelerator",
     "University incubator / competition",
+    "Business plan competition / hackathon",
     "Independent student startup",
+    "Family business modernisation",
+    "Freelance / side income that grew",
+    "Social cause / community need",
     "Already operating business",
     "Other",
 ];
 export const VENTURE_TYPES = [
+    "Physical product / consumer goods",
     "Physical product / consumer product",
+    "Food & beverage product",
+    "Fashion / apparel / accessories",
+    "Service business (offline)",
     "Service business",
+    "Online service / freelancing agency",
     "Software / app / SaaS",
+    "Marketplace / platform (two-sided)",
     "Marketplace / platform",
+    "E-commerce / online store",
+    "Content / media / creator business",
     "Hardware / device / IoT",
     "Manufacturing / industrial",
-    "Creative / fashion / media venture",
-    "Food / agriculture venture",
+    "Education / training venture",
     "Education venture",
     "Health / life sciences venture",
     "Research / deep-tech commercialization",
+    "AgriTech / farming venture",
+    "Food / agriculture venture",
     "Social enterprise / nonprofit venture",
+    "Consulting / professional services",
+    "Events / experiences / tourism",
+    "Creative / fashion / media venture",
     "Other",
 ];
 export const SECTORS_V11 = [
     "Consumer / Retail",
+    "E-commerce",
+    "Technology / Software / AI",
     "Technology / AI",
+    "FinTech / payments",
     "FinTech",
     "Health / MedTech / BioTech",
+    "Pharma / wellness",
     "Education / EdTech",
+    "Food / Beverage",
+    "Agriculture / AgriTech",
     "Food / AgriTech",
+    "Fashion / Textile / Apparel",
     "Fashion / Textile",
+    "Beauty / personal care",
+    "Media / Creative Industries / Gaming",
     "Media / Creative Industries",
     "Manufacturing / Industrial",
+    "Energy / Climate / CleanTech",
     "Energy / Climate",
+    "Water / sanitation",
+    "Mobility / Logistics / Transport",
     "Mobility / Logistics",
+    "Construction / Real estate / PropTech",
     "Construction / PropTech",
+    "Travel / Tourism / Hospitality",
+    "Professional Services / Consulting",
     "Professional Services",
+    "HR / recruitment / gig work",
+    "Legal / GovTech",
+    "Social Impact / Development",
     "Social Impact",
+    "Sports / fitness",
     "Other",
 ];
 export const LEGAL_STATUSES = [
     "Student project — not registered",
     "Not registered yet — planning to register",
+    "Sole proprietorship (NTN registered)",
     "Sole proprietorship",
+    "Partnership / AOP (registered)",
     "Partnership / LLP",
+    "Single Member Company (SMC-Pvt) — SECP",
+    "Private limited company (Pvt Ltd) — SECP",
     "Private limited company",
+    "Registered with PSEB / freelancer registration",
+    "Nonprofit / Section 42 / trust / society",
     "Nonprofit / not-for-profit",
     "University-owned / spinout under discussion",
+    "Registered abroad (e.g. Delaware / UK / UAE)",
     "Other",
 ];
 export const BUYER_MODELS = [
@@ -108,6 +206,7 @@ export const BUYER_MODELS = [
     "B2B · Business",
     "B2G · Government",
     "B2B2C",
+    "D2C · Direct to consumer online",
     "Marketplace / P2P",
     "Institution / nonprofit",
     "Mixed",
@@ -118,44 +217,81 @@ export const EVIDENCE_METHODS = [
     "📋 Survey",
     "🧪 Pilot / testing",
     "💰 Actual sales",
+    "📝 Pre-orders / waitlist",
+    "✍️ Letters of intent",
     "📚 Published research",
     "🔍 Competitor research",
+    "🧑‍💼 Expert / industry feedback",
+    "🧑‍🔬 Lab / technical validation",
+    "👩‍💻 Lived experience — we are the customer",
     "👁️ Observation only",
     "Other evidence",
 ];
 export const REVENUE_MODELS = [
+    "Product sales (one-off)",
     "Product sales",
+    "Service fee / per project",
     "Service fee",
+    "Subscription / membership",
     "Subscription",
+    "Commission / take rate",
     "Commission",
+    "Freemium (free + paid upgrade)",
+    "Licensing / royalties",
     "Licensing",
     "Advertising / sponsorship",
+    "Rental / leasing / pay-per-use",
+    "Wholesale to retailers / distributors",
     "Institutional contracts / procurement",
+    "Training / workshops",
     "Grant / donor funding",
+    "Grant + earned income (hybrid)",
     "Grant + earned income",
     "Other",
 ];
 export const CHANNELS = [
-    "Social media",
+    "Instagram / TikTok / Facebook (organic)",
+    "Paid social ads",
+    "Google search / SEO",
+    "WhatsApp groups / communities",
+    "Website / app store",
     "Website / app",
+    "Marketplaces (Daraz, Foodpanda, Amazon…)",
+    "University network / campus events",
     "University network",
-    "Retail",
-    "Partners / distributors",
-    "Referrals",
+    "Direct sales visits / cold outreach",
     "Direct sales",
+    "Retail shops / distributors",
+    "Retail",
+    "Partnerships / referral partners",
+    "Partners / distributors",
+    "Word of mouth / referrals",
+    "Referrals",
+    "Influencers / creators",
+    "Exhibitions / trade fairs / bazaars",
+    "Tenders / institutional procurement",
+    "PR / media coverage",
     "Other",
 ];
 export const SUPPORT_NEEDS = [
     "Mentorship",
+    "Incubation / co-working",
     "Incubation",
+    "Pilot customers / introductions",
     "Pilot customers",
     "Industry partner",
     "Manufacturing help",
+    "Distribution / retail access",
     "Distribution",
+    "Marketing / branding help",
+    "Financial modelling / accounting",
+    "Legal / IP / registration",
     "Legal / IP",
+    "Technical validation / lab access",
     "Technical validation",
     "Clinical / regulatory guidance",
     "Research commercialization",
+    "Hiring / finding a co-founder",
     "Grant funding",
     "Investment funding",
     "Nothing yet",
@@ -165,13 +301,19 @@ export const RESPONSIBILITY_PRACTICES = [
     "Environmental practices",
     "Ethical sourcing",
     "Inclusive employment",
+    "Women in the team / supply chain",
     "Accessibility",
     "Waste reduction",
+    "Fair wages",
     "Employee wellbeing",
+    "Data privacy",
     "None currently",
     "Other",
 ];
-export const PHONE_CODES = ["+92", "+1", "+44", "+971", "+966", "+49", "+61", "+86", "+91", "other"];
+export const PHONE_CODES = [
+    "+92", "+1", "+44", "+971", "+966", "+974", "+965", "+90", "+49", "+33", "+39", "+34", "+31", "+46",
+    "+61", "+64", "+81", "+82", "+86", "+91", "+880", "+94", "+60", "+65", "+62", "+20", "+27", "+234", "+254", "other",
+];
 
 export const SDG_COLORS: Record<number, string> = {
     1: "#E5243B",
@@ -384,11 +526,23 @@ export function compassScores(s: V11Snap) {
     if (s.teamFit) team += 30;
     if (s.teamCount) team += 20;
     if (s.risk && s.mitigation) team += 20;
+    let marketing = 0,
+        finance = 0;
+    if (s.channels.length) marketing += 40;
+    if (s.price > 0) marketing += 20;
+    if (s.milestone) marketing += 20;
+    if (s.whyNow) marketing += 20;
+    if (s.price > 0) finance += 30;
+    if (s.unitCost > 0) finance += 35;
+    if (s.askAmount > 0 || s.revenue > 0) finance += 20;
+    if (s.unitCost > 0 && s.price > s.unitCost) finance += 15;
     return {
         problem: clamp(problem),
         evidence: clamp(evidence),
         market: clamp(market),
         business: clamp(business),
+        marketing: clamp(marketing),
+        finance: clamp(finance),
         defence: clamp(defence),
         team: clamp(team),
     };
@@ -487,26 +641,42 @@ export function pitch60(s: V11Snap) {
 }
 
 export const COMPASS_TIPS: Record<string, string> = {
-    problem: "Define one specific customer and the painful problem they experience.",
-    evidence: "Add real-world proof: interviews, tests, pilots, users, sales, lab validation or partner evidence.",
-    market: "Show who you can realistically reach and where the estimate came from.",
-    business: "Explain how value becomes revenue or sustainable funding, plus your route to customers.",
-    defence: "Clarify why customers would choose you and what becomes harder for competitors to copy.",
-    team: "Show why this team can execute, then name the biggest risk and how you would reduce it.",
+    problem: "Define one specific customer, how often the problem happens and how painful it is.",
+    evidence: "Add real-world proof: interviews, tests, pilots, pre-orders, sales or partner letters.",
+    market: "Show who you can realistically reach, where the number came from, and name 2–3 competitors.",
+    business: "Choose a revenue model, set a price and say how you decided it.",
+    marketing: "Pick your one main channel, put a monthly budget on it and estimate cost per customer.",
+    finance: "Enter cost per sale, fixed costs and a simple budget — the calculators do the rest.",
+    defence: "Say specifically why customers choose you and what is hard to copy (contracts, IP, brand, data).",
+    team: "Show why this team can execute, agree roles and equity, and name your top risks with mitigations.",
 };
 
 export const PATHWAY = ["💡 Recorded", "🔎 Potential Identified", "⭐ High Potential", "🚀 Showcase Candidate", "💼 Investor-Ready"];
 
 export const MARKET_SOURCES = [
+    "Counted / calculated bottom-up (lists, registries, field count)",
     "Counted / calculated",
+    "Government data (PBS, SECP, SMEDA, provincial dept.)",
+    "Published industry report (e.g. Gallup, Karandaaz, Statista)",
     "Published report / government data",
+    "University / academic research",
+    "Industry association / partner estimate",
     "Industry / partner estimate",
+    "Platform data (Google, Meta, Daraz, Foodpanda audiences)",
+    "Own survey / pilot extrapolation",
     "Educated estimate — needs checking",
+    "Other",
 ];
 export const COMPETITOR_TYPES = [
+    "Direct competitor (same solution)",
     "Direct competitor",
+    "Indirect competitor (different type of solution)",
     "Different type of solution",
+    "Informal / unorganised providers",
+    "Imported product / foreign platform",
+    "Do it themselves (DIY)",
     "Do it themselves",
+    "Do nothing / tolerate the problem",
     "Do nothing",
     "Not sure yet",
     "Other",
@@ -524,18 +694,28 @@ export const NUMBER_SOURCES = [
 ];
 export const REG_BARRIERS = [
     "None known",
+    "Business registration / NTN / sales tax",
     "Business registration / licensing",
+    "Sector regulator approval (SBP, PTA, DRAP, PEMRA…)",
     "Sector regulator / government approval",
+    "Food safety / halal / PSQCA certification",
+    "Health / safety / environmental certification",
     "Health / safety / certification",
     "Data / privacy compliance",
+    "Intellectual property / ownership dispute",
     "Intellectual property / ownership",
     "Clinical / ethics approval",
+    "Import / export / customs",
     "Import / export approval",
+    "University policy / IP ownership approval",
     "University / partner approval",
+    "Local government / municipal permits",
     "Other",
 ];
 export const EXIT_STRATEGIES = [
+    "Build a sustainable independent company (no exit)",
     "Build a sustainable independent company",
+    "Strategic acquisition by a larger company",
     "Strategic acquisition",
     "Merger",
     "License / sell intellectual property",
@@ -574,8 +754,14 @@ export const SDG_SHORT: Record<number, string> = {
 export const ORIGIN_TO_SUBMISSION: Record<string, string> = {
     "Course assignment / business plan": "Course project",
     "Final Year Project (FYP)": "Final-Year Project",
+    "Thesis / research project": "Final-Year Project",
+    "University incubator / accelerator": "Independent venture",
     "University incubator / competition": "Independent venture",
+    "Business plan competition / hackathon": "Independent venture",
     "Independent student startup": "Independent venture",
+    "Family business modernisation": "Operating startup",
+    "Freelance / side income that grew": "Independent venture",
+    "Social cause / community need": "Independent venture",
     "Already operating business": "Operating startup",
 };
 export const REVIEW_BLOCKS: { key: "founder" | "opportunity" | "business" | "impact" | "ask"; title: string }[] = [

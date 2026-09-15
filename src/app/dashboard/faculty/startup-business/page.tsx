@@ -4,12 +4,14 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, HubBackButton, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
-import { SDG_COLORS, SDG_SHORT, V11_STEPS } from "@/utils/ventureStudioV11";
+import { SDG_COLORS, SDG_SHORT, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 import StartupBusinessWorkspace from "@/app/dashboard/student/paths/startup-business/StartupBusinessWorkspace";
@@ -98,7 +100,7 @@ function formatDay(value?: string | null) {
 }
 function sectionPercents(entry: FacultyVenture) {
     if (entry.status === "submitted" && !isRevision(entry)) return SECTION_SHORT.map(() => 100);
-    const unlocked = Math.max(0, Math.min(6, entry.stepCompleted ?? 0));
+    const unlocked = Math.max(0, Math.min(6, hubProgressIndex(entry.stepCompleted ?? 0, (entry as { academicSetup?: { formVersion?: number } }).academicSetup?.formVersion)));
     return SECTION_SHORT.map((_, i) => (i < unlocked ? 100 : i === unlocked && unlocked < 6 ? 30 : 0));
 }
 function overallPct(entry: FacultyVenture) {
@@ -370,61 +372,68 @@ function FacultyStartupBusinessHub() {
 
     return (
         <div>
-            <div className="mx-auto max-w-[1120px] space-y-4 pb-16">
+            <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
                 <CourseworkCrumb role="Faculty" view={crumbView} pathLabel="Startup / Venture" />
                 {screen === "home" ? (
-                    <CourseworkHero
-                        kicker="MY PATHS · STARTUP / VENTURE"
-                        title={`Welcome, ${greetName}`}
-                        subtitle="One pipeline for every venture you supervise — just started, in process, under review, approved — plus your own faculty ventures, the v11 review rubric and the AI grader."
-                        gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
-                        roleBadge="FACULTY"
+                    <MockupHero
+                        kicker="FACULTY · STARTUP / VENTURE"
+                        title={namedTimeGreeting(greetName === "Faculty" ? "" : greetName.split(/\s+/)[0], "🚀")}
+                        subtitle="One pipeline for every venture you supervise — just started, in process, under review, approved — plus your own faculty ventures."
                         stats={[
-                            { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
-                            { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=pipeline&tab=under_review` },
-                            { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
-                            { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
+                            { value: String(wallApproved.length), label: "APPROVED" },
+                            { value: String(waiting.length), label: "UNDER REVIEW" },
+                            { value: String(inProcess.length), label: "IN PROGRESS" },
                         ]}
                     />
                 ) : null}
 
                 {screen === "home" && (
-                    <div className="mt-[22px] grid grid-cols-1 gap-[22px] sm:grid-cols-2">
-                        <HubTile
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
                             href={`${VENTURE_BASE}?view=pipeline`}
-                            badge={`${inProcess.length} IN PROCESS · ${waiting.length} TO REVIEW`}
-                            badgeClass="text-[#c65b00]"
                             emoji="🧩"
+                            ghost="🧩"
                             title="Startup Pipeline"
-                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders and the v11 review rubric inside each record."
-                            background="linear-gradient(135deg,#f6a021,#e57a0f)"
+                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders and the review rubric inside each record."
+                            badge={`${inProcess.length} IN PROGRESS`}
+                            background={MOCKUP_GRADIENTS.orange}
                         />
-                        <HubTile
-                            href={`${VENTURE_BASE}?view=myventures`}
-                            badge={`${own ? 1 : 0} MINE`}
-                            badgeClass="text-[#0b4b57]"
-                            emoji="💡"
-                            title="Create Faculty Venture"
-                            subtitle="Your own startup or opportunity, linked to you as founder. Self-certified — no student loop — and pitched to the university and, if you opt in, to investors in the CIEL Investor Hub."
-                            background="linear-gradient(135deg,#19b8a8,#0b8b86)"
+                        <MockupActionCard
+                            href={`${VENTURE_BASE}?view=pipeline&tab=under_review`}
+                            emoji="📬"
+                            ghost="📬"
+                            title="Ventures Under Review"
+                            subtitle="Submitted venture cards waiting for your decision — Accept, Request revision or Reject — with Email / WhatsApp reminders."
+                            badge={`${waiting.length} UNDER REVIEW`}
+                            background={MOCKUP_GRADIENTS.blue}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href={`${VENTURE_BASE}?view=wall`}
-                            badge={`${wallApproved.length} APPROVED`}
-                            badgeClass="text-[#1c8a52]"
                             emoji="🏅"
+                            ghost="🏅"
                             title="Ventures Impact Wall"
-                            subtitle="Approved student ventures and your certified faculty ventures, published automatically to the student, university and CIEL PK walls and — if opted in — the CIEL Investor Hub."
-                            background="linear-gradient(135deg,#2fb96b,#1c8a52)"
+                            subtitle="Approved student ventures and your certified faculty ventures, published automatically to the student, university and CIEL PK walls."
+                            badge={`${wallApproved.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.green}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href={`${VENTURE_BASE}?view=rank`}
-                            badge="AI GRADER"
-                            badgeClass="text-[#6a35c8]"
-                            emoji="🤖"
-                            title="Run AI Rankings"
-                            subtitle="Rank approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year."
-                            background="linear-gradient(135deg,#8f5bea,#6a35c8)"
+                            emoji="🧮"
+                            ghost="🧮"
+                            title="Startup AI Rankings"
+                            subtitle="Rank approved ventures. Waiting submissions stay out of the live picks."
+                            badge="RANKINGS"
+                            background={MOCKUP_GRADIENTS.purple}
+                        />
+                        <MockupActionCard
+                            href={`${VENTURE_BASE}?view=myventures`}
+                            emoji="💡"
+                            ghost="💡"
+                            title="Create Faculty Venture"
+                            subtitle="Your own startup or opportunity, linked to you as founder. Self-certified — no student loop — and pitched to the university and, if you opt in, to investors."
+                            badge={`${own ? 1 : 0} MINE`}
+                            background={MOCKUP_GRADIENTS.teal}
+                            full
                         />
                     </div>
                 )}

@@ -4,12 +4,14 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { CourseworkCrumb, CourseworkHero, HubTile, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { SDG_COLORS, SDG_SHORT, V11_STEPS } from "@/utils/ventureStudioV11";
+import { SDG_COLORS, SDG_SHORT, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 
@@ -29,7 +31,6 @@ const PIPE_TABS: { key: PipeTab; label: string }[] = [
     { key: "rejected", label: "Rejected" },
 ];
 const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Review"] as const;
-const HERO_GRADIENT = "radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)";
 
 type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
@@ -112,7 +113,7 @@ function formatDay(value?: string | null) {
 }
 function sectionPercents(entry: HubVenture) {
     if (entry.status === "submitted" && !isRevision(entry)) return SECTION_SHORT.map(() => 100);
-    const unlocked = Math.max(0, Math.min(6, entry.stepCompleted ?? 0));
+    const unlocked = Math.max(0, Math.min(6, hubProgressIndex(entry.stepCompleted ?? 0, (entry.academicSetup as { formVersion?: number } | undefined)?.formVersion)));
     return SECTION_SHORT.map((_, i) => (i < unlocked ? 100 : i === unlocked && unlocked < 6 ? 30 : 0));
 }
 function overallPct(entry: HubVenture) {
@@ -406,9 +407,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const tabCount = (key: PipeTab) => (key === "all" ? entries.length : entries.filter((e) => pipeTabOf(e) === key).length);
     const openRecord = (id?: string) => `${base}?view=record&id=${encodeURIComponent(id || "")}`;
     const recordEntry = entries.find((e) => e.id === recordId) || null;
-    const heroTitle = isCiel ? "CIEL PK Venture Network" : orgTitle;
     const deptCount = departments.length;
-    const facCount = faculties.length;
 
     const crumbView =
         screen === "home" ? undefined
@@ -458,111 +457,109 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     );
 
     return (
-        <div className="mx-auto max-w-[1120px] space-y-4 pb-16">
-            <CourseworkCrumb role={isCiel ? "CIEL PK Master Dashboard" : "University Dashboard"} view={crumbView} pathLabel="Startup / Venture" />
+        <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
+            <CourseworkCrumb role={isCiel ? "CIEL PK" : "University"} view={crumbView} pathLabel="Startup / Venture" />
             {screen === "home" ? (
-            <CourseworkHero
-                kicker={isCiel ? "NETWORK · STARTUP / VENTURE" : "IMPACT AREAS · STARTUP / VENTURE"}
-                title={heroTitle}
+            <MockupHero
+                kicker={isCiel ? "CIEL PK · STARTUP / VENTURE" : "UNIVERSITY · STARTUP / VENTURE"}
+                title={namedTimeGreeting(isCiel ? "CIEL PK" : orgTitle, "🚀")}
                 subtitle={
                     isCiel
-                        ? "Master view of every student venture across all partner universities — in process, under review, approved, ranked live, and showcased to investors through the CIEL Investor Hub."
-                        : "Every venture your students are building, across all departments and faculty — in process, under faculty review, and approved on your Ventures Impact Wall."
+                        ? "Track ventures from first draft to faculty verification across every university."
+                        : "Every venture your students are building, across all departments and faculty — from first draft to faculty verification."
                 }
-                gradient={HERO_GRADIENT}
-                roleBadge={isCiel ? "CIEL PK · SUPER ADMIN" : "UNIVERSITY"}
-                stats={
-                    isCiel
-                        ? [
-                            { value: String(universities.length), label: "UNIVERSITIES", href: `${base}?view=pipeline` },
-                            { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=pipeline&tab=process` },
-                            { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=pipeline&tab=under_review` },
-                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
-                            { value: String(investorReady.length), label: "IN INVESTOR HUB", href: `${base}?view=showcase` },
-                        ]
-                        : [
-                            { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=pipeline&tab=process` },
-                            { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=pipeline&tab=under_review` },
-                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
-                            { value: String(investorReady.length), label: "INVESTOR-READY", href: `${base}?view=wall` },
-                        ]
-                }
+                stats={[
+                    { value: String(approved.length), label: "APPROVED" },
+                    { value: String(waiting.length), label: "UNDER REVIEW" },
+                    { value: String(inProcess.length), label: "IN PROGRESS" },
+                ]}
             />
             ) : null}
 
             {screen === "home" && (
-                <div className="mt-[22px] grid grid-cols-1 gap-[22px] sm:grid-cols-2">
-                    <HubTile
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <MockupActionCard
                         href={`${base}?view=pipeline`}
-                        badge={`${inProcess.length} IN PROCESS · ${waiting.length} UNDER REVIEW`}
-                        badgeClass="text-[#c65b00]"
                         emoji="🧩"
+                        ghost="🧩"
                         title={isCiel ? "Network Startup Pipeline" : "University Startup Pipeline"}
                         subtitle={
                             isCiel
-                                ? "Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected. Filter by university; remind students or faculty."
-                                : `All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} and ${facCount || 1} faculty on one platform — percentage completion, category, status, and Email / WhatsApp reminders to students or their reviewing faculty.`
+                                ? "Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected."
+                                : `All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} — percentage completion, category, status, and Email / WhatsApp reminders.`
                         }
-                        background="linear-gradient(135deg,#f6a021,#e57a0f)"
+                        badge={`${inProcess.length} IN PROGRESS`}
+                        background={MOCKUP_GRADIENTS.orange}
                     />
-                    <HubTile
+                    <MockupActionCard
+                        href={`${base}?view=pipeline&tab=under_review`}
+                        emoji="📬"
+                        ghost="📬"
+                        title="Ventures Under Review"
+                        subtitle={
+                            isCiel
+                                ? "Submitted venture cards waiting for faculty decision across universities — remind whoever holds the workflow."
+                                : "Submitted venture cards waiting for faculty decision — remind the faculty member or the student."
+                        }
+                        badge={`${waiting.length} UNDER REVIEW`}
+                        background={MOCKUP_GRADIENTS.blue}
+                    />
+                    <MockupActionCard
+                        href={`${base}?view=wall`}
+                        emoji="🏅"
+                        ghost="🏅"
+                        title={isCiel ? "Approved Venture Impact" : "Ventures Impact Wall"}
+                        subtitle={
+                            isCiel
+                                ? "Every approved venture from every university — the same record the student, faculty and university see."
+                                : `Every approved venture from ${orgTitle} — the same record the student, faculty and CIEL PK see.`
+                        }
+                        badge={`${approved.length} APPROVED`}
+                        background={MOCKUP_GRADIENTS.green}
+                    />
+                    <MockupActionCard
+                        href={`${base}?view=rank`}
+                        emoji="🧮"
+                        ghost="🧮"
+                        title="Startup AI Rankings"
+                        subtitle="Rank approved ventures. Waiting submissions stay out of the live picks."
+                        badge="RANKINGS"
+                        background={MOCKUP_GRADIENTS.purple}
+                    />
+                    <MockupActionCard
                         href={`${base}?view=facventures`}
-                        badge={`${facultyOwned.length} FACULTY VENTURES`}
-                        badgeClass="text-[#1f6fc2]"
                         emoji="💡"
+                        ghost="💡"
                         title="Faculty Ventures"
                         subtitle={
                             isCiel
                                 ? "Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
                                 : "Self-certified ventures and opportunities owned by your faculty, pitched to the university and — if opted in — to investors."
                         }
-                        background="linear-gradient(135deg,#3aa2e4,#1f6fc2)"
-                    />
-                    <HubTile
-                        href={`${base}?view=wall`}
-                        badge={`${approved.length} APPROVED`}
-                        badgeClass="text-[#1c8a52]"
-                        emoji="🏅"
-                        title={isCiel ? "CIEL PK Approved Ventures" : "University Ventures Impact Wall"}
-                        subtitle={
-                            isCiel
-                                ? "The master impact wall: every approved venture from every university, with scores, badges and investor interest."
-                                : `Every approved venture from ${orgTitle} with faculty score, badges and investor interest. Showcase-ready for ORIC, visitors and accreditation.`
-                        }
-                        background="linear-gradient(135deg,#2fb96b,#1c8a52)"
-                    />
-                    <HubTile
-                        href={`${base}?view=rank`}
-                        badge={isCiel ? "LIVE" : "AI GRADER"}
-                        badgeClass="text-[#6a35c8]"
-                        emoji="🤖"
-                        title={isCiel ? "Live AI Rankings" : "Run AI Rankings"}
-                        subtitle={
-                            isCiel
-                                ? "Run the comparative AI grader across the whole network or one university, any time. The CIEL PK badge updates live."
-                                : `Rank ${orgTitle}'s approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year.`
-                        }
-                        background="linear-gradient(135deg,#8f5bea,#6a35c8)"
+                        badge={`${facultyOwned.length} FACULTY`}
+                        background={MOCKUP_GRADIENTS.teal}
+                        full={!isCiel}
                     />
                     {isCiel ? (
                         <>
-                            <HubTile
+                            <MockupActionCard
                                 href={`${base}?view=showcase`}
-                                badge={`${investorReady.length} INVESTMENT-READY`}
-                                badgeClass="text-[#c2185b]"
                                 emoji="🤝"
+                                ghost="🤝"
                                 title="Investor Hub Control"
                                 subtitle="Approved + opted-in ventures flow to the CIEL Investor Hub automatically. Spotlight the best and track expressions of interest."
-                                background="linear-gradient(135deg,#f06292,#c2185b)"
+                                badge={`${investorReady.length} READY`}
+                                background={MOCKUP_GRADIENTS.pink}
                             />
-                            <HubTile
+                            <MockupActionCard
                                 href={`${base}?view=activity`}
-                                badge="CONTACT REQUESTS"
-                                badgeClass="text-[#34495e]"
                                 emoji="🕵️"
+                                ghost="🕵️"
                                 title="Investor Activity Log"
-                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder — approve or decline founder-contact requests here."
-                                background="linear-gradient(135deg,#5c6f80,#34495e)"
+                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder."
+                                badge="CONTACT REQUESTS"
+                                background={MOCKUP_GRADIENTS.navy}
+                                full
                             />
                         </>
                     ) : null}

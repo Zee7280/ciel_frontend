@@ -14,7 +14,8 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { isPathEntryWaiting } from "@/utils/reviewQueue";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import CourseworkSectionGuide from "@/components/ciel/coursework/CourseworkSectionGuide";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
 import CourseworkImpactListCard from "@/components/ciel/coursework/CourseworkImpactListCard";
@@ -102,7 +103,7 @@ function CourseProjectHub() {
     const flashEntry = flashId ? approved.find((e) => e.id === flashId) ?? null : null;
 
     return (
-        <div className="mx-auto max-w-[1040px] pb-16">
+        <div className="mx-auto max-w-[1500px] pb-16">
             <CourseworkCrumb
                 role="Student"
                 view={
@@ -122,11 +123,10 @@ function CourseProjectHub() {
                 }
             />
             {view === "home" ? (
-                <CourseworkHero
+                <MockupHero
                     kicker="MY PATHS · COURSEWORK"
-                    title={namedTimeGreeting(name, "📘")}
+                    title={namedTimeGreeting(name === "there" ? "" : name, "📘")}
                     subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
-                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
                     stats={[
                         { value: String(approved.length), label: "APPROVED" },
                         { value: String(underReview.length), label: "UNDER REVIEW" },
@@ -327,52 +327,52 @@ function CourseProjectHub() {
 
             {view === "home" && (
                 <>
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <HubTile
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
                             href={createHref}
-                            badge="START"
-                            badgeClass="text-[#15988b]"
                             emoji="📚"
+                            ghost="📚"
                             title="Create Coursework Record"
                             subtitle="Open the Coursework Sustainability & SDG form. Seven short sections — each writes its own AI summary; no pre-approval needed."
-                            background="linear-gradient(135deg,#15988b,#2ec8bd)"
+                            badge={creating ? "OPENING" : "START"}
+                            background={MOCKUP_GRADIENTS.teal}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href="/dashboard/student/paths/course-project?view=in-progress"
-                            badge={`${inProgress} IN PROGRESS`}
-                            badgeClass="text-[#c76000]"
                             emoji="🧩"
+                            ghost="🧩"
                             title="Coursework in Progress"
                             subtitle="Records you're still filling in — completion bar, and Email / WhatsApp reminders for your team or your faculty."
-                            background="linear-gradient(135deg,#c76000,#f59a00)"
+                            badge={`${inProgress} IN PROGRESS`}
+                            background={MOCKUP_GRADIENTS.orange}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href="/dashboard/student/paths/course-project?view=under-review"
-                            badge={`${underReview.length} UNDER REVIEW`}
-                            badgeClass="text-[#16798c]"
                             emoji="📤"
+                            ghost="📤"
                             title="Coursework Under Review"
                             subtitle="Submitted flashcards waiting for faculty approval — with Email / WhatsApp buttons to remind your faculty."
-                            background="linear-gradient(135deg,#16798c,#38b8e6)"
+                            badge={`${underReview.length} UNDER REVIEW`}
+                            background={MOCKUP_GRADIENTS.blue}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href="/dashboard/student/impact?area=Coursework"
-                            badge={`${approved.length} APPROVED`}
-                            badgeClass="text-[#0e4d4e]"
                             emoji="🏅"
+                            ghost="🏅"
                             title="My Coursework Impact"
                             subtitle="Approved flashcards with ranking live under My Impact Portfolio → Coursework. University and CIEL PK see the same cards."
-                            background="linear-gradient(135deg,#0e4d4e,#117669)"
+                            badge={`${approved.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.green}
                         />
-                        <HubTile
+                        <MockupActionCard
                             href="/dashboard/student/paths/course-project?view=guide"
-                            badge="GUIDE INSIDE"
-                            badgeClass="text-[#6b2bd9]"
                             emoji="📘"
+                            ghost="📘"
                             title="Coursework Guidance"
                             subtitle="What to fill in, what evidence helps, and what happens after you submit."
-                            background="linear-gradient(135deg,#6b2bd9,#9f78ef)"
-                            className="sm:col-span-2"
+                            badge="GUIDE INSIDE"
+                            background={MOCKUP_GRADIENTS.purple}
+                            full
                         />
                     </div>
 

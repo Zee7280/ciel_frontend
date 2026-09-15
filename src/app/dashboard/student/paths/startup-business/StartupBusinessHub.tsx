@@ -11,7 +11,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
-import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS } from "@/utils/ventureStudioV11";
+import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 
 const BASE = "/dashboard/student/paths/startup-business";
 const WORKSPACE_HREF = `${BASE}?view=workspace`;
@@ -71,6 +71,7 @@ type HubVenture = {
         courseRef?: string;
         courseCode?: string;
         facultyRole?: string;
+        formVersion?: number;
     } | null;
     team?: HubTeamMember[] | null;
     publishSettings?: { audience?: string; acceptIntros?: boolean } | null;
@@ -150,7 +151,7 @@ function sdgNumbers(entry: HubVenture) {
 
 function sectionPercents(entry: HubVenture) {
     if (entry.status === "submitted" && !isRevision(entry)) return SECTION_SHORT.map(() => 100);
-    const unlocked = Math.max(0, Math.min(6, entry.stepCompleted ?? 0));
+    const unlocked = Math.max(0, Math.min(6, hubProgressIndex(entry.stepCompleted ?? 0, entry.academicSetup?.formVersion)));
     return SECTION_SHORT.map((_, i) => {
         if (i < unlocked) return 100;
         if (i === unlocked && unlocked < 6) return hasRecord(entry) ? 30 : 0;

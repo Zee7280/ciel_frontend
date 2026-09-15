@@ -351,8 +351,8 @@ interface CourseProjectSummary {
 const COURSE_PROJECT_TOTAL_STEPS = 8;
 /** Must match the frontend FYP wizard's STEPS.length (paths/fyp-thesis/page.tsx). */
 const FYP_TOTAL_STEPS = 9;
-/** Must match the frontend Enterprise Path wizard's STEPS.length (paths/startup-business/page.tsx). */
-const VENTURE_TOTAL_STEPS = 6;
+/** Must match the 9-step Venture Studio wizard (0–8 stored as stepCompleted). */
+const VENTURE_TOTAL_STEPS = 9;
 
 interface FypSummary {
     projectTitle: string | null;

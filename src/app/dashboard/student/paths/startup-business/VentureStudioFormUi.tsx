@@ -13,6 +13,8 @@ export function VsField({
     optional,
     children,
     className,
+    term,
+    onTerm,
 }: {
     label: string;
     hint?: string;
@@ -20,11 +22,23 @@ export function VsField({
     optional?: boolean;
     children: React.ReactNode;
     className?: string;
+    term?: string;
+    onTerm?: (key: string) => void;
 }) {
     return (
         <div className={clsx("mb-3", className)}>
             <label className={vsLabel}>
                 {label}
+                {term && onTerm ? (
+                    <button
+                        type="button"
+                        className="ml-1 inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#a63d65] bg-white align-middle text-[11px] font-black text-[#a63d65] hover:bg-[#a63d65] hover:text-white"
+                        onClick={() => onTerm(term)}
+                        aria-label="Explain this term"
+                    >
+                        ?
+                    </button>
+                ) : null}
                 {tag === "required" ? (
                     <span className="ml-1.5 rounded-full bg-[#f8e8ef] px-1.5 py-0.5 text-[9px] font-black normal-case tracking-normal text-[#8b3155]">
                         required
@@ -294,4 +308,37 @@ export function VsNav({
 export function toggleChip(list: string[] | undefined, v: string) {
     const cur = list ?? [];
     return cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+}
+
+export function VsExplain({ summary, children }: { summary: string; children: React.ReactNode }) {
+    return (
+        <details className="my-3 overflow-hidden rounded-[14px] border border-[#ead9e2] bg-[#fdf7fa]">
+            <summary className="cursor-pointer list-none px-3.5 py-2.5 text-[12.5px] font-extrabold text-[#7d2b4d] marker:content-none [&::-webkit-details-marker]:hidden">
+                {summary}
+            </summary>
+            <div className="px-3.5 pb-3.5 text-[12.5px] leading-relaxed text-[#4b3a45]">{children}</div>
+        </details>
+    );
+}
+
+export function VsEx({ children }: { children: React.ReactNode }) {
+    return <div className="mt-1.5 rounded-lg border-l-[3px] border-[#a63d65] bg-white px-2.5 py-2 text-[#5b3d50]">{children}</div>;
+}
+
+export function VsTerm({ term, onTerm, children }: { term: string; onTerm: (k: string) => void; children: React.ReactNode }) {
+    return (
+        <button type="button" className="cursor-help border-b-[1.5px] border-dotted border-[#a63d65] font-bold text-[#7d2b4d]" onClick={() => onTerm(term)}>
+            {children}
+        </button>
+    );
+}
+
+export function VsCalc({ children, tone = "ok" }: { children: React.ReactNode; tone?: "ok" | "warn" | "bad" }) {
+    const cls =
+        tone === "bad"
+            ? "bg-[#fff0f2] border-[#efc3ca] text-[#8a2c3b]"
+            : tone === "warn"
+              ? "bg-[#fff3dc] border-[#eed9a5] text-[#7b5314]"
+              : "bg-[#f3f7f4] border-[#cfe3d6] text-[#2b5b41]";
+    return <div className={clsx("my-2 rounded-[11px] border px-3 py-2.5 text-xs leading-relaxed", cls)}>{children}</div>;
 }

@@ -63,6 +63,7 @@ function NavRow({
     return (
         <Link
             href={href}
+            scroll
             className={clsx(
                 "ciel-transition relative mx-[10px] mb-[5px] flex w-[calc(100%-20px)] items-center gap-[13px] rounded-[14px] px-3.5 py-3.5 text-left text-[14px] font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]",
                 active ? "bg-[#22515b] text-white shadow-[inset_4px_0_0_#42ddb2]" : "text-[#c8d4da] hover:bg-white/[0.055] hover:text-white",
@@ -417,7 +418,7 @@ export default function Sidebar() {
         () => [
             { label: "Community Service", href: "/dashboard/faculty/community-service", emoji: "⛺" },
             { label: "Coursework Project", href: "/dashboard/faculty/coursework-projects", emoji: "📚" },
-            { label: "FYP / Thesis", href: "/dashboard/faculty/fyp-thesis", emoji: "🎓" },
+            { label: "FYP / Final Year Project", href: "/dashboard/faculty/fyp-thesis", emoji: "🎓" },
             { label: "Startup / Business", href: "/dashboard/faculty/startup-business", emoji: "💼" },
         ],
         [],
