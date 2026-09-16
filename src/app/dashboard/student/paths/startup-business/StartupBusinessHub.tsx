@@ -1056,54 +1056,57 @@ export default function StartupBusinessHub({
             ) : null}
 
             {view === "home" && (
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <MockupActionCard
-                        href={CREATE_HREF}
-                        emoji="🚀"
-                        ghost="🚀"
-                        title="Create Startup Record"
-                        subtitle="Open the CIEL PK Venture Studio form. Each section auto-saves; your first saved fields create a venture record shared with your team, faculty, university and CIEL PK. No pre-approval needed."
-                        badge="START"
-                        background={MOCKUP_GRADIENTS.teal}
-                    />
-                    <MockupActionCard
-                        href={IN_PROGRESS_HREF}
-                        emoji="🧩"
-                        ghost="🧩"
-                        title="Startup Workspace"
-                        subtitle="Drafts you are still filling in and ventures returned for revision — completion bar, status tracker, and Email / WhatsApp reminders for your team or your faculty."
-                        badge={workspaceBadge || "0 in progress"}
-                        background={MOCKUP_GRADIENTS.orange}
-                    />
-                    <MockupActionCard
-                        href={UNDER_REVIEW_HREF}
-                        emoji="📬"
-                        ghost="📬"
-                        title="Ventures Under Review"
-                        subtitle="Submitted venture cards waiting for faculty decision — Accept, Request revision or Reject — with Email / WhatsApp buttons to remind your faculty."
-                        badge={`${underReview.length} under review`}
-                        background={MOCKUP_GRADIENTS.blue}
-                    />
-                    <MockupActionCard
-                        href={WALL_HREF}
-                        emoji="🏅"
-                        ghost="🏅"
-                        title="My Ventures Impact Wall"
-                        subtitle="Your approved ventures with faculty score, remarks and analysis. Approved cards also appear on your University's Ventures Impact Wall, CIEL PK, and — if you opted in — the CIEL Investor Hub."
-                        badge={wallBadge || "0 approved"}
-                        background={MOCKUP_GRADIENTS.green}
-                    />
-                    <MockupActionCard
-                        href={GUIDE_HREF}
-                        emoji="📘"
-                        ghost="📘"
-                        title="How the venture loop works"
-                        subtitle="Create → submit → faculty decision → publish. Open the guide for the full loop, including revision and investor opt-in."
-                        badge="GUIDE INSIDE"
-                        background={MOCKUP_GRADIENTS.purple}
-                        full
-                    />
-                </div>
+                <>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
+                            href={CREATE_HREF}
+                            emoji="🚀"
+                            ghost="🚀"
+                            title="Create Startup Record"
+                            subtitle="Open the CIEL PK Venture Studio form (v11). Six steps — each writes its own AI summary; your first saved fields issue a Venture ID and auto-save to your workspace. No pre-approval needed."
+                            badge="START"
+                            background={MOCKUP_GRADIENTS.orange}
+                        />
+                        <MockupActionCard
+                            href={IN_PROGRESS_HREF}
+                            emoji="🧩"
+                            ghost="🧩"
+                            title="Startup Workspace"
+                            subtitle="Drafts you are still filling in and ventures returned for revision — completion bar per section, status tracker, and Email / WhatsApp reminders for your team or your faculty."
+                            badge={`${inProgress.length} IN PROGRESS${revision.length ? ` · ${revision.length} REVISION` : ""}`}
+                            background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <MockupActionCard
+                            href={UNDER_REVIEW_HREF}
+                            emoji="📬"
+                            ghost="📬"
+                            title="Ventures Under Review"
+                            subtitle="Submitted venture cards waiting for faculty decision — Accept, Request revision or Reject — with Email / WhatsApp buttons to remind your faculty."
+                            badge={`${underReview.length} UNDER REVIEW`}
+                            background={MOCKUP_GRADIENTS.blue}
+                        />
+                        <MockupActionCard
+                            href={WALL_HREF}
+                            emoji="🏅"
+                            ghost="🏅"
+                            title="My Ventures Impact Wall"
+                            subtitle="Your approved ventures with faculty score, remarks and analysis. Approved cards also appear on your University's Ventures Impact Wall, CIEL PK, and — if you opted in — the CIEL Investor Hub."
+                            badge={`${approved.length} APPROVED${investorOpen ? " · 1 INVESTOR INTEREST" : ""}`}
+                            background={MOCKUP_GRADIENTS.green}
+                        />
+                    </div>
+                    <div className="mt-[22px] rounded-[22px] p-7 text-white shadow-[0_8px_30px_rgba(10,30,40,.08)]" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}>
+                        <span className="float-right rounded-full bg-white px-4 py-2 text-[11.5px] font-extrabold tracking-wide text-[#6a35c8]">
+                            GUIDE INSIDE
+                        </span>
+                        <h3 className="m-0 text-[22px] font-bold">📘 How the venture loop works</h3>
+                        <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14.5px] leading-relaxed">
+                            {LOOP_STEPS.map((step) => (
+                                <li key={step}>{step}</li>
+                            ))}
+                        </ol>
+                    </div>
+                </>
             )}
         </div>
     );
