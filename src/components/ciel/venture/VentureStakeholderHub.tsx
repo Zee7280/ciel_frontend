@@ -599,20 +599,22 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
             <CourseworkCrumb role={isCiel ? "CIEL PK" : "University"} view={crumbView} pathLabel="Startup / Venture" />
             {screen === "home" ? (
             <MockupHero
-                badge={isCiel ? "CIEL PK" : "UNIVERSITY"}
-                kicker={isCiel ? "CIEL PK · STARTUP / VENTURE" : "Impact Areas · Startup / Venture"}
-                title={isCiel ? namedTimeGreeting("CIEL PK", "🚀") : orgTitle}
+                badge={isCiel ? "CIEL PK · SUPER ADMIN" : "UNIVERSITY"}
+                kicker={isCiel ? "NETWORK · STARTUP / VENTURE" : "Impact Areas · Startup / Venture"}
+                title={isCiel ? "CIEL PK Venture Network" : orgTitle}
                 subtitle={
                     isCiel
-                        ? "Track ventures from first draft to faculty verification across every university."
+                        ? "Master view of every student venture across all partner universities — in process, under review, approved, ranked live, and showcased to investors through the CIEL Investor Hub."
                         : "Every venture your students are building, across all departments and faculty — in process, under faculty review, and approved on your Ventures Impact Wall."
                 }
                 stats={
                     isCiel
                         ? [
-                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
+                            { value: String(universities.length), label: "UNIVERSITIES", href: `${base}?view=pipeline` },
+                            { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=process` },
                             { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=review` },
-                            { value: String(inProcess.length), label: "IN PROGRESS", href: `${base}?view=process` },
+                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
+                            { value: String(investorReady.length), label: "IN INVESTOR HUB", href: `${base}?view=showcase` },
                         ]
                         : [
                             { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=process` },
@@ -626,86 +628,51 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
 
             {screen === "home" && (
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <MockupActionCard
-                        href={`${base}?view=pipeline`}
-                        emoji="🧩"
-                        ghost="🧩"
-                        title={isCiel ? "Network Startup Pipeline" : "University Startup Pipeline"}
-                        subtitle={
-                            isCiel
-                                ? "Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected."
-                                : `All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} and ${facCount || 1} faculty on one platform — percentage completion, category, status, and Email / WhatsApp reminders to students or their reviewing faculty.`
-                        }
-                        badge={isCiel ? `${inProcess.length} IN PROGRESS` : `${inProcess.length} in process · ${waiting.length} under review`}
-                        background={MOCKUP_GRADIENTS.orange}
-                    />
-                    {isCiel ? (
-                    <MockupActionCard
-                        href={`${base}?view=pipeline&tab=under_review`}
-                        emoji="📬"
-                        ghost="📬"
-                        title="Ventures Under Review"
-                        subtitle="Submitted venture cards waiting for faculty decision across universities — remind whoever holds the workflow."
-                        badge={`${waiting.length} UNDER REVIEW`}
-                        background={MOCKUP_GRADIENTS.blue}
-                    />
-                    ) : (
-                    <MockupActionCard
-                        href={`${base}?view=facventures`}
-                        emoji="💡"
-                        ghost="💡"
-                        title="Faculty Ventures"
-                        subtitle="Self-certified ventures and opportunities owned by your faculty, pitched to the university and — if opted in — to investors."
-                        badge={`${facultyOwned.length} faculty ventures`}
-                        background={MOCKUP_GRADIENTS.blue}
-                    />
-                    )}
-                    <MockupActionCard
-                        href={`${base}?view=wall`}
-                        emoji="🏅"
-                        ghost="🏅"
-                        title={isCiel ? "Approved Venture Impact" : "University Ventures Impact Wall"}
-                        subtitle={
-                            isCiel
-                                ? "Every approved venture from every university — the same record the student, faculty and university see."
-                                : `Every approved venture from ${orgTitle} with faculty score, badges and investor interest. Showcase-ready for ORIC, visitors and accreditation.`
-                        }
-                        badge={`${approved.length} approved`}
-                        background={MOCKUP_GRADIENTS.green}
-                    />
-                    <MockupActionCard
-                        href={`${base}?view=rank`}
-                        emoji="🤖"
-                        ghost="🤖"
-                        title={isCiel ? "Startup AI Rankings" : "Run AI Rankings"}
-                        subtitle={
-                            isCiel
-                                ? "Rank approved ventures. Waiting submissions stay out of the live picks."
-                                : `Rank ${orgTitle}'s approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year.`
-                        }
-                        badge={isCiel ? "RANKINGS" : "AI grader"}
-                        background={MOCKUP_GRADIENTS.purple}
-                    />
-                    {isCiel ? (
-                    <MockupActionCard
-                        href={`${base}?view=facventures`}
-                        emoji="💡"
-                        ghost="💡"
-                        title="Faculty Ventures"
-                        subtitle="Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
-                        badge={`${facultyOwned.length} FACULTY`}
-                        background={MOCKUP_GRADIENTS.teal}
-                    />
-                    ) : null}
                     {isCiel ? (
                         <>
+                            <MockupActionCard
+                                href={`${base}?view=pipeline`}
+                                emoji="🧩"
+                                ghost="🧩"
+                                title="Network Startup Pipeline"
+                                subtitle="Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected. Filter by university; remind students or faculty."
+                                badge={`${inProcess.length} IN PROCESS · ${waiting.length} UNDER REVIEW`}
+                                background={MOCKUP_GRADIENTS.teal}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=facventures`}
+                                emoji="💡"
+                                ghost="💡"
+                                title="Faculty Ventures"
+                                subtitle="Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
+                                badge={`${facultyOwned.length} FACULTY VENTURES`}
+                                background={MOCKUP_GRADIENTS.navy}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=wall`}
+                                emoji="🏅"
+                                ghost="🏅"
+                                title="CIEL PK Approved Ventures"
+                                subtitle="The master impact wall: every approved venture from every university, with scores, badges and investor interest."
+                                badge={`${approved.length} APPROVED`}
+                                background={MOCKUP_GRADIENTS.orange}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=rank`}
+                                emoji="🤖"
+                                ghost="🤖"
+                                title="Live AI Rankings"
+                                subtitle="Run the comparative AI grader across the whole network or one university, any time. The CIEL PK badge updates live."
+                                badge="LIVE"
+                                background={MOCKUP_GRADIENTS.purple}
+                            />
                             <MockupActionCard
                                 href={`${base}?view=showcase`}
                                 emoji="🤝"
                                 ghost="🤝"
                                 title="Investor Hub Control"
                                 subtitle="Approved + opted-in ventures flow to the CIEL Investor Hub automatically. Spotlight the best and track expressions of interest."
-                                badge={`${investorReady.length} READY`}
+                                badge={`${investorReady.length} INVESTMENT-READY`}
                                 background={MOCKUP_GRADIENTS.pink}
                             />
                             <MockupActionCard
@@ -713,13 +680,51 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 emoji="🕵️"
                                 ghost="🕵️"
                                 title="Investor Activity Log"
-                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder."
+                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder — approve or decline founder-contact requests here."
                                 badge="CONTACT REQUESTS"
-                                background={MOCKUP_GRADIENTS.navy}
-                                full
+                                background={MOCKUP_GRADIENTS.slate}
                             />
                         </>
-                    ) : null}
+                    ) : (
+                        <>
+                            <MockupActionCard
+                                href={`${base}?view=pipeline`}
+                                emoji="🧩"
+                                ghost="🧩"
+                                title="University Startup Pipeline"
+                                subtitle={`All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} and ${facCount || 1} faculty on one platform — percentage completion, category, status, and Email / WhatsApp reminders to students or their reviewing faculty.`}
+                                badge={`${inProcess.length} in process · ${waiting.length} under review`}
+                                background={MOCKUP_GRADIENTS.orange}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=facventures`}
+                                emoji="💡"
+                                ghost="💡"
+                                title="Faculty Ventures"
+                                subtitle="Self-certified ventures and opportunities owned by your faculty, pitched to the university and — if opted in — to investors."
+                                badge={`${facultyOwned.length} faculty ventures`}
+                                background={MOCKUP_GRADIENTS.blue}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=wall`}
+                                emoji="🏅"
+                                ghost="🏅"
+                                title="University Ventures Impact Wall"
+                                subtitle={`Every approved venture from ${orgTitle} with faculty score, badges and investor interest. Showcase-ready for ORIC, visitors and accreditation.`}
+                                badge={`${approved.length} approved`}
+                                background={MOCKUP_GRADIENTS.green}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=rank`}
+                                emoji="🤖"
+                                ghost="🤖"
+                                title="Run AI Rankings"
+                                subtitle={`Rank ${orgTitle}'s approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year.`}
+                                badge="AI grader"
+                                background={MOCKUP_GRADIENTS.purple}
+                            />
+                        </>
+                    )}
                 </div>
             )}
 

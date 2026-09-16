@@ -14,6 +14,7 @@ export const MOCKUP_GRADIENTS = {
     navy: "linear-gradient(135deg,#183b56,#286786)",
     gold: "linear-gradient(135deg,#a67516,#d5aa46)",
     red: "linear-gradient(135deg,#a33d49,#d7626a)",
+    slate: "linear-gradient(135deg,#5c6f80,#34495e)",
 } as const;
 
 export const COMMAND_HERO = "linear-gradient(120deg,#073b42,#11978f)";
