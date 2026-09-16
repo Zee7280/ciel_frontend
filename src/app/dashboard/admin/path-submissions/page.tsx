@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
@@ -13,8 +13,8 @@ import CourseworkCard from "@/components/ciel/CourseworkCard";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import Tabs from "@/components/ciel/Tabs";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
-import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { CourseworkCrumb, HubBackButton, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
@@ -191,8 +191,8 @@ const COURSE_VIEW_CRUMB: Record<Exclude<CourseView, "home">, string> = {
 const FYP_VIEW_CRUMB: Record<Exclude<FypHubView, "home">, string> = {
     progress: "FYP in Progress",
     review: "FYP Under Review",
-    approved: "Approved FYP Impact",
-    rank: "FYP AI Rankings",
+    approved: "Approved FYP + AI Ranking",
+    rank: "Approved FYP + AI Ranking",
 };
 
 function tabFromSearch(tab: string | null): PathTab {
@@ -234,6 +234,8 @@ function AdminPathSubmissionsHub() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
     const [fypReviewTab, setFypReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
+    const [fypApprovedTab, setFypApprovedTab] = useState<"studio" | "list">("studio");
+    const [hubStats, setHubStats] = useState<{ active: number; attention: number; hub: number; completion: number } | null>(null);
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [approvedMeritEntries, setApprovedMeritEntries] = useState<MeritEntry[]>([]);
@@ -280,6 +282,33 @@ function AdminPathSubmissionsHub() {
             .finally(() => {
                 if (!cancelled) setFypMeritLoading(false);
             });
+        return () => {
+            cancelled = true;
+        };
+    }, [pathTab, fypView]);
+
+    useEffect(() => {
+        if (pathTab !== "fyp-thesis" || fypView !== "home") return;
+        let cancelled = false;
+        authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/dashboard"), {}, { redirectToLogin: false, timeoutMs: 60_000 })
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                if (cancelled) return;
+                const metrics = result?.data?.metrics as
+                    | { opportunities?: number; pendingApprovals?: number; totalReports?: number; totalUsers?: { total?: number } }
+                    | undefined;
+                if (!metrics) return;
+                const pending = metrics.pendingApprovals ?? 0;
+                const reports = metrics.totalReports ?? 0;
+                const active = metrics.opportunities ?? metrics.totalUsers?.total ?? 0;
+                setHubStats({
+                    active,
+                    attention: pending,
+                    hub: reports,
+                    completion: reports + pending > 0 ? Math.round((reports / (reports + pending)) * 100) : 0,
+                });
+            })
+            .catch(() => undefined);
         return () => {
             cancelled = true;
         };
@@ -384,6 +413,19 @@ function AdminPathSubmissionsHub() {
         () => fypRowsAsMerit.filter(isPathEntryWaiting),
         [fypRowsAsMerit],
     );
+    const revisionFyp = useMemo(
+        () => fypRowsAsMerit.filter((r) => r.status === "submitted" && r.supervisorApprovalStatus === "revision_requested"),
+        [fypRowsAsMerit],
+    );
+    const rejectedFyp = useMemo(
+        () => fypRowsAsMerit.filter((r) => r.status === "submitted" && r.supervisorApprovalStatus === "rejected"),
+        [fypRowsAsMerit],
+    );
+    const underReviewFyp = useMemo(
+        () => fypRowsAsMerit.filter((r) => r.status === "submitted" && !isPathEntryApproved(r)),
+        [fypRowsAsMerit],
+    );
+    const underReviewFypBadge = underReviewFyp.filter((r) => r.supervisorApprovalStatus !== "rejected").length;
     const draftFyp = useMemo(
         () => fypRowsAsMerit.filter((r) => r.status === "draft"),
         [fypRowsAsMerit],
@@ -489,16 +531,23 @@ function AdminPathSubmissionsHub() {
                     {fypView === "home" ? (
                     <>
                     <MockupHero
-                        kicker="CIEL PK · FYP / FINAL YEAR PROJECT"
-                        title={namedTimeGreeting("CIEL PK", "🎓")}
-                        subtitle="Track Final Year Project records from first draft to faculty / supervisor verification."
+                        title="Final Year Project (FYP)"
+                        subtitle="Track Final Year Projects from initial draft through faculty approval and final EI analysis."
                         stats={[
-                            { value: String(approvedFyp.length), label: "APPROVED" },
-                            { value: String(waitingFyp.length), label: "UNDER REVIEW" },
-                            { value: String(draftFyp.length), label: "IN PROGRESS" },
+                            { value: String(hubStats?.active ?? fypRows.length), label: "Active Records" },
+                            { value: String(hubStats?.attention ?? underReviewFypBadge), label: "Need Attention" },
+                            { value: String(hubStats?.hub ?? approvedFyp.length), label: "On Impact Hub" },
                         ]}
+                        rightStat={{
+                            value: `${hubStats?.completion ?? (approvedFyp.length + underReviewFypBadge > 0 ? Math.round((approvedFyp.length / (approvedFyp.length + underReviewFypBadge)) * 100) : 0)}%`,
+                            label: "approval completion this semester",
+                        }}
                     />
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <MockupSectionHead
+                        title="Final Year Project (FYP)"
+                        subtitle="No pre-approval. CIEL PK sees each Final Year Project the moment the student starts, follows it through supervisor review, and receives every approved flashcard automatically."
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
                             href={tabHref("fyp-thesis", "progress")}
                             emoji="🔬"
@@ -510,30 +559,21 @@ function AdminPathSubmissionsHub() {
                         />
                         <MockupActionCard
                             href={tabHref("fyp-thesis", "review")}
-                            emoji="📤"
-                            ghost="📤"
+                            emoji="📝"
+                            ghost="📝"
                             title="FYP Under Review"
-                            subtitle="Submitted flashcards waiting for supervisor approval, or returned for revision — remind whoever holds the workflow."
-                            badge={`${waitingFyp.length} UNDER REVIEW`}
+                            subtitle="Submitted flashcards waiting for supervisor approval or returned for student revision. Remind whoever holds the workflow."
+                            badge={`${underReviewFypBadge} UNDER REVIEW`}
                             background={MOCKUP_GRADIENTS.blue}
                         />
                         <MockupActionCard
                             href={tabHref("fyp-thesis", "approved")}
                             emoji="🏅"
                             ghost="🏅"
-                            title="Approved FYP Impact"
-                            subtitle="Every supervisor-approved Final Year Project across universities — the same record the student, supervisor and university see."
+                            title="Approved FYP + CIEL PK AI Analyser"
+                            subtitle="Every supervisor-approved FYP across all universities and disciplines, each with its faculty score and badges. Run the CIEL PK AI Analyser any day, any time — benchmarked against excellent work per discipline, ranked best → less best with rationale; the live badge moves like a stock (▲ green / ▼ red) on every student's flashcard."
                             badge={`${approvedFyp.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
-                        />
-                        <MockupActionCard
-                            href={tabHref("fyp-thesis", "rank")}
-                            emoji="🧮"
-                            ghost="🧮"
-                            title="FYP AI Rankings"
-                            subtitle="Rank approved Final Year Projects nationwide. Waiting submissions stay out of the live picks."
-                            badge="RANKINGS"
-                            background={MOCKUP_GRADIENTS.purple}
                         />
                     </div>
                     </>
@@ -700,10 +740,15 @@ function AdminPathSubmissionsHub() {
                 </>
             ) : pathTab === "fyp-thesis" && fypView === "progress" ? (
                 <>
-                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
+                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
+                    <PathSectionHead
+                        title="FYP in Progress"
+                        subtitle={`${draftFyp.length} record${draftFyp.length === 1 ? "" : "s"} · Super Admin rule: wherever a student is holding the workflow, Email + WhatsApp reminder actions sit on that exact record.`}
+                        pill="READ ONLY"
+                    />
                     <p className="text-sm text-slate-500">Live workspace-linked completion status across all universities.</p>
                     {draftFyp.length === 0 ? (
-                        <Card className="border-dashed p-10 text-center text-slate-500">Nothing in progress right now.</Card>
+                        <Card className="border-dashed p-10 text-center text-slate-500">No Final Year Projects in progress.</Card>
                     ) : (
                         <div className="space-y-4">
                             {draftFyp.map((entry) => (
@@ -714,31 +759,34 @@ function AdminPathSubmissionsHub() {
                 </>
             ) : pathTab === "fyp-thesis" && fypView === "review" ? (
                 (() => {
-                    const byTab = {
-                        pending: waitingFyp.filter((e) => e.supervisorApprovalStatus === "pending"),
-                        revision: waitingFyp.filter((e) => e.supervisorApprovalStatus === "revision_requested"),
-                        rejected: waitingFyp.filter((e) => e.supervisorApprovalStatus === "rejected"),
-                    };
-                    const visible = fypReviewTab === "all" ? waitingFyp : byTab[fypReviewTab];
+                    const visible =
+                        fypReviewTab === "pending" ? waitingFyp
+                            : fypReviewTab === "revision" ? revisionFyp
+                              : fypReviewTab === "rejected" ? rejectedFyp
+                                : underReviewFyp;
                     return (
                         <>
-                            <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
+                            <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
+                            <PathSectionHead
+                                title="FYP Under Review"
+                                subtitle="Student has submitted. Supervisor review is pending, or a revision has been returned to the student. CIEL PK cannot skip the supervisor."
+                                pill="SUPERVISOR DECIDES"
+                            />
                             <p className="text-sm text-slate-500">
-                                The supervisor decides; the AI review score is visible only to the supervisor. CIEL PK sees status,
-                                owner and waiting time.
+                                The AI Analyser has run automatically on each submission; the supervisor decides and may edit it. CIEL PK sees status, owner and waiting time — and the released score once approved.
                             </p>
                             <Tabs
                                 tabs={[
-                                    { key: "all", label: `All · ${waitingFyp.length}` },
-                                    { key: "pending", label: `Waiting supervisor · ${byTab.pending.length}` },
-                                    { key: "revision", label: `Revision with student · ${byTab.revision.length}` },
-                                    { key: "rejected", label: `Rejected · ${byTab.rejected.length}` },
+                                    { key: "all", label: `All · ${underReviewFyp.length}` },
+                                    { key: "pending", label: `Waiting supervisor · ${waitingFyp.length}` },
+                                    { key: "revision", label: `Revision with student · ${revisionFyp.length}` },
+                                    { key: "rejected", label: `Rejected · ${rejectedFyp.length}` },
                                 ]}
                                 active={fypReviewTab}
                                 onChange={(key) => setFypReviewTab(key as typeof fypReviewTab)}
                             />
                             {visible.length === 0 ? (
-                                <Card className="border-dashed p-10 text-center text-slate-500">Nothing in this tab right now.</Card>
+                                <Card className="border-dashed p-10 text-center text-slate-500">Nothing under review.</Card>
                             ) : (
                                 <div className="space-y-4">
                                     {visible.map((entry) => (
@@ -756,32 +804,43 @@ function AdminPathSubmissionsHub() {
                         </>
                     );
                 })()
-            ) : pathTab === "fyp-thesis" && fypView === "approved" ? (
+            ) : pathTab === "fyp-thesis" && (fypView === "approved" || fypView === "rank") ? (
                 <>
-                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
+                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
+                    <PathSectionHead
+                        title="Approved FYP + AI Ranking"
+                        subtitle="Every supervisor-approved Final Year Project flashcard, and the CIEL PK live FYP ranking on top of it. Locked faculty and university badges are never changed by the live run. Only supervisor-approved records are ranked."
+                        pill="CIEL PK LIVE"
+                    />
+                    <p className="text-sm text-slate-500">
+                        {fypMeritEntries.length} approved flashcard{fypMeritEntries.length === 1 ? "" : "s"} across all universities · CIEL PK may run the live AI Analyser anytime — every run re-ranks the national cohort and updates each student&apos;s live badge with a ▲/▼ trend.
+                    </p>
+                    <Tabs
+                        tabs={[
+                            { key: "studio", label: "🏆 FYP Ranking Studio (live)" },
+                            { key: "list", label: "🃏 Approved list" },
+                        ]}
+                        active={fypApprovedTab}
+                        onChange={(key) => setFypApprovedTab(key as typeof fypApprovedTab)}
+                    />
                     {fypMeritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
+                    ) : fypApprovedTab === "studio" ? (
+                        fypMeritEntries.length === 0 ? (
+                            <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
+                        ) : (
+                            <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                        )
                     ) : fypMeritEntries.length === 0 ? (
-                        <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
+                        <Card className="border-dashed p-10 text-center text-slate-500">No approved Final Year Projects yet.</Card>
                     ) : (
                         <div className="space-y-4">
                             {fypMeritEntries.map((entry) => (
                                 <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
                             ))}
                         </div>
-                    )}
-                </>
-            ) : pathTab === "fyp-thesis" && fypView === "rank" ? (
-                <>
-                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to FYP / Thesis" />
-                    {fypMeritLoading ? (
-                        <div className="flex justify-center py-20">
-                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                        </div>
-                    ) : (
-                        <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                     )}
                 </>
             ) : pathTab === "fyp-thesis" ? null : (

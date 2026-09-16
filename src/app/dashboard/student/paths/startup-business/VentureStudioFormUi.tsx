@@ -1,10 +1,32 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
 
 export const vsField =
     "w-full rounded-[11px] border border-[#e5e7eb] bg-[#fbfcfe] px-3 py-2.5 text-sm text-[#1e293b] outline-none focus:border-[#a63d65] focus:shadow-[0_0_0_3px_rgba(166,61,101,.1)]";
 export const vsLabel = "mb-1.5 block text-[11px] font-extrabold uppercase tracking-[0.055em] text-[#71788a]";
+
+export function VsExample({ text, onUse }: { text: string; onUse?: () => void }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div>
+            <button type="button" className="border-0 bg-transparent p-0 text-[11.5px] font-extrabold text-[#a63d65]" onClick={() => setOpen((v) => !v)}>
+                {open ? "Hide example" : "See example"}
+            </button>
+            {open ? (
+                <div className="mt-2 rounded-[11px] border border-dashed border-[#d9b7c7] bg-[#fdf7fa] px-3 py-2.5 text-xs leading-relaxed text-[#5b3d50]">
+                    <b className="text-[#7d2b4d]">Example:</b> {text}
+                    {onUse ? (
+                        <button type="button" className="mt-1.5 block rounded-lg border border-[#d9b7c7] bg-white px-2 py-1 text-[11px] font-extrabold text-[#7d2b4d]" onClick={onUse}>
+                            Use this example
+                        </button>
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
+    );
+}
 
 export function VsField({
     label,
@@ -15,6 +37,10 @@ export function VsField({
     className,
     term,
     onTerm,
+    example,
+    onUseExample,
+    count,
+    max,
 }: {
     label: string;
     hint?: string;
@@ -24,6 +50,10 @@ export function VsField({
     className?: string;
     term?: string;
     onTerm?: (key: string) => void;
+    example?: string;
+    onUseExample?: () => void;
+    count?: string;
+    max?: number;
 }) {
     return (
         <div className={clsx("mb-3", className)}>
@@ -53,7 +83,19 @@ export function VsField({
                 ) : null}
             </label>
             {children}
-            {hint ? <p className="mt-1 text-[11.5px] leading-snug text-[#6b7280]">{hint}</p> : null}
+            {hint || example || count != null ? (
+                <div className="mt-1.5 flex items-start justify-between gap-2.5">
+                    <div className="min-w-0">
+                        {hint ? <p className="m-0 text-[11.5px] leading-snug text-[#6b7280]">{hint}</p> : null}
+                        {example ? <VsExample text={example} onUse={onUseExample} /> : null}
+                    </div>
+                    {count != null ? (
+                        <span className={clsx("shrink-0 text-[10.5px] tabular-nums", max && count.length > max * 0.9 ? "font-extrabold text-[#b57417]" : "text-[#a39aa1]")}>
+                            {count.length}{max ? ` / ${max}` : ""}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
         </div>
     );
 }

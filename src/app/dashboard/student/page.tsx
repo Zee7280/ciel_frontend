@@ -51,7 +51,7 @@ const PATH_CARDS = [
         href: "/dashboard/student/paths/fyp-thesis",
         emoji: "🎓",
         ghost: "🎓",
-        title: "FYP / Final Year Project",
+        title: "Final Year Project (FYP)",
         subtitle: "Build your final-year impact record from draft to faculty verification.",
         badge: "OPEN",
         background: MOCKUP_GRADIENTS.orange,

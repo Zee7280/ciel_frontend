@@ -11,7 +11,7 @@ import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { SDG_COLORS, SDG_SHORT, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
+import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 
@@ -21,6 +21,7 @@ const UNI_VIEWS = ["home", "pipeline", "wall", "rank", "facventures", "record", 
 const CIEL_VIEWS = [...UNI_VIEWS, "showcase", "activity"] as const;
 type HubView = (typeof CIEL_VIEWS)[number];
 type PipeTab = "all" | "just" | "process" | "under_review" | "revision" | "approved" | "rejected";
+type HubSort = "updated" | "completion" | "score" | "interest" | "name";
 const PIPE_TABS: { key: PipeTab; label: string }[] = [
     { key: "all", label: "All" },
     { key: "just", label: "Just Started" },
@@ -261,6 +262,65 @@ function remindFaculty(entry: HubVenture) {
     const body = `Hi ${name},\n\n"${title}" is waiting on faculty review in CIEL PK. Please open Startup / Venture → Startup Pipeline to continue.\n`;
     return { to: entry.academicSetup?.supervisorEmail || "", subject, body, label: name };
 }
+function meritScore(entry: HubVenture) {
+    return entry.meritRibbon?.total ?? computeVentureMeritScorecard(entry).total;
+}
+function tractionLine(entry: HubVenture) {
+    const rows = (entry.tractionRows || []).filter((r) => r.metric || r.value).slice(0, 3);
+    if (!rows.length) return "no traction logged";
+    return rows.map((r) => [r.metric, r.value].filter(Boolean).join(" ")).join("; ");
+}
+function analyserNotes(entry: HubVenture) {
+    const scorecard = computeVentureMeritScorecard(entry);
+    const ranked = [...scorecard.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
+    const best = ranked[0];
+    const worst = ranked[ranked.length - 1];
+    const traction = scorecard.criteria.find((c) => c.key === "traction");
+    const ratio = traction ? traction.points / traction.max : 0;
+    const analytical = `Analytical: weighted VEN-RANK 1.0 score ${scorecard.total}/100 — strongest on ${best?.label.toLowerCase() || "the rubric"} (${best?.points ?? 0}/${best?.max ?? 0}), weakest on ${worst?.label.toLowerCase() || "the rubric"} (${worst?.points ?? 0}/${worst?.max ?? 0}).`;
+    const critical =
+        (ratio >= 0.8
+            ? "Critical: traction claims are evidence-backed and consistent with the stated model."
+            : ratio >= 0.5
+              ? "Critical: traction is real but early; scale-up assumptions remain untested."
+              : "Critical: traction evidence is thin — ranking is capped until independent evidence is provided.") +
+        ((entry.team?.length || 1) <= 1 ? " Solo-founder execution risk noted." : "");
+    const factual = `Factual: ${entry.stage || "stage not set"} · ${tractionLine(entry)} · ${isInvestorOpen(entry) ? "opted in to investors" : "not seeking investment"}.`;
+    return { scorecard, analytical, critical, factual, band: scorecard.grade };
+}
+function activityLog(entry: HubVenture) {
+    const rows: { who: string; action: string; t: string }[] = [];
+    if (entry.createdAt) rows.push({ who: ownerName(entry), action: "Venture record created", t: formatDay(entry.createdAt) });
+    if (entry.reviewPipeline?.studentDeclaredAt) {
+        rows.push({
+            who: ownerName(entry),
+            action: "Submitted for faculty review — record locked, venture card generated, AI pre-screen run",
+            t: formatDay(entry.reviewPipeline.studentDeclaredAt),
+        });
+    }
+    const faculty = facultyName(entry) || "Faculty";
+    if (isRevision(entry)) rows.push({ who: faculty, action: "Revision requested — returned to student workspace", t: formatDay(entry.updatedAt) });
+    else if (isRejected(entry)) rows.push({ who: faculty, action: "Rejected — record preserved, not published", t: formatDay(entry.updatedAt) });
+    else if (isPathEntryApproved(entry)) {
+        rows.push({
+            who: isFacultyVenture(entry) ? ownerName(entry) : faculty,
+            action: isFacultyVenture(entry)
+                ? `Faculty venture self-certified and published to impact walls${isInvestorOpen(entry) ? " and CIEL Investor Hub" : ""}`
+                : `Approved — published to all Ventures Impact Walls${isInvestorOpen(entry) ? " and CIEL Investor Hub" : ""}`,
+            t: formatDay(entry.updatedAt),
+        });
+    } else if (isPathEntryWaiting(entry)) {
+        rows.push({ who: faculty, action: "Awaiting faculty decision — university cannot skip faculty review", t: formatDay(entry.updatedAt) });
+    }
+    if (entry.meritRibbon?.at) {
+        rows.push({
+            who: "University AI Grader",
+            action: `Ranked #${entry.meritRibbon.rank} of ${entry.meritRibbon.of}${entry.meritRibbon.scope ? ` · ${entry.meritRibbon.scope}` : ""}`,
+            t: formatDay(entry.meritRibbon.at),
+        });
+    }
+    return rows.reverse();
+}
 
 export default function VentureStakeholderHub({ variant }: { variant: VentureHubVariant }) {
     return (
@@ -294,6 +354,10 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const [deptFilter, setDeptFilter] = useState("");
     const [ownerFilter, setOwnerFilter] = useState("");
     const [investorFilter, setInvestorFilter] = useState("");
+    const [sectorFilter, setSectorFilter] = useState("");
+    const [stageFilter, setStageFilter] = useState("");
+    const [sdgFilter, setSdgFilter] = useState("");
+    const [sortBy, setSortBy] = useState<HubSort>("updated");
     const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
     const base = isCiel ? "/dashboard/admin/startup-business" : "/dashboard/partner/startup-business";
@@ -383,6 +447,12 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const universities = useMemo(() => [...new Set(entries.map(universityNameOf).filter(Boolean))].sort(), [entries]);
     const faculties = useMemo(() => [...new Set(entries.map(facultyName).filter(Boolean))].sort(), [entries]);
     const departments = useMemo(() => [...new Set(entries.map((e) => e.academicSetup?.department || e.student?.department).filter(Boolean) as string[])].sort(), [entries]);
+    const sectors = useMemo(() => [...new Set(entries.map((e) => e.ideaInfo?.sector).filter(Boolean) as string[])].sort(), [entries]);
+    const stages = useMemo(() => {
+        const fromData = [...new Set(entries.map((e) => e.stage).filter(Boolean) as string[])];
+        return [...new Set([...V11_STAGES.map((s) => s.id), ...fromData])];
+    }, [entries]);
+    const sdgOptions = useMemo(() => [...new Set(entries.flatMap(sdgNumbers))].sort((a, b) => a - b), [entries]);
 
     const matchesFilters = (entry: HubVenture) => {
         if (uniFilter && universityNameOf(entry) !== uniFilter) return false;
@@ -392,22 +462,60 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
         if (ownerFilter === "student" && isFacultyVenture(entry)) return false;
         if (investorFilter === "yes" && !isInvestorOpen(entry)) return false;
         if (investorFilter === "no" && isInvestorOpen(entry)) return false;
+        if (sectorFilter && entry.ideaInfo?.sector !== sectorFilter) return false;
+        if (stageFilter && entry.stage !== stageFilter) return false;
+        if (sdgFilter && !sdgNumbers(entry).includes(Number(sdgFilter))) return false;
         const q = query.trim().toLowerCase();
         if (!q) return true;
         return [entry.ventureName, ownerName(entry), entry.student?.email, entry.ideaInfo?.sector, displayVentureId(entry), universityNameOf(entry)].join(" ").toLowerCase().includes(q);
     };
 
-    const pipeRows = entries
-        .filter((e) => (pipeTab === "all" ? true : pipeTabOf(e) === pipeTab))
-        .filter(matchesFilters)
-        .sort((a, b) => {
-            const order: Record<string, number> = { under_review: 0, revision: 1, just: 2, process: 3, approved: 4, rejected: 5 };
-            return (order[pipeTabOf(a)] ?? 9) - (order[pipeTabOf(b)] ?? 9) || overallPct(b) - overallPct(a);
+    const sortEntries = (list: HubVenture[]) => {
+        const interestOf = (e: HubVenture) => (isFeatured(e) ? 2 : 0) + (isInvestorOpen(e) ? 1 : 0);
+        return list.slice().sort((a, b) => {
+            if (sortBy === "completion") return overallPct(b) - overallPct(a);
+            if (sortBy === "score") return meritScore(b) - meritScore(a);
+            if (sortBy === "interest") return interestOf(b) - interestOf(a);
+            if (sortBy === "name") return (a.ventureName || "").localeCompare(b.ventureName || "");
+            return (b.updatedAt || "").localeCompare(a.updatedAt || "");
         });
+    };
+
+    const pipeRows = sortEntries(
+        entries
+            .filter((e) => (pipeTab === "all" ? true : pipeTabOf(e) === pipeTab))
+            .filter(matchesFilters),
+    ).sort((a, b) => {
+        const order: Record<string, number> = { under_review: 0, revision: 1, just: 2, process: 3, approved: 4, rejected: 5 };
+        return (order[pipeTabOf(a)] ?? 9) - (order[pipeTabOf(b)] ?? 9) || overallPct(b) - overallPct(a);
+    });
     const tabCount = (key: PipeTab) => (key === "all" ? entries.length : entries.filter((e) => pipeTabOf(e) === key).length);
     const openRecord = (id?: string) => `${base}?view=record&id=${encodeURIComponent(id || "")}`;
     const recordEntry = entries.find((e) => e.id === recordId) || null;
     const deptCount = departments.length;
+    const facCount = faculties.length;
+    const wallRows = sortEntries(approved.filter(matchesFilters));
+    const facultyRows = sortEntries(facultyOwned.filter(matchesFilters));
+    const rankPool = sortEntries(approved.filter(matchesFilters));
+    const lastBadgeAt = approved
+        .map((e) => e.meritRibbon?.at)
+        .filter(Boolean)
+        .sort()
+        .at(-1);
+    const activeFilterCount = [uniFilter, facultyFilter, deptFilter, investorFilter, ownerFilter, sectorFilter, stageFilter, sdgFilter, query].filter(Boolean).length;
+    const clearFilters = () => {
+        setUniFilter("");
+        setFacultyFilter("");
+        setDeptFilter("");
+        setOwnerFilter("");
+        setInvestorFilter("");
+        setSectorFilter("");
+        setStageFilter("");
+        setSdgFilter("");
+        setQuery("");
+        setSortBy("updated");
+    };
+    const selectCls = "min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm";
 
     const crumbView =
         screen === "home" ? undefined
@@ -423,36 +531,66 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const filterBar = (showUni: boolean) => (
         <div className="mb-4 flex flex-wrap gap-2.5">
             {showUni ? (
-                <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className="min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm">
+                <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className={selectCls}>
                     <option value="">All universities</option>
                     {universities.map((u) => (
                         <option key={u} value={u}>{u}</option>
                     ))}
                 </select>
             ) : null}
-            <select value={facultyFilter} onChange={(e) => setFacultyFilter(e.target.value)} className="min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm">
+            <select value={facultyFilter} onChange={(e) => setFacultyFilter(e.target.value)} className={selectCls}>
                 <option value="">All faculty</option>
                 {faculties.map((f) => (
                     <option key={f} value={f}>{f}</option>
                 ))}
             </select>
-            <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm">
+            <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className={selectCls}>
                 <option value="">All departments</option>
                 {departments.map((d) => (
                     <option key={d} value={d}>{d}</option>
                 ))}
             </select>
-            <select value={investorFilter} onChange={(e) => setInvestorFilter(e.target.value)} className="min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm">
+            <select value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)} className={selectCls}>
+                <option value="">All sectors</option>
+                {sectors.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                ))}
+            </select>
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className={selectCls}>
+                <option value="">All stages</option>
+                {stages.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                ))}
+            </select>
+            <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={selectCls}>
+                <option value="">All SDGs</option>
+                {sdgOptions.map((n) => (
+                    <option key={n} value={String(n)}>SDG {n} — {SDG_SHORT[n]}</option>
+                ))}
+            </select>
+            <select value={investorFilter} onChange={(e) => setInvestorFilter(e.target.value)} className={selectCls}>
                 <option value="">Investor opt-in: any</option>
                 <option value="yes">Opted in to investors</option>
                 <option value="no">Not seeking investment</option>
             </select>
-            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="min-w-[170px] rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm">
+            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className={selectCls}>
                 <option value="">Student + faculty ventures</option>
                 <option value="student">Student ventures</option>
                 <option value="faculty">Faculty ventures</option>
             </select>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as HubSort)} className={selectCls}>
+                <option value="updated">Recently updated</option>
+                <option value="completion">Completion %</option>
+                <option value="score">Score</option>
+                <option value="interest">Investor interest</option>
+                <option value="name">Name A–Z</option>
+            </select>
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search venture, student, ID…" className="min-w-[170px] flex-1 rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm" />
+            {activeFilterCount ? (
+                <button type="button" onClick={clearFilters} className="rounded-xl border border-[#e3e9ee] bg-white px-3 py-2 text-[13px] font-bold text-[#0b4b57]">
+                    ✕ Clear {activeFilterCount}
+                </button>
+            ) : null}
         </div>
     );
 
@@ -461,18 +599,28 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
             <CourseworkCrumb role={isCiel ? "CIEL PK" : "University"} view={crumbView} pathLabel="Startup / Venture" />
             {screen === "home" ? (
             <MockupHero
-                kicker={isCiel ? "CIEL PK · STARTUP / VENTURE" : "UNIVERSITY · STARTUP / VENTURE"}
-                title={namedTimeGreeting(isCiel ? "CIEL PK" : orgTitle, "🚀")}
+                badge={isCiel ? "CIEL PK" : "UNIVERSITY"}
+                kicker={isCiel ? "CIEL PK · STARTUP / VENTURE" : "Impact Areas · Startup / Venture"}
+                title={isCiel ? namedTimeGreeting("CIEL PK", "🚀") : orgTitle}
                 subtitle={
                     isCiel
                         ? "Track ventures from first draft to faculty verification across every university."
-                        : "Every venture your students are building, across all departments and faculty — from first draft to faculty verification."
+                        : "Every venture your students are building, across all departments and faculty — in process, under faculty review, and approved on your Ventures Impact Wall."
                 }
-                stats={[
-                    { value: String(approved.length), label: "APPROVED" },
-                    { value: String(waiting.length), label: "UNDER REVIEW" },
-                    { value: String(inProcess.length), label: "IN PROGRESS" },
-                ]}
+                stats={
+                    isCiel
+                        ? [
+                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
+                            { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=review` },
+                            { value: String(inProcess.length), label: "IN PROGRESS", href: `${base}?view=process` },
+                        ]
+                        : [
+                            { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=process` },
+                            { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=review` },
+                            { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
+                            { value: String(investorReady.length), label: "INVESTOR-READY", href: `${base}?view=wall` },
+                        ]
+                }
             />
             ) : null}
 
@@ -486,60 +634,69 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         subtitle={
                             isCiel
                                 ? "Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected."
-                                : `All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} — percentage completion, category, status, and Email / WhatsApp reminders.`
+                                : `All student and faculty ventures across ${deptCount || 1} department${deptCount === 1 ? "" : "s"} and ${facCount || 1} faculty on one platform — percentage completion, category, status, and Email / WhatsApp reminders to students or their reviewing faculty.`
                         }
-                        badge={`${inProcess.length} IN PROGRESS`}
+                        badge={isCiel ? `${inProcess.length} IN PROGRESS` : `${inProcess.length} in process · ${waiting.length} under review`}
                         background={MOCKUP_GRADIENTS.orange}
                     />
+                    {isCiel ? (
                     <MockupActionCard
                         href={`${base}?view=pipeline&tab=under_review`}
                         emoji="📬"
                         ghost="📬"
                         title="Ventures Under Review"
-                        subtitle={
-                            isCiel
-                                ? "Submitted venture cards waiting for faculty decision across universities — remind whoever holds the workflow."
-                                : "Submitted venture cards waiting for faculty decision — remind the faculty member or the student."
-                        }
+                        subtitle="Submitted venture cards waiting for faculty decision across universities — remind whoever holds the workflow."
                         badge={`${waiting.length} UNDER REVIEW`}
                         background={MOCKUP_GRADIENTS.blue}
                     />
-                    <MockupActionCard
-                        href={`${base}?view=wall`}
-                        emoji="🏅"
-                        ghost="🏅"
-                        title={isCiel ? "Approved Venture Impact" : "Ventures Impact Wall"}
-                        subtitle={
-                            isCiel
-                                ? "Every approved venture from every university — the same record the student, faculty and university see."
-                                : `Every approved venture from ${orgTitle} — the same record the student, faculty and CIEL PK see.`
-                        }
-                        badge={`${approved.length} APPROVED`}
-                        background={MOCKUP_GRADIENTS.green}
-                    />
-                    <MockupActionCard
-                        href={`${base}?view=rank`}
-                        emoji="🧮"
-                        ghost="🧮"
-                        title="Startup AI Rankings"
-                        subtitle="Rank approved ventures. Waiting submissions stay out of the live picks."
-                        badge="RANKINGS"
-                        background={MOCKUP_GRADIENTS.purple}
-                    />
+                    ) : (
                     <MockupActionCard
                         href={`${base}?view=facventures`}
                         emoji="💡"
                         ghost="💡"
                         title="Faculty Ventures"
+                        subtitle="Self-certified ventures and opportunities owned by your faculty, pitched to the university and — if opted in — to investors."
+                        badge={`${facultyOwned.length} faculty ventures`}
+                        background={MOCKUP_GRADIENTS.blue}
+                    />
+                    )}
+                    <MockupActionCard
+                        href={`${base}?view=wall`}
+                        emoji="🏅"
+                        ghost="🏅"
+                        title={isCiel ? "Approved Venture Impact" : "University Ventures Impact Wall"}
                         subtitle={
                             isCiel
-                                ? "Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
-                                : "Self-certified ventures and opportunities owned by your faculty, pitched to the university and — if opted in — to investors."
+                                ? "Every approved venture from every university — the same record the student, faculty and university see."
+                                : `Every approved venture from ${orgTitle} with faculty score, badges and investor interest. Showcase-ready for ORIC, visitors and accreditation.`
                         }
+                        badge={`${approved.length} approved`}
+                        background={MOCKUP_GRADIENTS.green}
+                    />
+                    <MockupActionCard
+                        href={`${base}?view=rank`}
+                        emoji="🤖"
+                        ghost="🤖"
+                        title={isCiel ? "Startup AI Rankings" : "Run AI Rankings"}
+                        subtitle={
+                            isCiel
+                                ? "Rank approved ventures. Waiting submissions stay out of the live picks."
+                                : `Rank ${orgTitle}'s approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year.`
+                        }
+                        badge={isCiel ? "RANKINGS" : "AI grader"}
+                        background={MOCKUP_GRADIENTS.purple}
+                    />
+                    {isCiel ? (
+                    <MockupActionCard
+                        href={`${base}?view=facventures`}
+                        emoji="💡"
+                        ghost="💡"
+                        title="Faculty Ventures"
+                        subtitle="Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
                         badge={`${facultyOwned.length} FACULTY`}
                         background={MOCKUP_GRADIENTS.teal}
-                        full={!isCiel}
                     />
+                    ) : null}
                     {isCiel ? (
                         <>
                             <MockupActionCard
@@ -614,7 +771,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack href={homeHref} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">💡 Faculty Ventures — {facultyOwned.filter(matchesFilters).length}</h3>
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">💡 Faculty Ventures — {facultyRows.length}</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
                                     ? "Self-certified ventures owned by faculty founders across the network. CIEL PK may spot-check any record and spotlight investor-opted ones."
@@ -623,11 +780,11 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         </div>
                     </div>
                     {filterBar(isCiel)}
-                    {loading ? <SkeletonList /> : facultyOwned.filter(matchesFilters).length === 0 ? (
+                    {loading ? <SkeletonList /> : facultyRows.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">No faculty ventures yet.</div>
                     ) : (
                         <div className="flex flex-col gap-3.5">
-                            {facultyOwned.filter(matchesFilters).map((entry) => (
+                            {facultyRows.map((entry) => (
                                 <PipelineRow key={entry.id} entry={entry} onOpen={() => { window.location.href = openRecord(entry.id); }} showUniversity={isCiel} />
                             ))}
                         </div>
@@ -640,7 +797,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack href={homeHref} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏅 {isCiel ? "CIEL PK Approved Ventures" : "University Ventures Impact Wall"} — {approved.filter(matchesFilters).length}</h3>
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏅 {isCiel ? "CIEL PK Approved Ventures" : "University Ventures Impact Wall"} — {wallRows.length}</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
                                     ? "Network-wide impact wall of every faculty-approved venture. Rejected records are preserved below but never published."
@@ -650,11 +807,11 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         <a href={`${base}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">🤖 Run AI Grader</a>
                     </div>
                     {filterBar(isCiel)}
-                    {loading ? <SkeletonList /> : approved.filter(matchesFilters).length === 0 ? (
+                    {loading ? <SkeletonList /> : wallRows.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">No approved ventures yet.</div>
                     ) : (
                         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
-                            {approved.filter(matchesFilters).map((entry) => (
+                            {wallRows.map((entry) => (
                                 <WallCard
                                     key={entry.id}
                                     entry={entry}
@@ -697,18 +854,23 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
                                     ? "CIEL PK runs live any time; the CIEL PK badge moves with every published run, while faculty and university badges stay on the same student card. Filter the cohort first if you want one university."
-                                    : "Same rights as faculty: unlimited previews, 3 published finals per academic year. Published finals put a University badge on the student Impact Wall card."}
+                                    : "Same rights as faculty: unlimited previews, 3 published finals per academic year. Published finals put a University badge on the top 5 Impact Wall cards."}
                             </p>
                         </div>
                     </div>
                     {filterBar(isCiel)}
+                    <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{rankPool.length}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Approved ventures in cohort</small></div>
+                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{isCiel ? "∞" : "3"}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{isCiel ? "Live runs — unlimited" : "Published finals per academic year"}</small></div>
+                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{lastBadgeAt ? formatDay(lastBadgeAt) : "—"}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Last published badge</small></div>
+                    </div>
                     {loading ? (
                         <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
-                    ) : approved.filter(matchesFilters).length === 0 ? (
+                    ) : rankPool.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">Approve at least one submitted venture to run the merit model.</div>
                     ) : (
                         <VentureMeritPanel
-                            entries={approved.filter(matchesFilters) as VentureMeritPanelEntry[]}
+                            entries={rankPool as VentureMeritPanelEntry[]}
                             meritEndpoint="/api/v1/paths/startup-business/merit-model"
                             scopeName={isCiel ? "CIEL PK network" : orgTitle}
                         />
@@ -847,6 +1009,11 @@ function PipelineRow({
                 <span className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
                     Action with: {waiting ? "Faculty" : isPathEntryApproved(entry) ? "None — Approved" : isRejected(entry) ? "None — Rejected" : isFacultyVenture(entry) ? "Faculty founder" : "Student"}
                 </span>
+                {waiting ? (
+                    <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[12px] font-bold text-[#5e35b1]">
+                        AI pre-screen {meritScore(entry)} · {computeVentureMeritScorecard(entry).grade}
+                    </span>
+                ) : null}
                 {draftish && student.to ? (
                     <>
                         <a href={mailtoHref(student.to, student.subject, student.body)} className="rounded-[10px] bg-[#3b5ba9] px-3 py-1.5 text-[12.5px] font-bold text-white">Email {student.label}</a>
@@ -947,8 +1114,11 @@ function RecordView({
         );
     }
     const waiting = isPathEntryWaiting(entry);
-    const scorecard = computeVentureMeritScorecard(entry);
+    const notes = analyserNotes(entry);
+    const scorecard = notes.scorecard;
     const ribbon = entry.meritRibbon;
+    const decided = entry.reviewPipeline?.supervisorStatus && entry.reviewPipeline.supervisorStatus !== "pending" && entry.reviewPipeline.supervisorStatus !== "not_started";
+    const log = activityLog(entry);
     return (
         <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
             <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
@@ -962,13 +1132,23 @@ function RecordView({
             </div>
             <VentureTimeline entry={entry} />
             <div className="mt-4 overflow-hidden rounded-[22px] border border-[#e3e9ee]">
-                <div className="bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
-                    <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {universityNameOf(entry)}</div>
-                    <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
-                    <div className="mt-1.5 text-[13px] text-[#dff3f1]">
-                        {isFacultyVenture(entry) ? "Faculty venture · " : ""}
-                        {ownerName(entry)}
-                        {!isFacultyVenture(entry) && facultyName(entry) ? ` · Faculty: ${facultyName(entry)}` : ""}
+                <div className="flex flex-wrap items-start justify-between gap-4 bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
+                    <div>
+                        <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {universityNameOf(entry)}</div>
+                        <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
+                        <div className="mt-1.5 text-[13px] text-[#dff3f1]">
+                            {isFacultyVenture(entry) ? "Faculty venture · " : ""}
+                            {ownerName(entry)}
+                            {(entry.team || []).length > 1 ? ` + ${(entry.team || []).length - 1} team` : ""}
+                            {entry.academicSetup?.courseCode ? ` · ${entry.academicSetup.courseCode}` : ""}
+                            {!isFacultyVenture(entry) && facultyName(entry) ? ` · Faculty: ${facultyName(entry)}` : ""}
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <StatusChip entry={entry} />
+                        <div className="mt-2 text-[12px] text-[#dff3f1]">
+                            {isInvestorOpen(entry) ? "🤝 Open to investors" : "🔒 Not seeking investment"}
+                        </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5 p-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -976,6 +1156,8 @@ function RecordView({
                         { k: "Sector · Stage", v: [entry.ideaInfo?.sector, entry.stage].filter(Boolean).join(" · ") },
                         { k: "Problem", v: entry.ideaInfo?.problem || entry.ideaInfo?.pitch },
                         { k: "Solution", v: entry.solutionInfo?.solution },
+                        { k: "Business model", v: entry.solutionInfo?.revenue || (entry.solutionInfo?.revenueModels || []).join(", ") },
+                        { k: "Traction & evidence", v: tractionLine(entry) === "no traction logged" ? "" : tractionLine(entry) },
                         { k: "Team", v: (entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || ownerName(entry) },
                     ].filter((x) => x.v).map((x) => (
                         <div key={x.k} className="rounded-xl bg-[#f6f8fa] px-3 py-2.5 text-[13px]">
@@ -983,6 +1165,17 @@ function RecordView({
                             {x.v}
                         </div>
                     ))}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e3e9ee] px-6 py-4">
+                    <div>
+                        {sdgNumbers(entry).map((n) => (
+                            <span key={n} title={SDG_SHORT[n]} className="mr-1.5 mb-1 inline-block rounded-lg px-2 py-0.5 text-[11.5px] font-extrabold text-white" style={{ background: SDG_COLORS[n] }}>SDG {n}</span>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="max-w-[220px] text-right text-[12px] text-[#5d6c78]">AI pre-screen (decision support only — never shown to the student)</span>
+                        <ScoreRing value={scorecard.total} label={notes.band} />
+                    </div>
                 </div>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
@@ -999,38 +1192,84 @@ function RecordView({
                 </div>
                 <div className="rounded-[18px] border border-[#e3e9ee] p-5">
                     <b>AI notes</b>
-                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]">
-                        {scorecard.grade} · {scorecard.total}/100. {waiting
-                            ? "University and CIEL PK can view this card and remind faculty. Only the named faculty member can approve, request revision, or reject."
-                            : entry.reviewPipeline?.supervisorNote || "No faculty remarks stored."}
-                    </p>
-                    {entry.status !== "submitted" || isRevision(entry) ? <CompletionBar entry={entry} /> : null}
+                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Analytical:</b> {notes.analytical.replace(/^Analytical:\s*/, "")}</p>
+                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Critical:</b> {notes.critical.replace(/^Critical:\s*/, "")}</p>
+                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Factual:</b> {notes.factual.replace(/^Factual:\s*/, "")}</p>
+                    {variant !== "ciel" && waiting ? (
+                        <p className="mt-3 text-[13px] text-[#5d6c78]">University can view this card and remind faculty. Only the named faculty member can approve, request revision, or reject.</p>
+                    ) : null}
+                    {entry.status !== "submitted" || isRevision(entry) ? (
+                        <div className="mt-3 rounded-[14px] bg-[#fff8e1] px-4 py-3 text-[13.5px]">
+                            Record still in the student workspace — completion {overallPct(entry)}%.
+                            <CompletionBar entry={entry} />
+                        </div>
+                    ) : null}
                 </div>
             </div>
-            {entry.reviewPipeline?.supervisorStatus && entry.reviewPipeline.supervisorStatus !== "pending" && entry.reviewPipeline.supervisorStatus !== "not_started" ? (
-                <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
-                    <p className="mt-2 text-[14px] leading-relaxed">{entry.reviewPipeline.supervisorNote || "No overall remarks."}</p>
+            {decided ? (
+                <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
+                    <div className="rounded-[18px] border border-[#e3e9ee] p-5">
+                        <div className="flex items-center gap-4">
+                            {ribbon?.total != null || scorecard.total ? <ScoreRing value={ribbon?.total ?? scorecard.total} label="FACULTY SCORE" /> : null}
+                            <div>
+                                <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
+                                <p className="mt-2 text-[14px] leading-relaxed">{entry.reviewPipeline?.supervisorNote || "No overall remarks."}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="rounded-[18px] border border-[#e3e9ee] p-5">
+                        <b>Section remarks</b>
+                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">No section-level remarks.</p>
+                    </div>
                 </div>
             ) : null}
             {isPathEntryApproved(entry) ? (
                 <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
                     <b>Recognition & investor activity</b>
-                    <p className="mt-2 text-[13.5px] text-[#5d6c78]">
-                        {ribbon ? `Ranked #${ribbon.rank} of ${ribbon.of}${ribbon.total != null ? ` · ${ribbon.total}/100` : ""} · ${ribbon.scope}.` : "No ranking badges yet."}
-                    </p>
+                    {ribbon ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="rounded-lg border border-[#d1c4e9] bg-[#ede7f6] px-2 py-0.5 text-[11px] font-extrabold text-[#5e35b1]">
+                                {variant === "ciel" ? "🌐" : "🏛️"} Rank #{ribbon.rank} · {ribbon.scope}
+                            </span>
+                        </div>
+                    ) : (
+                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">No ranking badges yet.</p>
+                    )}
                     {isInvestorOpen(entry) ? (
-                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">Opted in to the CIEL Investor Hub{isFeatured(entry) ? " · currently spotlighted." : "."}</p>
+                        <div className="mt-3 rounded-[14px] bg-[#e8f7ef] px-4 py-3">
+                            <b>🤝 Investor activity via CIEL Investor Hub</b>
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Card views</small></div>
+                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Interest received</small></div>
+                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Founder-contact requests</small></div>
+                            </div>
+                            {variant === "ciel" && onSpotlight ? (
+                                <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`mt-3 rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
+                                    {isFeatured(entry) ? "Remove Investor Hub spotlight" : "Spotlight in Investor Hub"}
+                                </button>
+                            ) : null}
+                        </div>
                     ) : (
                         <p className="mt-2 text-[13.5px] text-[#5d6c78]">Not opted in to investors — impact walls only.</p>
                     )}
-                    {variant === "ciel" && onSpotlight && isInvestorOpen(entry) ? (
-                        <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`mt-3 rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
-                            {isFeatured(entry) ? "Remove Investor Hub spotlight" : "Spotlight in Investor Hub"}
-                        </button>
-                    ) : null}
                 </div>
             ) : null}
+            <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
+                <b>Activity log</b>
+                {log.length === 0 ? (
+                    <p className="mt-2 text-[13.5px] text-[#5d6c78]">No activity recorded yet.</p>
+                ) : (
+                    <div className="mt-3 divide-y divide-[#eef2f5]">
+                        {log.map((row, i) => (
+                            <div key={`${row.t}-${i}`} className="grid grid-cols-1 gap-1 py-2.5 text-[13px] sm:grid-cols-[160px_1fr_110px]">
+                                <span className="font-bold text-[#14212b]">{row.who}</span>
+                                <span className="text-[#5d6c78]">{row.action}</span>
+                                <span className="text-[#9aa8b2] sm:text-right">{row.t}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -1041,6 +1280,16 @@ function SkeletonList() {
             {[1, 2, 3].map((i) => (
                 <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
             ))}
+        </div>
+    );
+}
+
+function ScoreRing({ value, label }: { value: number; label: string }) {
+    const pct = Math.max(0, Math.min(100, value));
+    return (
+        <div className="flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-full border-[5px] border-[#0f8f8a] bg-white text-center">
+            <b className="text-[16px] leading-none text-[#0b4b57]">{Math.round(pct)}</b>
+            <small className="mt-0.5 max-w-[58px] text-[8px] font-extrabold uppercase leading-tight tracking-wide text-[#5d6c78]">{label}</small>
         </div>
     );
 }

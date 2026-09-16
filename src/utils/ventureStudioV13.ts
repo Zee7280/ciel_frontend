@@ -712,6 +712,30 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
         d: "Chronic exhaustion and falling performance from sustained overwork — weeks or months of it, not a busy week.",
         e: "A student founder juggling exams and 50 hours a week on the venture stops replying to customers.",
     },
+    "employee-burnout": {
+        cat: "Team health",
+        t: "Employee / team burnout",
+        d: "The same exhaustion pattern across a team, usually from unclear roles, unpaid work for too long, or one person carrying everything.",
+        e: "Three co-founders work unpaid for 8 months with no agreed roles. Two start prioritising jobs; the venture stalls.",
+    },
+    "business-burnout": {
+        cat: "Team health",
+        t: "Business burnout",
+        d: "When the business exhausts cash, stock or goodwill faster than it can renew them — even if the idea is still good.",
+        e: "A team spends its entire PKR 300,000 on inventory before confirming demand, and unsold stock ties up all the cash.",
+    },
+    dilution: {
+        cat: "Funding",
+        t: "Dilution",
+        d: "When you sell new shares to investors, everyone’s existing percentage shrinks. Normal and expected, but founders should understand it before each round.",
+        e: "Two founders at 50/50 sell 10% to an investor → each founder now holds 45%.",
+    },
+    "pre-seed": {
+        cat: "Funding",
+        t: "Pre-seed / seed / angel / VC",
+        d: "Stages of outside investment. Pre-seed is first small cheques to build an MVP. Seed proves customers will pay. Angels invest personal money. VC invests a fund’s money for ownership.",
+        e: "A PKR 2M cheque from a university alumni fund to build the app and run 3 pilots is a pre-seed round.",
+    },
     capacity: {
         cat: "Operations",
         t: "Capacity",
@@ -806,4 +830,383 @@ export function teamHealthLabel(opts: { paceScore?: string; burnoutSigns?: strin
 export type V13Row = { a?: string; b?: string; c?: string; d?: string; e?: string };
 export function filledRows(rows: V13Row[] | undefined, keys: (keyof V13Row)[]) {
     return (rows || []).filter((r) => keys.some((k) => String(r[k] || "").trim())).length;
+}
+
+export const TEAM_TIME = ["Full-time", "Part-time", "Advisor only", "Undecided"];
+
+export const FIELD_EXAMPLES: Record<string, string> = {
+    teamFit: "We are three textile-design students. Two of us have interned at garment exporters in Faisalabad for two semesters, so we know how orders, fabric sourcing and rejections actually work. Our third member built the ordering prototype in Flutter.",
+    founderInsight: "Small food manufacturers do not reject compostable packaging because of price — they reject it because suppliers cannot deliver consistent sizes on time. Reliability, not cost, is the real switching barrier.",
+    problem: "Small food manufacturers in Lahore (roughly 1,200 businesses) import plastic packaging that costs 30–40% more each year and is now being restricted by the Punjab plastic ban. They have no reliable local, affordable, compliant alternative, so they either overpay or risk fines.",
+    solution: "EcoPack makes compostable food boxes from sugarcane bagasse sourced from Punjab mills. Food manufacturers order weekly through WhatsApp or our web portal, get delivery within 48 hours, and receive a compliance certificate for the Punjab plastic ban. Prices match imported plastic within 5%.",
+    advantage: "We hold a signed 2-year exclusive supply agreement with a bagasse mill in Kasur, and our box mould design is registered with IPO Pakistan. Competitors would need 6+ months and PKR 4M to replicate.",
+    roadmap: "Oct 2026 — finish 3 box sizes and get food-safety lab test. Dec 2026 — run 4-week paid pilot with 5 factories. Mar 2027 — launch web ordering portal and reach 30 paying customers.",
+    finAssumptions: "Price PKR 25/box based on 3 competitor quotes. Unit cost PKR 18 from Kasur mill quotation (Aug 2026). Fixed costs PKR 70,000/month = workshop rent 35,000 + one technician 30,000 + software 5,000. Growth 15%/month assumes 2 new factories per month from direct visits.",
+    burnoutPlan: "We have written roles: Sara owns sales, Ali owns production, Hina owns finance. We meet every Sunday for 45 minutes and review one number each. Nobody works on the venture during exam fortnight. We will not buy more than 4 weeks of stock until 10 customers have reordered.",
+    plan90: "1) Visit 40 factories with samples and get 10 to trial (by Nov). 2) Complete food-safety lab test (by Oct). 3) Open a business bank account and register as SMC-Pvt with SECP (by Dec).",
+    vision35: "By 2030, EcoPack is the default compliant packaging supplier for food manufacturers in Punjab and Sindh — 600 factories, PKR 25M monthly revenue, two production sites, and a licensed mould design used by partners in Bangladesh.",
+    reflection: "We initially thought affordability would drive adoption, but customers cared more about consistent supply and compliance certificates. We changed our pitch from “cheaper” to “reliable and ban-proof”, and our first two factories signed after that.",
+};
+
+export type VcCheckItem = { label: string; ok: boolean; hint: string };
+
+export function vcChecklist(opts: {
+    problem: string;
+    customer: string;
+    traction: number;
+    wtpEvidence?: string;
+    marketSize: number;
+    marketSource?: string;
+    competitors: number;
+    advantage: string;
+    whyUs: string;
+    revenueModels: string[];
+    price: number;
+    unitCost: number;
+    channels: string[];
+    mktBudget?: number;
+    primaryChannel?: string;
+    cac?: number;
+    ltv?: number;
+    budgetLines: number;
+    monthlyCosts?: number;
+    cashOnHand?: number;
+    monthlyRevenue?: number;
+    raisePlan?: string;
+    askAmount?: number;
+    askUse?: string;
+    deliveryModel?: string;
+    capacity?: string;
+    bottleneck?: string;
+    vision35?: string;
+    teamFit?: string;
+    equitySplit?: string;
+    riskMit: number;
+    teamHealth: string;
+    milestone?: string;
+}): VcCheckItem[] {
+    const cac = opts.cac || 0;
+    const ltv = opts.ltv || 0;
+    const paidWtp = ["They have already paid", "Pre-orders / deposits collected", "Signed letter of intent / pilot agreement"].includes(opts.wtpEvidence || "");
+    return [
+        { label: "Specific problem & customer", ok: opts.problem.length > 40 && !!opts.customer, hint: "Who, what happens, how painful" },
+        { label: "Real evidence of demand", ok: opts.traction >= 10 || paidWtp, hint: "10+ interviews, pre-orders, LOIs or sales" },
+        { label: "Market sized with a source", ok: opts.marketSize > 0 && !!opts.marketSource, hint: "SAM + how you estimated it" },
+        { label: "Competitors named", ok: opts.competitors >= 2, hint: "At least 2 real alternatives" },
+        { label: "Clear differentiation / moat", ok: opts.advantage.length > 30 && !!opts.whyUs, hint: "Specific and hard to copy" },
+        { label: "Revenue model + tested price", ok: opts.revenueModels.length > 0 && opts.price > 0, hint: "How you earn and what one customer pays" },
+        { label: "Positive unit economics", ok: opts.price > 0 && opts.unitCost > 0 && opts.price > opts.unitCost, hint: "Price above cost per sale" },
+        { label: "Go-to-market with a budget", ok: opts.channels.length > 0 && ((opts.mktBudget || 0) > 0 || !!opts.primaryChannel), hint: "Channel + money + expected customers" },
+        { label: "CAC vs LTV estimated", ok: cac > 0 && ltv > 0, hint: "Cost to win a customer vs their value" },
+        { label: "Budget with 3+ lines", ok: opts.budgetLines >= 3, hint: "Costed plan to next milestone" },
+        { label: "Cash position & runway known", ok: (opts.monthlyCosts || 0) > 0 && ((opts.cashOnHand || 0) > 0 || (opts.monthlyRevenue || 0) >= (opts.monthlyCosts || 0)), hint: "Burn and months of survival" },
+        { label: "Funding plan stated", ok: !!opts.raisePlan && (opts.raisePlan === "no" || ((opts.askAmount || 0) > 0 && !!opts.askUse)), hint: "Bootstrapping, grant or investment + use of funds" },
+        { label: "Operations & capacity understood", ok: !!opts.deliveryModel && (!!opts.capacity || !!opts.bottleneck), hint: "How it is delivered and what breaks first" },
+        { label: "3–5 year vision stated", ok: (opts.vision35 || "").length > 30, hint: "Where this goes if it works" },
+        { label: "Team fit, roles & equity agreed", ok: !!opts.teamFit && ((opts.equitySplit || "").startsWith("Yes") || (opts.equitySplit || "").startsWith("Solo")), hint: "Why you, and ownership settled" },
+        { label: "Top risks with mitigations", ok: opts.riskMit >= 2, hint: "At least 2 named risks with a plan" },
+        { label: "Team health plan", ok: opts.teamHealth !== "Not assessed" && opts.teamHealth !== "At risk", hint: "Sustainable pace or a plan to fix it" },
+        { label: "Measurable 12-month milestone", ok: !!opts.milestone && /\d/.test(opts.milestone), hint: "Contains a number and a date" },
+    ];
+}
+
+function pkr(n: number) {
+    return `PKR ${Math.round(n).toLocaleString()}`;
+}
+
+export type VenturePlanSection = { title: string; body: string; gap?: string };
+
+export function buildVenturePlanSections(d: {
+    name: string;
+    pitch: string;
+    uni: string;
+    discipline: string;
+    city: string;
+    stage: string;
+    founder: string;
+    founderRole: string;
+    facultyName: string;
+    origin: string;
+    legalStatus: string;
+    commitment: string;
+    team: { name: string; role?: string; commitment?: string }[];
+    skills: string[];
+    skillGap: string;
+    equitySplit: string;
+    advisors: string;
+    teamFit: string;
+    founderInsight: string;
+    problem: string;
+    customer: string;
+    segment: string;
+    jtbd: string;
+    frequency: string;
+    severity: string;
+    trigger: string;
+    alternative: string;
+    currentSpend?: number;
+    payerDiff: string;
+    payerWho: string;
+    userWho: string;
+    evidence: string[];
+    interviews: number;
+    surveys: number;
+    willing: number;
+    wtpEvidence: string;
+    customerQuote: string;
+    marketWho: string;
+    marketSize: number;
+    tam: number;
+    som: number;
+    marketSource: string;
+    geography: string;
+    marketTrend: string;
+    whyNow: string;
+    competitorType: string;
+    competitionLevel: string;
+    competitors: { name?: string; price?: string; strength?: string; weakness?: string }[];
+    whyUs: string;
+    positioning: string;
+    resistance: string;
+    solution: string;
+    productStatus: string;
+    features: string;
+    advantage: string;
+    moatType: string;
+    ipStatus: string;
+    techDependency: string;
+    deliveryModel: string;
+    capacity: string;
+    bottleneck: string;
+    qualityControl: string;
+    scalePlan: string;
+    partners: string;
+    roadmap: string;
+    demoUrl: string;
+    revenueModels: string[];
+    price: number;
+    purchaseFreq?: number;
+    retentionYears?: number;
+    pricingStrategy: string;
+    pricingTested: string;
+    channels: string[];
+    primaryChannel: string;
+    salesMotion: string;
+    salesCycle: string;
+    keyMessage: string;
+    mktBudget?: number;
+    newCustMonth?: number;
+    cac?: number;
+    referral: string;
+    brandAssets: string;
+    repeatPercent?: number;
+    unitCost: number;
+    fixedCosts?: number;
+    monthlyRevenue?: number;
+    monthlyCosts?: number;
+    cashOnHand?: number;
+    revenueTarget12?: number;
+    profitMonth: string;
+    mrr?: number;
+    gmv?: number;
+    takeRate?: number;
+    mau?: number;
+    payingUsers?: number;
+    paymentTerms: string;
+    accounting: string;
+    finAssumptions: string;
+    numberSourceType: string;
+    budgetPeriod: string;
+    budgetStatus: string;
+    budgetLines: { category?: string; amount?: number; note?: string }[];
+    fundSources: { source?: string; amount?: number; note?: string }[];
+    raisePlan: string;
+    askAmount?: number;
+    askInstrument: string;
+    fundRunway?: number;
+    askUse: string;
+    askOutcome: string;
+    uofText: string;
+    valuation?: number;
+    equity?: number;
+    exitStrategy: string;
+    sdgMode: string;
+    sdgs: number[];
+    sdgNames: Record<number, string>;
+    impactLine: string;
+    helpImpact: string;
+    impactIndicator: string;
+    impactTarget: string;
+    responsibility: string[];
+    assumption: string;
+    regBarrier: string;
+    paceScore: string;
+    otherCommit: string;
+    burnoutSigns: string[];
+    keyPerson: string;
+    burnoutPlan: string;
+    hiringNeed: string;
+    riskRows: { type?: string; description?: string; likelihood?: string; impact?: string; mitigation?: string }[];
+    milestone: string;
+    plan90: string;
+    support: string[];
+    vision35: string;
+    reflection: string;
+    score: number;
+    evidenceLabel: string;
+    financialReadiness: string;
+    teamHealth: string;
+    vcLabel: string;
+}): { sections: VenturePlanSection[]; filled: number; total: number; meta: string; footer: string } {
+    const join = (parts: (string | false | 0 | undefined)[]) => parts.filter(Boolean).join(" ");
+    const sec = (title: string, parts: (string | false | 0 | undefined)[], gap: string): VenturePlanSection => {
+        const body = join(parts);
+        return { title, body, gap: body ? undefined : gap };
+    };
+    const raiseText: Record<string, string> = {
+        no: "Not raising outside money in the next 12 months — bootstrapping.",
+        grant: "Seeking grants or competition funding only (no equity).",
+        equity: "Seeking equity or convertible investment.",
+        loan: "Seeking a loan.",
+        unsure: "Funding route undecided — advice requested.",
+    };
+    const comps = (d.competitors || []).filter((r) => r.name?.trim());
+    const burn = (d.monthlyCosts || 0) - (d.monthlyRevenue || 0);
+    const sections = [
+        sec("1. Executive summary", [
+            d.pitch && `${d.pitch}.`,
+            d.solution && `${d.name || "The venture"} offers ${d.solution}`,
+            d.customer && `Our first customers are ${d.customer}.`,
+            d.marketSize > 0 && `We can reach approximately ${d.marketSize.toLocaleString()} customers${d.marketWho ? ` (${d.marketWho})` : ""}.`,
+            d.revenueModels.length > 0 && `Revenue comes from ${d.revenueModels.join(", ").toLowerCase()}${d.price ? ` at about ${pkr(d.price)} per sale` : ""}.`,
+            d.milestone && `Our 12-month goal: ${d.milestone}.`,
+            d.raisePlan && d.raisePlan !== "no" && d.askAmount ? `We are seeking ${pkr(d.askAmount)}${d.askOutcome ? ` to ${d.askOutcome}` : ""}.` : d.raisePlan === "no" && "We are bootstrapping and not raising outside money at this stage.",
+        ], "one-line description, solution, customer, market and milestone"),
+        sec("2. The venture and the team", [
+            d.stage && `Stage: ${d.stage}.`,
+            d.origin && `Origin: ${d.origin}.`,
+            d.legalStatus && `Legal status: ${d.legalStatus}.`,
+            d.founder && `${d.founder}${d.founderRole ? ` (${d.founderRole})` : ""} leads the venture${d.commitment ? `; post-graduation commitment: ${d.commitment.toLowerCase()}` : ""}.`,
+            d.team.length > 0 && `Team: ${d.team.map((r) => `${r.name}${r.role ? ` — ${r.role}` : ""}${r.commitment ? ` (${r.commitment.toLowerCase()})` : ""}`).join("; ")}.`,
+            d.teamFit && `Why this team: ${d.teamFit}`,
+            d.skills.length > 0 && `Skills covered: ${d.skills.join(", ")}.`,
+            d.skillGap && `Main gap: ${d.skillGap}.`,
+            d.equitySplit && `Equity: ${d.equitySplit.toLowerCase()}.`,
+            d.advisors && `Advisors: ${d.advisors}.`,
+            d.founderInsight && `Founder insight: ${d.founderInsight}`,
+        ], "founder, team fit and commitment"),
+        sec("3. Problem and customer", [
+            d.problem,
+            d.customer && `Beachhead customer: ${d.customer}${d.segment ? ` (${d.segment})` : ""}.`,
+            d.jtbd && `What they are trying to get done: ${d.jtbd}.`,
+            d.frequency && `The need occurs ${d.frequency.toLowerCase()}${d.severity ? ` with a severity of ${d.severity}/5.` : "."}`,
+            d.trigger && `Buying trigger: ${d.trigger}.`,
+            d.alternative && `Today they use: ${d.alternative}${d.currentSpend ? `, spending about ${pkr(d.currentSpend)} per month` : ""}.`,
+            d.payerDiff === "Yes" && `The payer (${d.payerWho || "?"}) differs from the user (${d.userWho || "?"}).`,
+            d.evidence.length > 0 && `Evidence: ${d.evidence.join(", ")}${d.interviews || d.surveys || d.willing ? ` — ${d.interviews} interviews, ${d.surveys} survey responses, ${d.willing} willing to test or buy` : ""}.`,
+            d.wtpEvidence && `Willingness to pay: ${d.wtpEvidence}.`,
+            d.customerQuote && `In a customer’s words: ${d.customerQuote}`,
+        ], "problem statement, customer and evidence"),
+        sec("4. Market and competition", [
+            d.marketWho && `Reachable market (SAM): ${d.marketWho}${d.marketSize ? ` — about ${d.marketSize.toLocaleString()} customers` : ""}.`,
+            d.tam > 0 && `TAM: ${d.tam.toLocaleString()} potential customers.`,
+            d.som > 0 && `SOM (2–3 years): ${d.som.toLocaleString()} customers.`,
+            d.marketSource && `Source: ${d.marketSource}.`,
+            d.geography && `Geographic focus: ${d.geography}.`,
+            d.marketTrend && `Trend: ${d.marketTrend.toLowerCase()}.`,
+            d.whyNow && `Why now: ${d.whyNow}`,
+            d.competitorType && `Without us, customers would choose: ${d.competitorType.toLowerCase()}${d.competitionLevel ? ` (${d.competitionLevel.toLowerCase()})` : ""}.`,
+            comps.length > 0 && `Competitors: ${comps.map((r) => `${r.name}${r.price ? ` (charges ${r.price})` : ""}${r.strength ? ` — strength: ${r.strength}` : ""}${r.weakness ? `; weakness: ${r.weakness}` : ""}`).join("; ")}.`,
+            d.whyUs && `Why customers choose us: ${d.whyUs}.`,
+            d.positioning && `Positioning: ${d.positioning}`,
+            d.resistance && `Switching barrier: ${d.resistance}.`,
+        ], "market size with a source and named competitors"),
+        sec("5. Solution, product and operations", [
+            d.solution,
+            d.productStatus && `What exists today: ${d.productStatus.toLowerCase()}.`,
+            d.features && `Key features: ${d.features}.`,
+            d.advantage && `Differentiation: ${d.advantage}`,
+            d.moatType && `Strongest edge: ${d.moatType}.`,
+            d.ipStatus && `IP: ${d.ipStatus}.`,
+            d.techDependency && `Key dependency: ${d.techDependency}.`,
+            d.deliveryModel && `Delivery: ${d.deliveryModel}.`,
+            d.capacity && `Current capacity: ${d.capacity}.`,
+            d.bottleneck && `Bottleneck at 2× demand: ${d.bottleneck}.`,
+            d.qualityControl && `Quality control: ${d.qualityControl}.`,
+            d.scalePlan && `To serve 10× more customers: ${d.scalePlan}.`,
+            d.partners && `Key partners: ${d.partners}.`,
+            d.roadmap && `Product roadmap: ${d.roadmap}`,
+            d.demoUrl && `Demo: ${d.demoUrl}`,
+        ], "solution description, product status and delivery model"),
+        sec("6. Business model, pricing and go-to-market", [
+            d.revenueModels.length > 0 && `Revenue model: ${d.revenueModels.join(" + ")}.`,
+            d.price > 0 && `Price: ${pkr(d.price)} per sale${d.purchaseFreq ? `, about ${d.purchaseFreq} purchases per year` : ""}${d.retentionYears ? `, customers retained ~${d.retentionYears} years` : ""}.`,
+            d.pricingStrategy && `Pricing strategy: ${d.pricingStrategy}${d.pricingTested ? ` (${d.pricingTested.toLowerCase()})` : ""}.`,
+            d.channels.length > 0 && `Channels: ${d.channels.join(", ")}.`,
+            d.primaryChannel && `Primary channel for the first 100 customers: ${d.primaryChannel}.`,
+            d.salesMotion && `Sales motion: ${d.salesMotion}.`,
+            d.salesCycle && `Sales cycle: ${d.salesCycle}.`,
+            d.keyMessage && `Core message: “${d.keyMessage}”.`,
+            (d.mktBudget || 0) > 0 && `Marketing budget: ${pkr(d.mktBudget || 0)} per month${d.newCustMonth ? `, expected to bring ${d.newCustMonth} new customers` : ""}${d.cac ? ` (CAC ≈ ${pkr(d.cac)})` : ""}.`,
+            d.price > 0 && d.purchaseFreq && d.retentionYears ? `Estimated customer lifetime value: ${pkr(d.price * d.purchaseFreq * d.retentionYears)}.` : "",
+            d.repeatPercent ? `${d.repeatPercent}% of customers buy again.` : "",
+            d.referral && `Referral driver: ${d.referral}.`,
+            d.brandAssets && `Brand assets: ${d.brandAssets.toLowerCase()}.`,
+        ], "revenue model, price and primary channel"),
+        sec("7. Financial plan", [
+            d.price > 0 && d.unitCost > 0 && `Unit economics: price ${pkr(d.price)} − cost per sale ${pkr(d.unitCost)} = margin ${pkr(d.price - d.unitCost)} (${(((d.price - d.unitCost) / d.price) * 100).toFixed(0)}% gross margin).`,
+            (d.fixedCosts || 0) > 0 && `Fixed costs: ${pkr(d.fixedCosts || 0)} per month${d.price > d.unitCost && d.unitCost > 0 ? `; break-even at ${Math.ceil((d.fixedCosts || 0) / (d.price - d.unitCost)).toLocaleString()} sales per month` : ""}.`,
+            (d.monthlyCosts || 0) > 0 && `Current position: revenue ${pkr(d.monthlyRevenue || 0)}/month against costs ${pkr(d.monthlyCosts || 0)}/month${d.cashOnHand ? `, cash available ${pkr(d.cashOnHand)}` : ""}${burn > 0 && d.cashOnHand ? ` → runway ≈ ${(d.cashOnHand / burn).toFixed(1)} months` : burn <= 0 && (d.monthlyCosts || 0) > 0 ? " → already cash-positive" : ""}.`,
+            (d.revenueTarget12 || 0) > 0 && `Team’s own 12-month revenue target: ${pkr(d.revenueTarget12 || 0)}.`,
+            d.profitMonth && `First profitable month expected: ${d.profitMonth.toLowerCase()}.`,
+            (d.mrr || 0) > 0 && `MRR ${pkr(d.mrr || 0)} (ARR ${pkr((d.mrr || 0) * 12)}).`,
+            (d.gmv || 0) > 0 && `GMV ${pkr(d.gmv || 0)}/month${d.takeRate ? ` at ${d.takeRate}% take rate` : ""}.`,
+            (d.mau || 0) > 0 && `${(d.mau || 0).toLocaleString()} monthly active users${d.payingUsers ? `, ${d.payingUsers.toLocaleString()} paying` : ""}.`,
+            d.paymentTerms && `Payment terms: ${d.paymentTerms.toLowerCase()}.`,
+            d.accounting && `Finances tracked via: ${d.accounting.toLowerCase()}.`,
+            d.finAssumptions && `Key assumptions: ${d.finAssumptions}`,
+            d.numberSourceType && `Main source of numbers: ${d.numberSourceType.toLowerCase()}.`,
+            d.budgetLines.filter((r) => r.category && (r.amount || 0) > 0).length > 0 && `Budget${d.budgetPeriod ? ` (${d.budgetPeriod.toLowerCase()})` : ""}: ${d.budgetLines.filter((r) => r.category && (r.amount || 0) > 0).map((r) => `${r.category} ${pkr(r.amount || 0)}`).join("; ")} — total ${pkr(d.budgetLines.reduce((s, r) => s + (r.amount || 0), 0))}${d.budgetStatus ? ` (${d.budgetStatus.toLowerCase()})` : ""}.`,
+            d.fundSources.filter((r) => r.source && r.source !== "None yet").length > 0 && `Funding to date: ${d.fundSources.filter((r) => r.source && r.source !== "None yet").map((r) => `${r.source}${(r.amount || 0) > 0 ? ` ${pkr(r.amount || 0)}` : ""}`).join("; ")}.`,
+        ], "cost per sale, fixed costs and cash position"),
+        sec("8. Funding ask", [
+            raiseText[d.raisePlan] || "",
+            (d.askAmount || 0) > 0 && `Amount: ${pkr(d.askAmount || 0)}${d.askInstrument ? ` as ${d.askInstrument.toLowerCase()}` : ""}${d.fundRunway ? `, covering about ${d.fundRunway} months` : ""}.`,
+            d.uofText && `Use of funds: ${d.uofText}.`,
+            d.askUse && `${d.askUse}.`,
+            d.askOutcome && `Milestone this achieves: ${d.askOutcome}.`,
+            (d.valuation || 0) > 0 && `Indicative pre-money valuation ${pkr(d.valuation || 0)}${d.equity ? `, offering ~${d.equity}% equity` : ""}.`,
+            d.exitStrategy && `Long-term: ${d.exitStrategy}.`,
+        ], "whether you are raising, how much, and what it achieves"),
+        sec("9. Impact and sustainability", [
+            d.sdgMode === "map" ? `SDG-linked${d.sdgs.length ? `: ${d.sdgs.map((n) => `SDG ${n}${d.sdgNames[n] ? ` (${d.sdgNames[n]})` : ""}`).join(", ")}` : ""}.` : d.sdgMode === "review" ? "SDG mapping assistance requested." : d.sdgMode === "none" ? "Not linked to an SDG — primarily commercial." : "",
+            d.impactLine && `Contribution: ${d.impactLine}.`,
+            d.helpImpact && `Intended change: ${d.helpImpact}`,
+            d.impactIndicator && `Indicator tracked: ${d.impactIndicator}${d.impactTarget ? ` — 12-month target ${d.impactTarget}` : ""}.`,
+            d.responsibility.length > 0 && `Responsible-business practices: ${d.responsibility.join(", ")}.`,
+        ], "SDG choice (choosing “not linked” is fine)"),
+        sec("10. Risks, assumptions and team health", [
+            d.assumption && `Riskiest untested assumption: ${d.assumption}.`,
+            d.regBarrier && `Regulatory / approvals: ${d.regBarrier}.`,
+            d.paceScore && `Team pace sustainability: ${d.paceScore}/5 (${d.teamHealth.toLowerCase()}).`,
+            d.otherCommit && `Competing commitments: ${d.otherCommit}.`,
+            d.burnoutSigns.length > 0 && `Warning signs present: ${d.burnoutSigns.join(", ")}.`,
+            d.keyPerson && `Key-person dependency: ${d.keyPerson.toLowerCase()}.`,
+            d.burnoutPlan && `Plan to keep the team and business healthy: ${d.burnoutPlan}`,
+            d.hiringNeed && `Next hire: ${d.hiringNeed}.`,
+            d.riskRows.filter((r) => r.description?.trim()).length > 0 && `Risks: ${d.riskRows.filter((r) => r.description?.trim()).map((r) => `${r.type || "Risk"}: ${r.description}${r.mitigation ? ` → ${r.mitigation}` : ""}`).join("; ")}.`,
+        ], "at least two named risks with mitigations"),
+        sec("11. Milestones and next steps", [
+            d.milestone && `12-month milestone: ${d.milestone}.`,
+            d.plan90 && `Next 90 days: ${d.plan90}`,
+            d.roadmap && `Product milestones: ${d.roadmap}`,
+            d.support.length > 0 && `Support needed: ${d.support.join(", ")}.`,
+            d.vision35 && `3–5 year vision: ${d.vision35}`,
+        ], "a measurable 12-month milestone and 90-day actions"),
+        sec("12. What we have learned", [d.reflection], "one honest learning from developing the idea"),
+    ];
+    const filled = sections.filter((s) => !s.gap).length;
+    const meta = [d.uni, d.discipline, d.city].filter(Boolean).join(" · ") + (d.stage ? ` · Stage: ${d.stage}` : "") + ` · Generated ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} · Prepared by ${d.founder || "the founding team"}` + (d.facultyName ? ` · Faculty reviewer: ${d.facultyName}` : "");
+    const footer = `CIEL Venture Potential Score ${d.score}/100 · Evidence: ${d.evidenceLabel} · Financial readiness: ${d.financialReadiness} · Team health: ${d.teamHealth} · Investor-readiness ${d.vcLabel}. Prototype scores are indicative and reviewed by faculty / CIEL PK.`;
+    return { sections, filled, total: sections.length, meta, footer };
 }

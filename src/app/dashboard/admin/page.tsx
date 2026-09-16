@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                 <MockupActionCard
                     href="/dashboard/admin/path-submissions?tab=fyp-thesis"
                     emoji="🎓"
-                    title="FYP / Final Year Project"
+                    title="Final Year Project (FYP)"
                     subtitle="Monitor FYP progress, faculty review and approved research impact records."
                     badge="OPEN"
                     background={MOCKUP_GRADIENTS.orange}

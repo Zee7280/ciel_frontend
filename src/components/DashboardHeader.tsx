@@ -79,7 +79,7 @@ function studentPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/student/create-opportunity")) return "Create opportunity";
     if (p.startsWith("/dashboard/student/paths/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/student/paths/course-project")) return "Coursework";
-    if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "FYP / Final Year Project";
+    if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "Final Year Project (FYP)";
     if (p.startsWith("/dashboard/student/paths/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/student/engagement")) return "Engagement";
     if (p.startsWith("/dashboard/student/projects")) return "My projects";
@@ -91,7 +91,11 @@ function adminPageKicker(pathname: string): string {
     if (p === "/dashboard/admin") return "Overview";
     if (p.startsWith("/dashboard/admin/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/admin/startup-business")) return "Startup / Venture";
-    if (p.startsWith("/dashboard/admin/path-submissions")) return "Path submissions";
+    if (p.startsWith("/dashboard/admin/path-submissions")) {
+        if (typeof window !== "undefined" && window.location.search.includes("tab=fyp-thesis")) return "Final Year Project (FYP)";
+        if (typeof window !== "undefined" && window.location.search.includes("tab=course-project")) return "Coursework";
+        return "Path submissions";
+    }
     if (p.startsWith("/dashboard/admin/analytics")) return "Impact Intelligence Hub";
     if (p.startsWith("/dashboard/admin/master-analytics")) return "CIEL Master";
     if (p.startsWith("/dashboard/admin/approvals")) return "Opportunity Review";

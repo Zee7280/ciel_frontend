@@ -125,6 +125,26 @@ export interface FypRepositoryInfo { externalLinks?: string; visibility?: string
 export interface FypSectionSummaries { project?: string; background?: string; objectives?: string; literature?: string; methodology?: string; findings?: string; sdg?: string; reflection?: string; }
 export interface FypDeliverable { version: number; label: string; fileUrl: string; uploadedAt: string; }
 
+export type FypRankScopeKind = "faculty" | "university" | "ciel";
+export interface FypRankRibbon {
+    rank: number;
+    of: number;
+    scope: string;
+    total?: number;
+    badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
+    previousRank?: number | null;
+    at: string;
+    kind?: FypRankScopeKind;
+    locked?: boolean;
+    academicYear?: number;
+    publishedBy?: string;
+}
+export interface FypMeritRibbon extends FypRankRibbon {
+    byScope?: Partial<Record<FypRankScopeKind, FypRankRibbon>>;
+    completionBadge?: { at: string; by?: string };
+    history?: FypRankRibbon[];
+}
+
 export interface FypEntry {
     id?: string;
     projectTitle: string | null;
@@ -147,21 +167,12 @@ export interface FypEntry {
     supervisorApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     supervisorApprovalNote?: string | null;
     supervisorApprovalAt?: string | null;
-    /** AI pre-analysis (FYP-MM 1.0 rubric) a supervisor can run before deciding — additive to
-     * meritRibbon below. Redacted to null on student-facing reads until a supervisor locks it. */
+    /** AI analysis — redacted on student reads until faculty locks it at approve time. */
     aiAnalysis?: FypAiAnalysis | null;
     aiAnalysisLock?: FypAiAnalysisLock | null;
     /** Pinned by the analyzer after a ranked run — shown on the thesis card. badgeLevel is a rank-percentile
      * tier; previousRank is this card's rank the last time it was ranked (null/undefined = first run). */
-    meritRibbon?: {
-        rank: number;
-        of: number;
-        scope: string;
-        total?: number;
-        badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
-        previousRank?: number | null;
-        at: string;
-    } | null;
+    meritRibbon?: FypMeritRibbon | null;
     /** False when this entry is showing because the viewer was named as a co-author on someone else's
      * submitted record, not because they own it — gates edit/delete access on the frontend. */
     isOwner?: boolean;
@@ -556,4 +567,34 @@ export function composeFypSummaries(entry: FypEntry): FypSectionSummaries {
         : "";
 
     return s;
+}
+
+export function inferFypRankKind(scope?: string, kind?: FypRankScopeKind): FypRankScopeKind {
+    if (kind === "faculty" || kind === "university" || kind === "ciel") return kind;
+    const s = (scope || "").toLowerCase();
+    if (s.includes("ciel") || s.includes("all universities") || s.includes("network") || s.includes("platform")) return "ciel";
+    if (s.includes("faculty") || s.includes("supervision") || s.includes("cohort")) return "faculty";
+    return "university";
+}
+
+export function fypRankRibbons(entry: FypEntry): { kind: FypRankScopeKind; ribbon: FypRankRibbon }[] {
+    const ribbon = entry.meritRibbon;
+    if (!ribbon) return [];
+    const by = ribbon.byScope;
+    if (by && (by.faculty || by.university || by.ciel)) {
+        return (["faculty", "university", "ciel"] as const)
+            .filter((k) => by[k] && by[k]!.rank > 0)
+            .map((k) => ({ kind: k, ribbon: by[k]! }));
+    }
+    if (ribbon.rank > 0) return [{ kind: inferFypRankKind(ribbon.scope, ribbon.kind), ribbon }];
+    return [];
+}
+
+export function fypRankContext(kind: FypRankScopeKind, ribbon: FypRankRibbon): string {
+    const n = `#${ribbon.rank} of ${ribbon.of.toLocaleString()}`;
+    const year = ribbon.academicYear ? ` · ${ribbon.academicYear}` : "";
+    const day = ribbon.at ? ` · ${String(ribbon.at).slice(0, 10)}` : "";
+    if (kind === "faculty") return `Faculty Cohort: ${n}${year}${day}${ribbon.locked ? " · 🔒 Published" : ""}`;
+    if (kind === "university") return `University: ${n}${year}${day}${ribbon.locked ? " · 🔒 Published" : ""}`;
+    return `CIEL PK Live Ranking: ${n}${year}${day} · 🔄 Live`;
 }

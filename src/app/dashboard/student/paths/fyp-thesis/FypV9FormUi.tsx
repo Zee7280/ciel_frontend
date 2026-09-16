@@ -126,6 +126,21 @@ export function SummaryBox({ text, placeholder }: { text?: string; placeholder?:
     );
 }
 
+export function CarryForward({ text }: { text?: string }) {
+    const plain = (text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (!plain) return null;
+    const clipped = plain.length > 360 ? `${plain.slice(0, 359).trim()}…` : plain;
+    return (
+        <div className="mb-3.5 flex items-start gap-2.5 rounded-[13px] border border-[#d8d0ff] bg-gradient-to-r from-[#fbf9ff] to-[#f7fbff] px-3.5 py-2.5">
+            <div className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-[9px] bg-ciel-purple-soft text-sm text-ciel-purple">↗</div>
+            <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.08em] text-ciel-purple">Previous section highlight</div>
+                <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#43506a]">{clipped}</p>
+            </div>
+        </div>
+    );
+}
+
 export function StepNav({
     onBack,
     onNext,

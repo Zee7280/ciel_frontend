@@ -25,13 +25,15 @@ export function MockupHero({
     subtitle,
     stats,
     rightStat,
+    badge,
     gradient = COMMAND_HERO,
 }: {
     kicker?: string;
     title: string;
     subtitle: string;
-    stats: { value: string; label: string }[];
+    stats: { value: string; label: string; href?: string }[];
     rightStat?: { value: string; label: string };
+    badge?: string;
     gradient?: string;
 }) {
     useRegisterDashboardPageChrome();
@@ -43,6 +45,11 @@ export function MockupHero({
                 background: `radial-gradient(circle at 92% 15%, rgba(255,255,255,.10) 0 17px, transparent 18px), radial-gradient(circle at 84% 8%, rgba(255,255,255,.06) 0 10px, transparent 11px), ${gradient}`,
             }}
         >
+            {badge ? (
+                <span className="absolute right-5 top-5 rounded-full border border-white/20 bg-white/14 px-3.5 py-2 text-[12.5px] font-bold tracking-wide sm:right-[34px] sm:top-[26px]">
+                    {badge}
+                </span>
+            ) : null}
             <div className="relative min-w-0">
                 {kicker ? (
                     <p className="text-[11px] font-black tracking-[0.13em] text-white/80">{kicker}</p>
@@ -51,17 +58,26 @@ export function MockupHero({
                 <p className="mt-1.5 max-w-[850px] text-sm leading-[1.55] text-[#d9f0ef]">{subtitle}</p>
                 {stats.length > 0 ? (
                     <div className="mt-5 flex flex-wrap gap-3">
-                        {stats.map((s) => (
-                            <div
-                                key={s.label}
-                                className="min-w-[130px] rounded-[17px] border border-white/25 bg-white/8 px-4 py-3.5"
-                            >
-                                <strong className="block text-[21px] font-semibold">{s.value}</strong>
-                                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#9df2df]">
-                                    {s.label}
-                                </span>
-                            </div>
-                        ))}
+                        {stats.map((s) => {
+                            const inner = (
+                                <>
+                                    <strong className="block text-[21px] font-semibold">{s.value}</strong>
+                                    <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#9df2df]">
+                                        {s.label}
+                                    </span>
+                                </>
+                            );
+                            const className = "min-w-[130px] rounded-[17px] border border-white/25 bg-white/8 px-4 py-3.5 text-left text-white";
+                            return s.href ? (
+                                <Link key={s.label} href={s.href} className={`${className} transition hover:bg-white/14`}>
+                                    {inner}
+                                </Link>
+                            ) : (
+                                <div key={s.label} className={className}>
+                                    {inner}
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : null}
             </div>

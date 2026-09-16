@@ -6,33 +6,37 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupPanel, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
-import { type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
+import { fypRankContext, fypRankRibbons, type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
 import { createStudentFyp, listStudentFyps } from "@/utils/fypStudentApi";
 import { isPathEntryApproved } from "@/utils/reviewQueue";
 import { fypStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import { FYP_V9_AREAS, FYP_V9_ROUTES, FYP_V9_STEP_NAMES, type FypV9RouteKey } from "@/utils/fypV9Catalog";
 import { SDG_COLORS } from "@/utils/ventureStudioV11";
+import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import { fetchImpactSummary } from "@/utils/cielImpactSummary";
+import { CIEL_PATHS } from "@/utils/cielPaths";
+import { rankMovement } from "@/utils/courseProjectTypes";
 
 const BASE = "/dashboard/student/paths/fyp-thesis";
 const GUIDE_HREF = `${BASE}?view=guide`;
+const CREATE_HREF = `${BASE}?view=create`;
 const IN_PROGRESS_HREF = `${BASE}?view=in-progress`;
 const UNDER_REVIEW_HREF = `${BASE}?view=under-review`;
 const WALL_HREF = `${BASE}?view=wall`;
 const SECTION_TOTAL = FYP_V9_STEP_NAMES.length;
 
 const HUB_VIEW_LABEL: Record<string, string> = {
-    guide: "Guidance",
-    wall: "Impact",
-    "in-progress": "In Progress",
-    "under-review": "Under Review",
-    create: "Create",
-    workspace: "Create",
+    guide: "FYP Guidance",
+    wall: "My Final Year Project Impact",
+    "in-progress": "FYP in Progress",
+    "under-review": "FYP Under Review",
+    create: "Create FYP Record",
+    workspace: "Create FYP Record",
 };
 
 const FYP_GUIDE_STEPS = [
@@ -48,12 +52,7 @@ const FYP_GUIDE_STEPS = [
 
 type HubView = "home" | "guide" | "wall" | "in-progress" | "under-review" | "create" | "workspace";
 type ReviewTab = "all" | "pending" | "revision" | "rejected";
-
-function studentFirstName() {
-    const user = readStoredCurrentUser();
-    const name = typeof user?.name === "string" ? user.name.split(" ")[0] : "";
-    return name || "there";
-}
+type DashHero = { active: number; hours: string; portfolio: number; completion: number };
 
 function displayFypId(entry: FypEntry) {
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
@@ -266,27 +265,65 @@ function SdgTiles({ entry }: { entry: FypEntry }) {
 }
 
 function RankBadges({ entry }: { entry: FypEntry }) {
-    const ribbon = entry.meritRibbon;
-    if (!ribbon) {
+    const ribbons = fypRankRibbons(entry);
+    const ai = entry.aiAnalysis;
+    const chips: { key: string; className: string; title: string; sub: string }[] = [];
+    if (ai && typeof ai.final === "number") {
+        chips.push({
+            key: "faculty-score",
+            className: "border-[#cfe0ff] bg-[#eef4ff] text-[#1d4f8a]",
+            title: `🎓 Faculty score ${ai.final} / 100`,
+            sub: `${ai.classification}${ai.facultyModified ? " · adjusted" : ""}`,
+        });
+    }
+    for (const { kind, ribbon } of ribbons) {
+        const move = rankMovement(ribbon);
+        const delta =
+            ribbon.previousRank != null && ribbon.previousRank !== ribbon.rank
+                ? Math.abs(ribbon.previousRank - ribbon.rank)
+                : 0;
+        const trend =
+            move?.symbol === "↑" ? `▲ +${delta}` : move?.symbol === "↓" ? `▼ −${delta}` : move?.symbol === "•" ? "✦ new" : "▬ 0";
+        if (kind === "faculty") {
+            chips.push({
+                key: "faculty",
+                className: "border-[#f1d68a] bg-[#fff6df] text-[#7a5a08]",
+                title: `🏅 Faculty AI Analyser · #${ribbon.rank} of ${ribbon.of}`,
+                sub: `${fypRankContext(kind, ribbon)} · 🔒 locked`,
+            });
+        } else if (kind === "university") {
+            chips.push({
+                key: "university",
+                className: "border-[#d5e4f5] bg-[#f3f8fd] text-[#1d4a73]",
+                title: `🏛️ University AI Analyser · #${ribbon.rank} of ${ribbon.of}`,
+                sub: `${fypRankContext(kind, ribbon)} · 🔒 locked`,
+            });
+        } else {
+            chips.push({
+                key: "ciel",
+                className: "border-[#cdeee6] bg-[#f0fbf7] text-[#0e4d4e]",
+                title: `🌐 CIEL PK Live · #${ribbon.rank} of ${ribbon.of} ${trend}`,
+                sub: fypRankContext(kind, ribbon),
+            });
+        }
+    }
+    if (!chips.length) {
         return (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <span className="rounded-xl border border-[#e3e8ec] bg-[#f7f8fa] px-2.5 py-1.5 text-[10.5px] font-semibold leading-snug text-[#70808a]">
-                    No ranking badge yet — badges arrive when your supervisor or university publish a final FYP ranking, and CIEL PK&apos;s live rank updates continuously.
+                    No AI Analyser badge yet — badges arrive when your supervisor or university publish an official AI ranking (locked, dated) and whenever CIEL PK runs its live ranking (moves like a stock ▲▼).
                 </span>
             </div>
         );
     }
-    const when = formatDay(ribbon.at);
     return (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <span className="inline-flex flex-col rounded-xl border border-[#f1d68a] bg-[#fff6df] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#7a5a08]">
-                🏅 #{ribbon.rank} of {ribbon.of}
-                {ribbon.badgeLevel ? ` · ${ribbon.badgeLevel}` : ""}
-                <small className="text-[8.5px] font-bold opacity-80">
-                    {ribbon.scope}
-                    {when ? ` · ${when}` : ""}
-                </small>
-            </span>
+            {chips.map((chip) => (
+                <span key={chip.key} className={`inline-flex flex-col rounded-xl border px-2.5 py-1.5 text-[10.5px] font-black leading-tight ${chip.className}`}>
+                    {chip.title}
+                    <small className="text-[8.5px] font-bold opacity-80">{chip.sub}</small>
+                </span>
+            ))}
         </div>
     );
 }
@@ -528,7 +565,7 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
                         ⚡ <b className="font-black uppercase tracking-[0.04em]">Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
                     </div>
                     {pending ? (
-                        <p className="mt-1.5 text-[10px] text-[#70808a]">🔒 Your record is locked while under review — it reopens automatically if your supervisor requests a revision.</p>
+                        <p className="mt-1.5 text-[10px] text-[#70808a]">🔒 Your record is locked while under review. The FYP AI Analyser has already run automatically; your supervisor is checking and may adjust the score and comments — both are released to you on approval.</p>
                     ) : null}
                 </div>
                 {pending ? (
@@ -635,6 +672,11 @@ function ApprovedCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }
                 <p className="text-[10.5px] text-[#70808a]">{meta}</p>
                 <div className="mt-[11px] rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-[11px]">
                     <span className="inline-block whitespace-nowrap rounded-[18px] bg-[#e8f5ef] px-2 py-[5px] text-[9.5px] font-black text-[#1d765d]">✓ FACULTY APPROVED</span>
+                    {entry.aiAnalysis && typeof entry.aiAnalysis.final === "number" ? (
+                        <span className="ml-1.5 inline-block whitespace-nowrap rounded-[18px] bg-[#eef4ff] px-2 py-[5px] text-[9.5px] font-black text-[#1d4f8a]">
+                            🎓 FACULTY SCORE {entry.aiAnalysis.final} · {entry.aiAnalysis.classification}
+                        </span>
+                    ) : null}
                     <p className="mt-2 text-[11px] leading-relaxed text-[#31405a]">{headline(entry)}</p>
                 </div>
                 <RankBadges entry={entry} />
@@ -710,6 +752,7 @@ export default function FypThesisHub({
     const [createError, setCreateError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<ReviewTab>("all");
+    const [dashHero, setDashHero] = useState<DashHero | null>(null);
     const autoOpenRef = useRef(false);
 
     const load = useCallback(async () => {
@@ -724,6 +767,33 @@ export default function FypThesisHub({
     useEffect(() => {
         void load();
     }, [load]);
+
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([
+            fetchStudentDashboardData({ redirectToLogin: false }),
+            fetchImpactSummary({ redirectToLogin: false }),
+        ])
+            .then(([dashboard, summary]) => {
+                if (cancelled) return;
+                const active = dashboard?.overview?.activeProjectsCount ?? dashboard?.activeProjects?.length ?? 0;
+                const verifiedHours = Math.round(summary?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0);
+                const portfolio = dashboard?.overview?.impactHistoryBadgeCount ?? dashboard?.overview?.completedCount ?? 0;
+                const completion = Math.round(
+                    (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
+                );
+                setDashHero({
+                    active,
+                    hours: verifiedHours ? `${verifiedHours}h` : "0h",
+                    portfolio,
+                    completion,
+                });
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const createNew = useCallback(async () => {
         if (creating) return;
@@ -786,14 +856,14 @@ export default function FypThesisHub({
             />
             {view === "home" ? (
                 <MockupHero
-                    kicker="MY PATHS · FYP / FINAL YEAR PROJECT"
-                    title={namedTimeGreeting(studentFirstName(), "🎓")}
+                    title="Final Year Project (FYP)"
                     subtitle="Build your Final Year Project record from first draft to faculty / supervisor verification."
                     stats={[
-                        { value: String(approved.length), label: "APPROVED" },
-                        { value: String(underReviewBadge), label: "UNDER REVIEW" },
-                        { value: String(drafts.length), label: "IN PROGRESS" },
+                        { value: String(dashHero?.active ?? entries.length), label: "Active Records" },
+                        { value: dashHero?.hours ?? "0h", label: "Verified Service" },
+                        { value: String(dashHero?.portfolio ?? approved.length), label: "Impact Portfolio" },
                     ]}
+                    rightStat={{ value: `${dashHero?.completion ?? 0}%`, label: "overall current-work completion" }}
                 />
             ) : null}
 
@@ -819,7 +889,7 @@ export default function FypThesisHub({
                                     🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
                                 </button>
                         <div className="mt-4 rounded-xl border border-[#d5eee8] bg-[#eef8f6] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#4b6f68]">
-                            Once you start, the record appears under <b>Final Year Project (FYP) → FYP in Progress</b> with a live progress bar and “Sections Completed” count.
+                            Once you start, the record appears under <b>Final Year Project (FYP) → FYP in Progress</b> with a live progress bar and “Sections Completed” count. Your supervisor, university and CIEL PK see the same progress % in real time and can send reminders — never your unfinished text.
                         </div>
                     </MockupPanel>
                 </div>
@@ -836,12 +906,12 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="My Final Year Project Impact"
-                        subtitle="Approved Final Year Projects only. These flashcards are also on your Impact Portfolio, your University's FYP Impact Wall and CIEL PK."
+                        subtitle="Approved Final Year Projects only. The same score, comments and badges are on your Impact Portfolio, your University's FYP Impact Wall and CIEL PK."
                         action={<LoopBack />}
                     />
                     <MockupPanel
                         title="My Final Year Project Impact"
-                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · You receive the approved file; scores and rankings stay with your supervisor.`}
+                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · Each shows the score allotted by your supervisor (with comments per section), plus every AI Analyser badge — locked faculty / university badges and the CIEL PK live rank (▲ green up · ▼ red down).`}
                     >
                     {approved.length === 0 ? (
                             <p className="px-1 py-8 text-center text-[12px] text-[#70808a]">No approved Final Year Project yet.</p>
@@ -900,7 +970,7 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="FYP Under Review"
-                        subtitle="Your submitted flashcard is with your supervisor. You'll receive the outcome — approved file, revision request, or not accepted — by Email and WhatsApp."
+                        subtitle="Your submitted flashcard is with your supervisor. The FYP AI Analyser ran automatically when you submitted; your supervisor may adjust it. On approval you receive the score allotted by faculty and the comments explaining it — by Email and WhatsApp."
                         action={<LoopBack />}
                     />
                     <MockupPanel title="FYP Under Review" subtitle="Your supervisor owns the next action while a record is pending. Use the buttons to send a polite reminder.">
@@ -927,44 +997,48 @@ export default function FypThesisHub({
 
             {view === "home" && (
                 <>
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <MockupSectionHead
+                        title="Final Year Project (FYP)"
+                        subtitle="Build your Final Year Project record section by section, submit your FYP Flashcard to your supervisor, and collect the approved FYP here."
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
-                            onClick={() => void createNew()}
+                            href={CREATE_HREF}
                             emoji="🎓"
                             ghost="🎓"
                             title="Create FYP Record"
                             subtitle="Open the CIEL PK Final Year Projects Form. Saving Section 1 creates your master FYP record with a unique FYP ID and auto-connects you, your team, your supervisor, your university and CIEL PK."
-                            badge={creating ? "OPENING" : "START"}
+                            badge="START"
                             background={MOCKUP_GRADIENTS.orange}
                         />
                         <MockupActionCard
                             href={IN_PROGRESS_HREF}
-                        emoji="🔬"
+                            emoji="🔬"
                             ghost="🔬"
-                        title="FYP in Progress"
-                        subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
+                            title="FYP in Progress"
+                            subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
                             badge={`${drafts.length} IN PROGRESS`}
                             background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
                             href={UNDER_REVIEW_HREF}
-                        emoji="📤"
+                            emoji="📤"
                             ghost="📤"
-                        title="FYP Under Review"
-                        subtitle="Submitted flashcards waiting for supervisor approval — with Email / WhatsApp buttons to remind your supervisor."
+                            title="FYP Under Review"
+                            subtitle="Submitted flashcards with your supervisor. The AI Analyser has already run automatically; the score and comments are released to you on approval."
                             badge={`${underReviewBadge} UNDER REVIEW`}
                             background={MOCKUP_GRADIENTS.blue}
                         />
                         <MockupActionCard
                             href={WALL_HREF}
-                        emoji="🏅"
+                            emoji="🏅"
                             ghost="🏅"
-                        title="My Final Year Project Impact"
-                        subtitle="Your approved Final Year Projects — every team member sees the same approved record here, and it also appears on your University's FYP Impact Wall and CIEL PK."
+                            title="My Final Year Project Impact"
+                            subtitle="Your approved Final Year Projects with the score allotted by your supervisor, section-by-section comments, and every AI Analyser badge — faculty (locked), university (locked) and the CIEL PK live rank that moves like a stock ▲▼."
                             badge={`${approved.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
-                    />
-                </div>
+                        />
+                    </div>
                     <p className="mt-4 text-center text-[11px] text-[#7a919a]">
                         Need a walkthrough?{" "}
                         <Link href={GUIDE_HREF} className="font-extrabold text-[#0e7d74] hover:underline">

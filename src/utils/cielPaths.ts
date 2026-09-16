@@ -11,7 +11,7 @@ export interface CielPathMeta {
 export const CIEL_PATHS: CielPathMeta[] = [
     { key: "communityService", label: "Community Service", emoji: "🏕️", href: "/dashboard/student/paths/community-service" },
     { key: "courseProject", label: "Coursework", emoji: "📚", href: "/dashboard/student/paths/course-project" },
-    { key: "fypThesis", label: "FYP / Final Year Project", emoji: "🎓", href: "/dashboard/student/paths/fyp-thesis" },
+    { key: "fypThesis", label: "Final Year Project (FYP)", emoji: "🎓", href: "/dashboard/student/paths/fyp-thesis" },
     { key: "startupBusiness", label: "Startup / Venture", emoji: "💼", href: "/dashboard/student/paths/startup-business" },
 ];
 

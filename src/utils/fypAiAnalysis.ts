@@ -37,6 +37,8 @@ export interface FypAiAnalysis {
     facultyModified?: boolean;
     computedAt?: string;
     facultyEditedAt?: string;
+    status?: "running" | "ready" | "failed";
+    original?: { final?: number; classification?: string; computedAt?: string };
 }
 
 export interface FypAiAnalysisLock {

@@ -6,7 +6,6 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { CourseworkCrumb, HubBackButton, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
@@ -15,8 +14,10 @@ import { SDG_COLORS, SDG_SHORT, V11_STEPS, hubProgressIndex } from "@/utils/vent
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 import StartupBusinessWorkspace from "@/app/dashboard/student/paths/startup-business/StartupBusinessWorkspace";
+import VentureAiCriticalReviewPanel, { VentureAiReviewChip } from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
+import { analyseVentureCriticalReview } from "@/utils/ventureCriticalReview";
 
-const VENTURE_VIEWS = ["home", "pipeline", "wall", "rank", "myventures", "create", "record", "pending", "approved"] as const;
+const VENTURE_VIEWS = ["home", "pipeline", "wall", "rank", "myventures", "create", "record", "pending", "approved", "aireview"] as const;
 type FacView = (typeof VENTURE_VIEWS)[number];
 const VENTURE_BASE = "/dashboard/faculty/startup-business";
 const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Review"] as const;
@@ -366,7 +367,8 @@ function FacultyStartupBusinessHub() {
             : screen === "pipeline" ? "Startup Pipeline"
               : screen === "wall" ? "Impact Wall"
                 : screen === "rank" ? "AI Rankings"
-                  : screen === "myventures" || screen === "create" ? "My Faculty Ventures"
+                  : screen === "aireview" ? "AI Critical Reviews"
+                    : screen === "myventures" || screen === "create" ? "My Faculty Ventures"
                     : screen === "record" ? "Venture Card"
                       : screen;
 
@@ -376,13 +378,16 @@ function FacultyStartupBusinessHub() {
                 <CourseworkCrumb role="Faculty" view={crumbView} pathLabel="Startup / Venture" />
                 {screen === "home" ? (
                     <MockupHero
-                        kicker="FACULTY · STARTUP / VENTURE"
-                        title={namedTimeGreeting(greetName === "Faculty" ? "" : greetName.split(/\s+/)[0], "🚀")}
-                        subtitle="One pipeline for every venture you supervise — just started, in process, under review, approved — plus your own faculty ventures."
+                        kicker="MY PATHS · STARTUP / VENTURE"
+                        title={greetName === "Faculty" ? "Welcome" : `Welcome, ${greetName}`}
+                        subtitle="One pipeline for every venture you supervise — plus the CIEL AI Critical Review on every submitted flashcard: Shark-Tank / VC-lens analysis of each section, an Ivy-style grade (30% academic, 70% practical), reality checks and live market intelligence with sources."
+                        badge="👩‍🏫 FACULTY"
+                        gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
                         stats={[
-                            { value: String(wallApproved.length), label: "APPROVED" },
-                            { value: String(waiting.length), label: "UNDER REVIEW" },
-                            { value: String(inProcess.length), label: "IN PROGRESS" },
+                            { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
+                            { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=aireview` },
+                            { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
+                            { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
                         ]}
                     />
                 ) : null}
@@ -390,51 +395,116 @@ function FacultyStartupBusinessHub() {
                 {screen === "home" && (
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
+                            href={`${VENTURE_BASE}?view=aireview`}
+                            emoji="🦈"
+                            ghost="🦈"
+                            title="AI Critical Reviews"
+                            subtitle="Every submitted flashcard arrives with a Shark-Tank / VC-lens review: section-by-section scores, Ivy-style grade (30% academic · 70% practical), reality checks, market intelligence with sources and a suggested decision."
+                            badge={`${waiting.length} AWAITING REVIEW`}
+                            background={MOCKUP_GRADIENTS.navy}
+                        />
+                        <MockupActionCard
                             href={`${VENTURE_BASE}?view=pipeline`}
                             emoji="🧩"
                             ghost="🧩"
                             title="Startup Pipeline"
-                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders and the review rubric inside each record."
-                            badge={`${inProcess.length} IN PROGRESS`}
+                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders and the v11 review rubric inside each record."
+                            badge={`${inProcess.length} IN PROCESS · ${waiting.length} TO REVIEW`}
                             background={MOCKUP_GRADIENTS.orange}
-                        />
-                        <MockupActionCard
-                            href={`${VENTURE_BASE}?view=pipeline&tab=under_review`}
-                            emoji="📬"
-                            ghost="📬"
-                            title="Ventures Under Review"
-                            subtitle="Submitted venture cards waiting for your decision — Accept, Request revision or Reject — with Email / WhatsApp reminders."
-                            badge={`${waiting.length} UNDER REVIEW`}
-                            background={MOCKUP_GRADIENTS.blue}
-                        />
-                        <MockupActionCard
-                            href={`${VENTURE_BASE}?view=wall`}
-                            emoji="🏅"
-                            ghost="🏅"
-                            title="Ventures Impact Wall"
-                            subtitle="Approved student ventures and your certified faculty ventures, published automatically to the student, university and CIEL PK walls."
-                            badge={`${wallApproved.length} APPROVED`}
-                            background={MOCKUP_GRADIENTS.green}
-                        />
-                        <MockupActionCard
-                            href={`${VENTURE_BASE}?view=rank`}
-                            emoji="🧮"
-                            ghost="🧮"
-                            title="Startup AI Rankings"
-                            subtitle="Rank approved ventures. Waiting submissions stay out of the live picks."
-                            badge="RANKINGS"
-                            background={MOCKUP_GRADIENTS.purple}
                         />
                         <MockupActionCard
                             href={`${VENTURE_BASE}?view=myventures`}
                             emoji="💡"
                             ghost="💡"
                             title="Create Faculty Venture"
-                            subtitle="Your own startup or opportunity, linked to you as founder. Self-certified — no student loop — and pitched to the university and, if you opt in, to investors."
+                            subtitle="Your own startup or opportunity, linked to you as founder. Self-certified — no student loop — and pitched to the university and, if you opt in, to investors in the CIEL Investor Hub."
                             badge={`${own ? 1 : 0} MINE`}
                             background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <MockupActionCard
+                            href={`${VENTURE_BASE}?view=wall`}
+                            emoji="🏅"
+                            ghost="🏅"
+                            title="Ventures Impact Wall"
+                            subtitle="Approved student ventures and your certified faculty ventures, published automatically to the student, university and CIEL PK walls and — if opted in — the CIEL Investor Hub."
+                            badge={`${wallApproved.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.green}
+                        />
+                        <MockupActionCard
+                            href={`${VENTURE_BASE}?view=rank`}
+                            emoji="🤖"
+                            ghost="🤖"
+                            title="Run AI Rankings"
+                            subtitle="Rank approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year."
+                            badge="AI GRADER"
+                            background={MOCKUP_GRADIENTS.purple}
                             full
                         />
+                    </div>
+                )}
+
+                {screen === "aireview" && (
+                    <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                        <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                            <PanelBack href={homeHref} />
+                            <div className="min-w-0 flex-1">
+                                <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🦈 AI Critical Reviews — {waiting.length} awaiting your decision</h3>
+                                <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                                    Each submitted flashcard is analysed like a Shark-Tank panel plus an Ivy-league rubric: sections scored academically (30%) and practically (70%), reality checks against the numbers, and a suggested decision. Open a record to read the full review and decide. AI never approves or rejects.
+                                </p>
+                            </div>
+                        </div>
+                        {loading ? (
+                            <SkeletonList />
+                        ) : waiting.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
+                                No submitted ventures awaiting review.
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3.5">
+                                {[...waiting]
+                                    .map((entry) => ({ entry, a: analyseVentureCriticalReview(entry) }))
+                                    .sort((x, y) => y.a.overall - x.a.overall)
+                                    .map(({ entry, a }) => (
+                                        <div key={entry.id} className="grid grid-cols-1 items-center gap-4 rounded-[18px] border border-[#e3e9ee] p-5 md:grid-cols-[1.6fr_1fr]">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2.5">
+                                                    <p className="m-0 text-[17px] font-extrabold">{entry.ventureName || "Untitled venture"}</p>
+                                                    <StatusChip entry={entry} />
+                                                    {isInvestorOpen(entry) ? <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#5e35b1]">Investor opt-in</span> : null}
+                                                </div>
+                                                <p className="mt-1 text-[13px] text-[#5d6c78]">
+                                                    <b className="text-[#14212b]">{displayVentureId(entry)}</b> · {studentName(entry)}
+                                                    {entry.ideaInfo?.sector ? ` · ${entry.ideaInfo.sector}` : ""}
+                                                </p>
+                                                <p className="mt-2 text-[13.5px] leading-relaxed text-[#2b3a44]">{a.summary}</p>
+                                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                                    {a.votes.map((v) => (
+                                                        <span
+                                                            key={v.who}
+                                                            className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold uppercase ${
+                                                                v.vote === "IN" ? "bg-[#e6f6ec] text-[#1c8a52]" : v.vote === "OUT" ? "bg-[#eceff1] text-[#455a64]" : "bg-[#fff3e0] text-[#c65b00]"
+                                                            }`}
+                                                        >
+                                                            {v.who.replace("The ", "")}: {v.vote}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="text-left md:text-right">
+                                                <div className="text-[30px] font-extrabold text-[#0b4b57]">
+                                                    {a.overall}<span className="text-sm text-[#5d6c78]">/100</span>
+                                                </div>
+                                                <div className="font-extrabold">{a.grade} · {a.tier}</div>
+                                                <div className="mt-1 text-[13px] text-[#5d6c78]">Academic {a.acad} · Practical {a.prac}</div>
+                                                <a href={openRecord(entry.id)} className="mt-2 inline-block rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">
+                                                    Read review & decide
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -749,6 +819,7 @@ function RecordView({
         );
     }
     const waiting = isPathEntryWaiting(entry);
+    const submitted = entry.status === "submitted" || waiting || isPathEntryApproved(entry) || isRejected(entry);
     const scorecard = computeVentureMeritScorecard(entry);
     const ribbon = entry.meritRibbon;
     return (
@@ -761,6 +832,7 @@ function RecordView({
                         {displayVentureId(entry)} · {ventureStatusLabel(entry).label} · {studentName(entry)}
                     </p>
                 </div>
+                {submitted ? <VentureAiReviewChip entry={entry} /> : null}
             </div>
             <VentureTimeline entry={entry} />
             <div className="mt-4 overflow-hidden rounded-[22px] border border-[#e3e9ee]">
@@ -783,6 +855,9 @@ function RecordView({
                     ))}
                 </div>
             </div>
+            {submitted ? (
+                <VentureAiCriticalReviewPanel entry={entry} onPrefill={waiting ? (draft) => setNote(draft) : undefined} />
+            ) : null}
             <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
                 <div className="rounded-[18px] border border-[#e3e9ee] p-5">
                     <b>Analyser — section-by-section (decision support only; never auto-approves)</b>

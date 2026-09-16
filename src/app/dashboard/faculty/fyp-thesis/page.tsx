@@ -8,21 +8,32 @@ import { formatDistanceToNow } from "date-fns";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypAiAnalysisPanel from "@/components/ciel/FypAiAnalysisPanel";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
-import { CourseworkCrumb, HubBackButton, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
-import { readStoredCurrentUser } from "@/utils/currentUser";
-import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
+import { CourseworkCrumb, HubBackButton, PathSectionHead, ActionKpiGrid, WorkflowSteps, PathFilterBar, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { isPathEntryApproved, isPathEntryWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 
 const FYP_VIEWS = ["home", "progress", "pending", "approved", "rank"] as const;
 type FacView = (typeof FYP_VIEWS)[number];
 const FYP_BASE = "/dashboard/faculty/fyp-thesis";
 const VIEW_CRUMB: Record<Exclude<FacView, "home">, string> = {
     progress: "FYP in Progress",
-    pending: "FYP Under Review",
+    pending: "FYP Review",
     approved: "Approved FYP Impact",
-    rank: "FYP AI Rankings",
+    rank: "Approved FYP + AI Ranking",
 };
+type ReviewTab = "pending" | "revision" | "rejected" | "all";
+
+function fypGate(entry: FypMeritEntry) {
+    return entry.supervisorApprovalStatus;
+}
+function isFypRevision(entry: FypMeritEntry) {
+    const gate = normalizeReviewStatus(fypGate(entry));
+    return gate === "revision_requested" || gate === "revisions_requested" || gate === "changes_requested";
+}
+function isFypRejected(entry: FypMeritEntry) {
+    const gate = normalizeReviewStatus(fypGate(entry));
+    return gate === "rejected" || gate === "declined";
+}
 
 export default function FacultyFypThesisPage() {
     return (
@@ -39,12 +50,7 @@ function FacultyFypThesisHub() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [reviewingId, setReviewingId] = useState<string | null>(null);
-    const [firstName, setFirstName] = useState("");
-
-    useEffect(() => {
-        const name = readStoredCurrentUser()?.name;
-        setFirstName(typeof name === "string" ? name.trim().split(/\s+/)[0] : "");
-    }, []);
+    const [reviewTab, setReviewTab] = useState<ReviewTab>("pending");
 
     useEffect(() => {
         void fetchEntries();
@@ -117,6 +123,9 @@ function FacultyFypThesisHub() {
 
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
     const approved = useMemo(() => entries.filter(isPathEntryApproved), [entries]);
+    const revision = useMemo(() => entries.filter(isFypRevision), [entries]);
+    const rejected = useMemo(() => entries.filter(isFypRejected), [entries]);
+    const readyNotSubmitted = inProgress.filter((e) => (e.stepCompleted ?? 0) >= 7);
 
     const matchesSearch = (entry: FypMeritEntry) => {
         const q = searchQuery.toLowerCase();
@@ -128,22 +137,28 @@ function FacultyFypThesisHub() {
             entry.projectTitle?.toLowerCase().includes(q)
         );
     };
-    const filteredWaiting = waiting.filter(matchesSearch);
     const filteredApproved = approved.filter(matchesSearch);
     const filteredInProgress = inProgress.filter(matchesSearch);
+    const reviewPool =
+        reviewTab === "pending" ? waiting
+            : reviewTab === "revision" ? revision
+              : reviewTab === "rejected" ? rejected
+                : [...waiting, ...revision, ...rejected];
+    const filteredReview = reviewPool.filter(matchesSearch);
 
     return (
         <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
                 <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : VIEW_CRUMB[view]} pathLabel="Final Year Project (FYP)" />
                 {view === "home" ? (
                     <MockupHero
-                        kicker="FACULTY · FYP / FINAL YEAR PROJECT"
-                        title={namedTimeGreeting(firstName, "🎓")}
-                        subtitle="Supervise Final Year Project records from first draft to faculty / supervisor verification."
+                        kicker="FACULTY IMPACT DASHBOARD"
+                        title="FYP"
+                        subtitle="Monitor final-year projects, research evidence, supervisor review and verified impact outcomes."
+                        gradient={FACULTY_HERO}
                         stats={[
-                            { value: String(approved.length), label: "APPROVED" },
-                            { value: String(waiting.length), label: "UNDER REVIEW" },
-                            { value: String(inProgress.length), label: "IN PROGRESS" },
+                            { value: String(waiting.length), label: "AWAITING REVIEW", href: `${FYP_BASE}?view=pending` },
+                            { value: String(approved.length), label: "APPROVED FYPS", href: `${FYP_BASE}?view=rank` },
+                            { value: String(approved.length), label: "ON IMPACT WALLS", href: `${FYP_BASE}?view=rank` },
                         ]}
                     />
                 ) : (
@@ -151,47 +166,67 @@ function FacultyFypThesisHub() {
                 )}
 
                 {view === "home" && (
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <MockupActionCard
-                            href={`${FYP_BASE}?view=progress`}
-                            emoji="🔬"
-                            ghost="🔬"
-                            title="FYP in Progress"
-                            subtitle="Students who named you as supervisor and are still writing — completion bar, last activity, Email + WhatsApp reminders."
-                            badge={`${inProgress.length} IN PROGRESS`}
-                            background={MOCKUP_GRADIENTS.teal}
+                    <>
+                        <PathSectionHead
+                            title="FYP Management"
+                            subtitle="Your supervisees' Final Year Projects flow in as flashcards. The FYP AI Analyser has already scored each one against excellent work in the student's discipline (level-aware) — edit anything you disagree with, then approve to release the score and comments to the student."
+                            pill="FACULTY VIEW"
                         />
-                        <MockupActionCard
-                            href={`${FYP_BASE}?view=pending`}
-                            emoji="📤"
-                            ghost="📤"
-                            title="FYP Under Review"
-                            subtitle="Submitted flashcards waiting for your supervisor sign-off — with Email / WhatsApp buttons to remind the student."
-                            badge={`${waiting.length} UNDER REVIEW`}
-                            background={MOCKUP_GRADIENTS.blue}
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <MockupActionCard
+                                href={`${FYP_BASE}?view=progress`}
+                                emoji="🔬"
+                                ghost="🔬"
+                                title="FYP in Progress"
+                                subtitle="Supervisees still building their record — completion bar, last activity, Email + WhatsApp reminders."
+                                badge={`${inProgress.length} IN PROGRESS`}
+                                background={MOCKUP_GRADIENTS.blue}
+                            />
+                            <MockupActionCard
+                                href={`${FYP_BASE}?view=pending`}
+                                emoji="✅"
+                                ghost="✅"
+                                title="FYP Review"
+                                subtitle="Submitted FYP Flashcards — the AI Analyser has run automatically on each (measured against excellent work in the student's discipline, at their level). Edit any section score or comment, then approve (releases the score to the student), request revision or reject."
+                                badge={`${waiting.length} PENDING`}
+                                background={MOCKUP_GRADIENTS.teal}
+                            />
+                            <MockupActionCard
+                                href={`${FYP_BASE}?view=rank`}
+                                emoji="🏅"
+                                ghost="🏅"
+                                title="Approved FYP + AI Analyser Ranking"
+                                subtitle="Run the AI Analyser across all your approved projects anytime (unofficial preview). Publish up to 3× per academic year — each student gets a locked, dated “Faculty AI Analyser” badge on their flashcard, synced to the university and CIEL PK."
+                                badge={`${approved.length} APPROVED`}
+                                background={MOCKUP_GRADIENTS.purple}
+                            />
+                        </div>
+                        <ActionKpiGrid
+                            subtitle="Current FYP items that need faculty attention."
+                            items={[
+                                { value: String(waiting.length), label: "Submitted for Review" },
+                                { value: String(revision.length), label: "Revision Requested" },
+                                { value: String(inProgress.length), label: "In Progress (students)" },
+                                { value: String(approved.length), label: "Approved This Year" },
+                            ]}
                         />
-                        <MockupActionCard
-                            href={`${FYP_BASE}?view=approved`}
-                            emoji="🏅"
-                            ghost="🏅"
-                            title="Approved FYP Impact"
-                            subtitle="Records you already approved — the same flashcard the student, university and CIEL PK see."
-                            badge={`${approved.length} APPROVED`}
-                            background={MOCKUP_GRADIENTS.green}
+                        <WorkflowSteps
+                            title="FYP review loop"
+                            subtitle="Student builds the record. You review the flashcard. Approval publishes the same file everywhere."
+                            steps={[
+                                "Student builds FYP record (in progress)",
+                                "Student submits flashcard → AI Analyser runs automatically",
+                                "Supervisor reviews & may edit score / comments",
+                                "Approve → score & comments released to student, university, CIEL PK",
+                                "AI Analyser cohort ranking (publish 3× / year → locked badges)",
+                            ]}
+                            captions={["Student side", "Student side", "You are here", "After your decision", "After your decision"]}
+                            activeIndex={2}
                         />
-                        <MockupActionCard
-                            href={`${FYP_BASE}?view=rank`}
-                            emoji="🧮"
-                            ghost="🧮"
-                            title="FYP AI Rankings"
-                            subtitle="Rank approved supervisees. Waiting submissions stay out of the live picks."
-                            badge="RANKINGS"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                    </div>
+                    </>
                 )}
 
-                {(view === "progress" || view === "pending" || view === "approved") && (
+                {(view === "progress" || view === "pending" || view === "approved" || view === "rank") && (
                     <div className="relative max-w-sm">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -204,8 +239,13 @@ function FacultyFypThesisHub() {
                     </div>
                 )}
 
-                {view === "progress" &&
-                    (loading && inProgress.length === 0 ? (
+                {view === "progress" && (
+                    <>
+                        <PathSectionHead
+                            title="FYP in Progress"
+                            subtitle={`Supervisees who have started their Final Year Project record but not yet submitted. ${readyNotSubmitted.length} ready but not submitted · ${revision.length} revision with student. Nudge anyone who has stalled.`}
+                        />
+                    {loading && inProgress.length === 0 ? (
                         <SkeletonList />
                     ) : filteredInProgress.length === 0 ? (
                         <EmptyFyp
@@ -233,37 +273,81 @@ function FacultyFypThesisHub() {
                                 </div>
                             ))}
                         </div>
-                    ))}
+                    )}
+                    </>
+                )}
 
-                {view === "pending" &&
-                    (loading ? (
+                {view === "pending" && (
+                    <>
+                        <PathSectionHead
+                            title="FYP Review"
+                            subtitle="Each submission arrives as the student's FYP Flashcard. You may edit every section score and comment; your approval releases the final score and comments to the student, the university and CIEL PK."
+                            pill="AI SCORE SUPPORTS — FACULTY DECIDES"
+                        />
+                        <div className="mb-4 rounded-[15px] border border-[#d5eee8] bg-[#eef8f6] px-4 py-3 text-[11px] leading-relaxed text-[#4b6f68]">
+                            🤖 <b>The AI Analyser runs on submission</b> — you can edit any score or comment inside the flashcard. <b>Approving releases the final score + your comments</b> to the student&apos;s My Final Year Project Impact, your Approved FYP, the University FYP Impact Wall and CIEL PK. University cannot skip you.
+                        </div>
+                        <PathFilterBar
+                            filters={[
+                                `Pending review · ${waiting.length}`,
+                                `Revision requested · ${revision.length}`,
+                                `Rejected · ${rejected.length}`,
+                                `All · ${waiting.length + revision.length + rejected.length}`,
+                            ]}
+                            active={
+                                reviewTab === "pending" ? `Pending review · ${waiting.length}`
+                                    : reviewTab === "revision" ? `Revision requested · ${revision.length}`
+                                      : reviewTab === "rejected" ? `Rejected · ${rejected.length}`
+                                        : `All · ${waiting.length + revision.length + rejected.length}`
+                            }
+                            onChange={(label) => {
+                                if (label.startsWith("Pending")) setReviewTab("pending");
+                                else if (label.startsWith("Revision")) setReviewTab("revision");
+                                else if (label.startsWith("Rejected")) setReviewTab("rejected");
+                                else setReviewTab("all");
+                            }}
+                        />
+                    {loading ? (
                         <SkeletonList />
-                    ) : filteredWaiting.length === 0 ? (
+                    ) : filteredReview.length === 0 ? (
                         <EmptyFyp
                             message={
-                                waiting.length === 0
-                                    ? "Nothing waiting. Submitted records appear here until you approve them."
+                                reviewPool.length === 0
+                                    ? "Nothing here. Submitted records appear until you approve them."
                                     : "No records match your search."
                             }
                         />
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {filteredWaiting.map((entry) => (
+                            {filteredReview.map((entry) => {
+                                const canDecide = isPathEntryWaiting(entry);
+                                return (
                                 <div key={entry.id} className="space-y-2">
-                                    {entry.id ? <FypAiAnalysisPanel entry={entry} onUpdate={updateEntry} /> : null}
+                                    {canDecide && entry.id ? <FypAiAnalysisPanel entry={entry} onUpdate={updateEntry} /> : null}
                                     <ThesisCard
                                         entry={entry}
                                         studentName={entry.student?.name}
-                                        onSupervisorReview={entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
+                                        remindDraftOwner={isFypRevision(entry)}
+                                        studentEmail={entry.student?.email || entry.projectInfo?.studentEmail}
+                                        onSupervisorReview={canDecide && entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
                                         reviewing={reviewingId === entry.id}
                                     />
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
-                    ))}
+                    )}
+                    </>
+                )}
 
-                {view === "approved" &&
-                    (loading ? (
+                {view === "approved" && (
+                    <>
+                        <PathSectionHead
+                            title="Approved Final Year Project flashcards"
+                            subtitle="Live on your Faculty Impact Wall, the student's My Final Year Project Impact, the University FYP Impact Wall and CIEL PK — each with the score you allotted."
+                            pill="SYNCED TO ALL DASHBOARDS"
+                        />
+                    {loading ? (
                         <SkeletonList />
                     ) : filteredApproved.length === 0 ? (
                         <EmptyFyp
@@ -279,16 +363,40 @@ function FacultyFypThesisHub() {
                                 <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
                             ))}
                         </div>
-                    ))}
+                    )}
+                    </>
+                )}
 
-                {view === "rank" &&
-                    (loading ? (
+                {view === "rank" && (
+                    <>
+                        <PathSectionHead
+                            title="Approved FYP + AI Ranking"
+                            subtitle="Run the AI Analyser across all your approved Final Year Projects whenever you like. Publish at most 3 times per academic year: that day every student in the cohort receives a locked “Faculty AI Analyser” badge on their flashcard, synced to the university and CIEL PK."
+                            pill="TOP AI PICKS"
+                        />
+                    {loading ? (
                         <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
                     ) : approved.length === 0 ? (
                         <EmptyFyp message="Approve at least one submitted record to run the merit model." />
                     ) : (
-                        <FypMeritPanel entries={approved} meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
-                    ))}
+                        <>
+                            <FypMeritPanel entries={approved} meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                            <div className="mt-8">
+                                <PathSectionHead
+                                    title="Approved Final Year Project flashcards"
+                                    subtitle="The same records live on your Faculty Impact Wall, the student's My Final Year Project Impact, the University FYP Impact Wall and CIEL PK."
+                                    pill="SYNCED TO ALL DASHBOARDS"
+                                />
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {filteredApproved.map((entry) => (
+                                        <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    </>
+                )}
         </div>
     );
 }
