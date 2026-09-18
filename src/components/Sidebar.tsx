@@ -149,6 +149,56 @@ function RoleMenuSheet({
     );
 }
 
+function InvestorPlanCard() {
+    const [label, setLabel] = useState("Explorer · Free");
+    const [quotaTxt, setQuotaTxt] = useState("0 / 3 intro requests used");
+    const [bar, setBar] = useState(0);
+
+    useEffect(() => {
+        const read = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw ? (JSON.parse(raw) as { investor?: Record<string, unknown> }) : null;
+                const inv = u?.investor && typeof u.investor === "object" ? u.investor : {};
+                const planKey = String(inv.plan || "explorer").toLowerCase();
+                const plans: Record<string, { name: string; price: string; quota: number | null }> = {
+                    explorer: { name: "Explorer", price: "Free", quota: 3 },
+                    angel: { name: "Angel", price: "PKR 60,000 / yr", quota: 10 },
+                    fund: { name: "Fund", price: "PKR 250,000 / yr", quota: null },
+                    institutional: { name: "Institutional Partner", price: "PKR 1,200,000 / yr", quota: null },
+                };
+                const p = plans[planKey] || plans.explorer;
+                setLabel(`${p.name} · ${p.price}`);
+                const hub = inv.hub && typeof inv.hub === "object" ? (inv.hub as { intros?: unknown[] }) : {};
+                const used = Array.isArray(hub.intros) ? hub.intros.length : 0;
+                if (p.quota) {
+                    setBar(Math.min(100, (used / p.quota) * 100));
+                    setQuotaTxt(`${used} / ${p.quota} intro requests used`);
+                } else {
+                    setBar(100);
+                    setQuotaTxt(`${used} sent · unlimited`);
+                }
+            } catch {
+                /* ignore */
+            }
+        };
+        read();
+        window.addEventListener("ciel_user_updated", read);
+        return () => window.removeEventListener("ciel_user_updated", read);
+    }, []);
+
+    return (
+        <div className="mx-3.5 mt-3 rounded-[14px] bg-white/[0.055] p-3.5 text-[11px] leading-[1.55] text-[#a9c2cc]">
+            <b className="text-white">{label}</b>
+            <div className="mt-1">Intro requests this quarter</div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <span className="block h-full rounded-full bg-[#42ddb2]" style={{ width: `${bar}%` }} />
+            </div>
+            <div className="mt-1.5">{quotaTxt}</div>
+        </div>
+    );
+}
+
 export default function Sidebar() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -204,6 +254,7 @@ export default function Sidebar() {
     const isPartner = navRole === "partner";
     const isFaculty = navRole === "faculty";
     const isAdmin = navRole === "admin";
+    const isInvestor = navRole === "investor";
 
     const [partnerMembershipNav, setPartnerMembershipNav] = useState(false);
     useEffect(() => {
@@ -251,7 +302,7 @@ export default function Sidebar() {
         return () => window.removeEventListener("ciel_user_updated", read);
     }, [isPartner]);
 
-    const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin;
+    const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin || isInvestor;
 
     useEffect(() => {
         if (!hasInboxNotificationsNav) {
@@ -352,7 +403,7 @@ export default function Sidebar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [mobilePathsSheetOpen, setMobilePathsSheetOpen] = useState(false);
 
-    const roleSlug = isStudent ? "student" : isPartner ? "partner" : isFaculty ? "faculty" : "admin";
+    const roleSlug = isStudent ? "student" : isPartner ? "partner" : isFaculty ? "faculty" : isInvestor ? "investor" : "admin";
     const dashboardHref = `/dashboard/${roleSlug}`;
     const settingsHref = `/dashboard/${roleSlug}/settings`;
     const helpHref = isAdmin ? "/dashboard/admin/support" : `/dashboard/${roleSlug}/help`;
@@ -501,7 +552,32 @@ export default function Sidebar() {
         [withCounts],
     );
 
-    const workspaceLinks = isPartner ? partnerWorkspace : isFaculty ? facultyWorkspace : isAdmin ? adminWorkspace : [];
+    const investorPaths = useMemo(
+        () => [
+            { label: "Overview", href: "/dashboard/investor?view=overview", emoji: "⌂" },
+            { label: "Inbox & Messages", href: "/dashboard/investor?view=inbox", emoji: "✉" },
+            { label: "Discover Ventures", href: "/dashboard/investor?view=discover", emoji: "🚀" },
+            { label: "AI Deal Match", href: "/dashboard/investor?view=match", emoji: "✦" },
+            { label: "My Pipeline", href: "/dashboard/investor?view=pipeline", emoji: "⭐" },
+            { label: "Diligence Rooms", href: "/dashboard/investor?view=diligence", emoji: "🔐" },
+            { label: "Deal Outcomes", href: "/dashboard/investor?view=outcomes", emoji: "🏁" },
+            { label: "Reports, Seats & API", href: "/dashboard/investor?view=reports", emoji: "📑" },
+            { label: "Membership & Billing", href: "/dashboard/investor?view=membership", emoji: "◈" },
+            { label: "Agreements & Protection", href: "/dashboard/investor?view=agreements", emoji: "🛡" },
+            { label: "My Activity Log", href: "/dashboard/investor?view=activity", emoji: "≡" },
+            { label: "Pipeline Impact", href: "/dashboard/investor?view=impact", emoji: "◎" },
+            { label: "Investor Profile", href: "/dashboard/investor?view=profile", emoji: "🏢" },
+        ],
+        [],
+    );
+
+    const investorDash = investorPaths.slice(0, 2);
+    const investorDealFlow = investorPaths.slice(2, 8);
+    const investorCielYou = investorPaths.slice(8);
+
+    const investorWorkspace = useMemo(() => withCounts([]), [withCounts]);
+
+    const workspaceLinks = isPartner ? partnerWorkspace : isFaculty ? facultyWorkspace : isAdmin ? adminWorkspace : isInvestor ? investorWorkspace : [];
     const moreLinksRole = isPartner ? partnerMore : isFaculty ? facultyMore : isAdmin ? adminMore : [];
     const rolePaths = isFaculty
         ? facultyPaths
@@ -509,7 +585,9 @@ export default function Sidebar() {
           ? universityPaths
           : isAdmin
             ? adminPaths
-            : [];
+            : isInvestor
+              ? investorPaths
+              : [];
     const impactHref = isFaculty
         ? "/dashboard/faculty/impact"
         : isPartner && isUniversityPartnerOrg
@@ -524,9 +602,13 @@ export default function Sidebar() {
         const items: NavItem[] = [];
         if (isFaculty) items.push({ label: "My Profile", href: "/dashboard/faculty/profile", icon: User });
         items.push({ label: "Settings", href: settingsHref, icon: Settings });
-        items.push({ label: "Help", href: helpHref, icon: HelpCircle });
+        items.push({
+            label: isInvestor ? "Help & Deal Desk" : "Help",
+            href: isInvestor ? "/dashboard/investor?view=agreements" : helpHref,
+            icon: HelpCircle,
+        });
         return items;
-    }, [isFaculty, settingsHref, helpHref]);
+    }, [isFaculty, isInvestor, settingsHref, helpHref]);
 
     const allRoleHrefs = useMemo(
         () => [
@@ -551,6 +633,17 @@ export default function Sidebar() {
             return pathname === hrefPath && searchParams.get("area") === hrefArea;
         }
         if (hrefView) {
+            if (isInvestor) {
+                const v = searchParams.get("view") || "";
+                const aliases: Record<string, string[]> = {
+                    overview: ["overview", "home", ""],
+                    discover: ["discover", "showcase"],
+                    match: ["match", "rankings", "rank"],
+                    pipeline: ["pipeline", "saved"],
+                };
+                const list = aliases[hrefView];
+                if (list) return pathname === hrefPath && list.includes(v);
+            }
             return pathname === hrefPath && (!hrefTab || searchParams.get("tab") === hrefTab) && searchParams.get("view") === hrefView;
         }
         if (hrefTab) {
@@ -586,6 +679,8 @@ export default function Sidebar() {
             ? { label: "Profile", href: "/dashboard/faculty/profile", icon: User }
             : isPartner
               ? { label: "Organization", href: "/dashboard/partner/organization", icon: Building2 }
+              : isInvestor
+                ? { label: "Profile", href: "/dashboard/investor?view=profile", icon: Building2 }
               : { label: "Settings", href: settingsHref, icon: Settings };
 
     const mobileMenuItems = [
@@ -625,9 +720,11 @@ export default function Sidebar() {
                                       ? "University Dashboard"
                                       : isStudent
                                         ? "Student Impact Dashboard"
-                                        : isAdmin
-                                          ? "Youth Empowered Community Impact"
-                                          : "Youth Empowered Community Impact"}
+                                        : isInvestor
+                                          ? "CIEL Investor Hub"
+                                          : isAdmin
+                                            ? "Youth Empowered Community Impact"
+                                            : "Youth Empowered Community Impact"}
                             </span>
                         </div>
                     )}
@@ -643,7 +740,44 @@ export default function Sidebar() {
             </div>
 
             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
-                {isStudent ? (
+                {isInvestor ? (
+                    <>
+                        <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
+                        {investorDash.map((link) => (
+                            <NavRow
+                                key={link.href}
+                                href={link.href}
+                                label={link.label}
+                                emoji={link.emoji}
+                                active={isNavActive(link.href)}
+                                collapsed={collapsed}
+                            />
+                        ))}
+                        <NavSectionLabel collapsed={collapsed}>Deal Flow</NavSectionLabel>
+                        {investorDealFlow.map((link) => (
+                            <NavRow
+                                key={link.href}
+                                href={link.href}
+                                label={link.label}
+                                emoji={link.emoji}
+                                active={isNavActive(link.href)}
+                                collapsed={collapsed}
+                            />
+                        ))}
+                        <NavSectionLabel collapsed={collapsed}>CIEL & You</NavSectionLabel>
+                        {investorCielYou.map((link) => (
+                            <NavRow
+                                key={link.href}
+                                href={link.href}
+                                label={link.label}
+                                emoji={link.emoji}
+                                active={isNavActive(link.href)}
+                                collapsed={collapsed}
+                            />
+                        ))}
+                        {!collapsed && <InvestorPlanCard />}
+                    </>
+                ) : isStudent ? (
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
                         <NavRow href={dashboardHref} label="Dashboard" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
@@ -710,13 +844,13 @@ export default function Sidebar() {
                 ) : (
                     <>
                         <NavSectionLabel collapsed={collapsed}>
-                            {isUniversityPartnerOrg ? "University" : isFaculty ? "My Paths" : isAdmin ? "Super Admin" : "Dashboard"}
+                            {isUniversityPartnerOrg ? "University" : isFaculty ? "My Paths" : isAdmin ? "Super Admin" : isInvestor ? "CIEL Investor Hub" : "Dashboard"}
                         </NavSectionLabel>
-                        <NavRow href={dashboardHref} label={isFaculty ? "Overview" : isUniversityPartnerOrg || isAdmin ? "Overview" : "Dashboard"} emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
+                        <NavRow href={dashboardHref} label={isFaculty ? "Overview" : isUniversityPartnerOrg || isAdmin ? "Overview" : isInvestor ? "Home" : "Dashboard"} emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
                         {rolePaths.length > 0 ? (
                             <>
                                 <NavSectionLabel collapsed={collapsed}>
-                                    {isFaculty ? "Impact Areas" : "Impact Areas"}
+                                    {isFaculty ? "Impact Areas" : isInvestor ? "Deal Flow" : "Impact Areas"}
                                 </NavSectionLabel>
                                 {rolePaths.map((link) => (
                                     <NavRow
@@ -795,7 +929,7 @@ export default function Sidebar() {
                                 ) : null}
                             </>
                         ) : null}
-                        <NavSectionLabel collapsed={collapsed}>Workspace</NavSectionLabel>
+                        <NavSectionLabel collapsed={collapsed}>{isInvestor ? "Organisation" : "Workspace"}</NavSectionLabel>
                         {workspaceLinks.map((link) => (
                             <NavRow
                                 key={link.href}
@@ -943,7 +1077,7 @@ export default function Sidebar() {
                 <RoleMenuSheet
                     open={mobileMenuOpen}
                     onClose={() => setMobileMenuOpen(false)}
-                    title={isUniversityPartnerOrg ? "University menu" : isPartner ? "Partner menu" : isFaculty ? "Faculty menu" : "Admin menu"}
+                    title={isInvestor ? "Investor Hub" : isUniversityPartnerOrg ? "University menu" : isPartner ? "Partner menu" : isFaculty ? "Faculty menu" : "Admin menu"}
                     items={mobileMenuItems}
                     isActive={isNavActive}
                 />

@@ -109,6 +109,15 @@ function adminPageKicker(pathname: string): string {
     return "Super Admin";
 }
 
+function investorPageKicker(pathname: string): string {
+    const p = pathname.replace(/\/+$/, "") || pathname;
+    if (p.startsWith("/dashboard/investor/settings")) return "Settings";
+    if (p.startsWith("/dashboard/investor/help")) return "Help & Deal Desk";
+    if (p.startsWith("/dashboard/investor/profile")) return "Investor Profile";
+    if (p.startsWith("/dashboard/investor/messages")) return "Inbox & Messages";
+    return "Investor Hub";
+}
+
 type HeaderNotification = {
     id: number;
     type: "approval" | "reminder" | "update" | "alert";
@@ -179,6 +188,8 @@ export default function DashboardHeader() {
                   ? "Partner Portal"
                   : navRole === "admin"
                     ? "Super Admin"
+                    : navRole === "investor"
+                      ? "CIEL Investor Hub"
                     : "Dashboard";
 
     const pageCrumb =
@@ -190,6 +201,8 @@ export default function DashboardHeader() {
                 ? universityPageKicker(pathname)
                 : navRole === "admin"
                   ? adminPageKicker(pathname)
+                  : navRole === "investor"
+                    ? investorPageKicker(pathname)
                   : "Overview";
 
     const hasPageChrome = useHasDashboardPageChrome();
@@ -239,7 +252,9 @@ export default function DashboardHeader() {
                 ? "/dashboard/faculty/notifications"
                 : navRole === "admin"
                   ? "/dashboard/admin/notifications"
-                  : null;
+                  : navRole === "investor"
+                    ? "/dashboard/investor?view=inbox"
+                    : null;
 
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);

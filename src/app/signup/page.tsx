@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, ShieldCheck, ChevronDown, BadgeCheck, Info, Upload, GraduationCap, User, Building2, Handshake, Briefcase, Landmark, Check } from "lucide-react";
+import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, ShieldCheck, ChevronDown, BadgeCheck, Info, Upload, GraduationCap, User, Building2, Handshake, Briefcase, Landmark, Check, TrendingUp } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -17,6 +17,7 @@ import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
 import { authApiErrorMessage, isSignupEmailUnverifiedMessage } from "@/utils/authApiError";
+import { EMPTY_INVESTOR_SIGNUP, INVESTOR_STEP_COPY, InvestorSignupPanel, type InvestorSignupState, type InvestorWizardStep } from "@/components/ciel/auth/InvestorSignupPanel";
 
 import { Suspense } from "react";
 
@@ -26,6 +27,7 @@ const ROLES = [
     { id: "university", label: "University", emoji: "🏛️", desc: "Institutional account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
     { id: "ngo", label: "NGO / Partner", emoji: "🤝", desc: "Partner account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
     { id: "corporate", label: "Company", emoji: "💼", desc: "Corporate / CSR account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
+    { id: "investor", label: "Investor / VC", emoji: "📈", desc: "KYC-verified deal flow from faculty-approved university ventures.", formTitle: "Investor / VC Registration", formSub: "Requires KYC verification by CIEL PK Admin.", submitLabel: "Submit for verification" },
     { id: "government", label: "HEC / Government", emoji: "🏢", desc: "Official representative account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
 ] as const;
 
@@ -65,6 +67,8 @@ function SignUpContent() {
     const [consent, setConsent] = useState(false);
     const [dismissedEmailWarning, setDismissedEmailWarning] = useState(false);
     const [orgKind, setOrgKind] = useState<(typeof ORG_KIND_OPTIONS)[number]["kind"]>("university");
+    const [investorStep, setInvestorStep] = useState<InvestorWizardStep>(1);
+    const [investor, setInvestor] = useState<InvestorSignupState>(EMPTY_INVESTOR_SIGNUP);
     const [proofMethod, setProofMethod] = useState<"upload" | "link">("upload");
     const [proofFileName, setProofFileName] = useState("");
     const [proofLinkType, setProofLinkType] = useState<(typeof PROOF_LINK_TYPES)[number]>(PROOF_LINK_TYPES[0]);
@@ -126,6 +130,7 @@ function SignUpContent() {
 
     const handleRoleSelect = (selectedRole: string) => {
         setRole(selectedRole);
+        setInvestorStep(1);
         const kindMatch = ORG_KIND_OPTIONS.find((o) => o.kind === selectedRole);
         if (kindMatch) setOrgKind(kindMatch.kind);
         setFormData((prev) => ({
@@ -144,6 +149,7 @@ function SignUpContent() {
     };
 
     const isOrgRole = ["university", "ngo", "corporate", "government"].includes(role);
+    const isInvestor = role === "investor";
     const apiRole = signupApiRole(role);
     const isPersonalEmail = useMemo(() => isPersonalEmailDomain(formData.email), [formData.email]);
 
@@ -165,6 +171,27 @@ function SignUpContent() {
             if (!formData.name.trim()) newErrors.name = "Full name is required";
         }
 
+        if (isInvestor) {
+            if (!formData.contactPerson.trim()) newErrors.contactPerson = "Designation is required";
+            if (!formData.orgName.trim()) newErrors.orgName = "Fund / organisation name is required";
+            if (!investor.linkedin.trim()) newErrors.linkedin = "LinkedIn profile is required";
+            if (!investor.website.trim()) newErrors.website = "Website is required";
+            if (!investor.investorType.trim()) newErrors.investorType = "Investor type is required";
+            if (investorStep >= 2) {
+                if (!investor.preferredRounds.length) newErrors.preferredRounds = "Select at least one round";
+                if (!investor.preferredStages.length) newErrors.preferredStages = "Select at least one product stage";
+                if (!investor.typicalTicket.trim()) newErrors.typicalTicket = "Typical ticket is required";
+                if (!investor.sectors.length) newErrors.sectors = "Select at least one sector";
+            }
+            if (investorStep >= 3) {
+                if (!investor.proofOrgLabel.trim()) newErrors.proofOrgLabel = "Proof of organisation is required";
+                if (!investor.proofRoleLabel.trim()) newErrors.proofRoleLabel = "Proof of role is required";
+                if (!investor.agreePlatform || !investor.agreePrivacy || !investor.agreeAuthority) {
+                    newErrors.consent = "Accept all three agreement checkboxes to continue";
+                }
+            }
+        }
+
         if (role === "student" || role === "faculty") {
             if (!formData.institution.trim()) newErrors.institution = "Institution is required";
             if (!formData.department.trim()) newErrors.department = role === "student" ? "Degree program is required" : "Department is required";
@@ -179,7 +206,7 @@ function SignUpContent() {
             newErrors.phone = "Phone number must be at least 10 digits";
         }
 
-        if (!formData.city.trim()) {
+        if (!formData.city.trim() && !isInvestor) {
             newErrors.city = "City is required";
         }
 
@@ -191,8 +218,8 @@ function SignUpContent() {
 
         if (!formData.password) {
             newErrors.password = "Password is required";
-        } else if (formData.password.length < 8) {
-            newErrors.password = "Password must be at least 8 characters";
+        } else if (formData.password.length < (isInvestor ? 10 : 8)) {
+            newErrors.password = isInvestor ? "Password must be at least 10 characters" : "Password must be at least 8 characters";
         } else if (
             /^(\d)\1+$/.test(formData.password) ||
             /^(0123456789|1234567890|12345678|123456789|0987654321|abcdefgh|qwertyui|password|pass1234)/i.test(formData.password) ||
@@ -207,18 +234,26 @@ function SignUpContent() {
             newErrors.cnic = "CNIC must be 13 digits";
         }
 
-        if (!consent) newErrors.consent = "You must accept the terms to continue";
+        if (!consent && !isInvestor) newErrors.consent = "You must accept the terms to continue";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const isFormValid = useMemo(() => {
-        if (!consent) return false;
+        if (!isInvestor && !consent) return false;
         if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return false;
-        if (!formData.password || formData.password.length < 8) return false;
+        if (!formData.password || formData.password.length < (isInvestor ? 10 : 8)) return false;
         if (!formData.phone.trim() || formData.phone.length < 10) return false;
-        if (!formData.city.trim()) return false;
+        if (!isInvestor && !formData.city.trim()) return false;
+        if (isInvestor) {
+            if (!formData.name.trim() || !formData.contactPerson.trim() || !formData.orgName.trim()) return false;
+            if (!investor.linkedin.trim() || !investor.website.trim() || !investor.investorType.trim()) return false;
+            if (!investor.preferredRounds.length || !investor.preferredStages.length || !investor.sectors.length || !investor.typicalTicket.trim()) return false;
+            if (!investor.proofOrgLabel.trim() || !investor.proofRoleLabel.trim()) return false;
+            if (!investor.agreePlatform || !investor.agreePrivacy || !investor.agreeAuthority) return false;
+            return true;
+        }
         if (isOrgRole) {
             if (!formData.orgName.trim() || !formData.contactPerson.trim() || !formData.organizationCategory.trim() || !formData.legalRegistrationType.trim()) return false;
             if (proofMethod === "link") {
@@ -231,7 +266,7 @@ function SignUpContent() {
         if ((role === "student" || role === "faculty") && (!formData.institution.trim() || !formData.department.trim())) return false;
         if (role === "student" && !formData.enrollmentYear.trim()) return false;
         return true;
-    }, [formData, role, isOrgRole, consent, proofMethod, proofUrl]);
+    }, [formData, role, isOrgRole, isInvestor, investor, consent, proofMethod, proofUrl]);
 
     const firstIncompleteHint = useMemo(() => {
         if (isFormValid) return "";
@@ -265,6 +300,10 @@ function SignUpContent() {
         e.preventDefault();
         setFormError(null);
         if (!validateForm()) return;
+        if (isInvestor && investorStep < 3) {
+            setInvestorStep((s) => (s === 1 ? 2 : 3));
+            return;
+        }
 
         const normalizedEmail = formData.email.trim().toLowerCase();
         setIsLoading(true);
@@ -321,17 +360,44 @@ function SignUpContent() {
                     name: isOrgRole ? formData.contactPerson.trim() : formData.name.trim(),
                     orgName: formData.orgName.trim(),
                     orgType: isOrgRole ? signupApiRole(role) : formData.orgType,
-                    contactPerson: isOrgRole ? formData.contactPerson.trim() : formData.contactPerson,
-                    affiliationProofKind: isOrgRole ? proofMethod : undefined,
-                    affiliationProofUrl: isOrgRole && proofMethod === "link" ? proofUrl.trim() : undefined,
+                    contactPerson: isInvestor || isOrgRole ? formData.contactPerson.trim() : formData.contactPerson,
+                    affiliationProofKind: isOrgRole ? proofMethod : isInvestor ? "upload" : undefined,
+                    affiliationProofUrl: isOrgRole && proofMethod === "link" ? proofUrl.trim() : isInvestor ? investor.website.trim() : undefined,
                     affiliationProofLabel: isOrgRole
                         ? (proofMethod === "link" ? proofLinkType : proofFileName || "Document upload selected")
-                        : undefined,
+                        : isInvestor
+                          ? [investor.proofOrgLabel, investor.proofRoleLabel].filter(Boolean).join(" · ")
+                          : undefined,
                     university:
                         role === "student" || role === "faculty"
                             ? formData.institution.trim()
                             : undefined,
                     faculty_department: role === "faculty" ? formData.department.trim() : undefined,
+                    city: isInvestor ? investor.country : formData.city,
+                    investorProfile: isInvestor
+                        ? {
+                              linkedin: investor.linkedin.trim(),
+                              website: investor.website.trim(),
+                              investorType: investor.investorType,
+                              country: investor.country,
+                              hearAbout: investor.hearAbout,
+                              referralCode: investor.referralCode.trim(),
+                              preferredRounds: investor.preferredRounds,
+                              preferredStages: investor.preferredStages,
+                              sectors: investor.sectors,
+                              typicalTicket: investor.typicalTicket,
+                              geographicFocus: investor.geographicFocus,
+                              dealsPerYear: investor.dealsPerYear,
+                              decisionTimeline: investor.decisionTimeline,
+                              leadFollow: investor.leadFollow,
+                              sdgInterests: investor.sdgInterests.trim(),
+                              valueAdd: investor.valueAdd.trim(),
+                              plan: investor.plan,
+                              professionalReference: investor.professionalReference.trim(),
+                              proofOrgLabel: investor.proofOrgLabel,
+                              proofRoleLabel: investor.proofRoleLabel,
+                          }
+                        : undefined,
                 }),
             });
             if (!signupRes.ok) {
@@ -490,21 +556,26 @@ function SignUpContent() {
                 </aside>
 
                 <main className="min-w-0 overflow-y-auto bg-white px-5 py-8 sm:px-10 lg:px-16 lg:py-12">
-                    <div className="mx-auto w-full max-w-[34rem]">
+                    <div className={clsx("mx-auto w-full", isInvestor ? "max-w-[46rem]" : "max-w-[34rem]")}>
 
                         {step === "form" && (
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
-                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">Create your account</h1>
-                                    <p className="mt-1.5 text-sm text-ciel-text-mid">Takes about a minute. You&apos;ll verify your email at the end.</p>
+                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">
+                                        {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].title : "Create your account"}
+                                    </h1>
+                                    <p className="mt-1.5 text-sm text-ciel-text-mid">
+                                        {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].sub : "Takes about a minute. You'll verify your email at the end."}
+                                    </p>
                                 </div>
 
                                 <div>
                                     <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ciel-text-soft">I&apos;m joining as</p>
-                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                         {([
                                             { id: "student", label: "Student", desc: "Find projects, log hours, build your impact record.", Icon: GraduationCap },
                                             { id: "faculty", label: "Faculty", desc: "Post opportunities, review reports, verify student hours.", Icon: User },
+                                            { id: "investor", label: "Investor / VC", desc: "Browse faculty-verified ventures. KYC within 3 working days.", Icon: TrendingUp },
                                         ] as const).map((item) => {
                                             const selected = role === item.id;
                                             return (
@@ -552,7 +623,9 @@ function SignUpContent() {
                                         })}
                                     </div>
                                     <p className="mt-2 text-[12px] italic leading-relaxed text-ciel-text-soft">
-                                        Organisation accounts need a short CIEL admin check. Students and faculty activate after email verification.
+                                        {isInvestor
+                                            ? "Investor accounts are KYC-verified by CIEL PK within 3 working days before founder access is activated."
+                                            : "Organisation accounts need a short CIEL admin check. Students and faculty activate after email verification."}
                                     </p>
                                 </div>
 
@@ -582,10 +655,26 @@ function SignUpContent() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div key={`${role}-name`} className="ciel-crossfade-enter">
-                                            <label className={labelClass}>Full name</label>
-                                            <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name)} placeholder={role === "faculty" ? "As it appears on your faculty record" : "As it appears on your student record"} />
-                                            {errors.name && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.name}</p>}
+                                        <div key={`${role}-name`} className="ciel-crossfade-enter space-y-4">
+                                            <div>
+                                                <label className={labelClass}>Full name{isInvestor ? " *" : ""}</label>
+                                                <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name)} placeholder={isInvestor ? "e.g. Ayesha Khan" : role === "faculty" ? "As it appears on your faculty record" : "As it appears on your student record"} />
+                                                {errors.name && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.name}</p>}
+                                            </div>
+                                            {isInvestor && (
+                                                <>
+                                                    <div>
+                                                        <label className={labelClass}>Designation *</label>
+                                                        <input type="text" value={formData.contactPerson} onChange={(e) => handleGenericChange("contactPerson", e.target.value)} className={fieldClass(!!errors.contactPerson)} placeholder="e.g. Investment Director" />
+                                                        {errors.contactPerson && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.contactPerson}</p>}
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelClass}>Fund / organisation name *</label>
+                                                        <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. ABC Ventures" />
+                                                        {errors.orgName && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.orgName}</p>}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     )}
 
@@ -623,7 +712,7 @@ function SignUpContent() {
                                                 value={formData.email}
                                                 onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
                                                 className={fieldClass(!!errors.email, "pl-11")}
-                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : "official@organization.org"}
+                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : isInvestor ? "name@fund.com" : "official@organization.org"}
                                             />
                                         </div>
                                         {errors.email && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.email}</p>}
@@ -662,6 +751,7 @@ function SignUpContent() {
                                         />
                                     </div>
 
+                                    {!isInvestor && (
                                     <div>
                                         <label className={labelClass}>City</label>
                                         <div className="relative">
@@ -673,6 +763,7 @@ function SignUpContent() {
                                         </div>
                                         {errors.city && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.city}</p>}
                                     </div>
+                                    )}
 
                                     {isOrgRole && (
                                         <div className="ciel-crossfade-enter space-y-3">
@@ -779,7 +870,7 @@ function SignUpContent() {
                                                 value={formData.password}
                                                 onChange={(e) => handleGenericChange("password", e.target.value)}
                                                 className={fieldClass(!!errors.password, "pl-11 pr-11")}
-                                                placeholder="At least 8 characters"
+                                                placeholder={isInvestor ? "Min. 10 characters" : "At least 8 characters"}
                                             />
                                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-ciel-text-soft hover:text-ciel-green ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs" tabIndex={-1}>
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -798,6 +889,23 @@ function SignUpContent() {
                                     </div>
                                 </div>
 
+                                {isInvestor && (
+                                    <InvestorSignupPanel
+                                        step={investorStep}
+                                        setStep={setInvestorStep}
+                                        onNext={() => {
+                                            if (!validateForm()) return;
+                                            setInvestorStep((s) => (s === 1 ? 2 : 3));
+                                        }}
+                                        investor={investor}
+                                        setInvestor={setInvestor}
+                                        errors={errors}
+                                        fieldClass={fieldClass}
+                                        selectClass={selectClass}
+                                        labelClass={labelClass}
+                                    />
+                                )}
+
                                 {formError && (
                                     <div className="p-4 rounded-ciel-md bg-red-50 text-red-600 text-xs font-semibold border border-red-100 flex items-start gap-3">
                                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -805,6 +913,8 @@ function SignUpContent() {
                                     </div>
                                 )}
 
+                                {!isInvestor && (
+                                <>
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -839,6 +949,8 @@ function SignUpContent() {
                                 )}
                                 {isOrgRole && (
                                     <p className="text-center text-[12px] text-ciel-text-soft">Organisation accounts stay pending until CIEL admin review.</p>
+                                )}
+                                </>
                                 )}
 
                                 <p className="text-center text-sm text-ciel-text-mid">

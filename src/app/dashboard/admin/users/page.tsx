@@ -41,6 +41,7 @@ function formatJoinDate(createdAt: string | undefined | null): string {
 function formatRoleLabel(role: string): string {
     const r = role?.toLowerCase() || "";
     const map: Record<string, string> = {
+        investor: "Investor / VC",
         student: "Student",
         faculty: "Faculty",
         university: "University",
@@ -331,6 +332,7 @@ export default function AdminUsersPage() {
                             <option value="university">University</option>
                             <option value="ngo">NGO</option>
                             <option value="corporate">Corporate</option>
+                            <option value="investor">Investor / VC</option>
                             <option value="organization_admin">Org Admin</option>
                             <option value="admin">Admin</option>
                         </select>
@@ -740,6 +742,7 @@ export default function AdminUsersPage() {
                                         <option value="university">University</option>
                                         <option value="ngo">NGO</option>
                                         <option value="corporate">Corporate</option>
+                                        <option value="investor">Investor / VC</option>
                                         <option value="organization_admin">Org Admin</option>
                                         <option value="admin">Admin</option>
                                     </select>

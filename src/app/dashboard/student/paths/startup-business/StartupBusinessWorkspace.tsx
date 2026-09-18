@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
@@ -331,6 +331,7 @@ function workspaceVentureId(entry: { id?: string; createdAt?: string }) {
 
 export default function StartupBusinessWorkspace() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [loading, setLoading] = useState(true);
     const [entry, setEntry] = useState<VentureEntry>(EMPTY);
     const [step, setStep] = useState(0);
@@ -354,7 +355,10 @@ export default function StartupBusinessWorkspace() {
                     const merged = mergeEntry(EMPTY, data);
                     setEntry(merged);
                     const raw = data.stepCompleted ?? 0;
-                    setStep(loadWorkspaceStep(raw, merged.academicSetup?.formVersion));
+                    const mapped = loadWorkspaceStep(raw, merged.academicSetup?.formVersion);
+                    const stepRaw = searchParams.get("step");
+                    const requested = stepRaw == null || stepRaw === "" ? Number.NaN : Number(stepRaw);
+                    setStep(Number.isInteger(requested) && requested >= 0 && requested <= mapped ? requested : mapped);
                     if (merged.reviewPipeline?.declarationWork) setRepoAck(true);
                 }
             })

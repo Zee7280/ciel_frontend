@@ -1,6 +1,6 @@
 import { isPartnerRole } from "@/utils/profileCompletion";
 
-export type DashboardNavRole = "student" | "partner" | "faculty" | "admin";
+export type DashboardNavRole = "student" | "partner" | "faculty" | "admin" | "investor";
 
 /**
  * Home URL under `/dashboard/*` for a stored API role.
@@ -15,6 +15,7 @@ export function getDashboardHomePathForRole(rawRole: unknown): string {
     if (isPartnerRole(r)) return "/dashboard/partner";
     if (r === "admin" || r === "super_admin") return "/dashboard/admin";
     if (r === "faculty") return "/dashboard/faculty";
+    if (r === "investor") return "/dashboard/investor";
     if (r === "student") return "/dashboard/student";
     return "/dashboard/student";
 }
@@ -24,6 +25,7 @@ export function dashboardNavRoleFromPathname(pathname: string): DashboardNavRole
     if (pathname.includes("/dashboard/admin")) return "admin";
     if (pathname.includes("/dashboard/partner")) return "partner";
     if (pathname.includes("/dashboard/faculty")) return "faculty";
+    if (pathname.includes("/dashboard/investor")) return "investor";
     return "student";
 }
 
@@ -32,6 +34,8 @@ function mapNormalizedStoredRoleToken(role: string): DashboardNavRole | null {
     if (isPartnerRole(role)) return "partner";
     if (role === "admin" || role === "super_admin") return "admin";
     if (role === "faculty") return "faculty";
+    if (role === "investor") return "investor";
+    if (role === "student") return "student";
     return "student";
 }
 

@@ -20,7 +20,8 @@ export function roleHasNotificationInbox(role: string | null | undefined): boole
         r === "ngo" ||
         r === "university" ||
         r === "corporate" ||
-        r === "organization_admin"
+        r === "organization_admin" ||
+        r === "investor"
     );
 }
 

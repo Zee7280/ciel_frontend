@@ -14,10 +14,10 @@ import { SDG_COLORS, SDG_SHORT, V11_STEPS, hubProgressIndex } from "@/utils/vent
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 import StartupBusinessWorkspace from "@/app/dashboard/student/paths/startup-business/StartupBusinessWorkspace";
-import VentureAiCriticalReviewPanel, { VentureAiReviewChip } from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
+import VentureAiCriticalReviewPanel from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
 import { analyseVentureCriticalReview } from "@/utils/ventureCriticalReview";
 
-const VENTURE_VIEWS = ["home", "pipeline", "wall", "rank", "myventures", "create", "record", "pending", "approved", "aireview"] as const;
+const VENTURE_VIEWS = ["home", "pipeline", "wall", "rank", "myventures", "create", "record", "pending", "approved", "aireview", "aireport", "assessment"] as const;
 type FacView = (typeof VENTURE_VIEWS)[number];
 const VENTURE_BASE = "/dashboard/faculty/startup-business";
 const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Review"] as const;
@@ -239,8 +239,12 @@ function FacultyStartupBusinessHub() {
     const searchParams = useSearchParams();
     const recordId = searchParams.get("id");
     const tabParam = searchParams.get("tab") as PipeTab | null;
-    const screen: FacView = view === "pending" ? "pipeline" : view === "approved" ? "wall" : view;
-    const initialTab: PipeTab = view === "pending" || tabParam === "under_review" ? "under_review" : tabParam && PIPE_TABS.some((t) => t.key === tabParam) ? tabParam : "all";
+    const screen: FacView =
+        view === "pending" || view === "aireview" ? "pipeline"
+            : view === "approved" ? "wall"
+              : view === "assessment" ? "aireport"
+                : view;
+    const initialTab: PipeTab = view === "pending" || view === "aireview" || tabParam === "under_review" ? "under_review" : tabParam && PIPE_TABS.some((t) => t.key === tabParam) ? tabParam : "all";
 
     const [entries, setEntries] = useState<FacultyVenture[]>([]);
     const [drafts, setDrafts] = useState<FacultyVenture[]>([]);
@@ -366,41 +370,43 @@ function FacultyStartupBusinessHub() {
         screen === "home" ? undefined
             : screen === "pipeline" ? "Startup Pipeline"
               : screen === "wall" ? "Impact Wall"
-                : screen === "rank" ? "AI Rankings"
-                  : screen === "aireview" ? "AI Critical Reviews"
+                : screen === "rank" ? "Startup Ranking"
+                  : screen === "aireport" ? "AI Analysis Report"
                     : screen === "myventures" || screen === "create" ? "My Faculty Ventures"
                     : screen === "record" ? "Venture Card"
                       : screen;
+    const heroStats = [
+        { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
+        { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=pipeline&tab=under_review` },
+        { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
+        { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
+    ];
+    const openAiReport = (id?: string) => `${VENTURE_BASE}?view=aireport&id=${encodeURIComponent(id || "")}`;
 
     return (
         <div>
             <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
                 <CourseworkCrumb role="Faculty" view={crumbView} pathLabel="Startup / Venture" />
-                {screen === "home" ? (
+                {screen !== "create" ? (
                     <MockupHero
                         kicker="MY PATHS · STARTUP / VENTURE"
                         title={greetName === "Faculty" ? "Welcome" : `Welcome, ${greetName}`}
-                        subtitle="One pipeline for every venture you supervise — plus the CIEL AI Critical Review on every submitted flashcard: Shark-Tank / VC-lens analysis of each section, an Ivy-style grade (30% academic, 70% practical), reality checks and live market intelligence with sources."
+                        subtitle="One pipeline for every venture you supervise. Each submission arrives as two separate documents: the student's Venture Card (flashcard) and the CIEL AI Analysis Report — a Shark-Tank / VC-lens review shared only with you, your university and CIEL PK."
                         badge="👩‍🏫 FACULTY"
                         gradient="radial-gradient(120% 140% at 100% 0%, #0d8e88 0%, #0b4b57 45%, #0a2f3d 100%)"
-                        stats={[
-                            { value: String(inProcess.length), label: "IN PROCESS", href: `${VENTURE_BASE}?view=pipeline&tab=process` },
-                            { value: String(waiting.length), label: "TO REVIEW", href: `${VENTURE_BASE}?view=aireview` },
-                            { value: String(wallApproved.length), label: "APPROVED", href: `${VENTURE_BASE}?view=wall` },
-                            { value: String(own ? 1 : 0), label: "MY VENTURES", href: `${VENTURE_BASE}?view=myventures` },
-                        ]}
+                        stats={heroStats}
                     />
                 ) : null}
 
                 {screen === "home" && (
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
-                            href={`${VENTURE_BASE}?view=aireview`}
-                            emoji="🦈"
-                            ghost="🦈"
-                            title="AI Critical Reviews"
-                            subtitle="Every submitted flashcard arrives with a Shark-Tank / VC-lens review: section-by-section scores, Ivy-style grade (30% academic · 70% practical), reality checks, market intelligence with sources and a suggested decision."
-                            badge={`${waiting.length} AWAITING REVIEW`}
+                            href={`${VENTURE_BASE}?view=pipeline&tab=under_review`}
+                            emoji="📬"
+                            ghost="📬"
+                            title="Ventures to Review"
+                            subtitle="Each submission arrives with its Startup Flashcard and an automatically generated Startup Assessment (100-point investment rubric, market benchmark, investor verdict). Review both on one screen, change section or overall scores, add comments, then return for revision or approve. Your approved score becomes the official published score."
+                            badge={`${waiting.length} AWAITING DECISION`}
                             background={MOCKUP_GRADIENTS.navy}
                         />
                         <MockupActionCard
@@ -408,7 +414,7 @@ function FacultyStartupBusinessHub() {
                             emoji="🧩"
                             ghost="🧩"
                             title="Startup Pipeline"
-                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders and the v11 review rubric inside each record."
+                            subtitle="One platform for all your students' ventures: percentage completion from Just Started to In Process, then Under Review, Revision, Approved, Rejected — with reminders, the pure Venture Card and the review rubric inside each record."
                             badge={`${inProcess.length} IN PROCESS · ${waiting.length} TO REVIEW`}
                             background={MOCKUP_GRADIENTS.orange}
                         />
@@ -432,79 +438,13 @@ function FacultyStartupBusinessHub() {
                         />
                         <MockupActionCard
                             href={`${VENTURE_BASE}?view=rank`}
-                            emoji="🤖"
-                            ghost="🤖"
-                            title="Run AI Rankings"
+                            emoji="🏆"
+                            ghost="🏆"
+                            title="Run Startup Ranking"
                             subtitle="Rank approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year."
-                            badge="AI GRADER"
+                            badge="RANKING"
                             background={MOCKUP_GRADIENTS.purple}
-                            full
                         />
-                    </div>
-                )}
-
-                {screen === "aireview" && (
-                    <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
-                        <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
-                            <PanelBack href={homeHref} />
-                            <div className="min-w-0 flex-1">
-                                <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🦈 AI Critical Reviews — {waiting.length} awaiting your decision</h3>
-                                <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                    Each submitted flashcard is analysed like a Shark-Tank panel plus an Ivy-league rubric: sections scored academically (30%) and practically (70%), reality checks against the numbers, and a suggested decision. Open a record to read the full review and decide. AI never approves or rejects.
-                                </p>
-                            </div>
-                        </div>
-                        {loading ? (
-                            <SkeletonList />
-                        ) : waiting.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
-                                No submitted ventures awaiting review.
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3.5">
-                                {[...waiting]
-                                    .map((entry) => ({ entry, a: analyseVentureCriticalReview(entry) }))
-                                    .sort((x, y) => y.a.overall - x.a.overall)
-                                    .map(({ entry, a }) => (
-                                        <div key={entry.id} className="grid grid-cols-1 items-center gap-4 rounded-[18px] border border-[#e3e9ee] p-5 md:grid-cols-[1.6fr_1fr]">
-                                            <div>
-                                                <div className="flex flex-wrap items-center gap-2.5">
-                                                    <p className="m-0 text-[17px] font-extrabold">{entry.ventureName || "Untitled venture"}</p>
-                                                    <StatusChip entry={entry} />
-                                                    {isInvestorOpen(entry) ? <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#5e35b1]">Investor opt-in</span> : null}
-                                                </div>
-                                                <p className="mt-1 text-[13px] text-[#5d6c78]">
-                                                    <b className="text-[#14212b]">{displayVentureId(entry)}</b> · {studentName(entry)}
-                                                    {entry.ideaInfo?.sector ? ` · ${entry.ideaInfo.sector}` : ""}
-                                                </p>
-                                                <p className="mt-2 text-[13.5px] leading-relaxed text-[#2b3a44]">{a.summary}</p>
-                                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                                    {a.votes.map((v) => (
-                                                        <span
-                                                            key={v.who}
-                                                            className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold uppercase ${
-                                                                v.vote === "IN" ? "bg-[#e6f6ec] text-[#1c8a52]" : v.vote === "OUT" ? "bg-[#eceff1] text-[#455a64]" : "bg-[#fff3e0] text-[#c65b00]"
-                                                            }`}
-                                                        >
-                                                            {v.who.replace("The ", "")}: {v.vote}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div className="text-left md:text-right">
-                                                <div className="text-[30px] font-extrabold text-[#0b4b57]">
-                                                    {a.overall}<span className="text-sm text-[#5d6c78]">/100</span>
-                                                </div>
-                                                <div className="font-extrabold">{a.grade} · {a.tier}</div>
-                                                <div className="mt-1 text-[13px] text-[#5d6c78]">Academic {a.acad} · Practical {a.prac}</div>
-                                                <a href={openRecord(entry.id)} className="mt-2 inline-block rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">
-                                                    Read review & decide
-                                                </a>
-                                            </div>
-                                        </div>
-                                    ))}
-                            </div>
-                        )}
                     </div>
                 )}
 
@@ -524,11 +464,11 @@ function FacultyStartupBusinessHub() {
                             <div className="min-w-0 flex-1">
                                 <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🧩 Startup Pipeline — {pipelineAll.length}</h3>
                                 <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                    Every venture you supervise on one screen. Each record shows its percentage completion — Just Started, In Process, Complete — then Under Review, Revision, Approved or Rejected. Remind students by Email / WhatsApp; open a submitted card to review it. The same record the student sees in Startup Workspace / Under Review / Impact Wall.
+                                    Every venture you supervise on one screen. Each record shows its percentage completion and category — Just Started, In Process, Complete — then Under Review, Revision, Approved or Rejected. Remind students by Email / WhatsApp; open a submitted card to read the flashcard, open its separate AI Analysis Report and decide with the rubric.
                                 </p>
                             </div>
                             <a href={`${VENTURE_BASE}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">
-                                🤖 Run AI Grader
+                                🏆 Run Startup Ranking
                             </a>
                         </div>
                         <input
@@ -564,6 +504,7 @@ function FacultyStartupBusinessHub() {
                                         onContinue={() => { window.location.href = `${VENTURE_BASE}?view=create`; }}
                                         onCertify={() => void selfCertify()}
                                         certifying={certifying}
+                                        aiHref={entry.status === "submitted" ? openAiReport(entry.id) : undefined}
                                     />
                                 ))}
                             </div>
@@ -578,11 +519,14 @@ function FacultyStartupBusinessHub() {
                             <div className="min-w-0 flex-1">
                                 <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏅 Ventures Impact Wall (Faculty) — {wallApproved.length}</h3>
                                 <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                    Every venture you approved plus your own certified faculty ventures — the same cards students, the university, CIEL PK and (for opted-in ventures) investors see.
+                                    Every venture you approved plus your own certified faculty ventures — the same cards students, the university, CIEL PK and (for consented ventures) investors see. Each card carries its separate 📊 AI report button (not shown to students or investors).
                                 </p>
                             </div>
                             <a href={`${VENTURE_BASE}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">
-                                🤖 Run AI Grader
+                                🏆 Run Startup Ranking
+                            </a>
+                            <a href={`${VENTURE_BASE}?view=rank`} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
+                                👁 View Ranking
                             </a>
                         </div>
                         {loading ? (
@@ -592,7 +536,7 @@ function FacultyStartupBusinessHub() {
                         ) : (
                             <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
                                 {wallApproved.filter(matchesQuery).map((entry) => (
-                                    <WallCard key={entry.id} entry={entry} onOpen={() => { window.location.href = openRecord(entry.id); }} />
+                                    <WallCard key={entry.id} entry={entry} onOpen={() => { window.location.href = openRecord(entry.id); }} aiHref={openAiReport(entry.id)} />
                                 ))}
                             </div>
                         )}
@@ -625,7 +569,7 @@ function FacultyStartupBusinessHub() {
                             <div className="min-w-0 flex-1">
                                 <h3 className="m-0 text-[22px] font-bold text-[#14212b]">💡 My Faculty Ventures — {own ? 1 : 0}</h3>
                                 <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                    Ventures and opportunities you own as founder. Drafts sit here with a completion bar; complete ones you self-certify and publish. Investor-opted ventures are pitched in the CIEL Investor Hub.
+                                    Ventures and opportunities you own as founder. Drafts sit here with a completion bar; complete ones you self-certify and publish. Ventures with a recorded investor-track consent are listed in the CIEL Investor Hub; CIEL PK may spot-check using the AI Analysis Report.
                                 </p>
                             </div>
                             <a href={`${VENTURE_BASE}?view=create`} className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white">
@@ -642,6 +586,7 @@ function FacultyStartupBusinessHub() {
                                 onContinue={() => { window.location.href = `${VENTURE_BASE}?view=create`; }}
                                 onCertify={() => void selfCertify()}
                                 certifying={certifying}
+                                aiHref={own.status === "submitted" ? openAiReport(own.id) : undefined}
                             />
                         )}
                     </div>
@@ -652,9 +597,9 @@ function FacultyStartupBusinessHub() {
                         <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                             <PanelBack href={homeHref} />
                             <div className="min-w-0 flex-1">
-                                <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🤖 AI Grader — Faculty Rankings</h3>
+                                <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏆 Run Startup Ranking — Faculty cohort</h3>
                                 <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                    Rank approved ventures best → least. Preview freely; published finals pin a Faculty badge on the student Impact Wall card.
+                                    Compares the approved startups in your course / section / cohort with the standardised investment framework and explains every position. Publish to stamp “Faculty Cohort #n of N” on each student&apos;s flashcard. Preview freely; publish up to 3 finals per year.
                                 </p>
                             </div>
                         </div>
@@ -678,7 +623,17 @@ function FacultyStartupBusinessHub() {
                         loading={loading}
                         reviewing={reviewingId === recordEntry?.id}
                         onBack={homeHref}
-                        onReview={recordEntry?.id ? (action, note) => reviewEntry(recordEntry.id!, action, note) : undefined}
+                        onReview={recordEntry?.id && isPathEntryWaiting(recordEntry) && !isMine(recordEntry, myId) ? (action, note) => reviewEntry(recordEntry.id!, action, note) : undefined}
+                        aiHref={recordEntry?.id ? openAiReport(recordEntry.id) : undefined}
+                    />
+                )}
+
+                {screen === "aireport" && (
+                    <AiReportView
+                        entry={recordEntry}
+                        loading={loading}
+                        recordHref={openRecord(recordEntry?.id)}
+                        onBack={homeHref}
                     />
                 )}
             </div>
@@ -693,6 +648,7 @@ function PipelineRow({
     onContinue,
     onCertify,
     certifying,
+    aiHref,
 }: {
     entry: FacultyVenture;
     mine?: boolean;
@@ -700,11 +656,13 @@ function PipelineRow({
     onContinue: () => void;
     onCertify: () => void;
     certifying?: boolean;
+    aiHref?: string;
 }) {
     const waiting = isPathEntryWaiting(entry);
     const draftish = entry.status !== "submitted" || isRevision(entry);
     const remind = remindStudent(entry);
     const complete = overallPct(entry) >= 100;
+    const ai = entry.status === "submitted" ? analyseVentureCriticalReview(entry) : null;
     const meta = [
         displayVentureId(entry),
         studentName(entry),
@@ -735,6 +693,11 @@ function PipelineRow({
                 <span className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
                     Action with: {waiting ? "Faculty" : isPathEntryApproved(entry) ? "None — Approved" : mine ? "Faculty founder" : "Student"}
                 </span>
+                {ai && aiHref ? (
+                    <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white" title="Separate CIEL AI Analysis Report (not part of the flashcard)">
+                        📊 AI report · {ai.overall}/100 · {ai.grade}
+                    </a>
+                ) : null}
                 {draftish && !mine && remind.to ? (
                     <>
                         <a href={mailtoHref(remind.to, remind.subject, remind.body)} className="rounded-[10px] bg-[#3b5ba9] px-3 py-1.5 text-[12.5px] font-bold text-white">Email {studentName(entry).split(" ")[0]}</a>
@@ -749,7 +712,10 @@ function PipelineRow({
                         ) : null}
                     </>
                 ) : null}
-                {waiting ? (
+                {waiting && mine && complete ? (
+                    <button type="button" onClick={onCertify} disabled={certifying} className="rounded-[10px] bg-[#2e9e5b] px-3 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50">Self-certify & publish</button>
+                ) : null}
+                {waiting && !mine ? (
                     <button type="button" onClick={onOpen} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">Review & Decide</button>
                 ) : (
                     <button type="button" onClick={onOpen} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">Details</button>
@@ -759,10 +725,11 @@ function PipelineRow({
     );
 }
 
-function WallCard({ entry, onOpen }: { entry: FacultyVenture; onOpen: () => void }) {
+function WallCard({ entry, onOpen, aiHref }: { entry: FacultyVenture; onOpen: () => void; aiHref?: string }) {
     const ribbon = entry.meritRibbon;
     const pitch = entry.solutionInfo?.solution || entry.ideaInfo?.pitch || entry.sectionSummaries?.opportunity || "Approved venture record.";
     const traction = (entry.tractionRows || []).filter((r) => r.metric || r.value).slice(0, 3).map((r) => [r.metric, r.value].filter(Boolean).join(" ")).join("; ");
+    const ai = analyseVentureCriticalReview(entry);
     return (
         <div className="flex flex-col overflow-hidden rounded-[20px] border border-[#e3e9ee] bg-white">
             <div className="bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-[18px] py-4 text-white">
@@ -789,10 +756,56 @@ function WallCard({ entry, onOpen }: { entry: FacultyVenture; onOpen: () => void
                 {ribbon?.total != null ? <span className="rounded-full bg-[#e0f2f1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#0b6f6c]">Faculty score {ribbon.total}</span> : null}
                 {isInvestorOpen(entry) ? <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#5e35b1]">Investor opt-in</span> : null}
                 <span className="flex-1" />
+                {aiHref ? (
+                    <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white" title="Separate CIEL AI Analysis Report (not part of the flashcard)">
+                        📊 AI report · {ai.overall}/100
+                    </a>
+                ) : null}
                 <button type="button" onClick={onOpen} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">Open</button>
             </div>
         </div>
     );
+}
+
+function downloadVentureCard(entry: FacultyVenture) {
+    const title = entry.ventureName || "Venture Card";
+    const id = displayVentureId(entry);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${id} · Venture Card</title>
+<style>body{font-family:Georgia,serif;max-width:820px;margin:24px auto;color:#14212b;padding:0 18px}h1{font-size:22px}p{line-height:1.5}small{color:#5d6c78}</style></head>
+<body><p><small>CIEL PK Venture Studio · Venture Card (flashcard) · ${id} · generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} · no AI content</small></p>
+<h1>${escHtml(title)}</h1>
+<p><b>${id}</b> · ${escHtml(entry.academicSetup?.university || entry.student?.institution || "")} · ${escHtml(ventureStatusLabel(entry).label)}</p>
+<p><b>Problem</b><br>${escHtml(entry.ideaInfo?.problem || "—")}</p>
+<p><b>Solution</b><br>${escHtml(entry.solutionInfo?.solution || "—")}</p>
+<p><b>Team</b><br>${escHtml((entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || studentName(entry))}</p>
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${id}_Venture_Card.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function escHtml(value: string) {
+    return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
+}
+
+function deriveActivity(entry: FacultyVenture) {
+    const rows: { at: string; who: string; action: string }[] = [];
+    if (entry.createdAt) rows.push({ at: entry.createdAt, who: studentName(entry), action: "Venture record created" });
+    if (entry.status === "submitted" || isPathEntryApproved(entry) || isRejected(entry) || isRevision(entry)) {
+        rows.push({
+            at: entry.reviewPipeline?.studentDeclaredAt || entry.updatedAt || entry.createdAt || "",
+            who: studentName(entry),
+            action: "Submitted for faculty review — flashcard generated; CIEL AI Analysis Report queued (faculty, university & CIEL PK only)",
+        });
+    }
+    if (isRevision(entry)) rows.push({ at: entry.updatedAt || "", who: entry.academicSetup?.supervisorName || "Faculty", action: "Revision requested — returned to student workspace" });
+    if (isRejected(entry)) rows.push({ at: entry.updatedAt || "", who: entry.academicSetup?.supervisorName || "Faculty", action: "Rejected — record preserved, not published" });
+    if (isPathEntryApproved(entry)) rows.push({ at: entry.updatedAt || "", who: entry.academicSetup?.supervisorName || "Faculty", action: "Approved — published to student, faculty, university and CIEL PK impact walls" });
+    return rows.filter((r) => r.at).sort((a, b) => a.at.localeCompare(b.at));
 }
 
 function RecordView({
@@ -801,12 +814,14 @@ function RecordView({
     reviewing,
     onBack,
     onReview,
+    aiHref,
 }: {
     entry: FacultyVenture | null;
     loading: boolean;
     reviewing?: boolean;
     onBack: string;
     onReview?: (action: "approve" | "reject" | "revision", note?: string) => void;
+    aiHref?: string;
 }) {
     const [note, setNote] = useState("");
     if (loading && !entry) return <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />;
@@ -822,6 +837,9 @@ function RecordView({
     const submitted = entry.status === "submitted" || waiting || isPathEntryApproved(entry) || isRejected(entry);
     const scorecard = computeVentureMeritScorecard(entry);
     const ribbon = entry.meritRibbon;
+    const ai = submitted ? analyseVentureCriticalReview(entry) : null;
+    const logs = deriveActivity(entry);
+    const model = entry.solutionInfo?.revenue || (entry.solutionInfo?.revenueModels || []).join(" + ");
     return (
         <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
             <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
@@ -829,83 +847,220 @@ function RecordView({
                 <div className="min-w-0 flex-1">
                     <h3 className="m-0 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h3>
                     <p className="mt-1.5 text-[14.5px] text-[#5d6c78]">
-                        {displayVentureId(entry)} · {ventureStatusLabel(entry).label} · {studentName(entry)}
+                        {displayVentureId(entry)} · {ventureStatusLabel(entry).label} · Action with: {waiting ? "Faculty" : isPathEntryApproved(entry) ? "None — Approved" : "Student"}
+                        {waiting ? " · Review the flashcard (left) and the assessment (right); then decide." : ""}
                     </p>
                 </div>
-                {submitted ? <VentureAiReviewChip entry={entry} /> : null}
             </div>
             <VentureTimeline entry={entry} />
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#e3e9ee]">
-                <div className="bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
-                    <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {entry.academicSetup?.university || entry.student?.institution || "Venture"}</div>
-                    <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
-                    <div className="mt-1.5 text-[13px] text-[#dff3f1]">{studentName(entry)} {entry.academicSetup?.supervisorName ? ` · Faculty: ${entry.academicSetup.supervisorName}` : ""}</div>
-                </div>
-                <div className="grid grid-cols-1 gap-2.5 p-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {[
-                        { k: "Sector · Stage", v: [entry.ideaInfo?.sector, entry.stage].filter(Boolean).join(" · ") },
-                        { k: "Problem", v: entry.ideaInfo?.problem || entry.ideaInfo?.pitch },
-                        { k: "Solution", v: entry.solutionInfo?.solution },
-                        { k: "Team", v: (entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || studentName(entry) },
-                    ].filter((x) => x.v).map((x) => (
-                        <div key={x.k} className="rounded-xl bg-[#f6f8fa] px-3 py-2.5 text-[13px]">
-                            <b className="mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{x.k}</b>
-                            {x.v}
-                        </div>
-                    ))}
-                </div>
-            </div>
-            {submitted ? (
-                <VentureAiCriticalReviewPanel entry={entry} onPrefill={waiting ? (draft) => setNote(draft) : undefined} />
-            ) : null}
-            <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
-                <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Analyser — section-by-section (decision support only; never auto-approves)</b>
-                    <div className="mt-3 space-y-2">
-                        {scorecard.criteria.map((c) => (
-                            <div key={c.key}>
-                                <div className="flex justify-between text-[12.5px]"><span>{c.label}</span><b>{c.points}/{c.max}</b></div>
-                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#e9eef2]"><i className="block h-full rounded-full" style={{ width: `${(c.points / c.max) * 100}%`, background: c.color }} /></div>
+            <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                <div>
+                    <div className="overflow-hidden rounded-[22px] border border-[#e3e9ee]">
+                        <div className="flex flex-wrap items-start justify-between gap-3.5 bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
+                            <div>
+                                <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {entry.academicSetup?.university || entry.student?.institution || "Venture"}</div>
+                                <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
+                                <div className="mt-1.5 text-[13px] text-[#dff3f1]">{studentName(entry)} {entry.academicSetup?.supervisorName ? ` · Faculty: ${entry.academicSetup.supervisorName}` : ""}</div>
                             </div>
-                        ))}
+                            <div className="text-right">
+                                <StatusChip entry={entry} />
+                                <div className="mt-2 text-[12px]">{isInvestorOpen(entry) ? "🤝 Investor track" : "🔒 Not on investor track"}</div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5 p-6 sm:grid-cols-2">
+                            {[
+                                { k: "Sector · Stage", v: [entry.ideaInfo?.sector, entry.stage].filter(Boolean).join(" · ") },
+                                { k: "Problem", v: entry.ideaInfo?.problem || entry.ideaInfo?.pitch },
+                                { k: "Solution", v: entry.solutionInfo?.solution },
+                                { k: "Business model", v: model },
+                                { k: "Team", v: (entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || studentName(entry) },
+                            ].filter((x) => x.v).map((x) => (
+                                <div key={x.k} className="rounded-xl bg-[#f6f8fa] px-3 py-2.5 text-[13px]">
+                                    <b className="mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{x.k}</b>
+                                    {x.v}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e3e9ee] px-6 py-3">
+                            <div>
+                                {sdgNumbers(entry).map((n) => (
+                                    <span key={n} title={SDG_SHORT[n]} className="mr-1.5 inline-block rounded-lg px-2 py-0.5 text-[11.5px] font-extrabold text-white" style={{ background: SDG_COLORS[n] }}>SDG {n}</span>
+                                ))}
+                            </div>
+                            <span className="text-[11.5px] text-[#5d6c78]">Venture Card · student-authored flashcard · no AI scoring on this card</span>
+                        </div>
                     </div>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => downloadVentureCard(entry)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">⬇ Download flashcard</button>
+                        {submitted && aiHref ? (
+                            <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">📈 View Assessment (full page)</a>
+                        ) : null}
+                    </div>
+                    <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                        <b>Investor track & consent</b>
+                        <p className="mt-1.5 mb-0 text-[13.5px] text-[#5d6c78]">
+                            {isInvestorOpen(entry)
+                                ? `Investor track is on${entry.reviewPipeline?.studentDeclaredAt ? ` · consented ${formatDay(entry.reviewPipeline.studentDeclaredAt)}` : ""}.`
+                                : "Not on investor track — investors cannot see this venture."}
+                        </p>
+                        {isInvestorOpen(entry) ? (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                                {[["0", "Card views"], ["0", "Interest received"], ["0", "Founder-contact requests"]].map(([n, l]) => (
+                                    <div key={l} className="rounded-xl bg-[#f6f8fa] px-3 py-2 text-center">
+                                        <b className="block text-lg">{n}</b>
+                                        <small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{l}</small>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                    {entry.status !== "submitted" || isRevision(entry) ? (
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Completion</b>
+                            <CompletionBar entry={entry} />
+                        </div>
+                    ) : null}
+                    {isPathEntryApproved(entry) ? (
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Recognition & investor activity</b>
+                            <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">
+                                {ribbon ? `Ranked #${ribbon.rank} of ${ribbon.of}${ribbon.total != null ? ` · ${ribbon.total}/100` : ""}.` : "No ranking badges yet."}
+                            </p>
+                        </div>
+                    ) : null}
+                    {entry.reviewPipeline?.supervisorNote && !waiting && !isPathEntryApproved(entry) ? (
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
+                            <p className="mt-2 mb-0 text-sm leading-relaxed">{entry.reviewPipeline.supervisorNote}</p>
+                        </div>
+                    ) : null}
                 </div>
-                <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Notes</b>
-                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]">
-                        {scorecard.grade} · {scorecard.total}/100. {waiting ? "Use this as support, then decide below. The student sees your remarks, not this internal breakdown." : entry.reviewPipeline?.supervisorNote || "No faculty remarks stored."}
-                    </p>
-                    {entry.status !== "submitted" || isRevision(entry) ? <CompletionBar entry={entry} /> : null}
+                <div>
+                    {submitted ? (
+                        <div className="rounded-[18px] border border-[#cfe3e1] p-5">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="grid h-[78px] w-[78px] place-items-center rounded-full text-[18px] font-extrabold" style={{ background: `conic-gradient(#0f8f8a ${scorecard.total}%, #e6ebef 0)` }}>
+                                    <span className="grid h-[64px] w-[64px] place-items-center rounded-full bg-white text-[#0b4b57]">{scorecard.total}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <b>Startup Investment & Growth Assessment</b>
+                                    <p className="mt-1 mb-0 text-[13px] text-[#5d6c78]">{scorecard.grade} · decision support only. The student sees your remarks, not this internal breakdown.</p>
+                                </div>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                                {scorecard.criteria.map((c) => (
+                                    <div key={c.key}>
+                                        <div className="flex justify-between text-[12.5px]"><span>{c.label}</span><b>{c.points}/{c.max}</b></div>
+                                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#e9eef2]"><i className="block h-full rounded-full" style={{ width: `${(c.points / c.max) * 100}%`, background: c.color }} /></div>
+                                    </div>
+                                ))}
+                            </div>
+                            {ai && aiHref ? (
+                                <div className="mt-4 rounded-[14px] border border-[#0f8f8a] bg-[#fbfdfd] p-3.5">
+                                    <b>📊 CIEL AI Analysis Report</b>
+                                    <p className="mt-1 mb-2 text-[13px] leading-relaxed text-[#5d6c78]">
+                                        {ai.overall}/100 · {ai.grade} · {ai.tier}. 🔒 Visible to Faculty · University · CIEL PK only. Separate from the Venture Card; never shown to the student or investors.
+                                    </p>
+                                    <a href={aiHref} className="inline-block rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">📊 Open full report</a>
+                                </div>
+                            ) : (
+                                <p className="mt-3 mb-0 text-[13.5px] text-[#5d6c78]">Generated automatically the moment the student submits. Nothing to assess yet — record is still a draft.</p>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Startup Assessment</b>
+                            <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">Generated automatically the moment the student submits. Nothing to assess yet — record is still in the workspace.</p>
+                        </div>
+                    )}
+                    {waiting && onReview ? (
+                        <div className="mt-4 rounded-[18px] border border-[#0f8f8a] p-5">
+                            <h3 className="m-0 text-[19px] font-bold">Faculty decision</h3>
+                            <p className="mt-1 text-[14.5px] text-[#5d6c78]">Score and remarks go to the student. The CIEL AI Analysis Report is your assistant only — the decision is yours.</p>
+                            <textarea
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="What the student will read… required for revision or reject."
+                                rows={3}
+                                className="mt-3 w-full rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm"
+                            />
+                            <div className="mt-3.5 flex flex-wrap justify-end gap-2">
+                                <button type="button" disabled={reviewing} onClick={() => onReview("reject", note.trim())} className="rounded-xl bg-[#d64545] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">✖ Reject</button>
+                                <button type="button" disabled={reviewing} onClick={() => onReview("revision", note.trim())} className="rounded-xl bg-[#f39c12] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">↩ Request Revision</button>
+                                <button type="button" disabled={reviewing} onClick={() => onReview("approve", note.trim() || undefined)} className="rounded-xl bg-[#2e9e5b] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">
+                                    ✔ Accept & Publish to Impact Walls
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
-            {waiting && onReview ? (
-                <div className="mt-4 rounded-[18px] border border-[#0f8f8a] p-5">
-                    <h3 className="m-0 text-[19px] font-bold">Faculty decision</h3>
-                    <p className="mt-1 text-[14.5px] text-[#5d6c78]">Score and remarks go to the student. The analyser is your assistant only — the decision is yours. Approving publishes the same card to the student Impact Wall.</p>
-                    <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="What the student will read… required for revision or reject."
-                        rows={3}
-                        className="mt-3 w-full rounded-xl border border-[#e3e9ee] px-3 py-2 text-sm"
-                    />
-                    <div className="mt-3.5 flex flex-wrap justify-end gap-2">
-                        <button type="button" disabled={reviewing} onClick={() => onReview("reject", note.trim())} className="rounded-xl bg-[#d64545] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">Reject</button>
-                        <button type="button" disabled={reviewing} onClick={() => onReview("revision", note.trim())} className="rounded-xl bg-[#f39c12] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">Request Revision</button>
-                        <button type="button" disabled={reviewing} onClick={() => onReview("approve", note.trim() || undefined)} className="rounded-xl bg-[#2e9e5b] px-4 py-2 text-[13.5px] font-bold text-white disabled:opacity-50">
-                            Accept & Publish to Impact Walls
-                        </button>
-                    </div>
+            <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
+                <b>Activity log</b>
+                <div className="mt-2 border-t border-[#e3e9ee]">
+                    {logs.length ? logs.map((row, i) => (
+                        <div key={`${row.at}-${i}`} className="grid grid-cols-1 gap-1 border-b border-[#e3e9ee] py-2.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_170px] sm:gap-3">
+                            <span><b>{row.who}</b></span>
+                            <span>{row.action}</span>
+                            <span className="text-[#5d6c78] sm:text-right">{formatDay(row.at)}</span>
+                        </div>
+                    )) : <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">No activity yet.</p>}
                 </div>
-            ) : null}
-            {isPathEntryApproved(entry) ? (
-                <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Recognition</b>
-                    <p className="mt-2 text-[13.5px] text-[#5d6c78]">
-                        {ribbon ? `Ranked #${ribbon.rank} of ${ribbon.of}${ribbon.total != null ? ` · ${ribbon.total}/100` : ""}.` : "No ranking badges yet — run AI Rankings to pin a faculty badge on the student card."}
+            </div>
+        </div>
+    );
+}
+
+function AiReportView({
+    entry,
+    loading,
+    recordHref,
+    onBack,
+}: {
+    entry: FacultyVenture | null;
+    loading: boolean;
+    recordHref: string;
+    onBack: string;
+}) {
+    if (loading && !entry) return <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />;
+    if (!entry) {
+        return (
+            <div className="rounded-[22px] bg-white p-8 text-center text-[#5d6c78] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                <PanelBack href={onBack} />
+                <p className="mt-4">No AI report yet — reports are generated only for submitted ventures.</p>
+            </div>
+        );
+    }
+    const submitted = entry.status === "submitted" || isPathEntryWaiting(entry) || isPathEntryApproved(entry) || isRejected(entry) || isRevision(entry);
+    const ai = submitted ? analyseVentureCriticalReview(entry) : null;
+    return (
+        <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+            <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                <PanelBack href={onBack} />
+                <div className="min-w-0 flex-1">
+                    <h3 className="m-0 text-[22px] font-bold">📊 CIEL AI Analysis Report — {entry.ventureName || "Untitled venture"}</h3>
+                    <p className="mt-1.5 text-[14.5px] text-[#5d6c78]">
+                        Separate from the Venture Card. Shark-Tank / VC-lens · 30% academic · 70% practical.
                     </p>
                 </div>
+                <a href={recordHref} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">🗂 Open venture record</a>
+                <button type="button" onClick={() => window.print()} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">🖨 Print / PDF</button>
+            </div>
+            <div className="mb-3 rounded-[14px] border border-[#b7d8f5] bg-[#e5f1fb] px-4 py-3 text-[13.5px] leading-relaxed">
+                🔒 <b>Restricted report.</b> Audience: Faculty (decision), University (oversight), CIEL PK (network). Not shown to the student or to investors. Decision support only — the faculty decision is human.
+            </div>
+            {ai ? (
+                <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.overall}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Overall /100 · {ai.grade} · {ai.tier}</small></div>
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.acad} / {ai.prac}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Academic 30% · Practical 70%</small></div>
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.verdict}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Shark verdict</small></div>
+                </div>
             ) : null}
+            {submitted ? (
+                <VentureAiCriticalReviewPanel entry={entry} />
+            ) : (
+                <p className="text-[14.5px] text-[#5d6c78]">No AI report yet — reports are generated only for submitted ventures.</p>
+            )}
         </div>
     );
 }

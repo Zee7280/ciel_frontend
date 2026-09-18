@@ -51,7 +51,7 @@ const segments = [
         label: "Investors",
         description: "Subscribe to the venture marketplace: faculty-gated student startups with verified traction and honest stages.",
         cta: "Browse the marketplace",
-        href: "/projects",
+        href: "/signup?role=investor",
         border: "border-l-teal-500",
     },
 ];

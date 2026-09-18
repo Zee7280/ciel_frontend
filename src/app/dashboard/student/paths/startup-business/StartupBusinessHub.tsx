@@ -1411,10 +1411,7 @@ export default function StartupBusinessHub({
                     <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">
                         <h3 className="m-0 text-[22px] font-bold">📤 Submit “{submitFor.ventureName || "Untitled venture"}” to faculty?</h3>
                         <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                            Your record will lock, a Venture Card will be generated and {submitFor.academicSetup?.supervisorName || "your faculty"} will be notified.{" "}
-                            {isInvestorOpen(submitFor)
-                                ? "Investor-track consent is on file — if approved, a curated Venture Card will also be listed in the CIEL Investor Hub (you can withdraw any time)."
-                                : "No investor-track consent — approval publishes to impact walls only."}
+                            Submit happens on form step 9 after core fields, five accepted summaries and the repository acknowledgement. This does not skip those checks.
                         </p>
                         <div className="mt-4 flex justify-end gap-2.5">
                             <button type="button" onClick={() => setSubmitFor(null)} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
@@ -1424,11 +1421,11 @@ export default function StartupBusinessHub({
                                 type="button"
                                 onClick={() => {
                                     setSubmitFor(null);
-                                    router.push(WORKSPACE_HREF);
+                                    router.push(`${WORKSPACE_HREF}&step=8`);
                                 }}
                                 className="rounded-xl bg-[#2e9e5b] px-4 py-2.5 text-[13.5px] font-bold text-white"
                             >
-                                Submit Venture
+                                Open step 9 to submit
                             </button>
                         </div>
                     </div>

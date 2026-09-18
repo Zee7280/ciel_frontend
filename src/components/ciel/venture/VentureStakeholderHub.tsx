@@ -6,7 +6,6 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { CourseworkCrumb, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
@@ -14,11 +13,13 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ventureMeritModel";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
+import VentureAiCriticalReviewPanel from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
+import { analyseVentureCriticalReview } from "@/utils/ventureCriticalReview";
 
 export type VentureHubVariant = "university" | "ciel";
 
-const UNI_VIEWS = ["home", "pipeline", "wall", "rank", "facventures", "record", "process", "review"] as const;
-const CIEL_VIEWS = [...UNI_VIEWS, "showcase", "activity"] as const;
+const UNI_VIEWS = ["home", "pipeline", "wall", "rank", "facventures", "record", "process", "review", "aireport", "assessment"] as const;
+const CIEL_VIEWS = [...UNI_VIEWS, "showcase", "activity", "accounts", "rankings", "ranking", "investorActivity", "investorAccounts"] as const;
 type HubView = (typeof CIEL_VIEWS)[number];
 type PipeTab = "all" | "just" | "process" | "under_review" | "revision" | "approved" | "rejected";
 type HubSort = "updated" | "completion" | "score" | "interest" | "name";
@@ -63,6 +64,7 @@ type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     sectionSummaries?: Record<string, string | undefined> | null;
     sdgMapping?: { entries?: { goalNumber: number }[]; howImpact?: string; indicators?: { indicator?: string; forGoal?: string; target12mo?: string; verifiedBy?: string }[] } | null;
     tractionRows?: { metric?: string; value?: string }[] | null;
+    evidenceInfo?: { fundingSought?: number; useOfFunds?: string } | null;
     meritRibbon?: {
         rank: number;
         of: number;
@@ -270,31 +272,13 @@ function tractionLine(entry: HubVenture) {
     if (!rows.length) return "no traction logged";
     return rows.map((r) => [r.metric, r.value].filter(Boolean).join(" ")).join("; ");
 }
-function analyserNotes(entry: HubVenture) {
-    const scorecard = computeVentureMeritScorecard(entry);
-    const ranked = [...scorecard.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
-    const best = ranked[0];
-    const worst = ranked[ranked.length - 1];
-    const traction = scorecard.criteria.find((c) => c.key === "traction");
-    const ratio = traction ? traction.points / traction.max : 0;
-    const analytical = `Analytical: weighted VEN-RANK 1.0 score ${scorecard.total}/100 — strongest on ${best?.label.toLowerCase() || "the rubric"} (${best?.points ?? 0}/${best?.max ?? 0}), weakest on ${worst?.label.toLowerCase() || "the rubric"} (${worst?.points ?? 0}/${worst?.max ?? 0}).`;
-    const critical =
-        (ratio >= 0.8
-            ? "Critical: traction claims are evidence-backed and consistent with the stated model."
-            : ratio >= 0.5
-              ? "Critical: traction is real but early; scale-up assumptions remain untested."
-              : "Critical: traction evidence is thin — ranking is capped until independent evidence is provided.") +
-        ((entry.team?.length || 1) <= 1 ? " Solo-founder execution risk noted." : "");
-    const factual = `Factual: ${entry.stage || "stage not set"} · ${tractionLine(entry)} · ${isInvestorOpen(entry) ? "opted in to investors" : "not seeking investment"}.`;
-    return { scorecard, analytical, critical, factual, band: scorecard.grade };
-}
 function activityLog(entry: HubVenture) {
     const rows: { who: string; action: string; t: string }[] = [];
     if (entry.createdAt) rows.push({ who: ownerName(entry), action: "Venture record created", t: formatDay(entry.createdAt) });
     if (entry.reviewPipeline?.studentDeclaredAt) {
         rows.push({
             who: ownerName(entry),
-            action: "Submitted for faculty review — record locked, venture card generated, AI pre-screen run",
+            action: "Submitted for faculty review — flashcard generated; CIEL AI Analysis Report queued (faculty, university & CIEL PK only)",
             t: formatDay(entry.reviewPipeline.studentDeclaredAt),
         });
     }
@@ -337,7 +321,13 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const searchParams = useSearchParams();
     const recordId = searchParams.get("id");
     const tabParam = searchParams.get("tab") as PipeTab | null;
-    const screen: HubView = view === "process" || view === "review" ? "pipeline" : view;
+    const screen: HubView =
+        view === "process" || view === "review" ? "pipeline"
+            : view === "assessment" ? "aireport"
+              : view === "rankings" || view === "ranking" ? "rank"
+                : view === "investorActivity" ? "activity"
+                  : view === "investorAccounts" ? "accounts"
+                    : view;
     const initialTab: PipeTab =
         view === "review" || tabParam === "under_review" ? "under_review"
             : view === "process" || tabParam === "process" ? "process"
@@ -359,6 +349,16 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     const [sdgFilter, setSdgFilter] = useState("");
     const [sortBy, setSortBy] = useState<HubSort>("updated");
     const [spotlightId, setSpotlightId] = useState<string | null>(null);
+    const [investorAccounts, setInvestorAccounts] = useState<{
+        id: string;
+        name?: string;
+        email?: string;
+        orgName?: string;
+        status?: string;
+        createdAt?: string;
+        settings?: { investor?: { investorType?: string; plan?: string; kycStatus?: string } };
+    }[]>([]);
+    const [investorActingId, setInvestorActingId] = useState<string | null>(null);
 
     const base = isCiel ? "/dashboard/admin/startup-business" : "/dashboard/partner/startup-business";
     const orgTitle = storedOrgName();
@@ -379,6 +379,10 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                 const res = await authenticatedFetch("/api/v1/admin/paths/startup-business");
                 const json = res?.ok ? await res.json() : null;
                 setEntries(Array.isArray(json?.data) ? json.data : []);
+                const usersRes = await authenticatedFetch("/api/v1/admin/users?role=investor");
+                const usersJson = usersRes?.ok ? await usersRes.json() : null;
+                const rows = Array.isArray(usersJson?.data) ? usersJson.data : Array.isArray(usersJson?.data?.data) ? usersJson.data.data : [];
+                setInvestorAccounts(rows);
             } else {
                 const [sub, draft] = await Promise.all([
                     authenticatedFetch("/api/v1/paths/startup-business/university"),
@@ -438,11 +442,32 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
         }
     };
 
+    const setInvestorStatus = async (id: string, status: "active" | "rejected") => {
+        setInvestorActingId(id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/users/${id}`, {
+                method: "POST",
+                body: JSON.stringify({ status }),
+            });
+            if (res?.ok) {
+                setInvestorAccounts((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)));
+                toast.success(status === "active" ? "Investor verified — Hub introductions unlocked" : "Investor application rejected");
+            } else {
+                toast.error("Could not update investor account");
+            }
+        } catch {
+            toast.error("Could not update investor account");
+        } finally {
+            setInvestorActingId(null);
+        }
+    };
+
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
     const approved = approvedEntries;
     const rejected = useMemo(() => entries.filter(isRejected), [entries]);
     const inProcess = entries.filter((e) => pipeTabOf(e) === "just" || pipeTabOf(e) === "process" || pipeTabOf(e) === "revision");
     const investorReady = approved.filter(isInvestorOpen);
+    const pendingInvestors = investorAccounts.filter((u) => String(u.status || "").toLowerCase() === "pending");
     const facultyOwned = entries.filter(isFacultyVenture);
     const universities = useMemo(() => [...new Set(entries.map(universityNameOf).filter(Boolean))].sort(), [entries]);
     const faculties = useMemo(() => [...new Set(entries.map(facultyName).filter(Boolean))].sort(), [entries]);
@@ -491,7 +516,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     });
     const tabCount = (key: PipeTab) => (key === "all" ? entries.length : entries.filter((e) => pipeTabOf(e) === key).length);
     const openRecord = (id?: string) => `${base}?view=record&id=${encodeURIComponent(id || "")}`;
-    const recordEntry = entries.find((e) => e.id === recordId) || null;
+    const recordEntry = entries.find((e) => e.id === recordId) || approvedEntries.find((e) => e.id === recordId) || null;
     const deptCount = departments.length;
     const facCount = faculties.length;
     const wallRows = sortEntries(approved.filter(matchesFilters));
@@ -521,12 +546,15 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
         screen === "home" ? undefined
             : screen === "pipeline" ? (isCiel ? "Network Pipeline" : "University Startup Pipeline")
               : screen === "wall" ? (isCiel ? "Approved Ventures" : "Impact Wall")
-                : screen === "rank" ? "AI Rankings"
+                : screen === "rank" ? "Startup Ranking"
                   : screen === "facventures" ? "Faculty Ventures"
                     : screen === "showcase" ? "Investor Hub Control"
-                      : screen === "activity" ? "Investor Activity"
+                      : screen === "activity" ? "Investor Activity Log"
+                        : screen === "accounts" ? "Investor Accounts"
+                        : screen === "aireport" ? "AI Analysis Report"
                         : screen === "record" ? "Venture Card"
                           : screen;
+    const openAiReport = (id?: string) => `${base}?view=aireport&id=${encodeURIComponent(id || "")}`;
 
     const filterBar = (showUni: boolean) => (
         <div className="mb-4 flex flex-wrap gap-2.5">
@@ -597,10 +625,10 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
     return (
         <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
             <CourseworkCrumb role={isCiel ? "CIEL PK" : "University"} view={crumbView} pathLabel="Startup / Venture" />
-            {screen === "home" ? (
+            {screen === "home" || screen === "pipeline" || screen === "wall" || screen === "rank" || screen === "facventures" || screen === "record" || screen === "aireport" || screen === "showcase" || screen === "activity" || screen === "accounts" ? (
             <MockupHero
-                badge={isCiel ? "CIEL PK · SUPER ADMIN" : "UNIVERSITY"}
-                kicker={isCiel ? "NETWORK · STARTUP / VENTURE" : "Impact Areas · Startup / Venture"}
+                badge={isCiel ? "🌐 CIEL PK · SUPER ADMIN" : "🏛️ UNIVERSITY"}
+                kicker={isCiel ? "Network · Startup / Venture" : "Impact Areas · Startup / Venture"}
                 title={isCiel ? "CIEL PK Venture Network" : orgTitle}
                 subtitle={
                     isCiel
@@ -620,7 +648,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             { value: String(inProcess.length), label: "IN PROCESS", href: `${base}?view=process` },
                             { value: String(waiting.length), label: "UNDER REVIEW", href: `${base}?view=review` },
                             { value: String(approved.length), label: "APPROVED", href: `${base}?view=wall` },
-                            { value: String(investorReady.length), label: "INVESTOR-READY", href: `${base}?view=wall` },
+                            { value: String(investorReady.length), label: "IN INVESTOR HUB", href: `${base}?view=wall` },
                         ]
                 }
             />
@@ -636,8 +664,8 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 ghost="🧩"
                                 title="Network Startup Pipeline"
                                 subtitle="Every student and faculty venture across all universities on one platform — percentage completion and category from Just Started to In Process, then Under Review, Revision, Approved, Rejected. Filter by university; remind students or faculty."
-                                badge={`${inProcess.length} IN PROCESS · ${waiting.length} UNDER REVIEW`}
-                                background={MOCKUP_GRADIENTS.teal}
+                                badge={`${inProcess.length} in process · ${waiting.length} under review`}
+                                background={MOCKUP_GRADIENTS.orange}
                             />
                             <MockupActionCard
                                 href={`${base}?view=facventures`}
@@ -645,8 +673,8 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 ghost="💡"
                                 title="Faculty Ventures"
                                 subtitle="Self-certified faculty ventures and opportunities network-wide — spot-check, and route to investors."
-                                badge={`${facultyOwned.length} FACULTY VENTURES`}
-                                background={MOCKUP_GRADIENTS.navy}
+                                badge={`${facultyOwned.length} faculty ventures`}
+                                background={MOCKUP_GRADIENTS.blue}
                             />
                             <MockupActionCard
                                 href={`${base}?view=wall`}
@@ -654,16 +682,16 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 ghost="🏅"
                                 title="CIEL PK Approved Ventures"
                                 subtitle="The master impact wall: every approved venture from every university, with scores, badges and investor interest."
-                                badge={`${approved.length} APPROVED`}
-                                background={MOCKUP_GRADIENTS.orange}
+                                badge={`${approved.length} approved`}
+                                background={MOCKUP_GRADIENTS.green}
                             />
                             <MockupActionCard
                                 href={`${base}?view=rank`}
-                                emoji="🤖"
-                                ghost="🤖"
-                                title="Live AI Rankings"
+                                emoji="🏆"
+                                ghost="🏆"
+                                title="Run Startup Ranking"
                                 subtitle="Run the comparative AI grader across the whole network or one university, any time. The CIEL PK badge updates live."
-                                badge="LIVE"
+                                badge="RANKING"
                                 background={MOCKUP_GRADIENTS.purple}
                             />
                             <MockupActionCard
@@ -672,7 +700,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 ghost="🤝"
                                 title="Investor Hub Control"
                                 subtitle="Approved + opted-in ventures flow to the CIEL Investor Hub automatically. Spotlight the best and track expressions of interest."
-                                badge={`${investorReady.length} INVESTMENT-READY`}
+                                badge={`${investorReady.length} investment-ready`}
                                 background={MOCKUP_GRADIENTS.pink}
                             />
                             <MockupActionCard
@@ -680,9 +708,18 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                 emoji="🕵️"
                                 ghost="🕵️"
                                 title="Investor Activity Log"
-                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder — approve or decline founder-contact requests here."
-                                badge="CONTACT REQUESTS"
+                                subtitle="Who is viewing which venture, who expressed interest, and who is trying to reach a founder — screen introduction requests here (gate 1 of 3)."
+                                badge="0 screenings pending"
                                 background={MOCKUP_GRADIENTS.slate}
+                            />
+                            <MockupActionCard
+                                href={`${base}?view=accounts`}
+                                emoji="🪪"
+                                ghost="🪪"
+                                title="Investor Accounts"
+                                subtitle="Verify or reject investor / VC applications from the sign-up page. Only verified accounts can use the CIEL Investor Hub."
+                                badge={`${pendingInvestors.length} pending verification`}
+                                background={MOCKUP_GRADIENTS.teal}
                             />
                         </>
                     ) : (
@@ -716,11 +753,11 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             />
                             <MockupActionCard
                                 href={`${base}?view=rank`}
-                                emoji="🤖"
-                                ghost="🤖"
-                                title="Run AI Rankings"
+                                emoji="🏆"
+                                ghost="🏆"
+                                title="Run Startup Ranking"
                                 subtitle={`Rank ${orgTitle}'s approved ventures best → least with analytical, critical and factual reasoning. Preview freely; publish up to 3 finals per year.`}
-                                badge="AI grader"
+                                badge="RANKING"
                                 background={MOCKUP_GRADIENTS.purple}
                             />
                         </>
@@ -736,10 +773,13 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🧩 {isCiel ? "Network Startup Pipeline" : "University Startup Pipeline"} — {entries.length}</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
-                                    ? "Every student and faculty venture across all partner universities on one platform. Remind students or faculty by Email / WhatsApp. University cannot be skipped — faculty still decides."
-                                    : "Every venture across all departments on one screen — percentage completion and category, then Under Review, Revision, Approved, Rejected. Remind students or faculty by Email / WhatsApp. University does not approve; faculty does."}
+                                    ? "Every student and faculty venture across all partner universities on one platform — percentage completion and category (Just Started / In Process / Complete), then Under Review, Revision, Approved, Rejected. Filter by university; remind students or faculty."
+                                    : "Every venture across all departments on one screen — percentage completion and category (Just Started / In Process / Complete), then Under Review, Revision, Approved, Rejected. Remind students or faculty by Email / WhatsApp."}
                             </p>
                         </div>
+                        <a href={`${base}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">
+                            🏆 Run Startup Ranking
+                        </a>
                     </div>
                     {filterBar(isCiel)}
                     <div className="mb-4 flex flex-wrap gap-2">
@@ -764,6 +804,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                     entry={entry}
                                     onOpen={() => { window.location.href = openRecord(entry.id); }}
                                     showUniversity={isCiel}
+                                    aiHref={hasAssessment(entry) ? openAiReport(entry.id) : undefined}
                                 />
                             ))}
                         </div>
@@ -786,11 +827,11 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     </div>
                     {filterBar(isCiel)}
                     {loading ? <SkeletonList /> : facultyRows.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">No faculty ventures yet.</div>
+                        <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">{isCiel ? "None yet." : "No faculty ventures yet."}</div>
                     ) : (
                         <div className="flex flex-col gap-3.5">
                             {facultyRows.map((entry) => (
-                                <PipelineRow key={entry.id} entry={entry} onOpen={() => { window.location.href = openRecord(entry.id); }} showUniversity={isCiel} />
+                                <PipelineRow key={entry.id} entry={entry} onOpen={() => { window.location.href = openRecord(entry.id); }} showUniversity={isCiel} aiHref={hasAssessment(entry) ? openAiReport(entry.id) : undefined} />
                             ))}
                         </div>
                     )}
@@ -805,11 +846,12 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏅 {isCiel ? "CIEL PK Approved Ventures" : "University Ventures Impact Wall"} — {wallRows.length}</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
-                                    ? "Network-wide impact wall of every faculty-approved venture. Rejected records are preserved below but never published."
-                                    : `All faculty-approved ventures from ${orgTitle}, published here automatically. Investor-opt-in ventures are also live in the CIEL Investor Hub.`}
+                                    ? "Network-wide impact wall of every faculty-approved venture, each with its separate 📊 AI report button. Rejected records are preserved below but never published."
+                                    : `All faculty-approved ventures from ${orgTitle}, published here automatically, each with its separate 📊 AI report button. Ventures whose student gave investor-track consent are also live in the CIEL Investor Hub.`}
                             </p>
                         </div>
-                        <a href={`${base}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">🤖 Run AI Grader</a>
+                        <a href={`${base}?view=rank`} className="rounded-xl bg-[#7d4ddb] px-4 py-2.5 text-[13.5px] font-bold text-white">🏆 Run Startup Ranking</a>
+                        <a href={`${base}?view=rank`} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">👁 View Ranking</a>
                     </div>
                     {filterBar(isCiel)}
                     {loading ? <SkeletonList /> : wallRows.length === 0 ? (
@@ -824,6 +866,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                     spotlighting={spotlightId === entry.id}
                                     onOpen={() => { window.location.href = openRecord(entry.id); }}
                                     onSpotlight={isCiel && isInvestorOpen(entry) ? () => void toggleSpotlight(entry) : undefined}
+                                    aiHref={openAiReport(entry.id)}
                                 />
                             ))}
                         </div>
@@ -855,11 +898,11 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack href={homeHref} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🤖 {isCiel ? "AI Grader — CIEL PK Live Rankings" : "AI Grader — University Rankings"}</h3>
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏆 {isCiel ? "Run Startup Ranking — CIEL PK national / multi-university" : "Run Startup Ranking — University (discipline-neutral)"}</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
                                 {isCiel
-                                    ? "CIEL PK runs live any time; the CIEL PK badge moves with every published run, while faculty and university badges stay on the same student card. Filter the cohort first if you want one university."
-                                    : "Same rights as faculty: unlimited previews, 3 published finals per academic year. Published finals put a University badge on the top 5 Impact Wall cards."}
+                                    ? "Rank across universities, cities, disciplines, sectors, semesters and academic years — e.g. Top Startups Pakistan 2026, Top Sustainable Startups, Top Fashion Ventures. Each run is versioned; publishing updates the “CIEL PK National #n of N” badge everywhere."
+                                    : "Compares approved startups across schools, departments and programmes on the quality of the business opportunity only — a fashion venture competes fairly with a technology or social venture. Filter by department, faculty, sector or stage to define the cohort. Preview freely; publish up to 3 finals per year."}
                             </p>
                         </div>
                     </div>
@@ -890,7 +933,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         <div className="min-w-0 flex-1">
                             <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🤝 Investor Hub Control — {investorReady.filter(matchesFilters).length} investment-ready ventures</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                Ventures that are faculty-approved and opted in by the student appear in the CIEL Investor Hub automatically. Spotlight the strongest. Faculty review is unchanged.
+                                A venture is listed in the CIEL Investor Hub only when <b>both</b> gates hold: faculty approval <b>and</b> a recorded student consent (investor track). Withdrawing consent removes it instantly. Spotlight the strongest and track every introduction.
                             </p>
                         </div>
                     </div>
@@ -909,10 +952,13 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                     <div>
                                         <div className="flex flex-wrap items-center gap-2.5">
                                             <p className="m-0 text-[17px] font-extrabold">{entry.ventureName || "Untitled venture"}</p>
-                                            {isFeatured(entry) ? <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#a06a00]">Spotlight</span> : null}
+                                            {isFeatured(entry) ? <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#a06a00]">⭐ Spotlight</span> : null}
                                         </div>
                                         <p className="mt-1 text-[13px] text-[#5d6c78]">
                                             <b>{displayVentureId(entry)}</b> · {ownerName(entry)} · {universityNameOf(entry)} · {entry.ideaInfo?.sector || "—"} · {entry.stage || "—"}
+                                            {askLine(entry) ? ` · Ask: ${askLine(entry)}` : ""}
+                                            {` · Faculty score ${meritScore(entry)}`}
+                                            {entry.reviewPipeline?.studentDeclaredAt ? ` · consent ${formatDay(entry.reviewPipeline.studentDeclaredAt)}` : ""}
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap justify-end gap-2">
@@ -922,7 +968,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                             onClick={() => void toggleSpotlight(entry)}
                                             className={`rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}
                                         >
-                                            {isFeatured(entry) ? "Remove spotlight" : "Spotlight"}
+                                            {isFeatured(entry) ? "Remove spotlight" : "⭐ Spotlight"}
                                         </button>
                                         <a href={openRecord(entry.id)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">Details</a>
                                     </div>
@@ -940,7 +986,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         <div className="min-w-0 flex-1">
                             <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🕵️ Investor Activity Log</h3>
                             <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                Who is looking at which venture, who expressed interest, and who is trying to reach a founder. Founder contact is never shared until CIEL PK approves the request here.
+                                Who is looking at which venture, who expressed interest, and who is trying to reach a founder. Three gates before contact is shared: CIEL PK screening (here) → founder acceptance (student dashboard) → introduction. Only verified investor accounts can act in the Hub.
                             </p>
                         </div>
                     </div>
@@ -949,9 +995,65 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                         <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Investor organisations active</small></div>
                         <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Contact requests awaiting CIEL PK</small></div>
                     </div>
+                    {filterBar(true)}
                     <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
-                        No investor activity yet. When investors view or request founder contact from the Investor Hub, those events will appear here for CIEL PK to approve or decline — without changing student or faculty records.
+                        No investor activity yet. When verified investors view, save, or request an introduction from the Investor Hub, those events will appear here for CIEL PK screening (gate 1 of 3) — without changing student or faculty records.
                     </div>
+                </div>
+            )}
+
+            {screen === "accounts" && isCiel && (
+                <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                    <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                        <PanelBack href={homeHref} />
+                        <div className="min-w-0 flex-1">
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🪪 Investor accounts — {investorAccounts.length}</h3>
+                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                                Applications from the Investor / VC sign-up land here. Only <b>verified</b> accounts can open the CIEL Investor Hub, request introductions or access data rooms. Pending: {pendingInvestors.length}.
+                            </p>
+                        </div>
+                    </div>
+                    {investorAccounts.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
+                            No investor / VC applications yet. When a verified-account request is submitted, it will appear here for CIEL PK to verify or reject — Hub access stays locked until then.
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3.5">
+                            {investorAccounts.map((u) => {
+                                const pending = String(u.status || "").toLowerCase() === "pending";
+                                const type = u.settings?.investor?.investorType || u.orgName || "Investor";
+                                return (
+                                    <div key={u.id} className="flex flex-wrap items-center gap-3 rounded-[18px] border border-[#e3e9ee] px-5 py-4">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-extrabold text-[#14212b]">{u.name || "Investor"}</div>
+                                            <div className="text-[13px] text-[#5d6c78]">{u.email} · {type} · {u.orgName || "—"}</div>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold uppercase ${pending ? "bg-[#fff3e0] text-[#c65b00]" : String(u.status).toLowerCase() === "active" ? "bg-[#e6f6ec] text-[#1c8a52]" : "bg-[#eceff1] text-[#455a64]"}`}>{u.status || "pending"}</span>
+                                        {pending && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    disabled={investorActingId === u.id}
+                                                    className="rounded-xl bg-[#2e9e5b] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                                                    onClick={() => void setInvestorStatus(u.id, "active")}
+                                                >
+                                                    Verify
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={investorActingId === u.id}
+                                                    className="rounded-xl bg-[#d64545] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                                                    onClick={() => void setInvestorStatus(u.id, "rejected")}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -963,25 +1065,72 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     onBack={homeHref}
                     onSpotlight={isCiel && recordEntry && isInvestorOpen(recordEntry) ? () => void toggleSpotlight(recordEntry) : undefined}
                     spotlighting={spotlightId === recordEntry?.id}
+                    aiHref={recordEntry?.id ? openAiReport(recordEntry.id) : undefined}
+                />
+            )}
+            {screen === "aireport" && (
+                <AiReportView
+                    entry={recordEntry}
+                    loading={loading}
+                    recordHref={openRecord(recordEntry?.id)}
+                    onBack={homeHref}
                 />
             )}
         </div>
     );
 }
 
+function hasAssessment(entry: HubVenture) {
+    return entry.status === "submitted" || isRevision(entry) || isRejected(entry) || isPathEntryApproved(entry) || isPathEntryWaiting(entry);
+}
+function isInvestorVisible(entry: HubVenture) {
+    return isPathEntryApproved(entry) && isInvestorOpen(entry);
+}
+function askLine(entry: HubVenture) {
+    const n = entry.evidenceInfo?.fundingSought;
+    if (!n || n <= 0) return "";
+    return `PKR ${n.toLocaleString()}`;
+}
+function escHtml(value: string) {
+    return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
+}
+function downloadVentureCard(entry: HubVenture) {
+    const title = entry.ventureName || "Venture Card";
+    const id = displayVentureId(entry);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${id} · Venture Card</title>
+<style>body{font-family:Georgia,serif;max-width:820px;margin:24px auto;color:#14212b;padding:0 18px}h1{font-size:22px}p{line-height:1.5}small{color:#5d6c78}</style></head>
+<body><p><small>CIEL PK Venture Studio · Venture Card (flashcard) · ${id} · generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} · no AI content</small></p>
+<h1>${escHtml(title)}</h1>
+<p><b>${id}</b> · ${escHtml(universityNameOf(entry))} · ${escHtml(ventureStatusLabel(entry).label)}</p>
+<p><b>Problem</b><br>${escHtml(entry.ideaInfo?.problem || "—")}</p>
+<p><b>Solution</b><br>${escHtml(entry.solutionInfo?.solution || "—")}</p>
+<p><b>Team</b><br>${escHtml((entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || ownerName(entry))}</p>
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${id}_Venture_Card.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 function PipelineRow({
     entry,
     onOpen,
     showUniversity,
+    aiHref,
 }: {
     entry: HubVenture;
     onOpen: () => void;
     showUniversity?: boolean;
+    aiHref?: string;
 }) {
     const waiting = isPathEntryWaiting(entry);
     const draftish = entry.status !== "submitted" || isRevision(entry);
     const student = remindStudent(entry);
     const faculty = remindFaculty(entry);
+    const ai = hasAssessment(entry) ? analyseVentureCriticalReview(entry) : null;
     const meta = [
         displayVentureId(entry),
         ownerName(entry),
@@ -1000,6 +1149,7 @@ function PipelineRow({
                     <StatusChip entry={entry} />
                     {isFacultyVenture(entry) ? <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#a06a00]">Faculty venture</span> : null}
                     {isInvestorOpen(entry) ? <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#5e35b1]">Investor opt-in</span> : null}
+                    {isInvestorVisible(entry) ? <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#a06a00]">Live in Investor Hub</span> : null}
                 </div>
                 <p className="mt-1 text-[13px] leading-relaxed text-[#5d6c78]"><b className="font-semibold text-[#14212b]">{displayVentureId(entry)}</b>{meta.replace(displayVentureId(entry), "")}</p>
                 {isRevision(entry) && entry.reviewPipeline?.supervisorNote ? (
@@ -1014,10 +1164,10 @@ function PipelineRow({
                 <span className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
                     Action with: {waiting ? "Faculty" : isPathEntryApproved(entry) ? "None — Approved" : isRejected(entry) ? "None — Rejected" : isFacultyVenture(entry) ? "Faculty founder" : "Student"}
                 </span>
-                {waiting ? (
-                    <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[12px] font-bold text-[#5e35b1]">
-                        AI pre-screen {meritScore(entry)} · {computeVentureMeritScorecard(entry).grade}
-                    </span>
+                {ai && aiHref ? (
+                    <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white" title="Separate CIEL AI Analysis Report (not part of the flashcard)">
+                        📈 {ai.overall}/100 · {ai.grade}
+                    </a>
                 ) : null}
                 {draftish && student.to ? (
                     <>
@@ -1031,7 +1181,7 @@ function PipelineRow({
                         <a href={whatsappShareHref(`${faculty.subject}\n\n${faculty.body}`)} target="_blank" rel="noreferrer" className="rounded-[10px] bg-[#25d366] px-3 py-1.5 text-[12.5px] font-bold text-white">WhatsApp {faculty.label}</a>
                     </>
                 ) : null}
-                <button type="button" onClick={onOpen} className={`rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${waiting ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#eef3f6] text-[#0b4b57]"}`}>
+                <button type="button" onClick={onOpen} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
                     {waiting ? "View Venture Card" : "Details"}
                 </button>
             </div>
@@ -1045,12 +1195,14 @@ function WallCard({
     onOpen,
     onSpotlight,
     spotlighting,
+    aiHref,
 }: {
     entry: HubVenture;
     variant: VentureHubVariant;
     onOpen: () => void;
     onSpotlight?: () => void;
     spotlighting?: boolean;
+    aiHref?: string;
 }) {
     const ribbon = entry.meritRibbon;
     const pitch = entry.solutionInfo?.solution || entry.ideaInfo?.pitch || entry.sectionSummaries?.opportunity || "Approved venture record.";
@@ -1083,6 +1235,9 @@ function WallCard({
                 {ribbon?.total != null ? <span className="rounded-full bg-[#e0f2f1] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#0b6f6c]">Faculty score {ribbon.total}</span> : null}
                 {isInvestorOpen(entry) ? <span className="rounded-full bg-[#ede7f6] px-2.5 py-1 text-[11.5px] font-extrabold uppercase text-[#5e35b1]">Investor opt-in</span> : null}
                 <span className="flex-1" />
+                {aiHref ? (
+                    <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white" title="Separate CIEL AI Analysis Report (not part of the flashcard)">📊 AI report</a>
+                ) : null}
                 {onSpotlight ? (
                     <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
                         {isFeatured(entry) ? "Spotlighted" : "Spotlight"}
@@ -1101,6 +1256,7 @@ function RecordView({
     onBack,
     onSpotlight,
     spotlighting,
+    aiHref,
 }: {
     entry: HubVenture | null;
     loading: boolean;
@@ -1108,6 +1264,7 @@ function RecordView({
     onBack: string;
     onSpotlight?: () => void;
     spotlighting?: boolean;
+    aiHref?: string;
 }) {
     if (loading && !entry) return <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />;
     if (!entry) {
@@ -1119,11 +1276,12 @@ function RecordView({
         );
     }
     const waiting = isPathEntryWaiting(entry);
-    const notes = analyserNotes(entry);
-    const scorecard = notes.scorecard;
+    const assessed = hasAssessment(entry);
+    const scorecard = computeVentureMeritScorecard(entry);
     const ribbon = entry.meritRibbon;
-    const decided = entry.reviewPipeline?.supervisorStatus && entry.reviewPipeline.supervisorStatus !== "pending" && entry.reviewPipeline.supervisorStatus !== "not_started";
+    const ai = assessed ? analyseVentureCriticalReview(entry) : null;
     const log = activityLog(entry);
+    const model = entry.solutionInfo?.revenue || (entry.solutionInfo?.revenueModels || []).join(" + ");
     return (
         <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
             <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
@@ -1132,133 +1290,157 @@ function RecordView({
                     <h3 className="m-0 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h3>
                     <p className="mt-1.5 text-[14.5px] text-[#5d6c78]">
                         {displayVentureId(entry)} · {ventureStatusLabel(entry).label} · Action with: {waiting ? "Faculty" : isPathEntryApproved(entry) ? "None — Approved" : ownerName(entry)}
+                        {waiting && variant !== "ciel" ? " · University can view this card and remind faculty. Only the named faculty member can approve, request revision, or reject." : ""}
                     </p>
                 </div>
             </div>
             <VentureTimeline entry={entry} />
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#e3e9ee]">
-                <div className="flex flex-wrap items-start justify-between gap-4 bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
-                    <div>
-                        <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {universityNameOf(entry)}</div>
-                        <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
-                        <div className="mt-1.5 text-[13px] text-[#dff3f1]">
-                            {isFacultyVenture(entry) ? "Faculty venture · " : ""}
-                            {ownerName(entry)}
-                            {(entry.team || []).length > 1 ? ` + ${(entry.team || []).length - 1} team` : ""}
-                            {entry.academicSetup?.courseCode ? ` · ${entry.academicSetup.courseCode}` : ""}
-                            {!isFacultyVenture(entry) && facultyName(entry) ? ` · Faculty: ${facultyName(entry)}` : ""}
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <StatusChip entry={entry} />
-                        <div className="mt-2 text-[12px] text-[#dff3f1]">
-                            {isInvestorOpen(entry) ? "🤝 Open to investors" : "🔒 Not seeking investment"}
-                        </div>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 gap-2.5 p-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {[
-                        { k: "Sector · Stage", v: [entry.ideaInfo?.sector, entry.stage].filter(Boolean).join(" · ") },
-                        { k: "Problem", v: entry.ideaInfo?.problem || entry.ideaInfo?.pitch },
-                        { k: "Solution", v: entry.solutionInfo?.solution },
-                        { k: "Business model", v: entry.solutionInfo?.revenue || (entry.solutionInfo?.revenueModels || []).join(", ") },
-                        { k: "Traction & evidence", v: tractionLine(entry) === "no traction logged" ? "" : tractionLine(entry) },
-                        { k: "Team", v: (entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || ownerName(entry) },
-                    ].filter((x) => x.v).map((x) => (
-                        <div key={x.k} className="rounded-xl bg-[#f6f8fa] px-3 py-2.5 text-[13px]">
-                            <b className="mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{x.k}</b>
-                            {x.v}
-                        </div>
-                    ))}
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e3e9ee] px-6 py-4">
-                    <div>
-                        {sdgNumbers(entry).map((n) => (
-                            <span key={n} title={SDG_SHORT[n]} className="mr-1.5 mb-1 inline-block rounded-lg px-2 py-0.5 text-[11.5px] font-extrabold text-white" style={{ background: SDG_COLORS[n] }}>SDG {n}</span>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="max-w-[220px] text-right text-[12px] text-[#5d6c78]">AI pre-screen (decision support only — never shown to the student)</span>
-                        <ScoreRing value={scorecard.total} label={notes.band} />
-                    </div>
-                </div>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
-                <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>AI Analyser — section-by-section (decision support only; AI never approves or rejects)</b>
-                    <div className="mt-3 space-y-2">
-                        {scorecard.criteria.map((c) => (
-                            <div key={c.key}>
-                                <div className="flex justify-between text-[12.5px]"><span>{c.label}</span><b>{c.points}/{c.max}</b></div>
-                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#e9eef2]"><i className="block h-full rounded-full" style={{ width: `${(c.points / c.max) * 100}%`, background: c.color }} /></div>
+            <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                <div>
+                    <div className="overflow-hidden rounded-[22px] border border-[#e3e9ee]">
+                        <div className="flex flex-wrap items-start justify-between gap-3.5 bg-[linear-gradient(120deg,#0b4b57,#0f8f8a)] px-6 py-5 text-white">
+                            <div>
+                                <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">{displayVentureId(entry)} · {universityNameOf(entry)}</div>
+                                <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
+                                <div className="mt-1.5 text-[13px] text-[#dff3f1]">
+                                    {isFacultyVenture(entry) ? "Faculty venture · " : ""}
+                                    {ownerName(entry)}
+                                    {(entry.team || []).length > 1 ? ` + ${(entry.team || []).length - 1} team` : ""}
+                                    {entry.academicSetup?.courseCode ? ` · ${entry.academicSetup.courseCode}` : ""}
+                                    {!isFacultyVenture(entry) && facultyName(entry) ? ` · Faculty: ${facultyName(entry)}` : ""}
+                                </div>
                             </div>
-                        ))}
+                            <div className="text-right">
+                                <StatusChip entry={entry} />
+                                <div className="mt-2 text-[12px]">{isInvestorOpen(entry) ? "🤝 Investor track" : "🔒 Not on investor track"}</div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5 p-6 sm:grid-cols-2">
+                            {[
+                                { k: "Sector · Stage", v: [entry.ideaInfo?.sector, entry.stage].filter(Boolean).join(" · ") },
+                                { k: "Problem", v: entry.ideaInfo?.problem || entry.ideaInfo?.pitch },
+                                { k: "Solution", v: entry.solutionInfo?.solution },
+                                { k: "Business model", v: model },
+                                { k: "Traction & evidence", v: tractionLine(entry) === "no traction logged" ? "" : tractionLine(entry) },
+                                { k: "Team", v: (entry.team || []).map((m) => m.name).filter(Boolean).join(", ") || ownerName(entry) },
+                            ].filter((x) => x.v).map((x) => (
+                                <div key={x.k} className="rounded-xl bg-[#f6f8fa] px-3 py-2.5 text-[13px]">
+                                    <b className="mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{x.k}</b>
+                                    {x.v}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e3e9ee] px-6 py-3">
+                            <div>
+                                {sdgNumbers(entry).map((n) => (
+                                    <span key={n} title={SDG_SHORT[n]} className="mr-1.5 inline-block rounded-lg px-2 py-0.5 text-[11.5px] font-extrabold text-white" style={{ background: SDG_COLORS[n] }}>SDG {n}</span>
+                                ))}
+                            </div>
+                            <span className="text-[11.5px] text-[#5d6c78]">Venture Card · student-authored flashcard · no AI scoring on this card</span>
+                        </div>
                     </div>
-                </div>
-                <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>AI notes</b>
-                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Analytical:</b> {notes.analytical.replace(/^Analytical:\s*/, "")}</p>
-                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Critical:</b> {notes.critical.replace(/^Critical:\s*/, "")}</p>
-                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#5d6c78]"><b>Factual:</b> {notes.factual.replace(/^Factual:\s*/, "")}</p>
-                    {variant !== "ciel" && waiting ? (
-                        <p className="mt-3 text-[13px] text-[#5d6c78]">University can view this card and remind faculty. Only the named faculty member can approve, request revision, or reject.</p>
-                    ) : null}
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => downloadVentureCard(entry)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">⬇ Download flashcard</button>
+                        {assessed && aiHref ? (
+                            <a href={aiHref} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">📈 View Assessment (full page)</a>
+                        ) : null}
+                    </div>
+                    <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                        <b>Investor track & consent</b>
+                        <p className="mt-1.5 mb-0 text-[13.5px] text-[#5d6c78]">
+                            {isInvestorOpen(entry)
+                                ? `Investor track is on${entry.reviewPipeline?.studentDeclaredAt ? ` · consented ${formatDay(entry.reviewPipeline.studentDeclaredAt)}` : ""}.`
+                                : "Not on investor track — investors cannot see this venture."}
+                        </p>
+                    </div>
                     {entry.status !== "submitted" || isRevision(entry) ? (
-                        <div className="mt-3 rounded-[14px] bg-[#fff8e1] px-4 py-3 text-[13.5px]">
-                            Record still in the student workspace — completion {overallPct(entry)}%.
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Completion</b>
+                            <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">
+                                Record still in the {isFacultyVenture(entry) ? "faculty" : "student"} workspace — completion {overallPct(entry)}%.
+                            </p>
                             <CompletionBar entry={entry} />
                         </div>
                     ) : null}
-                </div>
-            </div>
-            {decided ? (
-                <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
-                    <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                        <div className="flex items-center gap-4">
-                            {ribbon?.total != null || scorecard.total ? <ScoreRing value={ribbon?.total ?? scorecard.total} label="FACULTY SCORE" /> : null}
-                            <div>
-                                <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
-                                <p className="mt-2 text-[14px] leading-relaxed">{entry.reviewPipeline?.supervisorNote || "No overall remarks."}</p>
-                            </div>
+                    {isPathEntryApproved(entry) ? (
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Recognition & investor activity</b>
+                            {ribbon ? (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    <span className="rounded-lg border border-[#d1c4e9] bg-[#ede7f6] px-2 py-0.5 text-[11px] font-extrabold text-[#5e35b1]">
+                                        {variant === "ciel" ? "🌐" : "🏛️"} Rank #{ribbon.rank} · {ribbon.scope}
+                                    </span>
+                                </div>
+                            ) : (
+                                <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">No ranking badges yet.</p>
+                            )}
+                            {isInvestorOpen(entry) ? (
+                                <div className="mt-3 rounded-[14px] bg-[#e8f7ef] px-4 py-3">
+                                    <b>🤝 Investor activity via CIEL Investor Hub</b>
+                                    <div className="mt-2 grid grid-cols-3 gap-2">
+                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Card views</small></div>
+                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Interest received</small></div>
+                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Founder-contact requests</small></div>
+                                    </div>
+                                    {variant === "ciel" && onSpotlight ? (
+                                        <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`mt-3 rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
+                                            {isFeatured(entry) ? "Remove Investor Hub spotlight" : "Spotlight in Investor Hub"}
+                                        </button>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">Not opted in to investors — impact walls only.</p>
+                            )}
                         </div>
-                    </div>
-                    <div className="rounded-[18px] border border-[#e3e9ee] p-5">
-                        <b>Section remarks</b>
-                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">No section-level remarks.</p>
-                    </div>
-                </div>
-            ) : null}
-            {isPathEntryApproved(entry) ? (
-                <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Recognition & investor activity</b>
-                    {ribbon ? (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                            <span className="rounded-lg border border-[#d1c4e9] bg-[#ede7f6] px-2 py-0.5 text-[11px] font-extrabold text-[#5e35b1]">
-                                {variant === "ciel" ? "🌐" : "🏛️"} Rank #{ribbon.rank} · {ribbon.scope}
-                            </span>
+                    ) : null}
+                    {entry.reviewPipeline?.supervisorNote && !waiting && !isPathEntryApproved(entry) ? (
+                        <div className="mt-3 rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
+                            <p className="mt-2 mb-0 text-sm leading-relaxed">{entry.reviewPipeline.supervisorNote}</p>
                         </div>
-                    ) : (
-                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">No ranking badges yet.</p>
-                    )}
-                    {isInvestorOpen(entry) ? (
-                        <div className="mt-3 rounded-[14px] bg-[#e8f7ef] px-4 py-3">
-                            <b>🤝 Investor activity via CIEL Investor Hub</b>
-                            <div className="mt-2 grid grid-cols-3 gap-2">
-                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Card views</small></div>
-                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Interest received</small></div>
-                                <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Founder-contact requests</small></div>
+                    ) : null}
+                </div>
+                <div>
+                    {assessed ? (
+                        <div className="rounded-[18px] border border-[#cfe3e1] p-5">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="grid h-[78px] w-[78px] place-items-center rounded-full text-[18px] font-extrabold" style={{ background: `conic-gradient(#0f8f8a ${scorecard.total}%, #e6ebef 0)` }}>
+                                    <span className="grid h-[64px] w-[64px] place-items-center rounded-full bg-white text-[#0b4b57]">{scorecard.total}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <b>Startup Investment & Growth Assessment</b>
+                                    <p className="mt-1 mb-0 text-[13px] text-[#5d6c78]">{scorecard.grade} · read-only {variant === "ciel" ? "for CIEL PK" : "for university"}. Faculty decides; AI never approves or rejects.</p>
+                                </div>
                             </div>
-                            {variant === "ciel" && onSpotlight ? (
-                                <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`mt-3 rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
-                                    {isFeatured(entry) ? "Remove Investor Hub spotlight" : "Spotlight in Investor Hub"}
-                                </button>
+                            <div className="mt-3 space-y-2">
+                                {scorecard.criteria.map((c) => (
+                                    <div key={c.key}>
+                                        <div className="flex justify-between text-[12.5px]"><span>{c.label}</span><b>{c.points}/{c.max}</b></div>
+                                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#e9eef2]"><i className="block h-full rounded-full" style={{ width: `${(c.points / c.max) * 100}%`, background: c.color }} /></div>
+                                    </div>
+                                ))}
+                            </div>
+                            {ai && aiHref ? (
+                                <div className="mt-4 rounded-[14px] border border-[#0f8f8a] bg-[#fbfdfd] p-3.5">
+                                    <b>📊 CIEL AI Analysis Report</b>
+                                    <p className="mt-1 mb-2 text-[13px] leading-relaxed text-[#5d6c78]">
+                                        {ai.overall}/100 · {ai.grade} · {ai.tier}. 🔒 Visible to Faculty · University · CIEL PK only. Separate from the Venture Card; never shown to the student or investors.
+                                    </p>
+                                    <a href={aiHref} className="inline-block rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">📊 Open full report</a>
+                                </div>
+                            ) : null}
+                            {waiting && variant !== "ciel" ? (
+                                <p className="mt-3 mb-0 text-[13px] text-[#5d6c78]">University can view this assessment and remind faculty. Only the named faculty member can approve, request revision, or reject.</p>
                             ) : null}
                         </div>
                     ) : (
-                        <p className="mt-2 text-[13.5px] text-[#5d6c78]">Not opted in to investors — impact walls only.</p>
+                        <div className="rounded-[18px] border border-[#e3e9ee] p-5">
+                            <b>Startup Assessment</b>
+                            <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">Generated automatically the moment the student submits. Nothing to assess yet — record is {ventureStatusLabel(entry).label.toLowerCase()}.</p>
+                        </div>
                     )}
                 </div>
-            ) : null}
+            </div>
             <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
                 <b>Activity log</b>
                 {log.length === 0 ? (
@@ -1279,22 +1461,66 @@ function RecordView({
     );
 }
 
+function AiReportView({
+    entry,
+    loading,
+    recordHref,
+    onBack,
+}: {
+    entry: HubVenture | null;
+    loading: boolean;
+    recordHref: string;
+    onBack: string;
+}) {
+    if (loading && !entry) return <div className="h-40 animate-pulse rounded-[22px] bg-slate-100" />;
+    if (!entry) {
+        return (
+            <div className="rounded-[22px] bg-white p-8 text-center text-[#5d6c78] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                <PanelBack href={onBack} />
+                <p className="mt-4">No AI report yet — reports are generated only for submitted ventures.</p>
+            </div>
+        );
+    }
+    const submitted = hasAssessment(entry);
+    const ai = submitted ? analyseVentureCriticalReview(entry) : null;
+    return (
+        <div className="rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+            <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                <PanelBack href={onBack} />
+                <div className="min-w-0 flex-1">
+                    <h3 className="m-0 text-[22px] font-bold">📊 CIEL AI Analysis Report — {entry.ventureName || "Untitled venture"}</h3>
+                    <p className="mt-1.5 text-[14.5px] text-[#5d6c78]">
+                        Separate from the Venture Card. Shark-Tank / VC-lens · 30% academic · 70% practical.
+                    </p>
+                </div>
+                <a href={recordHref} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">🗂 Open venture record</a>
+                <button type="button" onClick={() => window.print()} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">🖨 Print / PDF</button>
+            </div>
+            <div className="mb-3 rounded-[14px] border border-[#b7d8f5] bg-[#e5f1fb] px-4 py-3 text-[13.5px] leading-relaxed">
+                🔒 <b>Restricted report.</b> Audience: Faculty (decision), University (oversight), CIEL PK (network). Not shown to the student or to investors. Decision support only — the faculty decision is human.
+            </div>
+            {ai ? (
+                <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.overall}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Overall /100 · {ai.grade} · {ai.tier}</small></div>
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.acad} / {ai.prac}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Academic 30% · Practical 70%</small></div>
+                    <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{ai.verdict}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Shark verdict</small></div>
+                </div>
+            ) : null}
+            {submitted ? (
+                <VentureAiCriticalReviewPanel entry={entry} />
+            ) : (
+                <p className="text-[14.5px] text-[#5d6c78]">No AI report yet — reports are generated only for submitted ventures.</p>
+            )}
+        </div>
+    );
+}
+
 function SkeletonList() {
     return (
         <div className="grid grid-cols-1 gap-3">
             {[1, 2, 3].map((i) => (
                 <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
             ))}
-        </div>
-    );
-}
-
-function ScoreRing({ value, label }: { value: number; label: string }) {
-    const pct = Math.max(0, Math.min(100, value));
-    return (
-        <div className="flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-full border-[5px] border-[#0f8f8a] bg-white text-center">
-            <b className="text-[16px] leading-none text-[#0b4b57]">{Math.round(pct)}</b>
-            <small className="mt-0.5 max-w-[58px] text-[8px] font-extrabold uppercase leading-tight tracking-wide text-[#5d6c78]">{label}</small>
         </div>
     );
 }

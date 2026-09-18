@@ -489,6 +489,14 @@ function LoginContent() {
                                         </span>
                                     </div>
                                 )}
+                                {searchParams.get("signup") === "pending" && (
+                                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/90 p-4 text-left text-xs font-semibold text-amber-950">
+                                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                        <span>
+                                            Application received. Sign in to browse the Investor Hub. CIEL PK verifies investor accounts within 3 working days before founder introductions unlock.
+                                        </span>
+                                    </div>
+                                )}
                                 {searchParams.get("signup") === "success" && (
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-4 text-left text-xs font-semibold text-emerald-900">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
