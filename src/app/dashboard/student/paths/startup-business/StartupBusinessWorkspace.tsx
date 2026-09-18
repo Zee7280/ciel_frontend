@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import clsx from "clsx";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
@@ -11,6 +12,9 @@ import { pakistaniUniversities } from "@/utils/universityData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
+import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 import {
     BUYER_MODELS,
     CHANNELS,
@@ -124,6 +128,7 @@ import {
     vsField,
 } from "./VentureStudioFormUi";
 import { VsHelpModal } from "./VentureStudioHelpModal";
+import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 
 interface TeamMember {
     name: string;
@@ -311,7 +316,21 @@ function updateTeam(entry: VentureEntry, i: number, patch: Partial<TeamMember>, 
     setEntry((s) => ({ ...s, team: next }));
 }
 
+function formCategory(pct: number) {
+    if (pct <= 0) return "Not Started";
+    if (pct <= 25) return "Just Started";
+    if (pct < 100) return "In Process";
+    return "Complete";
+}
+
+function workspaceVentureId(entry: { id?: string; createdAt?: string }) {
+    const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
+    const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
+    return `VEN-${year}-${tail}`;
+}
+
 export default function StartupBusinessWorkspace() {
+    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [entry, setEntry] = useState<VentureEntry>(EMPTY);
     const [step, setStep] = useState(0);
@@ -349,7 +368,6 @@ export default function StartupBusinessWorkspace() {
     const pct = useMemo(() => progressPercent(snap), [snap]);
     const weakest = (Object.entries(compass) as [keyof typeof compass, number][]).sort((a, b) => a[1] - b[1])[0]?.[0] ?? "problem";
     const isOwner = entry.isOwner !== false;
-    const showCard = (entry.status === "submitted" && !editing) || !isOwner;
     const as = entry.academicSetup || {};
     const idea = entry.ideaInfo || {};
     const sol = entry.solutionInfo || {};
@@ -360,7 +378,9 @@ export default function StartupBusinessWorkspace() {
     const early = !stage || stage === "Idea Recorded" || stage === "Business Plan Completed";
     const proto = stage === "Prototype Developed" || stage === "Pilot in Progress";
     const investorOn = !!entry.publishSettings?.acceptIntros;
-    const fundingOn = (ev.openTo || []).includes("Investment funding") || ["grant", "equity", "loan", "unsure"].includes(sol.raisePlan || "");
+    const isRevision = entry.reviewPipeline?.supervisorStatus === "revisions_requested";
+    const lockedSubmitted = entry.status === "submitted" && !isRevision && !editing;
+    const showCard = lockedSubmitted || !isOwner;
     const price = sol.price || 0;
     const unitCost = sol.unitCost || 0;
     const unlocked = loadWorkspaceStep(entry.stepCompleted, as.formVersion);
@@ -595,6 +615,27 @@ export default function StartupBusinessWorkspace() {
         if (ok) setEditing(false);
     };
 
+    const greetName = (() => {
+        const user = readStoredCurrentUser();
+        const n = typeof user?.name === "string" ? user.name.split(" ")[0] : "";
+        return n || "";
+    })();
+    const hasDraft = !!(entry.ventureName || (entry.stepCompleted ?? 0) > 0 || entry.status === "submitted");
+    const sup = entry.reviewPipeline?.supervisorStatus;
+    const heroStats = [
+        { value: String(entry.status === "submitted" && sup === "approved" ? 1 : 0), label: "APPROVED", href: "/dashboard/student/paths/startup-business?view=wall" },
+        { value: String(entry.status === "submitted" && (!sup || sup === "pending") ? 1 : 0), label: "UNDER REVIEW", href: "/dashboard/student/paths/startup-business?view=under-review" },
+        { value: String((entry.status !== "submitted" || sup === "revisions_requested") && hasDraft ? 1 : 0), label: "IN PROGRESS", href: "/dashboard/student/paths/startup-business?view=in-progress" },
+    ];
+    const createTitle = isRevision
+        ? `🚀 Revise venture — ${entry.ventureName || "Untitled venture"}`
+        : hasDraft
+            ? `🚀 Continue — ${entry.ventureName || "Untitled venture"}`
+            : "🚀 Create Startup Record";
+    const createSub = hasDraft
+        ? `${workspaceVentureId(entry)} · every change auto-saves to your Startup Workspace and updates the completion bar your faculty, university and CIEL PK see.`
+        : "Saving your first fields issues a Venture ID and creates one master record shared with your team, faculty, university and CIEL PK — never duplicated. Investor-track consent (Step 8) is recorded with a date and version.";
+
     if (loading) return <WorkspaceSkeleton />;
     const gates = entry.gates || { academicOk: false, showcaseOk: false, investmentReadyOk: false };
     const docFor = (type: string) => entry.documents.find((d) => d.type === type);
@@ -602,10 +643,20 @@ export default function StartupBusinessWorkspace() {
 
     if (showCard) {
         return (
-            <div className="mx-auto max-w-[1240px] px-4 pb-16 pt-2">
+            <div className="mx-auto max-w-[1500px] pb-16">
+                <MockupHero
+                    kicker="MY PATHS · STARTUP / VENTURE"
+                    title={namedTimeGreeting(greetName, "🚀")}
+                    subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
+                    badge="🎓 STUDENT"
+                    stats={heroStats}
+                />
+                <div className="mx-auto mt-[22px] max-w-[1240px] px-4">
                 <div className="space-y-4 rounded-[18px] border border-[#e5e7eb] bg-white p-6 shadow-sm">
                     {!isOwner && <div className="rounded-[13px] border border-[#e2c7d7] bg-[#f8eef4] p-3 text-sm font-semibold text-[#603449]">👥 You&apos;re named as a team member on this venture — the founder owns it and is the only one who can edit or submit changes.</div>}
-                    <div className="flex items-center gap-2 text-sm font-bold text-[#25683a]"><CheckCircle2 className="h-5 w-5" /> Submitted — awaiting faculty verification</div>
+                    <div className="rounded-[14px] border border-[#b7d8f5] bg-[#e5f1fb] px-4 py-3 text-[13.5px] leading-relaxed text-[#1f6fc2]">
+                        This record is locked ({ventureStatusLabel(entry).label}). Only drafts and revision-requested records in your Startup Workspace can be edited.
+                    </div>
                     <p className="text-lg font-black text-[#32133a]">{entry.ventureName || "Untitled venture"}</p>
                     <p className="text-sm text-[#6b7280]">{snap.stage || ""} {idea.sector ? `· ${idea.sector}` : ""} {idea.city ? `· ${idea.city}` : ""}</p>
                     <div className="flex flex-wrap gap-2">
@@ -622,14 +673,53 @@ export default function StartupBusinessWorkspace() {
                     {entry.reviewPipeline?.supervisorNote && (entry.reviewPipeline.supervisorStatus === "rejected" || entry.reviewPipeline.supervisorStatus === "revisions_requested") && (
                         <p className="rounded-[13px] border border-[#f2dfa6] bg-[#fff3dc] px-3 py-2 text-xs leading-relaxed text-[#805b13]">📝 Faculty note: “{entry.reviewPipeline.supervisorNote}”</p>
                     )}
-                    {isOwner && <button type="button" onClick={() => { setReview({}); setStep(0); setEditing(true); }} className="rounded-xl border border-[#e5e7eb] px-4 py-2.5 text-sm font-bold text-[#6b7280]">Edit this record</button>}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        <Link href="/dashboard/student/paths/startup-business?view=record" className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">
+                            View Venture Card
+                        </Link>
+                        <Link href="/dashboard/student/paths/startup-business" className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
+                            ← Back to Startup / Venture
+                        </Link>
+                    </div>
+                </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="mx-auto max-w-[1260px] px-[18px] pb-20 pt-0">
+        <div className="pb-20">
+            <div className="mx-auto max-w-[1500px] px-[18px]">
+                <MockupHero
+                    kicker="MY PATHS · STARTUP / VENTURE"
+                    title={namedTimeGreeting(greetName, "🚀")}
+                    subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
+                    badge="🎓 STUDENT"
+                    stats={heroStats}
+                />
+                <div className="mt-[22px] mb-4 flex flex-wrap items-start gap-3.5 rounded-[22px] bg-white p-[22px_26px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                    <div className="min-w-0 flex-1">
+                        <h3 className="m-0 text-[22px] font-bold text-[#14212b]">{createTitle}</h3>
+                        <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">{createSub}</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
+                        {pct}% · {formCategory(pct)}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => router.push("/dashboard/student/paths/startup-business?view=create")}
+                        className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white hover:brightness-105"
+                    >
+                        ＋ Create New Opportunity
+                    </button>
+                </div>
+                {isRevision && entry.reviewPipeline?.supervisorNote ? (
+                    <div className="mb-4 rounded-[14px] border border-[#f5c2be] bg-[#fdecea] px-4 py-3 text-[13.5px] leading-relaxed">
+                        <b>Faculty requested revision:</b> {entry.reviewPipeline.supervisorNote}
+                    </div>
+                ) : null}
+            </div>
+        <div className="mx-auto max-w-[1260px] px-[18px] pt-0 [&_h3.sec]:flex [&_h3.sec]:items-center [&_h3.sec]:gap-2 [&_h3.sec]:rounded-r-[10px] [&_h3.sec]:border-l-4 [&_h3.sec]:border-[#e2cbd7] [&_h3.sec]:bg-[#faf6f8] [&_h3.sec]:px-3 [&_h3.sec]:py-2.5">
             <header className="sticky top-0 z-[40] mb-4 rounded-b-[18px] bg-gradient-to-br from-[#32133a] to-[#5a244f] text-white shadow-[0_8px_24px_rgba(50,19,58,.2)]">
                 <div className="flex items-center gap-3.5 px-[18px] pb-2 pt-2.5">
                     <div className="flex min-w-0 items-center gap-2.5">
@@ -672,6 +762,12 @@ export default function StartupBusinessWorkspace() {
             </header>
             <VsHelpModal key={help ? JSON.stringify(help) : "closed"} open={!!help} initial={help} onClose={() => setHelp(null)} />
 
+            {isRevision && entry.reviewPipeline?.supervisorNote ? (
+                <div className="mb-4 rounded-[14px] border border-[#f5c2be] bg-[#fdecea] px-4 py-3 text-[13.5px] leading-relaxed">
+                    <b>Faculty requested revision:</b> {entry.reviewPipeline.supervisorNote}
+                </div>
+            ) : null}
+
             <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <main>
                     {step === 0 ? (
@@ -683,7 +779,7 @@ export default function StartupBusinessWorkspace() {
                         </div>
                         <div className="mt-3 rounded-[12px] border border-[#ecd9e3] bg-white px-3.5 py-2.5 text-xs leading-relaxed text-[#5b4a55]"><b>University Venture Repository — Mandatory:</b> this Venture Profile is part of your university record and must be submitted whether the venture is early, average, high-potential, SDG-linked or not. <b>Investor / VC exposure is completely optional</b> and controlled separately by you. <b>Do not guess:</b> leave optional figures blank when they are not yet known — “not known yet” scores better than invented numbers.</div>
                         <div className="mt-3 h-[9px] overflow-hidden rounded-full bg-[#ece7ea]"><span className="block h-full bg-gradient-to-r from-[#a63d65] to-[#d98aa8]" style={{ width: `${pct}%` }} /></div>
-                        <p className="mt-2 text-right text-[10.5px] text-[#8b93a3]">{saving ? "Saving…" : "Draft autosaves to your university record."}</p>
+                        <p className="mt-2 text-right text-[10.5px] text-[#8b93a3]">{saving ? "Saving…" : "Draft autosaves in this browser and to your university record."}</p>
                     </Card>
                     ) : null}
 
@@ -696,11 +792,11 @@ export default function StartupBusinessWorkspace() {
                                 <VsWhy icon="💡"><b>No pressure to look “advanced.”</b> The AI assessment changes with your stage, so early projects are not penalized for not having revenue or customers yet.</VsWhy>
                                 <VsExplain summary="📖 What do these stages mean? (with examples)">
                                     <p className="mb-2"><b>Early idea</b> — you have a concept but nothing built or tested. <VsEx><b>Example:</b> “We think hostel students would pay for home-cooked meal delivery.”</VsEx></p>
-                                    <p className="mb-2"><b>Business plan</b> — the idea is written down with customer, pricing and costs, but nothing is launched.</p>
-                                    <p className="mb-2"><b>Prototype / <VsTerm term="mvp" onTerm={onTerm}>MVP</VsTerm></b> — a first, rough version exists that people can see or touch.</p>
-                                    <p className="mb-2"><b>Pilot</b> — real users are trying it in a limited, controlled way.</p>
-                                    <p className="mb-2"><b>Operating</b> — you have real customers paying money, repeatedly.</p>
-                                    <p><b>Scaling</b> — the model works and you are growing into new cities, segments or products.</p>
+                                    <p className="mb-2"><b>Business plan</b> — the idea is written down with customer, pricing and costs, but nothing is launched. <VsEx><b>Example:</b> a 20-page ENT-301 plan with a budget, but no sales yet.</VsEx></p>
+                                    <p className="mb-2"><b>Prototype / <VsTerm term="mvp" onTerm={onTerm}>MVP</VsTerm></b> — a first, rough version exists that people can see or touch. <VsEx><b>Example:</b> a Figma app mock-up, a stitched sample bag, or a WhatsApp ordering group.</VsEx></p>
+                                    <p className="mb-2"><b>Pilot</b> — real users are trying it in a limited, controlled way. <VsEx><b>Example:</b> 30 students used the app for 4 weeks in one hostel and gave feedback.</VsEx></p>
+                                    <p className="mb-2"><b>Operating</b> — you have real customers paying money, repeatedly. <VsEx><b>Example:</b> PKR 80,000 of sales in the last 3 months from 45 customers.</VsEx></p>
+                                    <p><b>Scaling</b> — the model works and you are growing into new cities, segments or products. <VsEx><b>Example:</b> profitable in Lahore, now opening Karachi.</VsEx></p>
                                 </VsExplain>
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                     {V11_STAGES.map((s) => <VsChoice key={s.id} emoji={s.emoji} title={s.title} blurb={s.blurb} selected={stage === s.id} onClick={() => setEntry((e) => ({ ...e, stage: s.id }))} />)}
@@ -713,14 +809,14 @@ export default function StartupBusinessWorkspace() {
                             <Card>
                                 <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Start faster</div>
                                 <h2 className="mb-1 text-[23px] font-black text-[#32133a]">Already have a business plan or pitch deck?</h2>
-                                <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Upload it here. CIEL AI can extract fields for you to confirm — you stay in control of every answer.</p>
+                                <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Upload it here. In production, CIEL AI can extract the venture name, problem, customer, business model, market, SDG references and other fields for you to confirm.</p>
                                 <label className={clsx("mb-3 block cursor-pointer rounded-2xl border-2 border-dashed border-[#bfc6d7] bg-[#fbfcff] p-5 text-center hover:border-[#a63d65]", uploading && "pointer-events-none opacity-60")}>
                                     <input type="file" className="hidden" accept=".pdf,.doc,.docx,.ppt,.pptx" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void handleDocFile(file, "Full business plan"); }} />
                                     📎 <strong className="text-[#a63d65]">Upload business plan / pitch deck</strong><br /><span className="text-[11.5px] text-[#6b7280]">PDF, Word or PowerPoint · optional</span>
                                     {uploading === "Full business plan" ? <div className="mt-2 text-xs font-extrabold text-[#9b6712]">Uploading…</div> : null}
                                     {docFor("Full business plan") ? <div className="mt-2 text-xs font-extrabold text-[#25683a]">✅ Plan uploaded</div> : null}
                                 </label>
-                                <VsNotice tone="blue">✨ <b>Student-friendly AI prefill:</b> the system should suggest answers from the uploaded plan, but students must confirm or edit them before submission.</VsNotice>
+                                <VsNotice tone="blue">✨ <b>Student-friendly AI prefill:</b> the system suggests answers from the uploaded plan, but you must confirm or edit them before submission.</VsNotice>
                             </Card>
                             <Card>
                                 <h2 className="mb-2 text-[23px] font-black text-[#32133a]">Tell us the basics</h2>
@@ -731,22 +827,22 @@ export default function StartupBusinessWorkspace() {
                                     <VsField label="Faculty role" tag="required"><VsSelectOther value={as.facultyRole || ""} options={FACULTY_ROLES} onChange={(v) => patchGroup("academicSetup", { facultyRole: v })} /></VsField>
                                     <VsField label="Course / project / section" optional><input className={vsField} value={as.courseRef || as.courseCode || ""} onChange={(e) => patchGroup("academicSetup", { courseRef: e.target.value, courseCode: e.target.value })} placeholder="e.g. ENT-301 · Section A / FYP-402" /></VsField>
                                 </div>
-                                <p className="my-3 rounded-md border-l-[3px] border-[#c27698] bg-[#fff7fa] px-2.5 py-2 text-[11px] leading-relaxed text-[#7d6677]"><b>Core fields</b> create the repository record. Everything labelled optional can be left blank if you genuinely do not know it yet.</p>
+                                <p className="my-3 rounded-md border-l-[3px] border-[#c27698] bg-[#fff7fa] px-2.5 py-2 text-[11px] leading-relaxed text-[#7d6677]"><b>Core fields</b> create the repository record. Everything labelled optional can be left blank if you do not know it yet. “Not known yet” is better than invented numbers.</p>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <VsField label="Venture / business name" tag="core"><input className={vsField} value={entry.ventureName || ""} onChange={(e) => setEntry((s) => ({ ...s, ventureName: e.target.value }))} placeholder="e.g. EcoPack Pakistan" /></VsField>
                                     <VsField label="One-line description" tag="core" term="one-liner" onTerm={onTerm} hint="Formula: [what you offer] for [who] so they can [benefit]."><input className={vsField} maxLength={150} value={idea.pitch || ""} onChange={(e) => patchGroup("ideaInfo", { pitch: e.target.value })} placeholder="e.g. Compostable packaging made from crop waste for food SMEs" /></VsField>
                                     <VsField label="University" tag="core"><SearchableSelect value={as.university || ""} onChange={(v) => patchGroup("academicSetup", { university: v })} options={pakistaniUniversities} placeholder="Select university…" /></VsField>
                                     <VsField label="Discipline / programme" tag="core"><VsSelectOther value={as.program || ""} options={DISCIPLINES} onChange={(v) => patchGroup("academicSetup", { program: v })} placeholder="Select discipline…" /></VsField>
-                                    <VsField label="City" optional><input className={vsField} value={idea.city || ""} onChange={(e) => patchGroup("ideaInfo", { city: e.target.value })} placeholder="e.g. Lahore" /></VsField>
+                                    <VsField label="Degree level" optional><VsSelectOther value={as.degreeLevel || ""} options={DEGREE_LEVELS} onChange={(v) => patchGroup("academicSetup", { degreeLevel: v })} /></VsField>
+                                    <VsField label="City where the venture operates" optional><input className={vsField} value={idea.city || ""} onChange={(e) => patchGroup("ideaInfo", { city: e.target.value })} placeholder="e.g. Lahore" /></VsField>
                                     <VsField label="How did this project originate?" tag="core"><VsSelectOther value={as.origin || ""} options={ORIGINS} onChange={(v) => patchGroup("academicSetup", { origin: v })} /></VsField>
                                     <VsField label="What are you building?" tag="core"><VsSelectOther value={as.ventureType || ""} options={VENTURE_TYPES} onChange={(v) => patchGroup("academicSetup", { ventureType: v })} placeholder="Choose venture type…" /></VsField>
                                     <VsField label="Industry / sector" optional><VsSelectOther value={idea.sector || ""} options={SECTORS_V11} onChange={(v) => patchGroup("ideaInfo", { sector: v })} /></VsField>
                                     <VsField label="Registration / legal status" optional term="legal-status" onTerm={onTerm}><VsSelectOther value={as.legalStatus || ""} options={LEGAL_STATUSES} onChange={(v) => patchGroup("academicSetup", { legalStatus: v })} placeholder="Choose if known…" /></VsField>
-                                    <VsField label="Degree level" optional><VsSelectOther value={as.degreeLevel || ""} options={DEGREE_LEVELS} onChange={(v) => patchGroup("academicSetup", { degreeLevel: v })} /></VsField>
                                     <VsField label="Website / social handle" optional><input className={vsField} value={as.website || ""} onChange={(e) => patchGroup("academicSetup", { website: e.target.value })} placeholder="https://… or @instagram / WhatsApp Business" /></VsField>
                                 </div>
-                                <h3 className="mb-2.5 mt-2 text-sm font-black">Founder / team</h3>
-                                <p className="mb-3 rounded-xl border border-[#ecdde5] bg-[#f9f1f5] px-3 py-2.5 text-[11px] leading-relaxed text-[#6f5568]">👥 <b>One shared venture record.</b> Team members are linked through university email and phone. They should not create duplicate submissions.</p>
+                                <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">👥 Founder / team</h3>
+                                <p className="mb-3 rounded-xl border border-[#ecdde5] bg-[#f9f1f5] px-3 py-2.5 text-[11px] leading-relaxed text-[#6f5568]">👥 <b>One shared venture record.</b> Team members are linked to the same opportunity through their university email and phone number. They should not create duplicate venture submissions.</p>
                                 <VsExplain summary="📖 Why investors care about the team more than the idea">
                                     <p>Investors often back the people, not just the idea. They look for <VsTerm term="founder-market-fit" onTerm={onTerm}>founder-market fit</VsTerm>, complementary skills, time commitment, and whether ownership is agreed.</p>
                                     <VsEx><b>Example:</b> A textile-design student who interned with exporters, teamed with a CS student who built the ordering app, is stronger for a B2B apparel platform than three CS students with no industry contact.</VsEx>
@@ -785,7 +881,7 @@ export default function StartupBusinessWorkspace() {
                                 ))}
                                 <button type="button" className="bg-transparent p-1 text-xs font-black text-[#a63d65]" onClick={() => setEntry((s) => ({ ...s, team: [...(s.team.length ? s.team : []), { name: "", role: "", email: "", whatsappCode: "+92", whatsappNumber: "" }] }))}>+ Add another team member</button>
                                 <VsAiBox title="✨ AI summary building live" text={sums.founder} empty="Your venture identity and team summary will appear here." />
-                                <VsNav hideBack saving={saving} onNext={() => goNext(1)} nextLabel="Next →" />
+                                <VsNav hideBack saving={saving} onNext={() => goNext(1)} nextLabel="Next: Problem & customer →" />
                             </Card>
                         </>
                     )}
@@ -809,7 +905,7 @@ export default function StartupBusinessWorkspace() {
                             <VsField label="Customer / buyer model" optional term="b2b-b2c" onTerm={onTerm}><VsChips options={BUYER_MODELS} selected={idea.buyerModels || []} onToggle={(v) => patchGroup("ideaInfo", { buyerModels: toggleChip(idea.buyerModels, v) })} otherKey="Other" /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <VsField label="How often does the customer face this problem?" optional><select className={vsField} value={idea.frequency || ""} onChange={(e) => patchGroup("ideaInfo", { frequency: e.target.value })}><option value="">Choose…</option>{PROBLEM_FREQUENCY.map((o) => <option key={o}>{o}</option>)}</select></VsField>
-                                <VsField label="How painful is it? (1 = minor, 5 = urgent)" optional>
+                                <VsField label="How painful is it for them? (1 = minor annoyance, 5 = urgent, costly)" optional>
                                     <div className="flex gap-1.5">{["1","2","3","4","5"].map((n) => <button key={n} type="button" onClick={() => patchGroup("ideaInfo", { severity: n })} className={clsx("flex-1 rounded-full border px-2 py-2 text-xs font-bold", idea.severity === n ? "border-[#a63d65] bg-[#f8e8ef] text-[#087657]" : "border-[#e5e7eb] bg-white text-[#5e6473]")}>{n}</button>)}</div>
                                 </VsField>
                                 <VsField label="What triggers them to look for a solution?" optional term="trigger" onTerm={onTerm}><VsSelectOther value={idea.trigger || ""} options={TRIGGERS} onChange={(v) => patchGroup("ideaInfo", { trigger: v })} /></VsField>
@@ -830,9 +926,9 @@ export default function StartupBusinessWorkspace() {
                                     <VsField label="Who uses or benefits?"><input className={vsField} value={idea.userWho || ""} onChange={(e) => patchGroup("ideaInfo", { userWho: e.target.value })} placeholder="e.g. students / employees / patients" /></VsField>
                                 </div>
                             )}
-                            <h3 className="mb-2 mt-2 text-sm font-black">How do you know the problem is real?</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🔬 How do you know the problem is real?</h3>
                             <VsChips options={EVIDENCE_METHODS} selected={idea.evidenceMethods || []} warn={["👁️ Observation only"]} onToggle={(v) => patchGroup("ideaInfo", { evidenceMethods: toggleChip(idea.evidenceMethods, v) })} otherKey="Other evidence" />
-                            <p className="my-3 rounded-xl border border-[#ecdde5] bg-[#f9f1f5] px-3 py-2.5 text-[11px] leading-relaxed text-[#6f5568]">Evidence looks different across disciplines: prototypes, buyer feedback, lab results, signed pilots or audience engagement all count.</p>
+                            <p className="my-3 rounded-xl border border-[#ecdde5] bg-[#f9f1f5] px-3 py-2.5 text-[11px] leading-relaxed text-[#6f5568]">Evidence looks different across disciplines: a fashion venture may have prototypes and buyer feedback; a health venture may have technical or clinical validation; deep-tech may have lab results; a service venture may have signed pilots; a creative venture may have audience engagement or commissions.</p>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="Interviews completed"><VsUnit unit="people" value={ev.interviews} onChange={(n) => patchGroup("evidenceInfo", { interviews: n })} placeholder="0" min={0} /></VsField>
                                 <VsField label="Survey responses"><VsUnit unit="responses" value={ev.surveyResponses} onChange={(n) => patchGroup("evidenceInfo", { surveyResponses: n })} placeholder="0" min={0} /></VsField>
@@ -851,10 +947,11 @@ export default function StartupBusinessWorkspace() {
                             <h2 className="mb-1 text-[23px] font-black text-[#32133a]">How big is the opportunity, and who else is chasing it?</h2>
                             <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Investors do not expect perfect numbers. They expect you to know roughly how many customers you can reach, where that number came from, and who you are competing with.</p>
                             <VsExplain summary="📖 TAM / SAM / SOM explained with a student example">
-                                <p><b><VsTerm term="tam" onTerm={onTerm}>TAM</VsTerm></b> — everyone who could theoretically use it. <b>SAM</b> — the part you can actually reach. <b>SOM</b> — the slice you can realistically win in 2–3 years.</p>
-                                <VsEx><b>Example — hostel meal delivery:</b> TAM = all university students in Pakistan. SAM = hostel students in Lahore. SOM = the hostels near your kitchen in year one.</VsEx>
+                                <p><b><VsTerm term="tam" onTerm={onTerm}>TAM</VsTerm> (Total Addressable Market)</b> — everyone in the world who could theoretically use your product. <b>SAM</b> (Serviceable Available Market) — the part you can actually reach with your product and location. <b>SOM</b> (Serviceable Obtainable Market) — the slice you can realistically win in the next 2–3 years.</p>
+                                <VsEx><b>Example — hostel meal delivery:</b> TAM = all 1.9 million university students in Pakistan. SAM = ~60,000 hostel students in Lahore who order food online. SOM = 3,000 students (5% of SAM) across 6 hostels near your kitchen in year one. Investors care most about SOM and how you got there.</VsEx>
+                                <p className="mt-2">Bottom-up counts real units (1,200 factories × PKR 15,000/month). Top-down takes a big report number and guesses a %. Bottom-up is far more credible.</p>
                             </VsExplain>
-                            <h3 className="mb-2 mt-2 text-sm font-black">📈 Market size — rough is fine, source matters</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📈 Market size — rough is fine, source matters</h3>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <VsField label="Reachable customer group (SAM in words)" tag="core"><input className={vsField} value={sol.marketWho || ""} onChange={(e) => patchGroup("solutionInfo", { marketWho: e.target.value })} placeholder="e.g. 1,200 registered food manufacturers in Lahore" /></VsField>
                                 <VsField label="Geographic focus for the first 2 years" optional><VsSelectOther value={idea.geography || ""} options={GEOGRAPHY} onChange={(v) => patchGroup("ideaInfo", { geography: v })} /></VsField>
@@ -862,14 +959,14 @@ export default function StartupBusinessWorkspace() {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="TAM — total potential customers" optional term="tam" onTerm={onTerm}><VsUnit unit="customers" value={idea.tam} onChange={(n) => patchGroup("ideaInfo", { tam: n })} min={0} /></VsField>
                                 <VsField label="SAM — customers you can reach" tag="core"><VsUnit unit="customers" value={sol.marketSize ? num(sol.marketSize) : undefined} onChange={(n) => patchGroup("solutionInfo", { marketSize: n != null ? String(n) : undefined })} placeholder="e.g. 1200" min={0} /></VsField>
-                                <VsField label="SOM — win in 2–3 yrs" optional><VsUnit unit="customers" value={idea.som} onChange={(n) => patchGroup("ideaInfo", { som: n })} min={0} /></VsField>
+                                <VsField label="SOM — customers you can win in 2–3 yrs" optional><VsUnit unit="customers" value={idea.som} onChange={(n) => patchGroup("ideaInfo", { som: n })} min={0} /></VsField>
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <VsField label="How did you estimate it?" tag="core"><VsSelectOther value={sol.marketSource || ""} options={MARKET_SOURCES} onChange={(v) => patchGroup("solutionInfo", { marketSource: v })} /></VsField>
                                 <VsField label="Is this market growing, flat or shrinking?" optional><select className={vsField} value={idea.marketTrend || ""} onChange={(e) => patchGroup("ideaInfo", { marketTrend: e.target.value })}><option value="">Choose…</option>{MARKET_TRENDS.map((o) => <option key={o}>{o}</option>)}</select></VsField>
                             </div>
                             <VsField label="Why now?" optional term="why-now" onTerm={onTerm}><input className={vsField} maxLength={240} value={idea.whyNow || ""} onChange={(e) => patchGroup("ideaInfo", { whyNow: e.target.value })} placeholder="What has changed that makes this timely?" /></VsField>
-                            <h3 className="mb-2 mt-2 text-sm font-black">⚔️ Competition — name them honestly</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">⚔️ Competition — name them honestly</h3>
                             <VsExplain summary="📖 “We have no competitors” is a red flag — here’s why">
                                 <p>Every customer is already doing something — even “doing nothing” is a competitor. Name the alternatives and say clearly why you win.</p>
                             </VsExplain>
@@ -901,7 +998,7 @@ export default function StartupBusinessWorkspace() {
                         <Card>
                             <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Step 4 · Solution, product & operations</div>
                             <h2 className="mb-1 text-[23px] font-black text-[#32133a]">What are you offering, how far is it built, and how will you deliver it?</h2>
-                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Plain language wins. Questions that do not fit your model can stay blank.</p>
+                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Plain language wins. Products, services, apps, creative ventures, manufacturing, health, research commercialization and social enterprises all fit here. Questions that do not fit your model can stay blank.</p>
                             <VsExplain summary="📖 Value proposition, MVP, moat — explained">
                                 <p className="mb-2"><b><VsTerm term="value-prop" onTerm={onTerm}>Value proposition</VsTerm></b> — the clear benefit a customer gets, in their words.</p>
                                 <p className="mb-2"><b><VsTerm term="mvp" onTerm={onTerm}>MVP</VsTerm></b> — the smallest version that lets a real customer get the benefit so you can learn.</p>
@@ -912,7 +1009,7 @@ export default function StartupBusinessWorkspace() {
                                 <VsField label="What exists today?" tag="core"><VsSelectOther value={sol.productStatus || ""} options={PRODUCT_STATUS} onChange={(v) => patchGroup("solutionInfo", { productStatus: v })} /></VsField>
                                 <VsField label="Prototype / demo / portfolio link" optional><input className={vsField} type="url" value={sol.demoUrl || ""} onChange={(e) => patchGroup("solutionInfo", { demoUrl: e.target.value })} placeholder="https://…" /></VsField>
                             </div>
-                            <VsField label="Top 3 features or components" optional><input className={vsField} maxLength={260} value={sol.features || ""} onChange={(e) => patchGroup("solutionInfo", { features: e.target.value })} placeholder="e.g. 1) weekly ordering  2) 48-hour delivery  3) compliance certificate" /></VsField>
+                            <VsField label="Top 3 features or components (most important first)" optional><input className={vsField} maxLength={260} value={sol.features || ""} onChange={(e) => patchGroup("solutionInfo", { features: e.target.value })} placeholder="e.g. 1) weekly subscription ordering  2) 48-hour delivery  3) plastic-ban compliance certificate" /></VsField>
                             <VsField label="What makes it meaningfully different or hard to copy?" tag="core" term="moat" onTerm={onTerm} hint="Be specific. “Better quality” is not a moat; “exclusive supplier contract” is." example={FIELD_EXAMPLES.advantage} onUseExample={() => patchGroup("solutionInfo", { advantage: FIELD_EXAMPLES.advantage })} count={sol.advantage || ""} max={320}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={320} value={sol.advantage || ""} onChange={(e) => patchGroup("solutionInfo", { advantage: e.target.value })} placeholder="Be specific. “Better quality” is not a moat; “exclusive supplier contract” is." /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="Intellectual property (IP) status" optional term="ip" onTerm={onTerm}><VsSelectOther value={sol.ipStatus || ""} options={IP_STATUS} onChange={(v) => patchGroup("solutionInfo", { ipStatus: v })} /></VsField>
@@ -920,7 +1017,7 @@ export default function StartupBusinessWorkspace() {
                                 <VsField label="Key technology or supplier you depend on" optional><VsSelectOther value={sol.techDependency || ""} options={TECH_DEPENDENCY} onChange={(v) => patchGroup("solutionInfo", { techDependency: v })} /></VsField>
                             </div>
                             <VsField label="Next 3 product milestones (with rough dates)" optional term="milestone" onTerm={onTerm} hint='Milestones should be measurable, e.g. “30 paying customers by March.”' example={FIELD_EXAMPLES.roadmap} onUseExample={() => patchGroup("solutionInfo", { roadmap: FIELD_EXAMPLES.roadmap })} count={sol.roadmap || ""} max={400}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={400} value={sol.roadmap || ""} onChange={(e) => patchGroup("solutionInfo", { roadmap: e.target.value })} placeholder="Milestone 1 (month)… Milestone 2… Milestone 3…" /></VsField>
-                            <h3 className="mb-2 mt-2 text-sm font-black">⚙️ Operations — how you actually deliver</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">⚙️ Operations — how you actually deliver</h3>
                             <VsExplain summary="📖 Why investors ask about operations, capacity and bottlenecks">
                                 <p>A great product that cannot be delivered reliably at volume is not a business. Investors ask: how is it made or delivered, how many can you handle today, what breaks first when orders double, and how do you keep quality consistent?</p>
                                 <VsEx><b>Example:</b> “We can produce 8,000 boxes a month with two moulds. The bottleneck is drying time; at 15,000/month we need a second dryer.”</VsEx>
@@ -933,21 +1030,21 @@ export default function StartupBusinessWorkspace() {
                                     </div>
                             <VsField label="What must change to serve 10× more customers?" optional><input className={vsField} maxLength={220} value={sol.scalePlan || ""} onChange={(e) => patchGroup("solutionInfo", { scalePlan: e.target.value })} placeholder="e.g. second dryer, a part-time sales person" /></VsField>
                             {early ? (
-                                <><h3 className="mb-2 mt-2 text-sm font-black">📍 Progress so far — early stage</h3>
+                                <><h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📍 Progress so far — early stage</h3>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <VsField label="Mentors consulted"><VsUnit unit="people" value={ev.mentorsConsulted} onChange={(n) => patchGroup("evidenceInfo", { mentorsConsulted: n })} min={0} /></VsField>
                                     <VsField label="Letters of interest"><VsUnit unit="LOIs" value={ev.lettersOfIntent} onChange={(n) => patchGroup("evidenceInfo", { lettersOfIntent: n })} min={0} /></VsField>
                                     <VsField label="Competitions / incubators joined"><VsUnit unit="programs" value={ev.competitionsJoined} onChange={(n) => patchGroup("evidenceInfo", { competitionsJoined: n })} min={0} /></VsField>
                                 </div></>
                             ) : proto ? (
-                                <><h3 className="mb-2 mt-2 text-sm font-black">📍 Progress so far — prototype / pilot</h3>
+                                <><h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📍 Progress so far — prototype / pilot</h3>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <VsField label="People who tested it"><VsUnit unit="people" value={ev.testers} onChange={(n) => patchGroup("evidenceInfo", { testers: n })} min={0} /></VsField>
                                     <VsField label="Pilot partners"><VsUnit unit="pilots" value={ev.pilotPartners} onChange={(n) => patchGroup("evidenceInfo", { pilotPartners: n })} min={0} /></VsField>
                                     <VsField label="Pre-orders / commitments"><VsUnit unit="orders" value={ev.preOrders} onChange={(n) => patchGroup("evidenceInfo", { preOrders: n })} min={0} /></VsField>
                                 </div></>
                             ) : (
-                                <><h3 className="mb-2 mt-2 text-sm font-black">📍 Progress so far — operating / scaling</h3>
+                                <><h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📍 Progress so far — operating / scaling</h3>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <VsField label="Customers / users"><VsUnit unit="customers" value={ev.customers} onChange={(n) => patchGroup("evidenceInfo", { customers: n })} min={0} /></VsField>
                                     <VsField label="Revenue to date"><VsUnit unit="PKR total" value={ev.revenueToDate} onChange={(n) => patchGroup("evidenceInfo", { revenueToDate: n })} min={0} /></VsField>
@@ -963,12 +1060,12 @@ export default function StartupBusinessWorkspace() {
                         <Card>
                             <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Step 5 · Business model & marketing</div>
                             <h2 className="mb-1 text-[23px] font-black text-[#32133a]">How does value become money, and how will customers find you?</h2>
-                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">A clear way to earn revenue, and a realistic plan to reach customers. No finance degree required.</p>
-                            <VsExplain summary="📖 Business model, pricing, go-to-market — explained">
+                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Investors want two things here: a clear way to earn revenue, and a realistic, costed plan to reach customers (go-to-market). No finance degree required — every term is explained.</p>
+                            <VsExplain summary="📖 Business model, pricing strategy, go-to-market, funnel — explained">
                                 <p className="mb-2"><b><VsTerm term="business-model" onTerm={onTerm}>Business model</VsTerm></b> — how you make money: product, subscription, commission.</p>
                                 <p><b><VsTerm term="gtm" onTerm={onTerm}>Go-to-market</VsTerm></b> — which channel, which message, what budget for the first customers.</p>
                             </VsExplain>
-                            <h3 className="mb-2 mt-2 text-sm font-black">💵 Revenue model & pricing</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">💵 Revenue model & pricing</h3>
                             <VsField label="How will the venture earn money or sustain itself?" tag="core" term="business-model" onTerm={onTerm}><VsChips options={REVENUE_MODELS} selected={sol.revenueModels || []} onToggle={(v) => patchGroup("solutionInfo", { revenueModels: toggleChip(sol.revenueModels, v) })} otherKey="Other" /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <VsField label="Pricing strategy" optional term="pricing-strategy" onTerm={onTerm}><VsSelectOther value={sol.pricingStrategy || ""} options={PRICING_STRATEGY} onChange={(v) => patchGroup("solutionInfo", { pricingStrategy: v })} /></VsField>
@@ -977,21 +1074,21 @@ export default function StartupBusinessWorkspace() {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="What does one customer pay?" tag="core"><VsUnit unit="PKR / sale" value={sol.price} onChange={(n) => patchGroup("solutionInfo", { price: n })} placeholder="e.g. 2500" min={0} /></VsField>
                                 <VsField label="How many times a year do they buy?" optional><VsUnit unit="times / yr" value={sol.purchaseFreq} onChange={(n) => patchGroup("solutionInfo", { purchaseFreq: n })} min={0} step={0.1} /></VsField>
-                                <VsField label="How many years do they stay?" optional term="churn" onTerm={onTerm}><VsUnit unit="years" value={sol.retentionYears} onChange={(n) => patchGroup("solutionInfo", { retentionYears: n })} min={0} step={0.5} /></VsField>
+                                <VsField label="How many years do they stay a customer?" optional term="churn" onTerm={onTerm}><VsUnit unit="years" value={sol.retentionYears} onChange={(n) => patchGroup("solutionInfo", { retentionYears: n })} min={0} step={0.5} /></VsField>
                             </div>
                             {price > 0 && sol.purchaseFreq && sol.retentionYears ? <VsCalc>💎 LTV: <b>PKR {(price * sol.purchaseFreq * sol.retentionYears).toLocaleString()}</b> = price × purchases/yr × years.</VsCalc> : null}
-                            <h3 className="mb-2 mt-2 text-sm font-black">📣 Marketing & go-to-market</h3>
-                            <VsField label="How will customers find you?" tag="core" term="channel" onTerm={onTerm}><VsChips options={CHANNELS} selected={sol.channels || []} onToggle={(v) => patchGroup("solutionInfo", { channels: toggleChip(sol.channels, v) })} otherKey="Other" /></VsField>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📣 Marketing & go-to-market</h3>
+                            <VsField label="How will customers find you? (channels)" tag="core" term="channel" onTerm={onTerm}><VsChips options={CHANNELS} selected={sol.channels || []} onToggle={(v) => patchGroup("solutionInfo", { channels: toggleChip(sol.channels, v) })} otherKey="Other" /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <VsField label="Most important channel for the first 100 customers" optional><input className={vsField} maxLength={160} value={sol.primaryChannel || ""} onChange={(e) => patchGroup("solutionInfo", { primaryChannel: e.target.value })} placeholder="e.g. in-person visits with samples" /></VsField>
+                                <VsField label="Your single most important channel for the first 100 customers" optional><input className={vsField} maxLength={160} value={sol.primaryChannel || ""} onChange={(e) => patchGroup("solutionInfo", { primaryChannel: e.target.value })} placeholder="e.g. in-person visits with samples" /></VsField>
                                 <VsField label="How is a sale closed?" optional><VsSelectOther value={sol.salesMotion || ""} options={SALES_MOTION} onChange={(v) => patchGroup("solutionInfo", { salesMotion: v })} /></VsField>
                                 <VsField label="Typical time from first contact to payment" optional term="sales-cycle" onTerm={onTerm}><VsSelectOther value={sol.salesCycle || ""} options={SALES_CYCLE} onChange={(v) => patchGroup("solutionInfo", { salesCycle: v })} /></VsField>
                                 <VsField label="Why would a customer refer others?" optional term="referral" onTerm={onTerm}><input className={vsField} maxLength={180} value={sol.referral || ""} onChange={(e) => patchGroup("solutionInfo", { referral: e.target.value })} /></VsField>
                             </div>
-                            <VsField label="Your core marketing message" optional><input className={vsField} maxLength={160} value={sol.keyMessage || ""} onChange={(e) => patchGroup("solutionInfo", { keyMessage: e.target.value })} placeholder='e.g. “Ban-proof packaging at plastic prices.”' /></VsField>
+                            <VsField label="Your core marketing message (one line customers will remember)" optional><input className={vsField} maxLength={160} value={sol.keyMessage || ""} onChange={(e) => patchGroup("solutionInfo", { keyMessage: e.target.value })} placeholder='e.g. “Ban-proof packaging at plastic prices.”' /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <VsField label="Monthly marketing budget" optional><VsUnit unit="PKR / month" value={sol.mktBudget} onChange={(n) => patchGroup("solutionInfo", { mktBudget: n })} min={0} /></VsField>
-                                <VsField label="New customers expected per month" optional><VsUnit unit="customers" value={sol.newCustMonth} onChange={(n) => patchGroup("solutionInfo", { newCustMonth: n })} min={0} /></VsField>
+                                <VsField label="Monthly marketing budget (planned or actual)" optional><VsUnit unit="PKR / month" value={sol.mktBudget} onChange={(n) => patchGroup("solutionInfo", { mktBudget: n })} min={0} /></VsField>
+                                <VsField label="New customers expected per month from it" optional><VsUnit unit="customers" value={sol.newCustMonth} onChange={(n) => patchGroup("solutionInfo", { newCustMonth: n })} min={0} /></VsField>
                                 <VsField label="Customer acquisition cost (CAC)" optional term="cac" onTerm={onTerm}><VsUnit unit="PKR / customer" value={sol.cac} onChange={(n) => patchGroup("solutionInfo", { cac: n })} min={0} /></VsField>
                             </div>
                             {sol.mktBudget && sol.newCustMonth ? <VsCalc>📣 CAC: <b>PKR {Math.round(sol.mktBudget / sol.newCustMonth).toLocaleString()}</b> = budget ÷ new customers.</VsCalc> : null}
@@ -1010,7 +1107,7 @@ export default function StartupBusinessWorkspace() {
                                     </div>
                                 </div>
                             </details>
-                            <VsField label="Key partners needed to deliver" optional><input className={vsField} maxLength={240} value={sol.partners || ""} onChange={(e) => patchGroup("solutionInfo", { partners: e.target.value })} placeholder="e.g. mill, TCS, JazzCash" /></VsField>
+                            <VsField label="Key partners needed to deliver (suppliers, logistics, platforms)" optional><input className={vsField} maxLength={240} value={sol.partners || ""} onChange={(e) => patchGroup("solutionInfo", { partners: e.target.value })} placeholder="e.g. bagasse mill (Kasur), TCS for delivery, JazzCash for payments" /></VsField>
                             <VsField label="Your most important 12-month business milestone" tag="core" term="milestone" onTerm={onTerm}><input className={vsField} maxLength={220} value={sol.milestone12mo || ""} onChange={(e) => patchGroup("solutionInfo", { milestone12mo: e.target.value })} placeholder="e.g. 30 paying factories and PKR 600,000 monthly revenue by September" /></VsField>
                             <VsAiBox title="✨ AI summary building live" text={sums.business} empty="Your business model and marketing summary will appear here." />
                             <VsNav saving={saving} onBack={() => setStep(3)} onNext={() => goNext(5)} nextLabel="Next: Finance & budget →" />
@@ -1021,11 +1118,11 @@ export default function StartupBusinessWorkspace() {
                         <Card>
                             <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Step 6 · Finance & budget</div>
                             <h2 className="mb-1 text-[23px] font-black text-[#32133a]">Show us the money — simply.</h2>
-                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Most student ventures lose investors not because numbers are small, but because there are none. Leave blanks if you do not know yet.</p>
-                            <VsExplain summary="📖 Unit economics, gross margin, break-even, burn, runway">
-                                <p><b><VsTerm term="unit-economics" onTerm={onTerm}>Unit economics</VsTerm></b> — do you make money on one sale? Price − cost = unit margin. <b><VsTerm term="runway" onTerm={onTerm}>Runway</VsTerm></b> = cash ÷ monthly burn.</p>
+                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">This is where most student ventures lose investors: not because the numbers are small, but because there are none. Every field here is explained with an example, and the calculators do the maths for you.</p>
+                            <VsExplain summary="📖 Unit economics, gross margin, break-even, burn rate, runway — the 5 numbers every investor asks">
+                                <p><b><VsTerm term="unit-economics" onTerm={onTerm}>Unit economics</VsTerm></b> — do you make money on one sale before counting fixed costs? Price − cost to deliver that one unit = unit margin. <b><VsTerm term="runway" onTerm={onTerm}>Runway</VsTerm></b> = cash ÷ monthly burn.</p>
                             </VsExplain>
-                            <h3 className="mb-2 mt-2 text-sm font-black">🧮 Unit economics</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🧮 Unit economics</h3>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="Cost to deliver ONE sale" tag="core" term="cogs" onTerm={onTerm} hint={price ? `Price from Step 5: PKR ${price.toLocaleString()} / sale` : "Enter price in Step 5 first."}><VsUnit unit="PKR / sale" value={sol.unitCost} onChange={(n) => patchGroup("solutionInfo", { unitCost: n })} min={0} /></VsField>
                                 <VsField label="Fixed costs per month" optional term="fixed-costs" onTerm={onTerm}><VsUnit unit="PKR / month" value={sol.fixedCosts} onChange={(n) => patchGroup("solutionInfo", { fixedCosts: n })} min={0} /></VsField>
@@ -1033,7 +1130,7 @@ export default function StartupBusinessWorkspace() {
                             </div>
                             {price > 0 && unitCost > 0 ? (price > unitCost ? <VsCalc>🧮 Unit margin: <b>PKR {(price - unitCost).toLocaleString()}</b> ({Math.round(((price - unitCost) / price) * 100)}%).</VsCalc> : <VsCalc tone="bad">⚠️ Cost is at or above price — every sale loses money. Normal at prototype stage.</VsCalc>) : null}
                             {price > unitCost && unitCost > 0 && sol.fixedCosts ? <VsCalc>📍 Break-even: <b>{Math.ceil(sol.fixedCosts / (price - unitCost)).toLocaleString()} sales / month</b>.</VsCalc> : null}
-                            <h3 className="mb-2 mt-2 text-sm font-black">📒 Start-up budget — what do you need to spend, and on what?</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📒 Start-up budget — what do you need to spend, and on what?</h3>
                             <VsExplain summary="📖 What is a budget, and what should a student budget include?">
                                 <p>A <VsTerm term="budget" onTerm={onTerm}>budget</VsTerm> is a list of everything you must pay for to reach your next milestone, with an honest amount next to each line. Include a contingency (10–15% buffer for surprises).</p>
                                 <VsEx><b>Example — 6-month EcoPack pilot:</b> Moulds PKR 180,000 · Raw material PKR 90,000 · Lab test PKR 40,000 · Marketing PKR 30,000 · Website PKR 25,000 · SECP PKR 15,000 · Contingency PKR 45,000 → Total PKR 425,000.</VsEx>
@@ -1052,7 +1149,7 @@ export default function StartupBusinessWorkspace() {
                             ))}
                             <button type="button" className="mb-2 text-xs font-black text-[#a63d65]" onClick={() => patchGroup("solutionInfo", { budgetLines: [...(sol.budgetLines || [{ category: "", note: "" }]), { category: "", note: "" }].slice(0, 15) })}>+ Add budget line</button>
                             <p className="mb-3 text-xs font-black text-[#32133a]">Total budget: PKR {(sol.budgetLines || []).reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}</p>
-                            <h3 className="mb-2 mt-2 text-sm font-black">💰 Funding so far — where has the money come from?</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">💰 Funding so far — where has the money come from?</h3>
                             <VsExplain summary="📖 Bootstrapping, grants, angels, pre-seed — what do these mean?">
                                 <p><VsTerm term="bootstrapping" onTerm={onTerm}>Bootstrapping</VsTerm> funds the business from savings and its own sales. A grant is money you do not repay. An angel invests personal money for ownership. <VsTerm term="pre-seed" onTerm={onTerm}>Pre-seed / seed</VsTerm> is the earliest investment to build an MVP and prove customers will pay.</p>
                                 <VsEx><b>Example:</b> “We bootstrapped PKR 150,000 from savings, won PKR 200,000 at the university competition, and reinvested PKR 60,000 of sales.”</VsEx>
@@ -1066,7 +1163,7 @@ export default function StartupBusinessWorkspace() {
                                 </div>
                             ))}
                             <button type="button" className="mb-3 text-xs font-black text-[#a63d65]" onClick={() => patchGroup("solutionInfo", { fundSources: [...(sol.fundSources || [{ source: "", note: "" }]), { source: "", note: "" }].slice(0, 8) })}>+ Add funding source</button>
-                            <h3 className="mb-2 mt-2 text-sm font-black">📊 Current finances</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">📊 Current finances & simple 12-month outlook</h3>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <VsField label="Cash available today" optional><VsUnit unit="PKR" value={sol.cashOnHand} onChange={(n) => patchGroup("solutionInfo", { cashOnHand: n })} min={0} /></VsField>
                                 <VsField label="Current monthly revenue" optional><VsUnit unit="PKR / month" value={sol.monthlyRevenue} onChange={(n) => patchGroup("solutionInfo", { monthlyRevenue: n })} min={0} /></VsField>
@@ -1074,8 +1171,8 @@ export default function StartupBusinessWorkspace() {
                             </div>
                             {sol.monthlyCosts ? ((sol.monthlyCosts - (sol.monthlyRevenue || 0)) <= 0 ? <VsCalc>✅ Revenue covers costs.</VsCalc> : sol.cashOnHand ? <VsCalc tone={(sol.cashOnHand / (sol.monthlyCosts - (sol.monthlyRevenue || 0))) < 3 ? "bad" : "warn"}>🔥 Burn <b>PKR {(sol.monthlyCosts - (sol.monthlyRevenue || 0)).toLocaleString()}/month</b> · Runway <b>{(sol.cashOnHand / (sol.monthlyCosts - (sol.monthlyRevenue || 0))).toFixed(1)} months</b>.</VsCalc> : <VsCalc tone="warn">🔥 Burn rate known — enter cash to see runway.</VsCalc>) : null}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <VsField label="Customers expected in month 1" optional><VsUnit unit="customers" value={sol.projCustM1} onChange={(n) => patchGroup("solutionInfo", { projCustM1: n })} min={0} /></VsField>
-                                <VsField label="Expected monthly customer growth" optional><VsUnit unit="% / month" value={sol.projGrowth} onChange={(n) => patchGroup("solutionInfo", { projGrowth: n })} min={0} /></VsField>
+                                <VsField label="Customers you expect in month 1 of the plan" optional><VsUnit unit="customers" value={sol.projCustM1} onChange={(n) => patchGroup("solutionInfo", { projCustM1: n })} min={0} /></VsField>
+                                <VsField label="Expected monthly growth in customers" optional><VsUnit unit="% / month" value={sol.projGrowth} onChange={(n) => patchGroup("solutionInfo", { projGrowth: n })} min={0} /></VsField>
                                 <VsField label="When do customers pay you?" optional term="cash-flow" onTerm={onTerm}><VsSelectOther value={sol.paymentTerms || ""} options={PAYMENT_TERMS} onChange={(v) => patchGroup("solutionInfo", { paymentTerms: v })} /></VsField>
                             </div>
                             {sol.projCustM1 && price > 0 ? (() => {
@@ -1090,31 +1187,32 @@ export default function StartupBusinessWorkspace() {
                                 <VsField label="When do you expect the first profitable month?" optional term="break-even" onTerm={onTerm}><select className={vsField} value={sol.profitMonth || ""} onChange={(e) => patchGroup("solutionInfo", { profitMonth: e.target.value })}><option value="">Choose…</option>{PROFIT_MONTH.map((o) => <option key={o}>{o}</option>)}</select></VsField>
                             </div>
                             <details className="my-3 rounded-[14px] border border-[#e7dae3] bg-[#fffafd]">
-                                <summary className="cursor-pointer px-3.5 py-3 text-[12.5px] font-extrabold text-[#6d315c]">Optional: model-specific metrics (SaaS / app / marketplace)</summary>
+                                <summary className="cursor-pointer px-3.5 py-3 text-[12.5px] font-extrabold text-[#6d315c]">Optional: model-specific metrics (SaaS / app / marketplace) — only for operating ventures</summary>
                                 <div className="px-3.5 pb-3.5">
-                                    <p className="mb-3 text-[11px] text-[#6b7280]">Skip unless you already run a software, app or marketplace with real users.</p>
+                                    <p className="mb-3 text-[11px] text-[#6b7280]">Skip unless you already run a software, app or marketplace with real users. Each term is explained via the ? icon.</p>
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                        <VsField label="MRR" term="mrr" onTerm={onTerm}><VsUnit unit="PKR / month" value={sol.mrr} onChange={(n) => patchGroup("solutionInfo", { mrr: n })} min={0} /></VsField>
-                                        <VsField label="GMV" term="gmv" onTerm={onTerm}><VsUnit unit="PKR / month" value={sol.gmv} onChange={(n) => patchGroup("solutionInfo", { gmv: n })} min={0} /></VsField>
-                                        <VsField label="Take rate" term="take-rate" onTerm={onTerm}><VsUnit unit="%" value={sol.takeRate} onChange={(n) => patchGroup("solutionInfo", { takeRate: n })} min={0} max={100} step={0.1} /></VsField>
+                                        <VsField label="MRR — monthly recurring revenue" term="mrr" onTerm={onTerm}><VsUnit unit="PKR / month" value={sol.mrr} onChange={(n) => patchGroup("solutionInfo", { mrr: n })} min={0} /></VsField>
+                                        <VsField label="GMV — value traded on your platform" term="gmv" onTerm={onTerm}><VsUnit unit="PKR / month" value={sol.gmv} onChange={(n) => patchGroup("solutionInfo", { gmv: n })} min={0} /></VsField>
+                                        <VsField label="Take rate — your cut of GMV" term="take-rate" onTerm={onTerm}><VsUnit unit="%" value={sol.takeRate} onChange={(n) => patchGroup("solutionInfo", { takeRate: n })} min={0} max={100} step={0.1} /></VsField>
                                         <VsField label="Monthly active users" term="mau" onTerm={onTerm}><VsUnit unit="users" value={sol.mau} onChange={(n) => patchGroup("solutionInfo", { mau: n })} min={0} /></VsField>
                                         <VsField label="Monthly churn" term="churn" onTerm={onTerm}><VsUnit unit="% / month" value={sol.churn} onChange={(n) => patchGroup("solutionInfo", { churn: n })} min={0} max={100} step={0.1} /></VsField>
-                                        <VsField label="Paying users"><VsUnit unit="paying" value={sol.payingUsers} onChange={(n) => patchGroup("solutionInfo", { payingUsers: n })} min={0} /></VsField>
+                                        <VsField label="Paying users / customers"><VsUnit unit="paying" value={sol.payingUsers} onChange={(n) => patchGroup("solutionInfo", { payingUsers: n })} min={0} /></VsField>
                                     </div>
                                 </div>
                             </details>
-                            <VsField label="Key financial assumptions" optional hint="Label what is measured, quoted, or assumed." example={FIELD_EXAMPLES.finAssumptions} onUseExample={() => patchGroup("solutionInfo", { finAssumptions: FIELD_EXAMPLES.finAssumptions })} count={sol.finAssumptions || ""} max={500}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={500} value={sol.finAssumptions || ""} onChange={(e) => patchGroup("solutionInfo", { finAssumptions: e.target.value })} placeholder="Where do your price, cost, growth and market numbers come from?" /></VsField>
+                            <VsField label="Key financial assumptions (so reviewers can check your logic)" optional hint="Label what is measured, quoted, or assumed." example={FIELD_EXAMPLES.finAssumptions} onUseExample={() => patchGroup("solutionInfo", { finAssumptions: FIELD_EXAMPLES.finAssumptions })} count={sol.finAssumptions || ""} max={500}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={500} value={sol.finAssumptions || ""} onChange={(e) => patchGroup("solutionInfo", { finAssumptions: e.target.value })} placeholder="Where do your price, cost, growth and market numbers come from?" /></VsField>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <VsField label="Main source of your key numbers" optional><VsSelectOther value={sol.numberSourceType || ""} options={NUMBER_SOURCES} onChange={(v) => patchGroup("solutionInfo", { numberSourceType: v })} /></VsField>
                                 <VsField label="How are finances tracked today?" optional><VsSelectOther value={sol.accounting || ""} options={ACCOUNTING} onChange={(v) => patchGroup("solutionInfo", { accounting: v })} /></VsField>
                             </div>
-                            <h3 className="mb-2 mt-2 text-sm font-black">🎯 Funding ask (only if you want to raise money)</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🎯 Funding ask (only if you want to raise money)</h3>
                             <VsField label="Are you looking to raise money in the next 12 months?" tag="core"><select className={vsField} value={sol.raisePlan || ""} onChange={(e) => patchGroup("solutionInfo", { raisePlan: e.target.value })}><option value="">Choose…</option>{RAISE_PLAN.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></VsField>
                             {["grant", "equity", "loan", "unsure"].includes(sol.raisePlan || "") ? (
                                 <>
                                     <VsExplain summary="📖 Use of funds, valuation, equity, dilution, SAFE — explained">
-                                        <p><b>Use of funds</b> — exactly what the money buys and which milestone it gets you to. <VsTerm term="valuation" onTerm={onTerm}>Valuation</VsTerm> is what the company is worth when an investor buys in. <VsTerm term="equity" onTerm={onTerm}>Equity</VsTerm> is the % of ownership you give. <VsTerm term="dilution" onTerm={onTerm}>Dilution</VsTerm> is your share shrinking as you sell equity. A <VsTerm term="safe" onTerm={onTerm}>SAFE</VsTerm> delays the exact % until a later round.</p>
-                                        <VsEx><b>Example:</b> You raise PKR 5M at a PKR 45M pre-money valuation → post-money PKR 50M → investor owns 10%.</VsEx>
+                                        <p><b>Use of funds</b> — exactly what the money buys and which milestone it gets you to. Investors fund milestones, not salaries. <b><VsTerm term="valuation" onTerm={onTerm}>Valuation</VsTerm></b> — what the whole company is “worth” when the investor buys in. <b><VsTerm term="equity" onTerm={onTerm}>Equity</VsTerm></b> — the % of ownership you give. <b><VsTerm term="dilution" onTerm={onTerm}>Dilution</VsTerm></b> — your own share shrinking as you sell equity.</p>
+                                        <VsEx><b>Example:</b> You raise PKR 5M at a PKR 45M pre-money valuation → post-money PKR 50M → investor owns 10%. If two founders had 50/50, they now hold 45% each (diluted from 50%).</VsEx>
+                                        <p className="mt-2"><b><VsTerm term="safe" onTerm={onTerm}>SAFE / convertible note</VsTerm></b> — an agreement where the investor gives money now and the equity % is decided at a later round, so you don’t need to argue valuation today. Common for first cheques.</p>
                                     </VsExplain>
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                         <VsField label="Amount sought"><VsUnit unit="PKR" value={ev.fundingSought} onChange={(n) => patchGroup("evidenceInfo", { fundingSought: n })} min={0} /></VsField>
@@ -1132,12 +1230,12 @@ export default function StartupBusinessWorkspace() {
                                             return total > 0 ? <VsCalc tone={Math.abs(total - 100) < 1 ? undefined : "warn"}>Use of funds total: <b>{total}%</b>{Math.abs(total - 100) < 1 ? " ✓" : " — aim for 100%."}</VsCalc> : null;
                                         })()}
                                     </VsField>
-                                    <VsField label="Use of funds (note)" optional><input className={vsField} value={ev.useOfFunds || ""} onChange={(e) => patchGroup("evidenceInfo", { useOfFunds: e.target.value })} placeholder="e.g. 2 moulds, first 3 months of raw material, one sales intern" /></VsField>
+                                    <input className={clsx(vsField, "mt-2")} value={ev.useOfFunds || ""} onChange={(e) => patchGroup("evidenceInfo", { useOfFunds: e.target.value })} placeholder="Optional note: e.g. 2 moulds (PKR 180k), first 3 months of raw material, one sales intern" />
                                     <VsField label="What milestone will the money achieve?"><input className={vsField} value={ev.expectedResult || ""} onChange={(e) => patchGroup("evidenceInfo", { expectedResult: e.target.value })} placeholder="e.g. 300 paying customers within 9 months" /></VsField>
                                     <details className="my-3 rounded-[14px] border border-[#e7dae3] bg-[#fffafd]">
                                         <summary className="cursor-pointer px-3.5 py-3 text-[12.5px] font-extrabold text-[#6d315c]">Optional funding terms — only if you know them</summary>
                                         <div className="px-3.5 pb-3.5">
-                                            <p className="mb-3 text-[11px] text-[#6b7280]">Useful for pitch preparation; <b>not expected from most undergraduate projects</b>.</p>
+                                            <p className="mb-3 text-[11px] text-[#6b7280]">Useful for pitch preparation; not expected from most undergraduate projects .</p>
                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                                 <VsField label="Indicative pre-money valuation" term="valuation" onTerm={onTerm}><VsUnit unit="PKR" value={ev.valuation} onChange={(n) => patchGroup("evidenceInfo", { valuation: n })} min={0} /></VsField>
                                                 <VsField label="Equity you may offer" term="equity" onTerm={onTerm}><VsUnit unit="%" value={ev.equityPercent} onChange={(n) => patchGroup("evidenceInfo", { equityPercent: n })} min={0} max={100} step={0.1} /></VsField>
@@ -1189,13 +1287,13 @@ export default function StartupBusinessWorkspace() {
                                     {sdgCheck ? <div className="mb-3 rounded-[13px] border border-[#e2c8d6] bg-[#fff8fb] p-3 text-[11px] text-[#6d315c]">{sdgCheck}</div> : null}
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         <VsField label="One impact indicator you could track"><input className={vsField} value={sm.indicators?.[0]?.indicator || ""} onChange={(e) => patchGroup("sdgMapping", { indicators: [{ ...(sm.indicators?.[0] || {}), indicator: e.target.value, target12mo: sm.indicators?.[0]?.target12mo }] })} placeholder="e.g. kilograms of plastic replaced" /></VsField>
-                                        <VsField label="12-month target (optional)"><input className={vsField} value={sm.indicators?.[0]?.target12mo || ""} onChange={(e) => patchGroup("sdgMapping", { indicators: [{ ...(sm.indicators?.[0] || {}), indicator: sm.indicators?.[0]?.indicator, target12mo: e.target.value }] })} placeholder="e.g. 10,000 kg" /></VsField>
+                                        <VsField label="12-month target" optional><input className={vsField} value={sm.indicators?.[0]?.target12mo || ""} onChange={(e) => patchGroup("sdgMapping", { indicators: [{ ...(sm.indicators?.[0] || {}), indicator: sm.indicators?.[0]?.indicator, target12mo: e.target.value }] })} placeholder="e.g. 10,000 kg" /></VsField>
                                     </div>
                                 </>
                             )}
                             {sm.mode === "review" && (
                                 <>
-                                    <VsNotice tone="blue">💡 Your venture will be marked <b>“SDG mapping assistance requested.”</b> The student confirms the mapping; AI does not force it.</VsNotice>
+                                    <VsNotice tone="blue">💡 Your venture will be marked <b>“SDG mapping assistance requested.”</b> CIEL AI reads the problem, customer, solution and the change described below, then suggests likely SDGs with a reason. You confirm the mapping; AI does not force it.</VsNotice>
                                     <VsField label="What positive change could your venture create?"><textarea className={clsx(vsField, "min-h-[88px]")} maxLength={360} value={sm.helpImpact || ""} onChange={(e) => patchGroup("sdgMapping", { helpImpact: e.target.value })} placeholder="Describe the change in plain language." /></VsField>
                                     <button type="button" className="mb-3 rounded-xl bg-[#a63d65] px-4 py-2.5 text-[13px] font-extrabold text-white" onClick={() => setSdgSuggest(suggestSdgs(snap))}>✨ Ask CIEL AI to suggest SDGs</button>
                                     {sdgSuggest.length > 0 && (
@@ -1214,7 +1312,7 @@ export default function StartupBusinessWorkspace() {
                             {sm.mode === "none" && (
                                 <>
                                     <VsNotice>Your record will display <b>“Not linked to an SDG.”</b> This does not reduce the Venture Potential Score.</VsNotice>
-                                    <VsField label="Optional: does the business currently consider any responsible-business practices?"><VsChips options={RESPONSIBILITY_PRACTICES} selected={sm.responsibility || []} warn={["None currently"]} onToggle={(v) => patchGroup("sdgMapping", { responsibility: toggleChip(sm.responsibility, v) })} otherKey="Other" /></VsField>
+                                    <VsField label="Optional: does the business consider any responsible-business practices?"><VsChips options={RESPONSIBILITY_PRACTICES} selected={sm.responsibility || []} warn={["None currently"]} onToggle={(v) => patchGroup("sdgMapping", { responsibility: toggleChip(sm.responsibility, v) })} otherKey="Other" /></VsField>
                                 </>
                             )}
                             <VsAiBox title="✨ Sustainability summary" text={sums.impact} empty="Choose one of the three SDG options above." />
@@ -1226,12 +1324,15 @@ export default function StartupBusinessWorkspace() {
                         <Card>
                             <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Step 8 · Risk, team health & next step</div>
                             <h2 className="mb-1 text-[23px] font-black text-[#32133a]">What could go wrong — and how would you handle it?</h2>
-                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Investors trust founders who name their risks before being asked. This also checks whether the team can sustain the pace.</p>
-                            <h3 className="mb-2 mt-2 text-sm font-black">⚠️ Risks</h3>
+                            <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Investors trust founders who name their risks before being asked. This section also checks something most forms ignore: whether the team and the business can sustain the pace.</p>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">⚠️ Risks</h3>
                             <VsExplain summary="📖 Types of risk investors ask about (with examples)">
                                 <p><b>Market risk</b> — customers may not want it enough. <b>Execution risk</b> — the team may not be able to build or deliver it. <b>Financial risk</b> — running out of cash. <b>Supply / operational risk</b> — a supplier or partner fails. <b>Regulatory risk</b> — approvals, licences, bans. <b><VsTerm term="key-person" onTerm={onTerm}>Key-person risk</VsTerm></b> — everything depends on one individual. <b>Competitive risk</b> — a bigger player copies you.</p>
                                 <VsEx><b>Example:</b> Risk: “Our only pulp mill raises prices 30%.” Likelihood: Medium. Mitigation: “Sign a second mill in Faisalabad by December; hold 6 weeks of stock.”</VsEx>
                             </VsExplain>
+                            <div className="mb-1 hidden grid-cols-[.9fr_1.2fr_.6fr_.6fr_1fr_auto] gap-2 text-[10px] font-black uppercase tracking-wide text-[#9a8293] md:grid">
+                                <span>Type</span><span>Risk — what could happen</span><span>Likelihood</span><span>Impact</span><span>How you would reduce it</span><span />
+                            </div>
                             {(ev.riskRows?.length ? ev.riskRows : [{ type: "", description: "", likelihood: "", impact: "", mitigation: "" }]).map((row, i) => (
                                 <div key={i} className="mb-2 grid grid-cols-1 gap-2 md:grid-cols-[.9fr_1.2fr_.6fr_.6fr_1fr_auto]">
                                     <VsSelectOther value={row.type || ""} options={RISK_TYPES} onChange={(v) => { const next = [...(ev.riskRows?.length ? ev.riskRows : [{ type: "", description: "", likelihood: "", impact: "", mitigation: "" }])]; next[i] = { ...next[i], type: v }; patchGroup("evidenceInfo", { riskRows: next }); }} />
@@ -1243,53 +1344,27 @@ export default function StartupBusinessWorkspace() {
                                 </div>
                             ))}
                             <button type="button" className="mb-3 text-xs font-black text-[#a63d65]" onClick={() => patchGroup("evidenceInfo", { riskRows: [...(ev.riskRows || [{ type: "", description: "", mitigation: "" }]), { type: "", description: "", mitigation: "" }].slice(0, 6) })}>+ Add risk (top 3 is enough)</button>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <VsField label="Biggest risk or resistance" optional><input className={vsField} maxLength={250} value={ev.risk || ""} onChange={(e) => patchGroup("evidenceInfo", { risk: e.target.value })} placeholder="e.g. supplier dependency, customer trust, regulation" /></VsField>
-                                <VsField label="How could you reduce that risk?" optional><input className={vsField} maxLength={250} value={ev.mitigation || ""} onChange={(e) => patchGroup("evidenceInfo", { mitigation: e.target.value })} placeholder="e.g. second supplier, pilot evidence, certification" /></VsField>
-                            </div>
-                            <VsField label="Biggest assumption you still need to test" optional><input className={vsField} maxLength={250} value={ev.assumption || ""} onChange={(e) => patchGroup("evidenceInfo", { assumption: e.target.value })} placeholder="e.g. schools will sign annual contracts after a 4-week pilot" /></VsField>
+                            <VsField label="Biggest assumption you still need to test" optional term="assumption" onTerm={onTerm}><input className={vsField} maxLength={250} value={ev.assumption || ""} onChange={(e) => patchGroup("evidenceInfo", { assumption: e.target.value })} placeholder="e.g. factories will sign 12-month contracts after a 4-week pilot" /></VsField>
                             <VsField label="Regulatory / legal / approval barrier" optional><VsSelectOther value={ev.regulatoryBarrier || ""} options={REG_BARRIERS} onChange={(v) => patchGroup("evidenceInfo", { regulatoryBarrier: v })} placeholder="Choose if relevant…" /></VsField>
-                            <h3 className="mb-2 mt-2 text-sm font-black">🧠 Team health & burnout check</h3>
-                            <VsExplain summary="📖 What is burnout? Founder, employee and business burnout — explained">
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🧠 Team health & burnout check</h3>
+                            <VsExplain summary="📖 What is burnout? Founder, employee and business burnout — explained with examples">
                                 <p><VsTerm term="founder-burnout" onTerm={onTerm}>Founder burnout</VsTerm> is weeks or months of exhaustion, not a busy week. <VsTerm term="employee-burnout" onTerm={onTerm}>Team burnout</VsTerm> shows up as unclear roles, unpaid work and quiet exits. <VsTerm term="business-burnout" onTerm={onTerm}>Business burnout</VsTerm> is when cash, stock or goodwill run out faster than they can be renewed.</p>
                                 <VsEx><b>Example:</b> A team spends its entire PKR 300,000 on inventory before confirming demand. Unsold stock ties up all the cash even though the idea was good.</VsEx>
                             </VsExplain>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <VsField label="Main competing commitments right now" optional><VsSelectOther value={ev.otherCommit || ""} options={OTHER_COMMIT} onChange={(v) => patchGroup("evidenceInfo", { otherCommit: v })} /></VsField>
+                                <VsField label="Main competing commitments of the team right now" optional><VsSelectOther value={ev.otherCommit || ""} options={OTHER_COMMIT} onChange={(v) => patchGroup("evidenceInfo", { otherCommit: v })} /></VsField>
                                 <VsField label="Key-person dependency" optional term="key-person" onTerm={onTerm}><select className={vsField} value={ev.keyPerson || ""} onChange={(e) => patchGroup("evidenceInfo", { keyPerson: e.target.value })}><option value="">Choose…</option>{KEY_PERSON.map((o) => <option key={o}>{o}</option>)}</select></VsField>
-                                <VsField label="First hire or co-founder needed in 12 months" optional><VsSelectOther value={ev.hiringNeed || ""} options={HIRING_NEED} onChange={(v) => patchGroup("evidenceInfo", { hiringNeed: v })} /></VsField>
-                                <VsField label="How sustainable is the current pace for 6 months?">
+                                <VsField label="First hire or co-founder needed in the next 12 months" optional><VsSelectOther value={ev.hiringNeed || ""} options={HIRING_NEED} onChange={(v) => patchGroup("evidenceInfo", { hiringNeed: v })} /></VsField>
+                                <VsField label="How sustainable is the current pace for the next 6 months? (1 = we will burn out, 5 = very sustainable)">
                                     <div className="flex gap-1.5">{["1","2","3","4","5"].map((n) => <button key={n} type="button" onClick={() => patchGroup("evidenceInfo", { paceScore: n })} className={clsx("flex-1 rounded-full border px-2 py-2 text-xs font-bold", ev.paceScore === n ? "border-[#a63d65] bg-[#f8e8ef] text-[#087657]" : "border-[#e5e7eb] bg-white text-[#5e6473]")}>{n}</button>)}</div>
                                 </VsField>
                             </div>
                             <VsField label="Any of these warning signs present today?" optional><VsChips options={BURNOUT_SIGNS} selected={ev.burnoutSigns || []} warn={BURNOUT_SIGNS.filter((s) => s !== "None of these" && s !== "Other")} onToggle={(v) => patchGroup("evidenceInfo", { burnoutSigns: toggleChip(ev.burnoutSigns, v) })} otherKey="Other" /></VsField>
                             <VsField label="What will you do to keep the team and business healthy?" optional hint="Simple rules beat good intentions." example={FIELD_EXAMPLES.burnoutPlan} onUseExample={() => patchGroup("evidenceInfo", { burnoutPlan: FIELD_EXAMPLES.burnoutPlan })} count={ev.burnoutPlan || ""} max={400}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={400} value={ev.burnoutPlan || ""} onChange={(e) => patchGroup("evidenceInfo", { burnoutPlan: e.target.value })} placeholder="e.g. written roles, weekly check-in, exam-period pause" /></VsField>
-                            <h3 className="mb-2 mt-2 text-sm font-black">🤝 Support & next step</h3>
+                            <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🤝 Support & next step</h3>
                             <VsField label="Support you may need"><VsChips options={SUPPORT_NEEDS} selected={ev.openTo || []} warn={["Nothing yet"]} onToggle={(v) => patchGroup("evidenceInfo", { openTo: toggleChip(ev.openTo, v) })} otherKey="Other" /></VsField>
                             <VsField label="Your next 90 days — three concrete actions" optional hint="Actions you control, each with a date." example={FIELD_EXAMPLES.plan90} onUseExample={() => patchGroup("evidenceInfo", { plan90: FIELD_EXAMPLES.plan90 })} count={ev.plan90 || ""} max={400}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={400} value={ev.plan90 || ""} onChange={(e) => patchGroup("evidenceInfo", { plan90: e.target.value })} placeholder="1) … 2) … 3) …" /></VsField>
                             <VsField label="If this works, what could the venture become in 3–5 years?" optional term="vision" onTerm={onTerm} hint="Investors fund the 5-year story; faculty judge the 12-month plan. Give both." example={FIELD_EXAMPLES.vision35} onUseExample={() => patchGroup("evidenceInfo", { vision35: FIELD_EXAMPLES.vision35 })} count={ev.vision35 || ""} max={400}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={400} value={ev.vision35 || ""} onChange={(e) => patchGroup("evidenceInfo", { vision35: e.target.value })} placeholder="Size, geography, product range, team — be ambitious but specific" /></VsField>
-                            {fundingOn && (
-                                <>
-                                    <VsNotice tone="blue">Funding questions only appear because you selected <b>Investment funding</b>.</VsNotice>
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                        <VsField label="Amount sought"><VsUnit unit="PKR" value={ev.fundingSought} onChange={(n) => patchGroup("evidenceInfo", { fundingSought: n })} placeholder="e.g. 2500000" min={0} /></VsField>
-                                        <VsField label="What would you spend it on?"><input className={vsField} value={ev.useOfFunds || ""} onChange={(e) => patchGroup("evidenceInfo", { useOfFunds: e.target.value })} placeholder="e.g. product development + pilot launch" /></VsField>
-                                        <VsField label="What would that achieve?"><input className={vsField} value={ev.expectedResult || ""} onChange={(e) => patchGroup("evidenceInfo", { expectedResult: e.target.value })} placeholder="e.g. 300 paying users in 6 months" /></VsField>
-                                    </div>
-                                    <details className="my-3 rounded-[14px] border border-[#e7dae3] bg-[#fffafd]">
-                                        <summary className="cursor-pointer px-3.5 py-3 text-[12.5px] font-extrabold text-[#6d315c]">Optional funding terms & long-term outcome</summary>
-                                        <div className="px-3.5 pb-3.5">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                                <VsField label="Indicative valuation"><VsUnit unit="PKR" value={ev.valuation} onChange={(n) => patchGroup("evidenceInfo", { valuation: n })} min={0} /></VsField>
-                                                <VsField label="Equity you may consider offering"><VsUnit unit="%" value={ev.equityPercent} onChange={(n) => patchGroup("evidenceInfo", { equityPercent: n })} min={0} max={100} step={0.1} /></VsField>
-                                                <VsField label="Current founder / team ownership"><VsUnit unit="%" value={ev.founderOwnership} onChange={(n) => patchGroup("evidenceInfo", { founderOwnership: n })} min={0} max={100} step={0.1} /></VsField>
-                                                <VsField label="Funding runway created"><VsUnit unit="months" value={ev.fundRunway} onChange={(n) => patchGroup("evidenceInfo", { fundRunway: n })} min={0} step={0.5} /></VsField>
-                                            </div>
-                                            <VsField label="Exit / long-term ownership strategy" optional><VsSelectOther value={ev.exitStrategy || ""} options={EXIT_STRATEGIES} onChange={(v) => patchGroup("evidenceInfo", { exitStrategy: v })} placeholder="Not decided / not relevant yet" /></VsField>
-                                        </div>
-                                    </details>
-                                </>
-                            )}
                             <VsField label="One thing you learned while developing this idea" tag="core" hint="Aim for 2–4 honest sentences. No polished essay required." example={FIELD_EXAMPLES.reflection} onUseExample={() => patchGroup("evidenceInfo", { reflection: FIELD_EXAMPLES.reflection })} count={ev.reflection || ""} max={650}><textarea className={clsx(vsField, "min-h-[88px]")} maxLength={650} value={ev.reflection || ""} onChange={(e) => patchGroup("evidenceInfo", { reflection: e.target.value })} placeholder="What changed in your thinking about the customer, solution or business?" /></VsField>
                             <div className="rounded-[18px] border border-[#e5e7eb] bg-[#fbfcfe] p-4">
                                 <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Opportunity track · optional</div>
@@ -1301,8 +1376,8 @@ export default function StartupBusinessWorkspace() {
                                 </div>
                                 {investorOn && (
                                     <>
-                                        <VsNotice tone="green">✅ You can still control what is shared later. Approved investors should only see a curated Venture Card, and any direct introduction should require your approval.</VsNotice>
-                                        <label className="flex items-start gap-2 text-xs font-bold text-[#1e293b]"><input type="checkbox" className="mt-0.5" checked={!!entry.reviewPipeline?.declarationConsent} onChange={(e) => patchGroup("reviewPipeline", { declarationConsent: e.target.checked })} />I authorize my university and CIEL PK to consider this venture for approved external opportunities. I understand that my contact details and full documents should not be shared without further permission.</label>
+                                        <VsNotice tone="green">✅ You can still control what is shared later. Approved investors only see a curated Venture Card, and any direct introduction requires your approval.</VsNotice>
+                                        <label className="flex items-start gap-2 text-xs font-bold text-[#1e293b]"><input type="checkbox" className="mt-0.5" checked={!!entry.reviewPipeline?.declarationConsent} onChange={(e) => patchGroup("reviewPipeline", { declarationConsent: e.target.checked })} />I authorize my university and CIEL PK to consider this venture for approved external opportunities. I understand that my contact details and full documents will not be shared without further permission.</label>
                                     </>
                                 )}
                             </div>
@@ -1316,7 +1391,7 @@ export default function StartupBusinessWorkspace() {
                             <Card>
                                 <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Step 9 · Review & business plan</div>
                                 <h2 className="mb-1 text-[23px] font-black text-[#32133a]">Your AI-drafted Venture Profile</h2>
-                                <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Review each AI-drafted section summary before submission. <b>Accept or edit the summary</b> so the final repository flashcard accurately reflects what you meant. Faculty will separately receive an independent <b>CIEL AI Critical Review</b> based on your raw answers; that critical review cannot be edited by the student.</p>
+                                <p className="mb-4 text-[13px] leading-relaxed text-[#6b7280]">Review each AI-drafted section summary before submission. <b>Accept or edit the summary</b> so the final repository flashcard accurately reflects what you meant. Faculty separately receive an independent <b>CIEL AI Critical Review</b> based on your raw answers, calculations, uploaded evidence and market benchmarking; that review cannot be edited by the student.</p>
                                 {REVIEW_BLOCKS.map((block) => {
                                     const r = review[block.key] ?? { accepted: false, edited: false, text: sums[block.key] || "" };
                                     return (
@@ -1336,7 +1411,7 @@ export default function StartupBusinessWorkspace() {
                                 <div className="mt-3.5 rounded-[18px] border border-[#e5e7eb] bg-[#fffafd] p-4">
                                     <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">Evidence Vault · optional</div>
                                     <h2 className="mb-1 text-lg font-black text-[#32133a]">Add proof once — let every reviewer use it.</h2>
-                                    <p className="mb-3 text-[13px] text-[#6b7280]">These files stay attached to the same venture record.</p>
+                                    <p className="mb-3 text-[13px] text-[#6b7280]">Files stay attached to the same venture record for faculty verification, AI evidence confidence and later CIEL review.</p>
                                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                         {VAULT_DOCS.map((d) => (
                                             <label key={d.type} className={clsx("cursor-pointer rounded-[13px] border-[1.5px] border-dashed border-[#d6c4cf] bg-[#fffafd] p-3 text-center text-[11px] text-[#775d70]", uploading && "pointer-events-none opacity-60")}>
@@ -1365,8 +1440,8 @@ export default function StartupBusinessWorkspace() {
                                     <p className="font-serif text-sm leading-relaxed text-[#4a2940]">{pitch60(snap)}</p>
                                 </div>
                                 <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                                    <div className="rounded-[14px] border border-[#e5e7eb] bg-white p-3.5"><h4 className="mb-1 text-[12.5px] font-black text-[#32133a]">🏛 University / Faculty Lens</h4><p className="m-0 text-[11px] leading-relaxed text-[#6b7280]">Full academic record: project origin, student/team, evidence, stage, business logic, risks, SDG status, completeness, AI potential and verification history.</p></div>
-                                    <div className="rounded-[14px] border border-[#e5e7eb] bg-white p-3.5"><h4 className="mb-1 text-[12.5px] font-black text-[#32133a]">💼 Investor / Partner Lens</h4><p className="m-0 text-[11px] leading-relaxed text-[#6b7280]">Only after student opt-in + review: concise venture card with problem, solution, market, traction, advantage and ask. Contact details remain locked until an introduction is approved.</p></div>
+                                    <div className="rounded-[14px] border border-[#e5e7eb] bg-white p-3.5"><h4 className="mb-1 text-[12.5px] font-black text-[#32133a]">🏛 University / Faculty Lens</h4><p className="m-0 text-[11px] leading-relaxed text-[#6b7280]">Full academic record: project origin, student/team, evidence, stage, business logic, finances, risks, team health, SDG status, completeness, AI potential and verification history.</p></div>
+                                    <div className="rounded-[14px] border border-[#e5e7eb] bg-white p-3.5"><h4 className="mb-1 text-[12.5px] font-black text-[#32133a]">💼 Investor / Partner Lens</h4><p className="m-0 text-[11px] leading-relaxed text-[#6b7280]">Only after student opt-in + review: concise venture card with problem, solution, market, traction, unit economics, advantage and ask. Contact details and full documents remain locked until an introduction is approved.</p></div>
                                 </div>
                             </Card>
                             <Card>
@@ -1409,7 +1484,7 @@ export default function StartupBusinessWorkspace() {
                             <Card>
                                 <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#a63d65]">CIEL Venture Intelligence</div>
                                 <h2 className="mb-1 text-[23px] font-black text-[#32133a]">Potential, evidence & readiness — sustainability remains separate</h2>
-                                <p className="mb-4 text-[13px] text-[#6b7280]">This is a stage-adjusted pre-screen. Final rankings should be reviewed by faculty / university / CIEL PK.</p>
+                                <p className="mb-4 text-[13px] text-[#6b7280]">Illustrative, stage-adjusted pre-screening model for the prototype. Final rankings are reviewed by faculty / university / CIEL PK.</p>
                                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                                     {[
                                         { k: "Venture Potential Score", v: `${score}/100`, bar: score },
@@ -1430,7 +1505,7 @@ export default function StartupBusinessWorkspace() {
                                 <div className="flex flex-wrap gap-1">
                                     {PATHWAY.map((p, i) => <span key={p} className={clsx("rounded-full px-2 py-1 text-[9.5px] font-extrabold", i < pathwayLevel(snap, score) ? "bg-[#f8e8ef] text-[#087657]" : "bg-[#eef1f6] text-[#7a8091]")}>{p}</span>)}
                                 </div>
-                                <p className="mt-2 text-[10.8px] leading-relaxed text-[#6b7280]">“Investor-Ready” is intentionally harder to earn than a high venture-potential score.</p>
+                                <p className="mt-2 text-[10.8px] leading-relaxed text-[#6b7280]">“Investor-Ready” is intentionally harder to earn than a high venture-potential score. A strong plan may be high-potential without yet being ready for VC exposure.</p>
                             </Card>
                             <div className="rounded-[18px] border-2 border-[#cfe6dd] bg-gradient-to-br from-[#effaf6] to-[#f7fffc] p-[18px] text-center">
                                 <h3 className="m-0 text-lg font-black text-[#32133a]">Ready to add this venture to the university repository?</h3>
@@ -1497,11 +1572,13 @@ export default function StartupBusinessWorkspace() {
                         </ul>
                     </Card>
                     <Card>
+                        <div className="mb-2.5 text-[11px] font-black uppercase tracking-[0.12em] text-[#6b7280]">Repository logic</div>
                         <p className="text-[10.8px] leading-relaxed text-[#6b7280]">✅ All ventures: one university repository record<br /><br />👥 Team: linked to the same venture record<br /><br />🔒 Contact details: private by default<br /><br />📎 Evidence: attached once, reused for review<br /><br />🌍 SDG-linked: separate sustainability analytics<br /><br />⭐ High-potential: reviewer shortlist<br /><br />💼 External showcase: student opt-in + verification</p>
                     </Card>
                 </aside>
             </div>
             <p className="mt-3 text-center text-[10.5px] leading-relaxed text-[#8b93a3]">CIEL PK · Venture Studio v13 · Student Builder → University Review → Consented Opportunity Card</p>
+        </div>
         </div>
     );
 }

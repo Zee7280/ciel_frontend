@@ -20,12 +20,14 @@ import {
 export default function FypAiAnalysisPanel({
     entry,
     onUpdate,
+    defaultExpanded = false,
 }: {
     entry: FypEntry;
     /** Bubbles a partial entry patch back up to the parent's list state, same shape as reviewEntry's setEntries merge. */
     onUpdate: (id: string, patch: Partial<FypEntry>) => void;
+    defaultExpanded?: boolean;
 }) {
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(defaultExpanded);
     const [busy, setBusy] = useState<"analyse" | "approve" | "edit" | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [editMode, setEditMode] = useState(false);

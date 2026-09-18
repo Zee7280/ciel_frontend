@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
@@ -16,7 +18,6 @@ import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "
 const BASE = "/dashboard/student/paths/startup-business";
 const WORKSPACE_HREF = `${BASE}?view=workspace`;
 const CREATE_HREF = `${BASE}?view=create`;
-const GUIDE_HREF = `${BASE}?view=guide`;
 const WALL_HREF = `${BASE}?view=wall`;
 const IN_PROGRESS_HREF = `${BASE}?view=in-progress`;
 const UNDER_REVIEW_HREF = `${BASE}?view=under-review`;
@@ -31,12 +32,16 @@ const HUB_VIEW_LABEL: Record<string, string> = {
 };
 
 const LOOP_STEPS = [
-    "Create → fill the sections (auto-saved as a draft in your Startup Workspace; your faculty and university see your progress live).",
-    "Reach a complete record → Submit. Your record locks, a Venture Card is generated and it moves to Ventures Under Review.",
+    "Create → fill the 6 sections (auto-saved as a draft in your Startup Workspace; your faculty and university see your progress live).",
+    "Reach 100% → Submit. Your record locks, a Venture Card (flashcard) is generated and it moves to Ventures Under Review. Separately, CIEL AI prepares an analysis report for your faculty, university and CIEL PK only — it is not shown to you or to investors.",
     "Faculty accepts, requests revision (it comes back to your workspace — fix and resubmit) or rejects (record kept, never published).",
-    'Accepted ventures publish to every Ventures Impact Wall. If you ticked "open to investors", it also goes to the CIEL Investor Hub.',
-    "You receive your faculty score, remarks and analysis. Rankings from faculty / university / CIEL PK appear as badges on your card.",
+    "Accepted ventures publish to every Ventures Impact Wall. Only if you gave investor-track consent does the card also appear in the CIEL Investor Hub — verified investors see a curated card, and any introduction needs CIEL PK screening and your acceptance before contact is shared. You can withdraw consent at any time.",
+    "You receive your faculty score and remarks. Rankings from faculty / university / CIEL PK graders appear as badges on your card.",
 ];
+
+const CONSENT_VERSION = "CIEL-PK Investor Track Consent v1 (Sep 2026)";
+const CONSENT_TEXT =
+    "I authorize my university and CIEL PK to consider this venture for approved external opportunities (mentorship, incubation, partnerships or investment). Only a curated Venture Card is shown to verified investors; my contact details and full documents are never shared without my further permission, and I can withdraw at any time.";
 
 const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Review"] as const;
 
@@ -160,14 +165,138 @@ function sectionPercents(entry: HubVenture) {
 }
 
 function overallPct(entry: HubVenture) {
+    if (typeof entry.completenessPercent === "number") return Math.max(0, Math.min(100, entry.completenessPercent));
     const secs = sectionPercents(entry);
     return Math.round(secs.reduce((sum, n) => sum + n, 0) / secs.length);
 }
 
+function classifyScore(score: number) {
+    if (score >= 85) return "Exceptional";
+    if (score >= 70) return "Strong";
+    if (score >= 55) return "Developing";
+    if (score >= 40) return "Emerging";
+    return "Limited";
+}
+
+function formatStamp(value?: string | null) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value.slice(0, 16);
+    return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function trackLabel(entry: HubVenture) {
+    return isInvestorOpen(entry)
+        ? "Investor track is on — a curated Venture Card can appear in the CIEL Investor Hub after faculty approval. Contact details and full documents stay off that card."
+        : "No consent — investors cannot see this venture. Your repository record and impact-wall cards are unaffected.";
+}
+
+type ActivityRow = { who: string; action: string; at: string };
+
+function deriveActivity(entry: HubVenture, me: string): ActivityRow[] {
+    const faculty = entry.academicSetup?.supervisorName?.trim() || "Faculty";
+    const rows: ActivityRow[] = [];
+    if (entry.createdAt) {
+        rows.push({
+            who: me,
+            action: `Record created — Venture ID ${displayVentureId(entry)} issued and shared with faculty, university & CIEL PK`,
+            at: entry.createdAt,
+        });
+    }
+    if (entry.reviewPipeline?.studentDeclaredAt) {
+        rows.push({
+            who: me,
+            action: "Submitted for faculty review — record locked, venture card generated; CIEL AI Analysis Report queued (faculty, university & CIEL PK only)",
+            at: entry.reviewPipeline.studentDeclaredAt,
+        });
+        if (isInvestorOpen(entry)) {
+            rows.push({
+                who: me,
+                action: `Investor-track consent recorded (${CONSENT_VERSION}) — venture will be listed in the CIEL Investor Hub only after faculty approval`,
+                at: entry.reviewPipeline.studentDeclaredAt,
+            });
+        }
+    }
+    if (isRevision(entry) && entry.updatedAt) {
+        rows.push({ who: faculty, action: "Revision requested — returned to student workspace", at: entry.updatedAt });
+    }
+    if (isRejected(entry) && entry.updatedAt) {
+        rows.push({ who: faculty, action: "Rejected — record preserved, not published", at: entry.updatedAt });
+    }
+    if (isPathEntryApproved(entry) && entry.updatedAt) {
+        rows.push({
+            who: faculty,
+            action:
+                "Approved — published to Student, Faculty, University and CIEL PK impact walls" +
+                (isInvestorOpen(entry) ? " and listed in the CIEL Investor Hub (student consent on file)" : ""),
+            at: entry.updatedAt,
+        });
+    }
+    if (entry.meritRibbon?.at) {
+        rows.push({
+            who: entry.meritRibbon.scope || faculty,
+            action: `Ranking badge published — Rank #${entry.meritRibbon.rank} of ${entry.meritRibbon.of}`,
+            at: entry.meritRibbon.at,
+        });
+    }
+    return rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+
+function ActivityLog({ rows, onOpen }: { rows: ActivityRow[]; onOpen?: () => void }) {
+    if (!rows.length) {
+        return <p className="mt-2 text-[13.5px] text-[#5d6c78]">No activity yet.</p>;
+    }
+    return (
+        <div className="mt-2 border-t border-[#e3e9ee]">
+            {rows.map((row, i) => (
+                <div key={`${row.at}-${i}`} className="grid grid-cols-1 gap-1 border-b border-[#e3e9ee] py-2.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_170px] sm:gap-3">
+                    <span>
+                        <b className="text-[#14212b]">{row.who}</b>
+                    </span>
+                    <span>
+                        {row.action}
+                        {onOpen ? (
+                            <>
+                                {" — "}
+                                <button type="button" onClick={onOpen} className="font-bold text-[#0f8f8a] hover:underline">
+                                    Open card
+                                </button>
+                            </>
+                        ) : null}
+                    </span>
+                    <span className="text-[#5d6c78] sm:text-right">{formatStamp(row.at)}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function downloadVentureCard(entry: HubVenture) {
+    const title = entry.ventureName || "Venture Card";
+    const id = displayVentureId(entry);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${id} · Venture Card</title>
+<style>body{font-family:Georgia,serif;max-width:820px;margin:24px auto;color:#14212b;padding:0 18px}h1{font-size:22px}p{line-height:1.5}small{color:#5d6c78}</style></head>
+<body><p><small>CIEL PK Venture Studio · Venture Card (flashcard) · ${id} · generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} · no AI content</small></p>
+<h1>${title}</h1>
+<p><b>${id}</b> · ${entry.academicSetup?.university || ""} · ${ventureStatusLabel(entry).label}</p>
+<p><b>Problem</b><br>${entry.ideaInfo?.problem || "—"}</p>
+<p><b>Solution</b><br>${entry.solutionInfo?.solution || "—"}</p>
+<p><b>Traction</b><br>${tractionLine(entry) || "—"}</p>
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${id}_Venture_Card.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 function categoryLabel(pct: number) {
-    if (pct >= 100) return "COMPLETE";
-    if (pct <= 25) return "NOT STARTED";
-    return "IN PROCESS";
+    if (pct <= 0) return "NOT STARTED";
+    if (pct <= 25) return "JUST STARTED";
+    if (pct < 100) return "IN PROCESS";
+    return "COMPLETE";
 }
 
 function stageLabel(stage?: string | null) {
@@ -580,10 +709,12 @@ function WorkspaceRow({
     entry,
     onContinue,
     onDetails,
+    onSubmit,
 }: {
     entry: HubVenture;
     onContinue: () => void;
     onDetails: () => void;
+    onSubmit: () => void;
 }) {
     const rev = isRevision(entry);
     const metaRest = [
@@ -620,11 +751,11 @@ function WorkspaceRow({
                 </span>
                 <WorkspaceReminders entry={entry} />
                 <button type="button" onClick={onContinue} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white hover:brightness-105">
-                    {rev ? "Continue Revision" : "Continue Filling"}
+                    {rev ? "✏️ Continue Revision" : "✏️ Continue Filling"}
                 </button>
                 {complete ? (
-                    <button type="button" onClick={onContinue} className="rounded-[10px] bg-[#2e9e5b] px-3 py-1.5 text-[12.5px] font-bold text-white hover:brightness-105">
-                        {rev ? "Resubmit Venture" : "Submit to Faculty"}
+                    <button type="button" onClick={onSubmit} className="rounded-[10px] bg-[#2e9e5b] px-3 py-1.5 text-[12.5px] font-bold text-white hover:brightness-105">
+                        {rev ? "🔁 Resubmit Venture" : "📤 Submit to Faculty"}
                     </button>
                 ) : null}
                 <button type="button" onClick={onDetails} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57] hover:bg-[#e1eaef]">
@@ -733,7 +864,7 @@ function VentureDetailCard({ entry }: { entry: HubVenture }) {
                 </div>
                 <div className="text-right">
                     <StatusChip entry={entry} />
-                    <div className="mt-2 text-[12px]">{isInvestorOpen(entry) ? "🤝 Open to investors" : "🔒 Not seeking investment"}</div>
+                    <div className="mt-2 text-[12px]">{isInvestorOpen(entry) ? `🤝 Investor track (consented${entry.reviewPipeline?.studentDeclaredAt ? ` ${formatDay(entry.reviewPipeline.studentDeclaredAt)}` : ""})` : "🔒 Not on investor track"}</div>
                 </div>
             </div>
             <div className="px-6 py-[18px]">
@@ -754,16 +885,37 @@ function VentureDetailCard({ entry }: { entry: HubVenture }) {
                             </div>
                         ))}
                 </div>
-                <SdgTags entry={entry} />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5">
+                    <SdgTags entry={entry} />
+                    <span className="text-[11.5px] text-[#5d6c78]">Venture Card · student-authored flashcard · no AI scoring on this card</span>
+                </div>
             </div>
         </div>
     );
 }
 
-function RecordView({ entry, onBack, onContinue }: { entry: HubVenture; onBack: () => void; onContinue: () => void }) {
+function RecordView({
+    entry,
+    onBack,
+    onContinue,
+    onConsent,
+    consentBusy,
+}: {
+    entry: HubVenture;
+    onBack: () => void;
+    onContinue: () => void;
+    onConsent: (accept: boolean) => void;
+    consentBusy: boolean;
+}) {
     const ribbon = entry.meritRibbon;
     const note = entry.reviewPipeline?.supervisorNote;
     const decided = isPathEntryApproved(entry) || isRejected(entry) || isRevision(entry);
+    const [consentOpen, setConsentOpen] = useState(false);
+    const [withdrawOpen, setWithdrawOpen] = useState(false);
+    const [ack, setAck] = useState(false);
+    const me = displayName();
+    const logs = deriveActivity(entry, me);
+    const score = ribbon?.total;
     return (
         <div className="mt-[22px] rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
             <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
@@ -776,7 +928,7 @@ function RecordView({ entry, onBack, onContinue }: { entry: HubVenture; onBack: 
                 </div>
                 {isRevision(entry) ? (
                     <button type="button" onClick={onContinue} className="rounded-xl bg-[#f39c12] px-4 py-2.5 text-[13.5px] font-bold text-white">
-                        Continue Revision
+                        ✏️ Continue Revision
                     </button>
                 ) : null}
             </div>
@@ -794,22 +946,24 @@ function RecordView({ entry, onBack, onContinue }: { entry: HubVenture; onBack: 
                 <div className="mt-4 grid grid-cols-1 gap-[18px] md:grid-cols-2">
                     <div className="rounded-[18px] border border-[#e3e9ee] p-5">
                         <div className="flex items-center gap-[18px]">
-                            {isPathEntryApproved(entry) && ribbon?.total != null ? (
+                            {isPathEntryApproved(entry) && score != null ? (
                                 <div className="text-center">
                                     <div
                                         className="relative grid h-[78px] w-[78px] place-items-center rounded-full text-[18px] font-extrabold"
-                                        style={{ background: `conic-gradient(#0f8f8a ${ribbon.total}%, #e6ebef 0)` }}
+                                        style={{ background: `conic-gradient(#0f8f8a ${score}%, #e6ebef 0)` }}
                                     >
                                         <span className="absolute inset-[7px] rounded-full bg-white" />
-                                        <span className="relative">{ribbon.total}</span>
+                                        <span className="relative">{score}</span>
                                     </div>
                                     <div className="mt-1.5 text-[11px] font-bold tracking-wide text-[#5d6c78]">FACULTY SCORE</div>
                                 </div>
                             ) : null}
                             <div>
-                                <b>
-                                    Faculty decision — {ventureStatusLabel(entry).label}
-                                </b>
+                                <b>Faculty decision — {ventureStatusLabel(entry).label}</b>
+                                <p className="mt-1 mb-0 text-[13px] text-[#5d6c78]">
+                                    ({formatDay(entry.updatedAt) || "—"}
+                                    {entry.academicSetup?.supervisorName ? `, ${entry.academicSetup.supervisorName}` : ""})
+                                </p>
                                 <p className="mt-1.5 mb-0 text-sm leading-relaxed">{note || (isPathEntryApproved(entry) ? "Approved for the impact wall." : "See faculty note on this record.")}</p>
                             </div>
                         </div>
@@ -822,20 +976,131 @@ function RecordView({ entry, onBack, onContinue }: { entry: HubVenture; onBack: 
             ) : null}
             {isPathEntryApproved(entry) ? (
                 <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
-                    <b>Analysis & recognition</b>
+                    <b>Recognition</b>
                     <p className="mt-1.5 mb-2 text-[13.5px] leading-relaxed">
-                        {ribbon?.total != null ? `${ribbon.total}/100 faculty score.` : "Approved venture."}{" "}
-                        {ribbon ? `Ranked #${ribbon.rank} of ${ribbon.of}${ribbon.badgeLevel ? ` · ${ribbon.badgeLevel}` : ""}.` : "Rankings appear here after faculty / university / CIEL PK grading."}
+                        {score != null ? `${classifyScore(score)} venture — faculty score ${score}/100. ` : "Approved venture. "}
+                        Ranking badges from faculty, university and CIEL PK graders appear below when published.
                     </p>
-                    <RankBadges entry={entry} />
+                    {ribbon ? <RankBadges entry={entry} /> : <p className="mb-0 text-[14.5px] text-[#5d6c78]">No ranking badges yet.</p>}
+                </div>
+            ) : null}
+            {entry.status !== "draft" ? (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => downloadVentureCard(entry)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
+                        ⬇ Download my Venture Card (flashcard file)
+                    </button>
+                </div>
+            ) : null}
+            {entry.status !== "draft" && !isRejected(entry) ? (
+                <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
+                    <b>🤝 Investor track & consent</b>
+                    <p className="mt-1.5 mb-2 text-[13.5px] leading-relaxed">{trackLabel(entry)}</p>
                     {isInvestorOpen(entry) ? (
-                        <div className="mt-3 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px]">
-                            <b>Investor reach-outs (via CIEL Investor Hub)</b>
-                            <p className="mt-1 mb-0 text-[#5d6c78]">This venture is opted in. Interest from investors will show here when the hub records it.</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#e6f6ec] px-2.5 py-1 text-[11.5px] font-extrabold uppercase tracking-wide text-[#1c8a52]">
+                                Consent on file{entry.reviewPipeline?.studentDeclaredAt ? ` · ${formatDay(entry.reviewPipeline.studentDeclaredAt)}` : ""}
+                            </span>
+                            <span className="text-[12.5px] text-[#5d6c78]">{CONSENT_VERSION}</span>
+                            <button type="button" disabled={consentBusy} onClick={() => setWithdrawOpen(true)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
+                                ✖ Withdraw from investor track
+                            </button>
                         </div>
                     ) : (
-                        <p className="mt-2 mb-0 text-[14.5px] text-[#5d6c78]">Not opted in to investors — this venture is on the impact walls only.</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#fff3e0] px-2.5 py-1 text-[11.5px] font-extrabold uppercase tracking-wide text-[#c65b00]">No consent — investors cannot see this venture</span>
+                            <button type="button" disabled={consentBusy} onClick={() => { setAck(false); setConsentOpen(true); }} className="rounded-[10px] bg-[#2e9e5b] px-3 py-1.5 text-[12.5px] font-bold text-white">
+                                🤝 Open the door to investors
+                            </button>
+                        </div>
                     )}
+                    {isInvestorOpen(entry) ? (
+                        <div className="mt-3 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px]">
+                            <b>Investor activity (via CIEL Investor Hub)</b>
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                                {[
+                                    ["0", "Card views"],
+                                    ["0", "Interest received"],
+                                    ["0", "Introduction requests"],
+                                ].map(([n, l]) => (
+                                    <div key={l} className="rounded-xl bg-white/70 px-3 py-2 text-center">
+                                        <b className="block text-[18px] text-[#14212b]">{n}</b>
+                                        <small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{l}</small>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="mt-2 mb-0 text-[#5d6c78]">Verified investors see a curated card. Introductions need CIEL PK screening and your acceptance before any contact is shared.</p>
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+            {entry.status !== "draft" ? (
+                <div className="mt-4 rounded-[14px] border border-[#b7d8f5] bg-[#e5f1fb] px-4 py-3 text-[13.5px] leading-relaxed">
+                    🔒 A separate CIEL AI Analysis Report on this submission is shared with your faculty, your university and CIEL PK only. It is never shown to you or to investors; your faculty&apos;s decision, score and remarks are what you see here.
+                </div>
+            ) : null}
+            <div className="mt-4 rounded-[18px] border border-[#e3e9ee] p-5">
+                <b>Activity log</b>
+                <ActivityLog rows={logs} />
+            </div>
+            {consentOpen ? (
+                <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
+                    <div className="max-h-[92vh] w-full max-w-[760px] overflow-auto rounded-[22px] bg-white p-7">
+                        <h3 className="m-0 text-[22px] font-bold">🤝 Investor track — your consent</h3>
+                        <p className="mt-1 text-[14.5px] text-[#5d6c78]">
+                            {entry.ventureName} · {displayVentureId(entry)}
+                        </p>
+                        <div className="mt-2.5 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px] leading-relaxed">{CONSENT_TEXT}</div>
+                        <label className="mt-3 flex items-start gap-2 text-[13.5px]">
+                            <input type="checkbox" className="mt-1" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+                            I have read the statement above and give this consent ({CONSENT_VERSION}).
+                        </label>
+                        <div className="mt-4 flex justify-end gap-2.5">
+                            <button type="button" onClick={() => setConsentOpen(false)} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={consentBusy}
+                                onClick={() => {
+                                    if (!ack) {
+                                        toast.warning("Tick the consent statement first.");
+                                        return;
+                                    }
+                                    onConsent(true);
+                                    setConsentOpen(false);
+                                }}
+                                className="rounded-xl bg-[#2e9e5b] px-4 py-2.5 text-[13.5px] font-bold text-white"
+                            >
+                                Give consent
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            {withdrawOpen ? (
+                <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
+                    <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">
+                        <h3 className="m-0 text-[22px] font-bold">✖ Withdraw from the investor track?</h3>
+                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            {entry.ventureName} will be removed from the CIEL Investor Hub immediately. Your repository record and impact-wall cards are unaffected. You can opt in again later.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2.5">
+                            <button type="button" onClick={() => setWithdrawOpen(false)} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
+                                Keep consent
+                            </button>
+                            <button
+                                type="button"
+                                disabled={consentBusy}
+                                onClick={() => {
+                                    onConsent(false);
+                                    setWithdrawOpen(false);
+                                }}
+                                className="rounded-xl bg-[#d64545] px-4 py-2.5 text-[13.5px] font-bold text-white"
+                            >
+                                Withdraw
+                            </button>
+                        </div>
+                    </div>
                 </div>
             ) : null}
         </div>
@@ -852,6 +1117,8 @@ export default function StartupBusinessHub({
     const [entry, setEntry] = useState<HubVenture | null>(null);
     const [name, setName] = useState("there");
     const [filters, setFilters] = useState({ status: "", stage: "", sector: "", sdg: "", sort: "updated", q: "" });
+    const [consentBusy, setConsentBusy] = useState(false);
+    const [submitFor, setSubmitFor] = useState<HubVenture | null>(null);
 
     useEffect(() => {
         setName(firstName());
@@ -874,17 +1141,8 @@ export default function StartupBusinessHub({
     const rejected = all.filter(isRejected);
     const inProgress = all.filter((e) => (e.status !== "submitted" || isRevision(e)) && !isPathEntryApproved(e) && !isPathEntryWaiting(e) && !isRejected(e));
     const investorOpen = approved.some(isInvestorOpen);
-
     const workspaceList = applyFilters(inProgress, filters, "workspace");
     const wallList = applyFilters(approved, filters, "wall");
-
-    const workspaceBadge = [
-        `${inProgress.length} in progress`,
-        revision.length ? `${revision.length} revision` : null,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-    const wallBadge = [`${approved.length} approved`, investorOpen ? "1 investor interest" : null].filter(Boolean).join(" · ");
 
     if (loading) return <WorkspaceSkeleton />;
 
@@ -895,6 +1153,34 @@ export default function StartupBusinessHub({
         else if (entry && isPathEntryWaiting(entry)) router.push(UNDER_REVIEW_HREF);
         else router.push(IN_PROGRESS_HREF);
     };
+    const patchConsent = async (accept: boolean) => {
+        if (!entry) return;
+        setConsentBusy(true);
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/startup-business", {
+                method: "PATCH",
+                body: JSON.stringify({
+                    publishSettings: {
+                        ...(entry.publishSettings || {}),
+                        acceptIntros: accept,
+                        audience: accept ? "investors" : "university",
+                    },
+                }),
+            });
+            if (response?.ok) {
+                const data = await response.json();
+                if (data?.data) setEntry(data.data as HubVenture);
+                toast.success(accept ? "Consent recorded — investors will see your venture once faculty approve it" : "Withdrawn — removed from the Investor Hub");
+            } else {
+                toast.error("Could not update investor-track consent");
+            }
+        } catch {
+            toast.error("Could not update investor-track consent");
+        } finally {
+            setConsentBusy(false);
+        }
+    };
+    const feedRows = entry && hasRecord(entry) ? deriveActivity(entry, displayName()) : [];
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
@@ -903,15 +1189,16 @@ export default function StartupBusinessHub({
                 pathLabel="Startup / Venture"
                 view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
             />
-            {view === "home" ? (
+            {view === "home" || view === "in-progress" || view === "under-review" || view === "wall" || view === "record" ? (
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
                     title={namedTimeGreeting(name === "there" ? "" : name, "🚀")}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
+                    badge="🎓 STUDENT"
                     stats={[
-                        { value: String(approved.length), label: "APPROVED" },
-                        { value: String(underReview.length), label: "UNDER REVIEW" },
-                        { value: String(inProgress.length), label: "IN PROGRESS" },
+                        { value: String(approved.length), label: "APPROVED", href: WALL_HREF },
+                        { value: String(underReview.length), label: "UNDER REVIEW", href: UNDER_REVIEW_HREF },
+                        { value: String(inProgress.length), label: "IN PROGRESS", href: IN_PROGRESS_HREF },
                     ]}
                 />
             ) : null}
@@ -959,11 +1246,15 @@ export default function StartupBusinessHub({
                     <div className="flex flex-col gap-3.5">
                         {workspaceList.length ? (
                             workspaceList.map((row) => (
-                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={openForm} onDetails={openRecord} />
+                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={openForm} onDetails={openRecord} onSubmit={() => setSubmitFor(row)} />
                             ))
                         ) : (
                             <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
-                                No drafts — create a startup record to begin.
+                                No drafts —{" "}
+                                <Link href={CREATE_HREF} className="font-bold text-[#0f8f8a] hover:underline">
+                                    create a startup record
+                                </Link>{" "}
+                                to begin.
                             </div>
                         )}
                     </div>
@@ -1046,7 +1337,7 @@ export default function StartupBusinessHub({
             )}
 
             {view === "record" && entry && hasRecord(entry) ? (
-                <RecordView entry={entry} onBack={recordBack} onContinue={openForm} />
+                <RecordView entry={entry} onBack={recordBack} onContinue={openForm} onConsent={(accept) => void patchConsent(accept)} consentBusy={consentBusy} />
             ) : null}
             {view === "record" && !(entry && hasRecord(entry)) ? (
                 <div className="mt-[22px] rounded-[22px] bg-white p-8 text-center text-[#5d6c78] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
@@ -1063,9 +1354,9 @@ export default function StartupBusinessHub({
                             emoji="🚀"
                             ghost="🚀"
                             title="Create Startup Record"
-                            subtitle="Open the CIEL PK Venture Studio form (v11). Six steps — each writes its own AI summary; your first saved fields issue a Venture ID and auto-save to your workspace. No pre-approval needed."
+                            subtitle="Open the CIEL PK Venture Studio form (v13). Nine steps — each drafts its own summary for you to accept; your first saved fields issue a Venture ID and auto-save one master record shared with your faculty, university and CIEL PK."
                             badge="START"
-                            background={MOCKUP_GRADIENTS.orange}
+                            background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
                             href={IN_PROGRESS_HREF}
@@ -1074,7 +1365,7 @@ export default function StartupBusinessHub({
                             title="Startup Workspace"
                             subtitle="Drafts you are still filling in and ventures returned for revision — completion bar per section, status tracker, and Email / WhatsApp reminders for your team or your faculty."
                             badge={`${inProgress.length} IN PROGRESS${revision.length ? ` · ${revision.length} REVISION` : ""}`}
-                            background={MOCKUP_GRADIENTS.teal}
+                            background={MOCKUP_GRADIENTS.orange}
                         />
                         <MockupActionCard
                             href={UNDER_REVIEW_HREF}
@@ -1090,8 +1381,8 @@ export default function StartupBusinessHub({
                             emoji="🏅"
                             ghost="🏅"
                             title="My Ventures Impact Wall"
-                            subtitle="Your approved ventures with faculty score, remarks and analysis. Approved cards also appear on your University's Ventures Impact Wall, CIEL PK, and — if you opted in — the CIEL Investor Hub."
-                            badge={`${approved.length} APPROVED${investorOpen ? " · 1 INVESTOR INTEREST" : ""}`}
+                            subtitle="Your approved ventures with faculty score and remarks. Approved cards also appear on your University's Ventures Impact Wall and CIEL PK — and in the CIEL Investor Hub only while your investor-track consent is on."
+                            badge={`${approved.length} APPROVED${investorOpen ? " · INVESTOR TRACK" : ""}`}
                             background={MOCKUP_GRADIENTS.green}
                         />
                     </div>
@@ -1106,8 +1397,43 @@ export default function StartupBusinessHub({
                             ))}
                         </ol>
                     </div>
+                    <div className="mt-[18px] rounded-[22px] border border-[#e3e9ee] bg-white p-[22px_26px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <b className="text-[#14212b]">🔔 What happened on my ventures</b>
+                            <span className="text-[13px] text-[#5d6c78]">auto-updates from every dashboard</span>
+                        </div>
+                        <ActivityLog rows={feedRows} onOpen={entry && hasRecord(entry) ? openRecord : undefined} />
+                    </div>
                 </>
             )}
+            {submitFor ? (
+                <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
+                    <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">
+                        <h3 className="m-0 text-[22px] font-bold">📤 Submit “{submitFor.ventureName || "Untitled venture"}” to faculty?</h3>
+                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            Your record will lock, a Venture Card will be generated and {submitFor.academicSetup?.supervisorName || "your faculty"} will be notified.{" "}
+                            {isInvestorOpen(submitFor)
+                                ? "Investor-track consent is on file — if approved, a curated Venture Card will also be listed in the CIEL Investor Hub (you can withdraw any time)."
+                                : "No investor-track consent — approval publishes to impact walls only."}
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2.5">
+                            <button type="button" onClick={() => setSubmitFor(null)} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSubmitFor(null);
+                                    router.push(WORKSPACE_HREF);
+                                }}
+                                className="rounded-xl bg-[#2e9e5b] px-4 py-2.5 text-[13.5px] font-bold text-white"
+                            >
+                                Submit Venture
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

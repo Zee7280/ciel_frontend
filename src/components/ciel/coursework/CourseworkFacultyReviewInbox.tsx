@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CourseworkFacultyAiAnalyser from "@/components/ciel/coursework/CourseworkFacultyAiAnalyser";
 import { type MeritEntry } from "@/components/ciel/MeritModelPanel";
-import { courseworkStatusLabel, pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
+import { courseworkStatusLabel, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
 import { normalizeUrlList } from "@/utils/courseProjectTypes";
 
 const INBOX_CHIP: Record<ReturnType<typeof courseworkStatusLabel>["tone"], string> = {
@@ -18,6 +18,7 @@ export default function CourseworkFacultyReviewInbox({
     entries,
     reviewingId,
     onReview,
+    emptyMessage = "Nothing here.",
 }: {
     entries: MeritEntry[];
     reviewingId: string | null;
@@ -27,16 +28,23 @@ export default function CourseworkFacultyReviewInbox({
         note?: string,
         moderation?: { levels: Record<string, number>; notes?: Record<string, string>; facultyScore: number; band?: string; lockHash?: string },
     ) => void;
+    emptyMessage?: string;
 }) {
-    const queue = useMemo(() => entries.filter(pendingFacultyReview), [entries]);
+    const queue = useMemo(() => entries, [entries]);
+    const queueKey = queue.map((q) => q.id).join(",");
     const [sel, setSel] = useState(0);
+
+    useEffect(() => {
+        setSel(0);
+    }, [queueKey]);
+
     const current = queue[Math.min(sel, Math.max(queue.length - 1, 0))];
 
     if (queue.length === 0) {
         return (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center">
                 <p className="text-base font-bold text-slate-800">Inbox is clear</p>
-                <p className="mt-1.5 text-sm text-slate-500">No submitted cards waiting for your approval.</p>
+                <p className="mt-1.5 text-sm text-slate-500">{emptyMessage}</p>
             </div>
         );
     }
@@ -79,6 +87,11 @@ export default function CourseworkFacultyReviewInbox({
                                     {q.student?.name || q.studentInfo?.studentName || "Student"} · {fileCount} file{fileCount === 1 ? "" : "s"}
                                     {qIssues ? ` · ${qIssues} AI flag${qIssues === 1 ? "" : "s"}` : ""}
                                 </span>
+                                {st.tone === "under_review" ? (
+                                    <span className="mt-1.5 inline-flex rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[8px] font-extrabold text-[#0e7d74]">
+                                        🧑‍🏫 Moderate & decide
+                                    </span>
+                                ) : null}
                             </button>
                         );
                     })}

@@ -8,6 +8,9 @@ import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupPanel, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import FacultyFypFlashcardModal from "@/components/ciel/FacultyFypFlashcard";
+import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
+import type { FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { fypRankContext, fypRankRibbons, type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
@@ -157,7 +160,7 @@ function sdgNumbers(entry: FypEntry) {
 function actionWithLabel(entry: FypEntry) {
     if (isPathEntryApproved(entry)) return "None — Approved";
     if (isRejected(entry)) return "None — Closed";
-    if (isPendingReview(entry)) return "Faculty";
+    if (isPendingReview(entry)) return "Supervisor";
     return "Student";
 }
 
@@ -514,7 +517,7 @@ function ProgressCard({
     );
 }
 
-function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) {
+function ReviewCard({ entry, onOpenFlashcard, onOpenForm }: { entry: FypEntry; onOpenFlashcard: () => void; onOpenForm: () => void }) {
     const st = fypStatusLabel(entry);
     const pending = isPendingReview(entry);
     const names = teamNames(entry);
@@ -565,7 +568,7 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
                         ⚡ <b className="font-black uppercase tracking-[0.04em]">Action with: {actionWithLabel(entry)}</b> · {nextAction(entry)}
                     </div>
                     {pending ? (
-                        <p className="mt-1.5 text-[10px] text-[#70808a]">🔒 Your record is locked while under review. The FYP AI Analyser has already run automatically; your supervisor is checking and may adjust the score and comments — both are released to you on approval.</p>
+                        <p className="mt-1.5 text-[10px] text-[#70808a]">🔒 Your record is locked while under review. Your CIEL PK Detailed Review and score are with your supervisor for verification — released to you on approval.</p>
                     ) : null}
                 </div>
                 {pending ? (
@@ -588,10 +591,10 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
                         “{entry.supervisorApprovalNote?.trim() || "Please revise the sections named by your supervisor, then resubmit."}”
                         {entry.supervisorApprovalAt ? ` — ${faculty}, ${formatDay(entry.supervisorApprovalAt)}` : ""}
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
+                            <button type="button" onClick={onOpenForm} className="inline-flex items-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
                                 ✏️ CONTINUE REVISION
                             </button>
-                            <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white">
+                            <button type="button" onClick={onOpenForm} className="inline-flex items-center gap-1 rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white">
                                 ↻ RESUBMIT FYP
                             </button>
                         </div>
@@ -621,7 +624,7 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
                         {pending ? `Supervisor — ${faculty}` : isRevision(entry) ? "Student — revise & resubmit" : `Closed — ${st.label}`}
                     </small>
                 </div>
-                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
+                <button type="button" onClick={onOpenFlashcard} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
                     🃏 VIEW FYP FLASHCARD
                 </button>
                 {files.length ? (
@@ -638,7 +641,15 @@ function ReviewCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) 
     );
 }
 
-function ApprovedCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }) {
+function ApprovedCard({
+    entry,
+    onOpenFlashcard,
+    onOpenReview,
+}: {
+    entry: FypEntry;
+    onOpenFlashcard: () => void;
+    onOpenReview?: () => void;
+}) {
     const names = teamNames(entry);
     const faculty = entry.projectInfo?.supervisorName?.trim() || "supervisor";
     const uni = entry.projectInfo?.university?.trim() || "University";
@@ -686,9 +697,14 @@ function ApprovedCard({ entry, onOpen }: { entry: FypEntry; onOpen: () => void }
                     <b className="block text-[11px] text-[#16313d]">Published to</b>
                     <small className="mt-[3px] block text-[10px] leading-relaxed text-[#70808a]">🧑‍🎓 Student · 🧑‍🏫 Supervisor · 🏫 University · 🌐 CIEL PK</small>
                 </div>
-                <button type="button" onClick={onOpen} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
-                    🃏 OPEN FLASHCARD
+                <button type="button" onClick={onOpenFlashcard} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
+                    🃏 FLASHCARD
                 </button>
+                {onOpenReview && entry.aiAnalysis ? (
+                    <button type="button" onClick={onOpenReview} className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#6d3df5] px-3.5 py-2 text-[10px] font-black text-white">
+                        📋 DETAILED REVIEW
+                    </button>
+                ) : null}
                 {latestFile?.fileUrl ? (
                     <a
                         href={latestFile.fileUrl}
@@ -753,6 +769,8 @@ export default function FypThesisHub({
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<ReviewTab>("all");
     const [dashHero, setDashHero] = useState<DashHero | null>(null);
+    const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
+    const [openReviewId, setOpenReviewId] = useState<string | null>(null);
     const autoOpenRef = useRef(false);
 
     const load = useCallback(async () => {
@@ -836,6 +854,11 @@ export default function FypThesisHub({
         router.push(`${BASE}/${id}`);
     };
 
+    const asMerit = (entry: FypEntry) => entry as FypMeritEntry;
+    const updateEntry = (id: string, patch: Partial<FypMeritEntry>) => {
+        setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+    };
+
     if (loading) return <WorkspaceSkeleton />;
 
     const drafts = entries.filter((e) => e.status !== "submitted");
@@ -846,6 +869,8 @@ export default function FypThesisHub({
     const revision = underReview.filter(isRevision);
     const rejected = underReview.filter(isRejected);
     const visibleReview = reviewTab === "all" ? underReview : reviewTab === "pending" ? pending : reviewTab === "revision" ? revision : rejected;
+    const openFlashcard = entries.find((e) => e.id === openFlashcardId) || null;
+    const openReview = entries.find((e) => e.id === openReviewId) || null;
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
@@ -906,19 +931,24 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="My Final Year Project Impact"
-                        subtitle="Approved Final Year Projects only. The same score, comments and badges are on your Impact Portfolio, your University's FYP Impact Wall and CIEL PK."
+                        subtitle="Approved Final Year Projects only. The same flashcard, Detailed Review and badges are on your Impact Portfolio, your University's FYP Impact Wall and CIEL PK."
                         action={<LoopBack />}
                     />
                     <MockupPanel
                         title="My Final Year Project Impact"
-                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · Each shows the score allotted by your supervisor (with comments per section), plus every AI Analyser badge — locked faculty / university badges and the CIEL PK live rank (▲ green up · ▼ red down).`}
+                        subtitle={`${approved.length} approved record${approved.length === 1 ? "" : "s"} · Each has a flashcard and a separate Detailed Review — your CIEL PK score, strengths, limitations and how to improve, section by section — plus every ranking badge: locked faculty / university badges and the CIEL PK live rank (▲ green up · ▼ red down).`}
                     >
                     {approved.length === 0 ? (
                             <p className="px-1 py-8 text-center text-[12px] text-[#70808a]">No approved Final Year Project yet.</p>
                         ) : (
                             <div className="grid gap-3">
                             {approved.map((entry) => (
-                                    <ApprovedCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />
+                                    <ApprovedCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                        onOpenReview={entry.aiAnalysis ? () => setOpenReviewId(entry.id || null) : undefined}
+                                    />
                             ))}
                         </div>
                     )}
@@ -970,7 +1000,7 @@ export default function FypThesisHub({
                 <div className="mt-1">
                     <MockupSectionHead
                         title="FYP Under Review"
-                        subtitle="Your submitted flashcard is with your supervisor. The FYP AI Analyser ran automatically when you submitted; your supervisor may adjust it. On approval you receive the score allotted by faculty and the comments explaining it — by Email and WhatsApp."
+                        subtitle="Your submitted flashcard is with your supervisor. On approval you receive your CIEL PK score and a Detailed Review explaining it, section by section — by Email and WhatsApp."
                         action={<LoopBack />}
                     />
                     <MockupPanel title="FYP Under Review" subtitle="Your supervisor owns the next action while a record is pending. Use the buttons to send a polite reminder.">
@@ -988,7 +1018,14 @@ export default function FypThesisHub({
                             {visibleReview.length === 0 ? (
                                 <p className="px-1 py-[30px] text-center text-[12px] text-[#70808a]">Nothing under review.</p>
                             ) : (
-                                visibleReview.map((entry) => <ReviewCard key={entry.id} entry={entry} onOpen={() => openRecord(entry.id)} />)
+                                visibleReview.map((entry) => (
+                                    <ReviewCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                        onOpenForm={() => openRecord(entry.id)}
+                                    />
+                                ))
                                     )}
                                 </div>
                     </MockupPanel>
@@ -1025,7 +1062,7 @@ export default function FypThesisHub({
                             emoji="📤"
                             ghost="📤"
                             title="FYP Under Review"
-                            subtitle="Submitted flashcards with your supervisor. The AI Analyser has already run automatically; the score and comments are released to you on approval."
+                            subtitle="Submitted flashcards with your supervisor. Your CIEL PK Detailed Review and score are released to you on approval."
                             badge={`${underReviewBadge} UNDER REVIEW`}
                             background={MOCKUP_GRADIENTS.blue}
                         />
@@ -1034,7 +1071,7 @@ export default function FypThesisHub({
                             emoji="🏅"
                             ghost="🏅"
                             title="My Final Year Project Impact"
-                            subtitle="Your approved Final Year Projects with the score allotted by your supervisor, section-by-section comments, and every AI Analyser badge — faculty (locked), university (locked) and the CIEL PK live rank that moves like a stock ▲▼."
+                            subtitle="Your approved Final Year Projects — each with its flashcard, its CIEL PK Detailed Review (score allotted by your supervisor, section-by-section strengths, limitations and how to improve) and every ranking badge: faculty (locked), university (locked) and the CIEL PK live rank that moves like a stock ▲▼."
                             badge={`${approved.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
                         />
@@ -1047,6 +1084,33 @@ export default function FypThesisHub({
                     </p>
                 </>
             )}
+
+            {openFlashcard ? (
+                <FacultyFypFlashcardModal
+                    entry={asMerit(openFlashcard)}
+                    onClose={() => setOpenFlashcardId(null)}
+                    onUpdate={updateEntry}
+                    onOpenReview={
+                        isPathEntryApproved(openFlashcard) && openFlashcard.aiAnalysis && openFlashcard.id
+                            ? () => {
+                                setOpenFlashcardId(null);
+                                setOpenReviewId(openFlashcard.id || null);
+                            }
+                            : undefined
+                    }
+                />
+            ) : null}
+            {openReview ? (
+                <FacultyFypDetailedReview
+                    entry={asMerit(openReview)}
+                    onClose={() => setOpenReviewId(null)}
+                    onUpdate={updateEntry}
+                    onOpenFlashcard={() => {
+                        setOpenReviewId(null);
+                        setOpenFlashcardId(openReview.id || null);
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

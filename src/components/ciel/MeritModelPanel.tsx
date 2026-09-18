@@ -65,6 +65,9 @@ export function entryFormat(e: MeritEntry): string {
     if (format) return stripEmoji(format).split(" (")[0];
     return e.studentInfo?.courseworkTypes?.[0] || e.studentInfo?.courseworkType || "Coursework";
 }
+function entryCourse(e: MeritEntry): string {
+    return e.course?.trim() || "Unspecified";
+}
 function entryYear(e: MeritEntry): string {
     const d = e.updatedAt || e.createdAt;
     return d ? String(new Date(d).getFullYear()) : "";
@@ -125,6 +128,7 @@ export default function MeritModelPanel({
     const [faculty, setFaculty] = useState("all");
     const [university, setUniversity] = useState("all");
     const [format, setFormat] = useState("all");
+    const [course, setCourse] = useState("all");
     const [year, setYear] = useState("all");
     const [dfrom, setDfrom] = useState("");
     const [dto, setDto] = useState("");
@@ -136,6 +140,7 @@ export default function MeritModelPanel({
     const faculties = useMemo(() => Array.from(new Set(approved.map(entryFaculty))).sort(), [approved]);
     const universities = useMemo(() => Array.from(new Set(approved.map(entryUniversity))).sort(), [approved]);
     const formats = useMemo(() => Array.from(new Set(approved.map(entryFormat))).sort(), [approved]);
+    const courses = useMemo(() => Array.from(new Set(approved.map(entryCourse))).sort(), [approved]);
     const years = useMemo(() => Array.from(new Set(approved.map(entryYear).filter(Boolean))).sort().reverse(), [approved]);
     const semesters = useMemo(() => Array.from(new Set(approved.map(entrySemesterNum).filter(Boolean))).sort((a, b) => a - b), [approved]);
     const from = semFrom === "" ? (semesters[0] ?? 0) : semFrom;
@@ -147,6 +152,7 @@ export default function MeritModelPanel({
             if (showFacultyFilter && faculty !== "all" && entryFaculty(e) !== faculty) return false;
             if (showUniversityFilter && university !== "all" && entryUniversity(e) !== university) return false;
             if (format !== "all" && entryFormat(e) !== format) return false;
+            if (course !== "all" && entryCourse(e) !== course) return false;
             if (year !== "all" && entryYear(e) !== year) return false;
             const m = entryMonth(e);
             if (dfrom && m && m < dfrom) return false;
@@ -157,7 +163,7 @@ export default function MeritModelPanel({
             }
             return true;
         });
-    }, [approved, showDepartmentFilter, department, showFacultyFilter, faculty, showUniversityFilter, university, format, year, dfrom, dto, semesters, from, to]);
+    }, [approved, showDepartmentFilter, department, showFacultyFilter, faculty, showUniversityFilter, university, format, course, year, dfrom, dto, semesters, from, to]);
 
     /** A published "✓ SENT" badge must describe exactly what's on screen — if a filter changes after
      * publishing, the pool/ranking recompute live and the old top 3 may no longer match, so the
@@ -166,13 +172,14 @@ export default function MeritModelPanel({
         setNotifiedIds([]);
         setNotifyState("idle");
         setNotifyErrorMessage(null);
-    }, [department, faculty, university, format, year, dfrom, dto, semFrom, semTo]);
+    }, [department, faculty, university, format, course, year, dfrom, dto, semFrom, semTo]);
 
     const clearFilters = () => {
         setDepartment("all");
         setFaculty("all");
         setUniversity("all");
         setFormat("all");
+        setCourse("all");
         setYear("all");
         setDfrom("");
         setDto("");
@@ -271,6 +278,7 @@ export default function MeritModelPanel({
         showDepartmentFilter ? "DEPARTMENT" : null,
         showFacultyFilter ? "FACULTY" : null,
         "FORMAT",
+        courses.length > 1 ? "COURSE" : null,
         semesters.length > 1 ? "SEMESTER" : null,
         "YEAR",
         "DATE RANGE",
@@ -382,6 +390,14 @@ export default function MeritModelPanel({
                             <option key={f} value={f}>Format: {f}</option>
                         ))}
                     </select>
+                    {courses.length > 1 && (
+                        <select value={course} onChange={(e) => setCourse(e.target.value)} className={selectClass}>
+                            <option value="all">Course: All</option>
+                            {courses.map((c) => (
+                                <option key={c} value={c}>Course: {c}</option>
+                            ))}
+                        </select>
+                    )}
                     {semesters.length > 1 && (
                         <>
                             <select value={from} onChange={(e) => setSemFrom(Number(e.target.value))} className={selectClass}>

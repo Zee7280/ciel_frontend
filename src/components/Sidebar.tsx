@@ -546,10 +546,15 @@ export default function Sidebar() {
         const hrefTab = hrefParams?.get("tab");
         const hrefMode = hrefParams?.get("mode");
         const hrefArea = hrefParams?.get("area");
+        const hrefView = hrefParams?.get("view");
         if (hrefArea) {
             return pathname === hrefPath && searchParams.get("area") === hrefArea;
         }
+        if (hrefView) {
+            return pathname === hrefPath && (!hrefTab || searchParams.get("tab") === hrefTab) && searchParams.get("view") === hrefView;
+        }
         if (hrefTab) {
+            if (hrefTab === "fyp-thesis" && searchParams.get("view") === "faculty-work") return false;
             return pathname === hrefPath && searchParams.get("tab") === hrefTab;
         }
         if (hrefMode) {
@@ -586,6 +591,9 @@ export default function Sidebar() {
     const mobileMenuItems = [
         ...rolePaths.map((p) => ({ label: p.label, href: p.href, icon: BookOpen })),
         ...(impactHref ? [{ label: impactLabel, href: impactHref, icon: FileBarChart }] : []),
+        ...(isAdmin
+            ? [{ label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: BookOpen }]
+            : []),
         ...workspaceLinks,
         ...moreLinksRole,
         ...footerLinks,
@@ -751,6 +759,15 @@ export default function Sidebar() {
                                             collapsed={collapsed}
                                             impact
                                         />
+                                        {isAdmin ? (
+                                            <NavRow
+                                                href="/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work"
+                                                label="Faculty Work · All Universities"
+                                                emoji="🧑‍🏫"
+                                                active={isNavActive("/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work")}
+                                                collapsed={collapsed}
+                                            />
+                                        ) : null}
                                         {isUniversityPartnerOrg ? (
                                             <NavRow
                                                 href="/dashboard/partner/university-analytics"

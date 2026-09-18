@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
@@ -8,9 +9,16 @@ import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
-import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
+import { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
+import FypRankingStudio from "@/components/ciel/FypRankingStudio";
+import FacultyFypFlashcardModal, {
+    FacultyFypProgressCard,
+    FacultyFypApprovedCard,
+    UniversityFypReviewCard,
+    AdminFypFacultyWorkPanel,
+} from "@/components/ciel/FacultyFypFlashcard";
+import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import ThesisCard from "@/components/ciel/ThesisCard";
 import Tabs from "@/components/ciel/Tabs";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
 import { CourseworkCrumb, HubBackButton, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -176,7 +184,7 @@ function memberStatusLabel(member: { email?: string; inviteStatus?: "pending" | 
 
 const ADMIN_PATH = "/dashboard/admin/path-submissions";
 const COURSE_VIEWS = ["home", "progress", "review", "approved", "rank", "stats", "submissions", "hec"] as const;
-const FYP_HUB_VIEWS = ["home", "progress", "review", "approved", "rank"] as const;
+const FYP_HUB_VIEWS = ["home", "progress", "review", "approved", "rank", "faculty-work"] as const;
 type CourseView = (typeof COURSE_VIEWS)[number];
 type FypHubView = (typeof FYP_HUB_VIEWS)[number];
 const COURSE_VIEW_CRUMB: Record<Exclude<CourseView, "home">, string> = {
@@ -193,15 +201,17 @@ const FYP_VIEW_CRUMB: Record<Exclude<FypHubView, "home">, string> = {
     review: "FYP Under Review",
     approved: "Approved FYP + AI Ranking",
     rank: "Approved FYP + AI Ranking",
+    "faculty-work": "Faculty Work — all universities",
 };
 
 function tabFromSearch(tab: string | null): PathTab {
     return tab === "fyp-thesis" || tab === "startup-business" || tab === "course-project" ? tab : "course-project";
 }
 
-function tabHref(tab: PathTab, view?: string) {
+function tabHref(tab: PathTab, view?: string, pane?: string) {
     const q = new URLSearchParams({ tab });
     if (view && view !== "home") q.set("view", view);
+    if (pane) q.set("pane", pane);
     return `${ADMIN_PATH}?${q.toString()}`;
 }
 
@@ -222,6 +232,10 @@ function AdminPathSubmissionsHub() {
         pathTab === "course-project" && rawView && (COURSE_VIEWS as readonly string[]).includes(rawView) ? (rawView as CourseView) : "home";
     const fypView: FypHubView =
         pathTab === "fyp-thesis" && rawView && (FYP_HUB_VIEWS as readonly string[]).includes(rawView) ? (rawView as FypHubView) : "home";
+    const pane = searchParams.get("pane");
+    const fypApprovedTab: "studio" | "list" = pane === "list" ? "list" : "studio";
+    const fypReviewTab: "all" | "pending" | "revision" | "rejected" =
+        pane === "pending" || pane === "revision" || pane === "rejected" ? pane : "all";
     const setPathTab = (tab: PathTab) => router.push(tabHref(tab));
 
     const [courseRows, setCourseRows] = useState<AdminCourseProjectRow[]>([]);
@@ -233,8 +247,8 @@ function AdminPathSubmissionsHub() {
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
-    const [fypReviewTab, setFypReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
-    const [fypApprovedTab, setFypApprovedTab] = useState<"studio" | "list">("studio");
+    const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
+    const [openReviewId, setOpenReviewId] = useState<string | null>(null);
     const [hubStats, setHubStats] = useState<{ active: number; attention: number; hub: number; completion: number } | null>(null);
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
@@ -430,6 +444,20 @@ function AdminPathSubmissionsHub() {
         () => fypRowsAsMerit.filter((r) => r.status === "draft"),
         [fypRowsAsMerit],
     );
+    const fypUniverse = useMemo(() => {
+        const m = new Map<string, FypMeritEntry>();
+        for (const e of [...fypRowsAsMerit, ...fypMeritEntries]) {
+            if (e.id) m.set(e.id, e);
+        }
+        return [...m.values()];
+    }, [fypRowsAsMerit, fypMeritEntries]);
+    const openFlashcard = fypUniverse.find((e) => e.id === openFlashcardId) || null;
+    const openReview = fypUniverse.find((e) => e.id === openReviewId) || null;
+    const updateFypEntry = (id: string, patch: Partial<FypMeritEntry>) => {
+        const merge = (prev: FypMeritEntry[]) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e));
+        setFypRows((prev) => merge(prev as unknown as FypMeritEntry[]) as unknown as AdminFypRow[]);
+        setFypMeritEntries(merge);
+    };
 
     return (
         <div className="space-y-6 p-6">
@@ -571,7 +599,7 @@ function AdminPathSubmissionsHub() {
                             emoji="🏅"
                             ghost="🏅"
                             title="Approved FYP + CIEL PK AI Analyser"
-                            subtitle="Every supervisor-approved FYP across all universities and disciplines, each with its faculty score and badges. Run the CIEL PK AI Analyser any day, any time — benchmarked against excellent work per discipline, ranked best → less best with rationale; the live badge moves like a stock (▲ green / ▼ red) on every student's flashcard."
+                            subtitle="Every supervisor-approved FYP across all universities and disciplines, each with its Detailed Review and badges. Run the CIEL PK AI Analyser any day, any time — benchmarked against excellent work per discipline, ranked best → less best with rationale; the live badge moves like a stock (▲ green / ▼ red) on every student's flashcard."
                             badge={`${approvedFyp.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
                         />
@@ -752,7 +780,11 @@ function AdminPathSubmissionsHub() {
                     ) : (
                         <div className="space-y-4">
                             {draftFyp.map((entry) => (
-                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} remindDraftOwner studentEmail={entry.student?.email} />
+                                <FacultyFypProgressCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    onOpenDraft={() => setOpenFlashcardId(entry.id || null)}
+                                />
                             ))}
                         </div>
                     )}
@@ -773,30 +805,38 @@ function AdminPathSubmissionsHub() {
                                 pill="SUPERVISOR DECIDES"
                             />
                             <p className="text-sm text-slate-500">
-                                The AI Analyser has run automatically on each submission; the supervisor decides and may edit it. CIEL PK sees status, owner and waiting time — and the released score once approved.
+                                A Detailed Review is generated automatically on each submission; the supervisor decides and may amend it. CIEL PK sees status, owner and waiting time — and the released review once approved.
                             </p>
-                            <Tabs
-                                tabs={[
-                                    { key: "all", label: `All · ${underReviewFyp.length}` },
-                                    { key: "pending", label: `Waiting supervisor · ${waitingFyp.length}` },
-                                    { key: "revision", label: `Revision with student · ${revisionFyp.length}` },
-                                    { key: "rejected", label: `Rejected · ${rejectedFyp.length}` },
-                                ]}
-                                active={fypReviewTab}
-                                onChange={(key) => setFypReviewTab(key as typeof fypReviewTab)}
-                            />
+                            <div className="flex flex-wrap gap-2">
+                                {([
+                                    ["all", "All", underReviewFyp.length],
+                                    ["pending", "Waiting supervisor", waitingFyp.length],
+                                    ["revision", "Revision with student", revisionFyp.length],
+                                    ["rejected", "Rejected", rejectedFyp.length],
+                                ] as const).map(([key, label, n]) => (
+                                    <Link
+                                        key={key}
+                                        href={tabHref("fyp-thesis", "review", key === "all" ? undefined : key)}
+                                        className={`rounded-[18px] border px-2.5 py-[7px] text-[11px] font-extrabold ${
+                                            fypReviewTab === key
+                                                ? "border-[#153f47] bg-[#153f47] text-white"
+                                                : "border-[#dde5ea] bg-white text-[#5c6d76]"
+                                        }`}
+                                    >
+                                        {label} <span className="ml-1 opacity-80">{n}</span>
+                                    </Link>
+                                ))}
+                            </div>
                             {visible.length === 0 ? (
                                 <Card className="border-dashed p-10 text-center text-slate-500">Nothing under review.</Card>
                             ) : (
                                 <div className="space-y-4">
                                     {visible.map((entry) => (
-                                        <ThesisCard
+                                        <UniversityFypReviewCard
                                             key={entry.id}
                                             entry={entry}
-                                            studentName={entry.student?.name}
-                                            studentReminder={entry.supervisorApprovalStatus === "pending" ? "faculty" : undefined}
-                                            remindDraftOwner={entry.supervisorApprovalStatus === "revision_requested"}
-                                            studentEmail={entry.student?.email}
+                                            audience="admin"
+                                            onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
                                         />
                                     ))}
                                 </div>
@@ -806,41 +846,100 @@ function AdminPathSubmissionsHub() {
                 })()
             ) : pathTab === "fyp-thesis" && (fypView === "approved" || fypView === "rank") ? (
                 <>
-                    <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
-                    <PathSectionHead
-                        title="Approved FYP + AI Ranking"
-                        subtitle="Every supervisor-approved Final Year Project flashcard, and the CIEL PK live FYP ranking on top of it. Locked faculty and university badges are never changed by the live run. Only supervisor-approved records are ranked."
-                        pill="CIEL PK LIVE"
-                    />
-                    <p className="text-sm text-slate-500">
-                        {fypMeritEntries.length} approved flashcard{fypMeritEntries.length === 1 ? "" : "s"} across all universities · CIEL PK may run the live AI Analyser anytime — every run re-ranks the national cohort and updates each student&apos;s live badge with a ▲/▼ trend.
-                    </p>
-                    <Tabs
-                        tabs={[
-                            { key: "studio", label: "🏆 FYP Ranking Studio (live)" },
-                            { key: "list", label: "🃏 Approved list" },
-                        ]}
-                        active={fypApprovedTab}
-                        onChange={(key) => setFypApprovedTab(key as typeof fypApprovedTab)}
-                    />
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-[22px] font-semibold text-[#183140]">Approved FYP + AI Ranking</h2>
+                            <p className="mt-1 max-w-3xl text-xs text-[#71828e]">
+                                Every supervisor-approved Final Year Project flashcard, and the CIEL PK live FYP ranking on top of it. Locked faculty and university badges are never changed by the live run. Only supervisor-approved records are ranked.
+                            </p>
+                        </div>
+                        <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
+                    </div>
+                    <div className="overflow-hidden rounded-2xl border border-[#dde5ea] bg-white">
+                        <div className="flex flex-wrap items-center justify-between gap-3.5 border-b border-[#dde5ea] px-5 py-[18px]">
+                            <div>
+                                <h3 className="m-0 text-lg font-semibold text-[#14202b]">Approved FYP + AI Ranking</h3>
+                                <p className="mt-1 text-xs text-[#71828e]">
+                                    {fypMeritEntries.length} approved flashcard{fypMeritEntries.length === 1 ? "" : "s"} across all universities · CIEL PK may run the live AI Analyser anytime — every run re-ranks the national cohort (same standard formula, discipline benchmark) and updates each student&apos;s live badge with a ▲/▼ trend; locked faculty and university badges are never changed by it.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Link
+                                    href={tabHref("fyp-thesis", fypView === "rank" ? "rank" : "approved")}
+                                    className={`rounded-[18px] border px-2.5 py-[7px] text-[11px] font-extrabold ${
+                                        fypApprovedTab !== "list"
+                                            ? "border-[#153f47] bg-[#153f47] text-white"
+                                            : "border-[#dde5ea] bg-white text-[#5c6d76]"
+                                    }`}
+                                >
+                                    🏆 FYP Ranking Studio (live)
+                                </Link>
+                                <Link
+                                    href={tabHref("fyp-thesis", fypView === "rank" ? "rank" : "approved", "list")}
+                                    className={`rounded-[18px] border px-2.5 py-[7px] text-[11px] font-extrabold ${
+                                        fypApprovedTab === "list"
+                                            ? "border-[#153f47] bg-[#153f47] text-white"
+                                            : "border-[#dde5ea] bg-white text-[#5c6d76]"
+                                    }`}
+                                >
+                                    🃏 Approved list
+                                </Link>
+                            </div>
+                        </div>
+                        <div className="p-4">
                     {fypMeritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
                     ) : fypApprovedTab === "studio" ? (
-                        fypMeritEntries.length === 0 ? (
-                            <Card className="border-dashed p-10 text-center text-slate-500">No supervisor-approved FYP cards yet.</Card>
-                        ) : (
-                            <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
-                        )
+                        <FypRankingStudio
+                            entries={fypMeritEntries}
+                            meritEndpoint="/api/v1/paths/fyp-thesis/merit-model"
+                            stakeholder="CIEL_PK"
+                            byLabel="CIEL PK"
+                            scopeLabel="All universities · approved Final Year Projects"
+                            onOpenCard={(entry) => setOpenFlashcardId(entry.id || null)}
+                            onOpenReview={(entry) => setOpenReviewId(entry.id || null)}
+                        />
                     ) : fypMeritEntries.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">No approved Final Year Projects yet.</Card>
                     ) : (
                         <div className="space-y-4">
                             {fypMeritEntries.map((entry) => (
-                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                <FacultyFypApprovedCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    audience="admin"
+                                    onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                    onOpenReview={() => setOpenReviewId(entry.id || null)}
+                                />
                             ))}
                         </div>
+                    )}
+                        </div>
+                    </div>
+                </>
+            ) : pathTab === "fyp-thesis" && fypView === "faculty-work" ? (
+                <>
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-[22px] font-semibold text-[#183140]">Faculty Work — all universities</h2>
+                            <p className="mt-1 max-w-3xl text-xs text-[#71828e]">
+                                Every faculty member&apos;s Final Year Project work, cumulatively: each project&apos;s flashcard, its Detailed Review and every badge — the same records the student, the faculty and the university see, updated live.
+                            </p>
+                        </div>
+                        <HubBackButton href={tabHref("fyp-thesis")} label="← Back to module buttons" />
+                    </div>
+                    {loading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <AdminFypFacultyWorkPanel
+                            entries={fypRowsAsMerit}
+                            onOpenFlashcard={(id) => setOpenFlashcardId(id)}
+                            onOpenReview={(id) => setOpenReviewId(id)}
+                        />
                     )}
                 </>
             ) : pathTab === "fyp-thesis" ? null : (
@@ -1129,6 +1228,32 @@ function AdminPathSubmissionsHub() {
             )}
             </>
             )}
+            {pathTab === "fyp-thesis" && openFlashcard ? (
+                <FacultyFypFlashcardModal
+                    entry={openFlashcard}
+                    onClose={() => setOpenFlashcardId(null)}
+                    onUpdate={updateFypEntry}
+                    onOpenReview={
+                        isPathEntryApproved(openFlashcard) && openFlashcard.id
+                            ? () => {
+                                setOpenFlashcardId(null);
+                                setOpenReviewId(openFlashcard.id || null);
+                            }
+                            : undefined
+                    }
+                />
+            ) : null}
+            {pathTab === "fyp-thesis" && openReview ? (
+                <FacultyFypDetailedReview
+                    entry={openReview}
+                    onClose={() => setOpenReviewId(null)}
+                    onUpdate={updateFypEntry}
+                    onOpenFlashcard={() => {
+                        setOpenReviewId(null);
+                        setOpenFlashcardId(openReview.id || null);
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

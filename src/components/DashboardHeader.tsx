@@ -24,7 +24,7 @@ function facultyPageKicker(pathname: string): string {
     if (p === "/dashboard/faculty") return "Overview";
     if (p.startsWith("/dashboard/faculty/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/faculty/coursework-projects")) return "Coursework Project";
-    if (p.startsWith("/dashboard/faculty/fyp-thesis")) return "FYP / Thesis";
+    if (p.startsWith("/dashboard/faculty/fyp-thesis")) return "Final Year Project (FYP)";
     if (p.startsWith("/dashboard/faculty/startup-business")) return "Startup / Business";
     if (p.startsWith("/dashboard/faculty/impact")) return "My Impact Wall";
     if (p.startsWith("/dashboard/faculty/approvals")) return "Opportunity Approvals";

@@ -226,9 +226,9 @@ export default function FacultyDashboard() {
                 <MockupActionCard
                     href="/dashboard/faculty/fyp-thesis"
                     emoji="🎓"
-                    title="FYP / Thesis"
-                    subtitle="Supervisor approval that puts a record on the live deck."
-                    badge="SIGN-OFF"
+                    title="Final Year Project (FYP)"
+                    subtitle="Supervisees' FYP flashcards, review queue, and Approved FYP + AI Analyser Ranking."
+                    badge="OPEN"
                     background={MOCKUP_GRADIENTS.navy}
                 />
                 <MockupActionCard

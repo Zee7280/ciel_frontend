@@ -4,10 +4,15 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import ThesisCard from "@/components/ciel/ThesisCard";
-import FypAiAnalysisPanel from "@/components/ciel/FypAiAnalysisPanel";
-import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
+import { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
+import FypRankingStudio, { currentAcademicYear } from "@/components/ciel/FypRankingStudio";
+import FacultyFypFlashcardModal, {
+    FacultyFypReviewCard,
+    FacultyFypProgressCard,
+    FacultyFypApprovedCard,
+    fypAiFlagCount,
+} from "@/components/ciel/FacultyFypFlashcard";
+import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
 import { CourseworkCrumb, HubBackButton, PathSectionHead, ActionKpiGrid, WorkflowSteps, PathFilterBar, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { isPathEntryApproved, isPathEntryWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
@@ -51,10 +56,19 @@ function FacultyFypThesisHub() {
     const [searchQuery, setSearchQuery] = useState("");
     const [reviewingId, setReviewingId] = useState<string | null>(null);
     const [reviewTab, setReviewTab] = useState<ReviewTab>("pending");
+    const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
+    const [openReviewId, setOpenReviewId] = useState<string | null>(null);
+    const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
 
     useEffect(() => {
         void fetchEntries();
         void fetchInProgress();
+        authenticatedFetch("/api/v1/paths/fyp-thesis/merit-model")
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                if (result?.data?.graderRuns) setGraderRuns(result.data.graderRuns);
+            })
+            .catch(() => {});
     }, []);
 
     const fetchEntries = async () => {
@@ -100,11 +114,13 @@ function FacultyFypThesisHub() {
                 setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.data } : e)));
                 toast.success(
                     action === "approve"
-                        ? "Approved — now live in Merit Model rankings"
+                        ? "Approved ✓ — flashcard, the score you allotted and your section comments are now on the student's impact wall, your Approved FYP, the University FYP Impact Wall and CIEL PK."
                         : action === "revision"
-                          ? "Revision requested — student can fix and resubmit."
-                          : "Rejected — student can fix and resubmit if allowed.",
+                          ? "Revision requested — returned to the student with your comments (Email + WhatsApp notification)."
+                          : "Rejected — Final Year Project not accepted; the student has been notified with your reason.",
                 );
+                setOpenFlashcardId(null);
+                setOpenReviewId(null);
             } else {
                 toast.error("Could not save your review");
             }
@@ -125,7 +141,9 @@ function FacultyFypThesisHub() {
     const approved = useMemo(() => entries.filter(isPathEntryApproved), [entries]);
     const revision = useMemo(() => entries.filter(isFypRevision), [entries]);
     const rejected = useMemo(() => entries.filter(isFypRejected), [entries]);
-    const readyNotSubmitted = inProgress.filter((e) => (e.stepCompleted ?? 0) >= 7);
+    const readyNotSubmitted = inProgress.filter((e) => (e.stepCompleted ?? 0) >= 8);
+    const ay = currentAcademicYear();
+    const pubsLeft = graderRuns?.unlimited ? "∞" : String(Math.max(0, (graderRuns?.limit ?? 3) - (graderRuns?.used ?? 0)));
 
     const matchesSearch = (entry: FypMeritEntry) => {
         const q = searchQuery.toLowerCase();
@@ -145,6 +163,15 @@ function FacultyFypThesisHub() {
               : reviewTab === "rejected" ? rejected
                 : [...waiting, ...revision, ...rejected];
     const filteredReview = reviewPool.filter(matchesSearch);
+    const openFlashcard =
+        entries.find((e) => e.id === openFlashcardId) ||
+        inProgress.find((e) => e.id === openFlashcardId) ||
+        null;
+    const openReview =
+        entries.find((e) => e.id === openReviewId) ||
+        inProgress.find((e) => e.id === openReviewId) ||
+        null;
+    const aiFlagsToCheck = waiting.filter((e) => fypAiFlagCount(e) > 0).length;
 
     return (
         <div className="mx-auto max-w-[1500px] space-y-4 pb-16">
@@ -161,8 +188,8 @@ function FacultyFypThesisHub() {
                             { value: String(approved.length), label: "ON IMPACT WALLS", href: `${FYP_BASE}?view=rank` },
                         ]}
                     />
-                ) : (
-                    <HubBackButton href={homeHref} label="← Back to FYP / Thesis" />
+                ) : view === "pending" || view === "rank" || view === "progress" ? null : (
+                    <HubBackButton href={homeHref} label="← Back to module buttons" />
                 )}
 
                 {view === "home" && (
@@ -226,7 +253,7 @@ function FacultyFypThesisHub() {
                     </>
                 )}
 
-                {(view === "progress" || view === "pending" || view === "approved" || view === "rank") && (
+                {(view === "progress" || view === "approved") && (
                     <div className="relative max-w-sm">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -241,9 +268,21 @@ function FacultyFypThesisHub() {
 
                 {view === "progress" && (
                     <>
-                        <PathSectionHead
+                        <MockupHero
+                            kicker="FACULTY IMPACT DASHBOARD"
                             title="FYP in Progress"
-                            subtitle={`Supervisees who have started their Final Year Project record but not yet submitted. ${readyNotSubmitted.length} ready but not submitted · ${revision.length} revision with student. Nudge anyone who has stalled.`}
+                            subtitle="Supervisees who have started their Final Year Project record but not yet submitted. Nudge anyone who has stalled."
+                            gradient={FACULTY_HERO}
+                            stats={[
+                                { value: String(inProgress.length), label: "IN PROGRESS" },
+                                { value: String(readyNotSubmitted.length), label: "READY, NOT SUBMITTED" },
+                                { value: String(revision.length), label: "REVISION WITH STUDENT" },
+                            ]}
+                        />
+                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <PathSectionHead
+                            title="Final Year Projects in Progress"
+                            subtitle="Live completion from each student's FYP record. Reminders open Email / WhatsApp with a prefilled message."
                         />
                     {loading && inProgress.length === 0 ? (
                         <SkeletonList />
@@ -251,26 +290,18 @@ function FacultyFypThesisHub() {
                         <EmptyFyp
                             message={
                                 inProgress.length === 0
-                                    ? "Students still filling out the FYP form will appear here — nudge anyone who's stalled."
+                                    ? "No Final Year Projects in progress."
                                     : "No records match your search."
                             }
                         />
                     ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="grid gap-3">
                             {filteredInProgress.map((entry) => (
-                                <div key={entry.id}>
-                                    <ThesisCard
-                                        entry={entry}
-                                        studentName={entry.student?.name}
-                                        remindDraftOwner
-                                        studentEmail={entry.student?.email || entry.projectInfo?.studentEmail}
-                                    />
-                                    {entry.updatedAt ? (
-                                        <p className="mt-1.5 px-1 text-[10px] text-slate-400">
-                                            Last activity {formatDistanceToNow(new Date(entry.updatedAt), { addSuffix: true })}
-                                        </p>
-                                    ) : null}
-                                </div>
+                                <FacultyFypProgressCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    onOpenDraft={() => setOpenFlashcardId(entry.id || null)}
+                                />
                             ))}
                         </div>
                     )}
@@ -279,13 +310,25 @@ function FacultyFypThesisHub() {
 
                 {view === "pending" && (
                     <>
-                        <PathSectionHead
+                        <MockupHero
+                            kicker="FACULTY REVIEW QUEUE"
                             title="FYP Review"
-                            subtitle="Each submission arrives as the student's FYP Flashcard. You may edit every section score and comment; your approval releases the final score and comments to the student, the university and CIEL PK."
+                            subtitle="Each submission arrives as the student's FYP Flashcard plus a separate, system-generated Detailed Review — preliminary score and section-by-section strengths, limitations and improvements, measured against excellent work in the same discipline at the student's level. You may amend every score and comment; your approval releases the CIEL PK score and the review to the student, the university and CIEL PK."
+                            gradient={FACULTY_HERO}
+                            stats={[
+                                { value: String(waiting.length), label: "PENDING YOUR REVIEW" },
+                                { value: String(revision.length), label: "REVISION WITH STUDENT" },
+                                { value: String(aiFlagsToCheck), label: "AI FLAGS TO CHECK" },
+                            ]}
+                        />
+                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <PathSectionHead
+                            title="Final Year Project submissions"
+                            subtitle="Open the Detailed Review: every section shows the preliminary score, the review comment, strengths, limitations and how to improve, with a box to amend the score and add your own comment. Then approve, request revision or reject."
                             pill="AI SCORE SUPPORTS — FACULTY DECIDES"
                         />
                         <div className="mb-4 rounded-[15px] border border-[#d5eee8] bg-[#eef8f6] px-4 py-3 text-[11px] leading-relaxed text-[#4b6f68]">
-                            🤖 <b>The AI Analyser runs on submission</b> — you can edit any score or comment inside the flashcard. <b>Approving releases the final score + your comments</b> to the student&apos;s My Final Year Project Impact, your Approved FYP, the University FYP Impact Wall and CIEL PK. University cannot skip you.
+                            🧾 <b>A Detailed Review is generated automatically the moment a student submits</b> — no button. It is separate from the flashcard and measures every section against excellent work in the student's discipline, at the student's level: what is good, what is missing, how to make it better. <b>You can amend any score or comment</b> inside the review. <b>Approving releases the CIEL PK score + the review</b> beside the flashcard on the student's My Final Year Project Impact, your Approved FYP, the University FYP Impact Wall and CIEL PK — the student sees exactly what was scored and why. The student sees it as a CIEL PK review confirmed by you.
                         </div>
                         <PathFilterBar
                             filters={[
@@ -318,23 +361,15 @@ function FacultyFypThesisHub() {
                             }
                         />
                     ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {filteredReview.map((entry) => {
-                                const canDecide = isPathEntryWaiting(entry);
-                                return (
-                                <div key={entry.id} className="space-y-2">
-                                    {canDecide && entry.id ? <FypAiAnalysisPanel entry={entry} onUpdate={updateEntry} /> : null}
-                                    <ThesisCard
-                                        entry={entry}
-                                        studentName={entry.student?.name}
-                                        remindDraftOwner={isFypRevision(entry)}
-                                        studentEmail={entry.student?.email || entry.projectInfo?.studentEmail}
-                                        onSupervisorReview={canDecide && entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
-                                        reviewing={reviewingId === entry.id}
-                                    />
-                                </div>
-                                );
-                            })}
+                        <div className="grid gap-3">
+                            {filteredReview.map((entry) => (
+                                <FacultyFypReviewCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                    onOpenReview={() => setOpenReviewId(entry.id || null)}
+                                />
+                            ))}
                         </div>
                     )}
                     </>
@@ -358,9 +393,14 @@ function FacultyFypThesisHub() {
                             }
                         />
                     ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="grid gap-3">
                             {filteredApproved.map((entry) => (
-                                <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                <FacultyFypApprovedCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                    onOpenReview={() => setOpenReviewId(entry.id || null)}
+                                />
                             ))}
                         </div>
                     )}
@@ -369,34 +409,100 @@ function FacultyFypThesisHub() {
 
                 {view === "rank" && (
                     <>
-                        <PathSectionHead
+                        <MockupHero
+                            kicker="AI IMPACT RANKING"
                             title="Approved FYP + AI Ranking"
-                            subtitle="Run the AI Analyser across all your approved Final Year Projects whenever you like. Publish at most 3 times per academic year: that day every student in the cohort receives a locked “Faculty AI Analyser” badge on their flashcard, synced to the university and CIEL PK."
+                            subtitle="Run the AI Analyser across all your approved Final Year Projects whenever you like — every run measures each project against the benchmark of excellent work in its discipline and ranks best → less best with pluses, limitations and rationale. Publish at most 3 times per academic year: that day every student in the cohort receives a locked “Faculty AI Analyser” badge (rank, cohort, score, date) on their flashcard, synced to the university and CIEL PK."
+                            gradient={FACULTY_HERO}
+                            stats={[
+                                { value: String(approved.length), label: "APPROVED FYPS" },
+                                { value: `${pubsLeft} / ${graderRuns?.unlimited ? "∞" : graderRuns?.limit ?? 3}`, label: `PUBLICATIONS LEFT · AY ${ay}` },
+                                { value: "Unlimited", label: "CONFIDENTIAL PREVIEWS" },
+                            ]}
+                        />
+                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <PathSectionHead
+                            title="FYP Ranking Studio — Comparative AI Grader"
+                            subtitle="Standard formula CIEL-PK-FYP-COMP-2.0 · discipline-weighted, benchmarked against excellent work in each discipline · the same formula the University and CIEL PK use — only the cohort changes."
                             pill="TOP AI PICKS"
                         />
                     {loading ? (
                         <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
-                    ) : approved.length === 0 ? (
-                        <EmptyFyp message="Approve at least one submitted record to run the merit model." />
                     ) : (
                         <>
-                            <FypMeritPanel entries={approved} meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                            <FypRankingStudio
+                                entries={approved}
+                                meritEndpoint="/api/v1/paths/fyp-thesis/merit-model"
+                                stakeholder="FACULTY"
+                                byLabel="Faculty"
+                                scopeLabel="My approved Final Year Projects"
+                                onOpenCard={(entry) => setOpenFlashcardId(entry.id || null)}
+                                onOpenReview={(entry) => setOpenReviewId(entry.id || null)}
+                                onQuotaChange={setGraderRuns}
+                            />
                             <div className="mt-8">
                                 <PathSectionHead
                                     title="Approved Final Year Project flashcards"
-                                    subtitle="The same records live on your Faculty Impact Wall, the student's My Final Year Project Impact, the University FYP Impact Wall and CIEL PK."
+                                    subtitle="Live on your Faculty Impact Wall, the student's My Final Year Project Impact, the University FYP Impact Wall and CIEL PK — each with the score you allotted and every AI Analyser badge (faculty, university, CIEL PK live)."
                                     pill="SYNCED TO ALL DASHBOARDS"
                                 />
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {filteredApproved.map((entry) => (
-                                        <ThesisCard key={entry.id} entry={entry} studentName={entry.student?.name} />
-                                    ))}
-                                </div>
+                                {approved.length === 0 ? (
+                                    <EmptyFyp message="Approved records appear here after you sign them off." />
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {approved.map((entry) => (
+                                            <FacultyFypApprovedCard
+                                                key={entry.id}
+                                                entry={entry}
+                                                onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
+                                                onOpenReview={() => setOpenReviewId(entry.id || null)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
                     </>
                 )}
+                {openFlashcard ? (
+                    <FacultyFypFlashcardModal
+                        entry={openFlashcard}
+                        onClose={() => setOpenFlashcardId(null)}
+                        onUpdate={updateEntry}
+                        onSupervisorReview={
+                            isPathEntryWaiting(openFlashcard) && openFlashcard.id
+                                ? (action, note) => void reviewEntry(openFlashcard.id!, action, note)
+                                : undefined
+                        }
+                        reviewing={reviewingId === openFlashcard.id}
+                        onOpenReview={
+                            openFlashcard.id
+                                ? () => {
+                                    setOpenFlashcardId(null);
+                                    setOpenReviewId(openFlashcard.id || null);
+                                }
+                                : undefined
+                        }
+                    />
+                ) : null}
+                {openReview ? (
+                    <FacultyFypDetailedReview
+                        entry={openReview}
+                        onClose={() => setOpenReviewId(null)}
+                        onUpdate={updateEntry}
+                        onSupervisorReview={
+                            isPathEntryWaiting(openReview) && openReview.id
+                                ? (action, note) => void reviewEntry(openReview.id!, action, note)
+                                : undefined
+                        }
+                        reviewing={reviewingId === openReview.id}
+                        onOpenFlashcard={() => {
+                            setOpenReviewId(null);
+                            setOpenFlashcardId(openReview.id || null);
+                        }}
+                    />
+                ) : null}
         </div>
     );
 }

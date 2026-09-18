@@ -18,7 +18,7 @@ function StartupBusinessRouter() {
                         pathLabel="Startup / Venture"
                         view={view === "create" ? "Create" : "Workspace"}
                     />
-                    <HubBackButton href="/dashboard/student/paths/startup-business" label="← Back to Startup / Venture" />
+                    <HubBackButton href="/dashboard/student/paths/startup-business?view=in-progress" label="← Back to workspace" />
                 </div>
                 <StartupBusinessWorkspace />
             </div>

@@ -163,7 +163,7 @@ export function WorkflowSteps({
     return (
         <div className="mt-4 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-[18px] shadow-[0_8px_24px_rgba(18,48,65,.05)]">
             <PathSectionHead title={title} subtitle={subtitle} compact />
-            <div className="mt-1 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+            <div className={`mt-1 grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${steps.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
                 {steps.map((step, i) => {
                     const done = i < activeIndex;
                     const active = i === activeIndex;
