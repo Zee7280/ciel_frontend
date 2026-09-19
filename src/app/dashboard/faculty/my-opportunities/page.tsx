@@ -36,7 +36,7 @@ type Row = {
     review_feedback?: string | null;
 };
 
-type StatusTab = "all" | "live" | "review" | "rejected";
+type StatusTab = "all" | "drafts" | "review" | "action" | "live" | "rejected";
 type StepTone = "done" | "current" | "pending" | "rejected";
 
 function isLikelyMachineId(text: string): boolean {
@@ -80,8 +80,11 @@ function isMineLive(row: Row): boolean {
 }
 
 function listTab(row: Row): Exclude<StatusTab, "all"> {
+    const rec = asRecord(row);
+    if (lower(row.status) === "draft") return "drafts";
+    if (canEditReturnedOpportunity(rec)) return "action";
     if (isMineLive(row)) return "live";
-    const tone = resolvePartnerOpportunityListLabels(asRecord(row)).badgeTone;
+    const tone = resolvePartnerOpportunityListLabels(rec).badgeTone;
     if (tone === "rejected") return "rejected";
     return "review";
 }
@@ -175,7 +178,22 @@ export default function FacultyMyOpportunitiesPage() {
     useEffect(() => {
         if (typeof window === "undefined") return;
         const next = new URLSearchParams(window.location.search).get("tab");
-        if (next === "all" || next === "live" || next === "review" || next === "rejected") {
+        if (next === "published") {
+            setTab("live");
+            return;
+        }
+        if (next === "closed") {
+            setTab("rejected");
+            return;
+        }
+        if (
+            next === "all" ||
+            next === "drafts" ||
+            next === "live" ||
+            next === "review" ||
+            next === "action" ||
+            next === "rejected"
+        ) {
             setTab(next);
         }
     }, []);
@@ -268,7 +286,7 @@ export default function FacultyMyOpportunitiesPage() {
     }, [rows]);
 
     const counts = useMemo(() => {
-        const next = { all: rows.length, live: 0, review: 0, rejected: 0 };
+        const next = { all: rows.length, drafts: 0, live: 0, review: 0, action: 0, rejected: 0 };
         for (const row of rows) next[listTab(row)] += 1;
         return next;
     }, [rows]);
@@ -309,9 +327,10 @@ export default function FacultyMyOpportunitiesPage() {
         <div className="mx-auto max-w-5xl space-y-5 p-0 pb-20 sm:p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h1 className="text-[28px] font-bold tracking-tight text-slate-900">My opportunities</h1>
+                    <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Create & manage your opportunities</h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        Opportunities you created. Once approved they go live and students can apply.
+                        Unlimited publishing — Draft → Submit → Review → Revision if needed → Published / Closed. Faculty-created
+                        opportunities do not need a second faculty approver.
                     </p>
                 </div>
                 <Link
@@ -321,6 +340,11 @@ export default function FacultyMyOpportunitiesPage() {
                     <Plus className="h-4 w-4" />
                     Create opportunity
                 </Link>
+            </div>
+
+            <div className="rounded-xl border border-[#dce6ea] bg-[#f7fafb] px-4 py-3 text-[13px] leading-relaxed text-slate-600">
+                <b className="text-slate-800">Simple rule:</b> If you created the opportunity, its creator status stays here.
+                Once students are assigned, their service/report progress appears under Community Service Projects.
             </div>
 
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-slate-100 px-4 py-2.5 text-[13px] text-slate-600">
@@ -367,9 +391,11 @@ export default function FacultyMyOpportunitiesPage() {
                     {(
                         [
                             ["all", "All", counts.all],
-                            ["live", "Live", counts.live],
-                            ["review", "Under review", counts.review],
-                            ["rejected", "Rejected", counts.rejected],
+                            ["drafts", "Drafts", counts.drafts],
+                            ["review", "Under Approval", counts.review],
+                            ["action", "Action Required", counts.action],
+                            ["live", "Published", counts.live],
+                            ["rejected", "Closed", counts.rejected],
                         ] as const
                     ).map(([key, label, count]) => (
                         <button

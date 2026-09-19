@@ -687,7 +687,7 @@ export default function OpportunityPostingPage() {
                 // Check for success flag OR direct object return (id/title)
                 if (data.success || data.id || data.title) {
                     toast.success("Submitted for review. Your opportunity will appear as Live after admin approval.");
-                    router.push("/dashboard/partner/requests"); // Redirect to list
+                    router.push("/dashboard/partner/community-service?view=create");
                 } else {
                     toast.error(data.message || data.error || "Failed to create opportunity");
                 }

@@ -694,7 +694,7 @@ export default function FacultyOpportunityCreationPage() {
                     } catch {
                         // best-effort cleanup only
                     }
-                    router.push(isEdit ? "/dashboard/faculty/my-opportunities" : "/dashboard/faculty");
+                    router.push("/dashboard/faculty/community-service?view=create");
                 } else {
                     toast.error(data.message || (isEdit ? "Failed to update opportunity" : "Failed to create opportunity"));
                 }

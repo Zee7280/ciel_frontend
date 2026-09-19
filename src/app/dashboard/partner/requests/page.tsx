@@ -8,7 +8,12 @@ import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { peekPersistedVerificationReturn } from "@/utils/verificationReturnUrl";
-import { resolvePartnerOpportunityListLabels } from "@/utils/opportunityWorkflow";
+import {
+    canEditReturnedOpportunity,
+    isOpportunityPermanentlyRejected,
+    isOpportunityPubliclyLive,
+    resolvePartnerOpportunityListLabels,
+} from "@/utils/opportunityWorkflow";
 import { toast } from "sonner";
 
 function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
@@ -27,9 +32,16 @@ function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUs
     return String(creatorId).trim() === currentUserId;
 }
 
-type StatusTab = "all" | "live" | "review" | "rejected";
+type StatusTab = "all" | "drafts" | "review" | "action" | "live" | "rejected";
 
 function listTab(opportunity: Record<string, unknown>): Exclude<StatusTab, "all"> {
+    const status = String(opportunity.status ?? "")
+        .trim()
+        .toLowerCase();
+    if (status === "draft") return "drafts";
+    if (canEditReturnedOpportunity(opportunity)) return "action";
+    if (isOpportunityPubliclyLive(opportunity) || status === "live") return "live";
+    if (isOpportunityPermanentlyRejected(opportunity) || status === "rejected") return "rejected";
     const tone = resolvePartnerOpportunityListLabels(opportunity).badgeTone;
     if (tone === "live" || tone === "review" || tone === "rejected") return tone;
     return "review";
@@ -48,7 +60,18 @@ export default function PartnerRequestsPage() {
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
         const next = params.get("tab");
-        if (next === "all" || next === "live" || next === "review" || next === "rejected") {
+        if (next === "published") {
+            setTab("live");
+        } else if (next === "closed") {
+            setTab("rejected");
+        } else if (
+            next === "all" ||
+            next === "drafts" ||
+            next === "live" ||
+            next === "review" ||
+            next === "action" ||
+            next === "rejected"
+        ) {
             setTab(next);
         }
         setInstitutionScope(params.get("scope") === "institution");
@@ -125,8 +148,10 @@ export default function PartnerRequestsPage() {
     const visibleRequests = requests.filter((req) => (tab === "all" ? true : listTab(req as Record<string, unknown>) === tab));
     const tabCounts = {
         all: requests.length,
+        drafts: requests.filter((req) => listTab(req as Record<string, unknown>) === "drafts").length,
         live: requests.filter((req) => listTab(req as Record<string, unknown>) === "live").length,
         review: requests.filter((req) => listTab(req as Record<string, unknown>) === "review").length,
+        action: requests.filter((req) => listTab(req as Record<string, unknown>) === "action").length,
         rejected: requests.filter((req) => listTab(req as Record<string, unknown>) === "rejected").length,
     };
     const activeRequest = activeMenu ? requests.find(r => r.id === activeMenu.id) : null;
@@ -135,7 +160,10 @@ export default function PartnerRequestsPage() {
         <div className="w-full pb-32 space-y-6">
             <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-bold text-slate-900">My Opportunities</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">Create & manage your opportunities</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Draft → Submit → CIEL PK review → Published / Closed. Faculty linkage is optional.
+                    </p>
                 </div>
                 <Link href="/dashboard/partner/requests/new" className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
                     <Plus className="w-4 h-4" /> Post New
@@ -144,12 +172,14 @@ export default function PartnerRequestsPage() {
 
             <div className="mb-4 flex flex-wrap items-center gap-1 rounded-full bg-slate-100 p-1 w-fit">
                 {(
-                    [
-                        ["all", "All", tabCounts.all],
-                        ["live", "Live", tabCounts.live],
-                        ["review", "Under review", tabCounts.review],
-                        ["rejected", "Rejected", tabCounts.rejected],
-                    ] as const
+                        [
+                            ["all", "All", tabCounts.all],
+                            ["drafts", "Drafts", tabCounts.drafts],
+                            ["review", "Under Approval", tabCounts.review],
+                            ["action", "Action Required", tabCounts.action],
+                            ["live", "Published", tabCounts.live],
+                            ["rejected", "Closed", tabCounts.rejected],
+                        ] as const
                 ).map(([key, label, count]) => (
                     <button
                         key={key}

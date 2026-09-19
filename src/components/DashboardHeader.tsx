@@ -185,7 +185,7 @@ export default function DashboardHeader() {
               : navRole === "partner" && isUniversityPartnerOrg
                 ? "University Dashboard"
                 : navRole === "partner"
-                  ? "Partner Portal"
+                  ? "NGO / Nonprofit"
                   : navRole === "admin"
                     ? "Super Admin"
                     : navRole === "investor"
@@ -199,6 +199,8 @@ export default function DashboardHeader() {
               ? facultyPageKicker(pathname)
               : navRole === "partner" && isUniversityPartnerOrg
                 ? universityPageKicker(pathname)
+                : navRole === "partner"
+                  ? universityPageKicker(pathname)
                 : navRole === "admin"
                   ? adminPageKicker(pathname)
                   : navRole === "investor"

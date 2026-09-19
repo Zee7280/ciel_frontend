@@ -441,12 +441,7 @@ export default function Sidebar() {
                 { label: "Attendance review", href: "/dashboard/partner/attendance-review", icon: CalendarClock },
                 { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
-                ...(!isUniversityPartnerOrg
-                    ? [
-                          { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
-                          { label: "Community service", href: "/dashboard/partner/community-service", icon: BookOpen },
-                      ]
-                    : []),
+                ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart }] : []),
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 }]
                     : []),
@@ -505,6 +500,11 @@ export default function Sidebar() {
             { label: "Final Year Project (FYP)", href: "/dashboard/partner/university-showcase?mode=fyp-thesis", emoji: "🎓" },
             { label: "Startup / Venture", href: "/dashboard/partner/startup-business", emoji: "🚀" },
         ],
+        [],
+    );
+
+    const ngoPaths = useMemo(
+        () => [{ label: "Community Service", href: "/dashboard/partner/community-service", emoji: "🌱" }],
         [],
     );
 
@@ -583,6 +583,8 @@ export default function Sidebar() {
         ? facultyPaths
         : isPartner && isUniversityPartnerOrg
           ? universityPaths
+          : isPartner
+            ? ngoPaths
           : isAdmin
             ? adminPaths
             : isInvestor
@@ -658,6 +660,28 @@ export default function Sidebar() {
         if (hrefPath === "/dashboard/student/impact" && pathname.startsWith("/dashboard/student/analytics")) return true;
         if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/create-opportunity")) return true;
         if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/browse")) return true;
+        if (
+            hrefPath === "/dashboard/faculty/community-service" &&
+            (pathname.startsWith("/dashboard/faculty/create-opportunity") ||
+                pathname.startsWith("/dashboard/faculty/my-opportunities") ||
+                pathname.startsWith("/dashboard/faculty/approvals") ||
+                pathname.startsWith("/dashboard/faculty/join-applications") ||
+                pathname.startsWith("/dashboard/faculty/reports") ||
+                pathname.startsWith("/dashboard/faculty/attendance-review"))
+        ) {
+            return true;
+        }
+        if (
+            hrefPath === "/dashboard/partner/community-service" &&
+            !isUniversityPartnerOrg &&
+            (pathname.startsWith("/dashboard/partner/requests") ||
+                pathname.startsWith("/dashboard/partner/verify") ||
+                pathname.startsWith("/dashboard/partner/verification") ||
+                pathname.startsWith("/dashboard/partner/reports") ||
+                pathname.startsWith("/dashboard/partner/attendance-review"))
+        ) {
+            return true;
+        }
         if (pathname === hrefPath) return true;
         const longerChild = allRoleHrefs.some(
             (other) => other !== hrefPath && other.startsWith(`${hrefPath}/`) && (pathname === other || pathname.startsWith(`${other}/`)),
@@ -724,6 +748,8 @@ export default function Sidebar() {
                                           ? "CIEL Investor Hub"
                                           : isAdmin
                                             ? "Youth Empowered Community Impact"
+                                            : isPartner
+                                              ? "NGO / Nonprofit"
                                             : "Youth Empowered Community Impact"}
                             </span>
                         </div>
@@ -844,9 +870,9 @@ export default function Sidebar() {
                 ) : (
                     <>
                         <NavSectionLabel collapsed={collapsed}>
-                            {isUniversityPartnerOrg ? "University" : isFaculty ? "My Paths" : isAdmin ? "Super Admin" : isInvestor ? "CIEL Investor Hub" : "Dashboard"}
+                            {isUniversityPartnerOrg ? "University" : isFaculty ? "My Paths" : isAdmin ? "Super Admin" : isInvestor ? "CIEL Investor Hub" : isPartner ? "Organization dashboard" : "Dashboard"}
                         </NavSectionLabel>
-                        <NavRow href={dashboardHref} label={isFaculty ? "Overview" : isUniversityPartnerOrg || isAdmin ? "Overview" : isInvestor ? "Home" : "Dashboard"} emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
+                        <NavRow href={dashboardHref} label={isFaculty ? "Overview" : isUniversityPartnerOrg || isAdmin ? "Overview" : isInvestor ? "Home" : isPartner ? "Home" : "Dashboard"} emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
                         {rolePaths.length > 0 ? (
                             <>
                                 <NavSectionLabel collapsed={collapsed}>
