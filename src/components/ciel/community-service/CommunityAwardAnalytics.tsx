@@ -1,6 +1,6 @@
 "use client";
 
-import type { CommunityAwardCard } from "@/utils/communityAwardModel";
+import { DIVIDEND_HOURLY_RATE_PKR, type CommunityAwardCard } from "@/utils/communityAwardModel";
 
 export default function CommunityAwardAnalytics({ cards, groupBy }: { cards: CommunityAwardCard[]; groupBy: "university" | "department" }) {
     const hrs = cards.reduce((s, c) => s + (c.hours || 0), 0);
@@ -35,7 +35,7 @@ export default function CommunityAwardAnalytics({ cards, groupBy }: { cards: Com
                     <div className="mt-3 flex flex-wrap gap-2">
                         {stat(String(cards.length), "PROJECTS")}
                         {stat(String(hrs), "VERIFIED HOURS")}
-                        {stat(`PKR ${(hrs * 500).toLocaleString()}`, "DIVIDEND @500/H")}
+                        {stat(`PKR ${Math.round(hrs * DIVIDEND_HOURLY_RATE_PKR).toLocaleString()}`, `DIVIDEND @${DIVIDEND_HOURLY_RATE_PKR}/H`)}
                         {stat(`${avg}/100`, "AVG AWARD SCORE")}
                         {stat(String(sdgs.size), "SDGs")}
                         {stat(String(ev), "EVIDENCE")}

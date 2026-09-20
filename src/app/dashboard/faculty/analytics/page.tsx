@@ -17,6 +17,7 @@ import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
 import { FACULTY_HERO, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { DIVIDEND_HOURLY_RATE_PKR } from "@/utils/communityAwardModel";
 import {
     CIEL_FACULTY_DASHBOARD_VIEW_EVENT,
     readFacultyDashboardViewPreference,
@@ -155,9 +156,6 @@ function n(x: unknown) {
 function formatNum(x: number, digits = 0) {
     return x.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
-
-/** Same hourly rate as the public community ledger. */
-const DIVIDEND_HOURLY_RATE_PKR = 192;
 
 function formatPkr(amount: number) {
     return `PKR ${Math.round(amount).toLocaleString("en-PK")}`;
@@ -433,7 +431,7 @@ export default function FacultyAnalyticsPage() {
             <MockupHero
                 kicker={kicker}
                 title={facultyName}
-                subtitle="Aggregated from live records in your supervision scope. Community Dividend = verified volunteer hours × PKR 192 (not wages paid)."
+                subtitle={`Aggregated from live records in your supervision scope. Community Dividend = verified volunteer hours × PKR ${DIVIDEND_HOURLY_RATE_PKR} (not wages paid).`}
                 gradient={FACULTY_HERO}
                 stats={
                     data

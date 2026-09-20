@@ -62,7 +62,11 @@ export function ReportSectionGuideFloat({
                 <DialogContent className="relative flex h-[min(94vh,960px)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden bg-[#f8fcfd] p-0 gap-0">
                     <DialogTitle className="sr-only">Community Engagement — The Student Guide</DialogTitle>
                     <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5">
-                        {open ? <StudentCommunityGuide wizardStep={sectionStep} /> : null}
+                        {/* showHero=false: this floating in-wizard coach must show only the current
+                            section's guidance, never the large CIEL-branded hero banner — that's
+                            appropriate for the standalone pre-report guide page, not a per-section
+                            popup opened mid-wizard. */}
+                        {open ? <StudentCommunityGuide wizardStep={sectionStep} showHero={false} /> : null}
                     </div>
 
                     <DialogFooter className="shrink-0 border-t border-[#dcebee] bg-white px-4 py-3 sm:px-5">

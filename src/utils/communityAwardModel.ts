@@ -1,3 +1,10 @@
+/** PKR value of one verified volunteer hour in the Community Dividend formula — must match
+ * ciel_backend's DIVIDEND_HOURLY_RATE_PKR (platform-stats.ledger.util.ts) exactly. A prior drift
+ * (this file hardcoded 500/hr while the backend used 192/hr) showed a different dividend figure
+ * for the same hours depending on which dashboard you were on — every dividend display in this
+ * app must import this constant rather than hardcoding its own rate. */
+export const DIVIDEND_HOURLY_RATE_PKR = 192.31;
+
 export const COMMUNITY_AWARD_CRITERIA = [
     { key: "cii", max: 40, title: "Composite Impact Index (CII v8.2)", note: "the full 10-section AI evaluation — depth, honesty, verification compounded" },
     { key: "quality", max: 20, title: "Quality & depth of execution", note: "was the work done well, repeatedly, with skill — judged on its own pathway" },

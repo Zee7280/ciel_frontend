@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePlatformStats, type CityImpactStat } from "@/utils/usePlatformStats";
 import { PAKISTAN_PROVINCE_LABELS, pakistanOutlinePath, pakistanProvincePaths, projectLonLat } from "@/utils/pakistanMapGeo";
 import { HomeHeader, homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
+import { DIVIDEND_HOURLY_RATE_PKR } from "@/utils/communityAwardModel";
 
 type MetricKey = "peopleServing" | "peopleServed" | "verifiedHours" | "resourcesDeployedPkr" | "communityDividendPkr";
 
@@ -26,13 +27,17 @@ function StatTile({ label, value }: { label: string; value: string }) {
 
 export default function ImpactMap() {
     const { stats } = usePlatformStats();
+    // No per-city dividend field exists in the API response (only the platform-wide total), so
+    // this is computed here — using the backend's own reported rate keeps it in sync with the
+    // headline figure instead of drifting from a separately hardcoded local rate.
+    const rate = stats?.dividend_hourly_rate_pkr ?? DIVIDEND_HOURLY_RATE_PKR;
     const cities = useMemo(
         () =>
             (stats?.cities ?? []).map((c) => ({
                 ...c,
-                communityDividendPkr: c.verifiedHours * 192 + c.outOfPocketPkr,
+                communityDividendPkr: Math.round(c.verifiedHours * rate + c.outOfPocketPkr),
             })),
-        [stats],
+        [stats, rate],
     );
     const [metric, setMetric] = useState<MetricKey>("peopleServing");
     const [sdgFilter, setSdgFilter] = useState<number | null>(null);
@@ -190,7 +195,7 @@ export default function ImpactMap() {
                                             PKR {selected.communityDividendPkr.toLocaleString("en-US")}
                                         </span>
                                         <span className="mt-1 block text-[10.5px] font-semibold text-slate-500">
-                                            {selected.verifiedHours.toLocaleString("en-US")} hrs × PKR 192 + PKR {selected.outOfPocketPkr.toLocaleString("en-US")} out-of-pocket
+                                            {selected.verifiedHours.toLocaleString("en-US")} hrs × PKR {rate.toLocaleString("en-US", { maximumFractionDigits: 2 })} + PKR {selected.outOfPocketPkr.toLocaleString("en-US")} out-of-pocket
                                         </span>
                                     </div>
 

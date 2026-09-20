@@ -10,6 +10,18 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
+/** "09:00" (24h, from a native <input type="time">) → "9:00 AM" — this table previously rendered
+ * the raw 24h value verbatim (e.g. "14:30 – 17:00"). */
+function formatClock12h(value: string): string {
+    const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
+    if (!match) return String(value ?? "");
+    const hour24 = parseInt(match[1], 10);
+    const minute = match[2];
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${minute} ${period}`;
+}
+
 interface AttendanceEntry {
     id: string;
     date: string;
@@ -205,7 +217,7 @@ function SessionCard({
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-slate-900">
-                                {entry.start_time} – {entry.end_time}
+                                {formatClock12h(entry.start_time)} – {formatClock12h(entry.end_time)}
                             </p>
                             <p className="mt-0.5 truncate text-xs text-slate-500">
                                 {locationText || participantLabel}

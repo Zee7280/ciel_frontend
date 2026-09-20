@@ -112,6 +112,12 @@ export function validateSection2(data: any): ValidationResult {
         errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
     }
 
+    // "Other" system-gap chip reveals a required free-text field (Section2ProjectContext.tsx) that
+    // was never actually enforced here — a blank box passed submit silently.
+    if (Array.isArray(data.system_gaps) && data.system_gaps.includes('Other') && !String(data.system_gaps_other || '').trim()) {
+        errors.push({ field: 'system_gaps_other', message: 'Please specify the "Other" system gap' });
+    }
+
     const hasOtherToken = Array.isArray(data.baseline_evidence) && (data.baseline_evidence as string[]).some((s) => /^__o_(\d+)$/.test(String(s)));
     const hasLegacyOther = Array.isArray(data.baseline_evidence) && (data.baseline_evidence as string[]).includes("Other");
     if (hasOtherToken || hasLegacyOther) {
@@ -141,7 +147,9 @@ export function validateSection3(data: any): ValidationResult {
     const hasStudentMappingSelection = Boolean(
         data.primary_sdg?.goal_number ||
         data.primary_sdg?.target_id ||
-        data.primary_sdg?.indicator_id
+        data.primary_sdg?.target_code ||
+        data.primary_sdg?.indicator_id ||
+        data.primary_sdg?.indicator_code
     );
 
     pushWordRange(errors, 'contribution_intent_statement', data.contribution_intent_statement, 'Contribution logic');
@@ -184,6 +192,11 @@ export function validateSection4(data: any): ValidationResult {
         data.activity_blocks.forEach((block: any, index: number) => {
             if (!block.title?.trim()) errors.push({ field: `activity_blocks.${index}.title`, message: `Activity ${index + 1}: Title is required` });
             if (!block.primary_category) errors.push({ field: `activity_blocks.${index}.primary_category`, message: `Activity ${index + 1}: Primary category is required` });
+            // "Other" reveals a required free-text field (Section4Activities.tsx) that was never
+            // actually enforced here — selecting "Other" and leaving it blank passed submit.
+            if (block.primary_category === 'Other' && !String(block.other_category_text || '').trim()) {
+                errors.push({ field: `activity_blocks.${index}.other_category_text`, message: `Activity ${index + 1}: Please specify the "Other" category` });
+            }
             if (!block.sub_category) errors.push({ field: `activity_blocks.${index}.sub_category`, message: `Activity ${index + 1}: Sub-category is required` });
             
             pushWordRange(errors, `activity_blocks.${index}.description`, block.description, `Activity ${index + 1} description`);
@@ -317,6 +330,11 @@ export function validateSection7(data: any): ValidationResult {
         }
         if (!p.type) {
             errors.push({ field: `partners.${index}.type`, message: `Partner ${index + 1}: Partner type is required` });
+        }
+        // "Others (please specify)" reveals a required free-text field (Section7Partnerships.tsx)
+        // that was never actually enforced here — selecting it and leaving it blank passed submit.
+        if (p.type === 'Others (please specify)' && !String(p.type_other || '').trim()) {
+            errors.push({ field: `partners.${index}.type_other`, message: `Partner ${index + 1}: Please specify the "Other" partner type` });
         }
         const roleList = Array.isArray(p.role) ? p.role : (p.role ? [String(p.role)] : []);
         if (!roleList.length) {

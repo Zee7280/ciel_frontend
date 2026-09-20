@@ -1,8 +1,8 @@
 import { ShieldAlert, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, AlertTriangle, Lock, CreditCard, MessageSquareQuote } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
-import React, { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
@@ -61,6 +61,7 @@ function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMe
 
 export default function Section11Summary({ onRequestFinalSubmit, projectData }: Section11SummaryProps = {}) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const {
         data,
         isEligibleForSubmission,
@@ -142,6 +143,20 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
+
+    // Lets My Impact Wall's "Certificate"/"Full report" actions link straight into the real,
+    // already-built views here (?view=certificate | print) instead of a fake stand-in — see
+    // student-reports.service.ts's mapReportListing. Opens the modal only; printing still needs
+    // the visible "Print / Save PDF" click (a real user gesture), since browsers can silently
+    // block window.print() called without one.
+    const autoOpenView = searchParams.get("view");
+    const autoOpenedViewRef = useRef(false);
+    useEffect(() => {
+        if (autoOpenedViewRef.current || !autoOpenView || !showVerifiedImpactScores) return;
+        autoOpenedViewRef.current = true;
+        if (autoOpenView === "certificate") setShowCertificate(true);
+        else if (autoOpenView === "print") setShowPreview(true);
+    }, [autoOpenView, showVerifiedImpactScores]);
 
     const clearCertificatePrintScale = () => {
         document.documentElement.style.removeProperty("--cert-print-scale");

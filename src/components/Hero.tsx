@@ -33,14 +33,18 @@ export default function Hero() {
     const { stats } = usePlatformStats();
 
     const hours = stats?.report_verified_hours ?? 0;
-    const rate = 192;
+    // Use the backend's own computed dividend + rate (single source of truth) instead of
+    // re-deriving with a locally hardcoded rate — a prior drift (this file hardcoded 192 while
+    // other dashboards used 500) showed different dividend figures for the same hours depending
+    // on which page you were on.
+    const rate = stats?.dividend_hourly_rate_pkr ?? 0;
     const outOfPocket = stats?.out_of_pocket_pkr ?? 0;
     const peopleServing = useCountUp(stats?.people_serving ?? 0);
     const peopleReached = useCountUp(stats?.people_reached ?? 0);
     const verifiedHours = useCountUp(hours);
     const resourcesDeployed = useCountUp(stats?.resources_deployed_pkr ?? 0);
-    const dividend = useCountUp(hours * rate + outOfPocket);
-    const dividendSub = `${fmt(hours)} hrs × PKR ${fmt(rate)} + PKR ${fmt(outOfPocket)} out-of-pocket`;
+    const dividend = useCountUp(stats?.community_dividend_pkr ?? 0);
+    const dividendSub = `${fmt(hours)} hrs × PKR ${rate.toLocaleString("en-US", { maximumFractionDigits: 2 })} + PKR ${fmt(outOfPocket)} out-of-pocket`;
 
     const tiles = [
         { key: "serving", value: peopleServing, label: "People serving", sub: "students on submitted reports", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },

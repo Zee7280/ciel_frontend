@@ -14,13 +14,16 @@ import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import EmptyState from "@/components/ciel/EmptyState";
 import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
-import CommunityServiceHub, { CommunityCreateOpportunityView } from "./CommunityServiceHub";
+import CommunityServiceHub from "./CommunityServiceHub";
+import CommunityServiceCreate from "./CommunityServiceCreate";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import CommunityServiceRankings from "./CommunityServiceRankings";
-import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import CommunityServiceFiles from "./CommunityServiceFiles";
+import { CommunityCrumb, HubBackButton, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
-import { readStoredCurrentUser } from "@/utils/currentUser";
+import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
+import { isJoinApplicationPendingStatus, pickJoinApplicationStatus } from "@/utils/studentJoinApplication";
 
 /** Mirrors Nest `LINE_STATUS` (opportunity-workflow.service.ts) — every value the API can send. */
 type ApprovalLineStatus =
@@ -69,10 +72,22 @@ function formatHours(value: number | string): string {
     return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : String(value);
 }
 
-/** Postgres `time` comes back as "09:00:00" — students read HH:mm. */
+/** Postgres `time` comes back as "09:00:00" (24h) — students read it as a real clock, 12h + AM/PM. */
 function formatClock(value: string): string {
     const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? ""));
-    return match ? `${match[1].padStart(2, "0")}:${match[2]}` : String(value ?? "");
+    if (!match) return String(value ?? "");
+    const hour24 = parseInt(match[1], 10);
+    const minute = match[2];
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${minute} ${period}`;
+}
+
+/** ISO "2026-09-20" → "Sun, 20 Sep 2026" — the raw ISO string was previously shown as-is. */
+function formatEngagementDate(value: string): string {
+    const parsed = new Date(`${value}T00:00:00`);
+    if (!value || Number.isNaN(parsed.getTime())) return String(value ?? "");
+    return parsed.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
 function hourStatus(log: AttendanceLog): CielHourStatus {
@@ -99,18 +114,26 @@ function CommunityServiceContent() {
     const showHub = !rawTab;
     const rawFilter = searchParams.get("filter");
     const workspaceFilter =
-        rawFilter === "opportunity" ||
-        rawFilter === "report" ||
+        rawFilter === "ready" ||
+        rawFilter === "reports" ||
         rawFilter === "review" ||
-        rawFilter === "revision" ||
-        rawFilter === "closed"
+        rawFilter === "action" ||
+        rawFilter === "completed" ||
+        rawFilter === "archived"
             ? rawFilter
-            : "all";
+            : rawFilter === "report"
+              ? "reports"
+              : rawFilter === "revision"
+                ? "action"
+                : rawFilter === "closed"
+                  ? "completed"
+                  : "ready";
     const wallView = searchParams.get("view") === "wall";
     const guideView = searchParams.get("view") === "guide";
     const createView = searchParams.get("view") === "create";
     const workspaceView = searchParams.get("view") === "workspace";
     const rankingsView = searchParams.get("view") === "rankings";
+    const filesView = searchParams.get("view") === "files";
     const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
     const [loading, setLoading] = useState(true);
@@ -122,6 +145,7 @@ function CommunityServiceContent() {
     const [bestCii, setBestCii] = useState<number | null>(null);
     const [displayName, setDisplayName] = useState("");
     const [myOpportunities, setMyOpportunities] = useState<CreatedOpportunity[]>([]);
+    const [pendingApplications, setPendingApplications] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -134,7 +158,14 @@ function CommunityServiceContent() {
             authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
                 .then((res) => (res?.ok ? res.json() : null))
                 .catch(() => null),
-        ]).then(([data, summary, oppResult, rankingsResult]) => {
+            authenticatedFetch("/api/v1/students/opportunities", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ student_id: getStoredCurrentUserId() || null, page: 1, limit: 500 }),
+            }, { redirectToLogin: false })
+                .then((res) => (res?.ok ? res.json() : null))
+                .catch(() => null),
+        ]).then(([data, summary, oppResult, rankingsResult, browseResult]) => {
             if (cancelled) return;
             // `data === null` means the dashboard call failed (offline / expired session) — say so
             // instead of rendering a hub full of confident zeros.
@@ -169,6 +200,13 @@ function CommunityServiceContent() {
                         requires_partner_approval: Boolean(r.requires_partner_approval),
                     })),
             );
+            const browseRows = Array.isArray(browseResult?.data) ? (browseResult.data as Record<string, unknown>[]) : [];
+            setPendingApplications(
+                browseRows.filter((row) => {
+                    const status = pickJoinApplicationStatus(row);
+                    return Boolean(status) && isJoinApplicationPendingStatus(status);
+                }).length,
+            );
             setLoading(false);
         }).catch(() => {
             if (cancelled) return;
@@ -181,15 +219,23 @@ function CommunityServiceContent() {
     }, []);
 
     const attention = useMemo(() => {
-        const revisionOpp = myOpportunities.find((o) => o.workflow_stage === "revision");
-        const oppAction = myOpportunities.filter((o) => o.workflow_stage === "revision").length;
+        const oppAction = myOpportunities.filter(
+            (o) =>
+                o.workflow_stage === "revision" ||
+                o.faculty_approval_status === "revision_requested" ||
+                o.partner_approval_status === "revision_requested" ||
+                o.admin_approval_status === "revision_requested",
+        ).length;
         const oppApprovals = myOpportunities.filter((o) =>
             ["pending_faculty", "pending_partner", "pending_admin"].includes(o.workflow_stage ?? ""),
         ).length;
         const readyProjects = projects.filter((p) => !p.report_status);
-        const reportAction = projects.filter((p) => p.report_status === "rejected").length;
+        const reportAction = projects.filter((p) => {
+            const st = (p.report_status || "").toLowerCase();
+            return st === "rejected" || st.includes("revision");
+        }).length;
         const reportsInProgress = projects.filter(
-            (p) => p.report_status && !["verified", "paid", "rejected"].includes(p.report_status),
+            (p) => p.report_status && !["verified", "paid", "rejected"].includes(p.report_status) && !String(p.report_status).toLowerCase().includes("revision"),
         ).length;
         return [
             {
@@ -197,9 +243,7 @@ function CommunityServiceContent() {
                 n: oppAction,
                 title: "Opportunity action",
                 sub: oppAction ? "Revision waiting inside Create Opportunity" : "No proposal revision waiting",
-                href: revisionOpp
-                    ? `/dashboard/student/create-opportunity?edit=${encodeURIComponent(revisionOpp.id)}`
-                    : `${HUB}?view=create`,
+                href: `${HUB}?view=create&filter=action`,
                 urgent: oppAction > 0,
                 tone: oppAction > 0 ? ("bad" as const) : ("default" as const),
             },
@@ -208,7 +252,7 @@ function CommunityServiceContent() {
                 n: oppApprovals,
                 title: "Opportunity approvals",
                 sub: "Faculty / Partner / CIEL PK decisions tracked in Create Opportunity",
-                href: `${HUB}?view=workspace&filter=opportunity`,
+                href: `${HUB}?view=create&filter=review`,
                 urgent: false,
                 tone: "default" as const,
             },
@@ -217,7 +261,7 @@ function CommunityServiceContent() {
                 n: readyProjects.length,
                 title: "Ready to start",
                 sub: "Approved projects waiting in Workspace",
-                href: `${HUB}?view=workspace&filter=report`,
+                href: `${HUB}?view=workspace&filter=ready`,
                 urgent: false,
                 tone: readyProjects.length > 0 ? ("warn" as const) : ("default" as const),
             },
@@ -226,7 +270,7 @@ function CommunityServiceContent() {
                 n: reportAction,
                 title: "Report action",
                 sub: reportAction ? "Faculty requested a report revision" : "No report revision waiting",
-                href: `${HUB}?view=workspace&filter=revision`,
+                href: `${HUB}?view=workspace&filter=action`,
                 urgent: reportAction > 0,
                 tone: reportAction > 0 ? ("bad" as const) : ("default" as const),
             },
@@ -235,7 +279,7 @@ function CommunityServiceContent() {
                 n: reportsInProgress,
                 title: "Reports in progress",
                 sub: reportsInProgress ? "Continue your active report(s)" : "No active reports",
-                href: `${HUB}?view=workspace&filter=report`,
+                href: `${HUB}?view=workspace&filter=reports`,
                 urgent: false,
                 tone: reportsInProgress > 0 ? ("warn" as const) : ("default" as const),
             },
@@ -249,7 +293,10 @@ function CommunityServiceContent() {
         if (wallView) {
             router.replace("/dashboard/student/impact?area=Community%20Service");
         }
-    }, [rawTab, wallView, router]);
+        if (workspaceView && rawFilter === "opportunity") {
+            router.replace(`${HUB}?view=create&filter=review`);
+        }
+    }, [rawTab, wallView, workspaceView, rawFilter, router]);
 
     const setTab = (key: string) => {
         if (key === "find") {
@@ -270,20 +317,24 @@ function CommunityServiceContent() {
             <div className="mx-auto max-w-[980px] pb-16">
                 <CommunityCrumb role="Student" view="Guide" />
                 <HubBackButton href="/dashboard/student/paths/community-service" label="← Back to Community Service" />
+                <UserGuideBanner
+                    desc="A section-by-section coach for completing the Community Service Report correctly."
+                    items={[
+                        ["Section Guidance", "What the section is asking you to demonstrate."],
+                        ["Strong Example", "A model of the level of specificity expected."],
+                        ["Avoid", "Common weak responses or mistakes."],
+                        ["CII Connection", "How the section contributes evidence to the impact assessment."],
+                        ["Checklist", "Quick self-check before moving on."],
+                    ]}
+                    rule="Guidance supports the report; it does not replace the report form."
+                />
                 <StudentCommunityGuide showHero />
             </div>
         );
     }
 
     if (showHub && createView) {
-        return (
-            <CommunityCreateOpportunityView
-                projects={projects}
-                verifiedHours={verifiedHours}
-                wallCount={wallCount}
-                completion={completion}
-            />
-        );
+        return <CommunityServiceCreate />;
     }
 
     if (showHub && workspaceView) {
@@ -299,13 +350,11 @@ function CommunityServiceContent() {
     }
 
     if (showHub && rankingsView) {
-        return (
-            <div className="mx-auto max-w-[1500px] pb-16">
-                <CommunityCrumb role="Student" view="Rankings" />
-                <HubBackButton href={HUB} label="← Back to Community Service" />
-                <CommunityServiceRankings />
-            </div>
-        );
+        return <CommunityServiceRankings />;
+    }
+
+    if (showHub && filesView) {
+        return <CommunityServiceFiles />;
     }
 
     if (showHub) {
@@ -325,6 +374,7 @@ function CommunityServiceContent() {
                     bestCii={bestCii}
                     reportInProgress={reportInProgress}
                     recordCount={recordIds.size}
+                    pendingApplications={pendingApplications}
                 />
             </>
         );
@@ -848,7 +898,7 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-bold text-ciel-text">{log.activityType} · {formatHours(log.sessionHours)}h</p>
-                                    <p className="text-xs text-ciel-text-soft">{log.dateOfEngagement} · {formatClock(log.startTime)}–{formatClock(log.endTime)}</p>
+                                    <p className="text-xs text-ciel-text-soft">{formatEngagementDate(log.dateOfEngagement)} · {formatClock(log.startTime)}–{formatClock(log.endTime)}</p>
                                 </div>
                                 <StatusPill status={status} />
                             </div>
