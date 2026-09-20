@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
-import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 import {
     writeFacultyScopeSession,
     readFacultyDashboardViewPreference,
@@ -11,16 +10,11 @@ import {
     type FacultyDashboardViewClient,
 } from "@/utils/facultyScopeSession";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
-import { CourseworkHero, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { MOCKUP_GRADIENTS, MockupActionCard } from "@/components/ciel/dashboard/MockupChrome";
+import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
+import { useFacultyCommunityServiceData } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-
-type FacultyCourse = {
-    id?: string;
-    pending?: number;
-    pending_grading?: number;
-};
 
 type FacultyDashboardViewMode = FacultyDashboardViewClient;
 
@@ -32,11 +26,6 @@ type FacultyDashboardStats = {
         organization_id?: string;
         organization_name?: string;
     } | null;
-    students_active?: number;
-    hours_verified?: number;
-    pending_approvals?: number;
-    courses?: FacultyCourse[];
-    pendingSummary?: PendingSummary;
 };
 
 export default function FacultyDashboard() {
@@ -111,13 +100,6 @@ export default function FacultyDashboard() {
         }
     }, [isLoading, stats?.university_scope]);
 
-    const pendingGrading = useMemo(() => {
-        return (stats?.courses ?? []).reduce((sum, c) => {
-            const n = typeof c.pending_grading === "number" ? c.pending_grading : c.pending ?? 0;
-            return sum + n;
-        }, 0);
-    }, [stats?.courses]);
-
     const viewModes: FacultyDashboardViewMode[] = useMemo(() => {
         if (stats?.faculty_view_modes_available?.length) {
             return stats.faculty_view_modes_available;
@@ -137,39 +119,27 @@ export default function FacultyDashboard() {
         setDashboardView(v);
     };
 
-    const pendingApprovals = stats?.pending_approvals ?? 0;
-    const pendingSummary: PendingSummary = (() => {
-        const items = (stats?.pendingSummary?.items ?? [
-            {
-                key: "faculty_pending_approvals",
-                title: "Pending approvals",
-                count: pendingApprovals,
-                href: "/dashboard/faculty/approvals",
-                tone: "warning" as const,
-                description: "Student-created opportunities waiting for your review.",
-            },
-        ]).filter((item) => item.key !== "faculty_pending_grading" && item.title !== "Pending grading");
-        return {
-            total: items.reduce((sum, item) => sum + (item.count > 0 ? item.count : 0), 0),
-            items,
-        };
-    })();
-
-    const dash = (n: number) => (isLoading ? "—" : String(n));
+    const cs = useFacultyCommunityServiceData();
+    const communityActions = cs.pendingOppReviews + cs.pendingApps;
+    const dash = (n: number) => (isLoading && cs.loading ? "—" : String(n));
+    const tone = (n: number, kind: "bad" | "warn" = "bad") => (n ? kind : "default");
 
     return (
-        <div className="mx-auto max-w-[1240px]">
+        <div className="mx-auto max-w-[1500px] pb-16">
             <PendingAttendanceModal variant="faculty" />
 
-            <CourseworkHero
-                kicker="FACULTY IMPACT DASHBOARD"
-                title={namedTimeGreeting(firstName, "🧑‍🏫")}
-                subtitle="Approve what’s waiting, then open the path you need. Verified work lands on your Faculty Impact Wall."
+            <MockupHero
+                kicker="CIEL PK · Faculty Dashboard"
+                title={namedTimeGreeting(firstName || "Faculty", "👩‍🏫")}
+                subtitle="Choose an impact area from the left. Each area keeps its workflows, approvals, projects and verified outcomes together."
+                gradient={FACULTY_HERO}
                 stats={[
-                    { value: dash(stats?.students_active ?? 0), label: "Active Students" },
-                    { value: dash(stats?.hours_verified ?? 0), label: "Hours Verified" },
-                    { value: dash(pendingApprovals), label: "Pending Review" },
+                    { value: "4", label: "Impact areas" },
+                    { value: dash(communityActions), label: "Community actions", href: "/dashboard/faculty/community-service?view=review" },
+                    { value: dash(cs.pendingReports.length), label: "Reports to review", href: "/dashboard/faculty/community-service?view=reports" },
+                    { value: dash(cs.deckCards.length), label: "Verified impact", href: "/dashboard/faculty/community-service?view=impact" },
                 ]}
+                rightStat={{ value: "👩‍🏫", label: "Faculty impact workspace" }}
             />
 
             {viewModes.length > 1 ? (
@@ -198,109 +168,107 @@ export default function FacultyDashboard() {
                 </div>
             ) : null}
 
-            {pendingSummary.items.some((item) => item.count > 0) ? (
-                <div className="mt-4">
-                    <PendingActionCards summary={pendingSummary} emptyMessage="Nothing waiting — your inbox is clear." />
-                </div>
-            ) : null}
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                {(
+                    [
+                        {
+                            n: cs.pendingOppReviews,
+                            title: "Opportunities to review",
+                            sub: "Student-created · your approval is first",
+                            href: "/dashboard/faculty/community-service?view=review&tab=opps",
+                            tone: tone(cs.pendingOppReviews),
+                        },
+                        {
+                            n: cs.pendingApps,
+                            title: "Participation requests",
+                            sub: "Students applying to published opportunities",
+                            href: "/dashboard/faculty/community-service?view=review&tab=apps",
+                            tone: tone(cs.pendingApps, "warn"),
+                        },
+                        {
+                            n: cs.pendingReports.length,
+                            title: "Reports for review",
+                            sub: "AI Review complete · CII provisional",
+                            href: "/dashboard/faculty/community-service?view=reports&tab=pending",
+                            tone: tone(cs.pendingReports.length),
+                        },
+                        {
+                            n: cs.hoursProjectCount,
+                            title: "Projects with members below hours",
+                            sub: "Send a system reminder",
+                            href: "/dashboard/faculty/attendance-review",
+                            tone: tone(cs.hoursProjectCount, "warn"),
+                        },
+                    ] as const
+                ).map((item) => (
+                    <Link
+                        key={item.title}
+                        href={item.href}
+                        className="flex items-center gap-3 rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 shadow-[0_8px_22px_rgba(24,52,64,.04)] transition hover:-translate-y-0.5 hover:border-[#bcd4d8]"
+                    >
+                        <span
+                            className={
+                                "min-w-[36px] text-[26px] font-black leading-none " +
+                                (item.tone === "bad" ? "text-[#b34c4c]" : item.tone === "warn" ? "text-[#9a6410]" : "text-[#0e4d4e]")
+                            }
+                        >
+                            {item.n}
+                        </span>
+                        <span className="min-w-0">
+                            <b className="block text-[13px] font-extrabold leading-snug text-[#16313d]">{item.title}</b>
+                            <small className="mt-0.5 block text-[11.5px] leading-relaxed text-[#6b7c86]">{item.sub}</small>
+                        </span>
+                    </Link>
+                ))}
+            </div>
 
             <div className="mt-4">
-                <PathSectionHead title="Your paths" subtitle="Open a path to review submissions, run the grader, and publish to the Impact Wall." pill="FACULTY VIEW" />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FacultyCsInbox items={cs.inboxItems} loading={cs.loading} hideEmpty />
+            </div>
+
+            <MockupSectionHead
+                title="Impact Areas"
+                subtitle="Home is only an overview. Open Community Service from the left navigation to access its complete workflow."
+            />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <MockupActionCard
                     href="/dashboard/faculty/community-service"
-                    emoji="⛺"
+                    emoji="🌱"
+                    ghost="🌱"
                     title="Community Service"
-                    subtitle="Monitor service opportunities, participation, reports and verified community impact."
-                    badge="REVIEW"
+                    subtitle="Create, review and supervise Community Service opportunities and reports."
+                    badge="OPEN AREA"
                     background={MOCKUP_GRADIENTS.teal}
+                    hot={communityActions + cs.pendingReports.length > 0}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/coursework-projects"
                     emoji="📚"
-                    title="Coursework Project"
-                    subtitle="Review course-linked impact projects, approve completion and run semester rankings after approval."
-                    badge="OPEN"
-                    background={MOCKUP_GRADIENTS.teal}
+                    ghost="📚"
+                    title="Coursework / SDG Projects"
+                    subtitle="Sustainability-linked academic projects and assignments."
+                    badge="IMPACT AREA"
+                    background={MOCKUP_GRADIENTS.blue}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/fyp-thesis"
                     emoji="🎓"
-                    title="Final Year Project (FYP)"
-                    subtitle="Supervisees' FYP flashcards, review queue, and Approved FYP + AI Analyser Ranking."
-                    badge="OPEN"
-                    background={MOCKUP_GRADIENTS.navy}
+                    ghost="🎓"
+                    title="FYP / Thesis"
+                    subtitle="Final Year Projects and research with sustainability relevance."
+                    badge="IMPACT AREA"
+                    background={MOCKUP_GRADIENTS.purple}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/startup-business"
-                    emoji="💼"
-                    title="Startup / Business"
-                    subtitle="Supervisor approval that puts a venture on the live deck."
-                    badge="SIGN-OFF"
+                    emoji="🚀"
+                    ghost="🚀"
+                    title="Startup / Venture"
+                    subtitle="Student ventures and sustainability-linked entrepreneurship."
+                    badge="IMPACT AREA"
                     background={MOCKUP_GRADIENTS.orange}
                 />
-                </div>
             </div>
-
-            <WorkflowSteps
-                title="Faculty review workflow"
-                subtitle="Approved work flows into the same unified Faculty Impact Wall."
-                steps={["Opportunity Submitted", "Faculty Opportunity Approval", "Activity + Report", "Faculty Report Approval", "Impact Wall + AI Badge"]}
-            />
-
-            <PathSectionHead title="Workspace" subtitle="Approvals, enrolments, reports and new opportunities." />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <MockupActionCard
-                    href="/dashboard/faculty/approvals"
-                    emoji="✅"
-                    title="Approve Opportunities"
-                    subtitle="Review opportunities requiring faculty approval. Approve, request revision or reject."
-                    badge={pendingApprovals ? `${pendingApprovals} PENDING` : "QUEUE"}
-                    background={MOCKUP_GRADIENTS.teal}
-                />
-                <MockupActionCard
-                    href="/dashboard/faculty/reports"
-                    emoji="📄"
-                    title="Approve Reports"
-                    subtitle="Review submitted service reports with evidence, hours, SDGs and AI preliminary assessment."
-                    badge={pendingGrading ? `${pendingGrading} REPORTS` : "REVIEW"}
-                    background={MOCKUP_GRADIENTS.blue}
-                />
-                <MockupActionCard
-                    href="/dashboard/faculty/join-applications"
-                    emoji="📋"
-                    title="Applications"
-                    subtitle="Students asking to join your opportunities — approve or decline."
-                    badge="ENROLMENTS"
-                    background={MOCKUP_GRADIENTS.pink}
-                />
-                <MockupActionCard
-                    href="/dashboard/faculty/create-opportunity"
-                    emoji="🚀"
-                    title="Create an opportunity"
-                    subtitle="A supervised listing your students can enrol on."
-                    badge="PUBLISH"
-                    background={MOCKUP_GRADIENTS.green}
-                />
-            </div>
-
-            <p className="mt-6 text-center text-[11px] text-[#71828e]">
-                <Link href="/dashboard/faculty/my-opportunities" className="font-extrabold text-[#08756b] hover:underline">
-                    My opportunities
-                </Link>
-                {" · "}
-                <Link href="/dashboard/faculty/attendance-review" className="font-extrabold text-[#08756b] hover:underline">
-                    Attendance
-                </Link>
-                {" · "}
-                <Link href="/dashboard/faculty/analytics" className="font-extrabold text-[#08756b] hover:underline">
-                    Analytics
-                </Link>
-                {" · "}
-                <Link href="/dashboard/faculty/impact" className="font-extrabold text-[#08756b] hover:underline">
-                    Impact Wall
-                </Link>
-            </p>
         </div>
     );
 }

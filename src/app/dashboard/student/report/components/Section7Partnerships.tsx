@@ -13,6 +13,8 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 
 const partnerTypes = [
     "NGO",
@@ -316,14 +318,31 @@ function PartnerCard({
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <Label className={fieldLabel}>Number</Label>
-                    <Input
-                        type="tel"
-                        placeholder="+92 …"
-                        value={p.pakistan_contact_number ?? ""}
-                        onChange={e => onUpdate("pakistan_contact_number", e.target.value)}
-                        className={inputClasses}
-                    />
+                    <Label className={fieldLabel}>WhatsApp / mobile · country code + number</Label>
+                    {(() => {
+                        const parsed = parsePhoneForDisplay(p.pakistan_contact_number ?? "");
+                        return (
+                            <PhoneConnectivityRow
+                                usePortalCountryPicker
+                                phoneCountryKey={parsed.phoneCountryKey}
+                                nationalDigits={parsed.national}
+                                onPhoneCountryKeyChange={(key) =>
+                                    onUpdate("pakistan_contact_number", composeInternationalPhone(key, parsed.national))
+                                }
+                                onNationalDigitsChange={(digits) =>
+                                    onUpdate(
+                                        "pakistan_contact_number",
+                                        composeInternationalPhone(parsed.phoneCountryKey, digits),
+                                    )
+                                }
+                                maxNationalDigits={15}
+                                placeholderNational="3001234567"
+                                selectClassName="h-11 min-w-[7.5rem] rounded-lg border-slate-200 text-xs shadow-sm focus-visible:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                inputClassName="h-11 rounded-lg border-slate-200 text-sm shadow-sm focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                                rowClassName="items-stretch gap-2"
+                            />
+                        );
+                    })()}
                 </div>
                 <div className="space-y-1.5">
                     <Label className={fieldLabel}>Email</Label>

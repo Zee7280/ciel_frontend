@@ -34,6 +34,8 @@ import {
     opportunityHasPartner,
     type AttendanceApproverType,
 } from "@/utils/attendanceApproverRouting";
+import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
+import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 
 /** Copy for verify-attendance UX: student picks faculty or partner after the oath. */
 const ATTENDANCE_VERIFICATION_INFO = {
@@ -1216,9 +1218,20 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             {String((data.section1.team_lead as any).cnic || "")
                                                                 .replace(/\D/g, "")
                                                                 .length === 13
-                                                                ? String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "")
+                                                                ? formatPakistaniCnicDisplay((data.section1.team_lead as any).cnic)
                                                                 : "—"}
                                                         </p>
+                                                        {(() => {
+                                                            const mobile = formatInternationalPhoneDisplay(
+                                                                String((data.section1.team_lead as any).mobile || ""),
+                                                            );
+                                                            if (!mobile) return null;
+                                                            return (
+                                                                <p className="mt-0.5 font-mono text-[11px] text-slate-600">
+                                                                    Mobile: {mobile}
+                                                                </p>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
 

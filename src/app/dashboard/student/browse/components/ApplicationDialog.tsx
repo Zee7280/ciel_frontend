@@ -18,6 +18,7 @@ import {
     composeInternationalPhone,
     parsePhoneForDisplay,
 } from "@/utils/countryCallingCodes";
+import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
 import {
     messageFromApplyProxyError,
     normalizeNestHttpMessage,
@@ -230,8 +231,7 @@ export default function ApplicationDialog({
     const updateMember = (index: number, field: keyof TeamMember, value: string) => {
         // Strict numeric support for CNIC
         if (field === "cnic") {
-            if (!/^\d*$/.test(value)) return;
-            if (value.length > 13) return;
+            value = pakistaniCnicDigits(value);
         }
 
         if (field === "university" && teamMembers[index]?.role === "Lead") {
@@ -728,11 +728,13 @@ export default function ApplicationDialog({
                                                 />
                                             </div>
                                             <div className="space-y-1.5 md:col-span-1 lg:col-span-3">
-                                                <Label className="text-xs font-medium text-slate-600">CNIC (13 digits) *</Label>
+                                                <Label className="text-xs font-medium text-slate-600">CNIC (xxxxx-xxxxxxx-x) *</Label>
                                                 <Input
-                                                    value={member.cnic}
+                                                    value={formatPakistaniCnicInput(member.cnic)}
                                                     onChange={(e) => updateMember(index, 'cnic', e.target.value)}
-                                                    placeholder="35202..."
+                                                    placeholder="35202-1234567-1"
+                                                    inputMode="numeric"
+                                                    maxLength={15}
                                                     className="h-10 bg-white"
                                                 />
                                             </div>
@@ -791,8 +793,10 @@ export default function ApplicationDialog({
                                                             <Loader2 className="w-4 h-4 animate-spin" />
                                                         ) : member.verificationStatus === 'verified' ? (
                                                             "Verified"
+                                                        ) : member.verificationStatus === 'otp_sent' ? (
+                                                            "OTP sent"
                                                         ) : (
-                                                            "Verify"
+                                                            "Send OTP"
                                                         )}
                                                     </Button>
                                                 </div>
@@ -801,7 +805,7 @@ export default function ApplicationDialog({
                                                         <p className="text-[10px] text-green-600 font-medium">Email verified successfully.</p>
                                                     )}
                                                     {member.verificationStatus === 'unverified' && member.email && (
-                                                        <p className="text-[10px] text-slate-400">Click Verify to send OTP code.</p>
+                                                        <p className="text-[10px] text-slate-400">Click Send OTP — they must confirm the code before they are added.</p>
                                                     )}
                                                     {member.verificationStatus === 'otp_sent' && (
                                                         <p className="text-[10px] text-blue-600 font-medium">OTP code has been sent to this email.</p>

@@ -1,5 +1,5 @@
 import type { ReportData } from "../context/ReportContext";
-import { findSdgById } from "@/utils/sdgData";
+import { findSdgById, formatSdgCodeDisplay } from "@/utils/sdgData";
 
 function digitsGoalNumber(v: unknown): number | null {
     if (typeof v === "number" && Number.isFinite(v)) {
@@ -84,6 +84,15 @@ function firstValue(record: Record<string, unknown>, keys: string[]): unknown {
     return undefined;
 }
 
+function sdgCodeFromRecord(record: Record<string, unknown> | null | undefined, keys: string[]): string {
+    if (!record) return "";
+    return String(firstValue(record, keys) ?? "").trim();
+}
+
+function subIndicatorFromRecord(record: Record<string, unknown> | null | undefined): string {
+    return sdgCodeFromRecord(record, ["sub_indicator", "subIndicator", "sub", "local_sub_indicator", "localSubIndicator"]);
+}
+
 function goalNumberFromRecord(record: Record<string, unknown> | null | undefined): number | null {
     if (!record) return null;
     for (const key of GOAL_NUMBER_KEYS) {
@@ -111,6 +120,7 @@ export type ReportSdgRow = {
     title: string;
     targetId: string;
     indicatorId: string;
+    subIndicator?: string;
     source: ReportSdgSource;
     role: "primary" | "secondary";
     justification?: string;
@@ -146,17 +156,18 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
                 goalNumber: primaryNum,
                 title: titleForGoal(primaryNum, String(primaryObj?.goal_title ?? primaryObj?.title ?? "").trim() || null),
                 targetId: String(
-                    firstValue(info, ["target_id", "targetId", "target"]) ??
-                        (primaryObj ? firstValue(primaryObj, ["target_id", "targetId", "target"]) : undefined) ??
-                        firstValue(payload, ["target_id", "targetId", "target"]) ??
+                    firstValue(info, ["target_id", "targetId", "target", "target_code", "targetCode"]) ??
+                        (primaryObj ? firstValue(primaryObj, ["target_id", "targetId", "target", "target_code", "targetCode"]) : undefined) ??
+                        firstValue(payload, ["target_id", "targetId", "target", "target_code", "targetCode"]) ??
                         "",
                 ).trim(),
                 indicatorId: String(
-                    firstValue(info, ["indicator_id", "indicatorId", "indicator"]) ??
-                        (primaryObj ? firstValue(primaryObj, ["indicator_id", "indicatorId", "indicator"]) : undefined) ??
-                        firstValue(payload, ["indicator_id", "indicatorId", "indicator"]) ??
+                    firstValue(info, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) ??
+                        (primaryObj ? firstValue(primaryObj, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) : undefined) ??
+                        firstValue(payload, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) ??
                         "",
                 ).trim(),
+                subIndicator: subIndicatorFromRecord(info) || subIndicatorFromRecord(primaryObj) || subIndicatorFromRecord(payload),
                 source: "opportunity",
                 role: "primary",
             });
@@ -189,17 +200,18 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
                 goalNumber: n,
                 title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
                 targetId: String(
-                    (s ? firstValue(s, ["target_id", "targetId", "target"]) : undefined) ??
+                    (s ? firstValue(s, ["target_id", "targetId", "target", "target_code", "targetCode"]) : undefined) ??
                         firstValue(payload, ["secondary_target", "secondaryTarget", "secondary_target_id", "secondaryTargetId"]) ??
                         firstValue(info, ["secondary_target", "secondaryTarget", "secondary_target_id", "secondaryTargetId"]) ??
                         "",
                 ).trim(),
                 indicatorId: String(
-                    (s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : undefined) ??
+                    (s ? firstValue(s, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) : undefined) ??
                         firstValue(payload, ["secondary_indicator", "secondaryIndicator", "secondary_indicator_id", "secondaryIndicatorId"]) ??
                         firstValue(info, ["secondary_indicator", "secondaryIndicator", "secondary_indicator_id", "secondaryIndicatorId"]) ??
                         "",
                 ).trim(),
+                subIndicator: subIndicatorFromRecord(s),
                 source: "opportunity",
                 role: "secondary",
                 justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : "").trim(),
@@ -221,8 +233,9 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
             rows.push({
                 goalNumber: n,
                 title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
-                targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : "").trim(),
-                indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : "").trim(),
+                targetId: String(s ? firstValue(s, ["target_id", "targetId", "target", "target_code", "targetCode"]) : "").trim(),
+                indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) : "").trim(),
+                subIndicator: subIndicatorFromRecord(s),
                 source: "opportunity",
                 role: "secondary",
                 justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : "").trim(),
@@ -242,8 +255,9 @@ export function listStudentReportSdgs(section3: ReportData["section3"]): ReportS
         rows.push({
             goalNumber: primaryNum,
             title: titleForGoal(primaryNum, String(primary?.goal_title ?? primary?.title ?? "").trim() || null),
-            targetId: String(primary ? firstValue(primary, ["target_id", "targetId", "target"]) ?? "" : "").trim(),
-            indicatorId: String(primary ? firstValue(primary, ["indicator_id", "indicatorId", "indicator"]) ?? "" : "").trim(),
+            targetId: String(primary ? firstValue(primary, ["target_id", "targetId", "target", "target_code", "targetCode"]) ?? "" : "").trim(),
+            indicatorId: String(primary ? firstValue(primary, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) ?? "" : "").trim(),
+            subIndicator: subIndicatorFromRecord(primary),
             source: "student",
             role: "primary",
         });
@@ -256,8 +270,9 @@ export function listStudentReportSdgs(section3: ReportData["section3"]): ReportS
         rows.push({
             goalNumber: n,
             title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
-            targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : raw.target_id ?? "").trim(),
-            indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : raw.indicator_id ?? "").trim(),
+            targetId: String(s ? firstValue(s, ["target_id", "targetId", "target", "target_code", "targetCode"]) : raw.target_id ?? "").trim(),
+            indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator", "indicator_code", "indicatorCode"]) : raw.indicator_id ?? "").trim(),
+            subIndicator: subIndicatorFromRecord(s) || String(raw.sub_indicator ?? "").trim(),
             source: "student",
             role: "secondary",
             justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : raw.justification_text ?? "").trim(),
@@ -369,8 +384,10 @@ export function formatMergedSdgGoalsSnapshotLabels(rows: ReportSdgRow[]): {
     const goalsLine = rows.map((r) => `SDG ${r.goalNumber}`).join(", ");
     const parts = rows
         .map((r) => {
-            const t = r.targetId?.trim();
-            const i = r.indicatorId?.trim();
+            const t = formatSdgCodeDisplay(r.targetId) || r.targetId?.trim();
+            const i = formatSdgCodeDisplay(r.indicatorId) || r.indicatorId?.trim();
+            const sub = r.subIndicator?.trim();
+            if (t && i && sub) return `${t} (${i} · ${sub})`;
             if (t && i) return `${t} (${i})`;
             if (t) return t;
             if (i) return i;

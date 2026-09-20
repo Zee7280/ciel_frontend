@@ -1,4 +1,4 @@
-import { sdgData } from "@/utils/sdgData";
+import { findSdgById, findSdgTarget } from "@/utils/sdgData";
 import {
     type CourseProjectEntry,
     type CourseProjectSectionSummaries,
@@ -68,8 +68,8 @@ export function courseworkPrimaryTargetLabel(entry: CourseProjectEntry): string 
     const en = entry.sdgMapping?.entries?.[0];
     const tid = en?.targets?.[0];
     if (!en || !tid) return null;
-    const sdg = sdgData.find((s) => s.number === en.goalNumber);
-    const target = sdg?.targets.find((t) => t.id === tid);
+    const sdg = findSdgById(en.goalNumber);
+    const target = findSdgTarget(sdg, tid);
     return target ? `${tid} ${target.description}` : tid;
 }
 
@@ -100,7 +100,7 @@ export function courseworkFlashHighlights(entry: CourseProjectEntry): FlashHighl
     const outs = (re.outputs || []).map(stripEmoji).filter(Boolean);
     const primary = sm.entries?.[0];
     const support = (sm.entries || []).slice(1);
-    const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : undefined;
+    const sdg = primary ? findSdgById(primary.goalNumber) : undefined;
     const metric = (re.metrics || [])[0];
     const limitation = re.limitationType === "Other — describe below" ? re.limitationOther : re.limitationType;
 

@@ -4,7 +4,19 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
-import { sdgData } from "@/utils/sdgData";
+import {
+    findSdgById,
+    findSdgTarget,
+    findSdgIndicatorInGoal,
+    formatSdgCodeDisplay,
+    isClosestFitTarget,
+    resolveSdgTargetSelectValue,
+    resolveSdgIndicatorSelectValue,
+    SDG_LOCAL_SUB_INDICATORS,
+    SDG_CLOSEST_FIT_TARGET,
+    SDG_OTHER_INDICATOR,
+    type SDG,
+} from "@/utils/sdgData";
 import clsx from "clsx";
 import { listOpportunityReportSdgs } from "../utils/reportSdgMerge";
 import { REPORT_TEXT_MAX_WORDS, reportTextWordMeter } from "../utils/validation";
@@ -64,6 +76,123 @@ function WordCountBar({ count, max = REPORT_TEXT_MAX_WORDS, text }: { count: num
             </span>
         </div>
     );
+}
+
+function SdgCascadeFields({
+    sdgRecord,
+    targetId,
+    indicatorId,
+    subIndicator,
+    onChange,
+    targetError,
+}: {
+    sdgRecord: SDG | undefined;
+    targetId: string;
+    indicatorId: string;
+    subIndicator: string;
+    onChange: (patch: { target_id?: string; indicator_id?: string; sub_indicator?: string }) => void;
+    targetError?: string;
+}) {
+    const closest = isClosestFitTarget(targetId);
+    const resolvedTarget = findSdgTarget(sdgRecord, targetId);
+    const targetValue = resolveSdgTargetSelectValue(sdgRecord, targetId);
+    const indicatorPool = closest
+        ? sdgRecord?.targets.flatMap((t) => t.indicators) || []
+        : resolvedTarget?.indicators || [];
+    const indicatorValue = resolveSdgIndicatorSelectValue(resolvedTarget, indicatorId, indicatorPool);
+
+    return (
+        <div className="space-y-4 bg-white p-4 sm:p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <p className={fieldLabelClass}>
+                        Select target <span className="text-red-500">*</span>
+                    </p>
+                    <div className="relative">
+                        <select
+                            className={dropdownClass}
+                            value={targetValue}
+                            onChange={(e) =>
+                                onChange({
+                                    target_id: e.target.value,
+                                    indicator_id: "",
+                                    sub_indicator: "",
+                                })
+                            }
+                        >
+                            <option value="">Select target…</option>
+                            {(sdgRecord?.targets || []).map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    Target {formatSdgCodeDisplay(t.id)} — {t.description}
+                                </option>
+                            ))}
+                            <option value={SDG_CLOSEST_FIT_TARGET}>🧭 Closest fit — explained below</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                    {targetError ? <FieldError message={targetError} /> : null}
+                </div>
+                <div className={clsx("space-y-1.5", !targetValue && "pointer-events-none opacity-50")}>
+                    <p className={fieldLabelClass}>
+                        Indicator <span className="text-red-500">*</span>
+                    </p>
+                    <div className="relative">
+                        <select
+                            className={dropdownClass}
+                            value={indicatorValue}
+                            onChange={(e) => onChange({ indicator_id: e.target.value })}
+                        >
+                            <option value="">Select indicator…</option>
+                            {indicatorPool.map((ind) => (
+                                <option key={ind.id} value={ind.id}>
+                                    Indicator {formatSdgCodeDisplay(ind.id)} — {ind.description}
+                                </option>
+                            ))}
+                            <option value={SDG_OTHER_INDICATOR}>Other relevant indicator</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                        Indicators follow the selected UN target. Letter codes such as 4.A match 4.a.
+                    </p>
+                </div>
+            </div>
+            <div className={clsx("space-y-1.5", !targetValue && "pointer-events-none opacity-50")}>
+                <p className={fieldLabelClass}>
+                    Sub-indicator <span className="font-semibold normal-case tracking-normal text-slate-400">optional</span>
+                </p>
+                <div className="relative">
+                    <select
+                        className={dropdownClass}
+                        value={subIndicator || ""}
+                        onChange={(e) => onChange({ sub_indicator: e.target.value })}
+                    >
+                        <option value="">No sub-indicator selected</option>
+                        {SDG_LOCAL_SUB_INDICATORS.map((sub) => (
+                            <option key={sub} value={sub}>
+                                {sub}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function registeredSdgMeta(goalNumber: number, targetId: string, indicatorId: string, subIndicator?: string) {
+    const sdgRecord = findSdgById(goalNumber);
+    const target = findSdgTarget(sdgRecord, targetId);
+    const indicator = findSdgIndicatorInGoal(sdgRecord, indicatorId);
+    return {
+        sdgRecord,
+        targetCode: formatSdgCodeDisplay(target?.id || targetId),
+        targetDesc: target?.description || "",
+        indicatorCode: formatSdgCodeDisplay(indicator?.id || indicatorId),
+        indicatorDesc: indicator?.description || "",
+        subIndicator: (subIndicator || "").trim(),
+    };
 }
 
 /** Clickable colored SDG tile grid — replaces a plain goal dropdown with the same visual picker used across the app's redesigned SDG UI. */
@@ -132,10 +261,9 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentPrimaryId = data.section3.primary_sdg.goal_number?.toString() || "";
     const studentTargetId = data.section3.primary_sdg.target_id || "";
     const studentIndicatorId = data.section3.primary_sdg.indicator_id || "";
+    const studentSubIndicator = data.section3.primary_sdg.sub_indicator || "";
 
-    const selectedSDGRecord = sdgData.find(s => s.id === studentPrimaryId);
-    const availableTargets = selectedSDGRecord?.targets || [];
-    const availableIndicators = availableTargets.find(t => t.id === studentTargetId)?.indicators || [];
+    const selectedSDGRecord = findSdgById(studentPrimaryId);
 
     const handleRemoveSecondary = (index: number) => {
         const updated = [...secondary_sdgs];
@@ -269,6 +397,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             "Defining the contribution pathway",
                             "Mapping secondary goal alignments",
                             "Standardizing UN indicator reporting",
+                            "Optional local sub-indicators",
                             "Synthesizing your alignment logic",
                         ].map((item) => (
                             <div
@@ -325,15 +454,14 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                     {oppPrimaryNum > 0 &&
                         (() => {
                             const sdg = ALL_SDGS.find((s) => s.num === oppPrimaryNum);
-                            const sdgRecord = sdgData.find((s) => s.number === oppPrimaryNum);
                             const targetId = oppPrimaryRow?.targetId || "";
                             const indicatorId = oppPrimaryRow?.indicatorId || "";
-                            const targetDesc =
-                                sdgRecord?.targets?.find((t) => t.id === targetId)?.description || "";
-                            const indicatorDesc =
-                                sdgRecord?.targets
-                                    ?.flatMap((t) => t.indicators || [])
-                                    .find((i) => i.id === indicatorId)?.description || "";
+                            const meta = registeredSdgMeta(
+                                oppPrimaryNum,
+                                targetId,
+                                indicatorId,
+                                oppPrimaryRow?.subIndicator,
+                            );
 
                             if (!sdg) return null;
 
@@ -368,17 +496,25 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 {targetId ? (
                                                     <p className="text-sm text-slate-600">
                                                         <span className="font-semibold text-slate-800">
-                                                            TARGET {targetId}:
+                                                            TARGET {meta.targetCode}:
                                                         </span>{" "}
-                                                        {targetDesc || "Registered target"}
+                                                        {meta.targetDesc || "Registered target"}
                                                     </p>
                                                 ) : null}
                                                 {indicatorId ? (
                                                     <p className="text-sm text-slate-600">
                                                         <span className="font-semibold text-slate-800">
-                                                            INDICATOR {indicatorId}:
+                                                            INDICATOR {meta.indicatorCode}:
                                                         </span>{" "}
-                                                        {indicatorDesc || "Registered indicator"}
+                                                        {meta.indicatorDesc || "Registered indicator"}
+                                                    </p>
+                                                ) : null}
+                                                {meta.subIndicator ? (
+                                                    <p className="text-sm text-slate-600">
+                                                        <span className="font-semibold text-slate-800">
+                                                            SUB-INDICATOR:
+                                                        </span>{" "}
+                                                        {meta.subIndicator}
                                                     </p>
                                                 ) : null}
                                             </div>
@@ -391,15 +527,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                     {oppSecondaries.map((row, i) => {
                         const num = row.goalNumber;
                         const sdg = ALL_SDGS.find((s) => s.num === num);
-                        const sdgRecord = sdgData.find((s) => s.number === num);
-                        const secTargetId = row.targetId;
-                        const secIndicatorId = row.indicatorId;
-                        const secTargetDesc =
-                            sdgRecord?.targets?.find((t) => t.id === secTargetId)?.description || "";
-                        const secIndicatorDesc =
-                            sdgRecord?.targets
-                                ?.flatMap((t) => t.indicators || [])
-                                .find((ind) => ind.id === secIndicatorId)?.description || "";
+                        const meta = registeredSdgMeta(num, row.targetId, row.indicatorId, row.subIndicator);
 
                         if (!sdg) return null;
 
@@ -424,20 +552,26 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         </span>
                                     </div>
                                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                        {secTargetId ? (
+                                        {row.targetId ? (
                                             <span>
                                                 <span className="font-semibold text-slate-700">
-                                                    Target {secTargetId}:
+                                                    Target {meta.targetCode}:
                                                 </span>{" "}
-                                                {secTargetDesc || "Registered"}
+                                                {meta.targetDesc || "Registered"}
                                             </span>
                                         ) : null}
-                                        {secIndicatorId ? (
+                                        {row.indicatorId ? (
                                             <span>
                                                 <span className="font-semibold text-slate-700">
-                                                    Indicator {secIndicatorId}:
+                                                    Indicator {meta.indicatorCode}:
                                                 </span>{" "}
-                                                {secIndicatorDesc || "Registered"}
+                                                {meta.indicatorDesc || "Registered"}
+                                            </span>
+                                        ) : null}
+                                        {meta.subIndicator ? (
+                                            <span>
+                                                <span className="font-semibold text-slate-700">Sub-indicator:</span>{" "}
+                                                {meta.subIndicator}
                                             </span>
                                         ) : null}
                                     </div>
@@ -519,8 +653,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             </p>
                             <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
                                 The SDG, target, and indicator selected here will be linked to your project&apos;s
-                                accountability profile. Ensure they align with your planned activities in
-                                Section 4.
+                                accountability profile. Letter-coded UN targets such as 4.A match 4.a. Sub-indicator
+                                is optional. Ensure they align with your planned activities in Section 4.
                             </p>
                         </div>
                     </div>
@@ -538,6 +672,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         goal_number: id,
                                         target_id: "",
                                         indicator_id: "",
+                                        sub_indicator: "",
                                     },
                                 })
                             }
@@ -557,69 +692,21 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             >
                                 SDG {selectedSDGRecord?.number}: {selectedSDGRecord?.title}
                             </div>
-                            <div className="grid grid-cols-1 gap-4 bg-white p-4 sm:p-5 md:grid-cols-2">
-                                <div className="space-y-1.5">
-                                    <label className={fieldLabelClass}>C2. Select SDG Target</label>
-                                    <div className="relative">
-                                        <select
-                                            className={dropdownClass}
-                                            value={studentTargetId}
-                                            onChange={(e) => {
-                                                updateSection("section3", {
-                                                    primary_sdg: {
-                                                        ...data.section3.primary_sdg,
-                                                        target_id: e.target.value,
-                                                        indicator_id: "",
-                                                    },
-                                                });
-                                            }}
-                                        >
-                                            <option value="">Select target...</option>
-                                            {availableTargets.map((t) => (
-                                                <option key={t.id} value={t.id}>
-                                                    Target {t.id} — {t.description}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    </div>
-                                    <FieldError message={getFieldError("target_code")} />
-                                </div>
-
-                                <div
-                                    className={clsx(
-                                        "space-y-1.5",
-                                        !studentTargetId && "pointer-events-none opacity-50",
-                                    )}
-                                >
-                                    <label className={fieldLabelClass}>C3. SDG Indicator</label>
-                                    <div className="relative">
-                                        <select
-                                            className={dropdownClass}
-                                            value={studentIndicatorId}
-                                            onChange={(e) => {
-                                                updateSection("section3", {
-                                                    primary_sdg: {
-                                                        ...data.section3.primary_sdg,
-                                                        indicator_id: e.target.value,
-                                                    },
-                                                });
-                                            }}
-                                        >
-                                            <option value="">Select indicator...</option>
-                                            {availableIndicators.map((ind) => (
-                                                <option key={ind.id} value={ind.id}>
-                                                    Indicator {ind.id} — {ind.description}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    </div>
-                                    <p className="text-[11px] text-slate-400">
-                                        Selecting an indicator improves reporting quality.
-                                    </p>
-                                </div>
-                            </div>
+                            <SdgCascadeFields
+                                sdgRecord={selectedSDGRecord}
+                                targetId={studentTargetId}
+                                indicatorId={studentIndicatorId}
+                                subIndicator={studentSubIndicator}
+                                targetError={getFieldError("target_code")}
+                                onChange={(patch) =>
+                                    updateSection("section3", {
+                                        primary_sdg: {
+                                            ...data.section3.primary_sdg,
+                                            ...patch,
+                                        },
+                                    })
+                                }
+                            />
                         </div>
                     ) : null}
 
@@ -674,14 +761,11 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             goal_number?: string | number | null;
                             target_id?: string;
                             indicator_id?: string;
+                            sub_indicator?: string;
                             justification_text?: string;
                         }, index: number) => {
                             const sdgId = sdg.goal_number?.toString() || "";
-                            const sdgRecord = sdgData.find((s) => s.id === sdgId);
-                            const secTargets = sdgRecord?.targets || [];
-                            const secTargetId = sdg.target_id || "";
-                            const secIndicators =
-                                secTargets.find((t) => t.id === secTargetId)?.indicators || [];
+                            const sdgRecord = findSdgById(sdgId);
                             const justWords = (sdg.justification_text || "")
                                 .trim()
                                 .split(/\s+/)
@@ -719,6 +803,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 goal_number: id,
                                                 target_id: "",
                                                 indicator_id: "",
+                                                sub_indicator: "",
                                             })
                                         }
                                     />
@@ -735,55 +820,14 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                             >
                                                 SDG {sdgRecord.number}: {sdgRecord.title}
                                             </div>
-                                            <div className="space-y-4 bg-white p-4 sm:p-5">
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                <div className="space-y-1.5">
-                                                    <p className={fieldLabelClass}>UN Target</p>
-                                                    <div className="relative">
-                                                        <select
-                                                            className={dropdownClass}
-                                                            value={secTargetId}
-                                                            onChange={(e) =>
-                                                                updateSecondary(index, {
-                                                                    target_id: e.target.value,
-                                                                    indicator_id: "",
-                                                                })
-                                                            }
-                                                        >
-                                                            <option value="">Select target...</option>
-                                                            {secTargets.map((t) => (
-                                                                <option key={t.id} value={t.id}>
-                                                                    Target {t.id} — {t.description}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <p className={fieldLabelClass}>UN Indicator</p>
-                                                    <div className="relative">
-                                                        <select
-                                                            className={dropdownClass}
-                                                            value={sdg.indicator_id || ""}
-                                                            onChange={(e) =>
-                                                                updateSecondary(index, {
-                                                                    indicator_id: e.target.value,
-                                                                })
-                                                            }
-                                                        >
-                                                            <option value="">Select indicator...</option>
-                                                            {secIndicators.map((ind) => (
-                                                                <option key={ind.id} value={ind.id}>
-                                                                    Indicator {ind.id} — {ind.description}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
+                                            <SdgCascadeFields
+                                                sdgRecord={sdgRecord}
+                                                targetId={sdg.target_id || ""}
+                                                indicatorId={sdg.indicator_id || ""}
+                                                subIndicator={sdg.sub_indicator || ""}
+                                                onChange={(patch) => updateSecondary(index, patch)}
+                                            />
+                                            <div className="space-y-2 border-t border-slate-100 bg-white p-4 sm:p-5">
                                                 <p className={fieldLabelClass}>
                                                     Alignment justification
                                                 </p>
@@ -811,7 +855,6 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                     text={sdg.justification_text || ""}
                                                 />
                                             </div>
-                                            </div>
                                         </div>
                                     ) : null}
                                 </div>
@@ -829,6 +872,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 goal_number: null,
                                                 target_id: "",
                                                 indicator_id: "",
+                                                sub_indicator: "",
                                                 justification_text: "",
                                                 status: "provisional",
                                             },
@@ -898,8 +942,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             <div className="divide-y divide-slate-100 bg-white">
                                 {finalizedGoals.map((g) => {
                                     const sdg = ALL_SDGS.find((s) => s.num === g.num);
-                                    const sdgRecord = sdgData.find((s) => s.number === g.num);
-                                    const targetDesc = sdgRecord?.targets?.find((t) => t.id === g.targetId)?.description || "";
+                                    const targetDesc = findSdgTarget(findSdgById(g.num), g.targetId)?.description || "";
                                     return (
                                         <div key={g.num} className="flex gap-4 p-5 sm:px-6">
                                             <span

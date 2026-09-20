@@ -38,10 +38,22 @@ function looksLikeUniversityNameToken(value: string, universityName: string): bo
     return false;
 }
 
-export function formatPakistaniCnicDisplay(raw: unknown): string {
-    const digits = String(raw ?? "").replace(/\D/g, "").slice(0, 13);
-    if (digits.length !== 13) return firstNonBlank(raw);
+export function pakistaniCnicDigits(raw: unknown): string {
+    return String(raw ?? "").replace(/\D/g, "").slice(0, 13);
+}
+
+/** Live input mask: 12345-1234567-1 */
+export function formatPakistaniCnicInput(raw: unknown): string {
+    const digits = pakistaniCnicDigits(raw);
+    if (digits.length <= 5) return digits;
+    if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
     return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+}
+
+export function formatPakistaniCnicDisplay(raw: unknown): string {
+    const digits = pakistaniCnicDigits(raw);
+    if (digits.length !== 13) return firstNonBlank(raw);
+    return formatPakistaniCnicInput(digits);
 }
 
 export function formatVerifiedHoursDisplay(raw: unknown): string {

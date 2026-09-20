@@ -5,8 +5,7 @@ import Link from "next/link";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
+import { CommunityCrumb, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 
 const HUB = "/dashboard/student/paths/community-service";
 const CREATE_VIEW = `${HUB}?view=create`;
@@ -16,6 +15,7 @@ const LOG_HOURS_HREF = `${HUB}?tab=log-hours`;
 const GUIDE_HREF = `${HUB}?view=guide`;
 const CS_IMPACT_HREF = "/dashboard/student/impact?area=Community%20Service";
 const RANKINGS_HREF = `${HUB}?view=rankings`;
+const FILES_HREF = `${HUB}?view=files`;
 
 export type CommunityServiceAttentionItem = {
     key: string;
@@ -35,7 +35,7 @@ const TONE_CLASS = {
 
 function AttentionRow({ items }: { items: CommunityServiceAttentionItem[] }) {
     return (
-        <div className="rounded-[20px] border border-[#dce6ea] bg-[#f7fafb] p-3">
+        <div className="mt-3.5 rounded-[20px] border border-[#dce6ea] bg-[#f7fafb] p-3">
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
                 {items.map((item) => (
                     <Link
@@ -67,6 +67,7 @@ export default function CommunityServiceHub({
     bestCii,
     reportInProgress,
     recordCount,
+    pendingApplications = 0,
 }: {
     projects: ActiveProject[];
     verifiedHours: number;
@@ -77,6 +78,7 @@ export default function CommunityServiceHub({
     bestCii?: number | null;
     reportInProgress?: boolean;
     recordCount?: number;
+    pendingApplications?: number;
 }) {
     const [helpOpen, setHelpOpen] = useState(false);
     const [name, setName] = useState(displayName ?? "");
@@ -93,6 +95,7 @@ export default function CommunityServiceHub({
     const firstName = name.split(/\s+/)[0] ?? "";
     const createHot = Boolean(attention?.some((item) => item.key === "oppAction" && item.n > 0));
     const workspaceHot = Boolean(attention?.find((item) => item.key === "reportAction")?.n);
+    const browseHot = pendingApplications > 0;
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
@@ -113,6 +116,22 @@ export default function CommunityServiceHub({
                         : { value: "🌱", label: "community service journey" }
                 }
             />
+
+            <div className="mb-1 mt-6">
+                <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Community Service</h2>
+                <p className="mt-1 text-[12.5px] text-[#70808a]">
+                    One contained area. Proposal approval stays in Create Opportunity; applications stay in Browse; only approved work moves into Workspace.
+                </p>
+            </div>
+
+            <UserGuideBanner
+                desc="Everything for Community Service is grouped here. Choose the stage of your journey; Home stays an overview."
+                rule="Create/Apply happens before Workspace; Workspace starts after approval."
+            />
+
+            <ZoneRule title="Where am I?">
+                You entered Community Service from the left navigation. Everything below belongs to this impact area; Home remains a clean overview.
+            </ZoneRule>
 
             {attention?.length ? <AttentionRow items={attention} /> : null}
 
@@ -137,6 +156,7 @@ export default function CommunityServiceHub({
                     subtitle="Discover published opportunities created by Faculty, NGOs, Partners and CIEL PK. Apply here; once participation is approved, the project moves to Workspace."
                     badge="DISCOVER + APPLY"
                     background={MOCKUP_GRADIENTS.blue}
+                    hot={browseHot}
                 />
                 <MockupActionCard
                     href={WORKSPACE_HREF}
@@ -170,10 +190,19 @@ export default function CommunityServiceHub({
                     href={RANKINGS_HREF}
                     emoji="🧠"
                     ghost="🧠"
-                    title="My Rankings"
-                    subtitle="Official ranking snapshots awarded to your verified projects, with the reasons behind each position."
-                    badge="VIEW ONLY"
+                    title="AI Analyzer & My Rankings"
+                    subtitle="Run the AI Analyzer on your projects (dated badge + trend shared with faculty, partners, university and CIEL PK) and see official ranking snapshots."
+                    badge="ANALYZE"
                     background={MOCKUP_GRADIENTS.navy}
+                />
+                <MockupActionCard
+                    href={FILES_HREF}
+                    emoji="📁"
+                    ghost="📁"
+                    title="Shared Analysis Files"
+                    subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard."
+                    badge="SHARED"
+                    background={MOCKUP_GRADIENTS.purple}
                 />
             </div>
 
@@ -208,7 +237,7 @@ export default function CommunityServiceHub({
                         if (e.target === e.currentTarget) setHelpOpen(false);
                     }}
                 >
-                    <div className="mx-auto mt-6 w-full max-w-[520px] overflow-hidden rounded-[22px] bg-white">
+                    <div className="mx-auto mt-6 w-full max-w-[560px] overflow-hidden rounded-[22px] bg-white">
                         <div className="flex items-center gap-2.5 bg-[linear-gradient(115deg,#04252b,#0e5f63_60%,#12a5a0_120%)] px-5 py-4 text-white">
                             <span className="text-lg">🗺️</span>
                             <b className="text-[13.5px]">How Community Service works</b>
@@ -221,10 +250,18 @@ export default function CommunityServiceHub({
                                 ✕
                             </button>
                         </div>
-                        <div className="space-y-3 px-5 py-4">
-                            <p className="rounded-[11px] bg-[#e3f4fa] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-[#0f5e57]">
-                                <b>Create</b> your own opportunity or <b>browse</b> and join one → do the work, logging hours as you go →
-                                fill the 9 report sections → faculty approves → it hangs on your Impact Wall.
+                        <div className="space-y-3 px-5 py-4 text-[12.5px] leading-relaxed text-[#3f5661]">
+                            <p className="rounded-[11px] bg-[#e3f4fa] px-3.5 py-2.5 text-[11.5px] text-[#0f5e57]">
+                                Everything for Community Service is grouped here. Create or apply first; Workspace starts only after approval. Home stays an overview.
+                            </p>
+                            <p>
+                                <b>Create Opportunity</b> — your own proposal until Faculty → Partner/NGO (if linked) → CIEL PK decides.
+                            </p>
+                            <p>
+                                <b>Browse</b> — published opportunities. A pending application stays here until participation is approved.
+                            </p>
+                            <p>
+                                <b>Workspace</b> — approved work only: start the report, log hours, submit, revise, complete.
                             </p>
                             <div className="flex flex-wrap gap-2 pt-1">
                                 <Link href={CREATE_VIEW} className="rounded-full bg-[#0e7d74] px-4 py-2 text-[11px] font-extrabold text-white">
@@ -242,29 +279,6 @@ export default function CommunityServiceHub({
                     </div>
                 </div>
             ) : null}
-        </div>
-    );
-}
-
-export function CommunityCreateOpportunityView(_props: {
-    projects: ActiveProject[];
-    verifiedHours: number;
-    wallCount: number;
-    completion: number;
-}) {
-    return (
-        <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="Create" />
-            <MockupSectionHead
-                title="Create Opportunity"
-                subtitle="Start a new opportunity or continue a saved draft. Drafts remain here until submission."
-                action={
-                    <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
-                        ← Back to module buttons
-                    </Link>
-                }
-            />
-            <DraftsLandingView embedded />
         </div>
     );
 }

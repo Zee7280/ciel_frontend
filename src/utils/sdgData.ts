@@ -1224,6 +1224,96 @@ export const sdgData: SDG[] = [
     },
 ];
 
+/** Pull `4.A` / `4.A.1` out of labels like `4.A — Build and upgrade inclusive and safe schools`. */
+export function extractSdgCodeFromLabel(raw: string | null | undefined): string {
+    const s = String(raw ?? "").trim();
+    if (!s) return "";
+    const m = s.match(/^(\d{1,2}\.[A-Za-z0-9]+(?:\.\d+)?)/);
+    return m?.[1] || s;
+}
+
+/** Treat `4.A` and `4.a` as the same official UN target code. */
+export function normalizeSdgCode(code: string | null | undefined): string {
+    return extractSdgCodeFromLabel(code)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+}
+
+export function formatSdgCodeDisplay(code: string | null | undefined): string {
+    const raw = extractSdgCodeFromLabel(code);
+    if (!raw) return "";
+    return raw.replace(/(\d)([a-z])\b/gi, (_, n: string, letter: string) => `${n}${letter.toUpperCase()}`);
+}
+
+export function findSdgTarget(sdg: SDG | undefined, targetId: string | null | undefined): SDGTarget | undefined {
+    const key = normalizeSdgCode(targetId);
+    if (!sdg || !key) return undefined;
+    return sdg.targets.find((t) => normalizeSdgCode(t.id) === key);
+}
+
+export function findSdgIndicator(
+    target: SDGTarget | undefined,
+    indicatorId: string | null | undefined,
+): SDGIndicator | undefined {
+    const key = normalizeSdgCode(indicatorId);
+    if (!target || !key) return undefined;
+    return target.indicators.find((i) => normalizeSdgCode(i.id) === key);
+}
+
+/** Search every target on a goal so `4.A.1` still resolves when stored against the wrong target. */
+export function findSdgIndicatorInGoal(
+    sdg: SDG | undefined,
+    indicatorId: string | null | undefined,
+): SDGIndicator | undefined {
+    const key = normalizeSdgCode(indicatorId);
+    if (!sdg || !key) return undefined;
+    for (const target of sdg.targets) {
+        const hit = target.indicators.find((i) => normalizeSdgCode(i.id) === key);
+        if (hit) return hit;
+    }
+    return undefined;
+}
+
+/** Local/project metrics used as optional sub-indicators after a UN indicator is chosen. */
+export const SDG_LOCAL_SUB_INDICATORS = [
+    "Participants reached / served",
+    "Percentage improvement",
+    "Resources delivered / mobilized",
+    "Sessions / activities completed",
+    "Other local metric",
+] as const;
+
+export const SDG_CLOSEST_FIT_TARGET = "Closest fit — explained below";
+export const SDG_OTHER_INDICATOR = "Other relevant indicator";
+
+export function isClosestFitTarget(code: string | null | undefined): boolean {
+    return normalizeSdgCode(code).includes("closestfit");
+}
+
+export function isOtherSdgIndicator(code: string | null | undefined): boolean {
+    return normalizeSdgCode(code) === normalizeSdgCode(SDG_OTHER_INDICATOR);
+}
+
+/** Canonical `<select>` value so stored `4.A` matches option `4.a`. */
+export function resolveSdgTargetSelectValue(sdg: SDG | undefined, stored: string | null | undefined): string {
+    if (isClosestFitTarget(stored)) return SDG_CLOSEST_FIT_TARGET;
+    return findSdgTarget(sdg, stored)?.id || "";
+}
+
+export function resolveSdgIndicatorSelectValue(
+    target: SDGTarget | undefined,
+    stored: string | null | undefined,
+    fallbackPool: SDGIndicator[] = [],
+): string {
+    if (isOtherSdgIndicator(stored)) return SDG_OTHER_INDICATOR;
+    const fromTarget = findSdgIndicator(target, stored);
+    if (fromTarget) return fromTarget.id;
+    const key = normalizeSdgCode(stored);
+    if (!key) return "";
+    return fallbackPool.find((i) => normalizeSdgCode(i.id) === key)?.id || "";
+}
+
 /** Match form/API values whether they are string ids or numbers (e.g. sdg_id: 15 vs "15"). */
 export function findSdgById(id: string | number | null | undefined): SDG | undefined {
     if (id === null || id === undefined) return undefined;

@@ -153,6 +153,8 @@ export interface ReportData {
             goal_title?: string;
             target_id: string;
             indicator_id: string;
+            /** Optional local metric after the UN indicator (V10). */
+            sub_indicator?: string;
         };
         contribution_intent_statement: string;
         student_contribution_intent_statement: string;
@@ -160,6 +162,7 @@ export interface ReportData {
             goal_number: number | string | null;
             target_id?: string;
             indicator_id?: string;
+            sub_indicator?: string;
             justification_text: string;
             status: 'provisional' | 'validated' | 'rejected';
         }>;
@@ -404,7 +407,8 @@ export const defaultReportData: ReportData = {
         primary_sdg: {
             goal_number: null,
             target_id: '',
-            indicator_id: ''
+            indicator_id: '',
+            sub_indicator: ''
         },
         contribution_intent_statement: '',
         student_contribution_intent_statement: '',
@@ -523,6 +527,45 @@ export const defaultReportData: ReportData = {
     required_hours: 16
 };
 
+function firstSdgCode(...values: unknown[]): string {
+    for (const value of values) {
+        const text = value == null ? "" : String(value).trim();
+        if (text) return text;
+    }
+    return "";
+}
+
+/** Backend stores `target_code` / `indicator_code`; the form reads `target_id` / `indicator_id`. */
+function normalizeLoadedSection3(
+    incoming: ReportData["section3"],
+    prev: ReportData["section3"],
+): ReportData["section3"] {
+    const merged = { ...defaultReportData.section3, ...prev, ...incoming };
+    const primaryIn = {
+        ...defaultReportData.section3.primary_sdg,
+        ...prev?.primary_sdg,
+        ...incoming?.primary_sdg,
+    } as ReportData["section3"]["primary_sdg"] & {
+        target_code?: string;
+        indicator_code?: string;
+    };
+    merged.primary_sdg = {
+        ...primaryIn,
+        target_id: firstSdgCode(primaryIn.target_id, primaryIn.target_code),
+        indicator_id: firstSdgCode(primaryIn.indicator_id, primaryIn.indicator_code),
+        sub_indicator: firstSdgCode(primaryIn.sub_indicator),
+    };
+    merged.secondary_sdgs = (merged.secondary_sdgs || []).map((row) => {
+        const r = row as typeof row & { target_code?: string; indicator_code?: string };
+        return {
+            ...r,
+            target_id: firstSdgCode(r.target_id, r.target_code),
+            indicator_id: firstSdgCode(r.indicator_id, r.indicator_code),
+            sub_indicator: firstSdgCode(r.sub_indicator),
+        };
+    });
+    return merged;
+}
 
 interface ReportContextType {
     data: ReportData;
@@ -736,7 +779,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             // Ensure each section is also merged with its defaults to prevent undefined sub-properties
             if (newData.section1) merged.section1 = { ...defaultReportData.section1, ...prev.section1, ...newData.section1 };
             if (newData.section2) merged.section2 = { ...defaultReportData.section2, ...prev.section2, ...newData.section2 };
-            if (newData.section3) merged.section3 = { ...defaultReportData.section3, ...prev.section3, ...newData.section3 };
+            if (newData.section3) merged.section3 = normalizeLoadedSection3(newData.section3, prev.section3);
             if (newData.section4) merged.section4 = { ...defaultReportData.section4, ...prev.section4, ...newData.section4 };
             if (newData.section5) merged.section5 = { ...defaultReportData.section5, ...prev.section5, ...newData.section5 };
             if (newData.section6) merged.section6 = { ...defaultReportData.section6, ...prev.section6, ...newData.section6 };

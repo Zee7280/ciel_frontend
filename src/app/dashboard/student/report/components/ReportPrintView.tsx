@@ -38,6 +38,9 @@ import {
     mergedSdgTitlesLine,
     uniqueMergedSdgGoalNumbers,
 } from "../utils/reportSdgMerge";
+import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
+import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
+import { formatSdgCodeDisplay } from "@/utils/sdgData";
 import { resolveCiiLevelBadge, resolveCiiLevelTitle } from "@/utils/ciiLevelBadge";
 
 interface Props {
@@ -514,7 +517,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             pushRow({
                 key: firstNonBlank(lead?.id, lead?.email, lead?.cnic, leadName),
                 name: leadName || "Team lead",
-                contact: [lead?.email, lead?.mobile, lead?.cnic ? `CNIC: ${lead.cnic}` : ""].filter(Boolean).join(" · "),
+                contact: [
+                    lead?.email,
+                    formatInternationalPhoneDisplay(lead?.mobile),
+                    lead?.cnic ? `CNIC: ${formatPakistaniCnicDisplay(lead.cnic)}` : "",
+                ].filter(Boolean).join(" · "),
                 institutionProgram: [lead?.university, lead?.degree, lead?.year].filter(Boolean).join(" · "),
                 role: firstNonBlank(lead?.role, "Team lead"),
                 hoursVerified: [
@@ -530,7 +537,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             pushRow({
                 key: firstNonBlank(m.id, ext.participantId, ext.email, m.cnic, name),
                 name: name || `Applicant ${i + 1}`,
-                contact: [ext.email, m.mobile, m.cnic ? `CNIC: ${m.cnic}` : ""].filter(Boolean).join(" · "),
+                contact: [
+                    ext.email,
+                    formatInternationalPhoneDisplay(m.mobile),
+                    m.cnic ? `CNIC: ${formatPakistaniCnicDisplay(m.cnic)}` : "",
+                ].filter(Boolean).join(" · "),
                 institutionProgram: [m.university, m.program].filter(Boolean).join(" · "),
                 role: firstNonBlank((m as { role?: string }).role, "Team member"),
                 hoursVerified: [
@@ -710,9 +721,10 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         .filter((outcome): outcome is PrintableOutcome => Boolean(outcome));
 
     const formatSdgRowAnswer = (r: (typeof opportunitySdgRows)[number]) => {
-        const t = r.targetId || "—";
-        const ind = r.indicatorId || "—";
-        const base = `Goal ${r.goalNumber} — ${r.title}. Target: ${t}. Indicator: ${ind}.`;
+        const t = formatSdgCodeDisplay(r.targetId) || r.targetId || "—";
+        const ind = formatSdgCodeDisplay(r.indicatorId) || r.indicatorId || "—";
+        const sub = (r.subIndicator || "").trim();
+        const base = `Goal ${r.goalNumber} — ${r.title}. Target: ${t}. Indicator: ${ind}.${sub ? ` Sub-indicator: ${sub}.` : ""}`;
         if (r.justification) return `${base} Contribution: ${r.justification}`;
         return base;
     };

@@ -10,6 +10,9 @@ import PendingAttendanceModal from "@/components/engagement/PendingAttendanceMod
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupPanel, MockupSectionHead, MockupStatBars } from "@/components/ciel/dashboard/MockupChrome";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { isPathEntryApproved } from "@/utils/reviewQueue";
+import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
+import NgoDashboardHome from "./NgoDashboardHome";
+import UniversityDashboardHome from "./UniversityDashboardHome";
 
 type PartnerProject = {
     id: string;
@@ -81,6 +84,32 @@ function pctShare(part: number, whole: number) {
 }
 
 export default function PartnerDashboard() {
+    const [orgKind, setOrgKind] = useState<PartnerOrgKind | null>(null);
+
+    useEffect(() => {
+        setOrgKind(readPartnerOrgKind(readStoredCurrentUser()));
+    }, []);
+
+    if (!orgKind) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+        );
+    }
+
+    if (orgKind === "ngo") {
+        return <NgoDashboardHome />;
+    }
+
+    if (orgKind === "university") {
+        return <UniversityDashboardHome />;
+    }
+
+    return <PartnerOrgOrUniversityDashboard />;
+}
+
+function PartnerOrgOrUniversityDashboard() {
     const [stats, setStats] = useState<PartnerDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [uniSnap, setUniSnap] = useState<UniSnap | null>(null);

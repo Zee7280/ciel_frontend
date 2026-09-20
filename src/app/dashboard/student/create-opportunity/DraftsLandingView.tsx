@@ -55,7 +55,13 @@ function formatSavedAt(iso?: string): string {
 
 const FLOW = ["Draft", "Submit Opportunity", "Faculty", "Partner, if applicable", "CIEL PK Final Approval", "Start Report"];
 
-export default function DraftsLandingView({ embedded = false }: { embedded?: boolean }) {
+export default function DraftsLandingView({
+    embedded = false,
+    hideIntro = false,
+}: {
+    embedded?: boolean;
+    hideIntro?: boolean;
+}) {
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
     const [completion, setCompletion] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -132,6 +138,7 @@ export default function DraftsLandingView({ embedded = false }: { embedded?: boo
                 </div>
             ) : null}
 
+            {hideIntro ? null : (
             <div className="flex flex-col items-start justify-between gap-4 rounded-[20px] bg-[linear-gradient(135deg,#0b5c59,#19a18f)] px-5 py-5 text-white sm:flex-row sm:items-center">
                 <div>
                     <h3 className="m-0 text-[21px] font-semibold">Create Opportunity</h3>
@@ -146,7 +153,9 @@ export default function DraftsLandingView({ embedded = false }: { embedded?: boo
                     + Create New Opportunity
                 </Link>
             </div>
+            )}
 
+            {hideIntro ? null : (
             <div className="mt-3.5 rounded-2xl border border-[#dfe9e7] bg-[linear-gradient(135deg,#f3fbf8,#fff)] p-3.5">
                 <p className="mb-2.5 text-[10px] font-[950] uppercase tracking-[0.07em] text-[#176e64]">What happens after submission</p>
                 <div className="flex flex-wrap items-center gap-[7px]">
@@ -160,6 +169,7 @@ export default function DraftsLandingView({ embedded = false }: { embedded?: boo
                     ))}
                 </div>
             </div>
+            )}
 
             <div className="mb-2.5 mt-[19px] flex flex-wrap items-end justify-between gap-3">
                 <div>

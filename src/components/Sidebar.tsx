@@ -17,6 +17,7 @@ import {
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
 import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
+import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 import {
     CIEL_IMPACT_SUMMARY_CACHE_EVENT,
@@ -280,21 +281,25 @@ export default function Sidebar() {
     }, [isPartner, pathname]);
 
     const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
+    const [partnerOrgKind, setPartnerOrgKind] = useState<PartnerOrgKind>("partner");
     useEffect(() => {
         if (!isPartner) {
             setIsUniversityPartnerOrg(false);
+            setPartnerOrgKind("partner");
             return;
         }
         const read = () => {
             try {
                 const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
                 const u = raw
-                    ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string })
+                    ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string; role?: string })
                     : null;
-                const t = String(u?.orgType || u?.organization_type || u?.type || "").toLowerCase();
-                setIsUniversityPartnerOrg(t.includes("university"));
+                const kind = readPartnerOrgKind(u);
+                setPartnerOrgKind(kind);
+                setIsUniversityPartnerOrg(kind === "university");
             } catch {
                 setIsUniversityPartnerOrg(false);
+                setPartnerOrgKind("partner");
             }
         };
         read();
@@ -749,7 +754,9 @@ export default function Sidebar() {
                                           : isAdmin
                                             ? "Youth Empowered Community Impact"
                                             : isPartner
-                                              ? "NGO / Nonprofit"
+                                              ? partnerOrgKind === "ngo"
+                                                ? "NGO / Nonprofit"
+                                                : "Partner Organization"
                                             : "Youth Empowered Community Impact"}
                             </span>
                         </div>

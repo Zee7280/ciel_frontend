@@ -87,14 +87,15 @@ export default function TeamVerification({
             <div>
                 <p className="text-sm font-semibold text-slate-900">Team members</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                    Add registered CIEL users — each one verifies instantly through their own account, no OTP round-trips.
+                    Add registered CIEL users — send OTP to their email before they appear as verified.
                 </p>
             </div>
 
             <div className="flex gap-2.5 rounded-xl border border-amber-100 bg-amber-50/80 px-3.5 py-2.5">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <p className="text-xs leading-relaxed text-amber-900">
-                    Only registered CIEL users can be added. OTP verification is required for the audit trail.
+                    Only registered CIEL users can be added. Each member verifies by <b>OTP to their email</b> — that
+                    links this opportunity to their dashboard.
                 </p>
             </div>
 
@@ -155,7 +156,7 @@ export default function TeamVerification({
                         className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-indigo-300 px-3.5 py-[7px] text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
                     >
                         <UserPlus className="h-3.5 w-3.5" />
-                        Add member
+                        Send OTP & add
                     </button>
                 ) : null}
             </div>
@@ -166,7 +167,7 @@ export default function TeamVerification({
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs text-slate-600">
                             <Shield className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
-                            Enter registered details for OTP verification.
+                            Enter registered details, then send and confirm the email OTP.
                         </div>
                         <button
                             type="button"

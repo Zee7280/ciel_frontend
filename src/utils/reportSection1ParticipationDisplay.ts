@@ -5,6 +5,8 @@ import {
     type IndividualMetric,
 } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import { buildParticipationProgramLine } from "@/utils/reportTeamScope";
+import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
+import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 
 function printObject(value: unknown): Record<string, unknown> | null {
     return value && typeof value === "object" && !Array.isArray(value)
@@ -136,8 +138,8 @@ export function resolveReportAuthorParticipationSnapshot(
         isTeamLeadAuthor: true,
         memberIndex: -1,
         displayName: firstNonBlank(lead?.fullName, lead?.name, student?.name),
-        cnic: firstNonBlank(lead?.cnic),
-        mobile: firstNonBlank(lead?.mobile),
+        cnic: formatPakistaniCnicDisplay(firstNonBlank(lead?.cnic)),
+        mobile: formatInternationalPhoneDisplay(firstNonBlank(lead?.mobile)),
         email: firstNonBlank(lead?.email, student?.email),
         university: firstNonBlank(lead?.university),
         degreeProgramYearLine:
@@ -158,8 +160,8 @@ export function resolveReportAuthorParticipationSnapshot(
             isTeamLeadAuthor: false,
             memberIndex: i,
             displayName: firstNonBlank(m.fullName, m.name, student.name),
-            cnic: firstNonBlank(m.cnic),
-            mobile: firstNonBlank(m.mobile),
+            cnic: formatPakistaniCnicDisplay(firstNonBlank(m.cnic)),
+            mobile: formatInternationalPhoneDisplay(firstNonBlank(m.mobile)),
             email: firstNonBlank(ext.email, student.email),
             university: firstNonBlank(m.university),
             degreeProgramYearLine: buildParticipationProgramLine(m as Record<string, unknown>) || firstNonBlank(m.program),

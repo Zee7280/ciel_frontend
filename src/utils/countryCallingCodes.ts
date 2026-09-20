@@ -281,3 +281,12 @@ export function composeInternationalPhone(phoneCountryKey: string, nationalDigit
   const n = digitsOnly(nationalDigits);
   return n ? `${dial}${n}` : "";
 }
+
+/** Display as country code + national number, e.g. `+92 3001234567`. */
+export function formatInternationalPhoneDisplay(stored: string | null | undefined): string {
+  const raw = String(stored ?? "").trim();
+  if (!raw) return "";
+  const parsed = parsePhoneForDisplay(raw);
+  if (!parsed.national) return raw;
+  return `${dialFromPhoneCountryKey(parsed.phoneCountryKey)} ${parsed.national}`;
+}

@@ -33,6 +33,8 @@ import { resolveStudentProjectActionHref } from "@/utils/participationGuide";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
+import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
+import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import {
     findLiveApplyPromptProject,
@@ -1628,7 +1630,7 @@ export default function MyProjectsPage() {
                                                     </div>
                                                     <div>
                                                         <div className="font-semibold text-slate-900">{member.name}</div>
-                                                        <div className="text-xs text-slate-400 font-mono mt-0.5">{member.cnic}</div>
+                                                        <div className="text-xs text-slate-400 font-mono mt-0.5">{formatPakistaniCnicDisplay(member.cnic)}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -1652,7 +1654,7 @@ export default function MyProjectsPage() {
                                                     {member.mobile && (
                                                         <div className="flex items-center gap-2 text-slate-600 text-xs">
                                                             <Phone className="w-3 h-3 text-slate-400" />
-                                                            {member.mobile}
+                                                            {formatInternationalPhoneDisplay(member.mobile)}
                                                         </div>
                                                     )}
                                                     {member.university && (
@@ -1693,7 +1695,7 @@ export default function MyProjectsPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <div className="font-semibold text-slate-900">{member.name}</div>
-                                            <div className="text-xs text-slate-400 font-mono mt-0.5">{member.cnic}</div>
+                                            <div className="text-xs text-slate-400 font-mono mt-0.5">{formatPakistaniCnicDisplay(member.cnic)}</div>
                                         </div>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1721,7 +1723,7 @@ export default function MyProjectsPage() {
                                         {member.mobile && (
                                             <div className="flex items-center gap-2 text-slate-600 text-xs">
                                                 <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                                                {member.mobile}
+                                                {formatInternationalPhoneDisplay(member.mobile)}
                                             </div>
                                         )}
                                         {member.university && (

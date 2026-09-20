@@ -6,7 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import {
+    CommunityCrumb,
+    EmptyPanel,
+    HubTabs,
+    UserGuideBanner,
+    ZoneRule,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     isCommunityReportOnLiveDeck,
@@ -31,7 +37,7 @@ type ApprovalLineStatus =
     | "not_required"
     | null
     | undefined;
-type WsFilter = "all" | "opportunity" | "report" | "review" | "revision" | "closed";
+type WsFilter = "ready" | "reports" | "review" | "action" | "completed" | "archived";
 type NodeState = "complete" | "current" | "locked" | "rejected";
 
 type OpportunityRow = {
@@ -67,7 +73,7 @@ type JourneyNode = { title: string; detail: string; state: NodeState };
 
 type WorkCard = {
     id: string;
-    filter: Exclude<WsFilter, "all">;
+    filter: WsFilter;
     stageLabel: string;
     title: string;
     meta: string;
@@ -82,86 +88,24 @@ type WorkCard = {
 };
 
 const FILTERS: { key: WsFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "opportunity", label: "Opportunity Approval" },
-    { key: "report", label: "Reports in Progress" },
-    { key: "review", label: "Faculty Review" },
-    { key: "revision", label: "Revision Required" },
-    { key: "closed", label: "Approved / Rejected" },
+    { key: "ready", label: "Ready to Start" },
+    { key: "reports", label: "Reports in Progress" },
+    { key: "review", label: "Reports Under Review" },
+    { key: "action", label: "Action Required" },
+    { key: "completed", label: "Completed" },
+    { key: "archived", label: "Archived" },
 ];
 
-function formatSubmitted(iso?: string): string {
-    if (!iso) return "";
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return `Submitted ${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`;
-}
+const LEGACY_FILTER: Record<string, WsFilter> = {
+    opportunity: "ready",
+    report: "reports",
+    revision: "action",
+    closed: "completed",
+    all: "ready",
+};
 
 function opportunityFullyApproved(op: OpportunityRow): boolean {
     return op.status === "live" || op.admin_approval_status === "approved";
-}
-
-function opportunityRejected(op: OpportunityRow): boolean {
-    return (
-        op.status === "rejected" ||
-        op.faculty_approval_status === "rejected" ||
-        op.partner_approval_status === "rejected" ||
-        op.admin_approval_status === "rejected"
-    );
-}
-
-/** A reviewer sent the proposal back for changes (backend WORKFLOW_STAGE.REVISION /
- * LINE_STATUS.REVISION_REQUESTED). The next action is the student's, not the reviewer's —
- * without this the card rendered as "Pending Faculty approval" with a reminder button, so the
- * student sat waiting on a queue nobody was going to act on. */
-function opportunityNeedsRevision(op: OpportunityRow): boolean {
-    return (
-        op.workflow_stage === "revision" ||
-        op.status === "revision" ||
-        op.faculty_approval_status === "revision_requested" ||
-        op.partner_approval_status === "revision_requested" ||
-        op.admin_approval_status === "revision_requested"
-    );
-}
-
-function facultyNode(op: OpportunityRow): JourneyNode {
-    if (op.faculty_approval_status === "rejected") return { title: "1. Faculty", detail: "Rejected", state: "rejected" };
-    if (op.faculty_approval_status === "approved") return { title: "1. Faculty ✓", detail: "Approved", state: "complete" };
-    if (
-        op.faculty_approval_status === "not_applicable" ||
-        op.faculty_approval_status === "not_required" ||
-        op.faculty_approval_status === "skipped"
-    ) {
-        return { title: "1. Faculty ✓", detail: "Not required", state: "complete" };
-    }
-    return { title: "1. Faculty", detail: "Pending approval", state: "current" };
-}
-
-function partnerNode(op: OpportunityRow, faculty: JourneyNode): JourneyNode {
-    if (!op.requires_partner_approval) return { title: "2. Partner ✓", detail: "Not required", state: "complete" };
-    if (op.partner_approval_status === "rejected") return { title: "2. Partner", detail: "Rejected", state: "rejected" };
-    if (op.partner_approval_status === "approved") return { title: "2. Partner ✓", detail: "Approved", state: "complete" };
-    if (faculty.state === "complete") return { title: "2. Partner", detail: "Pending approval", state: "current" };
-    return { title: "2. Partner", detail: "Waiting for Faculty", state: "locked" };
-}
-
-function cielNode(op: OpportunityRow, faculty: JourneyNode, partner: JourneyNode): JourneyNode {
-    if (op.admin_approval_status === "rejected" || op.status === "rejected") {
-        return { title: "3. CIEL PK", detail: "Rejected", state: "rejected" };
-    }
-    if (opportunityFullyApproved(op)) return { title: "3. CIEL PK ✓", detail: "Final approval", state: "complete" };
-    if (faculty.state === "complete" && partner.state === "complete") {
-        return { title: "3. CIEL PK", detail: "Pending final approval", state: "current" };
-    }
-    return {
-        title: "3. CIEL PK",
-        detail: partner.state === "current" ? "Waiting for Partner" : "Final review locked",
-        state: "locked",
-    };
-}
-
-function approvalsDone(nodes: JourneyNode[]): number {
-    return nodes.filter((n) => n.state === "complete").length;
 }
 
 /** One Email + one WhatsApp action, each addressed to the actual contact when we have one on file
@@ -193,15 +137,15 @@ function reportAwaitingFee(row: ReportRow): boolean {
     return REPORT_FEE_STATUSES.has(normalizeReviewStatus(row.status));
 }
 
-function reportBucket(row: ReportRow): Exclude<WsFilter, "all"> {
-    if (isCommunityReportRejected(row)) return "closed";
-    if (isCommunityReportOnLiveDeck(row)) return "closed";
+function reportBucket(row: ReportRow): WsFilter {
+    if (isCommunityReportRejected(row)) return "archived";
+    if (isCommunityReportOnLiveDeck(row)) return "completed";
     const fac = normalizeReviewStatus(row.faculty_status);
     const st = normalizeReviewStatus(row.status);
-    if (fac.includes("revision") || st.includes("revision")) return "revision";
-    if (reportAwaitingFee(row)) return "report";
+    if (fac.includes("revision") || st.includes("revision")) return "action";
+    if (reportAwaitingFee(row)) return "reports";
     if (!isReviewDraftStatus(row.status)) return "review";
-    return "report";
+    return "reports";
 }
 
 function reportHref(row: Pick<ReportRow, "project_id" | "opportunity_id" | "id">): string {
@@ -238,7 +182,7 @@ function nodeClass(state: NodeState): string {
 
 export default function CommunityServiceWorkspace({
     projects,
-    initialFilter = "all",
+    initialFilter = "ready",
 }: {
     projects: ActiveProject[];
     verifiedHours?: number;
@@ -249,12 +193,14 @@ export default function CommunityServiceWorkspace({
     const router = useRouter();
     const searchParams = useSearchParams();
     const filterParam = searchParams.get("filter");
-    const filter: WsFilter = FILTERS.some((item) => item.key === filterParam) ? (filterParam as WsFilter) : initialFilter;
+    const mappedLegacy = filterParam && LEGACY_FILTER[filterParam] ? LEGACY_FILTER[filterParam] : null;
+    const filter: WsFilter = FILTERS.some((item) => item.key === filterParam)
+        ? (filterParam as WsFilter)
+        : mappedLegacy ?? initialFilter;
     const setFilter = (next: WsFilter) => {
         const qs = new URLSearchParams(searchParams.toString());
         qs.set("view", "workspace");
-        if (next === "all") qs.delete("filter");
-        else qs.set("filter", next);
+        qs.set("filter", next);
         router.replace(`${HUB}?${qs.toString()}`, { scroll: false });
     };
     const [opportunities, setOpportunities] = useState<OpportunityRow[]>([]);
@@ -315,102 +261,13 @@ export default function CommunityServiceWorkspace({
         for (const op of opportunities) {
             const linked = reportByKey.get(op.id);
             if (linked) continue;
-            if (!opportunityFullyApproved(op) && !opportunityRejected(op) && opportunityNeedsRevision(op)) {
-                out.push({
-                    id: `opp-${op.id}`,
-                    filter: "revision",
-                    stageLabel: "Stage 1 — Opportunity Approval",
-                    title: op.title,
-                    meta: formatSubmitted(op.created_at),
-                    journeyHead: "REVISION REQUIRED",
-                    journeySub: "Update the proposal and resubmit",
-                    pills: [{ label: "Revision Required", kind: "rev" }],
-                    note: {
-                        kind: "comment",
-                        body: "A reviewer asked for changes to this opportunity. Open it in Create Opportunity, update the requested details and resubmit — it will not move forward until you do.",
-                    },
-                    sideTitle: "Your Next Action",
-                    sideDetail: "Edit the proposal and resubmit",
-                    actions: [
-                        {
-                            label: "Edit & Resubmit",
-                            href: `/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`,
-                            style: "primary",
-                        },
-                        { label: "View Opportunity", href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`, style: "soft" },
-                    ],
-                });
-                continue;
-            }
-            if (!opportunityFullyApproved(op) || opportunityRejected(op)) {
-                const faculty = facultyNode(op);
-                const partner = partnerNode(op, faculty);
-                const ciel = cielNode(op, faculty, partner);
-                const nodes = [faculty, partner, ciel];
-                const done = approvalsDone(nodes);
-                const current = nodes.find((n) => n.state === "current" || n.state === "rejected") ?? ciel;
-                const who =
-                    current.title.includes("Faculty")
-                        ? "Faculty"
-                        : current.title.includes("Partner")
-                          ? "Partner"
-                          : "CIEL PK";
-                const remindActions: WorkCard["actions"] =
-                    current.state === "current" && who !== "CIEL PK"
-                        ? buildReminderActions(
-                              op.title,
-                              `${who} approval`,
-                              who === "Partner" ? op.partner_contact_name : op.faculty_contact_name,
-                              who === "Partner" ? op.partner_contact_email : op.faculty_contact_email,
-                          )
-                        : [
-                              {
-                                  label: "View Status",
-                                  href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`,
-                                  style: "blue" as const,
-                              },
-                          ];
-                out.push({
-                    id: `opp-${op.id}`,
-                    filter: "opportunity",
-                    stageLabel: "Stage 1 — Opportunity Approval",
-                    title: op.title,
-                    meta: [formatSubmitted(op.created_at), op.requires_partner_approval ? "Partner involved" : ""]
-                        .filter(Boolean)
-                        .join(" · "),
-                    journeyHead: "APPROVAL JOURNEY",
-                    journeySub: opportunityRejected(op) ? "Rejected" : `${done} of 3 approvals complete`,
-                    nodes,
-                    note: {
-                        kind: "notify",
-                        title: "Workflow Update",
-                        body:
-                            faculty.state === "current"
-                                ? "Submission confirmation sent. Faculty has the next action."
-                                : partner.state === "current"
-                                  ? "Faculty approved. Partner approval link sent automatically."
-                                  : ciel.state === "current"
-                                    ? "Faculty and Partner approved. Record has moved to CIEL PK for final approval."
-                                    : opportunityRejected(op)
-                                      ? "This opportunity was not approved. It will not move to the report stage."
-                                      : "Waiting on the next approval step.",
-                    },
-                    sideTitle: "Current Status",
-                    sideDetail:
-                        current.state === "rejected"
-                            ? `${who} rejected`
-                            : `Pending ${who} ${who === "CIEL PK" ? "Approval" : "approval"}`,
-                    actions: [
-                        { label: "View Opportunity", href: `/dashboard/student/browse/${encodeURIComponent(op.id)}`, style: "soft" },
-                        ...remindActions,
-                    ],
-                });
+            if (!opportunityFullyApproved(op)) {
                 continue;
             }
 
             out.push({
                 id: `start-${op.id}`,
-                filter: "report",
+                filter: "ready",
                 stageLabel: "Stage 2 — Community Service Report",
                 title: op.title,
                 meta: "Opportunity fully approved",
@@ -445,11 +302,11 @@ export default function CommunityServiceWorkspace({
             const bucket = reportBucket(report);
             const title = report.project_title || "Community service report";
             const href = reportHref(report);
-            if (bucket === "report" && reportAwaitingFee(report)) {
+            if (bucket === "reports" && reportAwaitingFee(report)) {
                 const underReview = normalizeReviewStatus(report.status) === "payment_under_review";
                 out.push({
                     id: `rep-${report.id}`,
-                    filter: "report",
+                    filter: "reports",
                     stageLabel: "Stage 2 — Reporting Fee",
                     title,
                     meta: "Report submitted",
@@ -482,10 +339,10 @@ export default function CommunityServiceWorkspace({
                 });
                 continue;
             }
-            if (bucket === "report") {
+            if (bucket === "reports") {
                 out.push({
                     id: `rep-${report.id}`,
-                    filter: "report",
+                    filter: "reports",
                     stageLabel: "Stage 2 — Community Service Report",
                     title,
                     meta: report.organization_name && report.organization_name !== "N/A" ? report.organization_name : "Draft auto-saved",
@@ -532,10 +389,10 @@ export default function CommunityServiceWorkspace({
                 });
                 continue;
             }
-            if (bucket === "revision") {
+            if (bucket === "action") {
                 out.push({
                     id: `rep-${report.id}`,
-                    filter: "revision",
+                    filter: "action",
                     stageLabel: "Stage 2 — Faculty Report Decision",
                     title,
                     meta: "Faculty decision received",
@@ -558,7 +415,7 @@ export default function CommunityServiceWorkspace({
             const rejected = isCommunityReportRejected(report);
             out.push({
                 id: `rep-${report.id}`,
-                filter: "closed",
+                filter: rejected ? "archived" : "completed",
                 stageLabel: "Stage 2 — Faculty Report Decision",
                 title,
                 meta: "Final decision received",
@@ -590,7 +447,7 @@ export default function CommunityServiceWorkspace({
             if (opportunities.some((op) => op.id === project.id)) continue;
             out.push({
                 id: `proj-${project.id}`,
-                filter: "report",
+                filter: project.report_status ? "reports" : "ready",
                 stageLabel: "Stage 2 — Community Service Report",
                 title: project.title,
                 meta: project.category ? `${project.category} · Joined engagement` : "Joined engagement",
@@ -612,70 +469,94 @@ export default function CommunityServiceWorkspace({
         return out;
     }, [opportunities, reports, projects]);
 
-    const visible = filter === "all" ? cards : cards.filter((c) => c.filter === filter);
-    const kpis = {
-        opportunity: cards.filter((c) => c.filter === "opportunity").length,
-        report: cards.filter((c) => c.filter === "report").length,
-        review: cards.filter((c) => c.filter === "review").length,
-        revision: cards.filter((c) => c.filter === "revision").length,
-    };
+    const visible = cards.filter((c) => c.filter === filter);
+    const tabLabel = FILTERS.find((item) => item.key === filter)?.label || filter;
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
             <CommunityCrumb role="Student" view="Workspace" />
             <MockupSectionHead
                 title="Community Service Workspace"
-                subtitle="Track sequential opportunity approvals, report completion, faculty decisions, revisions and final outcomes."
+                subtitle="This workspace begins only after an opportunity or participation request is approved. It manages service delivery and the report — never proposal approval."
                 action={
                     <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
                         ← Back to module buttons
                     </Link>
                 }
             />
+            <UserGuideBanner
+                desc="Approved work only: deliver the service, record participation and complete the report."
+                items={[
+                    ["Ready to Start", "Approved projects that have not started the report yet."],
+                    ["Reports in Progress", "Continue report sections, service hours and evidence."],
+                    ["Reports Under Review", "Submitted reports waiting for AI/faculty review."],
+                    ["Action Required", "Report revisions requested after submission."],
+                    ["Completed", "Verified Community Service Impact after approval."],
+                    ["Archived", "Closed report records retained for history."],
+                ]}
+                rule="Opportunity drafts and opportunity approvals never belong here."
+            />
 
-            <div className="flex flex-wrap gap-2">
-                {FILTERS.map((item) => (
-                    <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => setFilter(item.key)}
-                        className={`rounded-[18px] border px-2.5 py-[7px] text-[11px] font-[850] ${
-                            filter === item.key
-                                ? "border-[#153f47] bg-[#153f47] text-white"
-                                : "border-[#dde5ea] bg-white text-[#5c6d76]"
-                        }`}
-                    >
-                        {item.label}
-                    </button>
+            <div className="flex flex-col justify-between gap-3 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-5 sm:flex-row sm:items-center">
+                <div>
+                    <p className="text-[9.5px] font-black uppercase tracking-[0.08em] text-[#c76000]">Approved work only</p>
+                    <h3 className="mt-1 text-[20px] font-semibold text-[#16313d]">Your Community Service Workspace</h3>
+                    <p className="mt-1 max-w-[800px] text-[12px] leading-relaxed text-[#70808a]">
+                        Everything here has already cleared the opportunity/participation gate. From this point onward, the student is doing the work, recording evidence and completing the report.
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10.5px] font-extrabold">
+                    <span className="rounded-full bg-[#e8f5ef] px-2.5 py-1 text-[#1d765d]">● Created by You</span>
+                    <span className="rounded-full bg-[#edf4fb] px-2.5 py-1 text-[#376d9f]">● Joined via Browse</span>
+                </div>
+            </div>
+
+            <div className="mt-3.5 flex flex-wrap items-center gap-1.5 text-[10.5px] font-extrabold text-[#435660]">
+                {(
+                    [
+                        { n: "✓", label: "Approval Complete", done: true },
+                        { n: "1", label: "Start Report", done: false },
+                        { n: "2", label: "Log Hours + Evidence", done: false },
+                        { n: "3", label: "Complete Report", done: false },
+                        { n: "4", label: "Submit", done: false },
+                        { n: "5", label: "Faculty Review", done: false },
+                        { n: "6", label: "Verified Impact", done: false },
+                    ] as const
+                ).map((step, i, arr) => (
+                    <span key={step.label} className="flex items-center gap-1.5">
+                        <span className={"rounded-full px-2.5 py-1 " + (step.done ? "bg-[#e8f5ef] text-[#1d765d]" : "bg-[#f4f7f8] text-[#547079]")}>
+                            <b className="mr-1">{step.n}</b>
+                            {step.label}
+                        </span>
+                        {i < arr.length - 1 ? <span className="text-[#a8b6bb]">→</span> : null}
+                    </span>
                 ))}
             </div>
 
-            <div className="mt-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-                {(
-                    [
-                        ["opportunity", "Opportunity Approval", kpis.opportunity],
-                        ["report", "Reports in Progress", kpis.report],
-                        ["review", "Faculty Review", kpis.review],
-                        ["revision", "Action Required", kpis.revision],
-                    ] as const
-                ).map(([key, label, value]) => (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => setFilter(key)}
-                        className="rounded-[14px] border border-[#dde5ea] bg-white p-3 text-left"
-                    >
-                        <span className="block text-[9px] font-black uppercase tracking-[0.06em] text-[#70808a]">{label}</span>
-                        <strong className="mt-1.5 block text-lg text-[#16313d]">{value}</strong>
-                    </button>
-                ))}
+            <div className="mt-3.5">
+                <ZoneRule title="Nothing before approval belongs here." tone="warn">
+                    If you need to check a student-created proposal, go to <strong>Create Opportunity</strong>. If you are waiting on an application to a published opportunity, go to{" "}
+                    <strong>Browse Opportunities → My Applications</strong>.
+                </ZoneRule>
+            </div>
+
+            <div className="mt-4">
+                <HubTabs
+                    tabs={FILTERS.map((item) => ({
+                        id: item.key,
+                        label: item.label,
+                        count: cards.filter((c) => c.filter === item.key).length,
+                    }))}
+                    active={filter}
+                    onChange={(id) => setFilter(id as WsFilter)}
+                />
             </div>
 
             {loading ? (
                 <p className="mt-8 text-center text-sm text-[#7a919a]">Loading workspace…</p>
             ) : visible.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-dashed border-[#cbe7e3] bg-[#fbfefd] px-5 py-10 text-center text-[12px] text-[#7a919a]">
-                    Nothing in this filter yet. Create or join an opportunity to start tracking approvals and reports.
+                <div className="mt-2">
+                    <EmptyPanel title="Nothing here" text={`No approved records under “${tabLabel}”.`} />
                 </div>
             ) : (
                 <div className="mt-4 grid gap-3.5">

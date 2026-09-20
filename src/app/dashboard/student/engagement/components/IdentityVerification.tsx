@@ -9,12 +9,13 @@ import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
 import clsx from "clsx";
 import { useRef, useEffect } from "react";
 
 /** PK CNIC UI is 13 numeric digits — normalize API/localStorage quirks (spacing, coercion). */
 function normalizePakistaniCnicDigits(value: unknown): string {
-    return String(value ?? "").replace(/\D/g, "").slice(0, 13);
+    return pakistaniCnicDigits(value);
 }
 
 export interface Participant {
@@ -262,6 +263,18 @@ export default function IdentityVerification({
     };
 
     const handleSubmit = async () => {
+        if (!otpVerified.email && !initialData.verified) {
+            alert("Verify this member by OTP to their email before adding them.");
+            return;
+        }
+        if (pakistaniCnicDigits(formData.cnic).length !== 13) {
+            alert("Enter a 13-digit CNIC (xxxxx-xxxxxxx-x).");
+            return;
+        }
+        if (phoneNational.replace(/\D/g, "").length < 8) {
+            alert("Enter a mobile number with country code.");
+            return;
+        }
         setIsSubmitting(true);
         try {
             const body: any = {
@@ -322,8 +335,9 @@ export default function IdentityVerification({
     };
 
     const cnicNormalized = normalizePakistaniCnicDigits(formData.cnic);
+    const phoneOk = phoneNational.replace(/\D/g, "").length >= 8;
     const isPersonalValid =
-        !!formData.fullName.trim() && cnicNormalized.length === 13 && otpVerified.email;
+        !!formData.fullName.trim() && cnicNormalized.length === 13 && phoneOk && otpVerified.email;
     const isAcademicValid = formData.universityId && formData.universityName && formData.academicProgram;
 
     /** Verified / email-linked records can still lack CNIC (e.g. individual apply). Keep CNIC editable until 13 digits are saved. */
@@ -368,13 +382,15 @@ export default function IdentityVerification({
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">CNIC Number</Label>
                                 <Input
-                                    placeholder="13 digits"
-                                    maxLength={13}
-                                    value={formData.cnic}
+                                    placeholder="xxxxx-xxxxxxx-x"
+                                    maxLength={15}
+                                    inputMode="numeric"
+                                    value={formatPakistaniCnicInput(formData.cnic)}
                                     disabled={cnicFieldLocked}
-                                    onChange={(e) => setFormData({ ...formData, cnic: e.target.value.replace(/\D/g, '') })}
-                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.2em] disabled:opacity-70 disabled:cursor-not-allowed"
+                                    onChange={(e) => setFormData({ ...formData, cnic: pakistaniCnicDigits(e.target.value) })}
+                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.12em] disabled:opacity-70 disabled:cursor-not-allowed"
                                 />
+                                <p className="text-[10px] font-medium text-slate-400">13 digits with dashes, e.g. 35202-1234567-1</p>
                             </div>
                         </div>
 
@@ -399,7 +415,7 @@ export default function IdentityVerification({
                                         inputClassName="h-11 rounded-xl border-slate-100 font-bold shadow-none focus:border-report-primary focus:ring-2 focus:ring-report-primary/20"
                                         rowClassName="items-stretch gap-2"
                                     />
-                                    <p className="text-[10px] text-slate-400 font-medium">Used for critical institutional notifications.</p>
+                                    <p className="text-[10px] text-slate-400 font-medium">Country code + mobile number, e.g. +92 · 3001234567.</p>
                                 </div>
                             </div>
 
@@ -589,7 +605,7 @@ export default function IdentityVerification({
                             </Button>
                             <Button
                                 onClick={handleSubmit}
-                                disabled={isSubmitting || !isAcademicValid}
+                                disabled={isSubmitting || !isAcademicValid || !isPersonalValid}
                                 className="flex-1 h-14 bg-report-primary hover:bg-report-primary-border text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-report-primary-shadow"
                             >
                                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Verify Identity & Link Record"}

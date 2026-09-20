@@ -19,6 +19,7 @@ import {
     type FacultyScopeSessionPayload,
 } from "@/utils/facultyScopeSession";
 import { useHasDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
+import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
 function facultyPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/faculty") return "Overview";
@@ -162,18 +163,24 @@ export default function DashboardHeader() {
     }, [navRole, pathname]);
 
     const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
+    const [partnerOrgKind, setPartnerOrgKind] = useState<PartnerOrgKind>("partner");
     useEffect(() => {
         if (navRole !== "partner") {
             setIsUniversityPartnerOrg(false);
+            setPartnerOrgKind("partner");
             return;
         }
         try {
             const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
-            const u = raw ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string }) : null;
-            const t = String(u?.orgType || u?.organization_type || u?.type || "").toLowerCase();
-            setIsUniversityPartnerOrg(t.includes("university"));
+            const u = raw
+                ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string; role?: string })
+                : null;
+            const kind = readPartnerOrgKind(u);
+            setPartnerOrgKind(kind);
+            setIsUniversityPartnerOrg(kind === "university");
         } catch {
             setIsUniversityPartnerOrg(false);
+            setPartnerOrgKind("partner");
         }
     }, [navRole, pathname]);
 
@@ -182,10 +189,12 @@ export default function DashboardHeader() {
             ? "Student Dashboard"
             : navRole === "faculty"
               ? "Faculty Dashboard"
-              : navRole === "partner" && isUniversityPartnerOrg
+              : navRole === "partner" && partnerOrgKind === "university"
                 ? "University Dashboard"
-                : navRole === "partner"
+                : navRole === "partner" && partnerOrgKind === "ngo"
                   ? "NGO / Nonprofit"
+                  : navRole === "partner"
+                    ? "Partner Organization"
                   : navRole === "admin"
                     ? "Super Admin"
                     : navRole === "investor"

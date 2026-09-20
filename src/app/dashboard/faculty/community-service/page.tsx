@@ -2,9 +2,19 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { authenticatedFetch } from "@/utils/api";
-import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
+import {
+    FACULTY_CS_APPROVALS as APPROVALS,
+    FACULTY_CS_BASE as CS_BASE,
+    FACULTY_CS_HOURS as HOURS,
+    FACULTY_CS_JOIN_APPS as JOIN_APPS,
+    FACULTY_CS_REPORTS as REPORTS,
+    useFacultyCommunityServiceData,
+    type FacultyCsMineRow,
+} from "./useFacultyCommunityServiceData";
+import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
@@ -12,19 +22,10 @@ import CommunityAwardAnalytics from "@/components/ciel/community-service/Communi
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
-import { reportRowToAwardCard, type CommunityAwardCard } from "@/utils/communityAwardModel";
-import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting, isCommunityReportRejected, normalizeReviewStatus } from "@/utils/reviewQueue";
-import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
+import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
-import { getStoredCurrentUserEmail, readStoredCurrentUser } from "@/utils/currentUser";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
-import { normalizeFacultyApprovalsResponse, type FacultyApprovalRow } from "@/utils/facultyApprovals";
-import { extractPendingAttendanceRows } from "@/utils/engagementPendingAttendanceResponse";
-import {
-    fetchJoinApplicationsHistoryRows,
-    normalizeOpportunityApplicationsListResponse,
-    type OpportunityApplicationListRow,
-} from "@/utils/opportunityApplicationsAdmin";
 import { formatDisplayId } from "@/utils/displayIds";
 
 const CS_VIEWS = [
@@ -42,16 +43,100 @@ const CS_VIEWS = [
     "approved",
 ] as const;
 
-const CS_BASE = "/dashboard/faculty/community-service";
 const CREATE_FORM = "/dashboard/faculty/create-opportunity";
 const MY_OPPS = "/dashboard/faculty/my-opportunities";
-const APPROVALS = "/dashboard/faculty/approvals";
-const JOIN_APPS = "/dashboard/faculty/join-applications";
-const REPORTS = "/dashboard/faculty/reports";
 const IMPACT = "/dashboard/faculty/impact?tab=community";
-const HOURS = "/dashboard/faculty/attendance-review";
 
 type CsView = (typeof CS_VIEWS)[number];
+
+const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: string }> = {
+    home: {
+        desc: "Your academic Community Service work lives here: create, review, supervise, verify and analyse.",
+        rule: "Home stays a faculty overview; Community Service operations stay inside this hub.",
+    },
+    create: {
+        desc: "Create and manage Faculty-created opportunities through publication.",
+        items: [
+            ["Create New Opportunity", "Open the Faculty Opportunity Form. Your signed-in faculty identity is the academic owner."],
+            ["Drafts", "Saved Faculty-created opportunities not yet submitted."],
+            ["Under Approval", "Submitted opportunities waiting on partner acknowledgement if named and/or CIEL PK final review."],
+            ["Action Required", "Creator-side revisions requested before publication."],
+            ["Published", "Approved opportunities visible to eligible students in Browse Opportunities."],
+            ["Closed", "Rejected, expired or closed creator records retained for history."],
+        ],
+        rule: "Faculty-created opportunities do not require a second faculty approver.",
+    },
+    review: {
+        desc: "Academic approval area for student-created opportunities and participation requests.",
+        items: [
+            ["Pending My Approval", "Student-created proposals waiting for your decision."],
+            ["Revision with Student", "Proposals you returned for correction; status remains visible."],
+            ["Participation Requests", "Students asking to join published opportunities under your supervision."],
+            ["Decided", "Completed approval decisions retained for audit history."],
+        ],
+        rule: "Opportunity review and participation approval are separate decisions.",
+    },
+    projects: {
+        desc: "Monitor approved projects connected to you as faculty.",
+        items: [
+            ["Active", "Projects delivering service or completing reports."],
+            ["Verified", "Projects whose reports are approved and impact is verified."],
+            ["All", "Complete supervised project history."],
+            ["View Progress", "See report %, last activity and permitted member-hour status."],
+            ["Send Reminder", "System-generated Email/WhatsApp follow-up; communication is logged."],
+        ],
+        rule: "Monitoring does not expose raw private student phone numbers.",
+    },
+    reports: {
+        desc: "Final academic review of submitted Community Service Reports.",
+        items: [
+            ["Pending Review", "Reports where AI analysis is complete and your decision is required."],
+            ["Revision with Student", "Reports returned for correction."],
+            ["Decided", "Approved or rejected report decisions retained for history."],
+            ["CII Breakdown", "Review the provisional AI assessment and evidence logic."],
+            ["Approve / Revise / Reject", "Your final academic report decision; moderation requires a recorded reason."],
+        ],
+        rule: "AI CII is provisional until Faculty approval.",
+    },
+    impact: {
+        desc: "Verified impact from projects you supervised.",
+        items: [
+            ["Impact Wall", "Verified visible records under the permitted visibility setting."],
+            ["Flashcard & Credentials", "Open the verified project summary, CII, badge, certificate and QR."],
+        ],
+        rule: "Rejected work never appears as verified impact.",
+    },
+    run: {
+        desc: "Analyse and rank verified projects in your permitted faculty cohort.",
+        items: [
+            ["Ranking Preview", "Run dynamic analysis without creating a permanent award."],
+            ["Official Run", "Create a dated official cohort ranking, subject to role limits."],
+            ["Why It Ranks", "Evidence-backed explanation for each position."],
+            ["Ranking History", "Preserves previous official runs."],
+        ],
+        rule: "Faculty scope is limited to projects connected to the faculty member.",
+    },
+    files: {
+        desc: "One place for every analysis file shared across stakeholders.",
+        items: [
+            ["Faculty Analysis", "The faculty decision file for each submitted report: decision, CII accepted or moderated, reason, comments."],
+            ["AI Analyzer reports", "The latest dated AI Analyzer badge and run history for each project."],
+            ["Open / Download", "View inside the dashboard, print, or download the file."],
+        ],
+        rule: "Files are shared automatically — nobody has to send them.",
+    },
+    analytics: {
+        desc: "See performance patterns across your supervised Community Service projects.",
+        items: [
+            ["Projects & Students", "Counts and participation coverage."],
+            ["Person-hours", "Verified student service contribution."],
+            ["Community Dividend", "Verified volunteer contribution value + verified student out-of-pocket investment."],
+            ["Reach & SDGs", "Beneficiaries, outcomes and SDG distribution."],
+            ["CII Distribution", "Verified impact-quality profile across projects."],
+        ],
+        rule: "Analytics aggregate verified/authorised information only.",
+    },
+};
 
 const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     create: "Create Opportunity",
@@ -67,25 +152,7 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     approved: "Community Service Impact",
 };
 
-type FacultyReportRow = {
-    id: string;
-    student_name: string;
-    project_title: string;
-    organization_name?: string;
-    faculty_status?: string;
-    status?: string;
-    hours?: number;
-    submission_date?: string;
-    report_submitted_at?: string;
-};
-
-type MineRow = {
-    id: string;
-    title: string;
-    status?: string;
-    workflow_stage?: string | null;
-    created_at?: string;
-};
+type MineRow = FacultyCsMineRow;
 
 function pickStr(item: Record<string, unknown>, ...keys: string[]): string | undefined {
     for (const key of keys) {
@@ -172,14 +239,20 @@ function EmptyPanel({ title, text }: { title: string; text: string }) {
     );
 }
 
-function attendanceProjectId(row: Record<string, unknown>): string {
-    const nested = row.project && typeof row.project === "object" ? (row.project as Record<string, unknown>) : null;
-    for (const value of [row.projectId, row.project_id, row.opportunityId, row.opportunity_id, nested?.id, nested?._id]) {
-        if (value == null) continue;
-        const text = String(value).trim();
-        if (text) return text;
-    }
-    return "";
+function FacultyRemindButtons({ email, title }: { email?: string | null; title: string }) {
+    const to = email && email.includes("@") ? email : "";
+    const subject = `Community Service reminder — ${title}`;
+    const body = `A reminder from your faculty supervisor about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
+    return (
+        <div className="mt-1.5 flex flex-wrap gap-2">
+            <a href={mailtoHref(to, subject, body)} className="rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]">
+                ✉ Remind
+            </a>
+            <a href={whatsappShareHref(body)} className="rounded-full bg-[#e8f8ee] px-3 py-1.5 text-[11px] font-extrabold text-[#1f7a46]">
+                WhatsApp
+            </a>
+        </div>
+    );
 }
 
 function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" | "closed" {
@@ -189,16 +262,6 @@ function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" 
     if (isOpportunityPermanentlyRejected(rec) || normalizeReviewStatus(row.status) === "rejected") return "closed";
     if (isOpportunityPubliclyLive(rec) || normalizeReviewStatus(row.status) === "live") return "published";
     return "review";
-}
-
-function isReportRevision(row: FacultyReportRow): boolean {
-    const key = normalizeReviewStatus(row.faculty_status);
-    return key === "revision_requested" || key === "revisions_requested" || key === "changes_requested" || key === "returned";
-}
-
-function isOppRevision(row: FacultyApprovalRow): boolean {
-    const key = normalizeReviewStatus(row.opportunityStatus || row.workflowStage);
-    return key === "revision_requested" || key === "revisions_requested" || key === "returned" || key.includes("revision");
 }
 
 export default function FacultyCommunityServicePage() {
@@ -212,16 +275,28 @@ export default function FacultyCommunityServicePage() {
 function FacultyCommunityServiceHub() {
     const { view, homeHref } = useFacultyHubView(CS_VIEWS, "home");
     const searchParams = useSearchParams();
+    const router = useRouter();
     const tabParam = searchParams.get("tab") || "";
-    const [rows, setRows] = useState<FacultyReportRow[]>([]);
-    const [cards, setCards] = useState<CommunityAwardCard[]>([]);
-    const [mineRows, setMineRows] = useState<MineRow[]>([]);
-    const [pendingOppRows, setPendingOppRows] = useState<FacultyApprovalRow[]>([]);
-    const [historyOppRows, setHistoryOppRows] = useState<FacultyApprovalRow[]>([]);
-    const [pendingAppRows, setPendingAppRows] = useState<OpportunityApplicationListRow[]>([]);
-    const [historyAppRows, setHistoryAppRows] = useState<OpportunityApplicationListRow[]>([]);
-    const [hoursProjectCount, setHoursProjectCount] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const {
+        loading,
+        rows,
+        mineRows,
+        pendingOppRows,
+        historyOppRows,
+        pendingAppRows,
+        historyAppRows,
+        hoursProjectCount,
+        liveRows,
+        pendingReports,
+        revisionReports,
+        decidedReports,
+        activeProjects,
+        revisionOpps,
+        deckCards,
+        inboxItems,
+        pendingOppReviews,
+        pendingApps,
+    } = useFacultyCommunityServiceData();
     const [facultyName, setFacultyName] = useState("Faculty");
     const [department, setDepartment] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
@@ -240,139 +315,14 @@ function FacultyCommunityServiceHub() {
         setInnerTab(tabParam);
     }, [tabParam, view]);
 
-    useEffect(() => {
-        let cancelled = false;
-        const facultyEmail = getStoredCurrentUserEmail();
-        const approvalQs = new URLSearchParams({ status: "pending" });
-        const historyQs = new URLSearchParams({ status: "history" });
-        if (facultyEmail) {
-            approvalQs.set("faculty_email", facultyEmail);
-            historyQs.set("faculty_email", facultyEmail);
-        }
+    const setHubTab = (id: string) => {
+        setInnerTab(id);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("view", view);
+        params.set("tab", id);
+        router.replace(`${CS_BASE}?${params.toString()}`, { scroll: false });
+    };
 
-        Promise.all([
-            authenticatedFetch("/api/v1/faculty/reports", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-            authenticatedFetch("/api/v1/faculty/community-service/award-cards", {}, { redirectToLogin: false }).then(
-                (r) => (r?.ok ? r.json() : null),
-            ),
-            authenticatedFetch("/api/v1/opportunities/faculty/mine?scope=authored", {}, { redirectToLogin: false }).then(
-                (r) => (r?.ok ? r.json() : null),
-            ),
-            authenticatedFetch(`/api/v1/faculty/approvals?${approvalQs.toString()}`, {}, { redirectToLogin: false }).then(
-                (r) => (r?.ok ? r.json() : null),
-            ),
-            authenticatedFetch(`/api/v1/faculty/approvals?${historyQs.toString()}`, {}, { redirectToLogin: false }).then(
-                (r) => (r?.ok ? r.json() : null),
-            ),
-            authenticatedFetch("/api/v1/faculty/applications?status=pending", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-            fetchJoinApplicationsHistoryRows("/api/v1/faculty/applications"),
-            authenticatedFetch("/api/v1/engagement/attendance/pending", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-        ])
-            .then(([list, award, mine, approvals, history, apps, appHistory, attendance]) => {
-                if (cancelled) return;
-                const mappedMine = extractFacultyMineOpportunityRows(mine)
-                    .map((raw) => {
-                        const id = String(raw.id ?? raw._id ?? raw.opportunity_id ?? "").trim();
-                        return {
-                            id,
-                            title: pickStr(raw, "title", "name", "opportunity_title") || "Opportunity",
-                            status: pickStr(raw, "status"),
-                            workflow_stage: pickStr(raw, "workflow_stage", "workflowStage", "approval_stage") || null,
-                            created_at: pickStr(raw, "created_at", "createdAt"),
-                            ...raw,
-                        } as MineRow;
-                    })
-                    .filter((row) => row.id);
-                setMineRows(mappedMine);
-                setPendingOppRows(normalizeFacultyApprovalsResponse(approvals));
-                setHistoryOppRows(normalizeFacultyApprovalsResponse(history));
-                setPendingAppRows(normalizeOpportunityApplicationsListResponse(apps));
-                setHistoryAppRows(appHistory.rows);
-                const hourIds = new Set(
-                    extractPendingAttendanceRows(attendance)
-                        .map(attendanceProjectId)
-                        .filter(Boolean),
-                );
-                setHoursProjectCount(hourIds.size);
-                setRows(
-                    (Array.isArray(list?.data) ? list.data : [])
-                        .filter((item: unknown) => item && typeof item === "object")
-                        .map((item: Record<string, unknown>) => {
-                            const metrics =
-                                item.metrics && typeof item.metrics === "object"
-                                    ? (item.metrics as Record<string, unknown>)
-                                    : {};
-                            const hoursRaw = metrics.total_verified_hours ?? metrics.total_hours ?? item.hours;
-                            const hours = typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0);
-                            return {
-                                id: String(item.id || ""),
-                                student_name: pickStr(item, "student_name", "studentName") || "Student",
-                                project_title: pickStr(item, "project_title", "projectTitle") || "Report",
-                                organization_name: pickStr(item, "organization_name", "organizationName"),
-                                faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
-                                status: pickStr(item, "status"),
-                                hours: Number.isFinite(hours) ? hours : 0,
-                                submission_date: pickStr(item, "submission_date", "submissionDate"),
-                                report_submitted_at: pickStr(item, "report_submitted_at", "reportSubmittedAt"),
-                            };
-                        })
-                        .filter((r: FacultyReportRow) => r.id),
-                );
-                setCards(Array.isArray(award?.data) ? award.data : []);
-                setLoading(false);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setRows([]);
-                setCards([]);
-                setMineRows([]);
-                setPendingOppRows([]);
-                setHistoryOppRows([]);
-                setPendingAppRows([]);
-                setHistoryAppRows([]);
-                setHoursProjectCount(0);
-                setLoading(false);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
-    const pendingReports = useMemo(() => rows.filter((r) => isFacultyCommunityWaiting(r)), [rows]);
-    const revisionReports = useMemo(() => rows.filter(isReportRevision), [rows]);
-    const decidedReports = useMemo(
-        () => rows.filter((r) => isFacultyCommunityLiveCard(r) || isCommunityReportRejected(r)),
-        [rows],
-    );
-    const activeProjects = useMemo(
-        () => rows.filter((r) => !isFacultyCommunityLiveCard(r) && !isCommunityReportRejected(r)),
-        [rows],
-    );
-    const revisionOpps = useMemo(() => historyOppRows.filter(isOppRevision), [historyOppRows]);
-
-    const deckCards = useMemo(() => {
-        const liveIds = new Set(liveRows.map((r) => r.id));
-        const byId = new Map<string, CommunityAwardCard>();
-        for (const card of cards) {
-            if (liveIds.has(card.id) || isFacultyCommunityLiveCard(card)) {
-                byId.set(card.id, card);
-            }
-        }
-        for (const row of liveRows) {
-            if (!byId.has(row.id)) byId.set(row.id, reportRowToAwardCard(row));
-        }
-        return Array.from(byId.values());
-    }, [cards, liveRows]);
-
-    const pendingOppReviews = pendingOppRows.length;
-    const pendingApps = pendingAppRows.length;
     const pendingApprovalsHero = pendingOppReviews + pendingApps;
     const kicker = department ? `Community Service · Faculty · ${department}` : "Community Service · Faculty";
 
@@ -409,23 +359,6 @@ function FacultyCommunityServiceHub() {
             href: HOURS,
             tone: hoursProjectCount ? "warn" : "default",
         },
-    ];
-
-    const inboxItems = [
-        ...pendingOppRows.map((row) => ({
-            key: `opp-${row.id}`,
-            title: row.projectTitle,
-            meta: `${formatDisplayId(row.id, "OPP")} · ${row.studentName} · submitted ${row.submittedDate}`,
-            href: `${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
-            cta: "View Flashcard & Approve",
-        })),
-        ...pendingReports.map((row) => ({
-            key: `rep-${row.id}`,
-            title: row.project_title,
-            meta: `${formatDisplayId(row.id, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · AI CII provisional`,
-            href: `${REPORTS}/${row.id}`,
-            cta: "View Report & Approve",
-        })),
     ];
 
     const createCounts = useMemo(() => {
@@ -478,72 +411,15 @@ function FacultyCommunityServiceHub() {
 
             {view === "home" && (
                 <>
-                    <p className="mt-4 rounded-[15px] border border-[#cee3e0] bg-[linear-gradient(135deg,#eef9f6,#fff)] px-3.5 py-3 text-[12.5px] leading-relaxed text-[#4d6d6b]">
-                        <b className="text-[#126b60]">Navigation rule:</b> You entered Community Service from the left. Everything
-                        below belongs to this impact area. Create and creator-statuses stay in Create Opportunity; student
-                        approvals stay in Review; approved work stays in Projects/Reports.
-                    </p>
-
-                    <div className="mt-4 rounded-[18px] border border-[#cfe3de] bg-[linear-gradient(135deg,#f2fbf7,#fff)] p-4 shadow-[0_8px_24px_rgba(23,75,67,.06)]">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                                <h3 className="m-0 flex items-center gap-2 text-[15px] font-semibold text-[#16313d]">
-                                    Approvals waiting for you
-                                    <span className="rounded-full bg-[#174b43] px-2 py-0.5 text-[11px] font-bold text-white">
-                                        {inboxItems.length}
-                                    </span>
-                                </h3>
-                                <p className="mt-1 text-[11.5px] text-[#4f6068]">
-                                    Open the Flashcard and approve in one click. Revision and rejection ask for a short comment.
-                                </p>
-                            </div>
-                        </div>
-                        {loading ? (
-                            <p className="mt-3 text-sm text-slate-500">Loading approvals…</p>
-                        ) : inboxItems.length === 0 ? (
-                            <div className="mt-3 rounded-[14px] border border-[#dde8e6] bg-white px-3 py-6 text-center text-sm text-slate-600">
-                                <b>Nothing waiting</b>
-                                <p className="mt-1 text-[12px] text-slate-500">
-                                    New Flashcards appear here the moment a student submits an opportunity or a report.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="mt-2 space-y-2.5">
-                                {inboxItems.map((item) => (
-                                    <div
-                                        key={item.key}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#dde8e6] bg-white px-3 py-2.5"
-                                    >
-                                        <div className="min-w-[240px] flex-1">
-                                            <b className="block text-[13.5px] text-[#16313d]">{item.title}</b>
-                                            <small className="mt-0.5 block text-[11px] text-[#4f6068]">{item.meta}</small>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <Link
-                                                href={item.href}
-                                                className="rounded-full bg-[#0e7d74] px-3.5 py-1.5 text-[11px] font-extrabold text-white"
-                                            >
-                                                {item.cta}
-                                            </Link>
-                                            <Link
-                                                href={item.href}
-                                                className="rounded-full bg-[#f4e3b8] px-3 py-1.5 text-[11px] font-extrabold text-[#7a4b00]"
-                                            >
-                                                ✏ Revision
-                                            </Link>
-                                            <Link
-                                                href={item.href}
-                                                className="rounded-full bg-[#f8d4d4] px-3 py-1.5 text-[11px] font-extrabold text-[#9a2b2b]"
-                                            >
-                                                ✕ Reject
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.home} />
+                    <ZoneRule title="Navigation rule">
+                        You entered Community Service from the left. Everything below belongs to this impact area; Home remains a
+                        clean overview. Create and creator-statuses stay in Create Opportunity; student approvals stay in Review;
+                        approved work stays in Projects/Reports.
+                    </ZoneRule>
+                    <div className="mt-4">
+                        <FacultyCsInbox items={inboxItems} loading={loading} />
                     </div>
-
                     <AttentionRow items={attention} />
                     <MockupSectionHead title="Community Service tools" subtitle="Choose the responsibility you need to work on." />
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -639,6 +515,7 @@ function FacultyCommunityServiceHub() {
                             </Link>
                         }
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.create} />
                     <p className="mb-4 rounded-[14px] border border-[#dce6ea] bg-[#f7fafb] px-3.5 py-3 text-[12.5px] leading-relaxed text-[#52636e]">
                         <b className="text-[#16313d]">Simple rule:</b> If you created the opportunity, its creator status stays
                         here. Once students are assigned, their service/report progress appears under Community Service Projects.
@@ -652,7 +529,7 @@ function FacultyCommunityServiceHub() {
                             { id: "closed", label: "Closed", count: createCounts.closed },
                         ]}
                         active={createTab}
-                        onChange={setInnerTab}
+                        onChange={setHubTab}
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading your opportunities…</p>
@@ -670,10 +547,15 @@ function FacultyCommunityServiceHub() {
                             ) : (
                                 mineRows
                                     .filter((row) => mineBucket(row) === createTab)
-                                    .map((row) => (
+                                    .map((row) => {
+                                        const href =
+                                            createTab === "drafts" || createTab === "action"
+                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}`
+                                                : `${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`;
+                                        return (
                                         <Link
                                             key={row.id}
-                                            href={`${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`}
+                                            href={href}
                                             className="block rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
                                         >
                                             <b className="block text-[14px] text-[#16313d]">{row.title}</b>
@@ -682,7 +564,8 @@ function FacultyCommunityServiceHub() {
                                                 {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
                                             </small>
                                         </Link>
-                                    ))
+                                        );
+                                    })
                             )}
                             <Link href={MY_OPPS} className="inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
                                 Open full creator list →
@@ -698,15 +581,16 @@ function FacultyCommunityServiceHub() {
                         title="Review Opportunities"
                         subtitle="Student → Faculty → Partner/NGO (if named) → CIEL PK. Every decision is versioned and audited."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.review} />
                     <HubTabs
                         tabs={[
                             { id: "opps", label: "Pending my approval", count: pendingOppReviews },
                             { id: "revision", label: "Revision with student", count: revisionOpps.length },
                             { id: "apps", label: "Participation requests", count: pendingApps },
-                            { id: "done", label: "Decided", count: historyOppRows.length },
+                            { id: "done", label: "Decided", count: historyOppRows.length + historyAppRows.length },
                         ]}
                         active={reviewTab}
-                        onChange={setInnerTab}
+                        onChange={setHubTab}
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading reviews…</p>
@@ -733,13 +617,15 @@ function FacultyCommunityServiceHub() {
                         ) : (
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 {revisionOpps.map((row) => (
-                                    <CommunityQueueCard
-                                        key={row.id}
-                                        href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`}
-                                        title={row.projectTitle}
-                                        student={row.studentName}
-                                        cta="Open record →"
-                                    />
+                                    <div key={row.id}>
+                                        <CommunityQueueCard
+                                            href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`}
+                                            title={row.projectTitle}
+                                            student={row.studentName}
+                                            cta="Open record →"
+                                        />
+                                        <FacultyRemindButtons email={row.studentEmail} title={row.projectTitle} />
+                                    </div>
                                 ))}
                             </div>
                         )
@@ -765,10 +651,20 @@ function FacultyCommunityServiceHub() {
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {historyOppRows.map((row) => (
                                 <CommunityQueueCard
-                                    key={row.id}
+                                    key={`opp-${row.id}`}
                                     href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`}
                                     title={row.projectTitle}
                                     student={row.studentName}
+                                    tone="approved"
+                                    cta="History →"
+                                />
+                            ))}
+                            {historyAppRows.map((row) => (
+                                <CommunityQueueCard
+                                    key={`app-${row.id}`}
+                                    href={`${JOIN_APPS}?tab=history`}
+                                    title={`${row.studentName} → ${row.opportunityTitle}`}
+                                    student={row.studentEmail || row.studentName}
                                     tone="approved"
                                     cta="History →"
                                 />
@@ -794,6 +690,7 @@ function FacultyCommunityServiceHub() {
                         title="Community Service Projects"
                         subtitle="Connected stakeholders see completion, last activity and member hours. Reminders are system-generated and logged."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.projects} />
                     <HubTabs
                         tabs={[
                             { id: "active", label: "Active", count: activeProjects.length },
@@ -801,7 +698,7 @@ function FacultyCommunityServiceHub() {
                             { id: "all", label: "All", count: rows.length },
                         ]}
                         active={projectTab}
-                        onChange={setInnerTab}
+                        onChange={setHubTab}
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading projects…</p>
@@ -819,16 +716,20 @@ function FacultyCommunityServiceHub() {
                             return (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     {list.map((row) => (
-                                        <CommunityQueueCard
-                                            key={row.id}
-                                            href={`${REPORTS}/${row.id}`}
-                                            title={row.project_title}
-                                            student={row.student_name}
-                                            org={row.organization_name}
-                                            hours={row.hours}
-                                            tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                            cta="View progress →"
-                                        />
+                                        <div key={row.id}>
+                                            <CommunityQueueCard
+                                                href={`${REPORTS}/${row.id}`}
+                                                title={row.project_title}
+                                                student={row.student_name}
+                                                org={row.organization_name}
+                                                hours={row.hours}
+                                                tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
+                                                cta="View progress →"
+                                            />
+                                            {isFacultyCommunityLiveCard(row) ? null : (
+                                                <FacultyRemindButtons email={row.student_email} title={row.project_title} />
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             );
@@ -849,6 +750,7 @@ function FacultyCommunityServiceHub() {
                         title="Reports for Review"
                         subtitle="Faculty-only academic approval. AI score is provisional until you approve; overrides need a recorded reason."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.reports} />
                     <HubTabs
                         tabs={[
                             { id: "pending", label: "Pending review", count: pendingReports.length },
@@ -856,7 +758,7 @@ function FacultyCommunityServiceHub() {
                             { id: "done", label: "Decided", count: decidedReports.length },
                         ]}
                         active={view === "pending" ? "pending" : reportTab}
-                        onChange={setInnerTab}
+                        onChange={setHubTab}
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading reports…</p>
@@ -878,16 +780,20 @@ function FacultyCommunityServiceHub() {
                             return (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     {list.map((row) => (
-                                        <CommunityQueueCard
-                                            key={row.id}
-                                            href={`${REPORTS}/${row.id}`}
-                                            title={row.project_title}
-                                            student={row.student_name}
-                                            org={row.organization_name}
-                                            hours={row.hours}
-                                            tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                            cta="Open report →"
-                                        />
+                                        <div key={row.id}>
+                                            <CommunityQueueCard
+                                                href={`${REPORTS}/${row.id}`}
+                                                title={row.project_title}
+                                                student={row.student_name}
+                                                org={row.organization_name}
+                                                hours={row.hours}
+                                                tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
+                                                cta="Open report →"
+                                            />
+                                            {reportTab === "rev" ? (
+                                                <FacultyRemindButtons email={row.student_email} title={row.project_title} />
+                                            ) : null}
+                                        </div>
                                     ))}
                                 </div>
                             );
@@ -910,6 +816,7 @@ function FacultyCommunityServiceHub() {
                             </Link>
                         }
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.impact} />
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
@@ -930,13 +837,14 @@ function FacultyCommunityServiceHub() {
                         title="Shared Analysis Files"
                         subtitle="Faculty Analysis files and AI Analyzer reports are shared automatically with every stakeholder linked to a record — the same file, the same version, on every dashboard."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.files} />
                     <HubTabs
                         tabs={[
                             { id: "faculty", label: "Faculty Analysis files", count: decidedReports.length },
                             { id: "ai", label: "AI Analyzer reports", count: deckCards.filter((c) => c.cii != null).length },
                         ]}
                         active={filesTab}
-                        onChange={setInnerTab}
+                        onChange={setHubTab}
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading files…</p>
@@ -996,6 +904,7 @@ function FacultyCommunityServiceHub() {
                         title="AI Analyzer & Rankings"
                         subtitle="Faculty scope is limited to projects you supervised. Preview freely; an official run creates a dated cohort ranking."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.run} />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
@@ -1019,6 +928,7 @@ function FacultyCommunityServiceHub() {
                         title={`Analytics · ${facultyName}'s projects`}
                         subtitle="Person-hours, Community Dividend, reach, SDGs and CII patterns from the live deck."
                     />
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.analytics} />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : (

@@ -25,10 +25,12 @@ import {
 import {
     isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
+    isJoinApplicationApprovedStatus,
     joinApplicationLocksApplyButton,
     mergeHasAppliedFields,
     pickJoinApplicationId,
     pickJoinApplicationStage,
+    joinApplicationPendingLabel,
 } from "@/utils/studentJoinApplication";
 import {
     buildStudentReportsCheckMap,
@@ -403,6 +405,7 @@ export default function StudentBrowseOpportunitiesPage() {
     ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0);
 
     const pendingApplicationsCount = opportunities.filter((op) => op.applyLocked && isPendingJoin(op)).length;
+    const myApplications = opportunities.filter((op) => op.hasApplied || op.has_applied || op.applyLocked);
     const hoursRemaining = Math.max(0, hoursTarget - hoursLogged);
     const hoursPct = hoursTarget > 0 ? Math.min(100, Math.round((hoursLogged / hoursTarget) * 100)) : 0;
 
@@ -552,8 +555,11 @@ export default function StudentBrowseOpportunitiesPage() {
                 <div>
                     <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
                     <p className="mt-1 text-sm text-ciel-text-mid">
-                        Volunteer projects from CIEL partners. Apply, get accepted, then log your hours.
+                        Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to Workspace.
                     </p>
+                    <Link href="/dashboard/student/paths/community-service" className="mt-2 inline-block text-xs font-extrabold text-[#0e7d74] hover:underline">
+                        ← Community Service hub
+                    </Link>
                 </div>
                 <button
                     type="button"
@@ -573,6 +579,66 @@ export default function StudentBrowseOpportunitiesPage() {
                     {hoursRemaining} hours to go · {pendingApplicationsCount} application{pendingApplicationsCount === 1 ? "" : "s"} pending
                 </p>
             </div>
+
+            <section className="rounded-xl border border-ciel-border bg-white p-4">
+                <h2 className="text-[17px] font-semibold text-[#16313d]">My applications</h2>
+                <p className="mt-1 text-[12.5px] text-[#70808a]">
+                    Apply here → participation approval stays here → once approved, the assigned project moves to Workspace → Ready to Start.
+                </p>
+                {myApplications.length === 0 ? (
+                    <p className="mt-3 text-sm text-[#7a919a]">No applications yet.</p>
+                ) : (
+                    <div className="mt-3 grid gap-2.5">
+                        {myApplications.map((op) => {
+                            const status = op.application_status || "";
+                            const pending = isPendingJoin(op);
+                            const approved = isJoinApplicationApprovedStatus(status);
+                            const declined = isJoinApplicationRejectedStatus(status);
+                            const next = pending
+                                ? "No action required — waiting on participation approval"
+                                : approved
+                                  ? "Moved to Workspace · Ready to Start"
+                                  : declined
+                                    ? "Application closed — review other opportunities"
+                                    : "—";
+                            return (
+                                <div key={op.id} className="flex flex-col gap-2 rounded-2xl border border-[#dde5ea] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold text-[#16313d]">{op.title || "Opportunity"}</p>
+                                        <p className="mt-0.5 text-[11.5px] text-[#6b7c86]">
+                                            {pending
+                                                ? joinApplicationPendingLabel(op as unknown as Record<string, unknown>)
+                                                : approved
+                                                  ? "Approved · assigned"
+                                                  : declined
+                                                    ? "Declined"
+                                                    : status || "Applied"}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-[11.5px] text-[#6b7c86]">{next}</span>
+                                        {approved ? (
+                                            <Link
+                                                href="/dashboard/student/paths/community-service?view=workspace&filter=ready"
+                                                className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white"
+                                            >
+                                                Go to workspace
+                                            </Link>
+                                        ) : (
+                                            <Link
+                                                href={`/dashboard/student/browse/${encodeURIComponent(op.id)}`}
+                                                className="rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
+                                            >
+                                                View opportunity
+                                            </Link>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
 
             <section className="rounded-xl border border-ciel-border bg-white p-3" aria-label="Filters">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
