@@ -318,6 +318,10 @@ export default function FacultyOpportunityCreationPage() {
                 toast.error("Please enter a City/Area (Section B)");
                 return false;
             }
+            if (!formData.location.pin.trim()) {
+                toast.error("Please pin the exact location on the map (Section B) so it shows up accurately.");
+                return false;
+            }
         }
         if (!formData.timelineType) {
             toast.error("Please select a Timeline Type");
@@ -1362,18 +1366,29 @@ export default function FacultyOpportunityCreationPage() {
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Pin Exact Location</label>
                                         <div className="rounded-xl overflow-hidden border border-slate-200">
-                                            <LocationPicker
-                                                onLocationSelect={(loc) => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        location: {
-                                                            ...prev.location,
-                                                            venue: loc.address || "",
-                                                            pin: `${loc.lat},${loc.lng}`
-                                                        }
-                                                    }));
-                                                }}
-                                            />
+                                            {(() => {
+                                                let initialLocation: { lat: number; lng: number } | undefined;
+                                                if (formData.location.pin && formData.location.pin.includes(',')) {
+                                                    const [lat, lng] = formData.location.pin.split(',').map(s => parseFloat(s.trim()));
+                                                    if (!isNaN(lat) && !isNaN(lng)) initialLocation = { lat, lng };
+                                                }
+
+                                                return (
+                                                    <LocationPicker
+                                                        initialLocation={initialLocation}
+                                                        onLocationSelect={(loc) => {
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                location: {
+                                                                    ...prev.location,
+                                                                    venue: loc.address || prev.location.venue || "",
+                                                                    pin: `${loc.lat},${loc.lng}`
+                                                                }
+                                                            }));
+                                                        }}
+                                                    />
+                                                );
+                                            })()}
                                         </div>
                                         <div className="relative">
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1 h-4 bg-slate-300 rounded-full"></div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin, Search } from "lucide-react";
+import { toast } from "sonner";
 import {
     GOOGLE_MAPS_API_KEY,
     GOOGLE_MAPS_DEFAULT_CENTER,
@@ -56,6 +57,7 @@ type MapLike = {
 
 type MarkerLike = {
     setPosition: (position: LatLngLiteral) => void;
+    addListener: (eventName: string, handler: (event: { latLng?: LatLngLike }) => void) => void;
 };
 
 type GeocoderLike = {
@@ -135,6 +137,12 @@ function loadGoogleMaps() {
 
     if (googleWindow.google?.maps?.places) {
         return Promise.resolve(googleWindow.google);
+    }
+
+    if (!GOOGLE_MAPS_API_KEY) {
+        return Promise.reject(
+            new Error("Google Maps API key is not configured (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)."),
+        );
     }
 
     if (googleWindow.__googleMapsPromise) {
@@ -238,6 +246,7 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
     const placesRef = useRef<PlacesServiceLike | null>(null);
     const googleRef = useRef<GoogleMapsApi | null>(null);
     const suggestionsRequestRef = useRef(0);
+    const reverseGeocodeRequestRef = useRef(0);
 
     const [isReady, setIsReady] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -271,6 +280,14 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                 markerRef.current = new google.maps.Marker({
                     map: mapRef.current,
                     position,
+                    draggable: true,
+                });
+                markerRef.current.addListener("dragend", (event) => {
+                    if (!event.latLng) return;
+
+                    const nextPosition = getLatLngLiteral(event.latLng);
+                    setPinnedLocation(nextPosition);
+                    reverseGeocode(nextPosition);
                 });
 
                 if (inputRef.current) {
@@ -437,9 +454,20 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
     };
 
     const reverseGeocode = (nextPosition: LatLngLiteral) => {
+        const requestId = reverseGeocodeRequestRef.current + 1;
+        reverseGeocodeRequestRef.current = requestId;
+
         geocoderRef.current?.geocode({ location: nextPosition }, (results, status) => {
+            // Discard this callback if a newer click/drag has already started another lookup —
+            // otherwise an out-of-order response can save stale coordinates that don't match
+            // where the marker visually settled.
+            if (reverseGeocodeRequestRef.current !== requestId) return;
+
             const address = status === "OK" ? results?.[0]?.formatted_address : undefined;
             if (address) setSearchQuery(address);
+            else if (status !== "OK") {
+                toast.error("Couldn't look up an address for that spot — the pinned coordinates were still saved.");
+            }
             onLocationSelect({ ...nextPosition, address });
         });
     };
@@ -490,7 +518,10 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
 
                 const result = status === "OK" ? results?.[0] : null;
                 const location = result?.geometry?.location;
-                if (!location) return;
+                if (!location) {
+                    toast.error("Couldn't find that location. Try a more specific address, or click/drag the pin on the map.");
+                    return;
+                }
 
                 const nextPosition = getLatLngLiteral(location);
                 const address = result.formatted_address || q;

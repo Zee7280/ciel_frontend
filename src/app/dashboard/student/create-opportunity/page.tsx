@@ -7,7 +7,7 @@ import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
-import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
+import { findSdgById, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, missingProfileFieldsForRole, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -405,6 +405,10 @@ function StudentOpportunityCreationPageInner() {
         if (formData.mode !== 'Remote') {
             if (!formData.location.city.trim()) {
                 toast.error("Please enter a City/Area");
+                return false;
+            }
+            if (!formData.location.pin.trim()) {
+                toast.error("Please pin the exact location on the map so it shows up accurately.");
                 return false;
             }
         }
@@ -1979,18 +1983,29 @@ function StudentOpportunityCreationPageInner() {
 
                                     <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pin Implementation Location</label>
-                                        <LocationPicker
-                                            onLocationSelect={(loc) => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    location: {
-                                                        ...prev.location,
-                                                        venue: loc.address || prev.location.venue || "",
-                                                        pin: `${loc.lat},${loc.lng}`
-                                                    }
-                                                }));
-                                            }}
-                                        />
+                                        {(() => {
+                                            let initialLocation: { lat: number; lng: number } | undefined;
+                                            if (formData.location.pin && formData.location.pin.includes(',')) {
+                                                const [lat, lng] = formData.location.pin.split(',').map(s => parseFloat(s.trim()));
+                                                if (!isNaN(lat) && !isNaN(lng)) initialLocation = { lat, lng };
+                                            }
+
+                                            return (
+                                                <LocationPicker
+                                                    initialLocation={initialLocation}
+                                                    onLocationSelect={(loc) => {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            location: {
+                                                                ...prev.location,
+                                                                venue: loc.address || prev.location.venue || "",
+                                                                pin: `${loc.lat},${loc.lng}`
+                                                            }
+                                                        }));
+                                                    }}
+                                                />
+                                            );
+                                        })()}
                                     </div>
 
                                     <div className="relative">
@@ -2207,7 +2222,7 @@ function StudentOpportunityCreationPageInner() {
                         <label className="co-label">Relevant SDG target · optional</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.target}
+                            value={resolveSdgTargetSelectValue(findSdgById(formData.sdg), formData.target)}
                             onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
                         >
                             <option value="">Select a Target...</option>
@@ -2224,13 +2239,14 @@ function StudentOpportunityCreationPageInner() {
                         <label className="co-label">C3 · SDG indicator · optional</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.indicator}
+                            value={resolveSdgIndicatorSelectValue(
+                                findSdgTarget(findSdgById(formData.sdg), formData.target),
+                                formData.indicator,
+                            )}
                             onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
                         >
                             <option value="">Select an Indicator...</option>
-                            {formData.sdg && formData.target && findSdgById(formData.sdg)
-                                ?.targets
-                                .find(target => target.id === formData.target)?.indicators.map((indicator) => (
+                            {formData.sdg && formData.target && findSdgTarget(findSdgById(formData.sdg), formData.target)?.indicators.map((indicator) => (
                                     <option key={indicator.id} value={indicator.id}>
                                         Indicator {indicator.id} — {indicator.description}
                                     </option>
@@ -2277,7 +2293,7 @@ function StudentOpportunityCreationPageInner() {
                             </label>
                             <select
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                                value={formData.secondaryTarget}
+                                value={resolveSdgTargetSelectValue(findSdgById(formData.secondarySdg), formData.secondaryTarget)}
                                 onChange={(e) =>
                                     setFormData({ ...formData, secondaryTarget: e.target.value, secondaryIndicator: "" })
                                 }
@@ -2297,14 +2313,16 @@ function StudentOpportunityCreationPageInner() {
                             <label className="co-label">C6 · Secondary indicator</label>
                             <select
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                                value={formData.secondaryIndicator}
+                                value={resolveSdgIndicatorSelectValue(
+                                    findSdgTarget(findSdgById(formData.secondarySdg), formData.secondaryTarget),
+                                    formData.secondaryIndicator,
+                                )}
                                 onChange={(e) => setFormData({ ...formData, secondaryIndicator: e.target.value })}
                             >
                                 <option value="">Select an Indicator...</option>
                                 {formData.secondarySdg &&
                                     formData.secondaryTarget &&
-                                    findSdgById(formData.secondarySdg)
-                                        ?.targets.find((t) => t.id === formData.secondaryTarget)
+                                    findSdgTarget(findSdgById(formData.secondarySdg), formData.secondaryTarget)
                                         ?.indicators.map((indicator) => (
                                             <option key={indicator.id} value={indicator.id}>
                                                 Indicator {indicator.id} — {indicator.description}

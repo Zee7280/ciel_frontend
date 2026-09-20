@@ -344,6 +344,10 @@ export default function OpportunityPostingPage() {
                 toast.error("Please enter a City/Area");
                 return false;
             }
+            if (!formData.location.pin.trim()) {
+                toast.error("Please pin the exact location on the map so it shows up accurately.");
+                return false;
+            }
         }
         if (!formData.timelineType) {
             toast.error("Please select a Timeline Type");
@@ -1327,7 +1331,7 @@ export default function OpportunityPostingPage() {
                                                         ...prev,
                                                         location: {
                                                             ...prev.location,
-                                                            venue: loc.address || "",
+                                                            venue: loc.address || prev.location.venue || "",
                                                             pin: `${loc.lat},${loc.lng}`
                                                         }
                                                     }));

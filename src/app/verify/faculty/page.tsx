@@ -20,6 +20,12 @@ function FacultyVerifyContent() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
+    // The emailed link carries a deep-link straight to the specific opportunity
+    // (e.g. "/dashboard/faculty/approvals?opportunity=<id>&tab=pending") — without forwarding it,
+    // the faculty lands on the generic pending list and has to hunt for the right request manually.
+    const rawReturnTo = searchParams.get("returnTo");
+    const approvalsHref =
+        rawReturnTo && isSafeInternalReturnPath(rawReturnTo) ? rawReturnTo : FACULTY_APPROVALS_HREF;
 
     const [status, setStatus] = useState<"loading" | "portal" | "error">("loading");
     const [message, setMessage] = useState("");
@@ -34,7 +40,7 @@ function FacultyVerifyContent() {
         const bearer =
             typeof window !== "undefined" ? window.localStorage.getItem("ciel_token") : null;
         if (!bearer) {
-            const loginUrl = `/login?next=${encodeURIComponent(FACULTY_APPROVALS_HREF)}`;
+            const loginUrl = `/login?next=${encodeURIComponent(approvalsHref)}`;
             router.replace(loginUrl);
             return;
         }
@@ -43,9 +49,9 @@ function FacultyVerifyContent() {
         setMessage(
             "You are signed in. Open Approvals to review and approve or reject this request in the portal — nothing is confirmed automatically from this link.",
         );
-    }, [token, router]);
+    }, [token, router, approvalsHref]);
 
-    const signupHref = buildVerificationSignupHref(FACULTY_APPROVALS_HREF, { presetRole: "faculty" });
+    const signupHref = buildVerificationSignupHref(approvalsHref, { presetRole: "faculty" });
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -67,7 +73,7 @@ function FacultyVerifyContent() {
                 {status === "portal" && (
                     <div className="space-y-3 mb-2">
                         <Link
-                            href={FACULTY_APPROVALS_HREF}
+                            href={approvalsHref}
                             className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
                         >
                             <ClipboardList className="w-4 h-4" />
@@ -78,7 +84,7 @@ function FacultyVerifyContent() {
                 {status === "error" && token && pathname && isSafeInternalReturnPath(pathname) && (
                     <div className="space-y-3 mb-4">
                         <Link
-                            href={`/login?next=${encodeURIComponent(FACULTY_APPROVALS_HREF)}`}
+                            href={`/login?next=${encodeURIComponent(approvalsHref)}`}
                             className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
                         >
                             <LogIn className="w-4 h-4" />
