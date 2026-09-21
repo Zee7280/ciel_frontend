@@ -10,6 +10,7 @@ import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSec
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
+import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import {
     mapCommunityPipelineRow,
@@ -317,6 +318,7 @@ export default function PartnerCommunityServiceHub() {
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [innerTab, setInnerTab] = useState("");
+    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
 
     useEffect(() => {
@@ -893,9 +895,8 @@ export default function PartnerCommunityServiceHub() {
                                 {deckCards
                                     .filter((c) => c.cii != null)
                                     .map((card) => (
-                                        <Link
+                                        <div
                                             key={card.id}
-                                            href={reportHref(card.id)}
                                             className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
                                         >
                                             <div className="text-[22px]">🧠</div>
@@ -903,7 +904,19 @@ export default function PartnerCommunityServiceHub() {
                                             <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
                                                 {card.level || "CII"} · {card.cii}/100 · {card.student_name}
                                             </small>
-                                        </Link>
+                                            <div className="mt-2 flex flex-wrap gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setBreakdownFor({ id: card.id, title: card.project_title })}
+                                                    className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
+                                                >
+                                                    View CII breakdown →
+                                                </button>
+                                                <Link href={reportHref(card.id)} className="text-[10.5px] font-black text-[#6b7c86] hover:underline">
+                                                    Open report →
+                                                </Link>
+                                            </div>
+                                        </div>
                                     ))}
                             </div>
                         )
@@ -1014,6 +1027,14 @@ export default function PartnerCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
+
+            {breakdownFor && (
+                <CommunityCiiBreakdownModal
+                    fetchUrl={`/api/v1/partners/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
+                    title={breakdownFor.title}
+                    onClose={() => setBreakdownFor(null)}
+                />
+            )}
         </div>
     );
 }

@@ -19,6 +19,7 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { formatDisplayId } from "@/utils/displayIds";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
@@ -294,6 +295,7 @@ export default function NgoCommunityServiceHub() {
     } = useNgoCommunityServiceData();
     const [innerTab, setInnerTab] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
+    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
 
     useEffect(() => {
         setInnerTab(tabParam);
@@ -730,9 +732,8 @@ export default function NgoCommunityServiceHub() {
                                 {deckCards
                                     .filter((c) => c.cii != null)
                                     .map((card) => (
-                                        <Link
+                                        <div
                                             key={card.id}
-                                            href={reportHref(card.id)}
                                             className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
                                         >
                                             <div className="text-[22px]">🧠</div>
@@ -740,7 +741,19 @@ export default function NgoCommunityServiceHub() {
                                             <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
                                                 {card.level || "CII"} · {card.cii}/100 · {card.student_name}
                                             </small>
-                                        </Link>
+                                            <div className="mt-2 flex flex-wrap gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setBreakdownFor({ id: card.id, title: card.project_title })}
+                                                    className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
+                                                >
+                                                    View CII breakdown →
+                                                </button>
+                                                <Link href={reportHref(card.id)} className="text-[10.5px] font-black text-[#6b7c86] hover:underline">
+                                                    Open report →
+                                                </Link>
+                                            </div>
+                                        </div>
                                     ))}
                             </div>
                         )
@@ -851,6 +864,14 @@ export default function NgoCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
+
+            {breakdownFor && (
+                <CommunityCiiBreakdownModal
+                    fetchUrl={`/api/v1/partners/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
+                    title={breakdownFor.title}
+                    onClose={() => setBreakdownFor(null)}
+                />
+            )}
         </div>
     );
 }

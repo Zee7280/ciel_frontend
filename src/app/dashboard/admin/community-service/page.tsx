@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, CommunityHero, HubBackButton, HubTile } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import {
     mapCommunityPipelineRow,
     mergeCommunityLiveDeck,
@@ -39,6 +41,34 @@ export default function AdminCommunityServicePage() {
     const [pipeline, setPipeline] = useState<CommunityPipelineRow[]>([]);
     const [oppCount, setOppCount] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
+    const [rerunningId, setRerunningId] = useState<string | null>(null);
+
+    /** Backend already permits Super Admin to run an extra AI pass on an already faculty-approved
+     * report, platform-wide, never overwriting the faculty-approved score/level. */
+    const runIndependentAnalysis = async (reportId: string) => {
+        setRerunningId(reportId);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/community-service/reports/${encodeURIComponent(reportId)}/independent-analysis`,
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+            );
+            const json = await res?.json().catch(() => null);
+            if (!res?.ok) {
+                toast.error(json?.message || "Independent AI analysis failed.");
+                return;
+            }
+            const score = json?.data?.score ?? json?.score;
+            const levelName = json?.data?.level?.name ?? json?.level?.name;
+            toast.success(
+                score != null
+                    ? `Independent analysis complete — ${Math.round(score)}/100${levelName ? ` (${levelName})` : ""}. The faculty-approved score is unchanged.`
+                    : "Independent analysis complete. The faculty-approved score is unchanged.",
+            );
+        } finally {
+            setRerunningId(null);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -240,6 +270,27 @@ export default function AdminCommunityServicePage() {
                                     key={c.id}
                                     card={c}
                                     href={view === "hec" ? undefined : reportHref(c.id)}
+                                    actions={
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBreakdownFor({ id: c.id, title: c.project_title })}
+                                                className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
+                                            >
+                                                View CII breakdown →
+                                            </button>
+                                            {view === "approved" && (
+                                                <button
+                                                    type="button"
+                                                    disabled={rerunningId === c.id}
+                                                    onClick={() => void runIndependentAnalysis(c.id)}
+                                                    className="text-[10.5px] font-black text-[#6d28d9] hover:underline disabled:opacity-50"
+                                                >
+                                                    {rerunningId === c.id ? "Running…" : "Run AI Analyzer →"}
+                                                </button>
+                                            )}
+                                        </>
+                                    }
                                 />
                             ))}
                         </div>
@@ -290,6 +341,14 @@ export default function AdminCommunityServicePage() {
                         Open CIEL Master analytics →
                     </a>
                 </div>
+            )}
+
+            {breakdownFor && (
+                <CommunityCiiBreakdownModal
+                    fetchUrl={`/api/v1/admin/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
+                    title={breakdownFor.title}
+                    onClose={() => setBreakdownFor(null)}
+                />
             )}
         </div>
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import clsx from "clsx";
 import { COMMUNITY_LEVEL_CLASS, COMMUNITY_LEVEL_LABEL, type CommunityAwardCard } from "@/utils/communityAwardModel";
 
@@ -8,10 +9,15 @@ export default function CommunityFlashCard({
     card,
     rank,
     href,
+    actions,
 }: {
     card: CommunityAwardCard;
     rank?: number;
     href?: string;
+    /** Optional extra action row (e.g. "View CII breakdown", "Run AI Analyzer") rendered below
+     * the badges — only Super Admin's dashboard passes this today; every other caller is
+     * unaffected. Rendered outside the <Link> wrapper so buttons inside don't trigger navigation. */
+    actions?: ReactNode;
 }) {
     const body = (
         <div className="overflow-hidden rounded-[17px] border border-[#dcebee] bg-white">
@@ -51,10 +57,20 @@ export default function CommunityFlashCard({
             </div>
         </div>
     );
-    if (!href) return body;
-    return (
+    const linked = href ? (
         <Link href={href} className="block transition hover:-translate-y-0.5 hover:shadow-md">
             {body}
         </Link>
+    ) : (
+        body
+    );
+    if (!actions) return linked;
+    return (
+        <div>
+            {linked}
+            <div className="-mt-px flex flex-wrap gap-3 rounded-b-[17px] border border-t-0 border-[#dcebee] bg-[#fbfdfd] px-3 py-2">
+                {actions}
+            </div>
+        </div>
     );
 }
