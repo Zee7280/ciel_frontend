@@ -179,12 +179,16 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
         indicator: typeof sdgInfo.indicator_id === "string" ? sdgInfo.indicator_id : "",
+        subIndicator: typeof sdgInfo.sub_indicator_id === "string" ? sdgInfo.sub_indicator_id : "",
         sdgWhy: typeof sdgInfo.why_relevant === "string" ? sdgInfo.why_relevant : "",
+        // The builder only supports one secondary SDG (primary + one supporting) — cap here too,
+        // in case an older record was saved with more than one.
         secondarySdgs: Array.isArray(d.secondary_sdgs)
-            ? (d.secondary_sdgs as Record<string, string>[]).map((s) => ({
+            ? (d.secondary_sdgs as Record<string, string>[]).slice(0, 1).map((s) => ({
                   sdgId: s.sdg_id || "",
                   targetId: s.target_id || "",
                   indicatorId: s.indicator_id || "",
+                  subIndicatorId: s.sub_indicator_id || "",
                   justification: s.justification || "",
               }))
             : [],

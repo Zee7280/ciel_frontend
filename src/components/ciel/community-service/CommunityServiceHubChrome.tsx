@@ -61,6 +61,100 @@ export function EmptyPanel({ title, text }: { title: string; text: string }) {
     );
 }
 
+export function SummaryTiles({ tiles }: { tiles: [string, string][] }) {
+    return (
+        <div className="mb-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+            {tiles.map(([value, label]) => (
+                <div key={label} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
+                    <strong className="block text-lg text-[#16313d]">{value}</strong>
+                    <span className="mt-0.5 block text-[10px] font-semibold text-[#70808a]">{label}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+export type ApprovalLineStatus =
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "revision_requested"
+    | "skipped"
+    | "not_applicable"
+    | "not_required"
+    | null
+    | undefined;
+
+export function isApprovalLineDone(status: ApprovalLineStatus): boolean {
+    return (
+        status === "approved" ||
+        status === "skipped" ||
+        status === "not_applicable" ||
+        status === "not_required"
+    );
+}
+
+function isApprovalLineBlocked(status: ApprovalLineStatus): boolean {
+    return status === "rejected" || status === "revision_requested";
+}
+
+export type ApprovalPipelineStepState = "done" | "cur" | "bad" | "locked";
+
+/**
+ * Turns an ordered list of approval lines (whichever apply to this creator role — e.g. a
+ * faculty/NGO creator skips its own self-approved line) plus a final decision state into the
+ * step states an `ApprovalPipelineMini` renders.
+ */
+export function computeApprovalPipelineSteps(
+    lines: { label: string; status: ApprovalLineStatus }[],
+    decisionState: ApprovalPipelineStepState,
+): { label: string; state: ApprovalPipelineStepState }[] {
+    let blocked = false;
+    let curAssigned = false;
+    const steps = lines.map(({ label, status }) => {
+        if (isApprovalLineBlocked(status)) {
+            blocked = true;
+            return { label, state: "bad" as ApprovalPipelineStepState };
+        }
+        if (blocked) return { label, state: "locked" as ApprovalPipelineStepState };
+        if (isApprovalLineDone(status)) return { label, state: "done" as ApprovalPipelineStepState };
+        if (!curAssigned) {
+            curAssigned = true;
+            return { label, state: "cur" as ApprovalPipelineStepState };
+        }
+        return { label, state: "locked" as ApprovalPipelineStepState };
+    });
+    steps.push({ label: "Decision", state: decisionState });
+    return steps;
+}
+
+export function ApprovalPipelineMini({ steps }: { steps: { label: string; state: ApprovalPipelineStepState }[] }) {
+    return (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {steps.map((step, i) => (
+                <span key={step.label} className="flex items-center gap-1.5">
+                    <span
+                        className={
+                            "rounded-[9px] border px-2 py-1 text-[9.5px] font-black " +
+                            (step.state === "done"
+                                ? "border-[#cfeadf] bg-[#eff9f5] text-[#1c765d]"
+                                : step.state === "cur"
+                                  ? "border-[#efddb7] bg-[#fff8e9] text-[#9d6810]"
+                                  : step.state === "bad"
+                                    ? "border-[#f3d4d4] bg-[#fdeeee] text-[#b34c4c]"
+                                    : "border-[#e4e9eb] bg-[#f7fafb] text-[#96a3a9]")
+                        }
+                    >
+                        {step.label}
+                        {step.state === "locked" ? " · Locked" : null}
+                    </span>
+                    {i < steps.length - 1 ? <span className="text-[10px] font-black text-[#a8b6bb]">→</span> : null}
+                </span>
+            ))}
+        </div>
+    );
+}
+
 export function ZoneRule({
     title,
     children,

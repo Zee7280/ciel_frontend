@@ -18,6 +18,7 @@ import { Textarea } from "@/app/dashboard/student/report/components/ui/textarea"
 import { Label } from "@/app/dashboard/student/report/components/ui/label";
 import { toast } from "sonner";
 import {
+    type ApprovalHistoryEntry,
     type FacultyApprovalAction,
     type FacultyApprovalRow,
     type FacultyApprovalVisibility,
@@ -26,6 +27,36 @@ import {
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
+import {
+    ApprovalPipelineMini,
+    computeApprovalPipelineSteps,
+    type ApprovalLineStatus,
+    type ApprovalPipelineStepState,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { History } from "lucide-react";
+
+/** Faculty is reviewing a student-created opportunity here, so — unlike the Create Opportunity
+ * tab's "my own opportunity" pipeline — the Faculty line itself is shown as a real, live stage. */
+function facultyApprovalPipelineSteps(project: FacultyApprovalRow) {
+    const lines: { label: string; status: ApprovalLineStatus }[] = [
+        { label: "Faculty", status: project.facultyApprovalStatus as ApprovalLineStatus },
+        ...(project.requiresPartnerApproval
+            ? [{ label: "Partner / NGO", status: project.partnerApprovalStatus as ApprovalLineStatus }]
+            : []),
+        { label: "CIEL PK", status: project.adminApprovalStatus as ApprovalLineStatus },
+    ];
+    const status = (project.opportunityStatus || "").toLowerCase();
+    const decisionState: ApprovalPipelineStepState =
+        status === "rejected" ? "bad" : status === "active" || status === "live" ? "done" : "locked";
+    return computeApprovalPipelineSteps(lines, decisionState);
+}
+
+function approvalHistoryLabel(entry: ApprovalHistoryEntry): string {
+    const line = entry.line === "admin" ? "CIEL PK" : entry.line === "partner" ? "Partner / NGO" : "Faculty";
+    const action =
+        entry.action === "approved" ? "approved" : entry.action === "rejected" ? "rejected" : "requested revision on";
+    return `${line} ${action}`;
+}
 
 function ApprovalVisibilityBadges({ visibility }: { visibility?: FacultyApprovalVisibility }) {
     if (!visibility) return null;
@@ -73,6 +104,7 @@ export default function FacultyApprovalsPage() {
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
     const [feedbackMode, setFeedbackMode] = useState<"revise" | "reject_permanent">("revise");
     const autoOpenedIdRef = useRef<string | null>(null);
+    const [historyRow, setHistoryRow] = useState<FacultyApprovalRow | null>(null);
 
     useEffect(() => {
         void loadLists();
@@ -414,9 +446,16 @@ export default function FacultyApprovalsPage() {
                                                     <span className="break-all text-slate-600">· {project.studentEmail}</span>
                                                 ) : null}
                                                 <span className="hidden sm:inline w-1 h-1 bg-slate-300 rounded-full shrink-0" />
-                                                <span>Submitted {project.submittedDate}</span>
+                                                <span>
+                                                    Submitted {project.submittedDate} · Opp v{project.version ?? 1}
+                                                </span>
                                             </p>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <p className="mb-1.5 text-xs font-bold uppercase text-slate-500">Approval chain</p>
+                                        <ApprovalPipelineMini steps={facultyApprovalPipelineSteps(project)} />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -501,6 +540,11 @@ export default function FacultyApprovalsPage() {
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> {tab === "pending" ? "Review full details" : "Opportunity details"}
                                     </Button>
+                                    {project.approvalHistory && project.approvalHistory.length > 0 ? (
+                                        <Button variant="ghost" className="w-full" onClick={() => setHistoryRow(project)}>
+                                            <History className="w-4 h-4 mr-2" /> History
+                                        </Button>
+                                    ) : null}
                                 </div>
                             </div>
                         </Card>
@@ -625,6 +669,34 @@ export default function FacultyApprovalsPage() {
                             )}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!historyRow} onOpenChange={(open) => !open && setHistoryRow(null)}>
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Version & approval history</DialogTitle>
+                        <DialogDescription>
+                            {historyRow?.projectTitle} — actor, action, timestamp and version. Nothing is overwritten silently.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        {(historyRow?.approvalHistory ?? [])
+                            .slice()
+                            .reverse()
+                            .map((entry, i) => (
+                                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                    <p className="font-semibold text-slate-800">
+                                        {approvalHistoryLabel(entry)}
+                                        <span className="ml-2 text-xs font-normal text-slate-400">Opp v{entry.version}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {entry.actorName || "—"} · {new Date(entry.at).toLocaleString()}
+                                    </p>
+                                    {entry.reason ? <p className="mt-1 text-xs text-slate-600">&ldquo;{entry.reason}&rdquo;</p> : null}
+                                </div>
+                            ))}
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

@@ -24,6 +24,9 @@ export type StudentFlashcardModel = {
     resources: string;
     prerequisites: string;
     sdg: string;
+    target: string;
+    secondarySdg: string;
+    secondaryTarget: string;
     objective: string;
     outputs: string;
     creatorName: string;
@@ -137,6 +140,9 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const sdg = findSdgById(model.sdg);
     const sdgName = sdg?.title || "SDG";
     const sdgNum = sdg?.number != null ? String(sdg.number) : model.sdg || "—";
+    const secondarySdg = model.secondarySdg ? findSdgById(model.secondarySdg) : null;
+    const secondarySdgName = secondarySdg?.title || "SDG";
+    const secondarySdgNum = secondarySdg?.number != null ? String(secondarySdg.number) : model.secondarySdg || "—";
 
     return (
         <article className="co-flash">
@@ -152,7 +158,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                 <div className="co-flash-meta">
                     <span>🌱 {esc(model.activityType || "Community Service")}</span>
                     <span>📍 {esc(model.city || model.mode)}</span>
-                    <span>🌍 SDG {esc(sdgNum)} · {esc(sdgName)}</span>
+                    <span>🌍 SDG {esc(sdgNum)}{model.target ? `-${model.target}` : ""} · {esc(sdgName)}</span>
                     <span>🏛️ {esc(model.orgLabel)}</span>
                 </div>
             </section>
@@ -200,9 +206,86 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                         </ul>
                     </section>
                     <section className="co-flash-panel gold">
-                        <div className="co-flash-ph"><span>🌍</span><b>Impact & SDG</b></div>
-                        <ul className="co-flash-list">
-                            <li>SDG {esc(sdgNum)} · {esc(sdgName)}</li>
+                        <div className="co-flash-ph"><span>🌍</span><b>SDG impact</b></div>
+                        <div style={{ display: "flex", flexDirection: secondarySdg ? "row" : "column", gap: 8, flexWrap: "wrap" }}>
+                            <div
+                                style={{
+                                    flex: secondarySdg ? "1 1 120px" : undefined,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    borderLeft: "3px solid #f2b23a",
+                                    background: "rgba(255,255,255,.55)",
+                                    borderRadius: 10,
+                                    padding: "7px 9px",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        background: sdg?.color ?? "#0e7d74",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        width: 22,
+                                        height: 22,
+                                        flex: "none",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        fontSize: 11,
+                                        fontWeight: 900,
+                                    }}
+                                >
+                                    {esc(sdgNum)}
+                                </span>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800 }}>
+                                        SDG {esc(sdgNum)}{model.target ? `-${model.target}` : ""} · {esc(sdgName)}
+                                    </div>
+                                    <small style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: ".04em", color: "#9a6410" }}>
+                                        PRIMARY SDG
+                                    </small>
+                                </div>
+                            </div>
+                            {secondarySdg ? (
+                                <div
+                                    style={{
+                                        flex: "1 1 120px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        borderLeft: "3px solid #15988b",
+                                        background: "rgba(255,255,255,.55)",
+                                        borderRadius: 10,
+                                        padding: "7px 9px",
+                                    }}
+                                >
+                                    <span
+                                        style={{
+                                            background: secondarySdg.color ?? "#15988b",
+                                            color: "#fff",
+                                            borderRadius: "50%",
+                                            width: 22,
+                                            height: 22,
+                                            flex: "none",
+                                            display: "grid",
+                                            placeItems: "center",
+                                            fontSize: 11,
+                                            fontWeight: 900,
+                                        }}
+                                    >
+                                        {esc(secondarySdgNum)}
+                                    </span>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 800 }}>
+                                            SDG {esc(secondarySdgNum)}{model.secondaryTarget ? `-${model.secondaryTarget}` : ""} · {esc(secondarySdgName)}
+                                        </div>
+                                        <small style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: ".04em", color: "#0e7d74" }}>
+                                            SUPPORTING SDG
+                                        </small>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                        <ul className="co-flash-list" style={{ marginTop: 8 }}>
                             <li>{esc(model.objective)}</li>
                             <li>{esc(model.outputs)}</li>
                         </ul>

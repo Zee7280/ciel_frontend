@@ -126,11 +126,26 @@ type GoogleMapsApi = {
 type GoogleMapsWindow = Window & {
     google?: GoogleMapsApi;
     __googleMapsPromise?: Promise<GoogleMapsApi>;
+    gm_authFailure?: () => void;
 };
 
 function getGoogleWindow() {
     return window as GoogleMapsWindow;
 }
+
+/** Distinguishes *why* the map failed so the on-screen message tells whoever is debugging it what
+ * to actually go fix, instead of one generic string for every failure mode. Google's JS API loads
+ * the script successfully (no `script.onerror`) even when the key is invalid, restricted to the
+ * wrong HTTP referrer, or missing a required API/billing — it only reports that via the global
+ * `gm_authFailure` callback or a console warning, so we have to listen for those ourselves. */
+export const GOOGLE_MAPS_MISSING_KEY_ERROR =
+    "Google Maps API key is not configured (set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY and restart the dev/build server).";
+export const GOOGLE_MAPS_AUTH_FAILURE_ERROR =
+    "Google rejected this API key for this domain — check the key's HTTP referrer restrictions and that the Maps JavaScript + Places APIs are enabled and billed in Google Cloud Console.";
+export const GOOGLE_MAPS_SCRIPT_LOAD_ERROR =
+    "Google Maps script failed to load — check your network connection and any ad/script blockers.";
+export const GOOGLE_MAPS_INIT_ERROR =
+    "Google Maps loaded but did not initialize correctly. Try reloading the page.";
 
 function loadGoogleMaps() {
     const googleWindow = getGoogleWindow();
@@ -140,9 +155,7 @@ function loadGoogleMaps() {
     }
 
     if (!GOOGLE_MAPS_API_KEY) {
-        return Promise.reject(
-            new Error("Google Maps API key is not configured (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)."),
-        );
+        return Promise.reject(new Error(GOOGLE_MAPS_MISSING_KEY_ERROR));
     }
 
     if (googleWindow.__googleMapsPromise) {
@@ -150,18 +163,32 @@ function loadGoogleMaps() {
     }
 
     googleWindow.__googleMapsPromise = new Promise((resolve, reject) => {
+        let settled = false;
+        const settleReject = (error: Error) => {
+            if (settled) return;
+            settled = true;
+            googleWindow.__googleMapsPromise = undefined;
+            reject(error);
+        };
+
+        // Google calls this global specifically for auth/key/billing/API-not-enabled failures —
+        // it fires even though the script itself loaded with a 200, so `script.onerror` never sees it.
+        googleWindow.gm_authFailure = () => settleReject(new Error(GOOGLE_MAPS_AUTH_FAILURE_ERROR));
+
         const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
         const resolveGoogle = () => {
+            if (settled) return;
             if (googleWindow.google?.maps?.places) {
+                settled = true;
                 resolve(googleWindow.google);
                 return;
             }
-            reject(new Error("Google Maps did not initialize correctly"));
+            settleReject(new Error(GOOGLE_MAPS_INIT_ERROR));
         };
 
         if (existingScript) {
             existingScript.addEventListener("load", resolveGoogle);
-            existingScript.addEventListener("error", reject);
+            existingScript.addEventListener("error", () => settleReject(new Error(GOOGLE_MAPS_SCRIPT_LOAD_ERROR)));
             return;
         }
 
@@ -177,7 +204,7 @@ function loadGoogleMaps() {
         script.async = true;
         script.defer = true;
         script.onload = resolveGoogle;
-        script.onerror = () => reject(new Error("Google Maps script failed to load"));
+        script.onerror = () => settleReject(new Error(GOOGLE_MAPS_SCRIPT_LOAD_ERROR));
         document.head.appendChild(script);
     });
 
@@ -323,7 +350,9 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
             })
             .catch((error) => {
                 console.error(error);
-                if (!cancelled) setLoadError("Google Maps could not load. Please check API key restrictions.");
+                if (!cancelled) {
+                    setLoadError(error instanceof Error ? error.message : GOOGLE_MAPS_INIT_ERROR);
+                }
             });
 
         return () => {

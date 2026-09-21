@@ -571,7 +571,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                             <p className="text-2xl">💪</p>
                             <p className="mt-2 text-sm font-semibold text-slate-900">Just our time &amp; effort</p>
                             <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                                No money, materials, or outside support used.
+                                No money, materials, or outside support.
                             </p>
                         </button>
 

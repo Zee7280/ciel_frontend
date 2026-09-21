@@ -41,6 +41,14 @@ export type FacultyCsMineRow = {
     status?: string;
     workflow_stage?: string | null;
     created_at?: string;
+    // Present on the raw API row (spread in below) but not always populated on legacy records —
+    // used only for the create-tab pipeline/status display, so every field here stays optional.
+    partner_approval_status?: string | null;
+    admin_approval_status?: string | null;
+    requires_partner_approval?: boolean;
+    partner_contact_name?: string | null;
+    partner_contact_email?: string | null;
+    rejection_reason?: string | null;
 };
 
 function pickStr(item: Record<string, unknown>, ...keys: string[]): string | undefined {

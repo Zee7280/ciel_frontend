@@ -1,7 +1,7 @@
-import { 
-    Truck, Activity, GraduationCap, Megaphone, Search, Building, 
-    Smartphone, Gavel, Users, Leaf, Banknote, Landmark, 
-    Handshake, ShieldCheck, HelpCircle 
+import {
+    Truck, Activity, GraduationCap, Megaphone, Search, Building,
+    Smartphone, Gavel, Users, Leaf, Banknote, Landmark,
+    Handshake, ShieldCheck, HelpCircle, PartyPopper, HandCoins
 } from "lucide-react";
 
 export const PRIMARY_CATEGORIES = [
@@ -19,6 +19,8 @@ export const PRIMARY_CATEGORIES = [
     { id: "Institutional / Systems Strengthening", label: "Institutional / Systems Strengthening", icon: Landmark },
     { id: "Partnership / Coordination Development", label: "Partnership / Coordination Development", icon: Handshake },
     { id: "Protection / Inclusion Support", label: "Protection / Inclusion Support", icon: ShieldCheck },
+    { id: "Event / Campaign", label: "Event / Campaign", icon: PartyPopper },
+    { id: "Fundraising / Resource Mobilization", label: "Fundraising / Resource Mobilization", icon: HandCoins },
     { id: "Other", label: "Other", icon: HelpCircle }
 ];
 
@@ -111,6 +113,14 @@ export const SUB_CATEGORIES: Record<string, string[]> = {
         "Protection Referral Support", "Social Inclusion Activity", "Anti-Discrimination Initiative",
         "Accessibility Support", "Other Protection / Inclusion Activity"
     ],
+    "Event / Campaign": [
+        "Community Event", "Sports / Well-being Event", "Fundraising Event", "Awareness Campaign",
+        "Exhibition / Showcase", "Other Event / Campaign Activity"
+    ],
+    "Fundraising / Resource Mobilization": [
+        "Fundraising Drive", "Sponsorship Acquisition", "Donation Campaign", "In-Kind Mobilization",
+        "Crowdfunding Campaign", "Other Fundraising / Mobilization Activity"
+    ],
     "Other": ["Please specify your sub-category below"]
 };
 
@@ -122,10 +132,15 @@ export const IMPLEMENTATION_MODELS = [
 ];
 
 export const OUTPUT_TYPES = [
-    "Individuals Reached", "Households Supported", "Sessions Conducted", "Trainings Delivered",
-    "Resources Distributed", "Services Delivered", "Reports / Surveys / Assessments Generated",
-    "Facilities Improved", "Systems / Tools Developed", "Partnerships Formed", "Volunteers Engaged",
-    "Awareness Materials Produced", "Area Covered / Cleaned / Restored", "Financial Support Provided", "Other"
+    "Individuals Reached", "Unique People Reached", "Households Supported", "Sessions Conducted",
+    "Trainings Delivered", "Participant-Hours", "Resources Distributed", "Kits Distributed",
+    "Meals / Food Packages", "Books / Learning Materials", "Devices Distributed", "Services Delivered",
+    "Reports / Surveys / Assessments Generated", "Facilities Improved", "Rooms / Classrooms Improved",
+    "Systems / Tools Developed", "Partnerships Formed", "Volunteers Engaged", "Volunteer Hours",
+    "Awareness Materials Produced", "Area Covered / Cleaned / Restored", "Trees Planted", "Trees Surviving",
+    "Waste Collected / Diverted", "Water Supplied / Saved", "Financial Support Provided", "Funds Mobilized",
+    "In-Kind Value", "Digital Users", "Datasets Produced", "Referrals Made",
+    "SOPs / Policies Developed", "Businesses Supported", "Jobs / Internships Facilitated", "Other"
 ];
 
 export const UNIVERSAL_UNITS = [

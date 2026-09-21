@@ -1330,13 +1330,17 @@ export default function MyProjectsPage() {
                                                             Fully verified
                                                         </p>
                                                         <div className="flex flex-wrap gap-2">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-8 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                                                            <Link
+                                                                href={`/dashboard/student/report?projectId=${encodeURIComponent(project.id)}&view=certificate`}
                                                             >
-                                                                Download cii (Certificate)
-                                                            </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-8 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                                                                >
+                                                                    Download cii (Certificate)
+                                                                </Button>
+                                                            </Link>
                                                             <Link
                                                                 href={resolveStudentProjectActionHref({
                                                                     id: project.id,

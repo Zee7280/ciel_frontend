@@ -19,6 +19,7 @@ import {
     Phone,
     ChevronDown,
     ArrowUpDown,
+    History,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
@@ -28,6 +29,59 @@ import { toast } from "sonner";
 import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
 import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
 import { readActivityPlan, readObjectiveItems } from "@/utils/opportunityDetailView";
+import {
+    ApprovalPipelineMini,
+    computeApprovalPipelineSteps,
+    type ApprovalLineStatus,
+    type ApprovalPipelineStepState,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+
+type AdminApprovalHistoryEntry = {
+    line: "faculty" | "partner" | "admin";
+    action: "approved" | "rejected" | "revision_requested";
+    actorId?: string | null;
+    actorName?: string | null;
+    at: string;
+    version: number;
+    reason?: string | null;
+};
+
+/** CIEL PK is the final stage here, so — unlike the Create Opportunity tab's "my own opportunity"
+ * pipeline — every line up to and including Admin is shown as a real, live stage. */
+function adminApprovalPipelineSteps(row: Record<string, unknown>) {
+    const requiresPartner = row.requiresPartnerApproval === true || row.requires_partner_approval === true;
+    const lines: { label: string; status: ApprovalLineStatus }[] = [
+        { label: "Faculty", status: (row.facultyApprovalStatus ?? row.faculty_approval_status) as ApprovalLineStatus },
+        ...(requiresPartner
+            ? [{ label: "Partner / NGO", status: (row.partnerApprovalStatus ?? row.partner_approval_status) as ApprovalLineStatus }]
+            : []),
+        { label: "CIEL PK", status: (row.adminApprovalStatus ?? row.admin_approval_status) as ApprovalLineStatus },
+    ];
+    const status = readWorkflowStage(row);
+    const decisionState: ApprovalPipelineStepState =
+        status === "rejected" ? "bad" : readAdminApproved(row) || status === "live" || status === "active" ? "done" : "locked";
+    return computeApprovalPipelineSteps(lines, decisionState);
+}
+
+function readOpportunityVersion(row: Record<string, unknown>): number {
+    const v = row.version;
+    return typeof v === "number" && Number.isFinite(v) ? v : 1;
+}
+
+function readApprovalHistory(row: Record<string, unknown>): AdminApprovalHistoryEntry[] {
+    const v = row.approvalHistory ?? row.approval_history;
+    if (!Array.isArray(v)) return [];
+    return v.filter(
+        (x): x is AdminApprovalHistoryEntry => !!x && typeof x === "object" && typeof (x as AdminApprovalHistoryEntry).line === "string",
+    );
+}
+
+function approvalHistoryLabel(entry: AdminApprovalHistoryEntry): string {
+    const line = entry.line === "admin" ? "CIEL PK" : entry.line === "partner" ? "Partner / NGO" : "Faculty";
+    const action =
+        entry.action === "approved" ? "approved" : entry.action === "rejected" ? "rejected" : "requested revision on";
+    return `${line} ${action}`;
+}
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
     if (!o) return "";
@@ -111,14 +165,13 @@ function readIsStudentCreated(row: Record<string, unknown> | null | undefined): 
 }
 
 /**
- * Mirrors `OpportunitiesService.revise()`, which rejects anything that is neither student-created
- * nor already admin-approved. Faculty/partner-created pending rows can never be revised.
+ * Mirrors `OpportunitiesService.revise()`, which now allows a revision request on any opportunity
+ * (student, faculty, NGO/partner-created) at any stage — before or after CIEL PK's own decision.
  */
-const REVISION_INELIGIBLE_HINT =
-    "Revision is only available for student-created submissions or to correct a completed approval.";
+const REVISION_INELIGIBLE_HINT = "Revision is not available for this submission.";
 
-function canRequestOpportunityRevision(row: Record<string, unknown> | null | undefined): boolean {
-    return readIsStudentCreated(row) || readAdminApproved(row);
+function canRequestOpportunityRevision(_row: Record<string, unknown> | null | undefined): boolean {
+    return true;
 }
 
 function approvalPillClass(status: string): string {
@@ -427,6 +480,7 @@ export default function AdminApprovalsPage() {
     // Modal States
     const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [historyRow, setHistoryRow] = useState<Record<string, unknown> | null>(null);
     const [opportunityDetail, setOpportunityDetail] = useState<Record<string, unknown> | null>(null);
     const [opportunityDetailLoading, setOpportunityDetailLoading] = useState(false);
 
@@ -1053,8 +1107,12 @@ export default function AdminApprovalsPage() {
                                         • Submitted:{" "}
                                         {formatDateTime(
                                             proj.submitted_at || proj.submittedAt || proj.created_at || proj.createdAt,
-                                        )}
+                                        )}{" "}
+                                        · Opp v{readOpportunityVersion(projRow)}
                                     </span>
+                                </div>
+                                <div className="mt-2">
+                                    <ApprovalPipelineMini steps={adminApprovalPipelineSteps(projRow)} />
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-3 lg:justify-end">
@@ -1080,6 +1138,17 @@ export default function AdminApprovalsPage() {
                                 >
                                     Details <ArrowRight className="w-4 h-4" />
                                 </button>
+                                {readApprovalHistory(projRow).length > 0 ? (
+                                    <button
+                                        type="button"
+                                        title="Version & approval history"
+                                        aria-label="Version & approval history"
+                                        onClick={() => setHistoryRow(projRow)}
+                                        className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors shadow-sm"
+                                    >
+                                        <History className="w-5 h-5" />
+                                    </button>
+                                ) : null}
                                 {reminderWhatsAppUrl ? (
                                     <a
                                         href={reminderWhatsAppUrl}
@@ -1892,6 +1961,43 @@ export default function AdminApprovalsPage() {
                     </div>
                 )
             }
+
+            {historyRow ? (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6">
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                            <h3 className="text-lg font-bold text-slate-900">Version & approval history</h3>
+                            <button
+                                type="button"
+                                onClick={() => setHistoryRow(null)}
+                                className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4">
+                            {String(historyRow.title || "")} — actor, action, timestamp and version. Nothing is overwritten silently.
+                        </p>
+                        <div className="space-y-2">
+                            {readApprovalHistory(historyRow)
+                                .slice()
+                                .reverse()
+                                .map((entry, i) => (
+                                    <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                        <p className="font-semibold text-slate-800">
+                                            {approvalHistoryLabel(entry)}
+                                            <span className="ml-2 text-xs font-normal text-slate-400">Opp v{entry.version}</span>
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {entry.actorName || "—"} · {new Date(entry.at).toLocaleString()}
+                                        </p>
+                                        {entry.reason ? <p className="mt-1 text-xs text-slate-600">&ldquo;{entry.reason}&rdquo;</p> : null}
+                                    </div>
+                                ))}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div >
     );
 }

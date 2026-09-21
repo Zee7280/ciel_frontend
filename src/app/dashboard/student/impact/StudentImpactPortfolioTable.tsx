@@ -264,7 +264,11 @@ export default function StudentImpactPortfolioTable() {
                     year,
                     dateIso: asIso(r.created_at),
                     sdgs,
-                    href: `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id || r.id))}`,
+                    // Jump straight to the certificate/QR view the report page already builds
+                    // (Section11Summary's autoOpenView effect) instead of landing on a generic tab
+                    // the student then has to hunt through — this is a no-op if the record isn't
+                    // verified yet, since that effect is itself gated on showVerifiedImpactScores.
+                    href: `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id || r.id))}&view=certificate`,
                     flash: {
                         type: "COMMUNITY SERVICE",
                         title: r.project_title || "Community service",

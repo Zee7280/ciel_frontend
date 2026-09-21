@@ -360,7 +360,7 @@ export default function IdentityVerification({
                                 : "text-slate-400 hover:text-slate-600"
                         )}
                     >
-                        {tab === 'personal' ? 'Personal Info' : 'Academic Info'}
+                        {tab === 'personal' ? '👤 Personal Info' : '🎓 Academic Info'}
                     </button>
                 ))}
             </div>
@@ -440,7 +440,7 @@ export default function IdentityVerification({
                                                 disabled={isVerifyingOtp.email || !formData.email}
                                                 className="absolute right-2 top-1.5 h-8 px-3 bg-report-primary text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200 transition-all hover:bg-report-primary-border"
                                             >
-                                                {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Send OTP'}
+                                                {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : '📩 Send OTP'}
                                             </button>
                                         )}
                                         {otpSent.email && !otpVerified.email && (

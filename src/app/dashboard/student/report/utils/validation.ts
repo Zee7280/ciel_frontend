@@ -17,30 +17,49 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CNIC_REGEX = /^(\d{13}|\d{5}-\d{7}-\d{1})$/;
 const MOBILE_REGEX = /^03\d{9}$/;
 
-/** Community report narrative textareas — one rule for every essay field. */
+/** Community report narrative textareas — default rule; specific fields can tighten it below. */
 export const REPORT_TEXT_MIN_WORDS = 20;
 export const REPORT_TEXT_MAX_WORDS = 200;
 export const REPORT_TEXT_RANGE_LABEL = "20–200 words";
+
+/** Per-field word-count overrides for narrative fields with a tighter, field-specific target. */
+export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
+    problem_statement: { min: 20, max: 60 },
+    discipline_contribution: { min: 15, max: 50 },
+    contribution_intent_statement: { min: 30, max: 80 },
+    student_contribution_intent_statement: { min: 20, max: 60 },
+    justification_text: { min: 20, max: 60 },
+    observed_change: { min: 40, max: 100 },
+    challenges: { min: 15, max: 60 },
+};
+
+export function wordRangeLabel(min: number, max: number): string {
+    return `${min}–${max} words`;
+}
 
 export function countWords(str: string): number {
     return str.trim().split(/\s+/).filter(w => w.length > 0).length;
 }
 
-export function reportTextWordMeter(count: number): {
+export function reportTextWordMeter(
+    count: number,
+    min: number = REPORT_TEXT_MIN_WORDS,
+    max: number = REPORT_TEXT_MAX_WORDS,
+): {
     ok: boolean;
     over: boolean;
     barClass: string;
     textClass: string;
     widthPct: number;
 } {
-    const over = count > REPORT_TEXT_MAX_WORDS;
-    const ok = count >= REPORT_TEXT_MIN_WORDS && !over;
+    const over = count > max;
+    const ok = count >= min && !over;
     return {
         ok,
         over,
-        barClass: count < REPORT_TEXT_MIN_WORDS ? "bg-amber-400" : over ? "bg-red-500" : "bg-emerald-500",
+        barClass: count < min ? "bg-amber-400" : over ? "bg-red-500" : "bg-emerald-500",
         textClass: ok ? "text-emerald-600" : over ? "text-red-500" : "text-slate-400",
-        widthPct: Math.min((count / REPORT_TEXT_MAX_WORDS) * 100, 100),
+        widthPct: Math.min((count / max) * 100, 100),
     };
 }
 
@@ -51,21 +70,24 @@ function pushWordRange(
     label: string,
     required = true,
 ) {
+    const policyKey = field.includes(".") ? field.slice(field.lastIndexOf(".") + 1) : field;
+    const { min, max } = FIELD_WORD_POLICY[policyKey] || { min: REPORT_TEXT_MIN_WORDS, max: REPORT_TEXT_MAX_WORDS };
+    const rangeLabel = wordRangeLabel(min, max);
     const text = typeof value === "string" ? value : "";
     if (!text.trim()) {
         if (required) {
             errors.push({
                 field,
-                message: `${label} must be ${REPORT_TEXT_RANGE_LABEL} (0 current)`,
+                message: `${label} must be ${rangeLabel} (0 current)`,
             });
         }
         return;
     }
     const n = countWords(text);
-    if (n < REPORT_TEXT_MIN_WORDS || n > REPORT_TEXT_MAX_WORDS) {
+    if (n < min || n > max) {
         errors.push({
             field,
-            message: `${label} must be ${REPORT_TEXT_RANGE_LABEL} (${n} current)`,
+            message: `${label} must be ${rangeLabel} (${n} current)`,
         });
     }
 }
@@ -77,12 +99,21 @@ function pushWordRange(
 export function validateSection1(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const hasPrivacyConsent = Boolean(data.privacy_consent || data.review_checked?.[2]);
+    // The 3-item declaration replaces the old mid-flow attendance-verification request — the
+    // whole report is verified once, at the end, by faculty. All three boxes must be ticked.
+    const declarationComplete = Array.isArray(data.review_checked) && data.review_checked.length >= 3
+        ? data.review_checked.slice(0, 3).every(Boolean)
+        : false;
 
     if (data.metrics?.hec_compliance === 'below') {
-        errors.push({ 
-            field: 'metrics.hec_compliance', 
-            message: 'Must meet the required engagement hours (at least equal to the goal) to be eligible for report submission.' 
+        errors.push({
+            field: 'metrics.hec_compliance',
+            message: 'Must meet the required engagement hours (at least equal to the goal) to be eligible for report submission.'
         });
+    }
+
+    if (!declarationComplete) {
+        errors.push({ field: 'review_checked', message: 'Please complete all three declaration checkboxes.' });
     }
 
     // Older drafts store the consent only in the final review checklist.
@@ -104,6 +135,8 @@ export function validateSection2(data: any): ValidationResult {
 
     if (!data.discipline) {
         errors.push({ field: 'discipline', message: 'Academic discipline is required' });
+    } else if (data.discipline === 'Other…' && !String(data.discipline_other || '').trim()) {
+        errors.push({ field: 'discipline_other', message: 'Please name your discipline' });
     }
 
     pushWordRange(errors, 'discipline_contribution', data.discipline_contribution, 'Discipline contribution explanation');

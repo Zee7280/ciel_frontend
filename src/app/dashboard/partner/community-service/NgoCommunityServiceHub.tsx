@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import {
+    ApprovalPipelineMini,
+    SummaryTiles,
+    computeApprovalPipelineSteps,
+    isApprovalLineDone,
+    type ApprovalLineStatus,
+    type ApprovalPipelineStepState,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
@@ -28,6 +36,7 @@ import {
     ngoPickNum as pickNum,
     ngoPickStr as pickStr,
     useNgoCommunityServiceData,
+    type OppRow,
 } from "./useNgoCommunityServiceData";
 
 const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "files", "run", "analytics", "pending", "approved"] as const;
@@ -221,6 +230,44 @@ function EmptyPanel({ title, text }: { title: string; text: string }) {
             <p className="mt-1 text-[12.5px] text-slate-500">{text}</p>
         </div>
     );
+}
+
+/**
+ * The NGO/org itself is the creator (not an approval line against itself), so the visible chain
+ * is just an optional external co-host acknowledgement → CIEL PK → Decision.
+ */
+function ngoOwnPipeline(row: OppRow, bucket: "drafts" | "review" | "action" | "published" | "closed") {
+    const requiresPartner = Boolean(row.requires_partner_approval);
+    const lines: { label: string; status: ApprovalLineStatus }[] = [
+        ...(requiresPartner
+            ? [{ label: "Co-host org", status: (row.partner_approval_status ?? row.partner_status) as ApprovalLineStatus }]
+            : []),
+        { label: "CIEL PK", status: row.admin_approval_status as ApprovalLineStatus },
+    ];
+    const decisionState: ApprovalPipelineStepState = bucket === "closed" ? "bad" : bucket === "published" ? "done" : "locked";
+    return computeApprovalPipelineSteps(lines, decisionState);
+}
+
+/** Same contact resolution the backend uses for the student "mine" list — read here straight off
+ * the raw `partner_organization`/`supervision` JSON `findAll` already returns on every row. */
+function resolveNgoCoHostContactName(row: OppRow): string | null {
+    const po = row.partner_organization && typeof row.partner_organization === "object" ? (row.partner_organization as Record<string, unknown>) : null;
+    const sup = row.supervision && typeof row.supervision === "object" ? (row.supervision as Record<string, unknown>) : null;
+    const candidates = [po?.contact_person, po?.contact_person_name, sup?.partner_contact_person];
+    for (const c of candidates) {
+        if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    return null;
+}
+
+function ngoPendingStageLabel(row: OppRow): string {
+    const requiresPartner = Boolean(row.requires_partner_approval);
+    const partnerStatus = (row.partner_approval_status ?? row.partner_status) as ApprovalLineStatus;
+    if (requiresPartner && !isApprovalLineDone(partnerStatus)) {
+        const name = resolveNgoCoHostContactName(row);
+        return name ? `Pending co-host acknowledgement — Waiting for ${name}` : "Pending co-host acknowledgement";
+    }
+    return "Pending CIEL PK — Waiting for final platform approval";
 }
 
 export default function NgoCommunityServiceHub() {
@@ -451,6 +498,14 @@ export default function NgoCommunityServiceHub() {
                         here. Once students are assigned, their service/report progress appears under Community Service Projects.
                         Participation is approved by the student’s faculty; you see assigned students under Projects.
                     </p>
+                    <SummaryTiles
+                        tiles={[
+                            [String(createCounts.drafts + createCounts.review + createCounts.action), "Active proposal records"],
+                            [String(createCounts.review), "Waiting on reviewer"],
+                            [String(createCounts.action), "Need your action"],
+                            [String(createCounts.published), "Live for students"],
+                        ]}
+                    />
                     <HubTabs
                         tabs={[
                             { id: "drafts", label: "Drafts", count: createCounts.drafts },
@@ -489,11 +544,15 @@ export default function NgoCommunityServiceHub() {
                                     >
                                         <b className="block text-[14px] text-[#16313d]">{row.title}</b>
                                         <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                            {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
+                                            {formatDisplayId(row.id, "OPP")} ·{" "}
+                                            {createTab === "review" ? ngoPendingStageLabel(row) : String(row.status || "in review")}
                                             {pickNum(row, "applicants_count", "applicantsCount") > 0
                                                 ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
                                                 : ""}
                                         </small>
+                                        {createTab === "review" || createTab === "published" ? (
+                                            <ApprovalPipelineMini steps={ngoOwnPipeline(row, createTab)} />
+                                        ) : null}
                                     </Link>
                                 ))}
                         </div>

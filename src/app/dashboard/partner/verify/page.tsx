@@ -20,12 +20,42 @@ import { Textarea } from "@/app/dashboard/student/report/components/ui/textarea"
 import {
     extractFacultyApprovalsArray,
     normalizeFacultyApprovalsResponse,
+    type ApprovalHistoryEntry,
     type FacultyApprovalRow,
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
 import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
+import {
+    ApprovalPipelineMini,
+    computeApprovalPipelineSteps,
+    type ApprovalLineStatus,
+    type ApprovalPipelineStepState,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { History } from "lucide-react";
+
+/** Partner/NGO's own line has already been reached here — their pending decision IS the "Partner /
+ * NGO" stage, so (unlike the Create Opportunity tab's "my own opportunity" pipeline) it's shown as
+ * a real, live stage rather than skipped. */
+function partnerApprovalPipelineSteps(row: PartnerApprovalRow) {
+    const lines: { label: string; status: ApprovalLineStatus }[] = [
+        { label: "Faculty", status: row.facultyApprovalStatus as ApprovalLineStatus },
+        { label: "Partner / NGO", status: row.partnerApprovalStatus as ApprovalLineStatus },
+        { label: "CIEL PK", status: row.adminApprovalStatus as ApprovalLineStatus },
+    ];
+    const status = (row.opportunityStatus || "").toLowerCase();
+    const decisionState: ApprovalPipelineStepState =
+        status === "rejected" ? "bad" : status === "active" || status === "live" ? "done" : "locked";
+    return computeApprovalPipelineSteps(lines, decisionState);
+}
+
+function approvalHistoryLabel(entry: ApprovalHistoryEntry): string {
+    const line = entry.line === "admin" ? "CIEL PK" : entry.line === "partner" ? "Partner / NGO" : "Faculty";
+    const action =
+        entry.action === "approved" ? "approved" : entry.action === "rejected" ? "rejected" : "requested revision on";
+    return `${line} ${action}`;
+}
 
 type PartnerApprovalRow = FacultyApprovalRow & {
     workflowStageKey: OpportunityWorkflowStage;
@@ -222,6 +252,7 @@ export default function VerifyWorkPage() {
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
     const [feedbackMode, setFeedbackMode] = useState<"revise" | "reject_permanent">("revise");
     const [execVerifySubmitting, setExecVerifySubmitting] = useState(false);
+    const [historyRow, setHistoryRow] = useState<PartnerApprovalRow | null>(null);
     const autoOpenedIdRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -579,9 +610,14 @@ export default function VerifyWorkPage() {
                                                     <strong className="text-slate-700">{row.studentName}</strong> ({formatDisplayId(row.studentId, "STU")})
                                                 </span>
                                                 {row.studentEmail ? <span className="break-all text-slate-600">· {row.studentEmail}</span> : null}
-                                                <span>Submitted {row.submittedDate}</span>
+                                                <span>Submitted {row.submittedDate} · Opp v{row.version ?? 1}</span>
                                             </p>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <p className="mb-1.5 text-xs font-bold uppercase text-slate-500">Approval chain</p>
+                                        <ApprovalPipelineMini steps={partnerApprovalPipelineSteps(row)} />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -656,6 +692,11 @@ export default function VerifyWorkPage() {
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> Review details
                                     </Button>
+                                    {row.approvalHistory && row.approvalHistory.length > 0 ? (
+                                        <Button variant="outline" className="w-full" onClick={() => setHistoryRow(row)}>
+                                            <History className="w-4 h-4 mr-2" /> History
+                                        </Button>
+                                    ) : null}
                                 </div>
                             </div>
                         </Card>
@@ -923,6 +964,34 @@ export default function VerifyWorkPage() {
                             )}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!historyRow} onOpenChange={(open) => !open && setHistoryRow(null)}>
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Version & approval history</DialogTitle>
+                        <DialogDescription>
+                            {historyRow?.projectTitle} — actor, action, timestamp and version. Nothing is overwritten silently.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        {(historyRow?.approvalHistory ?? [])
+                            .slice()
+                            .reverse()
+                            .map((entry, i) => (
+                                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                    <p className="font-semibold text-slate-800">
+                                        {approvalHistoryLabel(entry)}
+                                        <span className="ml-2 text-xs font-normal text-slate-400">Opp v{entry.version}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {entry.actorName || "—"} · {new Date(entry.at).toLocaleString()}
+                                    </p>
+                                    {entry.reason ? <p className="mt-1 text-xs text-slate-600">&ldquo;{entry.reason}&rdquo;</p> : null}
+                                </div>
+                            ))}
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

@@ -20,6 +20,8 @@ const integrationOptions = [
     { id: "Research-integrated project", label: "🔬 Research project" },
 ];
 
+const SKILL_OTHER = "✏️ Other";
+
 const SKILL_OPTIONS = [
     "🗣️ Communication",
     "🤝 Teamwork",
@@ -29,6 +31,18 @@ const SKILL_OPTIONS = [
     "🎤 Leadership",
     "💗 Empathy",
     "⏰ Time management",
+    "🔬 Research & inquiry",
+    "🎨 Design thinking",
+    "🗣️ Public speaking",
+    "✍️ Writing & documentation",
+    "💻 Digital tools",
+    "💰 Budgeting & finance",
+    "🧑‍🏫 Teaching & mentoring",
+    "🌏 Cross-cultural collaboration",
+    "🔄 Adaptability",
+    "🕊️ Conflict resolution",
+    "🌱 Systems thinking",
+    SKILL_OTHER,
 ];
 
 function stripEmoji(s: string): string {
@@ -158,6 +172,7 @@ export default function Section9Reflection() {
         academic_application,
         competency_scores,
         skills_grown = [],
+        skills_grown_other = "",
         reflection_biggest_learning = "",
         reflection_moment = "",
         reflection_discipline_help = "",
@@ -173,14 +188,19 @@ export default function Section9Reflection() {
     const lastAutoPersonalRef = useRef("");
     const lastAutoAppRef = useRef("");
 
+    const skillLabel = (s: string, otherText: string) =>
+        s === SKILL_OTHER ? lowerFirst(otherText).replace(/\.$/, "") : stripEmoji(s).toLowerCase();
+
     const composeAndUpdate = (fieldPatch: Record<string, unknown>) => {
         const skills = (fieldPatch.skills_grown as string[] | undefined) ?? skills_grown;
+        const skillsOther = (fieldPatch.skills_grown_other as string | undefined) ?? skills_grown_other;
         const biggest = (fieldPatch.reflection_biggest_learning as string | undefined) ?? reflection_biggest_learning;
         const moment = (fieldPatch.reflection_moment as string | undefined) ?? reflection_moment;
         const disciplineHelp = (fieldPatch.reflection_discipline_help as string | undefined) ?? reflection_discipline_help;
+        const namedSkills = skills.filter((s) => s !== SKILL_OTHER || skillsOther.trim()).map((s) => skillLabel(s, skillsOther));
 
         const personalParts: string[] = [];
-        if (skills.length) personalParts.push(`Through this project I grew my ${joinList(skills.map((s) => stripEmoji(s).toLowerCase()))}.`);
+        if (namedSkills.length) personalParts.push(`Through this project I grew my ${joinList(namedSkills)}.`);
         if (biggest) personalParts.push(`The biggest thing I learned was ${lowerFirst(biggest)}.`);
         if (moment) personalParts.push(`A moment that changed how I see things was ${lowerFirst(moment)}.`);
         const composedPersonal = personalParts.join(" ");
@@ -207,13 +227,16 @@ export default function Section9Reflection() {
 
     /** Combined preview only — the real, validated text lives in personal_learning / academic_application below. */
     const reflectionPreview = useMemo(() => {
+        const namedSkills = skills_grown
+            .filter((s) => s !== SKILL_OTHER || skills_grown_other.trim())
+            .map((s) => skillLabel(s, skills_grown_other));
         const parts: string[] = [];
-        if (skills_grown.length) parts.push(`Through this project I grew my ${joinList(skills_grown.map((s) => stripEmoji(s).toLowerCase()))}.`);
+        if (namedSkills.length) parts.push(`Through this project I grew my ${joinList(namedSkills)}.`);
         if (reflection_biggest_learning) parts.push(`The biggest thing I learned was ${lowerFirst(reflection_biggest_learning)}.`);
         if (reflection_moment) parts.push(`A moment that changed how I see things was ${lowerFirst(reflection_moment)}.`);
         if (reflection_discipline_help) parts.push(`My field of study helped because ${lowerFirst(reflection_discipline_help)}.`);
         return parts.join(" ");
-    }, [skills_grown, reflection_biggest_learning, reflection_moment, reflection_discipline_help]);
+    }, [skills_grown, skills_grown_other, reflection_biggest_learning, reflection_moment, reflection_discipline_help]);
 
     const getWordCount = (text: string) =>
         (text || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
@@ -346,6 +369,14 @@ export default function Section9Reflection() {
                                 );
                             })}
                         </div>
+                        {skills_grown.includes(SKILL_OTHER) ? (
+                            <Input
+                                placeholder="Name the skill you grew…"
+                                value={skills_grown_other}
+                                onChange={(e) => composeAndUpdate({ skills_grown_other: e.target.value })}
+                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                            />
+                        ) : null}
                     </div>
 
                     <div className="space-y-1.5">

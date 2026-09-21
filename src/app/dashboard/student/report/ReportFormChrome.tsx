@@ -24,7 +24,7 @@ const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: st
     1: {
         kicker: "START HERE · APPROVAL COMES ONCE, AT THE END",
         title: "Your crew, your hours, your proof",
-        note: "Attendance still saves through the existing Section 1 flow. Faculty / partner approval is unchanged.",
+        note: "No separate attendance sign-off any more — you log, you declare, and the whole report is verified once at the end by faculty, from your flash card.",
     },
     2: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
@@ -172,6 +172,120 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
         names,
         pkr,
     };
+}
+
+/** Top-of-wizard hero — shown once, above the tab bar, for the life of the report. */
+export function ReportMissionHero({ data, projectData }: { data: ReportData; projectData?: unknown }) {
+    const a = chromeAgg(data, projectData);
+    const requiredHours = data.required_hours || 16;
+    const sdgLabel = a.sdgs.length
+        ? a.sdgs
+              .filter((row) => row.role === "primary")
+              .map((row) => `SDG ${row.goalNumber}`)
+              .join(" + ") || `${a.sdgs.length} SDG${a.sdgs.length === 1 ? "" : "s"}`
+        : "—";
+    return (
+        <div className="cer-mission">
+            <div>
+                <div className="ey">YOUR COMMUNITY IMPACT MISSION</div>
+                <h1>{a.title}</h1>
+                <p>
+                    {[a.context.partnerOrganization, a.context.projectLocation !== "N/A" ? a.context.projectLocation : "", a.context.timelineLabel !== "—" ? a.context.timelineLabel : ""]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    <br />
+                    Your approved opportunity is already connected to this report — no repetitive data entry.
+                </p>
+                <div className="cer-bpills">
+                    <div className="cer-bp">
+                        <div className="v">{requiredHours}h</div>
+                        <div className="kk">MINIMUM / MEMBER</div>
+                    </div>
+                    <div className="cer-bp">
+                        <div className="v">{a.members}</div>
+                        <div className="kk">CURRENT TEAM</div>
+                    </div>
+                    <div className="cer-bp">
+                        <div className="v">{sdgLabel}</div>
+                        <div className="kk">REGISTERED SDGs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>) => { headline: string; body: string; badges: string[] }> = {
+    2: (a) => ({
+        headline: "PARTICIPATION RECORD STARTED",
+        body: `${a.logs.length} evidence-backed session${a.logs.length === 1 ? "" : "s"} · ${Math.round(a.hours * 10) / 10} team-hours logged.`,
+        badges: [`👥 ${a.members} team member${a.members === 1 ? "" : "s"}`, `📸 ${a.evidence} evidence files`],
+    }),
+    3: (a) => ({
+        headline: "BASELINE ESTABLISHED",
+        body: a.context ? "Your starting-point story is on record." : "Your starting-point story is being built.",
+        badges: [`🌍 ${a.sdgs.length} SDG${a.sdgs.length === 1 ? "" : "s"} mapped`],
+    }),
+    4: (a) => ({
+        headline: "SDG STORY MAPPED",
+        body: `${a.sdgs.length} SDG alignment${a.sdgs.length === 1 ? "" : "s"} captured.`,
+        badges: [`🧭 contribution logic captured`],
+    }),
+    5: (a) => ({
+        headline: "ACTIVITIES & OUTCOMES BUILT",
+        body: `${a.acts.length} activities · ${a.outputs} countable outputs${a.reach ? ` · ${a.reach} reached` : ""}.`,
+        badges: [`📈 ${a.measured.length} measurable outcome${a.measured.length === 1 ? "" : "s"}`, `🛠 ${a.acts.length} activities`],
+    }),
+    6: (a) => ({
+        headline: "RESOURCE STORY BUILT",
+        body: a.pkr ? `PKR ${a.pkr.toLocaleString()} mobilized.` : "Resource story on record.",
+        badges: [`📦 resources logged`, `💪 student contribution captured`],
+    }),
+    7: (a) => ({
+        headline: "PARTNERSHIP STORY BUILT",
+        body: `${a.context.partnerOrganization || "Your partner"} relationship documented.`,
+        badges: [`🤝 ${a.context.partnerOrganization || "Partner"}`, `🔗 roles recorded`],
+    }),
+    8: (a) => ({
+        headline: "EVIDENCE VAULT BUILT",
+        body: `${a.evidence} evidence item${a.evidence === 1 ? "" : "s"} linked to the report.`,
+        badges: [`🔐 consent captured`, `📎 evidence classified`],
+    }),
+    9: (a) => ({
+        headline: "LEARNING RECORD BUILT",
+        body: a.competency ? `Overall competency ${a.competency}/5.` : "Your learning evidence is ready to be completed.",
+        badges: [`🎓 academic application`, `🧠 reflective learning`],
+    }),
+};
+
+/** 🏆 Recap of the previous section's real numbers — shown above the bridge from step 2 onward. */
+export function ReportAchievementBanner({
+    step,
+    data,
+    projectData,
+}: {
+    step: number;
+    data: ReportData;
+    projectData?: unknown;
+}) {
+    const build = ACHIEVEMENT_COPY[step];
+    if (!build) return null;
+    const a = chromeAgg(data, projectData);
+    const { headline, body, badges } = build(a);
+    return (
+        <div className="cer-achievement">
+            <div className="trophy">🏆</div>
+            <div className="copy">
+                <b>{headline}</b>
+                <p>{body}</p>
+            </div>
+            <div className="badges">
+                {badges.map((t) => (
+                    <span key={t}>{t}</span>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export function ReportSectionBridge({

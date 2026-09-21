@@ -4,6 +4,16 @@ export type FacultyApprovalVisibility = "named_supervisor" | "university_scope" 
 /** Which approve/reject API the Faculty Hub must call (`partner_ack` uses `/partner/approvals`). */
 export type FacultyApprovalAction = "faculty_review" | "partner_ack";
 
+export type ApprovalHistoryEntry = {
+    line: "faculty" | "partner" | "admin";
+    action: "approved" | "rejected" | "revision_requested";
+    actorId?: string | null;
+    actorName?: string | null;
+    at: string;
+    version: number;
+    reason?: string | null;
+};
+
 export type FacultyApprovalRow = {
     id: string;
     projectTitle: string;
@@ -18,6 +28,15 @@ export type FacultyApprovalRow = {
     workflowStage?: string | null;
     approvalVisibility?: FacultyApprovalVisibility;
     approvalAction?: FacultyApprovalAction;
+    /** Approval-chain data — same fields the Create Opportunity tab's pipeline already uses. */
+    requiresPartnerApproval?: boolean;
+    facultyApprovalStatus?: string | null;
+    partnerApprovalStatus?: string | null;
+    adminApprovalStatus?: string | null;
+    /** Creator role — lets NGO/Partner show "Acknowledge" instead of "Approve" when Faculty created it. */
+    createdByRole?: string | null;
+    version?: number;
+    approvalHistory?: ApprovalHistoryEntry[];
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -51,6 +70,24 @@ function pickNum(raw: Record<string, unknown>, ...keys: string[]): number | unde
         }
     }
     return undefined;
+}
+
+function pickBool(raw: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+    for (const k of keys) {
+        const v = raw[k];
+        if (typeof v === "boolean") return v;
+    }
+    return undefined;
+}
+
+function pickApprovalHistory(raw: Record<string, unknown>): ApprovalHistoryEntry[] | undefined {
+    const v = raw.approvalHistory ?? raw.approval_history;
+    if (!Array.isArray(v)) return undefined;
+    const entries = v.filter(
+        (x): x is ApprovalHistoryEntry =>
+            !!x && typeof x === "object" && typeof (x as ApprovalHistoryEntry).line === "string",
+    );
+    return entries.length ? entries : undefined;
 }
 
 function formatSubmitted(raw: Record<string, unknown>): string {
@@ -92,6 +129,13 @@ export function mapFacultyApprovalBackendRow(raw: unknown): FacultyApprovalRow |
         workflowStage: pickStr(r, "workflowStage", "workflow_stage", "approval_stage") || null,
         approvalVisibility: pickApprovalVisibility(r),
         approvalAction: pickApprovalAction(r),
+        requiresPartnerApproval: pickBool(r, "requiresPartnerApproval", "requires_partner_approval"),
+        facultyApprovalStatus: pickStr(r, "facultyApprovalStatus", "faculty_approval_status") || null,
+        partnerApprovalStatus: pickStr(r, "partnerApprovalStatus", "partner_approval_status") || null,
+        adminApprovalStatus: pickStr(r, "adminApprovalStatus", "admin_approval_status") || null,
+        createdByRole: pickStr(r, "createdByRole", "created_by_role", "creator_role", "creatorRole") || null,
+        version: pickNum(r, "version"),
+        approvalHistory: pickApprovalHistory(r),
     };
 }
 

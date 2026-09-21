@@ -43,7 +43,11 @@ function isFilesTab(value: string | null): value is FilesTab {
 
 function reportHref(row: FileRow): string {
     const id = row.project_id || row.opportunity_id || row.id;
-    return `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}`;
+    // Jump straight to the printable/downloadable dossier (Section11Summary's autoOpenView
+    // effect) so "print, or download the file" — promised in the guide banner below — is real,
+    // not just a card that opens the generic report page. Safe no-op if not verified yet, since
+    // that effect is itself gated on showVerifiedImpactScores.
+    return `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}&view=print`;
 }
 
 export default function CommunityServiceFiles() {

@@ -250,6 +250,96 @@
     margin-top: 2px;
 }
 
+.cer .cer-mission {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    background: linear-gradient(125deg, #163d61 0%, #335dc4 48%, #7657d7 100%);
+    color: #fff;
+    border-radius: 26px;
+    padding: 21px 23px;
+    margin-bottom: 14px;
+    box-shadow: 0 20px 52px rgba(54, 74, 167, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.cer .cer-mission .ey {
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+    color: #dce6ff;
+}
+
+.cer .cer-mission h1 {
+    font-size: 20px;
+    margin: 5px 0 6px;
+    line-height: 1.3;
+    font-weight: 800;
+}
+
+.cer .cer-mission p {
+    font-size: 10.5px;
+    line-height: 1.65;
+    color: #e8edff;
+}
+
+.cer .cer-achievement {
+    border: 1px solid #cce3df;
+    background: linear-gradient(135deg, #fff, #eef9f6);
+    border-radius: 17px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    flex-wrap: wrap;
+}
+
+.cer .cer-achievement .trophy {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #d8f4ee, #fff);
+    font-size: 19px;
+    flex-shrink: 0;
+}
+
+.cer .cer-achievement .copy {
+    flex: 1;
+    min-width: 220px;
+}
+
+.cer .cer-achievement .copy b {
+    font-size: 11px;
+    color: #0d2b33;
+}
+
+.cer .cer-achievement .copy p {
+    font-size: 8.8px;
+    color: #657a81;
+    line-height: 1.55;
+    margin-top: 2px;
+}
+
+.cer .cer-achievement .badges {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.cer .cer-achievement .badges span {
+    font-size: 7.6px;
+    font-weight: 900;
+    border-radius: 99px;
+    padding: 5px 8px;
+    background: #fff;
+    border: 1px solid #d8e7e7;
+    color: #315d60;
+}
+
 .cer .cer-hchip {
     border: 1px solid rgba(255, 255, 255, 0.35);
     background: rgba(255, 255, 255, 0.12);

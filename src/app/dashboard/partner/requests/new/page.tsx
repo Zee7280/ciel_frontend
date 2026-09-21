@@ -198,8 +198,9 @@ export default function OpportunityPostingPage() {
         sdg: "",
         target: "",
         indicator: "",
+        subIndicator: "",
         sdgWhy: "",
-        secondarySdgs: [] as { sdgId: string, targetId: string, indicatorId: string, justification: string }[],
+        secondarySdgs: [] as { sdgId: string, targetId: string, indicatorId: string, subIndicatorId: string, justification: string }[],
 
         // Section D
         objectives: {
@@ -387,6 +388,10 @@ export default function OpportunityPostingPage() {
             toast.error("Please explain why this SDG is genuinely relevant.");
             return false;
         }
+        if (formData.secondarySdgs[0] && !formData.secondarySdgs[0].justification.trim()) {
+            toast.error("Please explain why the secondary SDG is genuinely relevant.");
+            return false;
+        }
 
         // Section D
         if (!formData.objectives.description.trim()) {
@@ -546,15 +551,17 @@ export default function OpportunityPostingPage() {
                     sdg_id: formData.sdg,
                     target_id: formData.target,
                     indicator_id: formData.indicator,
+                    sub_indicator_id: formData.subIndicator.trim(),
                     why_relevant: formData.sdgWhy.trim(),
                 },
                 secondary_sdgs: formData.secondarySdgs
-                    .filter((s) => s.sdgId && s.targetId)
+                    .filter((s) => s.sdgId)
                     .map((s) => ({
                         sdg_id: s.sdgId,
                         target_id: s.targetId,
                         indicator_id: s.indicatorId,
-                        justification: s.justification
+                        sub_indicator_id: s.subIndicatorId,
+                        justification: s.justification.trim()
                     })),
                 objectives: {
                     description: formData.objectives.description,
@@ -954,6 +961,9 @@ export default function OpportunityPostingPage() {
             resources: formData.activity.resources,
             prerequisites: formData.activity.prerequisites,
             sdg: formData.sdg,
+            target: formData.target,
+            secondarySdg: formData.secondarySdgs[0]?.sdgId || "",
+            secondaryTarget: formData.secondarySdgs[0]?.targetId || "",
             objective: formData.objectives.description,
             outputs: formData.objectives.outputs,
             creatorName: orgDetails.focalPerson.name || orgDetails.organizationName,
@@ -1488,177 +1498,198 @@ export default function OpportunityPostingPage() {
                         </div>
                     </div>
 
-                    {/* C1. Primary SDG */}
+                    {/* C1. SDG Alignment — up to 2, one unified grid, first pick = primary */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C1. Select PRIMARY SDG <span className="text-red-500">*</span></label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.sdg}
-                            onChange={(e) => setFormData({ ...formData, sdg: e.target.value, target: "", indicator: "" })}
-                        >
-                            <option value="">Select an SDG...</option>
-                            {opportunityFormSdgList.map((sdg) => (
-                                <option key={sdg.id} value={sdg.id}>
-                                    SDG {sdg.number} — {sdg.title}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* C2. SDG Target */}
-                    <div className={!formData.sdg ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C2. Select SDG Target <span className="font-medium normal-case tracking-normal text-[#7a919a]">optional</span></label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.target}
-                            onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
-                        >
-                            <option value="">Select a Target...</option>
-                            {formData.sdg && findSdgById(formData.sdg)?.targets.map((target) => (
-                                <option key={target.id} value={target.id}>
-                                    Target {target.id} — {target.description}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* C3. SDG Indicator */}
-                    <div className={!formData.target ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C3. SDG Indicator (Strongly Recommended)</label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                            value={formData.indicator}
-                            onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
-                        >
-                            <option value="">Select an Indicator...</option>
-                            {formData.sdg && formData.target && findSdgById(formData.sdg)
-                                ?.targets
-                                .find(target => target.id === formData.target)?.indicators.map((indicator) => (
-                                    <option key={indicator.id} value={indicator.id}>
-                                        Indicator {indicator.id} — {indicator.description}
-                                    </option>
-                                ))}
-                        </select>
-                        <p className="text-xs text-slate-500 mt-2">Selecting an indicator improves UN, QS, and government reporting quality.</p>
-                    </div>
-                    <div>
-                        <label className="co-label">Why is this SDG genuinely relevant? *</label>
-                        <textarea
-                            spellCheck={true}
-                            placeholder="Explain the actual connection instead of selecting an SDG only because it sounds related."
-                            value={formData.sdgWhy}
-                            onChange={(e) => setFormData({ ...formData, sdgWhy: e.target.value })}
-                        />
-                    </div>
-
-                    {/* Examples Helper */}
-                    <div className="bg-slate-50 p-4 rounded-xl text-xs space-y-2 text-slate-600">
-                        <div className="font-bold text-slate-800 uppercase mb-1">🧭 Quick Examples</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <span className="font-bold">Training / Teaching</span> <br />
-                                SDG 4 → Target 4.4 → Indicator 4.4.1
-                            </div>
-                            <div>
-                                <span className="font-bold">Environmental Action</span> <br />
-                                SDG 13 → Target 13.3 → Indicator 13.3.1
-                            </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <label className="block text-sm font-bold text-slate-900" style={{ marginBottom: 0 }}>
+                                SDG Alignment <span className="text-red-500">*</span>{" "}
+                                <span className="font-medium normal-case tracking-normal text-[#7a919a]">· select 1–2</span>
+                            </label>
+                            <span className="shrink-0 text-xs font-bold text-slate-400">
+                                {(formData.sdg ? 1 : 0) + (formData.secondarySdgs[0] ? 1 : 0)}/2 selected
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 mb-3">
+                            Choose only the SDGs this opportunity can genuinely demonstrate. The first selection is treated as the primary SDG and the second as supporting.
+                        </p>
+                        <div className="co-sdg-grid">
+                            {opportunityFormSdgList.map((sdg) => {
+                                const isPrimary = formData.sdg === sdg.id;
+                                const isSecondary = formData.secondarySdgs[0]?.sdgId === sdg.id;
+                                const bothSelected = Boolean(formData.sdg) && Boolean(formData.secondarySdgs[0]);
+                                return (
+                                    <button
+                                        key={sdg.id}
+                                        type="button"
+                                        className={`co-sdg-pick${isPrimary || isSecondary ? " on" : ""}`}
+                                        style={{
+                                            background: sdg.color,
+                                            outline: isPrimary ? "3px solid #f2b23a" : isSecondary ? "3px solid #15988b" : undefined,
+                                            outlineOffset: isPrimary || isSecondary ? "-3px" : undefined,
+                                        }}
+                                        onClick={() => {
+                                            if (isPrimary) {
+                                                // Deselect the primary SDG, promoting the secondary (if any) up to primary.
+                                                const promoted = formData.secondarySdgs[0];
+                                                setFormData({
+                                                    ...formData,
+                                                    sdg: promoted?.sdgId || "",
+                                                    target: promoted?.targetId || "",
+                                                    indicator: promoted?.indicatorId || "",
+                                                    subIndicator: promoted?.subIndicatorId || "",
+                                                    sdgWhy: promoted?.justification || "",
+                                                    secondarySdgs: [],
+                                                });
+                                            } else if (isSecondary) {
+                                                setFormData({ ...formData, secondarySdgs: [] });
+                                            } else if (!formData.sdg) {
+                                                setFormData({ ...formData, sdg: sdg.id, target: "", indicator: "", subIndicator: "", sdgWhy: "" });
+                                            } else if (!bothSelected) {
+                                                setFormData({
+                                                    ...formData,
+                                                    secondarySdgs: [{ sdgId: sdg.id, targetId: "", indicatorId: "", subIndicatorId: "", justification: "" }],
+                                                });
+                                            }
+                                            // Two already selected and this tile is neither — ignore the click.
+                                        }}
+                                    >
+                                        <b>{sdg.number}</b>
+                                        <span>{sdg.title}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    {/* C4. Secondary SDG */}
-                    <div className="pt-6 border-t border-slate-100">
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDG (Optional)</label>
-                        <p className="text-xs text-slate-500 mb-4">If this project also contributes to another SDG, select it below.</p>
-
-                        <div className="space-y-4">
-                            <select
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                                value={formData.secondarySdgs[0]?.sdgId || ""}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    setFormData({
-                                        ...formData,
-                                        secondarySdgs: val
-                                            ? [{ sdgId: val, targetId: "", indicatorId: "", justification: "" }]
-                                            : [],
-                                    });
-                                }}
+                    {(
+                        [
+                            { sdgId: formData.sdg, target: formData.target, indicator: formData.indicator, subIndicator: formData.subIndicator, why: formData.sdgWhy, isPrimary: true },
+                            {
+                                sdgId: formData.secondarySdgs[0]?.sdgId || "",
+                                target: formData.secondarySdgs[0]?.targetId || "",
+                                indicator: formData.secondarySdgs[0]?.indicatorId || "",
+                                subIndicator: formData.secondarySdgs[0]?.subIndicatorId || "",
+                                why: formData.secondarySdgs[0]?.justification || "",
+                                isPrimary: false,
+                            },
+                        ] as const
+                    ).map((entry) => {
+                        if (!entry.sdgId) return null;
+                        const sdg = findSdgById(entry.sdgId);
+                        if (!sdg) return null;
+                        const accent = entry.isPrimary ? "#f2b23a" : "#15988b";
+                        const setEntry = (patch: Partial<{ target: string; indicator: string; subIndicator: string; why: string }>) => {
+                            if (entry.isPrimary) {
+                                setFormData({
+                                    ...formData,
+                                    ...(patch.target !== undefined ? { target: patch.target } : {}),
+                                    ...(patch.indicator !== undefined ? { indicator: patch.indicator } : {}),
+                                    ...(patch.subIndicator !== undefined ? { subIndicator: patch.subIndicator } : {}),
+                                    ...(patch.why !== undefined ? { sdgWhy: patch.why } : {}),
+                                });
+                            } else {
+                                const current = formData.secondarySdgs[0];
+                                if (!current) return;
+                                setFormData({
+                                    ...formData,
+                                    secondarySdgs: [{
+                                        ...current,
+                                        ...(patch.target !== undefined ? { targetId: patch.target } : {}),
+                                        ...(patch.indicator !== undefined ? { indicatorId: patch.indicator } : {}),
+                                        ...(patch.subIndicator !== undefined ? { subIndicatorId: patch.subIndicator } : {}),
+                                        ...(patch.why !== undefined ? { justification: patch.why } : {}),
+                                    }],
+                                });
+                            }
+                        };
+                        return (
+                            <div
+                                key={entry.isPrimary ? "primary" : "secondary"}
+                                className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
+                                style={{ borderLeft: `4px solid ${accent}` }}
                             >
-                                <option value="">Select a Secondary SDG...</option>
-                                {opportunityFormSdgList
-                                    .filter((sdg) => sdg.id !== formData.sdg)
-                                    .map((sdg) => (
-                                        <option key={sdg.id} value={sdg.id}>
-                                            SDG {sdg.number} — {sdg.title}
-                                        </option>
-                                    ))}
-                            </select>
-
-                            <div className={!formData.secondarySdgs[0]?.sdgId ? "opacity-50 pointer-events-none space-y-4" : "space-y-4"}>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-900 mb-2">C5. Select SDG Target</label>
-                                    <select
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                                        value={formData.secondarySdgs[0]?.targetId || ""}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                secondarySdgs: formData.secondarySdgs[0]
-                                                    ? [{
-                                                        ...formData.secondarySdgs[0],
-                                                        targetId: e.target.value,
-                                                        indicatorId: "",
-                                                    }]
-                                                    : [],
-                                            })
-                                        }
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+                                            style={{ background: sdg.color }}
+                                        >
+                                            {sdg.number}
+                                        </span>
+                                        <div>
+                                            <b className="block text-sm text-slate-800">SDG {sdg.number} · {sdg.title}</b>
+                                            <span className="text-xs text-slate-400">Complete only the evidence detail you genuinely have.</span>
+                                        </div>
+                                    </div>
+                                    <span
+                                        className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white"
+                                        style={{ background: accent }}
                                     >
-                                        <option value="">Select a Target...</option>
-                                        {(formData.secondarySdgs[0]?.sdgId
-                                            ? findSdgById(formData.secondarySdgs[0].sdgId)?.targets
-                                            : []
-                                        )?.map((target) => (
-                                            <option key={target.id} value={target.id}>
-                                                Target {target.id} — {target.description}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        {entry.isPrimary ? "Primary SDG" : "Supporting SDG"}
+                                    </span>
                                 </div>
-
-                                <div className={!formData.secondarySdgs[0]?.targetId ? "opacity-50 pointer-events-none" : ""}>
-                                    <label className="block text-sm font-bold text-slate-900 mb-2">C6. SDG Indicator</label>
-                                    <select
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
-                                        value={formData.secondarySdgs[0]?.indicatorId || ""}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                secondarySdgs: formData.secondarySdgs[0]
-                                                    ? [{
-                                                        ...formData.secondarySdgs[0],
-                                                        indicatorId: e.target.value,
-                                                    }]
-                                                    : [],
-                                            })
-                                        }
-                                    >
-                                        <option value="">Select an Indicator...</option>
-                                        {(formData.secondarySdgs[0]?.sdgId && formData.secondarySdgs[0]?.targetId
-                                            ? findSdgById(formData.secondarySdgs[0].sdgId)
-                                                ?.targets.find((target) => target.id === formData.secondarySdgs[0].targetId)
-                                                ?.indicators
-                                            : []
-                                        )?.map((indicator) => (
-                                            <option key={indicator.id} value={indicator.id}>
-                                                Indicator {indicator.id} — {indicator.description}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                                            SDG Target <span className="font-normal normal-case text-slate-400">· optional</span>
+                                        </label>
+                                        <select
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
+                                            value={entry.target}
+                                            onChange={(e) => setEntry({ target: e.target.value, indicator: "" })}
+                                        >
+                                            <option value="">Select a Target...</option>
+                                            {sdg.targets.map((target) => (
+                                                <option key={target.id} value={target.id}>
+                                                    Target {target.id} — {target.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className={!entry.target ? "opacity-50 pointer-events-none" : ""}>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                                            Indicator <span className="font-normal normal-case text-slate-400">· optional</span>
+                                        </label>
+                                        <select
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
+                                            value={entry.indicator}
+                                            onChange={(e) => setEntry({ indicator: e.target.value })}
+                                        >
+                                            <option value="">Select an Indicator...</option>
+                                            {entry.target && sdg.targets.find((t) => t.id === entry.target)?.indicators.map((indicator) => (
+                                                <option key={indicator.id} value={indicator.id}>
+                                                    Indicator {indicator.id} — {indicator.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                                            Sub-indicator / Local Metric <span className="font-normal normal-case text-slate-400">· optional</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
+                                            placeholder="e.g. learners completing all sessions"
+                                            value={entry.subIndicator}
+                                            onChange={(e) => setEntry({ subIndicator: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <label className="co-label" style={{ marginTop: 0 }}>
+                                        Why is SDG {sdg.number} genuinely relevant? *
+                                    </label>
+                                    <textarea
+                                        spellCheck={true}
+                                        placeholder={`Explain the direct connection between the opportunity and SDG ${sdg.number}.`}
+                                        value={entry.why}
+                                        onChange={(e) => setEntry({ why: e.target.value })}
+                                    />
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })}
                 </div>
             </div>
             )}

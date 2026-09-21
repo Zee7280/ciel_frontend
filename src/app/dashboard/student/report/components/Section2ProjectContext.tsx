@@ -9,7 +9,10 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
-import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from "../utils/validation";
+import { REPORT_TEXT_MIN_WORDS, FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
+
+const PROBLEM_WORD_RANGE = FIELD_WORD_POLICY.problem_statement;
+const DISCIPLINE_WORD_RANGE = FIELD_WORD_POLICY.discipline_contribution;
 
 /** Internal tokens for multiple "Other" rows in Q4 evidence (must not match human-readable option labels). */
 const OTHER_SLOT_RE = /^__o_(\d+)$/;
@@ -110,7 +113,23 @@ function listJoin(items: string[]): string {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-const GAP_OPTIONS = ["Skills", "Access", "Resources", "Systems", "Awareness", "Other"];
+const GAP_OPTIONS = [
+    "Skills",
+    "Knowledge",
+    "Access",
+    "Resources",
+    "Infrastructure",
+    "Funding",
+    "Services",
+    "Technology",
+    "Systems",
+    "Awareness",
+    "Inclusion",
+    "Safety",
+    "Community Participation",
+    "Data / Information",
+    "Other",
+];
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
     const { data, updateSection, getFieldError, isReportSectionsReadOnly } = useReportForm();
@@ -352,15 +371,21 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         "Agriculture & Food Sciences",
         "Hospitality & Services",
         "Interdisciplinary Studies",
+        "Other…",
     ];
 
     const evidenceTypes = [
         "Observation",
         "Survey Data",
+        "Community Interviews",
+        "Focus Group",
         "Partner-Provided Data",
+        "Attendance / Administrative Records",
         "Government Data",
         "Academic Research",
-        "Community Interviews",
+        "Needs Assessment",
+        "Environmental Measurement",
+        "Digital Analytics",
         "Previous Project Data",
         "Other",
     ];
@@ -483,7 +508,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">1 · What problem did you see?</p>
                             <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                {REPORT_TEXT_RANGE_LABEL}
+                                {wordRangeLabel(PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max)}
                             </span>
                         </div>
                         <p className="text-xs text-slate-500">Be specific — what issue, gap, or challenge existed, and why did it need a structured response?</p>
@@ -498,12 +523,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex items-center justify-between">
                             <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(wordCount).barClass)}
-                                    style={{ width: `${reportTextWordMeter(wordCount).widthPct}%` }}
+                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).barClass)}
+                                    style={{ width: `${reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).widthPct}%` }}
                                 />
                             </div>
-                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(wordCount).textClass)}>
-                                {wordCount} / 200 words · {charCount} chars
+                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).textClass)}>
+                                {wordCount} / {PROBLEM_WORD_RANGE.max} words · {charCount} chars
                             </p>
                         </div>
                         <FieldError message={getFieldError("problem_statement")} />
@@ -625,7 +650,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">5 · Your field of study &amp; how it helped</p>
                             <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                {REPORT_TEXT_RANGE_LABEL}
+                                {wordRangeLabel(DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max)}
                             </span>
                         </div>
                         <SingleSelect
@@ -636,6 +661,15 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             disabled={isReadOnly}
                         />
                         <FieldError message={getFieldError("discipline")} />
+                        {sectionData.discipline === "Other…" ? (
+                            <Input
+                                placeholder="Name your discipline…"
+                                disabled={isReadOnly}
+                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                value={sectionData.discipline_other || ""}
+                                onChange={(e) => updateSection("section2", { discipline_other: e.target.value })}
+                            />
+                        ) : null}
                         <p className="text-xs text-slate-500">Be specific: how was your academic background applied — not &ldquo;my degree helped me understand society.&rdquo;</p>
                         <Textarea
                             placeholder="e.g. we used engineering optimization models to identify inefficiencies in waste collection routing…"
@@ -648,12 +682,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex items-center justify-between">
                             <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(disciplineWordCount).barClass)}
-                                    style={{ width: `${reportTextWordMeter(disciplineWordCount).widthPct}%` }}
+                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).barClass)}
+                                    style={{ width: `${reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).widthPct}%` }}
                                 />
                             </div>
-                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(disciplineWordCount).textClass)}>
-                                {disciplineWordCount} / 200 words · {disciplineCharCount} chars
+                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).textClass)}>
+                                {disciplineWordCount} / {DISCIPLINE_WORD_RANGE.max} words · {disciplineCharCount} chars
                             </p>
                         </div>
                         <FieldError message={getFieldError("discipline_contribution")} />
@@ -704,16 +738,16 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             <div
                                 className={clsx(
                                     "h-full rounded-full transition-all",
-                                    reportTextWordMeter(summaryWordCount).ok ? "bg-emerald-500" : "bg-indigo-400",
+                                    reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? "bg-emerald-500" : "bg-indigo-400",
                                 )}
-                                style={{ width: `${reportTextWordMeter(summaryWordCount).widthPct}%` }}
+                                style={{ width: `${reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).widthPct}%` }}
                             />
                         </div>
                         <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-                            <span className={clsx("font-semibold tabular-nums", reportTextWordMeter(summaryWordCount).ok && "text-emerald-600")}>
-                                {summaryWordCount} words{reportTextWordMeter(summaryWordCount).ok ? " ✓" : ""}
+                            <span className={clsx("font-semibold tabular-nums", reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok && "text-emerald-600")}>
+                                {summaryWordCount} words{reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? " ✓" : ""}
                             </span>
-                            <span>aim for {REPORT_TEXT_RANGE_LABEL}</span>
+                            <span>aim for {wordRangeLabel(PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max)}</span>
                         </div>
                     </div>
 

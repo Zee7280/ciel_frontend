@@ -271,16 +271,14 @@ function PartnerVerifyContent() {
                             Verify this opportunity
                         </button>
                         <div className="flex gap-2">
-                            {preview?.isStudentCreated && (
-                                <button
-                                    type="button"
-                                    onClick={() => setPendingDecision("revision")}
-                                    className="inline-flex items-center justify-center gap-2 flex-1 bg-white border border-amber-200 text-amber-700 font-semibold py-2.5 rounded-xl hover:bg-amber-50 text-sm"
-                                >
-                                    <PenLine className="w-4 h-4" />
-                                    Request revision
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => setPendingDecision("revision")}
+                                className="inline-flex items-center justify-center gap-2 flex-1 bg-white border border-amber-200 text-amber-700 font-semibold py-2.5 rounded-xl hover:bg-amber-50 text-sm"
+                            >
+                                <PenLine className="w-4 h-4" />
+                                Request revision
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => setPendingDecision("reject")}

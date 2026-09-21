@@ -131,6 +131,8 @@ export interface ReportData {
     section2: {
         problem_statement: string;
         discipline: string;
+        /** Custom text when "Other…" is selected as discipline. */
+        discipline_other?: string;
         discipline_contribution: string;
         baseline_evidence: string[];
         baseline_evidence_other?: string;
@@ -331,6 +333,8 @@ export interface ReportData {
         summary_text?: string;
         /** Tapped chips answering "skills I grew" — feeds the composed personal_learning draft. */
         skills_grown?: string[];
+        /** Free-text value when "✏️ Other" is tapped in skills_grown. */
+        skills_grown_other?: string;
         /** Guided one-line inputs that compose personal_learning / academic_application — kept alongside them so the blanks survive navigation. */
         reflection_biggest_learning?: string;
         reflection_moment?: string;
@@ -354,6 +358,12 @@ export interface ReportData {
         is_ai_generated?: boolean;
         /** Structured fields parsed from Section 11 AI final audit (cross-section red flags). */
         audit_meta?: ReportCIIauditMeta | null;
+        /** Final report declaration — 5 checkboxes gating submission, replacing a per-section sign-off. */
+        final_declaration?: boolean[];
+        /** Typed full-name electronic signature accompanying the final declaration. */
+        signature_name?: string;
+        /** Auto-recorded timestamp the moment the declaration + signature were completed. */
+        signed_at?: string;
     };
     required_hours?: number;
     /** Report owner from API — used to align dossier with the filing student (may be a team member, not the lead). */
@@ -392,6 +402,7 @@ export const defaultReportData: ReportData = {
     section2: {
         problem_statement: '',
         discipline: '',
+        discipline_other: '',
         discipline_contribution: '',
         baseline_evidence: [],
         baseline_evidence_other: '',
@@ -507,6 +518,7 @@ export const defaultReportData: ReportData = {
         },
         summary_text: '',
         skills_grown: [],
+        skills_grown_other: '',
         reflection_biggest_learning: '',
         reflection_moment: '',
         reflection_discipline_help: ''
@@ -522,7 +534,10 @@ export const defaultReportData: ReportData = {
         continuation_risk: ''
     },
     section11: {
-        summary_text: ''
+        summary_text: '',
+        final_declaration: [false, false, false, false, false],
+        signature_name: '',
+        signed_at: ''
     },
     required_hours: 16
 };
@@ -589,7 +604,9 @@ interface ReportContextType {
     isEligibleForSubmission: boolean;
     /** Sections 1–10 pass validation (summary step excluded). */
     areAllSectionsComplete: boolean;
-    /** Hours + all sections valid — final submit allowed. */
+    /** Final report declaration + electronic signature complete. */
+    finalDeclarationComplete: boolean;
+    /** Hours + all sections valid + final declaration signed — final submit allowed. */
     canSubmitReport: boolean;
     /** Team projects: signed-in student matches roster team lead email. */
     isTeamLeadForSubmit: boolean;
@@ -656,9 +673,16 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         return checks.every((r) => r.isValid);
     }, [data]);
 
+    /** Final report declaration & electronic sign-off — 5 checkboxes + typed name, completed once at the very end. */
+    const finalDeclarationComplete = useMemo(() => {
+        const decl = data.section11?.final_declaration;
+        const signed = Array.isArray(decl) && decl.length >= 5 && decl.slice(0, 5).every(Boolean);
+        return signed && !!String(data.section11?.signature_name || '').trim();
+    }, [data.section11?.final_declaration, data.section11?.signature_name]);
+
     const canSubmitReport = useMemo(
-        () => isEligibleForSubmission && areAllSectionsComplete,
-        [isEligibleForSubmission, areAllSectionsComplete],
+        () => isEligibleForSubmission && areAllSectionsComplete && finalDeclarationComplete,
+        [isEligibleForSubmission, areAllSectionsComplete, finalDeclarationComplete],
     );
 
     const [signedInEmail, setSignedInEmail] = useState('');
@@ -969,6 +993,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setRequiredHours,
         isEligibleForSubmission,
         areAllSectionsComplete,
+        finalDeclarationComplete,
         canSubmitReport,
         isTeamLeadForSubmit,
         isTeamMemberAttendanceOnly,
@@ -998,6 +1023,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setRequiredHours,
         isEligibleForSubmission,
         areAllSectionsComplete,
+        finalDeclarationComplete,
         canSubmitReport,
         isTeamLeadForSubmit,
         isTeamMemberAttendanceOnly,

@@ -10,7 +10,10 @@ import { Button } from "./ui/button";
 import { FieldError } from "./ui/FieldError";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
-import { REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from "../utils/validation";
+import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
+
+const OBSERVED_CHANGE_WORD_RANGE = FIELD_WORD_POLICY.observed_change;
+const CHALLENGES_WORD_RANGE = FIELD_WORD_POLICY.challenges;
 
 type MeasurableOutcome = {
     id: string;
@@ -166,8 +169,16 @@ function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
-function WordMeterBar({ count }: { count: number }) {
-    const meter = reportTextWordMeter(count);
+function WordMeterBar({
+    count,
+    min = REPORT_TEXT_MIN_WORDS,
+    max = REPORT_TEXT_MAX_WORDS,
+}: {
+    count: number;
+    min?: number;
+    max?: number;
+}) {
+    const meter = reportTextWordMeter(count, min, max);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
@@ -177,7 +188,7 @@ function WordMeterBar({ count }: { count: number }) {
                 />
             </div>
             <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / 200 words
+                {count} / {max} words
             </p>
         </div>
     );
@@ -669,7 +680,9 @@ export default function Section5Outcomes() {
                         5.1
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Observed change (narrative)</h3>
-                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · {REPORT_TEXT_RANGE_LABEL}</span>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>
+                        Mandatory · {wordRangeLabel(OBSERVED_CHANGE_WORD_RANGE.min, OBSERVED_CHANGE_WORD_RANGE.max)}
+                    </span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -762,7 +775,7 @@ export default function Section5Outcomes() {
                             value={section5.observed_change}
                             onChange={e => update("observed_change", e.target.value)}
                         />
-                            <WordMeterBar count={observedWords} />
+                            <WordMeterBar count={observedWords} min={OBSERVED_CHANGE_WORD_RANGE.min} max={OBSERVED_CHANGE_WORD_RANGE.max} />
                     </div>
                 </div>
             </section>
@@ -810,7 +823,9 @@ export default function Section5Outcomes() {
                         5.3
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Challenges &amp; limitations</h3>
-                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · {REPORT_TEXT_RANGE_LABEL}</span>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>
+                        Mandatory · {wordRangeLabel(CHALLENGES_WORD_RANGE.min, CHALLENGES_WORD_RANGE.max)}
+                    </span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -872,7 +887,7 @@ export default function Section5Outcomes() {
                             value={section5.challenges}
                             onChange={e => update("challenges", e.target.value)}
                         />
-                            <WordMeterBar count={challengeWords} />
+                            <WordMeterBar count={challengeWords} min={CHALLENGES_WORD_RANGE.min} max={CHALLENGES_WORD_RANGE.max} />
                     </div>
                 </div>
 

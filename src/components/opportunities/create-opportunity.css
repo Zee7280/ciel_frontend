@@ -1,3 +1,12 @@
+/* Tailwind v4 (see src/app/globals.css's `@import "tailwindcss"`) emits its utility classes
+   inside `@layer utilities`. CSS Cascade Layers rank ANY unlayered rule above EVERY layered rule,
+   no matter the specificity — so as a plain, unlayered stylesheet this file's selectors were
+   beating Tailwind's utility classes outright, and no amount of tightening or loosening
+   specificity here could ever change that (that was the wrong axis entirely). Declaring this
+   whole file inside the pre-existing `components` layer makes it lose correctly to `utilities`,
+   which is what every `pl-*`/`pr-*`/`focus:*` override elsewhere in this file actually needs. */
+@layer components {
+
 .co-form {
     --co-ink: #16313d;
     --co-muted: #70808a;
@@ -342,11 +351,19 @@
     margin: 12px 0 6px;
 }
 
+/* These four selectors are meant as defaults only: whenever a field also carries a Tailwind
+   utility class (a left/right padding override, a focus border color, etc — used throughout this
+   wizard for icon-inset fields), that utility must win. A plain compound selector such as
+   ".co-form .co-card select" outranks a single Tailwind class by CSS specificity regardless of
+   source order, so every icon-inset field silently lost its extra inset here (e.g. the city picker
+   pin icon sitting on top of the text). Wrapping each selector in :where(...) zeroes its
+   specificity so ordinary utility classes always take priority, without having to special-case
+   every individual padding value that gets used. */
 .co-form .co-input,
-.co-form .co-card input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
-.co-form .co-card select,
-.co-form .co-card textarea,
-.co-form .co-final input:not([type="checkbox"]):not([type="radio"]) {
+:where(.co-form .co-card input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"])),
+:where(.co-form .co-card select),
+:where(.co-form .co-card textarea),
+:where(.co-form .co-final input:not([type="checkbox"]):not([type="radio"])) {
     width: 100%;
     border: 1px solid var(--co-line);
     border-radius: 10px;
@@ -357,15 +374,15 @@
     color: var(--co-ink);
 }
 
-.co-form .co-card textarea {
+:where(.co-form .co-card textarea) {
     min-height: 80px;
     resize: vertical;
     line-height: 1.7;
 }
 
-.co-form .co-card input:focus,
-.co-form .co-card select:focus,
-.co-form .co-card textarea:focus {
+:where(.co-form .co-card input):focus,
+:where(.co-form .co-card select):focus,
+:where(.co-form .co-card textarea):focus {
     outline: none;
     border-color: var(--co-teal);
     background: #fff;
@@ -780,3 +797,5 @@
     .co-flash-facts { grid-template-columns: 1fr 1fr; }
     .co-flash-title { font-size: 22px; }
 }
+
+} /* @layer components */

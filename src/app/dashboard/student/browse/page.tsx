@@ -46,6 +46,24 @@ import { ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
 import { fetchImpactSummary, readImpactSummaryCache } from "@/utils/cielImpactSummary";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import ProgressBar from "@/components/ciel/ProgressBar";
+import { UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { findSdgById } from "@/utils/sdgData";
+
+type BrowseCreatorLabel = "Faculty" | "NGO" | "Partner" | "CIEL PK";
+
+/** Coarser than `pickCreatorBucket` (which only knows student/faculty/partner) — Browse only ever
+ * shows published, non-student opportunities, so this splits the "partner" bucket further into
+ * the 4 creator types the design calls for. */
+function pickBrowseCreatorLabel(raw: Record<string, unknown>): BrowseCreatorLabel | null {
+    const r = String(raw.created_by_role ?? raw.creator_role ?? raw.creator_type ?? "")
+        .trim()
+        .toLowerCase();
+    if (!r) return null;
+    if (r.includes("faculty")) return "Faculty";
+    if (r.includes("ngo")) return "NGO";
+    if (r.includes("admin") || r.includes("ciel")) return "CIEL PK";
+    return "Partner";
+}
 
 interface TeamMember {
     name: string;
@@ -97,7 +115,11 @@ interface BrowseOpportunity {
     visibilityBucket?: VisibilityBucket;
     opportunityTypes?: string[];
     sdgLabel?: string;
+    sdgNumber?: number | null;
+    sdgTitle?: string | null;
+    creatorLabel?: BrowseCreatorLabel | null;
     seatsRemaining?: number | null;
+    seatsApproved?: number | null;
     /** True while a join application is pending or approved; false when rejected so student can re-apply. */
     applyLocked?: boolean;
     /** From bulk `/students/reports/check` when available. */
@@ -189,6 +211,12 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         (typeof op.remaining_seats === "number" ? op.remaining_seats : null) ??
         (typeof op.volunteersNeeded === "number" ? op.volunteersNeeded : null);
 
+    const sdgIdRaw =
+        (op.sdg_info && typeof op.sdg_info === "object" ? (op.sdg_info as { sdg_id?: unknown }).sdg_id : undefined) ??
+        raw.sdg;
+    const sdg = findSdgById(sdgIdRaw as string | number | undefined);
+    const creatorLabel = pickBrowseCreatorLabel(raw);
+
     const application_id = pickJoinApplicationId(raw) || op.application_id;
     const application_stage = (pickJoinApplicationStage(raw) ?? op.application_stage ?? null) as string | null;
 
@@ -204,6 +232,8 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         raw.volunteers_needed ?? raw.volunteersNeeded ?? timeline?.volunteers_required ?? raw.volunteers_count ?? op.volunteersNeeded,
     );
     const seatsTotal = Number.isFinite(needed) && needed > 0 ? needed : null;
+    const seatsApproved =
+        seatsTotal != null && seatsRemaining != null ? Math.max(0, seatsTotal - seatsRemaining) : null;
     const createdRaw = raw.created_at ?? raw.createdAt ?? raw.published_at;
     const createdAt = typeof createdRaw === "string" && createdRaw.trim() ? createdRaw : undefined;
 
@@ -226,7 +256,11 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         visibilityBucket: pickVisibilityBucket(raw),
         opportunityTypes,
         sdgLabel: buildSdgFilterLabel(raw),
+        sdgNumber: sdg?.number ?? null,
+        sdgTitle: sdg?.title ?? null,
+        creatorLabel,
         seatsRemaining,
+        seatsApproved,
     };
 }
 
@@ -336,6 +370,7 @@ export default function StudentBrowseOpportunitiesPage() {
     const [locationFilter, setLocationFilter] = useState("all");
     const [seatsFilter, setSeatsFilter] = useState<"all" | "1" | "5" | "10">("all");
     const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
+    const [creatorFilter, setCreatorFilter] = useState<"all" | BrowseCreatorLabel>("all");
 
     // Derived Data
     const universityOptions = Array.from(
@@ -359,6 +394,7 @@ export default function StudentBrowseOpportunitiesPage() {
         if (locationFilter !== "all" && (op.city || "Remote") !== locationFilter) return false;
         if (!passesSeatsFilter(op.seatsRemaining ?? null, seatsFilter)) return false;
         if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;
+        if (creatorFilter !== "all" && op.creatorLabel !== creatorFilter) return false;
         return true;
     });
     const needle = searchQuery.trim().toLowerCase();
@@ -386,6 +422,7 @@ export default function StudentBrowseOpportunitiesPage() {
         setLocationFilter("all");
         setSeatsFilter("all");
         setVisibilityFilter("all");
+        setCreatorFilter("all");
         setSearchQuery("");
         setOnlyOpenSeats(false);
         setSortNewest(true);
@@ -402,6 +439,7 @@ export default function StudentBrowseOpportunitiesPage() {
         locationFilter,
         seatsFilter,
         visibilityFilter,
+        creatorFilter,
     ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0);
 
     const pendingApplicationsCount = opportunities.filter((op) => op.applyLocked && isPendingJoin(op)).length;
@@ -569,6 +607,17 @@ export default function StudentBrowseOpportunitiesPage() {
                     How scoring works
                 </button>
             </header>
+
+            <UserGuideBanner
+                desc="Find approved opportunities published by Faculty, NGOs, Partners and CIEL PK."
+                items={[
+                    ["Published Opportunities", "Explore live opportunity flashcards and eligibility before applying."],
+                    ["My Applications", "Track Pending, Approved or Declined participation requests."],
+                    ["Apply Now", "Submit a participation request when you are eligible."],
+                    ["Go to Workspace", "Appears after participation approval; opens the assigned project."],
+                ]}
+                rule="A pending application stays in Browse. Only an approved assignment moves to Workspace."
+            />
 
             <div className="flex flex-col gap-3 rounded-xl border border-ciel-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-5">
                 <p className="shrink-0 text-sm font-bold text-ciel-text">
@@ -747,6 +796,20 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
                                     </div>
                                     <div className="relative">
+                                        <select
+                                            value={creatorFilter}
+                                            onChange={(e) => setCreatorFilter(e.target.value as "all" | BrowseCreatorLabel)}
+                                            className={`${filterSelectClass} w-full`}
+                                            title="Creator"
+                                        >
+                                            <option value="all">All creators</option>
+                                            {(["Faculty", "NGO", "Partner", "CIEL PK"] as const).map((c) => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="relative">
                                         <select value={seatsFilter} onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")} className={`${filterSelectClass} w-full`} title="Seats available">
                                             <option value="all">Any seats</option>
                                             <option value="1">1+ seats</option>
@@ -827,10 +890,19 @@ export default function StudentBrowseOpportunitiesPage() {
                                 key={op.id}
                                 className="flex h-full flex-col rounded-xl border border-ciel-border bg-white p-5"
                             >
-                                <h3 className="text-lg font-bold leading-snug text-ciel-text">{op.title}</h3>
+                                {op.sdgNumber ? (
+                                    <p className="text-[10px] font-black uppercase tracking-[0.06em] text-[#158272]">
+                                        SDG {op.sdgNumber}
+                                        {op.category ? ` · ${op.category}` : op.sdgTitle ? ` · ${op.sdgTitle}` : ""}
+                                    </p>
+                                ) : null}
+                                <h3 className="mt-0.5 text-lg font-bold leading-snug text-ciel-text">{op.title}</h3>
                                 <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ciel-text-mid">
                                     <Building2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="truncate">{op.organization_name || "Partner Organization"}</span>
+                                    <span className="truncate">
+                                        {op.creatorLabel ? `${op.creatorLabel}: ` : ""}
+                                        {op.organization_name || "Partner Organization"}
+                                    </span>
                                 </p>
                                 {op.description ? (
                                     <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ciel-text-mid">{op.description}</p>
@@ -846,6 +918,15 @@ export default function StudentBrowseOpportunitiesPage() {
                                         {seatsLeftLabel(op)}
                                     </span>
                                 </div>
+
+                                {op.seatsTotal && op.seatsTotal > 0 ? (
+                                    <ProgressBar
+                                        value={Math.min(100, Math.round(((op.seatsApproved ?? 0) / op.seatsTotal) * 100))}
+                                        className="mt-2 h-1.5"
+                                        barClassName={op.seatsRemaining != null && op.seatsRemaining <= 0 ? "bg-[#d7626a]" : "bg-[#15988b]"}
+                                        trackClassName="bg-slate-200"
+                                    />
+                                ) : null}
 
                                 <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ciel-text-mid">
                                     <span className="inline-flex items-center gap-1.5">

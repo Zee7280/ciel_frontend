@@ -50,7 +50,7 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner } from './ReportFormChrome';
+import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner } from './ReportFormChrome';
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -892,6 +892,8 @@ function ReportFormContent() {
                     />
                 ) : null}
 
+                <ReportMissionHero data={data} projectData={projectDetails} />
+
                 <div className="cer-tabs">
                     {REPORT_TAB_ITEMS.map((tab) => {
                         const isActive = tabMatchesStep(tab.step, activeStep);
@@ -924,6 +926,7 @@ function ReportFormContent() {
                                     }
                                 }}
                             >
+                                {(lockedSummary || lockedSection1) ? "🔒 " : ""}
                                 {tab.label}
                             </button>
                         );
@@ -931,12 +934,15 @@ function ReportFormContent() {
                 </div>
 
                 {!onFlash ? (
-                    <ReportSectionBridge
-                        step={activeStep}
-                        data={data}
-                        projectData={projectDetails}
-                        onOpenHelp={() => setHelpSignal((n) => n + 1)}
-                    />
+                    <>
+                        <ReportAchievementBanner step={activeStep} data={data} projectData={projectDetails} />
+                        <ReportSectionBridge
+                            step={activeStep}
+                            data={data}
+                            projectData={projectDetails}
+                            onOpenHelp={() => setHelpSignal((n) => n + 1)}
+                        />
+                    </>
                 ) : null}
 
                 <div>

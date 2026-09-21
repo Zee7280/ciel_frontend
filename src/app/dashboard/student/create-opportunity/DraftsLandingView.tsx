@@ -6,6 +6,16 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { DashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
+import { findSdgById } from "@/utils/sdgData";
+
+function readStr(obj: unknown, path: string[]): string {
+    let cur: unknown = obj;
+    for (const key of path) {
+        if (!cur || typeof cur !== "object") return "";
+        cur = (cur as Record<string, unknown>)[key];
+    }
+    return typeof cur === "string" ? cur : typeof cur === "number" ? String(cur) : "";
+}
 
 type DraftRow = {
     id: string;
@@ -64,8 +74,10 @@ export default function DraftsLandingView({
 }) {
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
     const [completion, setCompletion] = useState<Record<string, number>>({});
+    const [details, setDetails] = useState<Record<string, Record<string, unknown> | undefined>>({});
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [previewId, setPreviewId] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -78,7 +90,7 @@ export default function DraftsLandingView({
                 if (cancelled) return;
                 setDrafts(rows);
 
-                const pairs = await Promise.all(
+                const triples = await Promise.all(
                     rows.map(async (row) => {
                         try {
                             const detailRes = await authenticatedFetch(
@@ -88,13 +100,16 @@ export default function DraftsLandingView({
                             );
                             const detailJson = detailRes?.ok ? await detailRes.json().catch(() => null) : null;
                             const detail = detailJson?.data as Record<string, unknown> | undefined;
-                            return [row.id, detail ? computeCompletionPercent(detail) : 0] as const;
+                            return [row.id, detail ? computeCompletionPercent(detail) : 0, detail] as const;
                         } catch {
-                            return [row.id, 0] as const;
+                            return [row.id, 0, undefined] as const;
                         }
                     }),
                 );
-                if (!cancelled) setCompletion(Object.fromEntries(pairs));
+                if (!cancelled) {
+                    setCompletion(Object.fromEntries(triples.map(([id, pct]) => [id, pct])));
+                    setDetails(Object.fromEntries(triples.map(([id, , detail]) => [id, detail])));
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -197,14 +212,19 @@ export default function DraftsLandingView({
                         const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(d.id)}&draft=1`;
                         return (
                             <div key={d.id} className="rounded-2xl border border-[#dde5ea] bg-white p-[15px]">
-                                <div className="flex items-start justify-between gap-3">
+                                <p className="m-0 text-[9px] font-[950] uppercase tracking-[0.06em] text-[#0e7d74]">Your opportunity · Building</p>
+                                <div className="mt-1 flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <h4 className="m-0 truncate text-[13px] font-semibold text-[#16313d]">{d.title || "Untitled opportunity"}</h4>
                                         <p className="mt-1 text-[10px] text-[#70808a]">Draft · Last saved {formatSavedAt(d.updated_at || d.created_at)}</p>
                                     </div>
                                     <span className="shrink-0 text-lg font-[950] text-[#0f766e]">{pct}%</span>
                                 </div>
-                                <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#e6eef1]">
+                                <div className="mt-2.5 flex items-center justify-between text-[9.5px] font-black text-[#70808a]">
+                                    <span>Form completion</span>
+                                    <span>{pct}%</span>
+                                </div>
+                                <div className="mt-1 h-[7px] overflow-hidden rounded-full bg-[#e6eef1]">
                                     <div
                                         className="h-full rounded-full bg-[linear-gradient(90deg,#0e7d74,#f59e0b)]"
                                         style={{ width: `${Math.max(4, pct)}%` }}
@@ -218,11 +238,15 @@ export default function DraftsLandingView({
                                 </div>
                                 <div className="mt-[11px] flex flex-wrap gap-2">
                                     <Link href={editHref} className="rounded-[10px] bg-[#174b43] px-3 py-2 text-[10px] font-black text-white">
-                                        Continue Draft
+                                        Continue Editing
                                     </Link>
-                                    <Link href={editHref} className="rounded-[10px] border border-[#dde5ea] bg-[#edf3f6] px-3 py-2 text-[10px] font-black text-[#3c5968]">
-                                        Preview
-                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewId(d.id)}
+                                        className="rounded-[10px] border border-[#dde5ea] bg-[#edf3f6] px-3 py-2 text-[10px] font-black text-[#3c5968]"
+                                    >
+                                        Preview Flashcard
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => handleDelete(d.id, d.title)}
@@ -237,6 +261,103 @@ export default function DraftsLandingView({
                     })}
                 </div>
             )}
+
+            {previewId ? (() => {
+                const detail = details[previewId];
+                const draftRow = drafts.find((d) => d.id === previewId);
+                const sdg = findSdgById(readStr(detail, ["sdg_info", "sdg_id"]));
+                const types = Array.isArray((detail as { types?: unknown } | undefined)?.types)
+                    ? ((detail as { types?: unknown[] }).types as unknown[]).filter((t): t is string => typeof t === "string")
+                    : [];
+                const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(previewId)}&draft=1`;
+                return (
+                    <div
+                        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+                        onClick={(e) => e.target === e.currentTarget && setPreviewId(null)}
+                    >
+                        <div className="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+                            <div className="flex items-start justify-between gap-3">
+                                <h3 className="m-0 text-[16px] font-bold text-[#16313d]">
+                                    {draftRow?.title || "Untitled opportunity"}
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewId(null)}
+                                    className="shrink-0 rounded-full border border-[#dde5ea] px-2.5 py-1 text-[11px] font-bold text-[#3c5968]"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.06em] text-[#70808a]">
+                                Preview — read only · draft not yet submitted
+                            </p>
+
+                            {!detail ? (
+                                <p className="mt-4 text-[12px] text-[#70808a]">Could not load this draft's details.</p>
+                            ) : (
+                                <div className="mt-4 space-y-3 text-[12px] text-[#16313d]">
+                                    {readStr(detail, ["objectives", "hook"]) ? (
+                                        <p className="italic text-[#3c5968]">“{readStr(detail, ["objectives", "hook"])}”</p>
+                                    ) : null}
+                                    {readStr(detail, ["objectives", "summary"]) ? (
+                                        <p>{readStr(detail, ["objectives", "summary"])}</p>
+                                    ) : null}
+                                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#eef1f2] bg-[#fafbfc] p-3">
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Mode</b>
+                                            {readStr(detail, ["mode"]) || "—"}
+                                        </div>
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Activity type</b>
+                                            {types.length ? types.join(", ") : "—"}
+                                        </div>
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">SDG</b>
+                                            {sdg ? `SDG ${sdg.number} · ${sdg.title}` : "—"}
+                                        </div>
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Hours / seats</b>
+                                            {readStr(detail, ["timeline", "expected_hours"]) || "—"} h ·{" "}
+                                            {readStr(detail, ["timeline", "volunteers_required"]) || "—"} seats
+                                        </div>
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Dates</b>
+                                            {readStr(detail, ["timeline", "start_date"]) || "—"} →{" "}
+                                            {readStr(detail, ["timeline", "end_date"]) || "—"}
+                                        </div>
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Beneficiaries</b>
+                                            {readStr(detail, ["objectives", "beneficiary_group"]) || "—"}
+                                        </div>
+                                    </div>
+                                    {readStr(detail, ["activity_details", "student_responsibilities"]) ? (
+                                        <div>
+                                            <b className="block text-[9.5px] uppercase text-[#70808a]">What students will do</b>
+                                            <p className="mt-1">{readStr(detail, ["activity_details", "student_responsibilities"])}</p>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
+
+                            <div className="mt-5 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewId(null)}
+                                    className="rounded-[10px] border border-[#dde5ea] px-3 py-2 text-[10px] font-black text-[#3c5968]"
+                                >
+                                    Close
+                                </button>
+                                <Link
+                                    href={editHref}
+                                    className="rounded-[10px] bg-[#174b43] px-3 py-2 text-[10px] font-black text-white"
+                                >
+                                    Continue Editing
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })() : null}
         </div>
     );
 }

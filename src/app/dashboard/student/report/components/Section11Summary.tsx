@@ -9,7 +9,7 @@ import CertificateView from "./CertificateView";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
-import { formatIncompleteSectionHeading } from "../utils/reportWizardNav";
+import { formatIncompleteSectionHeading, REVIEW_DOSSIER_FORM_NAV, tabIsComplete } from "../utils/reportWizardNav";
 import { calculateCII } from "../utils/calculateCII";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
@@ -59,13 +59,156 @@ function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMe
     };
 }
 
+const FINAL_DECLARATION_ITEMS = [
+    "I confirm every section of this report is accurate to the best of my knowledge.",
+    "I understand that after final submission, no further edits are possible.",
+    "I understand my whole report — not each session — is verified once, by faculty, from the flash card.",
+    "I consent to this report and its evidence being shared with CIEL PK, my faculty, and my institution for verification.",
+    "I understand a reporting fee may apply before my score and certificate are unlocked.",
+];
+
+/** Mockup 10.5 — the final declaration + electronic sign-off that gates submission, once all sections are complete. */
+function FinalDeclarationCard({
+    declaration,
+    signatureName,
+    onToggle,
+    onSignatureChange,
+}: {
+    declaration: boolean[];
+    signatureName: string;
+    onToggle: (index: number) => void;
+    onSignatureChange: (value: string) => void;
+}) {
+    const allChecked = declaration.slice(0, 5).every(Boolean);
+    return (
+        <>
+            <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center">
+                <ShieldCheck className="w-8 h-8 text-indigo-600" />
+            </div>
+            <div className="max-w-lg w-full space-y-5 text-left">
+                <div>
+                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-1">
+                        Final report declaration &amp; electronic sign-off
+                    </h3>
+                    <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                        All sections and hours are complete. Before submission is accepted, tick every
+                        declaration below and sign with your full name.
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
+                    {FINAL_DECLARATION_ITEMS.map((text, i) => (
+                        <label key={i} className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50">
+                            <input
+                                type="checkbox"
+                                checked={!!declaration[i]}
+                                onChange={() => onToggle(i)}
+                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            />
+                            <span className="text-sm leading-relaxed text-slate-700">{text}</span>
+                        </label>
+                    ))}
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Electronic signature — type your full name
+                    </label>
+                    <input
+                        type="text"
+                        value={signatureName}
+                        onChange={(e) => onSignatureChange(e.target.value)}
+                        placeholder="Your full name"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-100"
+                    />
+                </div>
+                {!allChecked || !signatureName.trim() ? (
+                    <p className="text-xs font-medium text-amber-600">
+                        Tick all five declarations and sign your name to unlock final submission.
+                    </p>
+                ) : (
+                    <p className="text-xs font-medium text-emerald-600">
+                        Declaration complete — you can now submit from the button below.
+                    </p>
+                )}
+            </div>
+        </>
+    );
+}
+
+/** Mockup 10.7 — how a submitted report actually reaches each stakeholder. Static, informational only. */
+function ReportTravelsCard() {
+    const steps: Array<[string, string]> = [
+        ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
+        ["2 · Faculty approves once", "Faculty reviews the whole report from your flash card — not session by session."],
+        ["3 · Delivered per stakeholder", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK, faculty, and your institution."],
+    ];
+    return (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
+            <h4 className="text-sm font-semibold text-slate-900">Where your report travels</h4>
+            <p className="mt-1 text-xs text-slate-500">The mechanism — who gets what, and when.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {steps.map(([title, body]) => (
+                    <div key={title} className="rounded-lg border border-slate-200 bg-white p-3.5">
+                        <p className="text-xs font-bold text-slate-900">{title}</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{body}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/** Mockup 10.6 — a named-criteria readiness checklist, restyling the raw validation-error list into ✅/⏳ rows. */
+function ReadinessChecklist({
+    hoursMet,
+    incompleteSectionNums,
+    declarationComplete,
+}: {
+    hoursMet: boolean;
+    incompleteSectionNums: Set<number>;
+    declarationComplete: boolean;
+}) {
+    const rows: Array<{ label: string; done: boolean }> = [
+        { label: "Every member met the required hours", done: hoursMet },
+        ...REVIEW_DOSSIER_FORM_NAV.map((nav) => ({
+            label: `Step ${nav.wizard} · ${nav.label}`,
+            done: tabIsComplete(nav.wizard, incompleteSectionNums),
+        })),
+        { label: "Final declaration & electronic sign-off", done: declarationComplete },
+    ];
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h4 className="text-sm font-semibold text-slate-900">✅ CIEL PK · Submission Readiness</h4>
+            <p className="mt-0.5 text-xs text-slate-500">
+                Browse freely. This is the only gate: every item below must be complete before the report can be sent
+                for verification.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {rows.map((row) => (
+                    <div
+                        key={row.label}
+                        className={clsx(
+                            "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium",
+                            row.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+                        )}
+                    >
+                        <span>{row.done ? "✅" : "⏳"}</span>
+                        <span>{row.label}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function Section11Summary({ onRequestFinalSubmit, projectData }: Section11SummaryProps = {}) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const {
         data,
+        updateSection,
         isEligibleForSubmission,
         areAllSectionsComplete,
+        finalDeclarationComplete,
         showVerifiedImpactScores,
         incompleteSectionsSummary,
     } = useReportForm();
@@ -199,6 +342,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             ? String(beneficiariesRaw)
             : "0";
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
+    const incompleteSectionNums = useMemo(
+        () => new Set(incompleteSectionsSummary.map((block) => block.section)),
+        [incompleteSectionsSummary],
+    );
 
     const mergedSdgNums = useMemo(
         () => uniqueMergedSdgGoalNumbers(projectData, section3),
@@ -837,6 +984,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     {data.required_hours || 16} hours are verified.
                                 </p>
                             </div>
+                            <ReadinessChecklist
+                                hoursMet={verifiedHours >= (data.required_hours || 16)}
+                                incompleteSectionNums={incompleteSectionNums}
+                                declarationComplete={finalDeclarationComplete}
+                            />
                         </div>
                     </>
                 ) : isEligibleForSubmission && !areAllSectionsComplete ? (
@@ -893,8 +1045,30 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     )}
                                 </div>
                             </div>
+                            <ReadinessChecklist
+                                hoursMet
+                                incompleteSectionNums={incompleteSectionNums}
+                                declarationComplete={finalDeclarationComplete}
+                            />
                         </div>
                     </>
+                ) : isEligibleForSubmission && areAllSectionsComplete && !finalDeclarationComplete ? (
+                    <FinalDeclarationCard
+                        declaration={data.section11?.final_declaration || [false, false, false, false, false]}
+                        signatureName={data.section11?.signature_name || ""}
+                        onToggle={(i) => {
+                            const next = [...(data.section11?.final_declaration || [false, false, false, false, false])];
+                            next[i] = !next[i];
+                            const allNowChecked = next.slice(0, 5).every(Boolean);
+                            updateSection("section11", {
+                                final_declaration: next,
+                                ...(allNowChecked && (data.section11?.signature_name || "").trim()
+                                    ? { signed_at: new Date().toISOString() }
+                                    : {}),
+                            });
+                        }}
+                        onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
+                    />
                 ) : (
                     <>
                         <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center">
@@ -903,7 +1077,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         <div className="max-w-md space-y-4">
                             <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Ready for final submission</h3>
                             <p className="text-sm font-semibold text-slate-400 leading-relaxed">
-                                All sections are complete and hour requirements are met. Review and submit when ready.
+                                All sections are complete, hour requirements are met, and your declaration is signed.
+                                Review and submit when ready.
                             </p>
                             <Button
                                 onClick={() => {
@@ -920,6 +1095,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             >
                                 <Lock className="w-4 h-4" /> Submit final report
                             </Button>
+                            <ReportTravelsCard />
                         </div>
                     </>
                 )}

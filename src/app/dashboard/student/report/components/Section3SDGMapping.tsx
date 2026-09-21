@@ -19,7 +19,10 @@ import {
 } from "@/utils/sdgData";
 import clsx from "clsx";
 import { listOpportunityReportSdgs } from "../utils/reportSdgMerge";
-import { REPORT_TEXT_MAX_WORDS, reportTextWordMeter } from "../utils/validation";
+import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, reportTextWordMeter } from "../utils/validation";
+
+const PRIMARY_SDG_WORD_RANGE = FIELD_WORD_POLICY.contribution_intent_statement;
+const EXTRA_SDG_WORD_RANGE = FIELD_WORD_POLICY.justification_text;
 
 interface Section3Props {
     projectData: any;
@@ -61,8 +64,18 @@ const dropdownClass =
 const fieldLabelClass =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 
-function WordCountBar({ count, max = REPORT_TEXT_MAX_WORDS, text }: { count: number; max?: number; text?: string }) {
-    const meter = reportTextWordMeter(count);
+function WordCountBar({
+    count,
+    min = REPORT_TEXT_MIN_WORDS,
+    max = REPORT_TEXT_MAX_WORDS,
+    text,
+}: {
+    count: number;
+    min?: number;
+    max?: number;
+    text?: string;
+}) {
+    const meter = reportTextWordMeter(count, min, max);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
@@ -593,18 +606,18 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <Label className="text-sm font-semibold text-slate-900">
-                            3.1.1 Contribution logic statement
+                            3.1.1 Actual contribution to the registered SDG
                         </Label>
                         <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
                             Required
                         </span>
                     </div>
                     <p className="text-sm leading-relaxed text-slate-500">
-                        Explain the &ldquo;pathway to change&rdquo; — how do your activities directly lead to
-                        the selected SDG target? Consider who benefits and what specific shift occurs.
+                        What really happened during implementation? Explain how your activities actually led to
+                        the selected SDG target — who benefited and what shift occurred.
                     </p>
                     <Textarea
-                        placeholder="Describe the planned contribution pathway…"
+                        placeholder="During implementation, this project…"
                         className={clsx(
                             "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
                             getFieldError("contribution_intent_statement") && "border-red-300",
@@ -616,7 +629,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             })
                         }
                     />
-                    <WordCountBar count={primaryWordCount} text={contribution_intent_statement || ""} />
+                    <WordCountBar
+                        count={primaryWordCount}
+                        min={PRIMARY_SDG_WORD_RANGE.min}
+                        max={PRIMARY_SDG_WORD_RANGE.max}
+                        text={contribution_intent_statement || ""}
+                    />
                     <FieldError message={getFieldError("contribution_intent_statement")} />
                 </div>
             </section>
@@ -713,18 +731,18 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                     <div className="space-y-3 border-t border-slate-100 pt-6">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <Label className="text-sm font-semibold text-slate-900">
-                                3.2.1 Contribution logic statement
+                                3.2.1 Actual contribution to this SDG
                             </Label>
                             <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
                                 Required
                             </span>
                         </div>
                         <p className="text-sm leading-relaxed text-slate-500">
-                            Explain the &ldquo;pathway to change&rdquo; — how do your activities directly lead
-                            to the selected SDG target? Consider who benefits and what specific shift occurs.
+                            What really happened during implementation? Explain how your activities actually
+                            led to this SDG target — who benefited and what shift occurred.
                         </p>
                         <Textarea
-                            placeholder="Describe the planned contribution pathway…"
+                            placeholder="During implementation, this project…"
                             className={clsx(
                                 "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
                                 getFieldError("student_contribution_intent_statement") &&
@@ -737,7 +755,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 })
                             }
                         />
-                        <WordCountBar count={studentWordCount} text={student_contribution_intent_statement || ""} />
+                        <WordCountBar
+                            count={studentWordCount}
+                            min={EXTRA_SDG_WORD_RANGE.min}
+                            max={EXTRA_SDG_WORD_RANGE.max}
+                            text={student_contribution_intent_statement || ""}
+                        />
                         <FieldError message={getFieldError("student_contribution_intent_statement")} />
                     </div>
 
@@ -852,6 +875,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 />
                                                 <WordCountBar
                                                     count={justWords}
+                                                    min={EXTRA_SDG_WORD_RANGE.min}
+                                                    max={EXTRA_SDG_WORD_RANGE.max}
                                                     text={sdg.justification_text || ""}
                                                 />
                                             </div>

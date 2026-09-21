@@ -396,7 +396,7 @@ function PartnerCard({
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>Role in project</Label>
+                    <Label className={fieldLabel}>What role did they play?</Label>
                     <span className={badgeRequired}>Required</span>
                 </div>
                 <p className="text-xs text-slate-500">Select all that apply</p>
@@ -406,7 +406,7 @@ function PartnerCard({
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>Contribution type</Label>
+                    <Label className={fieldLabel}>What did they contribute?</Label>
                     <span className={badgeRequired}>Required</span>
                 </div>
                 <p className="text-xs text-slate-500">Select all that apply</p>

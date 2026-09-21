@@ -61,6 +61,22 @@ export default function StudentNotificationsPage() {
         }
     };
 
+    const markAllAsRead = async () => {
+        try {
+            const res = await authenticatedFetch(`/api/v1/notifications/read-all`, {
+                method: "PUT",
+            });
+            if (res?.ok) {
+                setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+                broadcastUnreadNotificationsCount(0);
+                toast.success("All notifications marked as read");
+            }
+        } catch (error) {
+            console.error("Failed to mark all notifications as read", error);
+            toast.error("Failed to mark all as read");
+        }
+    };
+
     const deleteNotification = async (id: number) => {
         try {
             const res = await authenticatedFetch(`/api/v1/notifications/${id}`, {
@@ -146,37 +162,47 @@ export default function StudentNotificationsPage() {
                         </p>
                     </div>
                 </div>
-                <div
-                    className="inline-flex w-full shrink-0 rounded-full bg-slate-100/90 p-1 ring-1 ring-slate-200/70 sm:w-auto"
-                    role="group"
-                    aria-label="Filter notifications"
-                >
-                    <button
-                        type="button"
-                        onClick={() => setFilter("all")}
-                        className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
-                            filter === "all"
-                                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
-                                : "text-slate-600 hover:text-slate-900"
-                        }`}
+                <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+                    <div
+                        className="inline-flex w-full shrink-0 rounded-full bg-slate-100/90 p-1 ring-1 ring-slate-200/70 sm:w-auto"
+                        role="group"
+                        aria-label="Filter notifications"
                     >
-                        All
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setFilter("unread")}
-                        className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
-                            filter === "unread"
-                                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
-                                : "text-slate-600 hover:text-slate-900"
-                        }`}
-                    >
-                        Unread
-                        <span
-                            className={`ml-1.5 tabular-nums ${unreadCount > 0 ? "text-blue-600" : "text-slate-400"}`}
+                        <button
+                            type="button"
+                            onClick={() => setFilter("all")}
+                            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
+                                filter === "all"
+                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
+                                    : "text-slate-600 hover:text-slate-900"
+                            }`}
                         >
-                            ({unreadCount})
-                        </span>
+                            All
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilter("unread")}
+                            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
+                                filter === "unread"
+                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
+                                    : "text-slate-600 hover:text-slate-900"
+                            }`}
+                        >
+                            Unread
+                            <span
+                                className={`ml-1.5 tabular-nums ${unreadCount > 0 ? "text-blue-600" : "text-slate-400"}`}
+                            >
+                                ({unreadCount})
+                            </span>
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void markAllAsRead()}
+                        disabled={unreadCount === 0}
+                        className="shrink-0 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Mark all read
                     </button>
                 </div>
             </div>

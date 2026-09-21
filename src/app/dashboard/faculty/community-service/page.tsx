@@ -4,6 +4,14 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import {
+    ApprovalPipelineMini,
+    SummaryTiles,
+    computeApprovalPipelineSteps,
+    isApprovalLineDone,
+    type ApprovalLineStatus,
+    type ApprovalPipelineStepState,
+} from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import {
     FACULTY_CS_APPROVALS as APPROVALS,
@@ -264,6 +272,27 @@ function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" 
     return "review";
 }
 
+/** Faculty self-approves at creation, so the visible chain is just Partner (if linked) → CIEL PK → Decision. */
+function facultyOwnPipeline(row: MineRow, bucket: ReturnType<typeof mineBucket>) {
+    const lines: { label: string; status: ApprovalLineStatus }[] = [
+        ...(row.requires_partner_approval
+            ? [{ label: "Partner / NGO", status: row.partner_approval_status as ApprovalLineStatus }]
+            : []),
+        { label: "CIEL PK", status: row.admin_approval_status as ApprovalLineStatus },
+    ];
+    const decisionState: ApprovalPipelineStepState = bucket === "closed" ? "bad" : bucket === "published" ? "done" : "locked";
+    return computeApprovalPipelineSteps(lines, decisionState);
+}
+
+/** "Pending Partner" / "Pending CIEL PK" for the Under Approval row status line. */
+function facultyPendingStageLabel(row: MineRow): string {
+    if (row.requires_partner_approval && !isApprovalLineDone(row.partner_approval_status as ApprovalLineStatus)) {
+        const name = row.partner_contact_name?.trim();
+        return name ? `Pending Partner — Waiting for ${name}` : "Pending Partner";
+    }
+    return "Pending CIEL PK — Waiting for final platform approval";
+}
+
 export default function FacultyCommunityServicePage() {
     return (
         <Suspense fallback={<div className="mx-auto max-w-[1240px] py-16 text-center text-sm text-[#71828e]">Loading community service…</div>}>
@@ -520,6 +549,14 @@ function FacultyCommunityServiceHub() {
                         <b className="text-[#16313d]">Simple rule:</b> If you created the opportunity, its creator status stays
                         here. Once students are assigned, their service/report progress appears under Community Service Projects.
                     </p>
+                    <SummaryTiles
+                        tiles={[
+                            [String(createCounts.drafts + createCounts.review + createCounts.action), "Active proposal records"],
+                            [String(createCounts.review), "Waiting on reviewer"],
+                            [String(createCounts.action), "Need your action"],
+                            [String(createCounts.published), "Live for students"],
+                        ]}
+                    />
                     <HubTabs
                         tabs={[
                             { id: "drafts", label: "Drafts", count: createCounts.drafts },
@@ -560,9 +597,13 @@ function FacultyCommunityServiceHub() {
                                         >
                                             <b className="block text-[14px] text-[#16313d]">{row.title}</b>
                                             <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                                {formatDisplayId(row.id, "OPP")} · {row.status || "in review"}
+                                                {formatDisplayId(row.id, "OPP")} ·{" "}
+                                                {createTab === "review" ? facultyPendingStageLabel(row) : row.status || "in review"}
                                                 {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
                                             </small>
+                                            {createTab === "review" || createTab === "published" ? (
+                                                <ApprovalPipelineMini steps={facultyOwnPipeline(row, createTab)} />
+                                            ) : null}
                                         </Link>
                                         );
                                     })
