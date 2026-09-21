@@ -59,7 +59,7 @@ function firstSentence(text: string, maxLen = 220): string {
 }
 
 const dropdownClass =
-    "h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50";
+    "h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--aqua-soft)] disabled:opacity-50";
 
 const fieldLabelClass =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
@@ -219,7 +219,7 @@ function SDGTileGrid({
     onSelect: (id: string) => void;
 }) {
     return (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+        <div className="cer-wall">
             {ALL_SDGS.map((sdg) => {
                 const id = String(sdg.num);
                 const isSelected = id === selectedId;
@@ -234,15 +234,12 @@ function SDGTileGrid({
                         className={clsx(
                             "cer-sdg-tile relative flex min-h-[66px] flex-col gap-0.5 rounded-lg border-2 p-2 text-left text-[11px] font-bold leading-tight text-white transition-all",
                             isSelected
-                                ? "on border-slate-900 shadow-lg"
+                                ? "on border-transparent"
                                 : isDisabled
-                                  ? "prim cursor-not-allowed border-transparent opacity-15"
+                                  ? "prim cursor-not-allowed border-transparent"
                                   : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
                         )}
                     >
-                        {isSelected ? (
-                            <CheckCircle2 className="absolute right-1.5 top-1.5 h-3.5 w-3.5" />
-                        ) : null}
                         <span className="text-base font-extrabold">{sdg.num}</span>
                         {sdg.name}
                     </button>
@@ -382,18 +379,18 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             {/* ── Section Header ───────────────────────────────────────── */}
             <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--teal)] text-white shadow-sm">
                         <Target className="h-5 w-5" />
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 3:</span> SDG contribution mapping
+                            <span className="text-[var(--teal)]">SECTION 3:</span> SDG contribution mapping
                         </h2>
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                <div className="rounded-xl border border-[#bfe6e2] bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--aqua)]">
                         Purpose of this section
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
@@ -417,7 +414,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 key={item}
                                 className="flex items-center gap-2 text-sm text-slate-700"
                             >
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--teal)]" />
                                 {item}
                             </div>
                         ))}
@@ -446,9 +443,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
-                                3.1
-                            </span>
+                            <span className="cer-secn">3.1</span>
                             <h3 className="text-base font-semibold text-slate-900">
                                 Opportunity&apos;s registered SDGs
                             </h3>
@@ -479,60 +474,25 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             if (!sdg) return null;
 
                             return (
-                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                    <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
-                                        <div
-                                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-xl font-bold text-white"
-                                            style={{ backgroundColor: sdg.color }}
-                                        >
-                                            {sdg.num}
-                                        </div>
-                                        <div className="min-w-0 flex-1 space-y-3">
-                                            <div className="flex flex-wrap items-start justify-between gap-2">
-                                                <div>
-                                                    <p
-                                                        className="text-[10px] font-bold uppercase tracking-[0.14em]"
-                                                        style={{ color: sdg.color }}
-                                                    >
-                                                        Primary alignment
-                                                    </p>
-                                                    <h4 className="mt-0.5 text-base font-semibold text-slate-900">
-                                                        SDG {sdg.num}: {sdg.name}
-                                                    </h4>
-                                                </div>
-                                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                                                    <CheckCircle2 className="h-3 w-3" />
-                                                    Verified
-                                                </span>
-                                            </div>
-                                            <div className="space-y-2 border-t border-slate-100 pt-3">
-                                                {targetId ? (
-                                                    <p className="text-sm text-slate-600">
-                                                        <span className="font-semibold text-slate-800">
-                                                            TARGET {meta.targetCode}:
-                                                        </span>{" "}
-                                                        {meta.targetDesc || "Registered target"}
-                                                    </p>
-                                                ) : null}
-                                                {indicatorId ? (
-                                                    <p className="text-sm text-slate-600">
-                                                        <span className="font-semibold text-slate-800">
-                                                            INDICATOR {meta.indicatorCode}:
-                                                        </span>{" "}
-                                                        {meta.indicatorDesc || "Registered indicator"}
-                                                    </p>
-                                                ) : null}
-                                                {meta.subIndicator ? (
-                                                    <p className="text-sm text-slate-600">
-                                                        <span className="font-semibold text-slate-800">
-                                                            SUB-INDICATOR:
-                                                        </span>{" "}
-                                                        {meta.subIndicator}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="cer-registered-sdg" style={{ background: sdg.color }}>
+                                    <div className="cer-rs-num">{sdg.num}</div>
+                                    <div className="cer-rs-name">SDG {sdg.num}: {sdg.name}</div>
+                                    <p className="cer-rs-meta">Primary alignment</p>
+                                    {targetId ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Target {meta.targetCode}:</b> {meta.targetDesc || "Registered target"}
+                                        </p>
+                                    ) : null}
+                                    {indicatorId ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Indicator {meta.indicatorCode}:</b> {meta.indicatorDesc || "Registered indicator"}
+                                        </p>
+                                    ) : null}
+                                    {meta.subIndicator ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Sub-indicator:</b> {meta.subIndicator}
+                                        </p>
+                                    ) : null}
                                 </div>
                             );
                         })()}
@@ -547,48 +507,27 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         return (
                             <div
                                 key={`${num}-${row.targetId}-${i}`}
-                                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row sm:items-center"
+                                className="cer-registered-sdg"
+                                style={{ background: sdg.color }}
                             >
-                                <div
-                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white"
-                                    style={{ backgroundColor: sdg.color }}
-                                >
-                                    {sdg.num}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <h4 className="text-sm font-semibold text-slate-800">
-                                            SDG {sdg.num}: {sdg.name}
-                                        </h4>
-                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                            Secondary
-                                        </span>
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                        {row.targetId ? (
-                                            <span>
-                                                <span className="font-semibold text-slate-700">
-                                                    Target {meta.targetCode}:
-                                                </span>{" "}
-                                                {meta.targetDesc || "Registered"}
-                                            </span>
-                                        ) : null}
-                                        {row.indicatorId ? (
-                                            <span>
-                                                <span className="font-semibold text-slate-700">
-                                                    Indicator {meta.indicatorCode}:
-                                                </span>{" "}
-                                                {meta.indicatorDesc || "Registered"}
-                                            </span>
-                                        ) : null}
-                                        {meta.subIndicator ? (
-                                            <span>
-                                                <span className="font-semibold text-slate-700">Sub-indicator:</span>{" "}
-                                                {meta.subIndicator}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </div>
+                                <div className="cer-rs-num">{sdg.num}</div>
+                                <div className="cer-rs-name">SDG {sdg.num}: {sdg.name}</div>
+                                <p className="cer-rs-meta">Secondary alignment</p>
+                                {row.targetId ? (
+                                    <p className="cer-rs-meta">
+                                        <b>Target {meta.targetCode}:</b> {meta.targetDesc || "Registered"}
+                                    </p>
+                                ) : null}
+                                {row.indicatorId ? (
+                                    <p className="cer-rs-meta">
+                                        <b>Indicator {meta.indicatorCode}:</b> {meta.indicatorDesc || "Registered"}
+                                    </p>
+                                ) : null}
+                                {meta.subIndicator ? (
+                                    <p className="cer-rs-meta">
+                                        <b>Sub-indicator:</b> {meta.subIndicator}
+                                    </p>
+                                ) : null}
                             </div>
                         );
                     })}
@@ -619,7 +558,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                     <Textarea
                         placeholder="During implementation, this project…"
                         className={clsx(
-                            "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                            "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--aqua-soft)]",
                             getFieldError("contribution_intent_statement") && "border-red-300",
                         )}
                         value={contribution_intent_statement || ""}
@@ -644,9 +583,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
-                                3.2
-                            </span>
+                            <span className="cer-secn">3.2</span>
                             <h3 className="text-base font-semibold text-slate-900">
                                 Optional student SDG mapping
                             </h3>
@@ -744,7 +681,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         <Textarea
                             placeholder="During implementation, this project…"
                             className={clsx(
-                                "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                                "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--aqua-soft)]",
                                 getFieldError("student_contribution_intent_statement") &&
                                     "border-red-300",
                             )}
@@ -775,7 +712,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     Map additional goals impacted by this project — up to two.
                                 </p>
                             </div>
-                            <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600">
+                            <span className="cer-sdg-count shrink-0">
                                 {(secondary_sdgs || []).length} of 2 added
                             </span>
                         </div>
@@ -855,7 +792,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                     Alignment justification
                                                 </p>
                                                 <Textarea
-                                                    className="min-h-[100px] w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                                                    className="min-h-[100px] w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--aqua-soft)]"
                                                     placeholder="Briefly explain how this project supports this secondary goal…"
                                                     value={sdg.justification_text || ""}
                                                     onChange={(e) =>
@@ -904,7 +841,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         ],
                                     });
                                 }}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-6 py-5 text-sm font-medium text-slate-500 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 hover:text-indigo-700"
+                                className="cer-addbig flex items-center justify-center gap-2"
                             >
                                 <Plus className="h-4 w-4" />
                                 Add secondary SDG alignment
@@ -922,7 +859,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             type="button"
                             onClick={handleFinalize}
                             disabled={!canFinalize}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="cer-bigbtn flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                         >
                             Finalise my SDGs →
                         </button>
@@ -935,12 +872,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                 ) : (
                     <>
                         <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                            <div className="bg-slate-900 px-5 py-5 text-white sm:px-6">
+                            <div className="bg-[var(--ink)] px-5 py-5 text-white sm:px-6">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                                     Section 3 finalised · Your SDG footprint
                                 </p>
                                 <h3 className="mt-2 flex items-center gap-2 text-lg font-bold">
-                                    <Globe2 className="h-5 w-5 text-indigo-300" />
+                                    <Globe2 className="h-5 w-5 text-[#99f6e4]" />
                                     This project advances {finalizedGoals.length} Global Goal{finalizedGoals.length === 1 ? "" : "s"}
                                 </h3>
                                 <p className="mt-1 text-sm text-slate-300">
@@ -982,7 +919,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                         SDG {g.num} — {sdg?.name}
                                                     </h4>
                                                     {g.isPrimary ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--gold)]">
                                                             ★ Primary — set by program
                                                         </span>
                                                     ) : null}
@@ -1014,7 +951,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 <button
                                     type="button"
                                     onClick={handleUnfinalize}
-                                    className="ml-auto shrink-0 text-xs font-semibold text-indigo-600 hover:underline"
+                                    className="ml-auto shrink-0 text-xs font-semibold text-[var(--teal)] hover:underline"
                                 >
                                     Edit shortlist
                                 </button>
@@ -1036,8 +973,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         <h3 className="text-base font-semibold text-slate-900">
                             Preliminary SDG alignment statement
                         </h3>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span className="cer-tag auto">
                             System synthesis
                         </span>
                     </div>
@@ -1055,7 +991,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     key={tag.label}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
                                 >
-                                    <tag.icon className="h-3 w-3 text-indigo-500" />
+                                    <tag.icon className="h-3 w-3 text-[var(--teal)]" />
                                     {tag.label}
                                 </span>
                             ))}

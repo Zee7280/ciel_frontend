@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { useSearchParams } from "next/navigation";
 import IdentityVerification from "../components/IdentityVerification";
+import "../../report/community-engagement-report.css";
 
 import { Suspense } from 'react';
 

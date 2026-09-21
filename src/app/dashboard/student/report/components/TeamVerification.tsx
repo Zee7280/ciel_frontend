@@ -74,6 +74,7 @@ export default function TeamVerification({
             cnic: '',
             university: '',
             program: '',
+            semester: '',
             role: 'Member',
             verified: false
         }]);
@@ -83,131 +84,118 @@ export default function TeamVerification({
     const expandedMember = expandedIndex != null ? members[expandedIndex] : null;
 
     return (
-        <div className="space-y-3">
-            <div>
-                <p className="text-sm font-semibold text-slate-900">Team members</p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                    Add registered CIEL users — send OTP to their email before they appear as verified.
-                </p>
-            </div>
+        <div className="space-y-2">
+            <p className="cer-sub !mb-1">
+                Add registered CIEL users — send OTP to their email before they appear as verified.
+            </p>
 
-            <div className="flex gap-2.5 rounded-xl border border-amber-100 bg-amber-50/80 px-3.5 py-2.5">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs leading-relaxed text-amber-900">
+            <div className="cer-note">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
                     Only registered CIEL users can be added. Each member verifies by <b>OTP to their email</b> — that
                     links this opportunity to their dashboard.
                 </p>
             </div>
 
             {/* Member chips */}
-            <div className="flex flex-wrap items-center gap-2">
-                {members.map((member, idx) => {
-                    const mayRemove = canRemoveMember ? canRemoveMember(member, idx) : !lockAddMembers;
-                    const isOpen = expandedIndex === idx;
-                    const displayName = member.fullName || member.name || `Team Member ${idx + 1}`;
-                    return (
-                        <div key={idx} className="inline-flex items-center gap-1">
-                            <button
-                                type="button"
-                                onClick={() => setExpandedIndex(isOpen ? null : idx)}
-                                title={`${member.role || "Member"} · ${member.university || "Pending university"}`}
-                                className={clsx(
-                                    "inline-flex items-center gap-2 rounded-full border bg-white py-1.5 pl-1.5 pr-3.5 text-sm font-semibold transition-colors",
-                                    member.verified ? "border-emerald-200" : "border-slate-200",
-                                    isOpen && "border-indigo-300 ring-2 ring-indigo-100",
-                                )}
-                            >
-                                <span
-                                    className={clsx(
-                                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white",
-                                        member.verified
-                                            ? "bg-gradient-to-br from-indigo-500 to-purple-500"
-                                            : "bg-slate-300",
-                                    )}
-                                >
-                                    {displayName.charAt(0).toUpperCase()}
-                                </span>
-                                <span className="text-slate-900">{displayName}</span>
-                                {member.verified ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                                ) : (
-                                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-amber-600">
-                                        Pending
-                                    </span>
-                                )}
-                            </button>
-                            {mayRemove ? (
+            {members.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {members.map((member, idx) => {
+                        const mayRemove = canRemoveMember ? canRemoveMember(member, idx) : !lockAddMembers;
+                        const isOpen = expandedIndex === idx;
+                        const displayName = member.fullName || member.name || `Team Member ${idx + 1}`;
+                        return (
+                            <div key={idx} className="inline-flex items-center gap-1">
                                 <button
                                     type="button"
-                                    onClick={() => removeMember(idx)}
-                                    aria-label={`Remove ${displayName}`}
-                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                                    onClick={() => setExpandedIndex(isOpen ? null : idx)}
+                                    title={`${member.role || "Member"} · ${member.university || "Pending university"}`}
+                                    className={clsx(
+                                        "inline-flex items-center gap-2 rounded-full border bg-white py-1.5 pl-1.5 pr-3.5 text-sm font-semibold transition-colors",
+                                        member.verified ? "border-[var(--teal)]/40" : "border-[var(--line)]",
+                                        isOpen && "border-[var(--teal)] ring-2 ring-[var(--teal-soft)]",
+                                    )}
                                 >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span
+                                        className={clsx(
+                                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white",
+                                            member.verified
+                                                ? "bg-gradient-to-br from-[#0e7d74] to-[#2dd4bf]"
+                                                : "bg-[var(--muted)]",
+                                        )}
+                                    >
+                                        {displayName.charAt(0).toUpperCase()}
+                                    </span>
+                                    <span className="text-[var(--ink)]">{displayName}</span>
+                                    {member.verified ? (
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
+                                    ) : (
+                                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[var(--gold)]">
+                                            Pending
+                                        </span>
+                                    )}
                                 </button>
-                            ) : null}
-                        </div>
-                    );
-                })}
-                {!lockAddMembers ? (
-                    <button
-                        type="button"
-                        onClick={handleAddMember}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-indigo-300 px-3.5 py-[7px] text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
-                    >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        Send OTP & add
-                    </button>
-                ) : null}
-            </div>
+                                {mayRemove ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => removeMember(idx)}
+                                        aria-label={`Remove ${displayName}`}
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-rose-50 hover:text-[var(--red)]"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {members.length === 0 && (
+                <div className="cer-hint !mb-0 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 shrink-0" />
+                    No teammates yet — this report stays individual until you add members.
+                </div>
+            )}
+
+            {!lockAddMembers ? (
+                <button
+                    type="button"
+                    onClick={handleAddMember}
+                    className="cer-addbig flex items-center justify-center gap-1.5"
+                >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Add team member — individual + academic configuration
+                </button>
+            ) : null}
 
             {/* Expanded configure panel */}
             {expandedMember ? (
-                <div className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/30 p-3.5 sm:p-4">
+                <div className="space-y-3 rounded-[13px] border-[1.5px] border-dashed border-[#cbe7e3] bg-[#fbfefd] p-3.5 sm:p-4">
                     <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <Shield className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
+                        <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                            <Shield className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
                             Enter registered details, then send and confirm the email OTP.
                         </div>
                         <button
                             type="button"
                             onClick={() => setExpandedIndex(null)}
-                            className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800"
+                            className="shrink-0 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)]"
                         >
                             Close
                         </button>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-                        <IdentityVerification
-                            projectId={projectId}
-                            initialData={expandedMember}
-                            participationMode="team"
-                            isTeamLead={false}
-                            teamId={teamId}
-                            primaryFacultyEmail={primaryFacultyEmail}
-                            secondaryFacultyEmail={secondaryFacultyEmail}
-                            onSuccess={(p) => handleMemberSuccess(expandedIndex as number, p)}
-                        />
-                    </div>
-                </div>
-            ) : null}
-
-            {members.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-8 text-center">
-                    <Users className="mx-auto h-8 w-8 text-slate-300" />
-                    <p className="mt-2 text-sm font-semibold text-slate-800">Individual participation</p>
-                    <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">
-                        No teammates yet — this report stays individual until you add members.
-                    </p>
-                    {!lockAddMembers ? (
-                        <button
-                            type="button"
-                            onClick={handleAddMember}
-                            className="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                        >
-                            + Add collaborators
-                        </button>
-                    ) : null}
+                    <IdentityVerification
+                        projectId={projectId}
+                        initialData={expandedMember}
+                        participationMode="team"
+                        isTeamLead={false}
+                        teamId={teamId}
+                        primaryFacultyEmail={primaryFacultyEmail}
+                        secondaryFacultyEmail={secondaryFacultyEmail}
+                        showSemester
+                        onSuccess={(p) => handleMemberSuccess(expandedIndex as number, p)}
+                    />
                 </div>
             ) : null}
         </div>

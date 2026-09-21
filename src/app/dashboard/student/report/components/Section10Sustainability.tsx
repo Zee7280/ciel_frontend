@@ -47,7 +47,7 @@ const textareaClasses =
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 const badgeMandatory =
-    "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+    "shrink-0 rounded-full border border-[var(--gold-soft)] bg-[var(--gold-soft)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--gold)]";
 const badgeRequired =
     "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 
@@ -165,21 +165,21 @@ export default function Section10Sustainability() {
         if (score >= 8) {
             return {
                 label: "High Strength",
-                color: "text-indigo-800",
-                bg: "border-indigo-200 bg-indigo-50 text-indigo-800",
+                color: "text-[var(--teal)]",
+                bg: "border-[var(--line)] bg-[var(--teal-soft)] text-[var(--teal)]",
             };
         }
         if (score >= 4) {
             return {
                 label: "Moderate Strength",
-                color: "text-indigo-600",
-                bg: "border-indigo-200 bg-indigo-50 text-indigo-600",
+                color: "text-[var(--aqua)]",
+                bg: "border-[var(--line)] bg-[var(--aqua-soft)] text-[var(--aqua)]",
             };
         }
         return {
             label: "Basic Strength",
-            color: "text-amber-800",
-            bg: "border-amber-200 bg-amber-50 text-amber-800",
+            color: "text-[var(--gold)]",
+            bg: "border-[var(--line)] bg-[var(--gold-soft)] text-[var(--gold)]",
         };
     }, [continuation_status, mechanisms, scaling_potential, policy_influence]);
 
@@ -220,21 +220,21 @@ export default function Section10Sustainability() {
             {!isEligibleForSubmission && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-start rounded-2xl bg-slate-50/60 p-8 pt-24 text-center backdrop-blur-[2px]">
                     <div className="max-w-md space-y-5 rounded-xl border border-slate-200 bg-white p-8 shadow-xl">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-500">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[var(--gold)]">
                             <Lock className="h-8 w-8" />
                         </div>
                         <div className="space-y-2">
                             <h3 className="text-lg font-semibold text-slate-900">Section locked</h3>
                             <p className="text-sm leading-relaxed text-slate-500">
                                 Sustainability analysis activates once the{" "}
-                                <span className="font-semibold text-indigo-600">{requiredHours}-hour minimum</span>{" "}
+                                <span className="font-semibold text-[var(--teal)]">{requiredHours}-hour minimum</span>{" "}
                                 engagement is verified. Complete your attendance logs in Section 1 to unlock this step.
                             </p>
                         </div>
                         <div>
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                    className="h-full bg-amber-500 transition-all duration-1000"
+                                    className="h-full bg-[var(--gold)] transition-all duration-1000"
                                     style={{
                                         width: `${Math.min((verifiedHours / requiredHours) * 100, 100)}%`,
                                     }}
@@ -315,7 +315,7 @@ export default function Section10Sustainability() {
                             })}
                         </div>
 
-                        <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+                        <div className="flex gap-2.5 rounded-xl border border-[var(--gold-soft)] bg-[var(--gold-soft)] px-4 py-3 text-sm leading-relaxed text-[var(--gold)]">
                             <span>💛</span>
                             <p>
                                 <span className="font-semibold">No penalty for honesty.</span> Most student projects are &ldquo;Partly&rdquo; or &ldquo;Not really&rdquo; — examiners trust reports that say so.

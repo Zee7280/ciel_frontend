@@ -504,7 +504,7 @@ export default function AttendanceForm({
                     <button
                         type="button"
                         onClick={() => setShowMap(true)}
-                        className="flex h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/40"
+                        className="flex h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 text-center transition-colors hover:border-[#0e7d74]/50 hover:bg-[#e6f6f4]"
                     >
                         <MapPin className="h-5 w-5 text-rose-500" />
                         <span className="text-xs font-medium text-slate-500">

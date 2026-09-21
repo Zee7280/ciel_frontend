@@ -199,6 +199,7 @@ export function buildSection1ParticipantDossierFields(
     pushField(academic, "Degree program", row.academicProgram ?? row.academic_program);
     pushField(academic, "Department", row.department);
     pushField(academic, "Year of study", firstNonBlank(row.yearOfStudy, row.year, row.year_of_study));
+    pushField(academic, "Semester", row.semester);
     pushField(academic, "Academic integration type", firstNonBlank(row.academicIntegrationType, row.academic_integration_type));
 
     const participation: Section1DossierField[] = [];

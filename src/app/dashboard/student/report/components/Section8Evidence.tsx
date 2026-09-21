@@ -181,23 +181,21 @@ function useEvidencePreviewUrl(file: EvidenceFileItem, isImage: boolean): string
     return previewUrl;
 }
 
+/** Renders the contents of a `.cer-ph` tile: the real image thumbnail when one is available,
+ *  otherwise a generic icon — evidence is always shown as a picture tile, never a file-list row. */
 function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
     const isImage = getFileType(file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
     const previewUrl = useEvidencePreviewUrl(file, isImage);
 
     if (isImage && previewUrl) {
-        return (
-            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-                <img src={previewUrl} alt={name} className="h-full w-full object-cover" />
-            </div>
-        );
+        return <img src={previewUrl} alt={name} />;
     }
 
-    return (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
-            <ImageIcon className="h-4 w-4" />
-        </div>
-    );
+    if (isImage) {
+        return <ImageIcon className="h-7 w-7 text-[var(--teal)]" />;
+    }
+
+    return <FileText className="h-7 w-7 text-[var(--teal)]" />;
 }
 
 function EvidenceFullFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
@@ -233,10 +231,10 @@ function EvidenceDropzone({
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
     return (
-        <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
-            <Upload className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-3 text-sm font-medium text-slate-600">{label}</p>
-            {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+        <div className="cer-dropzone relative px-6 py-10 text-center">
+            <Upload className="mx-auto h-8 w-8 text-[var(--teal)]" />
+            <p className="mt-3 text-sm font-medium text-[var(--ink)]">{label}</p>
+            {hint ? <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p> : null}
             <input
                 type="file"
                 multiple={multiple}
@@ -254,20 +252,20 @@ function classifyVerification(filesCount: number, typesCount: number, partnerAss
     if (partnerAssessed) {
         return {
             label: "Verified by Partner",
-            color: "border-indigo-200 bg-indigo-50 text-indigo-800",
+            color: "border-[var(--teal)]/25 bg-[var(--teal-soft)] text-[var(--teal)]",
             desc: "External confirmation included",
         };
     }
     if (filesCount > 1 && typesCount > 1) {
         return {
             label: "Structured Verification",
-            color: "border-blue-200 bg-blue-50 text-blue-800",
+            color: "border-[var(--aqua)]/25 bg-[var(--aqua-soft)] text-[var(--aqua)]",
             desc: "Multiple evidence types, documented outputs",
         };
     }
     return {
         label: "Basic Verification",
-        color: "border-amber-200 bg-amber-50 text-amber-800",
+        color: "border-[var(--gold)]/25 bg-[var(--gold-soft)] text-[var(--gold)]",
         desc: "Single file, limited documentation",
     };
 }
@@ -275,7 +273,7 @@ function classifyVerification(filesCount: number, typesCount: number, partnerAss
 function StepHeader({ n, title, status }: { n: string; title: string; status?: StepStatus }) {
     return (
         <div className="flex flex-wrap items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+            <span className="cer-secn">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
@@ -443,26 +441,23 @@ export default function Section8Evidence() {
                     <p className="text-sm text-slate-500">
                         Nothing to re-upload or re-describe — each item keeps the note you gave it originally.
                     </p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                        {collectedElsewhere.map((item, i) => {
-                            const isImage = getFileType(item.file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(item.label);
-                            return (
+                    <div className="cer-gal">
+                        {collectedElsewhere.map((item, i) => (
+                            <div key={`${item.source}-${i}`} className="space-y-1">
                                 <button
-                                    key={`${item.source}-${i}`}
                                     type="button"
                                     onClick={() => setPreviewFile({ file: item.file, name: item.label })}
-                                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition-colors hover:border-indigo-200"
+                                    className="cer-ph w-full cursor-pointer border-0 p-0"
+                                    title={item.label}
                                 >
-                                    <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-2xl">
-                                        {isImage ? "🖼️" : "📄"}
-                                    </div>
-                                    <div className="p-2.5">
-                                        <p className="truncate text-xs font-semibold text-slate-800">{item.label}</p>
-                                        <p className="mt-0.5 truncate text-[10px] font-semibold text-emerald-600">from {item.source}</p>
-                                    </div>
+                                    <EvidenceFilePreview file={item.file} name={item.label} />
                                 </button>
-                            );
-                        })}
+                                <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={item.label}>
+                                    {item.label}
+                                </p>
+                                <p className="truncate text-[9px] font-semibold text-[var(--teal)]">from {item.source}</p>
+                            </div>
+                        ))}
                     </div>
                 </section>
             ) : null}
@@ -512,7 +507,7 @@ export default function Section8Evidence() {
                             <p className="text-sm font-semibold">Yes — I have evidence to upload</p>
                             <p className={clsx(
                                 "mt-1.5 text-xs leading-relaxed",
-                                section8.has_evidence === "yes" ? "text-indigo-100" : "text-slate-500",
+                                section8.has_evidence === "yes" ? "text-[#cdf5f0]" : "text-slate-500",
                             )}>
                                 Continue below to upload and classify your files.
                             </p>
@@ -569,38 +564,35 @@ export default function Section8Evidence() {
                                     <Label className={fieldLabel}>
                                         Attached evidence ({evidence_files.length})
                                     </Label>
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="cer-gal">
                                         {evidence_files.map((file: EvidenceFileItem, fIdx: number) => {
                                             const fileName = getFileName(file, fIdx);
                                             return (
-                                                <div
-                                                    key={`${fileName}-${fIdx}`}
-                                                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3"
-                                                >
+                                                <div key={`${fileName}-${fIdx}`} className="space-y-1">
                                                     <div
-                                                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 overflow-hidden"
+                                                        className="cer-ph cursor-pointer"
                                                         onClick={() => setPreviewFile({ file, name: fileName })}
                                                     >
                                                         <EvidenceFilePreview file={file} name={fileName} />
-                                                        <div className="overflow-hidden">
-                                                            <p className="truncate text-sm font-semibold text-slate-700">
-                                                                {fileName}
-                                                            </p>
-                                                            <p className="text-xs text-slate-400">
-                                                                {formatFileSize(file)}
-                                                            </p>
-                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const kept = evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
+                                                                update("evidence_files", kept);
+                                                            }}
+                                                            className="cer-ph-badge transition hover:bg-[var(--red)]"
+                                                            title="Remove file"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const kept = evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
-                                                            update("evidence_files", kept);
-                                                        }}
-                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
+                                                    <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={fileName}>
+                                                        {fileName}
+                                                    </p>
+                                                    <p className="truncate text-[9px] text-[var(--muted)]">
+                                                        {formatFileSize(file)}
+                                                    </p>
                                                 </div>
                                             );
                                         })}
@@ -650,8 +642,8 @@ export default function Section8Evidence() {
                                     className={clsx(
                                         "flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors",
                                         active
-                                            ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                            : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                            ? "border-[var(--teal)]/40 bg-[var(--teal-soft)] text-[var(--teal)]"
+                                            : "border-slate-200 bg-white text-slate-600 hover:border-[var(--teal)]/30 hover:bg-slate-50",
                                     )}
                                 >
                                     <opt.icon className="h-4 w-4 shrink-0 opacity-70" />
@@ -660,7 +652,7 @@ export default function Section8Evidence() {
                                         className={clsx(
                                             "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
                                             active
-                                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                                ? "border-[var(--teal)] bg-[var(--teal)] text-white"
                                                 : "border-slate-300 bg-white",
                                         )}
                                     >
@@ -831,7 +823,7 @@ export default function Section8Evidence() {
                             onClick={() => update("partner_verification", !partner_verification)}
                             className={clsx(
                                 "relative h-[30px] w-[52px] shrink-0 rounded-full transition-colors",
-                                partner_verification ? "bg-emerald-500" : "bg-slate-200",
+                                partner_verification ? "bg-[#0e7d74]" : "bg-slate-200",
                             )}
                         >
                             <span
@@ -856,8 +848,8 @@ export default function Section8Evidence() {
                                             className={clsx(
                                                 "rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors",
                                                 partner_verification_type === v
-                                                    ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                                    ? "border-[var(--teal)]/40 bg-[var(--teal-soft)] text-[var(--teal)]"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:border-[var(--teal)]/30 hover:bg-slate-50",
                                             )}
                                         >
                                             {v}
@@ -888,38 +880,35 @@ export default function Section8Evidence() {
                                     <Label className={fieldLabel}>
                                         Partner documents ({partner_verification_files.length})
                                     </Label>
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="cer-gal">
                                         {partner_verification_files.map((file: EvidenceFileItem, fIdx: number) => {
                                             const fileName = getFileName(file, fIdx);
                                             return (
-                                                <div
-                                                    key={`${fileName}-${fIdx}`}
-                                                    className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/70 p-3"
-                                                >
+                                                <div key={`${fileName}-${fIdx}`} className="space-y-1">
                                                     <div
-                                                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 overflow-hidden"
+                                                        className="cer-ph cursor-pointer"
                                                         onClick={() => setPreviewFile({ file, name: fileName })}
                                                     >
                                                         <EvidenceFilePreview file={file} name={fileName} />
-                                                        <div className="overflow-hidden">
-                                                            <p className="truncate text-sm font-semibold text-indigo-900">
-                                                                {fileName}
-                                                            </p>
-                                                            <p className="text-xs text-indigo-600/70">
-                                                                {formatFileSize(file)}
-                                                            </p>
-                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const kept = partner_verification_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
+                                                                update("partner_verification_files", kept);
+                                                            }}
+                                                            className="cer-ph-badge transition hover:bg-[var(--red)]"
+                                                            title="Remove file"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const kept = partner_verification_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
-                                                            update("partner_verification_files", kept);
-                                                        }}
-                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-indigo-100 bg-white text-slate-400 hover:bg-red-50 hover:text-red-500"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
+                                                    <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={fileName}>
+                                                        {fileName}
+                                                    </p>
+                                                    <p className="truncate text-[9px] text-[var(--muted)]">
+                                                        {formatFileSize(file)}
+                                                    </p>
                                                 </div>
                                             );
                                         })}

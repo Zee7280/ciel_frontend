@@ -4,7 +4,6 @@ import {
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
 import {
@@ -243,7 +242,7 @@ function ResourceCard({
         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         {idx + 1}
                     </span>
                     <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -507,7 +506,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
             <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                             6.0
                         </span>
                         <h3 className="text-base font-semibold text-slate-900">Project snapshot</h3>
@@ -548,7 +547,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
             {/* 6.1 Resource Confirmation */}
             <section className="space-y-4">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         6.1
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Step 1 — Resource confirmation</h3>
@@ -621,7 +620,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                     <section className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                     6.2
                                 </span>
                                 <h3 className="text-base font-semibold text-slate-900">
@@ -630,14 +629,6 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-3">
                                 <span className={badgeRequired}>Required</span>
-                                <Button
-                                    type="button"
-                                    onClick={addResource}
-                                    className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add resource entry
-                                </Button>
                             </div>
                         </div>
 
@@ -645,14 +636,14 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                             <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
                                 <Package className="h-10 w-10 text-slate-300" />
                                 <p className="text-sm font-semibold text-slate-700">No resources added yet</p>
-                                <Button
+                                <button
                                     type="button"
                                     onClick={addResource}
-                                    className="h-9 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                                    className="cer-addbig flex max-w-xs items-center justify-center gap-1.5"
                                 >
-                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    <Plus className="h-3.5 w-3.5" />
                                     Add first resource
-                                </Button>
+                                </button>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -668,6 +659,14 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                         getFieldError={getFieldError}
                                     />
                                 ))}
+                                <button
+                                    type="button"
+                                    onClick={addResource}
+                                    className="cer-addbig flex items-center justify-center gap-1.5"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add resource entry
+                                </button>
                             </div>
                         )}
                     </section>
@@ -675,7 +674,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                     {/* 6.3 Evidence */}
                     <section className="space-y-4">
                         <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 6.3
                             </span>
                             <h3 className="text-base font-semibold text-slate-900">
@@ -706,7 +705,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                 </div>
                             </div>
 
-                            <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
+                            <div className="cer-dropzone relative px-6 py-10 text-center">
                                 <Upload className="mx-auto h-8 w-8 text-slate-300" />
                                 <p className="mt-3 text-sm font-medium text-slate-600">
                                     Drag &amp; drop files here, or click to browse

@@ -6,6 +6,7 @@ import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, wizardStepToDataSections } from "./utils/reportWizardNav";
+import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journeyLevel, sectionStrength } from "./utils/impactJourney";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -209,6 +210,98 @@ export function ReportMissionHero({ data, projectData }: { data: ReportData; pro
                         <div className="v">{sdgLabel}</div>
                         <div className="kk">REGISTERED SDGs</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** Top-of-wizard "Impact Journey" HUD — completion + 9-stop map + fun-meter XP/level. Purely
+ * derived from data the real form already collects; never affects CII, validation or submit. */
+export function ReportImpactJourney({
+    data,
+    activeStep,
+    incompleteStepNums,
+    sectionsCompleteCount,
+    onGo,
+}: {
+    data: ReportData;
+    activeStep: number;
+    incompleteStepNums: Set<number>;
+    sectionsCompleteCount: number;
+    onGo: (step: number) => void;
+}) {
+    const xp = computeJourneyXP(data);
+    const level = journeyLevel(xp);
+    const nextStop = JOURNEY_STOPS.find((s) => incompleteStepNums.has(s.step));
+    const nextLabel = nextStop ? `Next incomplete · ${nextStop.label}` : "All report missions complete";
+    return (
+        <div className="cer-journey">
+            <div className="cer-journey-hud">
+                <div className="cer-journey-hud-main">
+                    <div className="cer-journey-orb">🧭</div>
+                    <div className="cer-journey-copy">
+                        <div className="ey">CIEL PK · IMPACT JOURNEY</div>
+                        <b>{nextLabel}</b>
+                        <p>Move freely through the report. Color, stars and celebrations show interface progress only — they never change your CII or academic evaluation.</p>
+                    </div>
+                </div>
+                <div className="cer-journey-hud-side">
+                    <div className="row">
+                        <div>
+                            <small>REPORT COMPLETION</small>
+                            <b>{sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL}</b>
+                        </div>
+                        <div style={{ fontSize: 22 }}>{sectionsCompleteCount === REPORT_UI_SECTION_TOTAL ? "🏆" : "🌈"}</div>
+                    </div>
+                    <div className="cer-journey-hud-bar">
+                        <i style={{ width: `${Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100)}%` }} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="cer-journey-map">
+                <div className="head">
+                    <b>🗺️ Your Impact Journey — {REPORT_UI_SECTION_TOTAL} stops, one story</b>
+                    <span>{sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL} stops complete · tap any stop to jump there · Gold / Silver / Bronze show how strong each section reads (fun only, not CII)</span>
+                </div>
+                <div className="cer-journey-path">
+                    {JOURNEY_STOPS.map((s) => {
+                        const stepDone = !incompleteStepNums.has(s.step);
+                        const grade = sectionStrength(s.step, data);
+                        return (
+                            <button
+                                key={s.step}
+                                type="button"
+                                className={["cer-journey-stop", activeStep === s.step ? "on" : "", stepDone ? "done" : ""].filter(Boolean).join(" ")}
+                                style={{ ["--c" as string]: s.color }}
+                                onClick={() => onGo(s.step)}
+                            >
+                                <span className="orb">{s.icon}</span>
+                                <b>{s.label}</b>
+                                <span className={`cer-journey-grade ${STRENGTH_CLASS[grade]}`}>{grade ? STRENGTH_LABEL[grade] : "Not started"}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="cer-journey-xp">
+                <div className="lvl">{level.icon}</div>
+                <div>
+                    <b>Level {level.index + 1} · {level.name}</b>
+                    <small>
+                        {level.next
+                            ? `${level.next[0] - xp} XP to ${level.next[2]} — earn XP by logging sessions, attaching evidence, and finishing sections strongly.`
+                            : "Top level reached — your report reads like a pro's."}
+                    </small>
+                    <div className="bar">
+                        <i style={{ width: `${level.pct}%` }} />
+                    </div>
+                </div>
+                <div className="pts">
+                    <b>{xp} XP</b>
+                    <small>FUN METER · NOT CII</small>
                 </div>
             </div>
         </div>

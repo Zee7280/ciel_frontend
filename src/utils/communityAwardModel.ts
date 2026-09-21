@@ -51,6 +51,7 @@ export type CommunityAwardBadge = {
     score: number;
     scope: string;
     at: string;
+    by?: string;
 };
 
 export type CommunityAwardCard = {

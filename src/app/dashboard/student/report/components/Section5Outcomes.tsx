@@ -6,7 +6,6 @@ import {
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
 import { FieldError } from "./ui/FieldError";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
@@ -155,11 +154,11 @@ const METRIC_CATEGORY_OTHER = "🔹 Other";
 const confidenceLevels = ["Directly Measured", "Partner Confirmed", "Observed", "Estimated"];
 
 const inputClasses =
-    "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const selectClasses =
-    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const textareaClasses =
-    "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const badgeMandatory =
@@ -676,7 +675,7 @@ export default function Section5Outcomes() {
             {/* 5.1 Observed Change */}
             <section className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         5.1
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Observed change (narrative)</h3>
@@ -782,22 +781,12 @@ export default function Section5Outcomes() {
 
             {/* 5.2 Measurable Outcomes */}
             <section className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
-                            5.2
-                        </span>
-                        <h3 className="text-base font-semibold text-slate-900">Measurable outcomes</h3>
-                        <span className={badgeMandatory}>Mandatory</span>
-                    </div>
-                    <Button
-                        type="button"
-                        onClick={addOutcome}
-                        className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                    >
-                        <PlusCircle className="mr-1.5 h-4 w-4" />
-                        Add measurable outcome
-                    </Button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
+                        5.2
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">Measurable outcomes</h3>
+                    <span className={badgeMandatory}>Mandatory</span>
                 </div>
 
                 <div className="space-y-4">
@@ -814,12 +803,21 @@ export default function Section5Outcomes() {
                         />
                     ))}
                 </div>
+
+                <button
+                    type="button"
+                    onClick={addOutcome}
+                    className="cer-addbig flex items-center justify-center gap-2"
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Add measurable outcome
+                </button>
             </section>
 
             {/* 5.3 Challenges */}
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         5.3
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Challenges &amp; limitations</h3>
@@ -909,7 +907,7 @@ export default function Section5Outcomes() {
                             type="button"
                             onClick={handleFinalizeSection5}
                             disabled={!canFinalizeSection5}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--teal)] px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--teal)]/90 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             Finalise Section 5 →
                         </button>
@@ -922,15 +920,15 @@ export default function Section5Outcomes() {
                 ) : (
                     <>
                         <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                            <div className="bg-gradient-to-br from-violet-950 to-violet-800 px-5 py-5 text-white sm:px-6">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-300">
+                            <div className="bg-gradient-to-br from-[#04252b] via-[#0e5f63] to-[#12a5a0] px-5 py-5 text-white sm:px-6">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#99f6e4]">
                                     Section 5 · The change — finalised
                                 </p>
                                 <h3 className="mt-2 text-lg font-bold">
                                     🌟 {outcomes.length} measured change{outcomes.length === 1 ? "" : "s"} · {directlyMeasuredCount} directly measured
                                 </h3>
                                 {section5.observed_change ? (
-                                    <p className="mt-1 text-sm text-violet-200">{section5.observed_change}</p>
+                                    <p className="mt-1 text-sm text-[#cdf5f0]">{section5.observed_change}</p>
                                 ) : null}
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {[
@@ -941,7 +939,7 @@ export default function Section5Outcomes() {
                                     ].map((stat) => (
                                         <span key={stat.label} className="rounded-lg bg-white/10 px-4 py-2.5 text-center">
                                             <span className="block text-lg font-bold leading-none">{stat.value}</span>
-                                            <span className="mt-1 block text-[9px] font-semibold uppercase tracking-wide text-violet-200">{stat.label}</span>
+                                            <span className="mt-1 block text-[9px] font-semibold uppercase tracking-wide text-[#cdf5f0]">{stat.label}</span>
                                         </span>
                                     ))}
                                 </div>
@@ -954,7 +952,7 @@ export default function Section5Outcomes() {
                                     const causedBy = linkedActivities.length === 1 ? linkedActivities[0] : null;
                                     return (
                                         <div key={o.id || i} className="flex gap-4 p-5 sm:px-6">
-                                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#e6f6f4] text-[#0e7d74]">
                                                 <Repeat className="h-5 w-5" />
                                             </span>
                                             <div className="min-w-0 flex-1 space-y-1.5">
@@ -963,7 +961,7 @@ export default function Section5Outcomes() {
                                                         {i + 1}. {outcomeTitle(o)}
                                                     </h4>
                                                     {isDirectlyMeasured ? (
-                                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                                                        <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0e7d74]">
                                                             Directly measured
                                                         </span>
                                                     ) : null}
@@ -975,7 +973,7 @@ export default function Section5Outcomes() {
                                                 </p>
                                             </div>
                                             <div className="shrink-0 text-right">
-                                                <p className="text-lg font-bold text-violet-700">
+                                                <p className="text-lg font-bold text-[#0e7d74]">
                                                     {o.baseline} → {o.endline}
                                                 </p>
                                                 <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
@@ -1011,7 +1009,7 @@ export default function Section5Outcomes() {
                                 <button
                                     type="button"
                                     onClick={handleUnfinalizeSection5}
-                                    className="ml-auto shrink-0 text-xs font-semibold text-violet-600 hover:underline"
+                                    className="ml-auto shrink-0 text-xs font-semibold text-[var(--teal)] hover:underline"
                                 >
                                     Edit shortlist
                                 </button>

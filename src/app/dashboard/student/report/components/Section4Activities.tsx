@@ -20,19 +20,19 @@ import {
 import { REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from '../utils/validation';
 
 const inputClasses =
-    "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const selectClasses =
-    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const textareaClasses =
-    "min-h-[100px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "min-h-[100px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const badgeMandatory =
     "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
 const badgeRequired =
     "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
-const badgeNeutral =
-    "shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
+const badgeAuto =
+    "shrink-0 rounded-full bg-[var(--aqua-soft)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]";
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -288,22 +288,12 @@ export default function Section4Activities() {
 
             {/* 4.1 Activity Blocks */}
             <section className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
-                            4.1
-                        </span>
-                        <h3 className="text-base font-semibold text-slate-900">Activity blocks</h3>
-                        <span className={badgeMandatory}>Mandatory</span>
-                    </div>
-                    <Button
-                        type="button"
-                        onClick={addActivity}
-                        className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                    >
-                        <PlusCircle className="mr-1.5 h-4 w-4" />
-                        Add new activity
-                    </Button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
+                        4.1
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">Activity blocks</h3>
+                    <span className={badgeMandatory}>Mandatory</span>
                 </div>
 
                 {section4.activity_blocks.length === 0 ? (
@@ -314,7 +304,7 @@ export default function Section4Activities() {
                         <div>
                             <p className="text-sm font-semibold text-slate-900">No activities added yet</p>
                             <p className="mt-1 text-xs text-slate-500">
-                                Click the button above to record your first major project activity.
+                                Click the button below to record your first major project activity.
                             </p>
                         </div>
                     </div>
@@ -332,13 +322,22 @@ export default function Section4Activities() {
                         ))}
                     </div>
                 )}
+
+                <button
+                    type="button"
+                    onClick={addActivity}
+                    className="cer-addbig flex items-center justify-center gap-2"
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Add new activity
+                </button>
             </section>
 
             {/* 4.6 Project Summary */}
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                             4.6
                         </span>
                         <h3 className="text-base font-semibold text-slate-900">Project-level summary</h3>
@@ -410,11 +409,11 @@ export default function Section4Activities() {
             {/* 4.7 Scale Dashboard */}
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         4.7
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Implementation scale summary</h3>
-                    <span className={clsx(badgeNeutral, "ml-auto")}>Auto-calculated</span>
+                    <span className={clsx(badgeAuto, "ml-auto")}>Auto-calculated</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -536,7 +535,7 @@ export default function Section4Activities() {
                                 <button
                                     type="button"
                                     onClick={handleUnfinalizeSection4}
-                                    className="ml-auto shrink-0 text-xs font-semibold text-indigo-600 hover:underline"
+                                    className="ml-auto shrink-0 text-xs font-semibold text-[var(--teal)] hover:underline"
                                 >
                                     Edit shortlist
                                 </button>
@@ -758,7 +757,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     {/* 4.2 Delivery */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
                         <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 4.2
                             </span>
                             <h5 className="text-sm font-semibold text-slate-900">Delivery execution</h5>
@@ -813,7 +812,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     <div className="space-y-4 border-t border-slate-100 pt-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                     4.3
                                 </span>
                                 <h5 className="text-sm font-semibold text-slate-900">Measurable outputs</h5>
@@ -901,7 +900,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                 type="checkbox"
                                                 checked={out.is_shared}
                                                 onChange={e => updateOutput(idx, 'is_shared', e.target.checked)}
-                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                                                className="h-4 w-4 rounded border-slate-300 text-[var(--teal)] focus:ring-[var(--teal-soft)]"
                                             />
                                             Shared output
                                         </label>
@@ -923,7 +922,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     {/* 4.4 Beneficiaries */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
                         <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 4.4
                             </span>
                             <h5 className="text-sm font-semibold text-slate-900">Beneficiary reach</h5>
@@ -1026,7 +1025,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     {/* 4.5 Location */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
                         <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 4.5
                             </span>
                             <h5 className="text-sm font-semibold text-slate-900">Where it happened</h5>

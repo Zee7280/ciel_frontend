@@ -82,8 +82,8 @@ function FinalDeclarationCard({
     const allChecked = declaration.slice(0, 5).every(Boolean);
     return (
         <>
-            <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center">
-                <ShieldCheck className="w-8 h-8 text-indigo-600" />
+            <div className="w-16 h-16 bg-[var(--teal-soft)] rounded-xl flex items-center justify-center">
+                <ShieldCheck className="w-8 h-8 text-[var(--teal)]" />
             </div>
             <div className="max-w-lg w-full space-y-5 text-left">
                 <div>
@@ -102,7 +102,7 @@ function FinalDeclarationCard({
                                 type="checkbox"
                                 checked={!!declaration[i]}
                                 onChange={() => onToggle(i)}
-                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)] focus:ring-offset-1"
                             />
                             <span className="text-sm leading-relaxed text-slate-700">{text}</span>
                         </label>
@@ -117,15 +117,15 @@ function FinalDeclarationCard({
                         value={signatureName}
                         onChange={(e) => onSignatureChange(e.target.value)}
                         placeholder="Your full name"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-100"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
                     />
                 </div>
                 {!allChecked || !signatureName.trim() ? (
-                    <p className="text-xs font-medium text-amber-600">
+                    <p className="text-xs font-medium text-[var(--gold)]">
                         Tick all five declarations and sign your name to unlock final submission.
                     </p>
                 ) : (
-                    <p className="text-xs font-medium text-emerald-600">
+                    <p className="text-xs font-medium text-[var(--teal)]">
                         Declaration complete — you can now submit from the button below.
                     </p>
                 )}
@@ -188,7 +188,7 @@ function ReadinessChecklist({
                         key={row.label}
                         className={clsx(
                             "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium",
-                            row.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+                            row.done ? "bg-[var(--teal-soft)] text-[var(--teal)]" : "bg-[var(--gold-soft)] text-[var(--gold)]",
                         )}
                     >
                         <span>{row.done ? "✅" : "⏳"}</span>
@@ -680,11 +680,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 CII scores and certificates unlock only after admin approval.
                             </p>
                             {revisionFeedback ? (
-                                <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-900 mb-2 flex items-center gap-2">
+                                <div className="rounded-xl border border-[#bfe6e2] bg-[var(--aqua-soft)] p-4">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--aqua)] mb-2 flex items-center gap-2">
                                         <MessageSquareQuote className="w-3.5 h-3.5" /> Reviewer feedback
                                     </p>
-                                    <p className="text-xs font-medium text-indigo-950/90 leading-relaxed whitespace-pre-wrap">
+                                    <p className="text-xs font-medium text-[#0f5e57] leading-relaxed whitespace-pre-wrap">
                                         {revisionFeedback}
                                     </p>
                                 </div>
@@ -786,7 +786,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 )}
             >
                 {!(showVerifiedImpactScores && !needsAdminRevision) ? (
-                <div className="absolute right-0 top-0 w-40 h-40 bg-indigo-600/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+                <div className="absolute right-0 top-0 w-40 h-40 bg-[#0e7d74]/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
                 ) : null}
 
                 {needsAdminRevision ? (
@@ -802,36 +802,41 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 you to.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        const el = document.getElementById("report-section11-revision-feedback");
-                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                    }}
-                                    className="rounded-xl border border-slate-200 text-sm font-semibold h-12 px-6"
-                                >
-                                    View feedback
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={() => {
-                                        if (onRequestFinalSubmit) {
-                                            onRequestFinalSubmit();
-                                            return;
-                                        }
-                                        const footerSubmitBtn = Array.from(document.querySelectorAll("button")).find(
-                                            (btn) =>
-                                                btn.textContent?.includes("Resubmit") ||
-                                                btn.textContent?.includes("Submit Report"),
-                                        );
-                                        footerSubmitBtn?.click();
-                                    }}
-                                    disabled={!areAllSectionsComplete}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold h-12 px-8 disabled:opacity-50"
-                                >
-                                    {areAllSectionsComplete ? "Resubmit report" : "Complete all sections first"}
-                                </Button>
+                                <div className="w-full sm:w-56">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const el = document.getElementById("report-section11-revision-feedback");
+                                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }}
+                                        className="cer-ghost w-full h-12"
+                                        style={{ marginTop: 0 }}
+                                    >
+                                        View feedback
+                                    </button>
+                                </div>
+                                <div className="w-full sm:w-56">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (onRequestFinalSubmit) {
+                                                onRequestFinalSubmit();
+                                                return;
+                                            }
+                                            const footerSubmitBtn = Array.from(document.querySelectorAll("button")).find(
+                                                (btn) =>
+                                                    btn.textContent?.includes("Resubmit") ||
+                                                    btn.textContent?.includes("Submit Report"),
+                                            );
+                                            footerSubmitBtn?.click();
+                                        }}
+                                        disabled={!areAllSectionsComplete}
+                                        className="cer-bigbtn w-full h-12"
+                                        style={{ marginTop: 0 }}
+                                    >
+                                        {areAllSectionsComplete ? "Resubmit report" : "Complete all sections first"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </>
@@ -876,8 +881,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 ) : inPostSubmitLifecycle ? (
                     !feeOrSlipRecorded && paymentHref ? (
                         <>
-                            <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-100">
-                                <CreditCard className="w-7 h-7 text-amber-600" />
+                            <div className="w-16 h-16 bg-[var(--gold-soft)] rounded-xl flex items-center justify-center border border-[var(--gold-soft)]">
+                                <CreditCard className="w-7 h-7 text-[var(--gold)]" />
                             </div>
                             <div className="max-w-md space-y-4">
                                 <h3 className="text-lg font-semibold text-slate-900">Reporting fee required</h3>
@@ -885,22 +890,20 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     Your report is submitted. Complete the reporting fee and upload proof on the payment
                                     screen so your submission can move forward to verification.
                                 </p>
-                                <Button
+                                <button
                                     type="button"
                                     onClick={() => router.push(paymentHref)}
-                                    className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 text-white px-8 h-12 rounded-xl text-sm font-semibold transition-colors w-full sm:w-auto"
+                                    className="cer-bigbtn inline-flex items-center justify-center gap-2 w-full sm:w-56"
                                 >
-                                    <span className="inline-flex items-center gap-2">
-                                        <CreditCard className="w-4 h-4 shrink-0" />
-                                        <span>Go to payment</span>
-                                    </span>
-                                </Button>
+                                    <CreditCard className="w-4 h-4 shrink-0" />
+                                    <span>Go to payment</span>
+                                </button>
                             </div>
                         </>
                     ) : paymentSlipInReview && paymentHref ? (
                         <>
-                            <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center">
-                                <Clock className="w-7 h-7 text-slate-400" />
+                            <div className="w-16 h-16 bg-[var(--bg)] rounded-xl flex items-center justify-center border border-[var(--line)]">
+                                <Clock className="w-7 h-7 text-[var(--muted)]" />
                             </div>
                             <div className="max-w-md space-y-4">
                                 <h3 className="text-lg font-semibold text-slate-900">Payment proof under review</h3>
@@ -908,20 +911,20 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     Your fee proof was received and is being verified. You will be notified when it is
                                     cleared.
                                 </p>
-                                <Button
+                                <button
                                     type="button"
-                                    variant="outline"
                                     onClick={() => router.push(paymentHref)}
-                                    className="border border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-sm font-semibold transition-colors hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full sm:w-auto"
+                                    className="cer-ghost w-full sm:w-56"
+                                    style={{ marginTop: 0 }}
                                 >
                                     View payment details
-                                </Button>
+                                </button>
                             </div>
                         </>
                     ) : awaitingPartnerAfterPayment ? (
                         <>
-                            <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100">
-                                <Clock className="w-7 h-7 text-indigo-600" />
+                            <div className="w-16 h-16 bg-[var(--aqua-soft)] rounded-xl flex items-center justify-center border border-[var(--aqua-soft)]">
+                                <Clock className="w-7 h-7 text-[var(--aqua)]" />
                             </div>
                             <div className="max-w-md space-y-3">
                                 <h3 className="text-lg font-semibold text-slate-900">Partner review in progress</h3>
@@ -933,8 +936,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </>
                     ) : (
                         <>
-                            <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center">
-                                <ShieldAlert className="w-7 h-7 text-slate-400" />
+                            <div className="w-16 h-16 bg-[var(--bg)] rounded-xl flex items-center justify-center border border-[var(--line)]">
+                                <ShieldAlert className="w-7 h-7 text-[var(--muted)]" />
                             </div>
                             <div className="max-w-md space-y-3">
                                 <h3 className="text-lg font-semibold text-slate-900">Report locked pending admin approval</h3>
@@ -947,19 +950,19 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     )
                 ) : !isEligibleForSubmission ? (
                     <>
-                        <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center shadow-inner">
-                            <Clock className="w-8 h-8 text-amber-500 animate-pulse" />
+                        <div className="w-16 h-16 bg-[var(--gold-soft)] rounded-xl flex items-center justify-center shadow-inner">
+                            <Clock className="w-8 h-8 text-[var(--gold)] animate-pulse" />
                         </div>
                         <div className="flex-1 space-y-6">
                             <div>
                                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">Report in progress</h3>
                                 <p className="text-sm font-semibold text-slate-400">
-                                    You are currently in <span className="text-amber-600">progress mode</span>. Complete the following criteria:
+                                    You are currently in <span className="text-[var(--gold)]">progress mode</span>. Complete the following criteria:
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className={clsx("p-5 rounded-xl border flex items-center gap-4", verifiedHours >= (data.required_hours || 16) ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
-                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", verifiedHours >= (data.required_hours || 16) ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400")}>
+                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", verifiedHours >= (data.required_hours || 16) ? "bg-[var(--teal)] text-white" : "bg-slate-200 text-slate-400")}>
                                         {verifiedHours >= (data.required_hours || 16) ? <CheckCircle className="w-5 h-5" /> : "1"}
                                     </div>
                                     <div className="space-y-0.5 text-left">
@@ -968,7 +971,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </div>
                                 </div>
                                 <div className={clsx("p-5 rounded-xl border flex items-center gap-4", areAllSectionsComplete ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
-                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", areAllSectionsComplete ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400")}>
+                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", areAllSectionsComplete ? "bg-[var(--teal)] text-white" : "bg-slate-200 text-slate-400")}>
                                         {areAllSectionsComplete ? <CheckCircle className="w-5 h-5" /> : "2"}
                                     </div>
                                     <div className="space-y-0.5 text-left">
@@ -977,9 +980,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-5 bg-amber-50/50 border border-amber-100 rounded-xl flex items-start gap-4">
-                                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                <p className="text-xs font-semibold text-amber-700 leading-relaxed text-left">
+                            <div className="p-5 bg-[var(--gold-soft)] border border-[var(--gold-soft)] rounded-xl flex items-start gap-4">
+                                <AlertTriangle className="w-5 h-5 text-[var(--gold)] shrink-0 mt-0.5" />
+                                <p className="text-xs font-semibold text-[var(--gold)] leading-relaxed text-left">
                                     Final submission and <strong>Section 10 (Sustainability)</strong> will remain locked until all{" "}
                                     {data.required_hours || 16} hours are verified.
                                 </p>
@@ -993,8 +996,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     </>
                 ) : isEligibleForSubmission && !areAllSectionsComplete ? (
                     <>
-                        <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center shadow-inner">
-                            <AlertTriangle className="w-8 h-8 text-amber-500" />
+                        <div className="w-16 h-16 bg-[var(--gold-soft)] rounded-xl flex items-center justify-center shadow-inner">
+                            <AlertTriangle className="w-8 h-8 text-[var(--gold)]" />
                         </div>
                         <div className="flex-1 space-y-6 max-w-lg">
                             <div>
@@ -1005,7 +1008,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="p-5 rounded-xl border flex items-center gap-4 bg-slate-50 border-slate-100 text-slate-700">
-                                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--teal)] text-white flex items-center justify-center shrink-0">
                                         <CheckCircle className="w-5 h-5" />
                                     </div>
                                     <div className="space-y-0.5 text-left">
@@ -1013,28 +1016,28 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         <p className="text-xs font-semibold">{verifiedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-xl border border-amber-100 bg-amber-50/50 flex flex-col gap-3 text-left">
+                                <div className="p-5 rounded-xl border border-[var(--gold-soft)] bg-[var(--gold-soft)] flex flex-col gap-3 text-left">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-semibold text-sm">
+                                        <div className="w-8 h-8 rounded-full bg-[var(--gold)] text-white flex items-center justify-center shrink-0 font-semibold text-sm">
                                             !
                                         </div>
                                         <div className="space-y-0.5 min-w-0">
-                                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none text-amber-900">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none text-[var(--gold)]">
                                                 Form tabs 1–9
                                             </p>
-                                            <p className="text-xs font-semibold text-amber-800">
+                                            <p className="text-xs font-semibold text-[var(--gold)]">
                                                 Fix the items below, then return to this step to submit.
                                             </p>
                                         </div>
                                     </div>
                                     {incompleteSectionsSummary.length > 0 && (
-                                        <ul className="max-h-48 overflow-y-auto space-y-2.5 pl-1 border-t border-amber-100/80 pt-3 text-[11px] text-amber-950">
+                                        <ul className="max-h-48 overflow-y-auto space-y-2.5 pl-1 border-t border-[var(--gold-soft)] pt-3 text-[11px] text-[var(--gold)]">
                                             {incompleteSectionsSummary.map((block) => (
-                                                <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-amber-100/90">
-                                                    <span className="font-semibold text-amber-900">
+                                                <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-[var(--gold-soft)]">
+                                                    <span className="font-semibold text-[var(--gold)]">
                                                         {formatIncompleteSectionHeading(block.section, block.label)}
                                                     </span>
-                                                    <ul className="mt-1 ml-3 list-disc text-amber-900/85 font-medium space-y-0.5">
+                                                    <ul className="mt-1 ml-3 list-disc text-[var(--gold)] font-medium space-y-0.5">
                                                         {block.errors.map((err, j) => (
                                                             <li key={`${block.section}-${err.field}-${j}`}>{err.message}</li>
                                                         ))}
@@ -1071,8 +1074,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     />
                 ) : (
                     <>
-                        <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center">
-                            <ShieldCheck className="w-8 h-8 text-indigo-600" />
+                        <div className="w-16 h-16 bg-[var(--teal-soft)] rounded-xl flex items-center justify-center">
+                            <ShieldCheck className="w-8 h-8 text-[var(--teal)]" />
                         </div>
                         <div className="max-w-md space-y-4">
                             <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Ready for final submission</h3>
@@ -1080,7 +1083,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 All sections are complete, hour requirements are met, and your declaration is signed.
                                 Review and submit when ready.
                             </p>
-                            <Button
+                            <button
+                                type="button"
                                 onClick={() => {
                                     if (onRequestFinalSubmit) {
                                         onRequestFinalSubmit();
@@ -1091,10 +1095,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     );
                                     if (footerSubmitBtn) footerSubmitBtn.click();
                                 }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 h-12 rounded-xl w-full text-sm font-semibold transition-colors flex items-center justify-center gap-3"
+                                className="cer-bigbtn"
                             >
-                                <Lock className="w-4 h-4" /> Submit final report
-                            </Button>
+                                <span className="inline-flex w-full items-center justify-center gap-3">
+                                    <Lock className="w-4 h-4" /> Submit final report
+                                </span>
+                            </button>
                             <ReportTravelsCard />
                         </div>
                     </>
@@ -1221,7 +1227,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             {/* Modal Header */}
                             <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-xl z-[110] print-no-ui">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--teal)] text-white flex items-center justify-center">
                                         <Award className="w-5 h-5" />
                                     </div>
                                     <div>
@@ -1241,7 +1247,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </button>
                                     <Button
                                         onClick={handlePrint}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
+                                        className="bg-[var(--teal)] hover:opacity-90 text-white h-10 px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
                                     >
                                         <Printer className="w-3.5 h-3.5" /> Print / Save PDF
                                     </Button>

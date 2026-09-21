@@ -439,7 +439,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const charCount = (sectionData.problem_statement || "").length;
     const disciplineCharCount = (sectionData.discipline_contribution || "").length;
 
-    const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100";
+    const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[var(--teal)] focus:bg-white focus:ring-2 focus:ring-[var(--aqua-soft)]";
     const chipClass = (isSel: boolean) =>
         clsx(
             "rounded-full border px-3.5 py-2 text-xs font-semibold transition",
@@ -474,7 +474,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     { label: "Project Duration", value: `${startDate} – ${endDate}`, icon: Calendar },
                 ].map((item) => (
                     <div key={item.label} className="flex min-w-0 items-center gap-2" title={item.label}>
-                        <item.icon className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                        <item.icon className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
                         <span className="truncate text-sm font-semibold text-slate-800">{item.value}</span>
                     </div>
                 ))}
@@ -485,8 +485,8 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             </div>
 
             {/* ── One-rule banner ────────────────────────────────────────── */}
-            <div className="flex gap-2.5 rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 text-sm leading-relaxed text-indigo-900 sm:px-5">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
+            <div className="cer-note !mb-0 !text-sm sm:px-5">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
                     One rule only: describe things <span className="font-semibold">before</span> your project —
                     save activities and results for later sections.
@@ -499,8 +499,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 {/* LEFT: quick questions */}
                 <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
-                        <h2 className="text-base font-semibold text-slate-900">Quick questions</h2>
-                        <p className="text-xs text-slate-500">Short answers are fine — the statement builds itself on the right.</p>
+                        <div className="cer-secl">
+                            <span className="cer-secn">2.1</span>
+                            <h2>Quick questions</h2>
+                            <span className="cer-tag">Mandatory</span>
+                        </div>
+                        <p className="cer-sub">Short answers are fine — the statement builds itself on the right.</p>
                     </div>
 
                     {/* Q1 */}
@@ -542,7 +546,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             placeholder="e.g. around 120 children aged 5–12 at the SOS Village"
                             readOnly={isReadOnly}
                             disabled={isReadOnly}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
                             value={sectionData.affected_group || ""}
                             onChange={(e) => updateSection("section2", { affected_group: e.target.value })}
                         />
@@ -569,7 +573,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                 placeholder="Describe what was missing…"
                                 readOnly={isReadOnly}
                                 disabled={isReadOnly}
-                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
                                 value={sectionData.system_gaps_other || ""}
                                 onChange={(e) => updateSection("section2", { system_gaps_other: e.target.value })}
                             />
@@ -606,7 +610,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                             readOnly={isReadOnly}
                                             disabled={isReadOnly}
                                             className={clsx(
-                                                "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100",
+                                                "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]",
                                                 getFieldError(`baseline_other_entries.${i}`) && "border-red-400 bg-red-50/30",
                                             )}
                                             value={entryText}
@@ -636,7 +640,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                                 baseline_evidence_other: s.legacyOther,
                                             });
                                         }}
-                                        className="text-xs font-semibold text-indigo-600 hover:underline"
+                                        className="text-xs font-semibold text-[var(--teal)] hover:underline"
                                     >
                                         + Add another &apos;Other&apos; source
                                     </button>
@@ -665,7 +669,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             <Input
                                 placeholder="Name your discipline…"
                                 disabled={isReadOnly}
-                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
                                 value={sectionData.discipline_other || ""}
                                 onChange={(e) => updateSection("section2", { discipline_other: e.target.value })}
                             />
@@ -697,8 +701,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 {/* RIGHT: live baseline draft */}
                 <div className="lg:sticky lg:top-4 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
-                        <h2 className="text-base font-semibold text-slate-900">Your baseline statement ✍️</h2>
-                        <p className="text-xs text-slate-500">Builds itself as you answer on the left. Click in the box to edit directly.</p>
+                        <div className="cer-secl">
+                            <span className="cer-secn">2.2</span>
+                            <h2>Your baseline statement ✍️</h2>
+                            <span className="cer-tag auto">Auto-drafted</span>
+                        </div>
+                        <p className="cer-sub">Builds itself as you answer on the left. Click in the box to edit directly.</p>
                     </div>
 
                     {(sectionData.problem_category || sectionData.primary_beneficiary || (district !== "—" || province !== "—")) ? (
@@ -710,7 +718,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                 </span>
                             ) : null}
                             {sectionData.primary_beneficiary ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bfe6e2] bg-[var(--aqua-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]">
                                     <Users className="h-3 w-3" />
                                     {sectionData.primary_beneficiary}
                                 </span>
@@ -728,35 +736,21 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         placeholder="Start answering on the left and your statement will appear here…"
                         readOnly={isReadOnly}
                         disabled={isReadOnly}
-                        className="min-h-[220px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                        className="cer-stmt min-h-[220px] w-full resize-none"
                         value={sectionData.summary_text || ""}
                         onChange={(e) => updateSection("section2", { summary_text: e.target.value })}
                     />
 
-                    <div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                                className={clsx(
-                                    "h-full rounded-full transition-all",
-                                    reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? "bg-emerald-500" : "bg-indigo-400",
-                                )}
-                                style={{ width: `${reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).widthPct}%` }}
-                            />
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-                            <span className={clsx("font-semibold tabular-nums", reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok && "text-emerald-600")}>
-                                {summaryWordCount} words{reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? " ✓" : ""}
-                            </span>
-                            <span>aim for {wordRangeLabel(PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max)}</span>
-                        </div>
-                    </div>
+                    <p className={clsx("cer-wc", reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok && "ok")}>
+                        {summaryWordCount} words{reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? " ✓" : ""} · aim for {wordRangeLabel(PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max)}
+                    </p>
 
                     <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
                             onClick={handleGenerateAISummary}
                             disabled={isGenerating || isReadOnly}
-                            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 text-xs font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-50 disabled:opacity-40"
+                            className="cer-aibtn flex-1 inline-flex items-center justify-center gap-2 disabled:opacity-40"
                         >
                             {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                             {isGenerating ? "Generating…" : "✨ Expand with AI"}

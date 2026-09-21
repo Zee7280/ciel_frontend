@@ -109,7 +109,7 @@ const competencies = [
 ];
 
 const textareaClasses =
-    "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
@@ -131,7 +131,7 @@ function StepHeader({
 }) {
     return (
         <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+            <span className="cer-secn">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
@@ -281,23 +281,23 @@ export default function Section9Reflection() {
             {/* Header */}
             <div className="cer-dup-head space-y-4">
                 <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--teal)] text-white shadow-sm">
                         <GraduationCap className="h-5 w-5" />
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 8:</span> Reflection
+                            <span className="text-[var(--teal)]">SECTION 8:</span> Reflection
                         </h2>
                     </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                <div className="flex items-start gap-3 rounded-xl border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aqua)]" />
                     <div>
-                        <p className="text-sm font-semibold text-indigo-900">
+                        <p className="text-sm font-semibold text-[var(--ink)]">
                             This section captures what you learned, how your academic knowledge was applied, and which competencies you developed.
                         </p>
-                        <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
+                        <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/80">
                             It transforms your report from simple volunteering into structured academic engagement.
                         </p>
                     </div>
@@ -324,8 +324,8 @@ export default function Section9Reflection() {
                                     className={clsx(
                                         "rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors",
                                         active
-                                            ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
+                                            ? "border-[var(--teal)] bg-[var(--teal)] text-white shadow-sm"
+                                            : "border-slate-200 bg-white text-slate-700 hover:border-[var(--teal)]/40 hover:bg-[var(--teal-soft)]",
                                     )}
                                 >
                                     {opt.label}
@@ -357,12 +357,7 @@ export default function Section9Reflection() {
                                         key={skill}
                                         type="button"
                                         onClick={() => toggleSkill(skill)}
-                                        className={clsx(
-                                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
-                                            active
-                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
-                                        )}
+                                        className={clsx("cer-chip", active && "on")}
                                     >
                                         {skill}
                                     </button>
@@ -374,7 +369,7 @@ export default function Section9Reflection() {
                                 placeholder="Name the skill you grew…"
                                 value={skills_grown_other}
                                 onChange={(e) => composeAndUpdate({ skills_grown_other: e.target.value })}
-                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
                             />
                         ) : null}
                     </div>
@@ -385,7 +380,7 @@ export default function Section9Reflection() {
                             placeholder="e.g. that listening to the community matters more than my plan"
                             value={reflection_biggest_learning}
                             onChange={(e) => composeAndUpdate({ reflection_biggest_learning: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -394,23 +389,23 @@ export default function Section9Reflection() {
                             placeholder="e.g. seeing children choose books over the playground on day one"
                             value={reflection_moment}
                             onChange={(e) => composeAndUpdate({ reflection_moment: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
                         />
                     </div>
                     <div className="space-y-1.5">
                         <Label className={fieldLabel}>My field of study helped because…</Label>
                         {section2?.discipline ? (
-                            <p className="text-xs font-semibold text-indigo-700">Your discipline: {section2.discipline}</p>
+                            <p className="text-xs font-semibold text-[var(--teal)]">Your discipline: {section2.discipline}</p>
                         ) : null}
                         <Input
                             placeholder="e.g. I used simple data tracking to measure attendance improvements"
                             value={reflection_discipline_help}
                             onChange={(e) => composeAndUpdate({ reflection_discipline_help: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
                         />
                     </div>
 
-                    <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-4 text-sm leading-relaxed text-slate-700">
+                    <div className="rounded-xl border border-dashed border-[var(--aqua)]/40 bg-[var(--aqua-soft)] p-4 text-sm leading-relaxed text-slate-700">
                         {reflectionPreview || <span className="text-slate-400">Your reflection builds here as you tap and type…</span>}
                     </div>
 
@@ -454,7 +449,7 @@ export default function Section9Reflection() {
                     <button
                         type="button"
                         onClick={() => setShowRatingGuide((v) => !v)}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--teal)] hover:text-[var(--teal)]/80"
                     >
                         Rating guide — what each score means
                         <ChevronDown
@@ -485,7 +480,7 @@ export default function Section9Reflection() {
                                     {ratingGuide.map((r) => (
                                         <tr key={r.val}>
                                             <td className="px-4 py-3">
-                                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-[10px] font-bold text-white">
+                                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--ink)] text-[10px] font-bold text-white">
                                                     {r.val}
                                                 </span>
                                             </td>
@@ -509,7 +504,7 @@ export default function Section9Reflection() {
                                 className="space-y-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5"
                             >
                                 <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
-                                    <cat.icon className="h-4 w-4 text-indigo-600" />
+                                    <cat.icon className="h-4 w-4 text-[var(--teal)]" />
                                     <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-800">
                                         {cat.label}
                                     </h4>
@@ -546,9 +541,9 @@ export default function Section9Reflection() {
                                                             className={clsx(
                                                                 "flex h-9 flex-1 items-center justify-center rounded-md text-xs font-semibold transition-colors",
                                                                 score === v
-                                                                    ? "bg-indigo-600 text-white shadow-sm"
+                                                                    ? "bg-[var(--teal)] text-white shadow-sm"
                                                                     : score > v
-                                                                        ? "bg-indigo-100 text-indigo-700"
+                                                                        ? "bg-[var(--teal-soft)] text-[var(--teal)]"
                                                                         : "bg-white text-slate-400 hover:bg-slate-100 border border-slate-200",
                                                             )}
                                                         >
@@ -564,11 +559,11 @@ export default function Section9Reflection() {
                         ))}
                     </div>
 
-                    <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                    <div className="flex items-center justify-between rounded-xl border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--aqua)]">
                             Average competency score
                         </p>
-                        <p className="text-sm font-semibold text-indigo-900">
+                        <p className="text-sm font-semibold text-[var(--ink)]">
                             {avgScore > 0 ? avgScore.toFixed(1) : "—"} / 5
                         </p>
                     </div>
@@ -579,7 +574,7 @@ export default function Section9Reflection() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">
                             <BrainCircuit className="h-4 w-4" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">
@@ -610,11 +605,11 @@ export default function Section9Reflection() {
                                 Discipline applied
                             </p>
                         </div>
-                        <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-4 col-span-2 lg:col-span-1">
-                            <p className="text-2xl font-semibold text-indigo-700">
+                        <div className="rounded-lg border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] p-4 col-span-2 lg:col-span-1">
+                            <p className="text-2xl font-semibold text-[var(--ink)]">
                                 {avgScore > 0 ? avgScore.toFixed(1) : "—"}
                             </p>
-                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600/80">
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]">
                                 Avg competency score
                             </p>
                         </div>
@@ -626,7 +621,7 @@ export default function Section9Reflection() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">
                             <BrainCircuit className="h-4 w-4" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">

@@ -243,10 +243,19 @@ function ImpactClockGauge({
 }
 
 /**
- * Compact mobile-only "Participation Adventure" recap — same locked form, same mandatory
- * evidence, just a smaller-screen progress view with five star-missions instead of the desktop
- * stepper. Tapping a mission jumps to the internal step it lives on.
+ * "Participation Adventure" — same locked form, same mandatory evidence, just a five-mission
+ * progress view layered on top of the existing 4-step wizard. Tapping a mission jumps to the
+ * internal step it lives on; nothing about the underlying step content changes. Stars/badges
+ * are UI progress only — they never feed CII or academic evaluation.
  */
+const QUEST_MISSIONS = [
+    { icon: "🪪", title: "Verify Me", small: "Personal + academic profile" },
+    { icon: "👥", title: "Build My Crew", small: "Team configuration" },
+    { icon: "📍", title: "Log Real Impact", small: "Session + evidence" },
+    { icon: "⏱️", title: "Watch Progress", small: "Clock + activity ledger" },
+    { icon: "🏁", title: "Finish Section 1", small: "Declaration" },
+] as const;
+
 function ParticipationQuest({
     internalStep,
     setInternalStep,
@@ -264,47 +273,86 @@ function ParticipationQuest({
     hoursMet: boolean;
     declared: boolean;
 }) {
-    const missions = [
-        { label: "Identity", done: isVerified, step: 1 },
-        { label: "Team", done: teamVerified, step: 1 },
-        { label: "Log a session", done: hasSession, step: 2 },
-        { label: "Hours", done: hoursMet, step: 2 },
-        { label: "Declaration", done: declared, step: 3 },
-    ];
-    const starsFilled = missions.filter((m) => m.done).length;
+    const missionSteps = [1, 1, 2, 2, 3];
+    const missionDone = [isVerified, teamVerified, hasSession, hoursMet, declared];
+    const starsFilled = missionDone.filter(Boolean).length;
+    const currentMission = (() => {
+        const firstOpenAtStep = missionSteps.findIndex((step, i) => step === internalStep && !missionDone[i]);
+        if (firstOpenAtStep >= 0) return firstOpenAtStep;
+        const lastAtStep = missionSteps.reduce((found, step, i) => (step === internalStep ? i : found), -1);
+        if (lastAtStep >= 0) return lastAtStep;
+        // internalStep has no mission of its own (e.g. the post-declaration metrics dashboard) —
+        // by that point every mission should already be complete, so show the final one.
+        return missionSteps.length - 1;
+    })();
+    const mission = QUEST_MISSIONS[currentMission];
+
     return (
-        <div className="sm:hidden rounded-[16px] border border-[#dcebee] bg-gradient-to-br from-[#e6f6f4] to-white p-3.5">
-            <div className="flex items-center justify-between gap-2">
+        <div className="cer-quest-shell">
+            <div className="cer-quest-hero">
                 <div>
-                    <p className="text-[9px] font-extrabold tracking-[0.14em] text-[#0e7d74]">
-                        SECTION 1 · PARTICIPATION ADVENTURE 🎮
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-[#657a81]">Same form, five small missions.</p>
+                    <div className="k">SECTION 1 · PLAY IT AS FIVE SMALL MISSIONS</div>
+                    <h2>Participation Adventure 🎮</h2>
+                    <p>Same locked form. Same mandatory evidence. Complete one mission at a time and collect five progress stars.</p>
                 </div>
-                <b className="shrink-0 text-sm text-[#0e7d74]">
-                    {"★".repeat(starsFilled)}
-                    {"☆".repeat(missions.length - starsFilled)}
-                </b>
+                <div className="stars">
+                    <b>
+                        {"★".repeat(starsFilled)}
+                        {"☆".repeat(missionDone.length - starsFilled)}
+                    </b>
+                    <small>UI PROGRESS · NOT CII POINTS</small>
+                </div>
             </div>
-            <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1">
-                {missions.map((m) => (
-                    <button
-                        key={m.label}
-                        type="button"
-                        onClick={() => setInternalStep(m.step)}
-                        className={clsx(
-                            "shrink-0 rounded-full border px-2.5 py-1.5 text-[9.5px] font-bold transition-colors",
-                            m.done
-                                ? "border-[#0e7d74] bg-[#0e7d74] text-white"
-                                : internalStep === m.step
-                                  ? "border-[#0e7d74] bg-white text-[#0e7d74]"
-                                  : "border-[#dcebee] bg-white text-[#7a919a]",
-                        )}
-                    >
-                        {m.done ? "✓ " : ""}
-                        {m.label}
-                    </button>
-                ))}
+            <div className="cer-quest-bar">
+                <i style={{ width: `${(starsFilled / QUEST_MISSIONS.length) * 100}%` }} />
+            </div>
+            <div className="cer-quest-grid">
+                {QUEST_MISSIONS.map((m, i) => {
+                    const done = missionDone[i];
+                    const isActive = i === currentMission;
+                    return (
+                        <button
+                            key={m.title}
+                            type="button"
+                            onClick={() => setInternalStep(missionSteps[i])}
+                            className={clsx("cer-quest-step", isActive && "active", done && "done")}
+                        >
+                            <span className="ico">{m.icon}</span>
+                            <b>{i + 1}. {m.title}</b>
+                            <small>{m.small}</small>
+                            <span className="miniState">{done ? "★ COMPLETE" : isActive ? "IN PROGRESS" : "UP NEXT"}</span>
+                        </button>
+                    );
+                })}
+            </div>
+            <div className="cer-quest-context">
+                <div className="badge">{mission.icon}</div>
+                <div className="copy">
+                    <div className="ey">MISSION {currentMission + 1} OF {QUEST_MISSIONS.length}</div>
+                    <b>{mission.title}</b>
+                </div>
+                <span className="state">{missionDone[currentMission] ? "★ MISSION COMPLETE" : "● IN PROGRESS"}</span>
+            </div>
+            <div className="cer-quest-controls">
+                <button
+                    type="button"
+                    className="cer-quest-btn back"
+                    disabled={currentMission === 0}
+                    onClick={() => setInternalStep(missionSteps[Math.max(0, currentMission - 1)])}
+                >
+                    ← Previous mission
+                </button>
+                <div className="center">
+                    <b>{starsFilled}/{QUEST_MISSIONS.length} progress stars</b>
+                </div>
+                <button
+                    type="button"
+                    className="cer-quest-btn next"
+                    disabled={currentMission === QUEST_MISSIONS.length - 1}
+                    onClick={() => setInternalStep(missionSteps[Math.min(QUEST_MISSIONS.length - 1, currentMission + 1)])}
+                >
+                    Next mission →
+                </button>
             </div>
         </div>
     );
@@ -1030,9 +1078,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
     return (
         <div className="flex min-h-0 w-full min-w-0 flex-col bg-slate-50/30">
             {isTeamMemberAttendanceOnly ? (
-                <div className="mx-3 mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 sm:mx-5 lg:mx-6">
+                <div className="mx-3 mt-3 rounded-xl border border-[#bfe6e2] bg-[#e3f4fa] px-4 py-3 text-sm text-[#0f5e57] sm:mx-5 lg:mx-6">
                     <p className="font-semibold">Team member — attendance only</p>
-                    <p className="mt-1 text-xs text-sky-800/90">
+                    <p className="mt-1 text-xs text-[#0f5e57]/90">
                         Your team lead completes and submits this report. You may log and update your own attendance below.
                     </p>
                     {!isSubmittedReport || isParticipationUnlocked ? (
@@ -1071,7 +1119,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <div
                                             className={clsx(
                                                 "absolute left-[calc(50%+0.875rem)] right-0 top-3.5 hidden h-0.5 sm:block",
-                                                isComplete ? "bg-emerald-400" : "bg-slate-200",
+                                                isComplete ? "bg-[#0e7d74]" : "bg-[#dcebee]",
                                             )}
                                             aria-hidden
                                         />
@@ -1096,9 +1144,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <span
                                             className={clsx(
                                                 "flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold transition-all",
-                                                isCurrent && "bg-indigo-600 text-white shadow-sm",
-                                                isComplete && !isCurrent && "bg-emerald-500 text-white",
-                                                !isCurrent && !isComplete && "bg-slate-200 text-white",
+                                                isCurrent && "bg-[#0e7d74] text-white shadow-sm",
+                                                isComplete && !isCurrent && "bg-[#0d2b33] text-white",
+                                                !isCurrent && !isComplete && "bg-[#dcebee] text-[#7a919a]",
                                             )}
                                         >
                                             {isComplete && !isCurrent ? (
@@ -1111,10 +1159,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             className={clsx(
                                                 "hidden max-w-[5.5rem] text-center text-[10px] font-medium leading-tight sm:block",
                                                 isCurrent
-                                                    ? "text-indigo-700"
+                                                    ? "text-[#0e7d74]"
                                                     : isComplete
-                                                      ? "text-emerald-700"
-                                                      : "text-slate-400",
+                                                      ? "text-[#0d2b33]"
+                                                      : "text-[#7a919a]",
                                             )}
                                         >
                                             {s.title}
@@ -1122,7 +1170,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <span
                                             className={clsx(
                                                 "max-w-[4rem] text-center text-[10px] font-medium leading-tight sm:hidden",
-                                                isCurrent ? "text-indigo-700" : "text-slate-400",
+                                                isCurrent ? "text-[#0e7d74]" : "text-[#7a919a]",
                                             )}
                                         >
                                             {s.title.split(" ")[0]}
@@ -1157,25 +1205,26 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {/* 1. Identity Verification */}
-                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-slate-900">Identity verification</h4>
-                                    </div>
+                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                                <div className="mb-3 flex items-center gap-2">
+                                    <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                        1.1
+                                    </span>
+                                    <h4 className="text-[14.5px] font-bold text-[#0d2b33]">Identity verification</h4>
+                                    <span className="ml-auto rounded-full bg-[#fbf0d7] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#b45309]">
+                                        MANDATORY
+                                    </span>
                                 </div>
 
-                                <div className="px-4 py-4 sm:px-5">
+                                <div>
                                     {(isVerified && !isEditingLead) ? (
                                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                                             {(() => {
                                                 const leadCnicRaw = String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "");
                                                 const leadCnicOk = leadCnicRaw.length === 13;
                                                 return !leadCnicOk ? (
-                                                    <div className="border-b border-amber-100 bg-amber-50 px-4 py-2.5">
-                                                        <p className="text-sm text-amber-900">
+                                                    <div className="border-b border-[#f3d9a0] bg-[#fbf0d7] px-4 py-2.5">
+                                                        <p className="text-sm text-[#7a5200]">
                                                             CNIC incomplete — use <span className="font-semibold">Edit academic</span> to add your 13-digit CNIC.
                                                         </p>
                                                     </div>
@@ -1183,7 +1232,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             })()}
                                             <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0e7d74] text-white">
                                                         <User className="h-5 w-5" />
                                                     </div>
                                                     <div className="min-w-0">
@@ -1191,7 +1240,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             <h4 className="text-sm font-semibold text-slate-900">
                                                                 {(data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead"}
                                                             </h4>
-                                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[#0e7d74]">
                                                                 <CheckCircle2 className="h-3 w-3" />
                                                                 Verified
                                                             </span>
@@ -1238,7 +1287,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                                 setIsLoadingMetrics(false);
                                                             }}
                                                             disabled={isLoadingMetrics}
-                                                            className="inline-flex h-9 items-center rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                                                            className="inline-flex h-9 items-center rounded-lg bg-[#fbf0d7] px-3 text-xs font-semibold text-[#b45309] hover:bg-[#f3d9a0] disabled:opacity-50"
                                                         >
                                                             {isLoadingMetrics ? "Syncing…" : "Sync record"}
                                                         </button>
@@ -1258,6 +1307,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             teamId={teamId}
                                             primaryFacultyEmail={primaryFacultyEmail}
                                             secondaryFacultyEmail={secondaryFacultyEmail}
+                                            showSemester
                                             onSuccess={(p) => {
                                                 setIsVerified(true);
                                                 setIsEditingLead(false);
@@ -1270,6 +1320,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         university: p.universityName,
                                                         degree: p.academicProgram,
                                                         year: p.yearOfStudy,
+                                                        semester: p.semester,
                                                         name: p.fullName
                                                     }
                                                 });
@@ -1281,16 +1332,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {/* 2. Team Members */}
-                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                                            <Users className="h-4 w-4" />
-                                        </div>
-                                        <h4 className="text-sm font-semibold text-slate-900">Team members</h4>
-                                    </div>
+                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                                <div className="mb-3 flex items-center gap-2">
+                                    <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                        1.2
+                                    </span>
+                                    <h4 className="text-[14.5px] font-bold text-[#0d2b33]">Team members</h4>
+                                    <span className="ml-auto rounded-full bg-[#e3f4fa] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#0891b2]">
+                                        EACH MEMBER: INDIVIDUAL + ACADEMIC
+                                    </span>
                                 </div>
-                                <div className="px-4 py-4 sm:px-5">
+                                <div>
                                     <TeamVerification
                                         projectId={data.project_id || projectIdFromUrl || ""}
                                         members={team_members}
@@ -1536,7 +1588,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             <div className="mt-5 border-t border-[#dcebee] pt-4">
                                                 {isAttendanceVerificationRequested ? (
                                                     <div className="space-y-1.5">
-                                                        <p className="text-xs font-semibold text-emerald-700">
+                                                        <p className="text-xs font-semibold text-[#0e7d74]">
                                                             Verification request sent
                                                         </p>
                                                         <p className="text-sm leading-relaxed text-slate-600">
@@ -1640,10 +1692,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         <div className="mx-auto max-w-2xl space-y-6 py-4">
 
                             <div className="text-center">
-                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0e7d74] text-white shadow-md shadow-[#0e7d74]/20">
                                     <Shield className="h-7 w-7" />
                                 </div>
-                                <p className="text-xs font-medium text-indigo-600">Step 3</p>
+                                <p className="text-xs font-medium text-[#0e7d74]">Step 3</p>
                                 <h2 className="mt-1 text-xl font-semibold text-slate-900">
                                     Review & submit
                                 </h2>
@@ -1652,43 +1704,43 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </p>
                             </div>
 
-                            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <p className="text-xs font-medium text-slate-500">Hours summary</p>
+                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm">
+                                <p className="text-xs font-medium text-[#7a919a]">Hours summary</p>
                                 <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
-                                        <p className="text-lg font-bold text-slate-900">{projectGoal}</p>
-                                        <p className="text-[11px] text-slate-500">Project goal</p>
+                                    <div className="rounded-lg bg-[#f5fbfa] px-2 py-2.5 ring-1 ring-[#dcebee]">
+                                        <p className="text-lg font-bold text-[#0d2b33]">{projectGoal}</p>
+                                        <p className="text-[11px] text-[#7a919a]">Project goal</p>
                                     </div>
-                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
-                                        <p className="text-lg font-bold text-indigo-600">
+                                    <div className="rounded-lg bg-[#f5fbfa] px-2 py-2.5 ring-1 ring-[#dcebee]">
+                                        <p className="text-lg font-bold text-[#0e7d74]">
                                             {collectiveProjectHours}
                                         </p>
-                                        <p className="text-[11px] text-slate-500">Team logged</p>
+                                        <p className="text-[11px] text-[#7a919a]">Team logged</p>
                                     </div>
-                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
+                                    <div className="rounded-lg bg-[#f5fbfa] px-2 py-2.5 ring-1 ring-[#dcebee]">
                                         <p
                                             className={clsx(
                                                 "text-lg font-bold",
-                                                isMinimumHoursMet ? "text-emerald-600" : "text-amber-600",
+                                                isMinimumHoursMet ? "text-[#0e7d74]" : "text-[#b45309]",
                                             )}
                                         >
                                             {requiredHoursPerStudent}
                                         </p>
-                                        <p className="text-[11px] text-slate-500">Per student</p>
+                                        <p className="text-[11px] text-[#7a919a]">Per student</p>
                                     </div>
                                 </div>
                                 <div className="mt-3 flex items-center gap-2 rounded-lg px-1 py-1">
                                     {isMinimumHoursMet ? (
                                         <>
-                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                                            <p className="text-xs text-emerald-700">
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#0e7d74]" />
+                                            <p className="text-xs text-[#0f5e57]">
                                                 All students have met the minimum hour requirement.
                                             </p>
                                         </>
                                     ) : (
                                         <>
-                                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
-                                            <p className="text-xs text-amber-700">
+                                            <AlertCircle className="h-4 w-4 shrink-0 text-[#b45309]" />
+                                            <p className="text-xs text-[#7a5200]">
                                                 Some students still need more hours. Return to Step 2 to
                                                 add sessions.
                                             </p>
@@ -1697,13 +1749,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                            <div className="flex gap-3 rounded-xl border border-[#f3d9a0] bg-[#fbf0d7] p-4">
+                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#b45309]" />
                                 <div>
-                                    <h4 className="text-sm font-semibold text-amber-900">
+                                    <h4 className="text-sm font-semibold text-[#7a5200]">
                                         Permanent record lock
                                     </h4>
-                                    <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                                    <p className="mt-1 text-sm leading-relaxed text-[#7a5200]">
                                         After submission, all participation records become{" "}
                                         <strong>permanently locked</strong> and cannot be edited. Any
                                         inaccuracies will appear on your official HEC verification record.
@@ -1712,13 +1764,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {!isMinimumHoursMet ? (
-                                <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-                                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                                <div className="flex gap-3 rounded-xl border border-[#f3c6cf] bg-[#fdedf0] p-4">
+                                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#e11d48]" />
                                     <div>
-                                        <h4 className="text-sm font-semibold text-red-900">
+                                        <h4 className="text-sm font-semibold text-[#9f1239]">
                                             Minimum hours not met
                                         </h4>
-                                        <p className="mt-1 text-sm leading-relaxed text-red-700">
+                                        <p className="mt-1 text-sm leading-relaxed text-[#9f1239]">
                                             Every student must reach{" "}
                                             <strong>{requiredHoursPerStudent} hours</strong> before you can
                                             finalize. Go back to attendance logging to complete remaining
@@ -1728,17 +1780,23 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             ) : null}
 
-                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
-                                    <h4 className="text-sm font-semibold text-slate-900">
+                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                                <div className="mb-3 flex items-center gap-2">
+                                    <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                        1.6
+                                    </span>
+                                    <h4 className="text-[14.5px] font-bold text-[#0d2b33]">
                                         Declaration
                                     </h4>
-                                    <p className="mt-0.5 text-xs text-slate-500">
-                                        No separate attendance sign-off — this declaration replaces it. Your
-                                        whole report is verified once, by faculty, at the end.
-                                    </p>
+                                    <span className="ml-auto rounded-full bg-[#fbf0d7] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#b45309]">
+                                        REQUIRED
+                                    </span>
                                 </div>
-                                <div className="divide-y divide-slate-100 p-2">
+                                <p className="mb-3 -mt-1 text-xs text-[#7a919a]">
+                                    No separate attendance sign-off — this declaration replaces it. Your
+                                    whole report is verified once, by faculty, at the end.
+                                </p>
+                                <div className="space-y-2">
                                     {[
                                         "I verify that all session entries are authentic.",
                                         "I understand that no further edits are possible after submission.",
@@ -1746,7 +1804,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     ].map((check, i) => (
                                         <label
                                             key={i}
-                                            className="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
+                                            className={clsx(
+                                                "flex cursor-pointer items-start gap-3 rounded-[13px] border px-3 py-3 transition-colors",
+                                                reviewChecked[i]
+                                                    ? "border-[#0e7d74] bg-[#e6f6f4]"
+                                                    : "border-dashed border-[#cbe7e3] bg-white hover:border-[#0e7d74]/50",
+                                            )}
                                         >
                                             <input
                                                 type="checkbox"
@@ -1761,9 +1824,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             : {}),
                                                     });
                                                 }}
-                                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-[#dcebee] accent-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74] focus:ring-offset-1"
                                             />
-                                            <span className="text-sm leading-relaxed text-slate-700">
+                                            <span className="text-sm leading-relaxed text-[#0d2b33]">
                                                 {check}
                                             </span>
                                         </label>
@@ -1775,9 +1838,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 before this was replaced by the declaration above stay visibly locked; no
                                 new requests can be created any more. */}
                             {!isSubmittedReport && !isTeamMemberAttendanceOnly && isAttendanceVerificationRequested ? (
-                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                <div className="rounded-lg border border-[#bfe6e2] bg-[#e6f6f4] px-4 py-3 text-sm text-[#0f5e57]">
                                     <p className="font-semibold">Verification request sent</p>
-                                    <p className="mt-1 text-xs text-emerald-700">
+                                    <p className="mt-1 text-xs text-[#0f5e57]">
                                         {ATTENDANCE_VERIFICATION_INFO.afterSent}{" "}
                                         {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
                                     </p>
@@ -1791,7 +1854,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     {internalStep === 4 && (
                         <div className="space-y-6">
                             <div className="mx-auto max-w-2xl text-center">
-                                <p className="text-xs font-medium text-indigo-600">Step 4</p>
+                                <p className="text-xs font-medium text-[#0e7d74]">Step 4</p>
                                 <h2 className="mt-1 text-xl font-semibold text-slate-900">
                                     Metrics dashboard
                                 </h2>
@@ -1799,7 +1862,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     Engagement hours, sessions, and evidence for this record.
                                 </p>
                                 {isSubmitted ? (
-                                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#e6f6f4] px-3 py-1 text-xs font-medium text-[#0f5e57] ring-1 ring-[#bfe6e2]">
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         Record finalized
                                     </span>
@@ -1824,7 +1887,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             ) : (
                                 <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white py-16 text-center shadow-sm">
-                                    <Loader2 className="mx-auto h-9 w-9 animate-spin text-indigo-600" />
+                                    <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#0e7d74]" />
                                     <p className="mt-4 text-base font-semibold text-slate-800">
                                         Generating analytics
                                     </p>
@@ -1835,7 +1898,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <Button
                                             variant="outline"
                                             onClick={() => setInternalStep(3)}
-                                            className="mt-6 h-10 rounded-lg border-indigo-200 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                                            className="mt-6 h-10 rounded-lg border-[#cbe7e3] text-sm font-medium text-[#0e7d74] hover:bg-[#e6f6f4]"
                                         >
                                             Return to review
                                         </Button>
@@ -1882,7 +1945,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             isLoadingMetrics ||
                                             !isMinimumHoursMet
                                         }
-                                        className="h-10 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                                        className="h-10 rounded-lg bg-[#0e7d74] px-5 text-sm font-semibold text-white hover:bg-[#0c6a62] disabled:opacity-50"
                                     >
                                         {isLoadingMetrics ? (
                                             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -1900,10 +1963,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         (isTeamMemberAttendanceOnly && internalStep >= 2)
                                     }
                                     className={clsx(
-                                        "h-10 rounded-lg px-5 text-sm font-semibold text-white disabled:opacity-50",
+                                        "h-10 rounded-lg px-5 text-sm font-semibold disabled:opacity-50",
                                         internalStep === 3
-                                            ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 shadow-none"
-                                            : "bg-indigo-600 hover:bg-indigo-700 shadow-sm",
+                                            ? "bg-[#e6f6f4] text-[#0e7d74] hover:bg-[#d9f2ee] shadow-none"
+                                            : "bg-[#0e7d74] text-white hover:bg-[#0c6a62] shadow-sm",
                                     )}
                                 >
                                     {internalStep === 3 ? "Skip & continue" : "Next step"}
@@ -1913,7 +1976,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         ) : !isTeamMemberAttendanceOnly ? (
                             <Button
                                 onClick={handleNext}
-                                className="h-10 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+                                className="h-10 rounded-lg bg-[#0e7d74] px-5 text-sm font-semibold text-white hover:bg-[#0c6a62]"
                             >
                                 Save & continue to next section
                                 <ChevronRight className="ml-1.5 h-4 w-4" />

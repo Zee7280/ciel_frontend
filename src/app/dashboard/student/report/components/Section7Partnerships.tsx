@@ -3,7 +3,6 @@ import {
     Users2, CheckCircle2, Activity, Globe, Upload, FileText,
 } from "lucide-react";
 import { Label } from "./ui/label";
-import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
@@ -112,14 +111,14 @@ function classifyEngagement(partnerCount: number, verifiedCount: number, formalC
     if (partnerCount >= 3 && formalCount >= 1 && verifiedCount >= 2) {
         return {
             label: "Strategic Partnership",
-            color: "border-indigo-200 bg-indigo-50 text-indigo-800",
+            color: "border-indigo-200 bg-indigo-50 text-[var(--teal)]",
             desc: "Multi-sector collaboration, formalized, high verification",
         };
     }
     if (partnerCount >= 2 || verifiedCount >= 2) {
         return {
             label: "Collaborative Engagement",
-            color: "border-indigo-200 bg-indigo-50 text-indigo-800",
+            color: "border-indigo-200 bg-indigo-50 text-[var(--aqua)]",
             desc: "Multiple partners, shared roles, verified outputs",
         };
     }
@@ -269,7 +268,7 @@ function PartnerCard({
         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         {idx + 1}
                     </span>
                     <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -306,9 +305,12 @@ function PartnerCard({
                 <FieldError message={getFieldError(`partners.${idx}.name`)} />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                    <Label className={fieldLabel}>Contact name in Pakistan</Label>
+            <div className="cer-pgrid">
+                <div>
+                    <Label className="cer-field-label">
+                        Contact name in Pakistan
+                        <span className="cer-soft-req">RECOMMENDED</span>
+                    </Label>
                     <Input
                         type="text"
                         placeholder="Focal person name…"
@@ -317,8 +319,11 @@ function PartnerCard({
                         className={inputClasses}
                     />
                 </div>
-                <div className="space-y-1.5">
-                    <Label className={fieldLabel}>WhatsApp / mobile · country code + number</Label>
+                <div>
+                    <Label className="cer-field-label">
+                        WhatsApp / mobile · country code + number
+                        <span className="cer-soft-opt">OPTIONAL</span>
+                    </Label>
                     {(() => {
                         const parsed = parsePhoneForDisplay(p.pakistan_contact_number ?? "");
                         return (
@@ -344,8 +349,11 @@ function PartnerCard({
                         );
                     })()}
                 </div>
-                <div className="space-y-1.5">
-                    <Label className={fieldLabel}>Email</Label>
+                <div className="cer-full">
+                    <Label className="cer-field-label">
+                        Email
+                        <span className="cer-soft-req">RECOMMENDED</span>
+                    </Label>
                     <Input
                         type="email"
                         placeholder="Contact email…"
@@ -577,7 +585,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             {/* 7.0 Confirmation */}
             <section className="space-y-4">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         7.0
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">
@@ -644,7 +652,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                     <section className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                     7.1
                                 </span>
                                 <h3 className="text-base font-semibold text-slate-900">
@@ -659,14 +667,6 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                                     </span>
                                 ) : null}
                                 <span className={badgeMandatory}>Mandatory</span>
-                                <Button
-                                    type="button"
-                                    onClick={addPartner}
-                                    className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add partner
-                                </Button>
                             </div>
                         </div>
                         {partners[0]?._seeded ? (
@@ -679,14 +679,14 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                             <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
                                 <Users2 className="h-10 w-10 text-slate-300" />
                                 <p className="text-sm font-semibold text-slate-700">No partners added yet</p>
-                                <Button
+                                <button
                                     type="button"
                                     onClick={addPartner}
-                                    className="h-9 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                                    className="cer-addbig flex max-w-xs items-center justify-center gap-1.5"
                                 >
-                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    <Plus className="h-3.5 w-3.5" />
                                     Add first partner
-                                </Button>
+                                </button>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -701,13 +701,21 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                                         getFieldError={getFieldError}
                                     />
                                 ))}
+                                <button
+                                    type="button"
+                                    onClick={addPartner}
+                                    className="cer-addbig flex items-center justify-center gap-1.5"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add partner
+                                </button>
                             </div>
                         )}
                     </section>
 
                     <section className="space-y-4">
                         <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 7.2
                             </span>
                             <h3 className="text-base font-semibold text-slate-900">
@@ -752,7 +760,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                                 })}
                             </div>
 
-                            <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-5 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
+                            <div className="cer-dropzone relative px-5 py-8 text-center">
                                 <Upload className="mx-auto h-7 w-7 text-slate-300" />
                                 <p className="mt-2 text-sm font-medium text-slate-600">
                                     Upload supporting documentation (optional)

@@ -206,7 +206,12 @@ function facultyStatusKey(value: unknown): string {
 export function decisionFromFacultyRecord(status: unknown, remarks: unknown): FacultyDecisionKind {
     const key = facultyStatusKey(status);
     const note = pickString(remarks);
-    if (key === "rejected" || note.startsWith(ADMIN_REVIEW_REMARK_PREFIX)) return "ar";
+    // faculty_status is authoritative. It used to be overridable by an ADMIN_REVIEW_REMARK_PREFIX
+    // remark alone, but buildFacultyActionBody always pairs that remark with status: 'rejected'
+    // when it's set, so that extra check had no independent purpose — it only ever fired on
+    // stale data, keeping a resubmitted (now-pending) report reading as still rejected here
+    // because the reset-to-pending on resubmit didn't used to clear the old remark text.
+    if (key === "rejected") return "ar";
     if (key === "approved" && note.startsWith(CONDITIONAL_REMARK_PREFIX)) return "cn";
     if (key === "approved") return "ap";
     return "";

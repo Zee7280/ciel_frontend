@@ -50,7 +50,7 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner } from './ReportFormChrome';
+import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney } from './ReportFormChrome';
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -774,7 +774,7 @@ function ReportFormContent() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#0e7d74]" />
             </div>
         );
     }
@@ -893,6 +893,16 @@ function ReportFormContent() {
                 ) : null}
 
                 <ReportMissionHero data={data} projectData={projectDetails} />
+
+                {!onFlash && !stepperLockedToSummaryOnly && !stepperLockedToSection1Only ? (
+                    <ReportImpactJourney
+                        data={data}
+                        activeStep={activeStep}
+                        incompleteStepNums={incompleteStepNums}
+                        sectionsCompleteCount={sectionsCompleteCount}
+                        onGo={(step) => setStep(step)}
+                    />
+                ) : null}
 
                 <div className="cer-tabs">
                     {REPORT_TAB_ITEMS.map((tab) => {
@@ -1133,7 +1143,7 @@ function ReportFormContent() {
 export default function ReportPage() {
     return (
         <ReportProvider>
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-[#0e7d74]" /></div>}>
                 <ReportFormContent />
             </Suspense>
         </ReportProvider>

@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, User, GraduationCap, Phone, Hash, School, Book, Calendar, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
-import { Input } from "../../report/components/ui/input";
-import { Label } from "../../report/components/ui/label";
-import { Button } from "../../report/components/ui/button";
+import { School, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -31,7 +28,11 @@ export interface Participant {
     department: string;
     academicIntegrationType: string;
     facultySupervisorEmail?: string;
+    /** Community-service report only (see `showSemester`) — not stored on the backend Participant record. */
+    semester?: string;
 }
+
+const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 
 export default function IdentityVerification({
     projectId,
@@ -41,7 +42,8 @@ export default function IdentityVerification({
     isTeamLead = false,
     teamId = "",
     primaryFacultyEmail = "",
-    secondaryFacultyEmail = ""
+    secondaryFacultyEmail = "",
+    showSemester = false,
 }: {
     projectId: string;
     onSuccess: (p: Participant) => void;
@@ -51,6 +53,8 @@ export default function IdentityVerification({
     teamId?: string;
     primaryFacultyEmail?: string;
     secondaryFacultyEmail?: string;
+    /** Community-service report screens pass true to also collect Semester (1-10) here. */
+    showSemester?: boolean;
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'academic'>('personal');
@@ -75,6 +79,7 @@ export default function IdentityVerification({
         department: initialData.department || '',
         academicIntegrationType: initialData.academicIntegrationType || 'Course-Linked',
         facultySupervisorEmail: initialData.facultySupervisorEmail || '',
+        semester: initialData.semester || '',
     });
 
     const [otpInputs, setOtpInputs] = useState({ email: '' });
@@ -287,6 +292,8 @@ export default function IdentityVerification({
             };
             // facultySupervisorEmail is now collected at the application/apply stage — not here
             delete body.facultySupervisorEmail;
+            // Only the community-service report flow collects semester — leave other callers' records untouched.
+            if (!showSemester) delete body.semester;
             const resolvedTeamId =
                 effectiveTeamId ||
                 teamId ||
@@ -338,7 +345,7 @@ export default function IdentityVerification({
     const phoneOk = phoneNational.replace(/\D/g, "").length >= 8;
     const isPersonalValid =
         !!formData.fullName.trim() && cnicNormalized.length === 13 && phoneOk && otpVerified.email;
-    const isAcademicValid = formData.universityId && formData.universityName && formData.academicProgram;
+    const isAcademicValid = !!(formData.universityId && formData.universityName && formData.academicProgram && (!showSemester || formData.semester));
 
     /** Verified / email-linked records can still lack CNIC (e.g. individual apply). Keep CNIC editable until 13 digits are saved. */
     const cnicDigitsLen = cnicNormalized.length;
@@ -346,278 +353,280 @@ export default function IdentityVerification({
         (otpVerified.email || !!initialData.verified) && cnicDigitsLen === 13;
 
     return (
-        <div className="space-y-8">
+        <div className="cer-scope space-y-4">
             {/* Tab Navigation */}
-            <div className="flex p-1.5 bg-slate-100 rounded-2xl w-full max-w-sm mx-auto">
+            <div className="cer-chips">
                 {(['personal', 'academic'] as const).map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={clsx(
-                            "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300",
-                            activeTab === tab
-                                ? "bg-white text-report-primary shadow-sm"
-                                : "text-slate-400 hover:text-slate-600"
-                        )}
+                        className={clsx("cer-chip", activeTab === tab && "on")}
                     >
-                        {tab === 'personal' ? '👤 Personal Info' : '🎓 Academic Info'}
+                        {tab === 'personal' ? '👤 Personal info' : '🎓 Academic info'}
                     </button>
                 ))}
             </div>
 
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-8 min-h-[400px]">
-                {activeTab === 'personal' ? (
-                    <div className="space-y-8 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Full Name (per CNIC)</Label>
-                                <Input
-                                    placeholder="Enter full name"
-                                    value={formData.fullName}
-                                    disabled={otpVerified.email || !!initialData.verified}
-                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">CNIC Number</Label>
-                                <Input
-                                    placeholder="xxxxx-xxxxxxx-x"
-                                    maxLength={15}
-                                    inputMode="numeric"
-                                    value={formatPakistaniCnicInput(formData.cnic)}
-                                    disabled={cnicFieldLocked}
-                                    onChange={(e) => setFormData({ ...formData, cnic: pakistaniCnicDigits(e.target.value) })}
-                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.12em] disabled:opacity-70 disabled:cursor-not-allowed"
-                                />
-                                <p className="text-[10px] font-medium text-slate-400">13 digits with dashes, e.g. 35202-1234567-1</p>
-                            </div>
+            {activeTab === 'personal' ? (
+                <div className="space-y-1">
+                    <div className="cer-g2">
+                        <div>
+                            <label className="cer-field-label">Full name (per CNIC)</label>
+                            <input
+                                placeholder="Enter full name"
+                                value={formData.fullName}
+                                disabled={otpVerified.email || !!initialData.verified}
+                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                className="cer-input"
+                            />
+                        </div>
+                        <div>
+                            <label className="cer-field-label">CNIC number</label>
+                            <input
+                                placeholder="xxxxx-xxxxxxx-x"
+                                maxLength={15}
+                                inputMode="numeric"
+                                value={formatPakistaniCnicInput(formData.cnic)}
+                                disabled={cnicFieldLocked}
+                                onChange={(e) => setFormData({ ...formData, cnic: pakistaniCnicDigits(e.target.value) })}
+                                className="cer-input tracking-[0.08em]"
+                            />
+                            <p className="cer-hint">13 digits with dashes, e.g. 35202-1234567-1</p>
+                        </div>
+                    </div>
+
+                    {/* OTP Flow for Mobile/Email */}
+                    <div className="cer-g2">
+                        {/* Mobile */}
+                        <div>
+                            <label className="cer-field-label flex items-center gap-1.5">
+                                <Smartphone className="w-3 h-3" /> Mobile contact
+                            </label>
+                            <PhoneConnectivityRow
+                                usePortalCountryPicker
+                                phoneCountryKey={phoneCountryKey}
+                                nationalDigits={phoneNational}
+                                onPhoneCountryKeyChange={setPhoneCountryKey}
+                                onNationalDigitsChange={setPhoneNational}
+                                disabled={otpVerified.email || !!initialData.verified}
+                                maxNationalDigits={15}
+                                placeholderNational="3001234567"
+                                selectClassName="cer-input min-w-[6.5rem]"
+                                inputClassName="cer-input"
+                                rowClassName="items-stretch gap-2"
+                            />
+                            <p className="cer-hint">Country code + mobile number, e.g. +92 · 3001234567.</p>
                         </div>
 
-                        {/* OTP Flow for Mobile/Email */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Mobile */}
-                            <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                    <Smartphone className="w-3.5 h-3.5" /> Mobile Contact
-                                </Label>
-                                <div className="space-y-3">
-                                    <PhoneConnectivityRow
-                                        usePortalCountryPicker
-                                        phoneCountryKey={phoneCountryKey}
-                                        nationalDigits={phoneNational}
-                                        onPhoneCountryKeyChange={setPhoneCountryKey}
-                                        onNationalDigitsChange={setPhoneNational}
-                                        disabled={otpVerified.email || !!initialData.verified}
-                                        maxNationalDigits={15}
-                                        placeholderNational="3001234567"
-                                        selectClassName="h-11 min-w-[7.5rem] rounded-xl border-slate-100 font-bold text-xs shadow-none focus-visible:border-report-primary focus-visible:ring-2 focus-visible:ring-report-primary/20"
-                                        inputClassName="h-11 rounded-xl border-slate-100 font-bold shadow-none focus:border-report-primary focus:ring-2 focus:ring-report-primary/20"
-                                        rowClassName="items-stretch gap-2"
-                                    />
-                                    <p className="text-[10px] text-slate-400 font-medium">Country code + mobile number, e.g. +92 · 3001234567.</p>
-                                </div>
+                        {/* Email */}
+                        <div>
+                            <label className="cer-field-label flex items-center gap-1.5">
+                                <MessageSquare className="w-3 h-3" /> Email verification
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="email"
+                                    placeholder="student@uni.edu"
+                                    value={formData.email}
+                                    disabled={otpSent.email || otpVerified.email || !!initialData.verified}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="cer-input pr-[5.5rem]"
+                                />
+                                {!otpSent.email && (
+                                    <button
+                                        onClick={() => sendOtp('email')}
+                                        disabled={isVerifyingOtp.email || !formData.email}
+                                        className="cer-aibtn absolute right-1.5 top-1.5 !mt-0 !py-1 !px-2.5 text-[9px] disabled:opacity-50"
+                                    >
+                                        {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : '📩 Send OTP'}
+                                    </button>
+                                )}
+                                {otpSent.email && !otpVerified.email && (
+                                    <button
+                                        onClick={handleChangeEmail}
+                                        className="absolute right-2 top-1.5 h-8 px-2 text-[9px] font-black uppercase tracking-wider text-[var(--muted)] hover:text-[var(--ink)]"
+                                    >
+                                        Change
+                                    </button>
+                                )}
                             </div>
 
-                            {/* Email */}
-                            <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                    <MessageSquare className="w-3.5 h-3.5" /> Email Verification
-                                </Label>
-                                <div className="space-y-3">
-                                    <div className="relative">
-                                        <Input
-                                            type="email"
-                                            placeholder="student@uni.edu"
-                                            value={formData.email}
-                                            disabled={otpSent.email || otpVerified.email || !!initialData.verified}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
+                            {otpSent.email && !otpVerified.email && (
+                                <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex gap-2">
+                                        <input
+                                            placeholder="6-digit"
+                                            maxLength={6}
+                                            value={otpInputs.email}
+                                            onChange={(e) => setOtpInputs({ ...otpInputs, email: e.target.value })}
+                                            className="cer-input text-center tracking-[0.4em]"
                                         />
-                                        {!otpSent.email && (
-                                            <button
-                                                onClick={() => sendOtp('email')}
-                                                disabled={isVerifyingOtp.email || !formData.email}
-                                                className="absolute right-2 top-1.5 h-8 px-3 bg-report-primary text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200 transition-all hover:bg-report-primary-border"
-                                            >
-                                                {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : '📩 Send OTP'}
-                                            </button>
-                                        )}
-                                        {otpSent.email && !otpVerified.email && (
-                                            <button
-                                                onClick={handleChangeEmail}
-                                                className="absolute right-2 top-1.5 h-8 px-3 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-slate-200 transition-all"
-                                            >
-                                                Change
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => verifyOtp('email')}
+                                            disabled={isVerifyingOtp.email || otpInputs.email.length !== 6}
+                                            className="cer-aibtn !mt-0 whitespace-nowrap disabled:opacity-50"
+                                        >
+                                            {isVerifyingOtp.email ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
+                                        </button>
                                     </div>
+                                    <button
+                                        onClick={() => sendOtp('email')}
+                                        disabled={isVerifyingOtp.email}
+                                        className="text-[10px] font-black text-[var(--teal)] uppercase tracking-widest hover:underline disabled:text-[var(--muted)]"
+                                    >
+                                        {isVerifyingOtp.email ? 'Sending...' : 'Resend OTP'}
+                                    </button>
+                                </div>
+                            )}
 
-                                    {otpSent.email && !otpVerified.email && (
-                                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="6-digit"
-                                                    maxLength={6}
-                                                    value={otpInputs.email}
-                                                    onChange={(e) => setOtpInputs({ ...otpInputs, email: e.target.value })}
-                                                    className="h-11 bg-white border-slate-200 rounded-xl text-center font-bold tracking-[0.4em]"
-                                                />
-                                                <Button
-                                                    onClick={() => verifyOtp('email')}
-                                                    disabled={isVerifyingOtp.email || otpInputs.email.length !== 6}
-                                                    className="bg-slate-900 text-white rounded-xl h-11 px-6 font-bold"
-                                                >
-                                                    {isVerifyingOtp.email ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
-                                                </Button>
-                                            </div>
-                                            <div className="flex justify-between items-center px-1">
-                                                <button
-                                                    onClick={() => sendOtp('email')}
-                                                    disabled={isVerifyingOtp.email}
-                                                    className="text-[10px] font-black text-report-primary uppercase tracking-widest hover:underline disabled:text-slate-400"
-                                                >
-                                                    {isVerifyingOtp.email ? 'Sending...' : 'Resend OTP'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                            {otpVerified.email && (
+                                <div className="cer-note !mb-0 mt-2 items-center">
+                                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Academy mail linked
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                                    {otpVerified.email && (
-                                        <div className="flex items-center gap-2 text-report-primary font-black text-[10px] uppercase tracking-widest bg-report-primary-soft p-2 rounded-xl">
-                                            <CheckCircle2 className="w-3.5 h-3.5" /> Academy Mail Linked
+                    <button
+                        disabled={!isPersonalValid}
+                        onClick={() => setActiveTab('academic')}
+                        className="cer-aibtn w-full !mt-4 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Confirm info &amp; proceed to academic <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-1">
+                    <div className="relative" ref={dropdownRef}>
+                        <label className="cer-field-label">University / institution</label>
+                        <div className="relative">
+                            <School className="absolute left-3 top-[10px] w-3.5 h-3.5 text-[var(--muted)] z-10" />
+                            <input
+                                placeholder="Search and select your university..."
+                                value={formData.universityName}
+                                onFocus={() => setShowUniDropdown(true)}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, universityName: e.target.value });
+                                    setShowUniDropdown(true);
+                                }}
+                                className="cer-input pl-8"
+                            />
+                            {showUniDropdown && (
+                                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-xl border border-[var(--line)] z-[100] max-h-[260px] overflow-y-auto p-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    {pakistaniUniversities
+                                        .filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase()))
+                                        .map((uni, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    setFormData({ ...formData, universityName: uni });
+                                                    setShowUniDropdown(false);
+                                                }}
+                                                className="w-full text-left px-2.5 py-2 hover:bg-[var(--teal-soft)] rounded-lg transition-colors flex items-center gap-2 text-xs font-bold text-[var(--ink)]"
+                                            >
+                                                <School className="w-3 h-3 text-[var(--teal)]" />
+                                                {uni}
+                                            </button>
+                                        ))}
+                                    {pakistaniUniversities.filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase())).length === 0 && (
+                                        <div className="p-3 text-center text-[11px] text-[var(--muted)] font-bold">
+                                            No university found within Pakistan list.
                                         </div>
                                     )}
                                 </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="cer-g2">
+                        <div>
+                            <label className="cer-field-label">Student ID / CNIC link</label>
+                            <input
+                                placeholder="FA21-BCS-056"
+                                value={formData.universityId}
+                                onChange={(e) => setFormData({ ...formData, universityId: e.target.value })}
+                                className="cer-input"
+                            />
+                        </div>
+                        <div>
+                            <label className="cer-field-label">Degree program</label>
+                            <input
+                                placeholder="BS Computer Science"
+                                value={formData.academicProgram}
+                                onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
+                                className="cer-input"
+                            />
+                        </div>
+                    </div>
+
+                    {showSemester && (
+                        <div className="cer-g2">
+                            <div>
+                                <label className="cer-field-label">Semester</label>
+                                <select
+                                    value={formData.semester}
+                                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                                    className="cer-input"
+                                >
+                                    <option value="">Select semester…</option>
+                                    {SEMESTER_OPTIONS.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
+                    )}
 
-                        <Button
-                            disabled={!isPersonalValid}
-                            onClick={() => setActiveTab('academic')}
-                            className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-slate-200"
+                    {!showSemester && (
+                        <div className="cer-g2">
+                            <div>
+                                <label className="cer-field-label">Year of study</label>
+                                <select
+                                    value={formData.yearOfStudy}
+                                    onChange={(e) => setFormData({ ...formData, yearOfStudy: e.target.value })}
+                                    className="cer-input"
+                                >
+                                    {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduate', 'Postgraduate'].map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="cer-field-label">Academic integration type</label>
+                                <select
+                                    value={formData.academicIntegrationType}
+                                    onChange={(e) => setFormData({ ...formData, academicIntegrationType: e.target.value })}
+                                    className="cer-input"
+                                >
+                                    {['Voluntary', 'Course-Linked', 'Credit-Bearing', 'Capstone / Thesis', 'Research-Integrated'].map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 !mt-4">
+                        <button
+                            onClick={() => setActiveTab('personal')}
+                            className="cer-ghost"
                         >
-                            Confirm Info & Proceed to Academic <ChevronRight className="w-4 h-4 ml-2" />
-                        </Button>
+                            Back
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={isSubmitting || !isAcademicValid || !isPersonalValid}
+                            className="cer-bigbtn flex-1 !mt-0 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify identity & link record"}
+                        </button>
                     </div>
-                ) : (
-                    <div className="space-y-8 animate-in fade-in duration-500">
-                        <div className="space-y-6">
-                            <div className="space-y-2 relative" ref={dropdownRef}>
-                                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">University / Institution</Label>
-                                <div className="relative">
-                                    <School className="absolute left-4 top-4 w-4 h-4 text-slate-400 z-10" />
-                                    <Input
-                                        placeholder="Search and select your university..."
-                                        value={formData.universityName}
-                                        onFocus={() => setShowUniDropdown(true)}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, universityName: e.target.value });
-                                            setShowUniDropdown(true);
-                                        }}
-                                        className="h-12 pl-11 bg-slate-50 border-none rounded-2xl font-bold shadow-sm"
-                                    />
-                                    {showUniDropdown && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[100] max-h-[300px] overflow-y-auto p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                            {pakistaniUniversities
-                                                .filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase()))
-                                                .map((uni, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => {
-                                                            setFormData({ ...formData, universityName: uni });
-                                                            setShowUniDropdown(false);
-                                                        }}
-                                                        className="w-full text-left p-3 hover:bg-report-primary-soft rounded-xl transition-colors flex items-center gap-3 text-sm font-bold text-slate-700"
-                                                    >
-                                                        <School className="w-3.5 h-3.5 text-report-primary" />
-                                                        {uni}
-                                                    </button>
-                                                ))}
-                                            {pakistaniUniversities.filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase())).length === 0 && (
-                                                <div className="p-4 text-center text-xs text-slate-400 font-bold">
-                                                    No university found within Pakistan list.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                </div>
+            )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Student ID / CNIC Link</Label>
-                                    <Input
-                                        placeholder="FA21-BCS-056"
-                                        value={formData.universityId}
-                                        onChange={(e) => setFormData({ ...formData, universityId: e.target.value })}
-                                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Degree Program</Label>
-                                    <Input
-                                        placeholder="BS Computer Science"
-                                        value={formData.academicProgram}
-                                        onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
-                                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Year of Study</Label>
-                                    <select
-                                        value={formData.yearOfStudy}
-                                        onChange={(e) => setFormData({ ...formData, yearOfStudy: e.target.value })}
-                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-report-primary outline-none appearance-none"
-                                    >
-                                        {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduate', 'Postgraduate'].map(y => (
-                                            <option key={y} value={y}>{y}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Academic Integration Type</Label>
-                                    <select
-                                        value={formData.academicIntegrationType}
-                                        onChange={(e) => setFormData({ ...formData, academicIntegrationType: e.target.value })}
-                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-report-primary outline-none appearance-none"
-                                    >
-                                        {['Voluntary', 'Course-Linked', 'Credit-Bearing', 'Capstone / Thesis', 'Research-Integrated'].map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                        </div>
-
-
-                        <div className="flex gap-4">
-                            <Button
-                                onClick={() => setActiveTab('personal')}
-                                variant="outline"
-                                className="h-14 border-slate-200 rounded-2xl font-bold px-8"
-                            >
-                                Back
-                            </Button>
-                            <Button
-                                onClick={handleSubmit}
-                                disabled={isSubmitting || !isAcademicValid || !isPersonalValid}
-                                className="flex-1 h-14 bg-report-primary hover:bg-report-primary-border text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-report-primary-shadow"
-                            >
-                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Verify Identity & Link Record"}
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="p-6 bg-report-primary-soft rounded-3xl border border-report-primary-border flex items-start gap-4">
-                <AlertCircle className="w-5 h-5 text-report-primary mt-1 shrink-0" />
-                <p className="text-xs text-report-primary font-medium leading-relaxed">
+            <div className="cer-note !mt-4">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <p>
                     Identity verification is a <strong>hard gateway</strong>. Your academic record will be locked and traceable for institutional HEC compliance once verified.
                 </p>
             </div>
