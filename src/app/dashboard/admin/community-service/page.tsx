@@ -13,17 +13,24 @@ import {
     type CommunityAwardCard,
     type CommunityPipelineRow,
 } from "@/utils/communityAwardModel";
-import { isAdminCommunityLiveCard, isAdminCommunityWaiting } from "@/utils/reviewQueue";
+import { isAdminCommunityLiveCard, isAdminCommunityWaiting, isCommunityReportFacultyApproved } from "@/utils/reviewQueue";
 
 type View = "home" | "pending" | "approved" | "run" | "analytics" | "hec";
 
+/** Every row here already failed isAdminCommunityLiveCard (still in `inPipe`), so none of
+ * these are actually "Approved" yet from the admin's own perspective — the one real distinction
+ * worth surfacing is whether Faculty has already cleared it (this admin's own action is now
+ * the only thing outstanding) versus it still being earlier in the pipeline. Do not call this
+ * "Approved →" — a faculty-approved-but-admin-pending row still belongs on THIS board. */
 function pipelineCta(r: CommunityPipelineRow) {
     const st = String(r.status || "").toLowerCase();
-    const fac = String(r.faculty_status || "").toLowerCase();
     if (st === "draft") return "Draft →";
-    if (fac === "approved") return "Approved →";
-    if (st === "submitted" || st.includes("pending")) return "Open report →";
+    if (isCommunityReportFacultyApproved(r)) return "Review & approve →";
     return "Open report →";
+}
+
+function pipelineTone(r: CommunityPipelineRow): "waiting" | "ready" {
+    return isCommunityReportFacultyApproved(r) ? "ready" : "waiting";
 }
 
 export default function AdminCommunityServicePage() {
@@ -72,7 +79,15 @@ export default function AdminCommunityServicePage() {
     }, []);
 
     const liveRows = useMemo(() => pipeline.filter((r) => isAdminCommunityLiveCard(r)), [pipeline]);
-    const inPipe = useMemo(() => pipeline.filter((r) => isAdminCommunityWaiting(r)), [pipeline]);
+    // Faculty-approved-and-ready-for-admin rows surface first — those are the only ones this
+    // board can actually act on today; earlier-pipeline rows are still waiting on someone else.
+    const inPipe = useMemo(
+        () =>
+            pipeline
+                .filter((r) => isAdminCommunityWaiting(r))
+                .sort((a, b) => Number(isCommunityReportFacultyApproved(b)) - Number(isCommunityReportFacultyApproved(a))),
+        [pipeline],
+    );
     const deckCards = useMemo(
         () => mergeCommunityLiveDeck(cards, liveRows, isAdminCommunityLiveCard),
         [cards, liveRows],
@@ -176,8 +191,8 @@ export default function AdminCommunityServicePage() {
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900">National status board</h2>
                     <p className="mt-1 text-sm text-slate-500">
-                        Draft → submitted → partner/admin → faculty. Open the existing report to act — this board does not
-                        change that flow.
+                        Draft → submitted → faculty → partner/admin. Rows marked “Faculty approved · ready for you” only
+                        need your sign-off — open the existing report to act, this board does not change that flow.
                     </p>
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-500">Loading…</p>
@@ -196,6 +211,7 @@ export default function AdminCommunityServicePage() {
                                     org={r.organization_name}
                                     hours={r.hours}
                                     cta={pipelineCta(r)}
+                                    tone={pipelineTone(r)}
                                 />
                             ))}
                         </div>
