@@ -8,6 +8,7 @@ import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
+import { resolveCiiLevelBadge } from "@/utils/ciiLevelBadge";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
@@ -22,11 +23,20 @@ type WallRow = {
     organization_name?: string;
     university?: string;
     faculty_status?: string;
+    partner_status?: string;
+    /** Backend's isReportPartnerStepSatisfied result — true for both an explicit partner
+     * approval AND opportunities that never required one ('not_applicable'/'not_required'). */
+    partner_verified?: boolean;
     status?: string;
     awardBadges?: CommunityAwardBadge[];
     cii_score?: number | null;
     level?: CommunityServiceLevel;
     section1?: { metrics?: { total_verified_hours?: number } };
+    section4?: { project_summary?: { distinct_total_beneficiaries?: number | null } };
+    section9?: {
+        competency_scores?: { cognitive?: number; practical?: number; social?: number; transformative?: number } | null;
+    };
+    required_hours?: number | null;
     sdgs?: unknown;
     story?: string;
     executive_summary?: string;
@@ -48,6 +58,7 @@ type WallRow = {
             good?: string;
             limit?: string;
         }>;
+        evidence?: Array<{ id: string; type: string; claim: string; verdict: "MATCH" | "PARTIAL" | "MISMATCH" }>;
         bonus?: { effort: number; resources: number; partners: number; total: number };
         integrityPenalty?: number;
         studentFeedback?: {
@@ -124,6 +135,20 @@ type FlashState = {
         redFlags?: Array<{ flag: string; severity?: string }>;
         lockedAt?: string;
         facultyNote?: string;
+        evidence?: Array<{ id: string; type: string; claim: string; verdict: "MATCH" | "PARTIAL" | "MISMATCH" }>;
+    } | null;
+    // Verified impact flashcard: badge, checklist, metrics, path and skills built from the
+    // faculty-locked CII v2 record above — only present when aiAnalysis is present.
+    flashcard?: {
+        badgeSrc: string;
+        badgeAlt: string;
+        badgeTitle: string;
+        checklist: Array<{ label: string; ok: boolean }>;
+        metrics: Array<{ label: string; value: string }>;
+        oneLiner?: string;
+        path: Array<{ label: string; text: string }>;
+        quality: { strongest: string[]; limitations: string[]; nextStep?: string };
+        skills: Array<{ label: string; value: number }>;
     } | null;
     // Phase 4: Independent AI analyses (do not overwrite faculty-approved)
     independentAnalyses?: Array<{
@@ -188,6 +213,119 @@ function openOrToast(url: string | null | undefined, empty: string) {
     toast.message(empty);
 }
 
+type CiiSection = NonNullable<NonNullable<WallRow["ciiV2"]>["sections"]>[number];
+type CompetencyScores = NonNullable<NonNullable<WallRow["section9"]>["competency_scores"]>;
+
+function findSection(sections: CiiSection[] | undefined, id: number): CiiSection | undefined {
+    return sections?.find((s) => s.id === id);
+}
+
+/** Self-rated reflection competencies (Section 9 of the report) — the closest real equivalent
+ * to a "skill capability" chart; not fabricated scores, just relabeled from CIEL's own framework. */
+function competencySkills(scores: CompetencyScores | null | undefined): Array<{ label: string; value: number }> {
+    if (!scores) return [];
+    const items: Array<[string, number | undefined]> = [
+        ["Cognitive", scores.cognitive],
+        ["Practical", scores.practical],
+        ["Social & Civic", scores.social],
+        ["Transformative", scores.transformative],
+    ];
+    return items
+        .filter((pair): pair is [string, number] => typeof pair[1] === "number" && pair[1] > 0)
+        .map(([label, value]) => ({ label, value }));
+}
+
+/** Builds the richer "verified impact flashcard" visuals (badge, checklist, metric rail, path,
+ * quality judgement, skills) entirely from the faculty-locked CII v2 record — no new/fabricated
+ * data, just a presentational layer on top of what CommunityCiiAnalyser already approved. */
+function buildFlashcardExtras(
+    r: WallRow,
+    cii: NonNullable<WallRow["ciiV2"]>,
+    hours: number,
+    facultyScore: number | null,
+): NonNullable<FlashState["flashcard"]> {
+    const sections = cii.sections || [];
+    const badge = resolveCiiLevelBadge(facultyScore ?? cii.final ?? 0);
+    const evidenceCount = cii.evidence?.length ?? 0;
+    const reach = r.section4?.project_summary?.distinct_total_beneficiaries;
+    const sdgCount = sdgNumbers(r.sdgs).length;
+
+    const checklist = [
+        { label: "Faculty approved", ok: r.faculty_status === "approved" },
+        { label: "Partner verified", ok: r.partner_verified ?? r.partner_status === "approved" },
+        { label: "Hours compliant", ok: r.required_hours ? hours >= r.required_hours : hours > 0 },
+        { label: "Evidence triangulated", ok: evidenceCount > 0 },
+        { label: "CIEL PK verified", ok: true },
+        { label: "Privacy protected", ok: true },
+    ];
+
+    const metrics: Array<{ label: string; value: string }> = [
+        { label: "Verified hours", value: hours ? `${Math.round(hours)}h` : "—" },
+    ];
+    if (r.required_hours) metrics.push({ label: "Required minimum", value: `${Math.round(r.required_hours)}h` });
+    if (typeof reach === "number" && reach > 0) metrics.push({ label: "People reached", value: String(reach) });
+    metrics.push({ label: "Evidence items", value: String(evidenceCount) });
+    if (sdgCount) metrics.push({ label: "SDGs linked", value: String(sdgCount) });
+
+    const path = [
+        {
+            label: "Need",
+            text: findSection(sections, 2)?.good || "Community need documented in the baseline.",
+        },
+        {
+            label: "Student Action & Result",
+            text: findSection(sections, 4)?.good || "Verified activities and outputs delivered in the field.",
+        },
+        {
+            label: "Continuity",
+            text: findSection(sections, 9)?.good || "Handover and continuation reviewed by faculty.",
+        },
+    ];
+
+    const ranked = [...sections].sort((a, b) => b.score / (b.weight || 1) - a.score / (a.weight || 1));
+    const strongest = ranked
+        .filter((s) => s.good)
+        .slice(0, 3)
+        .map((s) => s.good as string);
+    const limitations = ranked
+        .filter((s) => s.limit)
+        .slice(-3)
+        .map((s) => s.limit as string);
+    const nextStep = cii.studentFeedback?.five_specific_actions?.[0] || cii.redFlags?.[0]?.flag;
+
+    return {
+        badgeSrc: badge.src,
+        badgeAlt: badge.alt,
+        badgeTitle: badge.title,
+        checklist,
+        metrics,
+        oneLiner: cii.studentFeedback?.opening_praise || r.story,
+        path,
+        quality: { strongest, limitations, nextStep },
+        skills: competencySkills(r.section9?.competency_scores),
+    };
+}
+
+function confidenceLabel(score: number, weight: number): string {
+    if (!weight) return "—";
+    const ratio = score / weight;
+    if (ratio >= 0.85) return "High";
+    if (ratio >= 0.65) return "Med-High";
+    if (ratio >= 0.45) return "Developing";
+    return "Needs work";
+}
+
+function evidenceIcon(type: string): string {
+    const t = type.toLowerCase();
+    if (t.includes("attend") || t.includes("session") || t.includes("ledger")) return "📋";
+    if (t.includes("before") || t.includes("baseline")) return "📷";
+    if (t.includes("after") || t.includes("complet") || t.includes("output")) return "🏫";
+    if (t.includes("receipt") || t.includes("resource")) return "🧾";
+    if (t.includes("partner")) return "🤝";
+    if (t.includes("outcome") || t.includes("attendance sheet")) return "📊";
+    return "📄";
+}
+
 /**
  * Phase 3: Two-Column Modal — Flash Card | AI Analysis & Score
  * 
@@ -210,6 +348,8 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
 
     const ai = flash.aiAnalysis;
     const hasTwoColumns = Boolean(ai);
+    const fc = flash.flashcard;
+    const [evidenceOpen, setEvidenceOpen] = useState<{ type: string; claim: string; verdict: string } | null>(null);
 
     return (
         <div
@@ -407,6 +547,178 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                     )}
                 </div>
 
+                {/* Verified Impact Flashcard: badge, checklist, metric rail, path, section grid,
+                    quality judgement, skills and evidence gallery — all built from the same
+                    faculty-locked CII v2 record shown in the AI Analysis column above. */}
+                {fc && ai && (
+                    <div className="border-t border-[#dde5ea] px-5 py-5 sm:px-[26px]">
+                        <div className="flex flex-col items-center gap-3 rounded-[18px] bg-[linear-gradient(125deg,#052c37,#0b4850,#0d7c72)] p-5 text-center text-white sm:flex-row sm:text-left">
+                            <img src={fc.badgeSrc} alt={fc.badgeAlt} className="h-20 w-20 rounded-full bg-white object-contain shadow-[0_10px_24px_rgba(0,0,0,.2)]" />
+                            <div>
+                                <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#b8f2e8]">Verified Impact Badge</span>
+                                <div className="mt-1 text-lg font-semibold">{fc.badgeTitle}</div>
+                                {fc.oneLiner && <p className="mt-1.5 max-w-xl text-[11px] italic leading-relaxed text-[#d8f1ee]">“{fc.oneLiner}”</p>}
+                            </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+                            {fc.checklist.map((c) => (
+                                <div
+                                    key={c.label}
+                                    className={`rounded-[11px] border px-2.5 py-2 text-center text-[9px] font-black ${c.ok ? "border-[#cce9df] bg-[#eaf8f4] text-[#1a6c5d]" : "border-[#e5dccb] bg-[#faf6ec] text-[#8a6414]"}`}
+                                >
+                                    {c.ok ? "✓" : "•"} {c.label}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+                            {fc.metrics.map((m) => (
+                                <div key={m.label} className="rounded-[11px] border border-[#dde5ea] bg-[#fbfcfe] p-2.5 text-center">
+                                    <strong className="block text-base text-[#16313d]">{m.value}</strong>
+                                    <span className="mt-0.5 block text-[7.8px] font-black uppercase tracking-wide text-[#70808a]">{m.label}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Need → Action → Continuity</h4>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            {fc.path.map((p, i) => (
+                                <div key={p.label} className="relative rounded-[14px] border border-[#dde5ea] bg-[#fbfdfd] p-3">
+                                    <span className="mb-1.5 inline-grid h-5 w-5 place-items-center rounded-[7px] bg-[#082f3a] text-[9px] font-black text-white">{i + 1}</span>
+                                    <b className="block text-[9px] font-black uppercase tracking-wide text-[#16313d]">{p.label}</b>
+                                    <p className="mt-1 text-[10px] leading-relaxed text-[#5f737b]">{p.text}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {ai.sections.length > 0 && (
+                            <>
+                                <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Section-by-section summary</h4>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {ai.sections.map((s) => (
+                                        <div key={s.id} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <b className="text-[10.5px] leading-tight text-[#16313d]">{s.id}. {s.title}</b>
+                                                <span className="whitespace-nowrap rounded-full border border-[#efdfb6] bg-[#fff9e9] px-1.5 py-0.5 text-[8.5px] font-black text-[#875f16]">{s.score}/{s.weight}</span>
+                                            </div>
+                                            {s.good && (
+                                                <div className="mt-1.5 rounded-r-lg border-l-[3px] border-[#18aa9c] bg-[#f3fbf9] px-2 py-1 text-[8.6px] leading-relaxed text-[#315a57]">
+                                                    <b>Verified highlight:</b> {s.good}
+                                                </div>
+                                            )}
+                                            <div className="mt-1.5 text-[8px] font-black text-[#70808a]">
+                                                <span className="rounded-full bg-[#edf9f5] px-1.5 py-0.5 text-[#287565]">{confidenceLabel(s.score, s.weight)} confidence</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {(fc.quality.strongest.length > 0 || fc.quality.limitations.length > 0 || fc.quality.nextStep) && (
+                            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                {fc.quality.strongest.length > 0 && (
+                                    <div className="rounded-[15px] border border-[#cce9df] bg-[#eaf8f4] p-3">
+                                        <b className="text-[10px] text-[#16694f]">✓ Strongest signals</b>
+                                        <ul className="mt-1.5 list-inside list-disc space-y-1 text-[9px] leading-relaxed text-[#2d6654]">
+                                            {fc.quality.strongest.map((g, i) => <li key={i}>{g}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                                {fc.quality.nextStep && (
+                                    <div className="rounded-[15px] border border-[#efdfb6] bg-[#fff9e9] p-3">
+                                        <b className="text-[10px] text-[#875f16]">⚠ Critical next step</b>
+                                        <p className="mt-1.5 text-[9px] leading-relaxed text-[#6b5b3f]">{fc.quality.nextStep}</p>
+                                    </div>
+                                )}
+                                {fc.quality.limitations.length > 0 && (
+                                    <div className="rounded-[15px] border border-[#e0daf0] bg-[#f5f1fb] p-3">
+                                        <b className="text-[10px] text-[#5b3f8f]">◌ Limitations</b>
+                                        <ul className="mt-1.5 list-inside list-disc space-y-1 text-[9px] leading-relaxed text-[#5d5775]">
+                                            {fc.quality.limitations.map((l, i) => <li key={i}>{l}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {fc.skills.length > 0 && (
+                            <>
+                                <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Reflection competency profile</h4>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {fc.skills.map((s) => (
+                                        <div key={s.label} className="rounded-[13px] border border-[#dde5ea] bg-[#fbfdfd] p-2.5">
+                                            <div className="flex items-center justify-between text-[9px] font-black text-[#16313d]">
+                                                <span>{s.label}</span>
+                                                <span>{s.value.toFixed(1)}/5</span>
+                                            </div>
+                                            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e8efef]">
+                                                <div className="h-full rounded-full bg-[linear-gradient(90deg,#0b8278,#3bc3b5)]" style={{ width: `${Math.min(100, (s.value / 5) * 100)}%` }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {ai.evidence && ai.evidence.length > 0 && (
+                            <>
+                                <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Evidence gallery</h4>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                    {ai.evidence.map((e) => (
+                                        <button
+                                            key={e.id}
+                                            type="button"
+                                            onClick={() => setEvidenceOpen(e)}
+                                            className="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-[14px] border border-[#dde5ea] bg-[linear-gradient(145deg,#f4fbfa,#f7f9fc)] p-2.5 text-center hover:border-[#b7d9d4]"
+                                        >
+                                            <span className="text-xl">{evidenceIcon(e.type)}</span>
+                                            <b className="text-[8px] leading-tight text-[#16313d]">{e.type}</b>
+                                            <span
+                                                className={`rounded-full px-1.5 py-0.5 text-[6.5px] font-black ${
+                                                    e.verdict === "MATCH"
+                                                        ? "bg-[#e7f7ef] text-[#176b5e]"
+                                                        : e.verdict === "PARTIAL"
+                                                          ? "bg-[#fff3dc] text-[#886210]"
+                                                          : "bg-[#fff0f2] text-[#a34758]"
+                                                }`}
+                                            >
+                                                {e.verdict === "MATCH" ? "Verified" : e.verdict === "PARTIAL" ? "Partial" : "Needs review"}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {evidenceOpen && (
+                    <div
+                        className="fixed inset-0 z-[1000] flex items-center justify-center bg-[rgba(7,28,35,.58)] p-4"
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) setEvidenceOpen(null);
+                        }}
+                        role="presentation"
+                    >
+                        <div role="dialog" aria-modal="true" className="w-[min(420px,94vw)] rounded-[18px] bg-white p-5">
+                            <div className="mb-2.5 grid h-[70px] place-items-center rounded-[14px] bg-[linear-gradient(145deg,#e2f4ef,#eff3fa)] text-[38px]">
+                                {evidenceIcon(evidenceOpen.type)}
+                            </div>
+                            <h3 className="m-0 text-sm font-semibold text-[#16313d]">{evidenceOpen.type}</h3>
+                            <p className="mt-1.5 text-[11px] leading-relaxed text-[#70808a]">{evidenceOpen.claim}</p>
+                            <button
+                                type="button"
+                                onClick={() => setEvidenceOpen(null)}
+                                className="mt-4 rounded-[9px] bg-[#174b43] px-3 py-1.5 text-[10px] font-black text-white"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Phase 4: Independent AI Analyses Section */}
                 {flash.independentAnalyses && flash.independentAnalyses.length > 0 && (
                     <div className="border-t border-[#dde5ea] bg-[#fefcf8] px-5 py-4 sm:px-[26px]">
@@ -498,10 +810,11 @@ export default function CommunityImpactWall(_props: {
         // Phase 3: Build AI Analysis data from ciiV2 + ciiV2Lock
         const cii = r.ciiV2;
         const lock = r.ciiV2Lock;
+        const facultyScore = cii ? (lock?.facultyApprovedScore ?? cii.facultyApprovedScore ?? cii.final ?? null) : null;
         const aiAnalysis = cii
             ? {
                   aiScore: lock?.aiRecommendedScore ?? cii.aiRecommendedScore ?? cii.final ?? null,
-                  facultyScore: lock?.facultyApprovedScore ?? cii.facultyApprovedScore ?? cii.final ?? null,
+                  facultyScore,
                   scoreWasAdjusted: lock?.scoreWasAdjusted ?? false,
                   scoreAdjustmentReason: lock?.scoreAdjustmentReason,
                   levelName: cii.level?.name || r.level || "Approved",
@@ -520,8 +833,11 @@ export default function CommunityImpactWall(_props: {
                   redFlags: cii.redFlags,
                   lockedAt: lock?.lockedAt,
                   facultyNote: lock?.facultyNote,
+                  evidence: cii.evidence || [],
               }
             : null;
+
+        const flashcard = cii ? buildFlashcardExtras(r, cii, hours, facultyScore) : null;
 
         // Phase 4: Build independent analyses list
         const independentAnalyses = (r.independentAiAnalyses || []).map((a) => ({
@@ -553,6 +869,7 @@ export default function CommunityImpactWall(_props: {
             certificate: r.actions?.certificate_url,
             qr: r.impact_verify_url,
             aiAnalysis,
+            flashcard,
             independentAnalyses,
             reportId: r.id,
         });

@@ -51,6 +51,11 @@ export interface ReportData {
         breakdown?: Record<string, number>;
         suggestions?: string[];
     };
+    /** Community Service's dedicated CII v2 score (see ciel_backend cii-v2.constants.ts) — only
+     * present once faculty has locked it; takes priority over the legacy `calculateCII` used by
+     * other path types (FYP/Coursework/Venture), which never populate this field. */
+    ciiV2?: { final?: number } | null;
+    ciiV2Lock?: { locked?: boolean } | null;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';

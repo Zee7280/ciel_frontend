@@ -206,6 +206,12 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     }, [data, section1, verifiedHours, engagementSpanDays, engagementRecalc]);
 
     const ciiScore = useMemo(() => {
+        // Community Service reports carry a faculty-locked CII v2 score, which is stricter and
+        // more current than the generic v1 formula below — prefer it whenever it's present so the
+        // certificate can never show a different score than the record faculty actually approved.
+        if (data.ciiV2Lock?.locked && typeof data.ciiV2?.final === "number") {
+            return Math.min(100, Math.max(0, Math.round(data.ciiV2.final)));
+        }
         const persisted = readPersistedCiiSnapshot(data);
         if (persisted) {
             return Math.min(100, Math.max(0, Math.round(persisted.totalScore)));

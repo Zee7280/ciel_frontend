@@ -14,6 +14,11 @@ type VerifyJson = {
     verified?: boolean;
     project_title?: string;
     verified_at?: string;
+    record_id?: string;
+    university?: string | null;
+    partner_name?: string | null;
+    cii_score?: number | null;
+    level?: { level?: number; name?: string } | null;
     status?: string;
     report_status?: string;
     verification_status?: string;
@@ -163,6 +168,43 @@ export default function ImpactReportVerificationClient({ verificationKey }: Prop
                                     timeStyle: "short",
                                 })}
                             </p>
+                        ) : null}
+                        {body?.record_id || body?.university || body?.partner_name || body?.cii_score != null ? (
+                            <div className="grid grid-cols-2 gap-2 pt-1 text-left">
+                                {body?.record_id ? (
+                                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Record ID</p>
+                                        <p className="truncate text-xs font-semibold text-slate-700">{body.record_id}</p>
+                                    </div>
+                                ) : null}
+                                {body?.cii_score != null ? (
+                                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Impact Score</p>
+                                        <p className="text-xs font-semibold text-slate-700">{body.cii_score} / 100</p>
+                                    </div>
+                                ) : null}
+                                {body?.level?.name ? (
+                                    <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Badge</p>
+                                        <p className="text-xs font-semibold text-slate-700">
+                                            {body.level.level ? `Level ${body.level.level} · ` : ""}
+                                            {body.level.name}
+                                        </p>
+                                    </div>
+                                ) : null}
+                                {body?.university ? (
+                                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">University</p>
+                                        <p className="truncate text-xs font-semibold text-slate-700">{body.university}</p>
+                                    </div>
+                                ) : null}
+                                {body?.partner_name ? (
+                                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Partner</p>
+                                        <p className="truncate text-xs font-semibold text-slate-700">{body.partner_name}</p>
+                                    </div>
+                                ) : null}
+                            </div>
                         ) : null}
                         <div className="flex items-center justify-center gap-2 pt-2 text-xs font-semibold text-emerald-800">
                             <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden />
