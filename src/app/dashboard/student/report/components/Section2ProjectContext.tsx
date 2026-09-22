@@ -1,15 +1,14 @@
 "use client";
 import React, { useMemo, useState, useLayoutEffect, useRef } from "react";
-import { generateAISummary } from "../utils/aiSummarizer";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Building, AlertCircle, CheckCircle2, MapPin, Calendar, Users } from "lucide-react";
+import { Building, AlertCircle, CheckCircle2, MapPin, Calendar, Users } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
-import { REPORT_TEXT_MIN_WORDS, FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
+import { FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
 
 const PROBLEM_WORD_RANGE = FIELD_WORD_POLICY.problem_statement;
 const DISCIPLINE_WORD_RANGE = FIELD_WORD_POLICY.discipline_contribution;
@@ -137,7 +136,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
     const sectionData = data.section2;
 
-    const [isGenerating, setIsGenerating] = useState(false);
     const legacyOtherMigrated = useRef(false);
     /** Tracks the last summary WE composed, so a student's hand-edit is never silently overwritten. */
     const lastAutoSummaryRef = useRef<string>("");
@@ -156,46 +154,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             baseline_evidence_other: s.legacyOther,
         });
     }, [sectionData.baseline_evidence, sectionData.baseline_evidence_other, updateSection]);
-
-    const handleGenerateAISummary = async () => {
-        const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
-        if (words < REPORT_TEXT_MIN_WORDS) {
-            toast.error(`Please provide at least ${REPORT_TEXT_MIN_WORDS} words in Question 1 first.`);
-            return;
-        }
-        if (!sectionData.discipline) {
-            toast.error("Please select an academic discipline first.");
-            return;
-        }
-
-        setIsGenerating(true);
-        const evidenceSource =
-            sectionData.baseline_evidence?.length > 0
-                ? formatBaselineEvidenceForDisplay(sectionData)
-                : "Unknown Sources";
-
-        const result = await generateAISummary("section2", {
-            ...sectionData,
-            projectTitle: title,
-            partnerOrg: partner,
-            location: locationDisplay,
-            duration: `${startDate} – ${endDate}`,
-            baseline_evidence: evidenceSource,
-        });
-        setIsGenerating(false);
-
-        if (result.error) {
-            toast.error(result.error);
-        } else if (result.summary) {
-            lastAutoSummaryRef.current = result.summary;
-            updateSection('section2', {
-                summary_text: result.summary,
-                problem_category: classifyProblem(sectionData.problem_statement),
-                primary_beneficiary: detectBeneficiary(sectionData.problem_statement)
-            });
-            toast.success("AI baseline statement generated!");
-        }
-    };
 
     // ─── Helper: Rule-based classification ───────────────────────────────────
     const classifyProblem = (text: string) => {
@@ -337,7 +295,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     // ─── Word counts ─────────────────────────────────────────────────────────
     const wordCount = (sectionData.problem_statement || "").trim().split(/\s+/).filter((w) => w).length;
     const disciplineWordCount = (sectionData.discipline_contribution || "").trim().split(/\s+/).filter((w) => w).length;
-    const summaryWordCount = (sectionData.summary_text || "").trim().split(/\s+/).filter((w) => w).length;
     const otherCount = useMemo(() => {
         const n = otherSlotCount(sectionData.baseline_evidence);
         if (n > 0) return n;
@@ -493,19 +450,16 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 </p>
             </div>
 
-            {/* ── Two-column: quick questions + live draft ──────────────── */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
-
-                {/* LEFT: quick questions */}
-                <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <div className="cer-secl">
-                            <span className="cer-secn">2.1</span>
-                            <h2>Quick questions</h2>
-                            <span className="cer-tag">Mandatory</span>
-                        </div>
-                        <p className="cer-sub">Short answers are fine — the statement builds itself on the right.</p>
+            {/* ── Quick questions ────────────────────────────────────────── */}
+            <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div>
+                    <div className="cer-secl">
+                        <span className="cer-secn">2.1</span>
+                        <h2>Quick questions</h2>
+                        <span className="cer-tag">Mandatory</span>
                     </div>
+                    <p className="cer-sub">Short answers are fine — the statement builds itself below.</p>
+                </div>
 
                     {/* Q1 */}
                     <div className="space-y-1.5">
@@ -696,71 +650,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         </div>
                         <FieldError message={getFieldError("discipline_contribution")} />
                     </div>
-                </div>
-
-                {/* RIGHT: live baseline draft */}
-                <div className="lg:sticky lg:top-4 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <div className="cer-secl">
-                            <span className="cer-secn">2.2</span>
-                            <h2>Your baseline statement ✍️</h2>
-                            <span className="cer-tag auto">Auto-drafted</span>
-                        </div>
-                        <p className="cer-sub">Builds itself as you answer on the left. Click in the box to edit directly.</p>
-                    </div>
-
-                    {(sectionData.problem_category || sectionData.primary_beneficiary || (district !== "—" || province !== "—")) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {sectionData.problem_category ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                                    {sectionData.problem_category}
-                                </span>
-                            ) : null}
-                            {sectionData.primary_beneficiary ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bfe6e2] bg-[var(--aqua-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]">
-                                    <Users className="h-3 w-3" />
-                                    {sectionData.primary_beneficiary}
-                                </span>
-                            ) : null}
-                            {(district !== "—" || province !== "—") ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                                    <MapPin className="h-3 w-3" />
-                                    {[district, province].filter((x) => x && x !== "—").join(", ")}
-                                </span>
-                            ) : null}
-                        </div>
-                    ) : null}
-
-                    <Textarea
-                        placeholder="Start answering on the left and your statement will appear here…"
-                        readOnly={isReadOnly}
-                        disabled={isReadOnly}
-                        className="cer-stmt min-h-[220px] w-full resize-none"
-                        value={sectionData.summary_text || ""}
-                        onChange={(e) => updateSection("section2", { summary_text: e.target.value })}
-                    />
-
-                    <p className={clsx("cer-wc", reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok && "ok")}>
-                        {summaryWordCount} words{reportTextWordMeter(summaryWordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).ok ? " ✓" : ""} · aim for {wordRangeLabel(PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max)}
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={handleGenerateAISummary}
-                            disabled={isGenerating || isReadOnly}
-                            className="cer-aibtn flex-1 inline-flex items-center justify-center gap-2 disabled:opacity-40"
-                        >
-                            {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                            {isGenerating ? "Generating…" : "✨ Expand with AI"}
-                        </button>
-                    </div>
-
-                    <p className="border-t border-slate-100 pt-3 text-center text-[11px] text-slate-400">
-                        That&apos;s the whole section — no separate essays, no duplicate summaries.
-                    </p>
-                </div>
             </div>
         </div>
     );

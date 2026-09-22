@@ -708,6 +708,21 @@ export default function FacultyOpportunityCreationPage() {
                 } else {
                     toast.error(data.message || (isEdit ? "Failed to update opportunity" : "Failed to create opportunity"));
                 }
+            } else if (res) {
+                // Surface the server's real reason (validation error, profile-incomplete, etc.) instead of a
+                // generic network-failure message — this was previously always shown, hiding why submit failed.
+                let serverMessage = "";
+                try {
+                    const errBody = await res.json();
+                    const raw = errBody?.message;
+                    serverMessage = Array.isArray(raw) ? raw.filter(Boolean).join(" ") : (raw || errBody?.error || "");
+                } catch {
+                    // non-JSON error body — fall through to the generic message below
+                }
+                toast.error(
+                    serverMessage ||
+                        `${isEdit ? "Failed to update opportunity" : "Failed to create opportunity"} (HTTP ${res.status}).`,
+                );
             } else {
                 toast.error("Failed to connect to server");
             }
@@ -1317,7 +1332,7 @@ export default function FacultyOpportunityCreationPage() {
                         {/* B3. Mode */}
                         <div>
                             <label className="co-label">B3 · Mode of engagement</label>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 {(["On site", "Remote", "Hybrid"] as const).map((m) => (
                                     <button
                                         key={m}

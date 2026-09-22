@@ -21,6 +21,16 @@
     margin: 0 auto;
 }
 
+.cer .cer-sticky-head {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+    padding-top: 10px;
+    margin-top: -10px;
+    padding-bottom: 6px;
+}
+
 .cer .cer-apph {
     display: flex;
     align-items: flex-start;
@@ -33,9 +43,6 @@
     border: 1px solid #dcebed;
     border-radius: 18px;
     padding: 13px 15px;
-    position: sticky;
-    top: 8px;
-    z-index: 20;
     box-shadow: 0 10px 30px rgba(4, 37, 43, 0.06);
 }
 
@@ -135,6 +142,7 @@
 }
 
 .cer .cer-tb {
+    flex: 0 0 auto;
     border: 1px solid var(--line);
     background: #fff;
     color: var(--muted);
@@ -1971,6 +1979,9 @@
     .cer .cer-journey {
         display: none !important;
     }
+    .cer .cer-apph {
+        position: static;
+    }
 }
 
 /* ───────── Participation Adventure (Section 1's five-mission quest shell) ───────── */
@@ -2236,6 +2247,13 @@
 }
 
 @media (max-width: 850px) {
+    .cer .cer-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 9px;
+        scrollbar-width: thin;
+    }
     .cer .cer-quest-grid {
         grid-template-columns: repeat(3, 1fr);
     }

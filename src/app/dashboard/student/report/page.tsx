@@ -24,9 +24,8 @@ import {
     isFlashCardStep,
     isMergedActivitiesStep,
     REPORT_UI_SECTION_TOTAL,
-    tabIsComplete,
-    tabMatchesStep,
     uiSectionsCompleteCount,
+    tabMatchesStep,
     uiStepLabel,
 } from './utils/reportWizardNav';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
@@ -50,7 +49,7 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney } from './ReportFormChrome';
+import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney } from './ReportFormChrome';
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -825,6 +824,7 @@ function ReportFormContent() {
     return (
         <div className="cer">
             <div className="cer-wrap">
+                <div className="cer-sticky-head">
                 <div className="cer-apph">
                     <div className="min-w-0 flex-1">
                         <button
@@ -900,47 +900,23 @@ function ReportFormContent() {
                         activeStep={activeStep}
                         incompleteStepNums={incompleteStepNums}
                         sectionsCompleteCount={sectionsCompleteCount}
-                        onGo={(step) => setStep(step)}
+                        onGo={(step) => {
+                            const lockedSummary = stepperLockedToSummaryOnly && step !== FLASH_CARD_STEP;
+                            const lockedSection1 = stepperLockedToSection1Only && step !== 1;
+                            if (lockedSummary || lockedSection1) return;
+                            const isActive = tabMatchesStep(step, activeStep);
+                            const isCompleted = activeStep > step;
+                            if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
+                                setStep(step);
+                            } else if (!isActive && validateCurrentSection()) {
+                                setStep(step);
+                            } else if (!isActive) {
+                                toast.info("Navigating to step. Please complete mandatory fields later.");
+                                setStep(step);
+                            }
+                        }}
                     />
                 ) : null}
-
-                <div className="cer-tabs">
-                    {REPORT_TAB_ITEMS.map((tab) => {
-                        const isActive = tabMatchesStep(tab.step, activeStep);
-                        const isCompleted = activeStep > tab.step;
-                        const isDone = tabIsComplete(tab.step, incompleteStepNums);
-                        const lockedSummary = stepperLockedToSummaryOnly && tab.step !== FLASH_CARD_STEP;
-                        const lockedSection1 = stepperLockedToSection1Only && tab.step !== 1;
-                        return (
-                            <button
-                                key={tab.step}
-                                type="button"
-                                disabled={lockedSummary || lockedSection1}
-                                className={[
-                                    "cer-tb",
-                                    isActive ? "on" : "",
-                                    tab.flash ? "fc" : "",
-                                    isDone && !tab.flash ? "done" : "",
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                onClick={() => {
-                                    if (lockedSummary || lockedSection1) return;
-                                    if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
-                                        setStep(tab.step);
-                                    } else if (!isActive && validateCurrentSection()) {
-                                        setStep(tab.step);
-                                    } else if (!isActive) {
-                                        toast.info("Navigating to step. Please complete mandatory fields later.");
-                                        setStep(tab.step);
-                                    }
-                                }}
-                            >
-                                {(lockedSummary || lockedSection1) ? "🔒 " : ""}
-                                {tab.label}
-                            </button>
-                        );
-                    })}
                 </div>
 
                 {!onFlash ? (

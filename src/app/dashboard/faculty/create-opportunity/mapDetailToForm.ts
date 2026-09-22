@@ -260,6 +260,15 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             safeEnvironment: subConf.environment_safe_and_appropriate === true,
             correctVerifiable: subConf.information_correct_and_verifiable === true,
         },
+        // These 4 boxes have no backend field to restore from (the backend never stores them) — but this
+        // opportunity was already submitted once with them checked, so re-defaulting to unchecked on every
+        // edit just re-blocks submit with no way to see why (see extraSafety validation at page.tsx:437).
+        extraSafety: {
+            communicateChanges: true,
+            visibilityIntentional: true,
+            cielNotGuarantee: true,
+            signatureAck: true,
+        },
     };
 
     return { facultyDetailsPatch, formDataPatch };
