@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-    Calendar,
-    Clock,
     MapPin,
     Loader2,
     CheckCircle2,
@@ -121,6 +119,9 @@ const labelClass =
 
 const fieldClass =
     "h-11 rounded-lg border border-[#dcebee] bg-[#f5fbfa] text-sm font-medium text-[#0d2b33] shadow-sm transition-colors placeholder:text-slate-400 focus:border-[#0e7d74] focus:bg-white focus:ring-2 focus:ring-[#0e7d74]/15";
+
+const nativePickerClass =
+    "w-full min-w-0 max-w-full [color-scheme:light] [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer";
 
 const ACTIVITY_TYPES = [
     "Training / Workshop",
@@ -279,6 +280,7 @@ export default function AttendanceForm({
             evidence_file: evidenceFile || undefined,
             hours: numericHours,
             participantId: activeParticipantId,
+            location_pin: formData.locationPin || undefined,
         };
         let mergedEntry: Record<string, unknown> = { ...newEntry };
         setIsSubmitting(true);
@@ -423,55 +425,47 @@ export default function AttendanceForm({
                 </div>
             </div>
 
-            {/* Date & Time row */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                    <Label className={labelClass}>Date of Engagement</Label>
-                    <div className="relative">
-                        <Input
-                            type="date"
-                            value={formData.dateOfEngagement}
-                            max={mounted ? new Date().toISOString().split("T")[0] : undefined}
-                            onChange={(e) =>
-                                setFormData({ ...formData, dateOfEngagement: e.target.value })
-                            }
-                            className={clsx(fieldClass, "pr-10")}
-                            required
-                        />
-                        <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-1">
+                <div className="space-y-1.5 min-w-0">
+                    <Label className={labelClass}>Date</Label>
+                    <Input
+                        type="date"
+                        value={formData.dateOfEngagement}
+                        max={mounted ? new Date().toISOString().split("T")[0] : undefined}
+                        onChange={(e) =>
+                            setFormData({ ...formData, dateOfEngagement: e.target.value })
+                        }
+                        className={clsx(fieldClass, nativePickerClass)}
+                        required
+                    />
                 </div>
-                <div className="space-y-1.5">
-                    <Label className={labelClass}>Time</Label>
-                    <div className="flex items-center gap-2">
-                        <div className="relative min-w-0 flex-1">
-                            <Input
-                                type="time"
-                                aria-label="Start Time"
-                                value={formData.startTime}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, startTime: e.target.value })
-                                }
-                                className={clsx(fieldClass, "pr-9")}
-                                required
-                            />
-                            <Clock className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        </div>
-                        <span className="shrink-0 text-sm font-medium text-slate-400">–</span>
-                        <div className="relative min-w-0 flex-1">
-                            <Input
-                                type="time"
-                                aria-label="End Time"
-                                value={formData.endTime}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, endTime: e.target.value })
-                                }
-                                className={clsx(fieldClass, "pr-9")}
-                                required
-                            />
-                            <Clock className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        </div>
-                    </div>
+                <div className="space-y-1.5 min-w-0">
+                    <Label className={labelClass}>From</Label>
+                    <Input
+                        type="time"
+                        step={60}
+                        aria-label="From"
+                        value={formData.startTime}
+                        onChange={(e) =>
+                            setFormData({ ...formData, startTime: e.target.value })
+                        }
+                        className={clsx(fieldClass, nativePickerClass)}
+                        required
+                    />
+                </div>
+                <div className="space-y-1.5 min-w-0">
+                    <Label className={labelClass}>To</Label>
+                    <Input
+                        type="time"
+                        step={60}
+                        aria-label="To"
+                        value={formData.endTime}
+                        onChange={(e) =>
+                            setFormData({ ...formData, endTime: e.target.value })
+                        }
+                        className={clsx(fieldClass, nativePickerClass)}
+                        required
+                    />
                 </div>
             </div>
 
@@ -504,15 +498,15 @@ export default function AttendanceForm({
                     <button
                         type="button"
                         onClick={() => setShowMap(true)}
-                        className="flex h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 text-center transition-colors hover:border-[#0e7d74]/50 hover:bg-[#e6f6f4]"
+                        className="flex min-h-[120px] w-full min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 px-4 py-5 text-center transition-colors hover:border-[#0e7d74]/50 hover:bg-[#e6f6f4]"
                     >
-                        <MapPin className="h-5 w-5 text-rose-500" />
-                        <span className="text-xs font-medium text-slate-500">
+                        <MapPin className="h-5 w-5 shrink-0 text-rose-500" />
+                        <span className="max-w-full text-xs font-medium leading-snug break-words text-slate-500">
                             Map preview — tap to search or drop a pin
                         </span>
                     </button>
                 ) : (
-                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200">
                         <LocationPicker
                             onLocationSelect={(loc) => {
                                 setPinnedAddress(loc.address || "");
@@ -546,7 +540,7 @@ export default function AttendanceForm({
             {/* Activity Type */}
             <div className="space-y-1.5">
                 <Label className={labelClass}>Activity Type</Label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex max-w-full flex-wrap gap-2">
                     {ACTIVITY_TYPES.map((t) => (
                         <button
                             key={t}
@@ -578,10 +572,10 @@ export default function AttendanceForm({
 
             {/* Brief Description */}
             <div className="space-y-1.5">
-                <Label className={labelClass}>Brief Description</Label>
+                <Label className={labelClass}>What did you accomplish? · max 40 words</Label>
                 <textarea
                     spellCheck
-                    placeholder="What activities were performed? What was achieved?"
+                    placeholder="e.g. Tested 6 water samples and briefed 40 residents"
                     value={formData.description}
                     maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
                     onChange={(e) =>

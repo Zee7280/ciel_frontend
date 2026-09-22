@@ -263,6 +263,18 @@ function FacultyRemindButtons({ email, title }: { email?: string | null; title: 
     );
 }
 
+function FacultyAttendanceLink({ projectId }: { projectId?: string }) {
+    if (!projectId) return null;
+    return (
+        <Link
+            href={`${HOURS}?projectId=${encodeURIComponent(projectId)}`}
+            className="mt-1.5 inline-block text-[11px] font-extrabold text-[#0e7d74] hover:underline"
+        >
+            Review attendance →
+        </Link>
+    );
+}
+
 function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" | "closed" {
     const rec = row as unknown as Record<string, unknown>;
     if (normalizeReviewStatus(row.status) === "draft") return "drafts";
@@ -413,7 +425,7 @@ function FacultyCommunityServiceHub() {
     const showHomeHero = view === "home";
 
     return (
-        <div className="mx-auto max-w-[1500px] pb-16">
+        <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
             <CommunityCrumb role="Faculty" view={crumb} />
 
             {showHomeHero ? (
@@ -770,6 +782,7 @@ function FacultyCommunityServiceHub() {
                                             {isFacultyCommunityLiveCard(row) ? null : (
                                                 <FacultyRemindButtons email={row.student_email} title={row.project_title} />
                                             )}
+                                            <FacultyAttendanceLink projectId={row.project_id} />
                                         </div>
                                     ))}
                                 </div>
@@ -834,6 +847,7 @@ function FacultyCommunityServiceHub() {
                                             {reportTab === "rev" ? (
                                                 <FacultyRemindButtons email={row.student_email} title={row.project_title} />
                                             ) : null}
+                                            <FacultyAttendanceLink projectId={row.project_id} />
                                         </div>
                                     ))}
                                 </div>

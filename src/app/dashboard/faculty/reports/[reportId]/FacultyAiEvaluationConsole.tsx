@@ -111,7 +111,7 @@ export default function FacultyAiEvaluationConsole() {
             setLoading(true);
             const response = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}`);
             if (!response?.ok) {
-                toast.error("Report not available yet (admin approval may be pending)");
+                toast.error("This report is not assigned to you, or the student has not submitted it yet.");
                 setRawReport(null);
                 return;
             }
@@ -370,6 +370,17 @@ export default function FacultyAiEvaluationConsole() {
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v2`}>
                         Open CII v2 Analyser
                     </Link>
+                    {(() => {
+                        const projectId = String(
+                            rawReport?.projectId || rawReport?.project_id || rawReport?.opportunityId || "",
+                        ).trim();
+                        if (!projectId) return null;
+                        return (
+                            <Link href={`/dashboard/faculty/attendance-review?projectId=${encodeURIComponent(projectId)}`}>
+                                Review attendance
+                            </Link>
+                        );
+                    })()}
                 </div>
 
                 <div className="fae-pipe">

@@ -121,7 +121,7 @@ export default function CommunityAwardPanel({
                 <p className="mt-1 text-[9.5px] leading-relaxed text-[#7a919a]">
                     Weighted, normalized, interdisciplinary. Total <b className="text-[#0d2b33]">/100</b>. Ties break on evidence integrity.
                 </p>
-                <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
                     {COMMUNITY_AWARD_CRITERIA.map((c) => (
                         <div key={c.key} className="rounded-[12px] border-[1.5px] border-[#e2d9f7] bg-white px-2 py-2 text-center">
                             <div className="text-[15px] font-extrabold text-[#6d28d9]">{c.max}</div>

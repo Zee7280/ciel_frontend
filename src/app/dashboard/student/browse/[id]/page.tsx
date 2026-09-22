@@ -604,7 +604,7 @@ export default function OpportunityDetailsPage() {
                     {/* Middle/Right Column: Main Details */}
                     <div className="p-8 space-y-8 md:col-span-8 lg:col-span-9">
                         {/* Stats Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                             <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
                                 <div className="text-xs font-bold text-orange-600 uppercase mb-1">Volunteers Needed</div>
                                 <div className="text-2xl font-bold text-orange-900">{opportunity.timeline?.volunteers_required || opportunity.volunteers_needed || "Open"}</div>

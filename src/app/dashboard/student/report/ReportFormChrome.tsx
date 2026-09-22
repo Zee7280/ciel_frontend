@@ -12,13 +12,13 @@ export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: bool
     { step: 1, label: "1 Participation" },
     { step: 2, label: "2 Context" },
     { step: 3, label: "3 SDG mapping" },
-    { step: 4, label: "4 Activities" },
+    { step: 4, label: "4 Activities & outputs" },
     { step: 5, label: "5 Resources" },
     { step: 6, label: "6 Partnerships" },
     { step: 7, label: "7 Evidence" },
     { step: 8, label: "8 Reflection" },
     { step: 9, label: "9 Sustainability" },
-    { step: 10, label: "Summary card", flash: true },
+    { step: 10, label: "Flash card", flash: true },
 ];
 
 const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: string }> = {

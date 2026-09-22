@@ -31,6 +31,7 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     justification_text: { min: 20, max: 60 },
     observed_change: { min: 40, max: 100 },
     challenges: { min: 15, max: 60 },
+    continuation_details: { min: 60, max: 120 },
 };
 
 export function wordRangeLabel(min: number, max: number): string {

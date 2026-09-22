@@ -28,6 +28,7 @@ export type FacultyCsReportRow = {
     student_email?: string;
     project_title: string;
     organization_name?: string;
+    project_id?: string;
     faculty_status?: string;
     status?: string;
     hours?: number;
@@ -164,6 +165,7 @@ export function useFacultyCommunityServiceData() {
                                 })(),
                                 project_title: pickStr(item, "project_title", "projectTitle") || "Report",
                                 organization_name: pickStr(item, "organization_name", "organizationName"),
+                                project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
                                 faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
                                 status: pickStr(item, "status"),
                                 hours: Number.isFinite(hours) ? hours : 0,

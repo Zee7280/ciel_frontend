@@ -904,7 +904,7 @@ function RecordView({
                                 : "Not on investor track — investors cannot see this venture."}
                         </p>
                         {isInvestorOpen(entry) ? (
-                            <div className="mt-3 grid grid-cols-3 gap-2">
+                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 {[["0", "Card views"], ["0", "Interest received"], ["0", "Founder-contact requests"]].map(([n, l]) => (
                                     <div key={l} className="rounded-xl bg-[#f6f8fa] px-3 py-2 text-center">
                                         <b className="block text-lg">{n}</b>

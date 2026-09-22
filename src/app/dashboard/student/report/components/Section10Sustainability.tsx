@@ -8,7 +8,7 @@ import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
-import { REPORT_TEXT_RANGE_LABEL, countWords, reportTextWordMeter } from "../utils/validation";
+import { countWords, reportTextWordMeter } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const continuationOptions = [
@@ -88,7 +88,7 @@ export default function Section10Sustainability() {
         continuation_risk = "",
     } = section10;
     const continuationWords = countWords(continuation_details || "");
-    const continuationMeter = reportTextWordMeter(continuationWords);
+    const continuationMeter = reportTextWordMeter(continuationWords, 60, 120);
 
     const update = (field: string, val: unknown) => updateSection("section10", { [field]: val });
 
@@ -215,45 +215,41 @@ export default function Section10Sustainability() {
     const verifiedHours = data.section1.metrics?.total_verified_hours || 0;
     const requiredHours = data.required_hours || 16;
 
-    return (
-        <div className="relative">
-            {!isEligibleForSubmission && (
-                <div className="absolute inset-0 z-50 flex flex-col items-center justify-start rounded-2xl bg-slate-50/60 p-8 pt-24 text-center backdrop-blur-[2px]">
-                    <div className="max-w-md space-y-5 rounded-xl border border-slate-200 bg-white p-8 shadow-xl">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[var(--gold)]">
-                            <Lock className="h-8 w-8" />
+    if (!isEligibleForSubmission) {
+        return (
+            <div className="mx-auto max-w-6xl pb-10">
+                <div className="mx-auto max-w-md space-y-5 rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[var(--gold)]">
+                        <Lock className="h-8 w-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-slate-900">Section locked</h3>
+                        <p className="text-sm leading-relaxed text-slate-500">
+                            Sustainability analysis activates once the{" "}
+                            <span className="font-semibold text-[var(--teal)]">{requiredHours}-hour minimum</span>{" "}
+                            engagement is verified. Complete your attendance logs in Section 1 to unlock this step.
+                        </p>
+                    </div>
+                    <div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div
+                                className="h-full bg-[var(--gold)]"
+                                style={{
+                                    width: `${Math.min((verifiedHours / Math.max(requiredHours, 1)) * 100, 100)}%`,
+                                }}
+                            />
                         </div>
-                        <div className="space-y-2">
-                            <h3 className="text-lg font-semibold text-slate-900">Section locked</h3>
-                            <p className="text-sm leading-relaxed text-slate-500">
-                                Sustainability analysis activates once the{" "}
-                                <span className="font-semibold text-[var(--teal)]">{requiredHours}-hour minimum</span>{" "}
-                                engagement is verified. Complete your attendance logs in Section 1 to unlock this step.
-                            </p>
-                        </div>
-                        <div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                    className="h-full bg-[var(--gold)] transition-all duration-1000"
-                                    style={{
-                                        width: `${Math.min((verifiedHours / requiredHours) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                Current progress: {verifiedHours} / {requiredHours} hours
-                            </p>
-                        </div>
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                            Current progress: {verifiedHours} / {requiredHours} hours
+                        </p>
                     </div>
                 </div>
-            )}
+            </div>
+        );
+    }
 
-            <div
-                className={clsx(
-                    "mx-auto max-w-6xl space-y-8 pb-10 transition-all duration-500",
-                    !isEligibleForSubmission && "pointer-events-none opacity-40 blur-[1px] grayscale",
-                )}
-            >
+    return (
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
                 {/* Header */}
                 <div className="cer-dup-head space-y-4">
                     <div className="flex items-center gap-3.5">
@@ -329,10 +325,10 @@ export default function Section10Sustainability() {
                 {/* 10.2 Explanation */}
                 {continuation_status ? (
                     <section className="space-y-4">
-                        <StepHeader n="10.2" title="Step 2 — Tell us in two lines" status="mandatory" />
+                        <StepHeader n="10.2" title="What continues, what stops?" status="mandatory" />
 
                         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                            <p className="text-sm text-slate-500">{REPORT_TEXT_RANGE_LABEL} — we still draft it from the two lines below.</p>
+                            <p className="text-sm text-slate-500">60–120 words — we still draft it from the two lines below.</p>
 
                             <div className="space-y-1.5">
                                 <Label className={fieldLabel}>
@@ -423,7 +419,7 @@ export default function Section10Sustainability() {
 
                 {/* 10.4 Scaling & influence */}
                 <section className="space-y-4">
-                    <StepHeader n="10.4" title="Step 4 — Two last taps" status="required" />
+                    <StepHeader n="10.4" title="Scaling &amp; system influence" status="required" />
 
                     <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="space-y-2">
@@ -581,6 +577,5 @@ export default function Section10Sustainability() {
                     </div>
                 </section>
             </div>
-        </div>
     );
 }

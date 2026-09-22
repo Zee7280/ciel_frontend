@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import {
@@ -1002,13 +1003,27 @@ export default function AdminReportDetailPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-                    <button
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Reports
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={() => router.back()}
+                            className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            Back
+                        </button>
+                        <Link
+                            href="/dashboard/admin/community-service"
+                            className="rounded-lg px-3 py-2 text-sm font-semibold text-[#0e7d74] hover:bg-white"
+                        >
+                            Community Service
+                        </Link>
+                        <Link
+                            href="/dashboard/admin/reports/verify"
+                            className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-white"
+                        >
+                            Student reports
+                        </Link>
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
                             Admin report review
@@ -2272,7 +2287,7 @@ export default function AdminReportDetailPage() {
 
             {/* Sticky Action Bar for quick access while scrolling */}
             {showStickyActions && !isVerifying && report.admin_status !== "approved" && (
-                <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-3 duration-500 animate-in fade-in slide-in-from-bottom-10 sm:bottom-8 sm:px-6">
+                <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-3 duration-500 animate-in fade-in slide-in-from-bottom-10 sm:px-6 lg:bottom-8">
                     <div className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-slate-900/90 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-4">
                         <div className="ml-1 flex items-center gap-3 sm:ml-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-indigo-600 text-sm font-bold text-white">

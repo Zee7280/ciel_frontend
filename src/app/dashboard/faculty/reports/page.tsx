@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import { CheckCircle2, Clock, Eye, FileText, Loader2, Search } from "lucide-react";
@@ -16,6 +17,7 @@ interface FacultyReportRow {
     organization_name?: string;
     status: string;
     faculty_status?: string;
+    project_id?: string;
     hours?: number;
     submission_date?: string;
     report_submitted_at?: string;
@@ -174,8 +176,8 @@ export default function FacultyStudentReportsPage() {
                         Student impact reports
                     </h1>
                     <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
-                        AI evaluation console for your supervised students, visible after CIEL Admin final
-                        approval. The 9-section dossier plus flash card remains available from each report.
+                        Submitted reports from students you supervise. Review the report here; attendance for the
+                        same project opens on Attendance review. CIEL Admin signs off after your decision.
                     </p>
                 </div>
 
@@ -219,7 +221,7 @@ export default function FacultyStudentReportsPage() {
                         <FileText className="mx-auto mb-3 h-9 w-9 text-slate-300" />
                         <h3 className="text-lg font-semibold text-slate-900">No reports found</h3>
                         <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-500">
-                            Reports appear here after CIEL Admin verification. Try another search or check back later.
+                            Submitted reports from your supervised students appear here. Try another search or check back after a student submits.
                         </p>
                     </div>
                 ) : (
@@ -300,6 +302,14 @@ export default function FacultyStudentReportsPage() {
                                                         <Eye className="h-3.5 w-3.5" />
                                                         Review evaluation
                                                     </button>
+                                                    {report.project_id ? (
+                                                        <Link
+                                                            href={`/dashboard/faculty/attendance-review?projectId=${encodeURIComponent(report.project_id)}`}
+                                                            className="mt-1.5 block text-[11px] font-semibold text-[#0e7d74] hover:underline"
+                                                        >
+                                                            Attendance
+                                                        </Link>
+                                                    ) : null}
                                                 </td>
                                             </tr>
                                         );

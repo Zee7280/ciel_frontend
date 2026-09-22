@@ -60,6 +60,7 @@ export default function FacultyAttendanceReviewPage() {
     const [loading, setLoading] = useState(true);
     const [projects, setProjects] = useState<{ id: string; title: string; subtitle?: string }[]>([]);
     const [projectId, setProjectId] = useState("");
+    const requestedProjectId = useRef("");
     const [pendingById, setPendingById] = useState<Record<string, number>>({});
     const [countsLoading, setCountsLoading] = useState(false);
     const didInitProjectChoice = useRef(false);
@@ -89,14 +90,26 @@ export default function FacultyAttendanceReviewPage() {
     }, [loading, projects, refreshAllPendingCounts]);
 
     useEffect(() => {
+        requestedProjectId.current =
+            new URLSearchParams(window.location.search).get("projectId")?.trim() || "";
+    }, []);
+
+    useEffect(() => {
         if (didInitProjectChoice.current) return;
+        if (loading || projects.length === 0) return;
+        const requested = requestedProjectId.current;
+        if (requested && projects.some((p) => p.id === requested)) {
+            didInitProjectChoice.current = true;
+            setProjectId(requested);
+            return;
+        }
         if (projectId) return;
         if (countsLoading) return;
         if (Object.keys(pendingById).length === 0) return;
         didInitProjectChoice.current = true;
         const first = projects.find((p) => (pendingById[p.id] ?? 0) > 0);
         if (first) setProjectId(first.id);
-    }, [countsLoading, projects, pendingById, projectId]);
+    }, [loading, countsLoading, projects, pendingById, projectId]);
 
     const handlePanelPendingCount = useCallback((n: number) => {
         if (!projectId) return;
@@ -138,8 +151,8 @@ export default function FacultyAttendanceReviewPage() {
 
     return (
         <AttendanceReviewDashboard
-            backHref="/dashboard/faculty/approvals"
-            backLabel="Back to approvals"
+            backHref="/dashboard/faculty/community-service?view=projects"
+            backLabel="Back to Community Service"
             eyebrow=""
             title="Attendance review"
             description=""

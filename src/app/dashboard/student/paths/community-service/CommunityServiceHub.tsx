@@ -98,7 +98,7 @@ export default function CommunityServiceHub({
     const browseHot = pendingApplications > 0;
 
     return (
-        <div className="mx-auto max-w-[1500px] pb-16">
+        <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
             <CommunityCrumb role="Student" />
             <MockupHero
                 kicker={name ? `Community Service · ${name}` : "Community Service"}

@@ -125,7 +125,7 @@ export default function FacultyDashboard() {
     const tone = (n: number, kind: "bad" | "warn" = "bad") => (n ? kind : "default");
 
     return (
-        <div className="mx-auto max-w-[1500px] pb-16">
+        <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
             <PendingAttendanceModal variant="faculty" />
 
             <MockupHero

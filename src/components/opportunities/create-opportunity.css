@@ -328,6 +328,18 @@
     }
 }
 
+@media (max-width: 480px) {
+    .co-form .co-step-list {
+        grid-template-columns: 1fr;
+    }
+    .co-form .co-card {
+        padding: 14px;
+    }
+    .co-form .co-hero {
+        padding: 14px;
+    }
+}
+
 .co-form .co-card {
     background: #fff;
     border: 1px solid var(--co-line);
@@ -796,6 +808,10 @@
 @media (max-width: 680px) {
     .co-flash-facts { grid-template-columns: 1fr 1fr; }
     .co-flash-title { font-size: 22px; }
+}
+@media (max-width: 480px) {
+    .co-flash-facts { grid-template-columns: 1fr; }
+    .co-flash-cta { grid-template-columns: 1fr; }
 }
 
 } /* @layer components */

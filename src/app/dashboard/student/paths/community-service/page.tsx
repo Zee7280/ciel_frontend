@@ -19,8 +19,8 @@ import CommunityServiceCreate from "./CommunityServiceCreate";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import CommunityServiceRankings from "./CommunityServiceRankings";
 import CommunityServiceFiles from "./CommunityServiceFiles";
-import { CommunityCrumb, HubBackButton, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
+import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import DetailedStudentReportGuide from "./DetailedStudentReportGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
 import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
 import { isJoinApplicationPendingStatus, pickJoinApplicationStatus } from "@/utils/studentJoinApplication";
@@ -314,21 +314,10 @@ function CommunityServiceContent() {
 
     if (showHub && guideView) {
         return (
-            <div className="mx-auto max-w-[980px] pb-16">
+            <div className="mx-auto min-w-0 max-w-[1180px] pb-24">
                 <CommunityCrumb role="Student" view="Guide" />
                 <HubBackButton href="/dashboard/student/paths/community-service" label="← Back to Community Service" />
-                <UserGuideBanner
-                    desc="A section-by-section coach for completing the Community Service Report correctly."
-                    items={[
-                        ["Section Guidance", "What the section is asking you to demonstrate."],
-                        ["Strong Example", "A model of the level of specificity expected."],
-                        ["Avoid", "Common weak responses or mistakes."],
-                        ["CII Connection", "How the section contributes evidence to the impact assessment."],
-                        ["Checklist", "Quick self-check before moving on."],
-                    ]}
-                    rule="Guidance supports the report; it does not replace the report form."
-                />
-                <StudentCommunityGuide showHero />
+                <DetailedStudentReportGuide />
             </div>
         );
     }

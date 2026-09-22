@@ -1016,7 +1016,7 @@ function RecordView({
                     {isInvestorOpen(entry) ? (
                         <div className="mt-3 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px]">
                             <b>Investor activity (via CIEL Investor Hub)</b>
-                            <div className="mt-2 grid grid-cols-3 gap-2">
+                            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 {[
                                     ["0", "Card views"],
                                     ["0", "Interest received"],

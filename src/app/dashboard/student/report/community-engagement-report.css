@@ -13,7 +13,7 @@
     background: var(--bg);
     color: var(--ink);
     min-height: 100vh;
-    padding: 18px 14px 120px;
+    padding: 0 0 120px;
 }
 
 .cer .cer-wrap {
@@ -23,12 +23,17 @@
 
 .cer .cer-sticky-head {
     position: sticky;
-    top: 0;
-    z-index: 20;
+    top: 56px;
+    z-index: 30;
     background: var(--bg);
-    padding-top: 10px;
-    margin-top: -10px;
-    padding-bottom: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+@media (min-width: 1024px) {
+    .cer .cer-sticky-head {
+        top: 0;
+    }
 }
 
 .cer .cer-apph {
@@ -1979,6 +1984,7 @@
     .cer .cer-journey {
         display: none !important;
     }
+    .cer .cer-sticky-head,
     .cer .cer-apph {
         position: static;
     }

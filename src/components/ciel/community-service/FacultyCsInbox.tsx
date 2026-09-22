@@ -57,7 +57,7 @@ export function FacultyCsInbox({
                                 key={item.key}
                                 className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#dde8e6] bg-white px-3 py-2.5"
                             >
-                                <div className="min-w-[240px] flex-1">
+                                <div className="min-w-0 flex-1">
                                     <b className="block text-[13.5px] text-[#16313d]">{item.title}</b>
                                     <small className="mt-0.5 block text-[11px] text-[#4f6068]">{item.meta}</small>
                                 </div>

@@ -436,7 +436,7 @@ export default function UniversityCommunityServiceHub() {
     };
 
     return (
-        <div className="mx-auto max-w-[1500px] pb-16">
+        <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
             <CommunityCrumb
                 role="University"
                 view={
@@ -705,7 +705,7 @@ export default function UniversityCommunityServiceHub() {
                         <EmptyPanel title="None yet" text="Verified cards appear here after Faculty sign-off." />
                     ) : (
                         <div className="overflow-x-auto rounded-2xl border border-[#dde5ea] bg-white">
-                            <table className="min-w-full text-left text-[12px]">
+                            <table className="min-w-[720px] w-full text-left text-[12px]">
                                 <thead className="bg-[#f7fafb] text-[10px] uppercase tracking-wide text-[#70808a]">
                                     <tr>
                                         <th className="px-3 py-2">Project</th>

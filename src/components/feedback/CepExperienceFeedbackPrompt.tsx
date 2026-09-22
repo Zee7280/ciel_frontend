@@ -141,7 +141,7 @@ export function CepExperienceFeedbackPrompt({
                 <button
                     type="button"
                     onClick={() => setOpen(true)}
-                    className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-lg transition hover:bg-slate-50 print:hidden"
+                    className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-lg transition hover:bg-slate-50 print:hidden lg:bottom-6 lg:right-6"
                     aria-label="Open feedback survey"
                 >
                     <MessageSquare className="h-4 w-4 text-emerald-600" />

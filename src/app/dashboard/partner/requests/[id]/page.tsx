@@ -627,7 +627,7 @@ function OpportunityDetailsContent() {
                         {/* Middle/Right Column: Main Details */}
                         <div className="space-y-8 p-5 sm:p-8 md:col-span-8 lg:col-span-9">
                             {/* Stats Cards */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                                 <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
                                     <div className="text-xs font-bold text-orange-600 uppercase mb-1">Volunteers Needed</div>
                                     <div className="text-2xl font-bold text-orange-900">{formData.capacity.volunteers || "-"}</div>
@@ -1362,7 +1362,7 @@ function OpportunityDetailsContent() {
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Gained</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                             {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map(s => (
                                 <label key={s} className={`flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer`}>
                                     <input

@@ -125,7 +125,7 @@ export default function StudentDashboardPage() {
     );
 
     return (
-        <div className="mx-auto max-w-[1500px]">
+        <div className="mx-auto min-w-0 max-w-[1500px]">
             <MockupHero
                 title={namedTimeGreeting(firstName, "👋")}
                 subtitle="Four impact areas. One portfolio. Start your work, track every approval, and build a verified record of your academic and community impact."

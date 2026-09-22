@@ -649,7 +649,7 @@ export default function OrganizationProfilePage() {
                     </div>
 
                     {isEditing && (
-                        <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:static md:border-t-0 md:bg-transparent md:p-0 md:shadow-none">
+                        <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:static lg:border-t-0 lg:bg-transparent lg:p-0 lg:shadow-none">
                             <button
                                 onClick={() => setIsEditing(false)}
                                 className="rounded-lg px-6 py-2 font-bold text-slate-600 hover:bg-slate-50"

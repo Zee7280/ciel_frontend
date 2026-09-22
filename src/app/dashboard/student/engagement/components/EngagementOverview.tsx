@@ -85,7 +85,7 @@ function PrimaryStatsRow({
     evidenceWithCount: number;
 }) {
     return (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
             {[
                 { value: `${totalHours}h`, label: "Total hours" },
                 { value: String(totalSessionsDisplay), label: "Sessions" },
@@ -95,7 +95,7 @@ function PrimaryStatsRow({
                     key={card.label}
                     className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-center"
                 >
-                    <p className="text-2xl font-bold text-indigo-600 sm:text-3xl">{card.value}</p>
+                    <p className="text-lg font-bold text-indigo-600 sm:text-3xl">{card.value}</p>
                     <p className="mt-1 text-xs font-medium text-slate-500">{card.label}</p>
                 </div>
             ))}

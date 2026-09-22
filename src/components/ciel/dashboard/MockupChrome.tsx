@@ -40,35 +40,34 @@ export function MockupHero({
     useRegisterDashboardPageChrome();
     return (
         <section
-            className="relative mt-2 flex flex-col items-start justify-between gap-7 overflow-hidden rounded-[22px] px-5 py-6 text-white shadow-[0_12px_30px_rgba(13,61,70,.10)] sm:flex-row sm:items-center sm:px-[34px] sm:py-[27px]"
+            className="relative mt-2 flex min-h-0 flex-col items-start justify-between gap-5 overflow-hidden rounded-[22px] px-4 py-5 text-white shadow-[0_12px_30px_rgba(13,61,70,.10)] sm:min-h-[175px] sm:flex-row sm:items-center sm:gap-7 sm:px-[34px] sm:py-[27px]"
             style={{
-                minHeight: 175,
                 background: `radial-gradient(circle at 92% 15%, rgba(255,255,255,.10) 0 17px, transparent 18px), radial-gradient(circle at 84% 8%, rgba(255,255,255,.06) 0 10px, transparent 11px), ${gradient}`,
             }}
         >
             {badge ? (
-                <span className="absolute right-5 top-5 rounded-full border border-white/20 bg-white/14 px-3.5 py-2 text-[12.5px] font-bold tracking-wide sm:right-[34px] sm:top-[26px]">
+                <span className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/14 px-3 py-1.5 text-[11px] font-bold tracking-wide sm:right-[34px] sm:top-[26px] sm:px-3.5 sm:py-2 sm:text-[12.5px]">
                     {badge}
                 </span>
             ) : null}
-            <div className="relative min-w-0">
+            <div className="relative min-w-0 max-w-full">
                 {kicker ? (
-                    <p className="text-[11px] font-black tracking-[0.13em] text-white/80">{kicker}</p>
+                    <p className="text-[10px] font-black tracking-[0.13em] text-white/80 sm:text-[11px]">{kicker}</p>
                 ) : null}
-                <h1 className="m-0 text-[31px] font-[950] leading-tight tracking-tight">{title}</h1>
-                <p className="mt-1.5 max-w-[850px] text-sm leading-[1.55] text-[#d9f0ef]">{subtitle}</p>
+                <h1 className="m-0 text-[22px] font-[950] leading-tight tracking-tight sm:text-[31px]">{title}</h1>
+                <p className="mt-1.5 max-w-[850px] text-[13px] leading-[1.55] text-[#d9f0ef] sm:text-sm">{subtitle}</p>
                 {stats.length > 0 ? (
-                    <div className="mt-5 flex flex-wrap gap-3">
+                    <div className="mt-4 flex w-full min-w-0 flex-wrap gap-2.5 sm:mt-5 sm:gap-3">
                         {stats.map((s) => {
                             const inner = (
                                 <>
-                                    <strong className="block text-[21px] font-semibold">{s.value}</strong>
-                                    <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#9df2df]">
+                                    <strong className="block text-[18px] font-semibold sm:text-[21px]">{s.value}</strong>
+                                    <span className="mt-1 block text-[8.5px] font-black uppercase tracking-[0.08em] text-[#9df2df] sm:text-[9px]">
                                         {s.label}
                                     </span>
                                 </>
                             );
-                            const className = "min-w-[130px] rounded-[17px] border border-white/25 bg-white/8 px-4 py-3.5 text-left text-white";
+                            const className = "min-w-[108px] flex-1 rounded-[17px] border border-white/25 bg-white/8 px-3 py-3 text-left text-white sm:min-w-[130px] sm:flex-none sm:px-4 sm:py-3.5";
                             return s.href ? (
                                 <Link key={s.label} href={s.href} className={`${className} transition hover:bg-white/14`}>
                                     {inner}
@@ -83,9 +82,9 @@ export function MockupHero({
                 ) : null}
             </div>
             {rightStat ? (
-                <div className="relative min-w-[240px] shrink-0 text-right">
-                    <div className="text-[48px] font-[950] leading-none">{rightStat.value}</div>
-                    <small className="mt-1 block text-[13px] text-[#c7e8e4]">{rightStat.label}</small>
+                <div className="relative w-full min-w-0 shrink-0 text-left sm:w-auto sm:min-w-[180px] sm:text-right">
+                    <div className="text-[36px] font-[950] leading-none sm:text-[48px]">{rightStat.value}</div>
+                    <small className="mt-1 block text-[12px] text-[#c7e8e4] sm:text-[13px]">{rightStat.label}</small>
                 </div>
             ) : null}
         </section>
@@ -102,12 +101,12 @@ export function MockupSectionHead({
     action?: ReactNode;
 }) {
     return (
-        <div className="mb-3.5 mt-[23px] flex flex-wrap items-end justify-between gap-5">
-            <div>
-                <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">{title}</h2>
-                {subtitle ? <p className="mt-1 text-[12.5px] text-[#70808a]">{subtitle}</p> : null}
+        <div className="mb-3.5 mt-4 flex min-w-0 flex-wrap items-end justify-between gap-3 sm:mt-[23px] sm:gap-5">
+            <div className="min-w-0">
+                <h2 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">{title}</h2>
+                {subtitle ? <p className="mt-1 text-[12px] text-[#70808a] sm:text-[12.5px]">{subtitle}</p> : null}
             </div>
-            {action}
+            {action ? <div className="min-w-0">{action}</div> : null}
         </div>
     );
 }
@@ -137,7 +136,7 @@ export function MockupActionCard({
     full?: boolean;
     hot?: boolean;
 }) {
-    const className = `relative min-h-[158px] overflow-hidden rounded-[24px] px-[22px] py-5 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-[22px] after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION']" : ""}`;
+    const className = `relative min-h-[140px] overflow-hidden rounded-[24px] px-4 py-4 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] sm:min-h-[158px] sm:px-[22px] sm:py-5 ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-4 after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION'] sm:after:left-[22px]" : ""}`;
     const inner = (
         <>
             <span
@@ -148,8 +147,8 @@ export function MockupActionCard({
                 {badge}
             </span>
             <span className="mb-[18px] block text-[29px] leading-none">{emoji}</span>
-            <h3 className="m-0 pr-24 text-[21px] font-[950] leading-tight">{title}</h3>
-            <p className="mt-1.5 max-w-[78%] text-[12.5px] leading-[1.45] text-white/90">{subtitle}</p>
+            <h3 className="m-0 pr-20 text-[18px] font-[950] leading-tight sm:pr-24 sm:text-[21px]">{title}</h3>
+            <p className="mt-1.5 max-w-none text-[12px] leading-[1.45] text-white/90 sm:max-w-[78%] sm:text-[12.5px]">{subtitle}</p>
             <span
                 className="pointer-events-none absolute -bottom-6 -right-2 rotate-[-7deg] text-[92px] opacity-10"
                 aria-hidden
@@ -178,7 +177,7 @@ export function MockupKpiGrid({
     items: { label: string; value: string; hint?: string }[];
 }) {
     return (
-        <div className="grid grid-cols-2 gap-[11px] xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-[11px] min-[380px]:grid-cols-2 xl:grid-cols-4">
             {items.map((item) => (
                 <div key={item.label} className="rounded-[15px] border border-[#dde5ea] bg-white p-3.5">
                     <span className="text-[9px] font-black tracking-[0.05em] text-[#70808a]">{item.label}</span>
@@ -200,14 +199,14 @@ export function MockupPanel({
     children: ReactNode;
 }) {
     return (
-        <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
-            <div className="flex flex-wrap items-center justify-between gap-3.5 border-b border-[#dde5ea] px-5 py-[18px]">
-                <div>
-                    <h3 className="m-0 text-[18px] font-semibold text-[#16313d]">{title}</h3>
+        <section className="mt-4 min-w-0 overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3.5 border-b border-[#dde5ea] px-4 py-4 sm:px-5 sm:py-[18px]">
+                <div className="min-w-0">
+                    <h3 className="m-0 text-[16px] font-semibold text-[#16313d] sm:text-[18px]">{title}</h3>
                     {subtitle ? <p className="mt-1 text-xs text-[#70808a]">{subtitle}</p> : null}
                 </div>
             </div>
-            <div className="p-4">{children}</div>
+            <div className="min-w-0 p-3 sm:p-4">{children}</div>
         </section>
     );
 }

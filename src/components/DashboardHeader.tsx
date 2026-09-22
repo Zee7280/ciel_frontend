@@ -405,12 +405,13 @@ export default function DashboardHeader() {
     };
 
     return (
-        <header className="ciel-transition sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-[#dde5ea] bg-white px-4 font-sans sm:px-7 lg:ml-[var(--ciel-sidebar-width)]">
-            <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
+        <header className={`ciel-transition sticky top-0 z-30 flex min-h-[56px] min-w-0 items-center justify-between gap-2 overflow-x-clip border-b border-[#dde5ea] bg-white px-3 py-2 font-sans sm:h-[72px] sm:gap-3 sm:px-7 sm:py-0 lg:ml-[var(--ciel-sidebar-width)] ${pathname.startsWith("/dashboard/student/report") ? "lg:hidden" : ""}`}>
+            <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {hasPageChrome ? null : (
-                    <p className="truncate text-[13px] text-[#70808a]">
-                        CIEL PK / {roleCrumb} / <b className="font-semibold text-[#16313d]">{pageCrumb}</b>
+                    <p className="min-w-0 truncate text-[12px] text-[#70808a] sm:text-[13px]">
+                        <span className="hidden sm:inline">CIEL PK / {roleCrumb} / </span>
+                        <b className="font-semibold text-[#16313d]">{pageCrumb}</b>
                     </p>
                     )}
                     {navRole === "faculty" && facultyDelegatedScope?.organization_name ? (
@@ -425,7 +426,7 @@ export default function DashboardHeader() {
                 </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2.5">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
                 <div className="relative hidden md:block">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#70808a]" />
                     <input
@@ -440,7 +441,7 @@ export default function DashboardHeader() {
                         <button
                             type="button"
                             onClick={() => setNotifOpen((o) => !o)}
-                            className="group relative inline-flex items-center gap-1.5 rounded-[10px] border border-[#dde5ea] bg-white px-3 py-2 text-[12px] font-extrabold text-[#435660] transition-all hover:bg-[#f4f7fa]"
+                            className="group relative inline-flex items-center gap-1.5 rounded-[10px] border border-[#dde5ea] bg-white px-2.5 py-2 text-[12px] font-extrabold text-[#435660] transition-all hover:bg-[#f4f7fa] sm:px-3"
                             aria-expanded={notifOpen}
                             aria-haspopup="dialog"
                             aria-label="Notifications"

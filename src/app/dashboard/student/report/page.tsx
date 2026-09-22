@@ -877,6 +877,7 @@ function ReportFormContent() {
                         ) : null}
                     </div>
                 </div>
+                </div>
 
                 {isTeamMemberAttendanceOnly ? (
                     <div className="cer-note">
@@ -917,7 +918,6 @@ function ReportFormContent() {
                         }}
                     />
                 ) : null}
-                </div>
 
                 {!onFlash ? (
                     <>
@@ -972,7 +972,7 @@ function ReportFormContent() {
                         </>
                     )}
                 </div>
-                {activeStep >= 1 && activeStep < FLASH_CARD_STEP ? (
+                {activeStep >= 1 && activeStep < FLASH_CARD_STEP && activeStep !== 3 ? (
                     <ReportLiveBanner step={activeStep} data={data} projectData={projectDetails} />
                 ) : null}
 

@@ -1277,7 +1277,7 @@ export default function OpportunityPostingPage() {
                         {/* B3. Mode */}
                         <div>
                             <label className="co-label">B3 · Mode of engagement</label>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 {(["On site", "Remote", "Hybrid"] as const).map((m) => (
                                     <button
                                         key={m}

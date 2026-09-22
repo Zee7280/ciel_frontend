@@ -361,7 +361,7 @@ export default function NgoCommunityServiceHub() {
     ];
 
     return (
-        <div className="mx-auto max-w-[1500px] pb-16">
+        <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
             <CommunityCrumb role="NGO / Nonprofit" view={crumb} />
 
             {view === "home" ? (

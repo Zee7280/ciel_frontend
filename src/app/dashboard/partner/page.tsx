@@ -305,7 +305,7 @@ function PartnerOrgOrUniversityDashboard() {
                             <b className="text-xs text-[#16313d]">University Overview Filters</b>
                             <span className="text-[10px] text-[#70808a]">Use one or multiple filters to refine the institutional view.</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
                             {["All Departments", "All Faculty Members", "All Programs", "All Batches", "All Semesters", "All Academic Years", "All Impact Areas", "All SDGs", "All Project Types", "All Statuses"].map((label) => (
                                 <select key={label} defaultValue={label} className="w-full rounded-[10px] border border-[#dde5ea] bg-white px-2.5 py-2 text-[10.5px] text-[#4c5d65]">
                                     <option>{label}</option>
@@ -410,7 +410,7 @@ function PartnerOrgOrUniversityDashboard() {
             {!isUni ? (
             <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {statCards.map((stat, index) => (
                     <div key={index} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] flex flex-col gap-4 group hover:-translate-y-1 transition-transform">
                         <div className="flex justify-between items-start">

@@ -51,6 +51,33 @@ export function isTokenValid(token: string | null): boolean {
     return payload.exp * 1000 > Date.now();
 }
 
+let loginRedirectStarted = false;
+
+function onStudentDashboard(): boolean {
+    return typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard/student");
+}
+
+/** Clears the session and sends the browser to login. Safe to call more than once. */
+function leaveForLogin() {
+    if (typeof window === "undefined" || loginRedirectStarted) return;
+    loginRedirectStarted = true;
+    localStorage.removeItem("ciel_token");
+    clearStudentDashboardCache();
+    window.location.replace("/login");
+}
+
+/**
+ * Student pages must leave for login when the stored session is missing or expired,
+ * even if a page fetch opted out of the default redirect.
+ * Returns false when a redirect was started.
+ */
+export function enforceStudentSession(): boolean {
+    if (!onStudentDashboard()) return true;
+    if (isTokenValid(localStorage.getItem("ciel_token"))) return true;
+    leaveForLogin();
+    return false;
+}
+
 /**
  * Browser: turn `/api/...` into `https://current-host/api/...` so the request uses Next.js route handlers.
  * If `NEXT_PUBLIC_APP_API_BASE_URL` points at the raw Nest host, relative `/api/v1/...` calls would miss BFF
@@ -70,16 +97,15 @@ export async function authenticatedFetch(
 ) {
     const token = localStorage.getItem("ciel_token");
     const redirectToLogin = config.redirectToLogin ?? true;
+    // Student screens always leave on an expired or rejected session. Other roles keep the caller's flag
+    // so background polls can stay on the page.
+    const shouldRedirect = redirectToLogin || onStudentDashboard();
 
     // Never call the API with a missing/expired token (avoids Authorization: Bearer null and pointless 401s)
     if (!isTokenValid(token)) {
-        if (redirectToLogin) {
+        if (shouldRedirect) {
             console.log("Fetcher: Token expired or missing. Redirecting to login...");
-            if (typeof window !== "undefined") {
-                localStorage.removeItem("ciel_token");
-                clearStudentDashboardCache();
-                window.location.replace("/login");
-            }
+            leaveForLogin();
         }
         return null;
     }
@@ -134,16 +160,12 @@ export async function authenticatedFetch(
     });
 
     if (response.status === 401) {
-        if (redirectToLogin) {
+        if (shouldRedirect) {
             // Server rejected the session — redirect even if JWT `exp` is still in the future
-            // (revoked token, backend out of sync, etc.). Callers that must not navigate (e.g.
-            // login bootstrap, background unread polls) pass `redirectToLogin: false`.
+            // (revoked token, backend out of sync, etc.). Non-student callers that must not navigate
+            // (login bootstrap, background unread polls) pass `redirectToLogin: false`.
             console.log("Fetcher: 401 Unauthorized. Redirecting to login...");
-            if (typeof window !== "undefined") {
-                localStorage.removeItem("ciel_token");
-                clearStudentDashboardCache();
-                window.location.replace("/login");
-            }
+            leaveForLogin();
         } else {
             console.log("Fetcher: 401 detected in background. Skipping redirect.");
         }

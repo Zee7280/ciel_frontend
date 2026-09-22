@@ -1482,7 +1482,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
 
                                 <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
-                                    <div className="mb-1 flex items-center gap-2">
+                                    <div className="mb-1 flex flex-wrap items-center gap-2">
                                         <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                             1.1
                                         </span>
@@ -1556,7 +1556,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
 
                                 <div>
-                                    <div className="mb-3 flex items-center gap-2">
+                                    <div className="mb-3 flex flex-wrap items-center gap-2">
                                         <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                             1.2
                                         </span>
@@ -1570,7 +1570,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </p>
                                 </div>
 
-                                <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+                                <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
                                     {/* Left: form */}
                                     <div className="min-w-0 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                         <AttendanceForm
@@ -1611,7 +1611,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     {/* Right: logged sessions + hours progress */}
                                     <div className="min-w-0 space-y-4">
                                         <div className="overflow-hidden rounded-[18px] border border-[#dcebee] bg-white shadow-sm">
-                                            <div className="flex items-baseline justify-between gap-3 border-b border-[#dcebee] px-5 py-4">
+                                            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#dcebee] px-4 py-4 sm:px-5">
                                                 <div className="flex items-center gap-2">
                                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                                         1.3
@@ -1706,7 +1706,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                             <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm">
                                 <p className="text-xs font-medium text-[#7a919a]">Hours summary</p>
-                                <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 text-center">
                                     <div className="rounded-lg bg-[#f5fbfa] px-2 py-2.5 ring-1 ring-[#dcebee]">
                                         <p className="text-lg font-bold text-[#0d2b33]">{projectGoal}</p>
                                         <p className="text-[11px] text-[#7a919a]">Project goal</p>

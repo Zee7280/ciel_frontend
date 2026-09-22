@@ -2036,7 +2036,7 @@ export default function MyProjectsPage() {
                                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
                                                 Overview & Logistics
                                             </h3>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 md:gap-6">
                                                 <div>
                                                     <span className="text-xs text-slate-500 block mb-1">Mode</span>
                                                     <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded text-sm">{String(v.mode ?? "N/A")}</span>
@@ -2060,7 +2060,7 @@ export default function MyProjectsPage() {
                                                     <span className="font-bold text-slate-900 text-sm capitalize">{String(v.visibility || "Restricted")}</span>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
+                                            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 md:gap-6">
                                                 <div>
                                                     <span className="text-xs text-slate-500 block mb-1">Start Date</span>
                                                     <span className="font-bold text-slate-900 text-sm">

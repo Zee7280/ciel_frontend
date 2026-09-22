@@ -61,11 +61,41 @@
   --ciel-sidebar-width: 305px;
 }
 
+html {
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+}
+
+/* Dashboard: stop sideways scroll, keep tables swipeable, avoid iOS input zoom */
+.dashboard-shell img,
+.dashboard-shell video {
+  max-width: 100%;
+  height: auto;
+}
+
+.dashboard-shell:has(.cer) main {
+  padding-top: 0;
+}
+
+.dashboard-shell main .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .dashboard-shell select,
+  .dashboard-shell textarea {
+    font-size: 16px;
+  }
 }
 
 @layer utilities {

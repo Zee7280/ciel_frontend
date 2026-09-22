@@ -565,9 +565,9 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
     };
 
     return (
-        <div className="relative isolate space-y-4">
-            <div className={`relative flex gap-3 ${showSuggestions && suggestions.length > 0 ? "z-40" : "z-20"}`}>
-                <div className="group relative flex-1">
+        <div className="relative isolate min-w-0 space-y-4">
+            <div className={`relative flex min-w-0 items-stretch gap-2 sm:gap-3 ${showSuggestions && suggestions.length > 0 ? "z-40" : "z-20"}`}>
+                <div className="group relative min-w-0 flex-1">
                     <div className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-500">
                         <MapPin className="h-full w-full" />
                     </div>
@@ -575,7 +575,7 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                         ref={inputRef}
                         type="text"
                         placeholder="Search location on Google Maps"
-                        className="h-14 w-full rounded-[1.25rem] border border-slate-200/60 bg-white/80 pl-12 pr-4 text-sm font-bold shadow-sm outline-none backdrop-blur-md transition-all placeholder:text-slate-300 focus:border-blue-400/50 focus:ring-4 focus:ring-blue-500/10"
+                        className="h-12 w-full min-w-0 rounded-[1.25rem] border border-slate-200/60 bg-white/80 pl-12 pr-4 text-sm font-bold shadow-sm outline-none backdrop-blur-md transition-all placeholder:text-slate-300 focus:border-blue-400/50 focus:ring-4 focus:ring-blue-500/10 sm:h-14"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
@@ -618,7 +618,7 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                     type="button"
                     onClick={handleSearch}
                     disabled={!isReady || isSearching}
-                    className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-slate-900 text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-70"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.25rem] bg-slate-900 text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-70 sm:h-14 sm:w-14"
                 >
                     {isSearching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                 </button>
@@ -629,7 +629,7 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                 the exact location.
             </p>
 
-            <div className="relative z-0 h-[280px] w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner">
+            <div className="relative z-0 h-[220px] w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner sm:h-[280px]">
                 {!isReady && !loadError && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-slate-50 text-sm font-bold text-slate-400">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -641,11 +641,11 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                         {loadError}
                     </div>
                 )}
-                <div ref={mapNodeRef} className="h-[280px] w-full" />
+                <div ref={mapNodeRef} className="h-[220px] w-full sm:h-[280px]" />
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-3">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50/50 px-3 py-3 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-100 bg-white shadow-sm">
                         <MapPin className="h-3.5 w-3.5 text-slate-400" />
                     </div>
@@ -664,7 +664,8 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                     z-index: 2147483647 !important;
                     margin-top: 8px;
                     width: min(92vw, 30rem) !important;
-                    min-width: 18rem !important;
+                    min-width: 0 !important;
+                    max-width: min(92vw, 30rem) !important;
                     overflow: hidden;
                     border: 1px solid rgba(226, 232, 240, 0.9);
                     border-radius: 1.25rem;

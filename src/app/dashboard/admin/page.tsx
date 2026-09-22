@@ -130,7 +130,7 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="mx-auto max-w-[1500px]">
+        <div className="mx-auto min-w-0 max-w-[1500px]">
             <MockupHero
                 title={namedTimeGreeting("CIEL PK", "👋")}
                 subtitle="Four impact areas. One command center. Monitor work, intervene when anyone is delayed, and turn approved projects into measurable impact intelligence."

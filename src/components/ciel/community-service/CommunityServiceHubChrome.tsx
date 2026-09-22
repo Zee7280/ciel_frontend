@@ -63,7 +63,7 @@ export function EmptyPanel({ title, text }: { title: string; text: string }) {
 
 export function SummaryTiles({ tiles }: { tiles: [string, string][] }) {
     return (
-        <div className="mb-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+        <div className="mb-3.5 grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2 xl:grid-cols-4">
             {tiles.map(([value, label]) => (
                 <div key={label} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
                     <strong className="block text-lg text-[#16313d]">{value}</strong>
