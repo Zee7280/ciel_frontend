@@ -374,7 +374,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentWordCount = (student_contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
 
             {/* ── Section Header ───────────────────────────────────────── */}
             <div className="cer-dup-head space-y-5">
@@ -439,7 +439,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             )}
 
             {/* ── 1. Opportunity's Registered SDGs ─────────────────────── */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2.5">
@@ -579,7 +579,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             </section>
 
             {/* ── 2. Optional Student SDG Mapping ──────────────────────── */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2.5">
@@ -968,7 +968,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
             {/* ── Preliminary Summary ──────────────────────────────────── */}
             {!isFinalized ? (
-                <section className="space-y-4 border-t border-slate-200 pt-8">
+                <section className="cer-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-base font-semibold text-slate-900">
                             Preliminary SDG alignment statement

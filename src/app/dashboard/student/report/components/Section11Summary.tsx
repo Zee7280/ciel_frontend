@@ -19,6 +19,7 @@ import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
+import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
@@ -342,6 +343,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             ? String(beneficiariesRaw)
             : "0";
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
+    const loggedHours = sumNonRejectedLoggedHours(section1.attendance_logs || []);
     const incompleteSectionNums = useMemo(
         () => new Set(incompleteSectionsSummary.map((block) => block.section)),
         [incompleteSectionsSummary],
@@ -961,13 +963,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className={clsx("p-5 rounded-xl border flex items-center gap-4", verifiedHours >= (data.required_hours || 16) ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
-                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", verifiedHours >= (data.required_hours || 16) ? "bg-[var(--teal)] text-white" : "bg-slate-200 text-slate-400")}>
-                                        {verifiedHours >= (data.required_hours || 16) ? <CheckCircle className="w-5 h-5" /> : "1"}
+                                <div className={clsx("p-5 rounded-xl border flex items-center gap-4", loggedHours >= (data.required_hours || 16) ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
+                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", loggedHours >= (data.required_hours || 16) ? "bg-[var(--teal)] text-white" : "bg-slate-200 text-slate-400")}>
+                                        {loggedHours >= (data.required_hours || 16) ? <CheckCircle className="w-5 h-5" /> : "1"}
                                     </div>
                                     <div className="space-y-0.5 text-left">
                                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none">Min. hours met</p>
-                                        <p className="text-xs font-semibold">{verifiedHours} / {data.required_hours || 16} Hours</p>
+                                        <p className="text-xs font-semibold">{loggedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
                                 <div className={clsx("p-5 rounded-xl border flex items-center gap-4", areAllSectionsComplete ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
@@ -983,12 +985,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div className="p-5 bg-[var(--gold-soft)] border border-[var(--gold-soft)] rounded-xl flex items-start gap-4">
                                 <AlertTriangle className="w-5 h-5 text-[var(--gold)] shrink-0 mt-0.5" />
                                 <p className="text-xs font-semibold text-[var(--gold)] leading-relaxed text-left">
-                                    Final submission and <strong>Section 10 (Sustainability)</strong> will remain locked until all{" "}
-                                    {data.required_hours || 16} hours are verified.
+                                    Final submission and <strong>Section 10 (Sustainability)</strong> stay locked until all{" "}
+                                    {data.required_hours || 16} hours are logged. Faculty approves the flash card after you submit.
                                 </p>
                             </div>
                             <ReadinessChecklist
-                                hoursMet={verifiedHours >= (data.required_hours || 16)}
+                                hoursMet={loggedHours >= (data.required_hours || 16)}
                                 incompleteSectionNums={incompleteSectionNums}
                                 declarationComplete={finalDeclarationComplete}
                             />

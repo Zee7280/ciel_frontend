@@ -124,6 +124,44 @@ export function formatHecComplianceLabel(value: string | undefined | null): stri
         .join("-");
 }
 
+/** Logged hours count toward submit unless faculty has rejected the session. */
+export function isLogCountedBeforeFacultyReview(log: {
+    approval_status?: string | null;
+    approvalStatus?: string | null;
+}): boolean {
+    const status = String(log.approval_status ?? log.approvalStatus ?? "").trim().toLowerCase();
+    return status !== "rejected";
+}
+
+/**
+ * Pre-submit hour bar. Uses hours the student logged, including sessions faculty has not
+ * reviewed yet. Faculty approves the report from the flash card after submission.
+ */
+export function loggedHoursClearSubmitBar(args: {
+    logs: AttendanceLog[];
+    requiredHours: number;
+    rosterIds?: readonly string[];
+}): boolean {
+    const required = args.requiredHours > 0 ? args.requiredHours : 16;
+    const logs = (args.logs || []).filter(isLogCountedBeforeFacultyReview);
+    const sumFor = (rosterId?: string) =>
+        logs.reduce((acc, log) => {
+            if (rosterId && !engagementParticipantIdsMatch(log.participantId, rosterId)) return acc;
+            return acc + effectiveHoursFromLog(log);
+        }, 0);
+    if (args.rosterIds && args.rosterIds.length > 0) {
+        return args.rosterIds.every((id) => sumFor(id) >= required);
+    }
+    return sumFor() >= required;
+}
+
+/** Sum of hours that count toward submit (rejected sessions excluded). */
+export function sumNonRejectedLoggedHours(logs: AttendanceLog[]): number {
+    return (logs || [])
+        .filter(isLogCountedBeforeFacultyReview)
+        .reduce((acc, log) => acc + effectiveHoursFromLog(log), 0);
+}
+
 export function calculateEngagementMetrics(
     logs: AttendanceLog[], 
     requiredHours: number = 16, 

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from '../utils/engagementMetrics';
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
@@ -184,8 +184,11 @@ export interface ReportData {
             primary_category: string;
             sub_category: string;
             other_category_text?: string;
+            other_sub_category_text?: string;
+            activity_period?: string;
+            partner_host?: string;
             description: string;
-            status: string; // Completed, Partially Completed, Ongoing
+            status: string; // Completed, Partially Completed, Ongoing, Cancelled / Not Delivered
             
             // 4.2 Delivery
             delivery_mode: string;
@@ -197,8 +200,10 @@ export interface ReportData {
             outputs: Array<{
                 title: string;
                 type: string;
+                type_other?: string;
                 quantity: string;
                 unit: string;
+                unit_other?: string;
                 verification_note: string;
                 is_shared: boolean;
             }>;
@@ -206,9 +211,14 @@ export interface ReportData {
             // 4.4 Beneficiaries
             serves_beneficiaries: boolean;
             beneficiaries_reached: string;
+            unique_beneficiaries?: string;
             beneficiary_categories: string[];
+            other_beneficiary_text?: string;
             relevance_types: string[];
             overlap_status: string;
+            overlap_note?: string;
+            reach_counting_method?: string;
+            reach_counting_method_other?: string;
             beneficiary_description: string;
             
             // 4.5 Location
@@ -644,21 +654,23 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [myParticipationIsTeamLead, setMyParticipationIsTeamLead] = useState<boolean | null>(null);
     const [isParticipationUnlocked, setParticipationUnlocked] = useState(false);
     
-    // Eligibility for Submission (Progress vs Submission Mode)
-    // Hours must clear the bar for EVERY team member individually, not just the pooled team total —
-    // otherwise one member logging all the hours lets the whole team qualify for the payout while
-    // others contribute (and are credited for) zero verified hours.
+    // Hour bar for submission uses logged sessions, including ones faculty has not reviewed yet.
+    // Each member must log their own hours. Faculty approves the flash card after submit.
     const isEligibleForSubmission = useMemo(() => {
-        const metHours = (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
-        const individualMetrics = data.section1.metrics?.individual_metrics;
-        const everyoneMetTheirOwnHours =
-            !Array.isArray(individualMetrics) || individualMetrics.length === 0
-                ? true
-                : individualMetrics.every((m: any) => m?.gateway_status === "ELIGIBLE");
-        return metHours && everyoneMetTheirOwnHours;
+        const rosterIds = buildIndividualRosterFromSection1(
+            data.section1,
+            data.section1.team_lead?.id,
+        );
+        return loggedHoursClearSubmitBar({
+            logs: data.section1.attendance_logs || [],
+            requiredHours: data.required_hours || 16,
+            rosterIds,
+        });
     }, [
-        data.section1.metrics?.total_verified_hours,
-        data.section1.metrics?.individual_metrics,
+        data.section1.attendance_logs,
+        data.section1.participation_type,
+        data.section1.team_lead,
+        data.section1.team_members,
         data.required_hours,
     ]);
 

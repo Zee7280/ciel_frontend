@@ -79,6 +79,7 @@ export type CommunityAwardCard = {
     total: number;
     level?: CommunityServiceLevel;
     awardBadges?: CommunityAwardBadge[];
+    awardBadgeHistory?: CommunityAwardBadge[];
 };
 
 export function awardTier(ratio: number) {

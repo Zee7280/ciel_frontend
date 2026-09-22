@@ -96,13 +96,24 @@ export default function FacultyAttendanceReviewPage() {
 
     useEffect(() => {
         if (didInitProjectChoice.current) return;
-        if (loading || projects.length === 0) return;
+        if (loading) return;
         const requested = requestedProjectId.current;
-        if (requested && projects.some((p) => p.id === requested)) {
+        if (requested) {
+            const match = projects.find((p) => p.id.toLowerCase() === requested.toLowerCase());
             didInitProjectChoice.current = true;
+            if (match) {
+                setProjectId(match.id);
+                return;
+            }
+            setProjects((prev) =>
+                prev.some((p) => p.id.toLowerCase() === requested.toLowerCase())
+                    ? prev
+                    : [{ id: requested, title: "Linked project" }, ...prev],
+            );
             setProjectId(requested);
             return;
         }
+        if (projects.length === 0) return;
         if (projectId) return;
         if (countsLoading) return;
         if (Object.keys(pendingById).length === 0) return;

@@ -239,27 +239,25 @@ function ResourceCard({
     };
 
     return (
-        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        {idx + 1}
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Resource entry
-                    </span>
-                </div>
+        <div className="overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
+            <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
+                    {idx + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
+                    Resource entry
+                </span>
                 {canRemove ? (
                     <button
                         type="button"
                         onClick={onRemove}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 transition-colors hover:text-red-700"
+                        className="rounded-lg border border-[#f6cfd8] bg-[#fdf1f4] px-2 py-1 text-[8.5px] font-extrabold text-[#e11d48]"
                     >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remove
+                        Delete
                     </button>
                 ) : null}
             </div>
+            <div className="space-y-4 px-3.5 pb-3.5 pt-3">
 
             <div className="space-y-1.5">
                 <Label className={fieldLabel}>
@@ -378,6 +376,7 @@ function ResourceCard({
                 <p className="text-xs text-slate-500">One clear line beats a 50-word minimum. ✂️</p>
                 <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
             </div>
+            </div>
         </div>
     );
 }
@@ -472,7 +471,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
     }, [resources]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -503,7 +502,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
             </div>
 
             {/* 6.0 Project Snapshot */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
@@ -545,7 +544,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
             </section>
 
             {/* 6.1 Resource Confirmation */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         6.1
@@ -617,7 +616,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
             {/* 6.2 + 6.3 when yes */}
             {use_resources === "yes" ? (
                 <div className="space-y-8">
-                    <section className="space-y-4">
+                    <section className="cer-card space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
                                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
@@ -672,7 +671,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                     </section>
 
                     {/* 6.3 Evidence */}
-                    <section className="space-y-4">
+                    <section className="cer-card space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 6.3
@@ -773,7 +772,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                     </section>
 
                     {/* Auto summary */}
-                    <section className="space-y-4 border-t border-slate-200 pt-8">
+                    <section className="cer-card space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">

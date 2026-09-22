@@ -277,7 +277,7 @@ export default function Section9Reflection() {
     }, [autoNarrative, section9.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-4">
                 <div className="flex items-center gap-3.5">
@@ -305,7 +305,7 @@ export default function Section9Reflection() {
             </div>
 
             {/* 9.0 Academic integration */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="9.0" title="Step 1 — Academic integration level" status="mandatory" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -339,7 +339,7 @@ export default function Section9Reflection() {
             </section>
 
             {/* 9.1 + 9.2 merged — guided reflection */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="9.1" title="Step 2 — Your reflection" status="mandatory" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -442,7 +442,7 @@ export default function Section9Reflection() {
             </section>
 
             {/* 9.3 Competency self-assessment */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="9.2" title="Step 3 — Rate yourself, be honest" />
 
                 <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -571,7 +571,7 @@ export default function Section9Reflection() {
             </section>
 
             {/* System summary */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">
@@ -618,7 +618,7 @@ export default function Section9Reflection() {
             </section>
 
             {/* Auto narrative */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">

@@ -265,27 +265,25 @@ function PartnerCard({
     };
 
     return (
-        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        {idx + 1}
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Partner entry
-                    </span>
-                </div>
+        <div className="overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
+            <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
+                    {idx + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
+                    Partner entry
+                </span>
                 {canRemove ? (
                     <button
                         type="button"
                         onClick={onRemove}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 transition-colors hover:text-red-700"
+                        className="rounded-lg border border-[#f6cfd8] bg-[#fdf1f4] px-2 py-1 text-[8.5px] font-extrabold text-[#e11d48]"
                     >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remove
+                        Delete
                     </button>
                 ) : null}
             </div>
+            <div className="space-y-4 px-3.5 pb-3.5 pt-3">
 
             <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -443,6 +441,7 @@ function PartnerCard({
                     ))}
                 </div>
             </div>
+            </div>
         </div>
     );
 }
@@ -550,7 +549,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
     }, [autoNarrative, data.section7.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -583,7 +582,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             </div>
 
             {/* 7.0 Confirmation */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         7.0
@@ -649,7 +648,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             {/* 7.1 + 7.2 when yes */}
             {has_partners === "yes" ? (
                 <div className="space-y-8">
-                    <section className="space-y-4">
+                    <section className="cer-card space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
                                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
@@ -713,7 +712,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                         )}
                     </section>
 
-                    <section className="space-y-4">
+                    <section className="cer-card space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                                 7.2
@@ -838,7 +837,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             ) : null}
 
             {/* 7.3 Analytics — always visible (zeros when No) */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">

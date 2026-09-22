@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, CommunityHero, HubBackButton, HubTile } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
+import AdminNationalRankingStudio from "@/components/ciel/community-service/AdminNationalRankingStudio";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
@@ -70,9 +70,8 @@ export default function AdminCommunityServicePage() {
         }
     };
 
-    useEffect(() => {
-        let cancelled = false;
-        Promise.all([
+    const loadHub = useCallback(() => {
+        return Promise.all([
             authenticatedFetch("/api/v1/admin/community-service/award-cards", {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
@@ -84,7 +83,6 @@ export default function AdminCommunityServicePage() {
             ),
         ])
             .then(([award, reports, projects]) => {
-                if (cancelled) return;
                 setCards(Array.isArray(award?.data) ? award.data : []);
                 setPipeline(
                     (Array.isArray(reports?.data) ? reports.data : [])
@@ -97,16 +95,16 @@ export default function AdminCommunityServicePage() {
                 setLoading(false);
             })
             .catch(() => {
-                if (cancelled) return;
                 setCards([]);
                 setPipeline([]);
                 setOppCount(0);
                 setLoading(false);
             });
-        return () => {
-            cancelled = true;
-        };
     }, []);
+
+    useEffect(() => {
+        void loadHub();
+    }, [loadHub]);
 
     const liveRows = useMemo(() => pipeline.filter((r) => isAdminCommunityLiveCard(r)), [pipeline]);
     // Faculty-approved-and-ready-for-admin rows surface first — those are the only ones this
@@ -188,11 +186,11 @@ export default function AdminCommunityServicePage() {
                     />
                     <HubTile
                         onClick={() => setView("run")}
-                        badge="HIGHEST BADGE"
+                        badge="REVIEW → PUBLISH"
                         badgeClass="text-[#6d28d9]"
-                        emoji="🏆"
-                        title="Run the AI Award Model"
-                        subtitle="Same criteria, national scope — grant the CIEL PK Medal."
+                        emoji="🧭"
+                        title="National Ranking AI Analyzer"
+                        subtitle="Filter the verified cohort, review every place, then publish badges. Faculty CII stays locked."
                         background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                     />
                     <HubTile
@@ -259,6 +257,15 @@ export default function AdminCommunityServicePage() {
                             ? "Read-only view of the same live cards — one standard rubric, no new login role."
                             : "Every live flash card nationwide. Open a card to use the existing verify screen."}
                     </p>
+                    {view === "approved" && deckCards.length > 0 ? (
+                        <button
+                            type="button"
+                            onClick={() => setView("run")}
+                            className="mt-3 rounded-[10px] bg-[#123f49] px-3 py-2 text-[12px] font-black text-white"
+                        >
+                            Run / Publish Rankings →
+                        </button>
+                    ) : null}
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
@@ -300,24 +307,19 @@ export default function AdminCommunityServicePage() {
 
             {view === "run" && (
                 <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Run the AI Award Model</h2>
-                    <p className="mt-1 mb-4 text-sm text-slate-500">
-                        Rank the national live deck and grant the CIEL PK Medal. Notifications still use the existing award
-                        endpoint.
-                    </p>
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
-                    ) : deckCards.length === 0 ? (
+                    ) : cards.length === 0 ? (
                         <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-                            No live cards to rank yet.
+                            No verified cards to rank yet. Faculty and admin both have to sign off before a project enters this cohort.
                         </p>
                     ) : (
-                        <CommunityAwardPanel
-                            cards={deckCards}
-                            kind="ciel"
-                            scopeName="CIEL PK"
+                        <AdminNationalRankingStudio
+                            cards={cards}
                             notifyEndpoint="/api/v1/admin/community-service/award-notify"
-                            filters={{ university: true, department: true, org: true, faculty: true }}
+                            onPublished={() => {
+                                void loadHub();
+                            }}
                         />
                     )}
                 </div>

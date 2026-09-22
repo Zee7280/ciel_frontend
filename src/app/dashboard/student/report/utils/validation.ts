@@ -106,13 +106,6 @@ export function validateSection1(data: any): ValidationResult {
         ? data.review_checked.slice(0, 3).every(Boolean)
         : false;
 
-    if (data.metrics?.hec_compliance === 'below') {
-        errors.push({
-            field: 'metrics.hec_compliance',
-            message: 'Must meet the required engagement hours (at least equal to the goal) to be eligible for report submission.'
-        });
-    }
-
     if (!declarationComplete) {
         errors.push({ field: 'review_checked', message: 'Please complete all three declaration checkboxes.' });
     }

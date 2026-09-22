@@ -1,13 +1,12 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { useReportForm } from '../context/ReportContext';
-import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { FieldError } from './ui/FieldError';
 import {
-    Plus, Trash2, Globe, Target, Info, Layers, Users,
-    ChevronDown, ChevronUp, PlusCircle, Lock, Pencil, CheckCircle2,
+    Plus, Trash2, Target, Info, Layers,
+    ChevronDown, PlusCircle, Lock, Pencil, CheckCircle2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -33,6 +32,10 @@ const badgeRequired =
     "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 const badgeAuto =
     "shrink-0 rounded-full bg-[var(--aqua-soft)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]";
+
+function isOtherChoice(value: unknown): boolean {
+    return /other/i.test(String(value ?? ""));
+}
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -74,10 +77,10 @@ function PillToggle({
                         type="button"
                         onClick={() => onToggle(opt)}
                         className={clsx(
-                            "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                            "s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
                             active
-                                ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/50",
+                                ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
+                                : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
                         )}
                     >
                         {opt}
@@ -107,10 +110,10 @@ function SingleChip({
                         type="button"
                         onClick={() => onChange(opt)}
                         className={clsx(
-                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                            "s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
                             active
-                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
+                                : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
                         )}
                     >
                         {opt}
@@ -135,6 +138,9 @@ export default function Section4Activities() {
             title: '',
             primary_category: '',
             sub_category: '',
+            other_sub_category_text: '',
+            activity_period: '',
+            partner_host: '',
             description: '',
             status: 'Ongoing',
             delivery_mode: '',
@@ -144,9 +150,14 @@ export default function Section4Activities() {
             outputs: [{ title: '', type: '', quantity: '', unit: '', verification_note: '', is_shared: false }],
             serves_beneficiaries: true,
             beneficiaries_reached: '',
+            unique_beneficiaries: '',
             beneficiary_categories: [],
+            other_beneficiary_text: '',
             relevance_types: [],
             overlap_status: '',
+            overlap_note: '',
+            reach_counting_method: '',
+            reach_counting_method_other: '',
             beneficiary_description: '',
             geographic_reach: '',
             geographic_sub_category: '',
@@ -242,7 +253,7 @@ export default function Section4Activities() {
     const handleUnfinalizeSection4 = () => update('finalized', false);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -287,7 +298,7 @@ export default function Section4Activities() {
             </div>
 
             {/* 4.1 Activity Blocks */}
-            <section className="space-y-4">
+            <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         4.1
@@ -334,7 +345,7 @@ export default function Section4Activities() {
             </section>
 
             {/* 4.6 Project Summary */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
@@ -342,16 +353,16 @@ export default function Section4Activities() {
                         </span>
                         <h3 className="text-base font-semibold text-slate-900">Project-level summary</h3>
                     </div>
-                    <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                        Auto-computed from activities above · editable
+                    <span className="rounded-full bg-[#e3f4fa] px-2.5 py-1 text-[8px] font-extrabold uppercase tracking-[0.08em] text-[#0891b2]">
+                        Auto — editable
                     </span>
                 </div>
 
-                <div className="space-y-5 rounded-xl border border-indigo-100 bg-indigo-50/40 p-5 shadow-sm sm:p-6">
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <div className="space-y-2">
+                <div className="space-y-5">
+                    <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2">
+                        <div className="flex min-w-0 flex-col gap-2">
                             <Label className={fieldLabel}>Distinct total beneficiaries</Label>
-                            <p className="text-xs text-slate-500">
+                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
                                 Total unique individuals reached across all activities.
                             </p>
                             <Input
@@ -359,14 +370,17 @@ export default function Section4Activities() {
                                 placeholder="e.g. 250"
                                 value={section4.project_summary?.distinct_total_beneficiaries || ''}
                                 onChange={e => updateProjectSummary('distinct_total_beneficiaries', e.target.value)}
-                                className={inputClasses}
+                                className={clsx(inputClasses, "mt-auto")}
                             />
                             <FieldError message={getFieldError('section4.project_summary.distinct_total_beneficiaries')} />
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="flex min-w-0 flex-col gap-2">
                             <Label className={fieldLabel}>Beneficiary counting method</Label>
-                            <div className="relative">
+                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
+                                How that distinct total was counted.
+                            </p>
+                            <div className="relative mt-auto">
                                 <select
                                     value={section4.project_summary?.counting_method || ''}
                                     onChange={e => updateProjectSummary('counting_method', e.target.value)}
@@ -381,9 +395,12 @@ export default function Section4Activities() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-5 border-t border-indigo-100/80 pt-5 md:grid-cols-2">
-                        <div className="space-y-2">
+                    <div className="grid grid-cols-1 items-stretch gap-5 border-t border-[#dcebee] pt-5 md:grid-cols-2">
+                        <div className="flex min-w-0 flex-col gap-2">
                             <Label className={fieldLabel}>Overall beneficiary overlap</Label>
+                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
+                                Whether the same people are counted in more than one activity.
+                            </p>
                             <SingleChip
                                 options={OVERLAP_STATUSES}
                                 value={section4.project_summary?.overall_overlap || ''}
@@ -391,9 +408,11 @@ export default function Section4Activities() {
                             />
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="flex min-w-0 flex-col gap-2">
                             <Label className={fieldLabel}>Project implementation explanation</Label>
-                            <p className="text-xs text-slate-500">{REPORT_TEXT_RANGE_LABEL} · how activities integrated to achieve goals.</p>
+                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
+                                {REPORT_TEXT_RANGE_LABEL} · how activities integrated to achieve goals.
+                            </p>
                             <Textarea
                                 placeholder="Explain the project synergy…"
                                 value={section4.project_summary?.project_implementation_explanation || ''}
@@ -407,7 +426,7 @@ export default function Section4Activities() {
             </section>
 
             {/* 4.7 Scale Dashboard */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         4.7
@@ -416,22 +435,17 @@ export default function Section4Activities() {
                     <span className={clsx(badgeAuto, "ml-auto")}>Auto-calculated</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="flex flex-wrap gap-2">
                     {[
-                        { label: 'Scale tier', value: scaleClassification, icon: Globe },
-                        { label: 'Categories touched', value: String(categoriesTouched), icon: Target },
-                        { label: 'SDG mix', value: sdgMixLabel, icon: Layers },
-                        { label: 'Partners involved', value: String(partnersCount), icon: Users },
+                        { emoji: '🛠️', label: 'Scale tier', value: scaleClassification },
+                        { emoji: '🎯', label: 'Categories touched', value: String(categoriesTouched) },
+                        { emoji: '🌍', label: 'SDG mix', value: sdgMixLabel },
+                        { emoji: '🤝', label: 'Partners involved', value: String(partnersCount) },
                     ].map((card) => (
-                        <div
-                            key={card.label}
-                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                        >
-                            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                                <card.icon className="h-4 w-4" />
-                            </div>
-                            <p className={clsx(fieldLabel, "mb-1")}>{card.label}</p>
-                            <p className="text-sm font-semibold leading-snug text-slate-900">{card.value}</p>
+                        <div key={card.label} className="s4-scale">
+                            <div className="text-base leading-none">{card.emoji}</div>
+                            <b className="mt-1 block text-sm text-[#0d2b33]">{card.value}</b>
+                            <div className="mt-1 text-[7px] font-extrabold uppercase tracking-[0.1em] text-[#7a919a]">{card.label}</div>
                         </div>
                     ))}
                 </div>
@@ -573,7 +587,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
         else update('implementation_models', [...current, model]);
     };
 
-    const addOutput = () => update('outputs', [...(activity.outputs || []), { title: '', type: '', quantity: '', unit: '', verification_note: '', is_shared: false }]);
+    const addOutput = () => update('outputs', [...(activity.outputs || []), { title: '', type: '', type_other: '', quantity: '', unit: '', unit_other: '', verification_note: '', is_shared: false }]);
     const removeOutput = (idx: number) => update('outputs', activity.outputs.filter((_: any, i: number) => i !== idx));
     const updateOutput = (idx: number, field: string, val: any) => {
         const next = [...activity.outputs];
@@ -594,73 +608,33 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
     };
 
     return (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div
-                className={clsx(
-                    "flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50/80 sm:px-5",
-                    isExpanded && "border-b border-slate-100",
-                )}
-                onClick={() => setIsExpanded(!isExpanded)}
-            >
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-sm font-bold text-indigo-700">
-                        {index + 1}
-                    </div>
-                    <div className="min-w-0">
-                        <h4 className="truncate text-sm font-semibold text-slate-900">
-                            {activity.title || 'Unnamed activity'}
-                        </h4>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {activity.primary_category ? (
-                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                    {activity.primary_category}
-                                </span>
-                            ) : (
-                                <span className="text-[11px] text-slate-400">No category selected</span>
-                            )}
-                            {activity.delivery_mode ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                    {activity.delivery_mode}
-                                </span>
-                            ) : null}
-                            {activity.sessions_count ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                    {activity.sessions_count} session{Number(activity.sessions_count) === 1 ? '' : 's'}
-                                </span>
-                            ) : null}
-                            {activity.serves_beneficiaries && activity.beneficiaries_reached ? (
-                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                    👥 {activity.beneficiaries_reached} reached
-                                </span>
-                            ) : null}
-                            {activity.status ? (
-                                <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                                    {activity.status}
-                                </span>
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            removeActivity(activity.id);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-500 transition-colors hover:bg-red-500 hover:text-white"
-                        aria-label="Remove activity"
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </div>
-                </div>
+        <div className="mt-2.5 overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
+            <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
+                    {index + 1}
+                </span>
+                <h4 className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
+                    {activity.title || 'Unnamed activity'}
+                </h4>
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="rounded-lg border border-[#dcebee] bg-white px-2 py-1 text-[10px] font-extrabold text-[#0e7d74]"
+                >
+                    {isExpanded ? 'Hide' : 'Edit'}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => removeActivity(activity.id)}
+                    className="rounded-lg border border-[#f6cfd8] bg-[#fdf1f4] px-2 py-1 text-[8.5px] font-extrabold text-[#e11d48]"
+                    aria-label="Remove activity"
+                >
+                    Delete
+                </button>
             </div>
 
             {isExpanded && (
-                <div className="space-y-6 px-4 py-5 sm:px-5">
+                <div className="space-y-4 px-3.5 pb-3.5 pt-1">
                     {/* 4.1 fields */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
@@ -674,12 +648,19 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.title`)} />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity status</Label>
-                            <SingleChip
-                                options={['Completed', 'Partially Completed', 'Ongoing']}
-                                value={activity.status || ''}
-                                onChange={(val) => update('status', val)}
-                            />
+                            <Label className={fieldLabel}>Status</Label>
+                            <div className="relative">
+                                <select
+                                    value={activity.status || 'Ongoing'}
+                                    onChange={e => update('status', e.target.value)}
+                                    className={selectClasses}
+                                >
+                                    {['Completed', 'Partially Completed', 'Ongoing', 'Cancelled / Not Delivered'].map((status) => (
+                                        <option key={status} value={status}>{status}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            </div>
                         </div>
                     </div>
 
@@ -695,10 +676,10 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             type="button"
                                             onClick={() => update({ primary_category: cat.id, sub_category: '' })}
                                             className={clsx(
-                                                "flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                                                "s4-chip flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
                                                 active
-                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                                    ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
+                                                    : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
                                             )}
                                         >
                                             <cat.icon className="h-3.5 w-3.5" />
@@ -726,8 +707,39 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 </div>
                                 <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
+                                {isOtherChoice(activity.sub_category) ? (
+                                    <Input
+                                        placeholder="Describe your sub-category…"
+                                        value={activity.other_sub_category_text || ''}
+                                        onChange={e => update('other_sub_category_text', e.target.value)}
+                                        className={clsx(inputClasses, "mt-2")}
+                                    />
+                                ) : null}
                             </div>
                         ) : null}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label className={fieldLabel}>Activity date / period</Label>
+                            <p className="text-xs text-slate-500">Optional if these dates are already in the session log.</p>
+                            <Input
+                                placeholder="e.g. 12–18 Oct 2026"
+                                value={activity.activity_period || ''}
+                                onChange={e => update('activity_period', e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className={fieldLabel}>Partner / host involved</Label>
+                            <p className="text-xs text-slate-500">Optional.</p>
+                            <Input
+                                placeholder="Organization, department, or community group"
+                                value={activity.partner_host || ''}
+                                onChange={e => update('partner_host', e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
                     </div>
 
                     {activity.primary_category === 'Other' ? (
@@ -754,86 +766,17 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
                     </div>
 
-                    {/* 4.2 Delivery */}
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                4.2
-                            </span>
-                            <h5 className="text-sm font-semibold text-slate-900">Delivery execution</h5>
-                            <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Mode of delivery</Label>
-                            <SingleChip
-                                options={DELIVERY_MODES}
-                                value={activity.delivery_mode || ''}
-                                onChange={(val) => update('delivery_mode', val)}
-                            />
-                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.delivery_mode`)} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className={fieldLabel}>Implementation model</Label>
-                            <PillToggle
-                                options={IMPLEMENTATION_MODELS}
-                                selected={activity.implementation_models || []}
-                                onToggle={toggleImplementationModel}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="space-y-1.5">
-                                <Label className={fieldLabel}>Number of sessions / events / drives</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="e.g. 5"
-                                    value={activity.sessions_count}
-                                    onChange={e => update('sessions_count', e.target.value)}
-                                    className={inputClasses}
-                                />
-                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.sessions_count`)} />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label className={fieldLabel}>Delivery explanation</Label>
-                                <Textarea
-                                    placeholder="Briefly explain implementation roles…"
-                                    value={activity.delivery_explanation}
-                                    onChange={e => update('delivery_explanation', e.target.value)}
-                                    className={clsx(textareaClasses, "min-h-[88px]")}
-                                />
-                                <WordMeterBar count={deliveryWords} extra="if filled" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 4.3 Outputs */}
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                    4.3
-                                </span>
-                                <h5 className="text-sm font-semibold text-slate-900">Measurable outputs</h5>
-                                <span className={badgeRequired}>Required</span>
-                            </div>
-                            <Button
-                                type="button"
-                                onClick={addOutput}
-                                variant="outline"
-                                className="h-9 rounded-lg border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                Add output
-                            </Button>
-                        </div>
-
+                    <details className="s4-fold" open>
+                        <summary>📦 Countable outputs — what was delivered?</summary>
+                        <div className="space-y-4 px-3 pb-3">
+                        <p className="rounded-[10px] bg-[#e6f6f4] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
+                            Count what was delivered here. Changes in knowledge, health, behaviour, or systems belong in outcomes.
+                        </p>
                         <div className="space-y-3">
                             {activity.outputs?.map((out: any, idx: number) => (
                                 <div
                                     key={idx}
-                                    className="relative space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                                    className="relative space-y-3 rounded-[11px] border border-[#dcebee] bg-white p-3"
                                 >
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
                                         <div className="space-y-1.5 md:col-span-5">
@@ -858,6 +801,14 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                 </select>
                                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                             </div>
+                                            {isOtherChoice(out.type) ? (
+                                                <Input
+                                                    placeholder="Specify custom output…"
+                                                    value={out.type_other || ''}
+                                                    onChange={e => updateOutput(idx, 'type_other', e.target.value)}
+                                                    className={inputClasses}
+                                                />
+                                            ) : null}
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 md:col-span-3">
                                             <div className="space-y-1.5">
@@ -882,6 +833,14 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                     </select>
                                                     <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                                 </div>
+                                                {isOtherChoice(out.unit) ? (
+                                                    <Input
+                                                        placeholder="Custom unit…"
+                                                        value={out.unit_other || ''}
+                                                        onChange={e => updateOutput(idx, 'unit_other', e.target.value)}
+                                                        className={clsx(inputClasses, "mt-2 px-2")}
+                                                    />
+                                                ) : null}
                                             </div>
                                         </div>
                                     </div>
@@ -917,17 +876,22 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             ))}
                         </div>
                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.outputs`)} />
-                    </div>
-
-                    {/* 4.4 Beneficiaries */}
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                4.4
-                            </span>
-                            <h5 className="text-sm font-semibold text-slate-900">Beneficiary reach</h5>
-                            <span className={clsx(badgeRequired, "ml-auto")}>Required</span>
+                        <button
+                            type="button"
+                            onClick={addOutput}
+                            className="cer-aibtn"
+                        >
+                            ＋ Add another countable output
+                        </button>
                         </div>
+                    </details>
+
+                    <details className="s4-fold">
+                        <summary>🫶 Direct beneficiaries / reach</summary>
+                        <div className="space-y-4 px-3 pb-3">
+                        <p className="rounded-[10px] border border-[#bfe6e2] bg-[#e3f4fa] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
+                            Gross engagements may count repeat contacts. Estimated unique reach should leave out the same people where you can.
+                        </p>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <Label className="text-sm font-medium text-slate-700">
@@ -947,8 +911,8 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             className={clsx(
                                                 "rounded-md px-4 py-1.5 text-xs font-semibold transition-colors",
                                                 active
-                                                    ? "bg-indigo-600 text-white shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-700",
+                                                    ? "bg-[#0e7d74] text-white shadow-sm"
+                                                    : "text-[#3c5a5c] hover:text-[#0e7d74]",
                                             )}
                                         >
                                             {opt}
@@ -962,14 +926,25 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Number of people reached</Label>
+                                        <Label className={fieldLabel}>Gross people reached</Label>
                                         <Input
                                             type="number"
+                                            placeholder="e.g. 180 contacts"
                                             value={activity.beneficiaries_reached}
                                             onChange={e => update('beneficiaries_reached', e.target.value)}
                                             className={inputClasses}
                                         />
                                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.beneficiaries_reached`)} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className={fieldLabel}>Estimated unique beneficiaries</Label>
+                                        <Input
+                                            type="number"
+                                            placeholder="e.g. 120 different people"
+                                            value={activity.unique_beneficiaries || ''}
+                                            onChange={e => update('unique_beneficiaries', e.target.value)}
+                                            className={inputClasses}
+                                        />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className={fieldLabel}>Overlap with other activities</Label>
@@ -985,6 +960,37 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                         </div>
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <Label className={fieldLabel}>How was reach counted?</Label>
+                                        <div className="relative">
+                                            <select
+                                                value={activity.reach_counting_method || ''}
+                                                onChange={e => update('reach_counting_method', e.target.value)}
+                                                className={selectClasses}
+                                            >
+                                                <option value="">Select method...</option>
+                                                {COUNTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        </div>
+                                        {isOtherChoice(activity.reach_counting_method) ? (
+                                            <Input
+                                                placeholder="Describe the counting method…"
+                                                value={activity.reach_counting_method_other || ''}
+                                                onChange={e => update('reach_counting_method_other', e.target.value)}
+                                                className={clsx(inputClasses, "mt-2")}
+                                            />
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className={fieldLabel}>Overlap note</Label>
+                                    <Input
+                                        placeholder="e.g. the same 40 children attended three workshops"
+                                        value={activity.overlap_note || ''}
+                                        onChange={e => update('overlap_note', e.target.value)}
+                                        className={inputClasses}
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
@@ -994,6 +1000,14 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         selected={activity.beneficiary_categories || []}
                                         onToggle={toggleBeneficiaryCategory}
                                     />
+                                    {(activity.beneficiary_categories || []).some((item: string) => isOtherChoice(item)) ? (
+                                        <Input
+                                            placeholder="Specify the other beneficiary group…"
+                                            value={activity.other_beneficiary_text || ''}
+                                            onChange={e => update('other_beneficiary_text', e.target.value)}
+                                            className={inputClasses}
+                                        />
+                                    ) : null}
                                 </div>
 
                                 <div className="space-y-2">
@@ -1020,17 +1034,9 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 </div>
                             </div>
                         ) : null}
-                    </div>
 
-                    {/* 4.5 Location */}
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                4.5
-                            </span>
-                            <h5 className="text-sm font-semibold text-slate-900">Where it happened</h5>
-                            <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
-                        </div>
+                    <div className="space-y-4 border-t border-[#dcebee] pt-4">
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#0e7d74]">Where it happened</p>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div className="space-y-1.5">
@@ -1083,6 +1089,56 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             />
                         </div>
                     </div>
+                        </div>
+                    </details>
+
+                    <details className="s4-fold">
+                        <summary>🚚 Delivery execution</summary>
+                        <div className="space-y-4 px-3 pb-3">
+                            <div className="space-y-1.5">
+                                <Label className={fieldLabel}>Mode of delivery</Label>
+                                <SingleChip
+                                    options={DELIVERY_MODES}
+                                    value={activity.delivery_mode || ''}
+                                    onChange={(val) => update('delivery_mode', val)}
+                                />
+                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.delivery_mode`)} />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className={fieldLabel}>Implementation model</Label>
+                                <PillToggle
+                                    options={IMPLEMENTATION_MODELS}
+                                    selected={activity.implementation_models || []}
+                                    onToggle={toggleImplementationModel}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label className={fieldLabel}>Number of sessions / events / drives</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 5"
+                                        value={activity.sessions_count}
+                                        onChange={e => update('sessions_count', e.target.value)}
+                                        className={inputClasses}
+                                    />
+                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.sessions_count`)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className={fieldLabel}>Delivery explanation</Label>
+                                    <Textarea
+                                        placeholder="Briefly explain implementation roles…"
+                                        value={activity.delivery_explanation}
+                                        onChange={e => update('delivery_explanation', e.target.value)}
+                                        className={clsx(textareaClasses, "min-h-[88px]")}
+                                    />
+                                    <WordMeterBar count={deliveryWords} extra="if filled" />
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
             )}
         </div>

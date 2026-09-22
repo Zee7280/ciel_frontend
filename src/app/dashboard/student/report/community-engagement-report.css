@@ -544,6 +544,96 @@
     color: var(--teal);
 }
 
+.cer .s4-chip.on,
+.cer .s4-chip.on:hover {
+    background: var(--teal) !important;
+    border-color: var(--teal) !important;
+    color: #fff !important;
+}
+
+/* Selected pills in the other report sections use the same solid teal chip. */
+.cer button[class*="border-indigo-500"][class*="rounded-full"],
+.cer button[class*="border-indigo-600"][class*="rounded-full"],
+.cer button[class*="border-indigo-500"][class*="rounded-md"],
+.cer button[class*="border-indigo-600"][class*="rounded-md"],
+.cer button[class*="border-indigo-500"][class*="rounded-lg"],
+.cer button[class*="border-indigo-600"][class*="rounded-lg"],
+.cer button[class*="border-indigo-500"][class*="rounded-full"]:hover,
+.cer button[class*="border-indigo-600"][class*="rounded-full"]:hover,
+.cer button[class*="border-indigo-500"][class*="rounded-md"]:hover,
+.cer button[class*="border-indigo-600"][class*="rounded-md"]:hover,
+.cer button[class*="border-indigo-500"][class*="rounded-lg"]:hover,
+.cer button[class*="border-indigo-600"][class*="rounded-lg"]:hover {
+    background: var(--teal) !important;
+    border-color: var(--teal) !important;
+    color: #fff !important;
+}
+
+.cer section.cer-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 0;
+    box-shadow: 0 1px 2px rgba(13, 43, 51, 0.04);
+}
+
+.cer section.cer-card > div[class*="rounded-xl"][class*="bg-white"][class*="shadow"],
+.cer section.cer-card > div[class*="rounded-2xl"][class*="bg-white"][class*="shadow"] {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.cer section.cer-card span.h-7.w-7.rounded-full {
+    min-width: 30px;
+    width: auto;
+    height: 25px;
+    border-radius: 9px;
+    padding: 0 6px;
+    font-size: 9.5px;
+    font-weight: 800;
+}
+
+.cer .s4-fold {
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    margin-top: 10px;
+    background: #fbfefd;
+}
+
+.cer .s4-fold > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 9px 12px;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.cer .s4-fold > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cer .s4-fold > summary::before {
+    content: "▸ ";
+}
+
+.cer .s4-fold[open] > summary::before {
+    content: "▾ ";
+}
+
+.cer .s4-scale {
+    flex: 1;
+    min-width: 100px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    background: #f5fbfa;
+}
+
 .cer .cer-sdg-tile {
     border-radius: 12px !important;
     min-height: 74px;
@@ -2663,4 +2753,194 @@
 :is(.cer, .cer-scope) .cer-input:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+}
+
+:is(.cer, .cer-scope) .cer-own {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: #f3fbf8;
+    border: 1px solid #d5eee8;
+}
+
+:is(.cer, .cer-scope) .cer-own .ey {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #6f8388;
+}
+
+:is(.cer, .cer-scope) .cer-own b {
+    display: block;
+    margin-top: 2px;
+    color: #12363d;
+}
+
+:is(.cer, .cer-scope) .cer-own p {
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    color: #4d656b;
+}
+
+:is(.cer, .cer-scope) .cer-spot-wrap {
+    margin: 0 0 14px;
+}
+
+:is(.cer, .cer-scope) .cer-spot-toggle {
+    border: 0;
+    background: transparent;
+    color: #4a5f6a;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    margin-bottom: 6px;
+}
+
+:is(.cer, .cer-scope) .cer-spot {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+:is(.cer, .cer-scope) .cer-spot > div {
+    border-radius: 16px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    border: 1px solid transparent;
+}
+
+:is(.cer, .cer-scope) .cer-spot b {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+:is(.cer, .cer-scope) .cer-spot .why {
+    background: #eef5ff;
+    border-color: #cfe0fb;
+    color: #254a82;
+}
+
+:is(.cer, .cer-scope) .cer-spot .ex {
+    background: #eefbf4;
+    border-color: #bfe8d3;
+    color: #1e5a44;
+}
+
+:is(.cer, .cer-scope) .cer-spot .no {
+    background: #fff1f0;
+    border-color: #f6c6c1;
+    color: #8a3a33;
+}
+
+:is(.cer, .cer-scope) .cer-model {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    flex-wrap: wrap;
+    margin: 0 0 14px;
+}
+
+:is(.cer, .cer-scope) .cer-model .n {
+    flex: 1;
+    min-width: 130px;
+    border-radius: 14px;
+    padding: 10px 12px;
+    color: #fff;
+    background: var(--c);
+}
+
+:is(.cer, .cer-scope) .cer-model .n b {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+
+:is(.cer, .cer-scope) .cer-model .n span {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    margin-top: 3px;
+    line-height: 1.3;
+}
+
+:is(.cer, .cer-scope) .cer-model .n small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.9;
+    margin-top: 3px;
+}
+
+:is(.cer, .cer-scope) .cer-ladder {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 0 0 14px;
+}
+
+:is(.cer, .cer-scope) .cer-ladder > div {
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+    border: 2px solid #e3eaee;
+    background: #fff;
+    font-size: 12.5px;
+    color: #58707a;
+}
+
+:is(.cer, .cer-scope) .cer-ladder > div.on {
+    border-color: #0f9d79;
+    background: #edfaf5;
+    color: #0b5d47;
+}
+
+:is(.cer, .cer-scope) .cer-ladder .e {
+    font-size: 24px;
+    display: block;
+}
+
+:is(.cer, .cer-scope) .cer-resource-model {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: #fffbea;
+    border: 1px solid #f1dfa2;
+    font-size: 12.5px;
+    color: #5c4a16;
+}
+
+:is(.cer, .cer-scope) .cer-resource-model b {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+:is(.cer, .cer-scope) .cer-resource-model div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+:is(.cer, .cer-scope) .cer-resource-model span {
+    background: #fff;
+    border-radius: 99px;
+    padding: 4px 8px;
+    font-weight: 800;
+    font-size: 11px;
+}
+
+@media (max-width: 800px) {
+    :is(.cer, .cer-scope) .cer-spot,
+    :is(.cer, .cer-scope) .cer-ladder {
+        grid-template-columns: 1fr;
+    }
 }

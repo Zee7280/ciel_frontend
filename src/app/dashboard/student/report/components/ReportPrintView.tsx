@@ -1570,6 +1570,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <QandA q="Primary category" a={block.primary_category} />
                                     <QandA q="Sub-category" a={block.sub_category} />
                                     <QandA q="Other category" a={block.other_category_text} />
+                                    {block.other_sub_category_text ? <QandA q="Custom sub-category" a={block.other_sub_category_text} /> : null}
+                                    {block.activity_period ? <QandA q="Activity period" a={block.activity_period} /> : null}
+                                    {block.partner_host ? <QandA q="Partner / host" a={block.partner_host} /> : null}
                                     <QandA q="Status" a={block.status} />
                                     <QandA q="Delivery mode" a={block.delivery_mode} />
                                     <QandA q="Implementation models" a={block.implementation_models} />
@@ -1580,7 +1583,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <QandA q="Delivery explanation" a={block.delivery_explanation} fullWidth />
                                     <QandA q="Serves beneficiaries" a={block.serves_beneficiaries} />
                                     <QandA q="Beneficiaries reached" a={block.beneficiaries_reached} />
+                                    {block.unique_beneficiaries ? <QandA q="Estimated unique beneficiaries" a={block.unique_beneficiaries} /> : null}
+                                    {block.reach_counting_method ? <QandA q="How reach was counted" a={block.reach_counting_method_other || block.reach_counting_method} /> : null}
+                                    {block.overlap_note ? <QandA q="Overlap note" a={block.overlap_note} /> : null}
                                     <QandA q="Beneficiary categories" a={block.beneficiary_categories} fullWidth />
+                                    {block.other_beneficiary_text ? <QandA q="Other beneficiary" a={block.other_beneficiary_text} /> : null}
                                     <QandA q="Relevance types" a={block.relevance_types} fullWidth />
                                     <QandA q="Overlap status" a={block.overlap_status} />
                                     <QandA q="Beneficiary description" a={block.beneficiary_description} fullWidth />
@@ -1600,8 +1607,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <p className="mb-1 text-sm font-black text-slate-900">{firstNonBlank(output.title, "Output")}</p>
                                     <p className="mb-4 text-[9px] font-black uppercase tracking-widest text-slate-400">{blockTitle}</p>
                                     <div className="grid grid-cols-1 gap-4">
-                                        <QandA q="Type" a={output.type} />
-                                        <QandA q="Quantity / unit" a={[output.quantity, output.unit].filter(Boolean).join(" ")} />
+                                        <QandA q="Type" a={output.type_other || output.type} />
+                                        <QandA q="Quantity / unit" a={[output.quantity, output.unit_other || output.unit].filter(Boolean).join(" ")} />
                                         <QandA q="Shared" a={output.is_shared} />
                                         <QandA q="Verification note" a={output.verification_note} fullWidth />
                                     </div>

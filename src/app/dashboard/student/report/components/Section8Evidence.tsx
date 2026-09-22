@@ -398,7 +398,7 @@ export default function Section8Evidence() {
     }, [autoNarrative, section8.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-4">
                 <div className="flex items-center gap-3.5">
@@ -428,7 +428,7 @@ export default function Section8Evidence() {
 
             {/* Already collected — pulled from earlier sections, nothing to redo */}
             {collectedElsewhere.length > 0 ? (
-                <section className="space-y-4">
+                <section className="cer-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-base font-semibold text-slate-900">
                             Already collected <span className="font-normal text-slate-500">({collectedElsewhere.length})</span>
@@ -463,7 +463,7 @@ export default function Section8Evidence() {
             ) : null}
 
             {/* 8.1 Upload evidence */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.1" title="Step 1 — Upload evidence" status="mandatory" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -620,7 +620,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* 8.2 Classify */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.2" title="Step 2 — Classify the evidence" status="required" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -699,7 +699,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* 8.3 Describe */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.3" title="Step 3 — What does your evidence show?" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -732,7 +732,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* 8.4 Ethical */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.4" title="Step 4 — Ethical & consent confirmation" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -768,7 +768,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* 8.5 Visibility */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.5" title="Step 5 — Media visibility preference" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -804,7 +804,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* 8.6 Partner verification */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <StepHeader n="8.6" title="Step 6 — Partner verification" status="optional" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -921,7 +921,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* System evidence status */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
@@ -991,7 +991,7 @@ export default function Section8Evidence() {
             </section>
 
             {/* Auto summary */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">

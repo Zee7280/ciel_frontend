@@ -34,6 +34,7 @@ import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMa
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import { pickReportStatusFromCheckRow } from '@/utils/studentBrowseReportCta';
 import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
+import { buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, sumNonRejectedLoggedHours } from './utils/engagementMetrics';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -49,7 +50,7 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney } from './ReportFormChrome';
+import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel } from './ReportFormChrome';
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -535,7 +536,7 @@ function ReportFormContent() {
                     toast.error('Only your team lead can submit this team report.');
                 } else if (!isEligibleForSubmission) {
                     toast.error(
-                        `Minimum verified hours not met (${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16}). Complete Section 1 first.`,
+                        `Minimum logged hours not met (${sumNonRejectedLoggedHours(data.section1.attendance_logs || [])}/${data.required_hours || 16}). Complete Section 1 first.`,
                     );
                 } else {
                     toast.error('Complete all required fields in every section before submitting.');
@@ -624,8 +625,14 @@ function ReportFormContent() {
 
     const confirmSubmit = async () => {
         if (submitSucceeded) return;
-        const hoursOk =
-            (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
+        const hoursOk = loggedHoursClearSubmitBar({
+            logs: data.section1.attendance_logs || [],
+            requiredHours: data.required_hours || 16,
+            rosterIds: buildIndividualRosterFromSection1(
+                data.section1,
+                data.section1.team_lead?.id,
+            ),
+        });
         const stillIncomplete = getIncompleteSectionsSummary(data);
         if (!hoursOk || stillIncomplete.length > 0) {
             toast.error('Report is not ready to submit. Fix the items below and try again.');
@@ -921,13 +928,28 @@ function ReportFormContent() {
 
                 {!onFlash ? (
                     <>
-                        <ReportAchievementBanner step={activeStep} data={data} projectData={projectDetails} />
                         <ReportSectionBridge
                             step={activeStep}
                             data={data}
                             projectData={projectDetails}
                             onOpenHelp={() => setHelpSignal((n) => n + 1)}
                         />
+                        {activeStep === 1 ? (
+                            <div className="cer-own">
+                                <div>
+                                    <div className="ey">REPORT OWNERSHIP & ACCESS</div>
+                                    <b>{isTeamMemberAttendanceOnly ? "Team member · attendance only" : "Master Student · Report Owner"}</b>
+                                    <p>
+                                        {isTeamMemberAttendanceOnly
+                                            ? "You can read the shared report and edit only your own attendance. The Master Student writes Sections 2–9 and submits."
+                                            : "You control Sections 1–9, team setup, final declarations and submission."}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+                        <ReportAchievementBanner step={activeStep} data={data} projectData={projectDetails} />
+                        <ReportExampleSpot step={activeStep} />
+                        <ReportSectionModel step={activeStep} data={data} />
                     </>
                 ) : null}
 
@@ -1057,24 +1079,21 @@ function ReportFormContent() {
                     <DialogHeader>
                         <DialogTitle>Cannot submit yet</DialogTitle>
                         <DialogDescription className="sr-only">
-                            The report cannot be submitted until minimum verified hours and all required steps are complete.
+                            The report cannot be submitted until the logged hour minimum and all required steps are complete.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 text-left text-sm text-slate-600">
                         {!isEligibleForSubmission && (
                             <p>
-                                Verified hours:{" "}
+                                Logged hours:{" "}
                                 <span className="font-semibold text-slate-900">
-                                    {data.section1.metrics?.total_verified_hours || 0} / {data.required_hours || 16}
+                                    {sumNonRejectedLoggedHours(data.section1.attendance_logs || [])} / {data.required_hours || 16}
                                 </span>
-                                . Complete and verify attendance in Section 1 until the minimum is met.
-                                {Array.isArray(data.section1.metrics?.individual_metrics) &&
-                                data.section1.metrics.individual_metrics.some((m: any) => m?.gateway_status !== "ELIGIBLE") &&
-                                (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16) ? (
+                                . Log attendance in Section 1 until the minimum is met. Faculty reviews the flash card after you submit.
+                                {sumNonRejectedLoggedHours(data.section1.attendance_logs || []) >= (data.required_hours || 16) ? (
                                     <>
                                         {" "}
-                                        The team total meets the goal, but every teammate needs their own individual
-                                        hours logged and verified — hours can&apos;t be pooled from one member to cover another.
+                                        The team total meets the goal, but every teammate needs their own hours logged — hours can&apos;t be pooled from one member to cover another.
                                     </>
                                 ) : null}
                             </p>

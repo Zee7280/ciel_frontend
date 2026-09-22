@@ -427,7 +427,7 @@ export default function FacultyAiEvaluationConsole() {
                                 <div className="fae-fstats">
                                     <div className="fae-fs">
                                         <div className="v">{model.hoursLabel}</div>
-                                        <div className="kk">VERIFIED HOURS</div>
+                                        <div className="kk">LOGGED HOURS</div>
                                     </div>
                                     <div className="fae-fs">
                                         <div className="v">{model.reachedLabel}</div>

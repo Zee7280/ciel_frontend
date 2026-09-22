@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { ReportData } from "./context/ReportContext";
 import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, wizardStepToDataSections } from "./utils/reportWizardNav";
 import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journeyLevel, sectionStrength } from "./utils/impactJourney";
+import { sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -308,7 +309,12 @@ export function ReportImpactJourney({
     );
 }
 
-const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>) => { headline: string; body: string; badges: string[] }> = {
+const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>, requiredHours: number) => { headline: string; body: string; badges: string[] }> = {
+    1: (a, requiredHours) => ({
+        headline: "READY TO BEGIN",
+        body: "Your opportunity is connected. Build your participation record first.",
+        badges: [`🎯 ${requiredHours}h target/member`, `🌍 ${a.sdgs.length} registered SDG${a.sdgs.length === 1 ? "" : "s"}`],
+    }),
     2: (a) => ({
         headline: "PARTICIPATION RECORD STARTED",
         body: `${a.logs.length} evidence-backed session${a.logs.length === 1 ? "" : "s"} · ${Math.round(a.hours * 10) / 10} team-hours logged.`,
@@ -361,10 +367,11 @@ export function ReportAchievementBanner({
     data: ReportData;
     projectData?: unknown;
 }) {
-    const build = ACHIEVEMENT_COPY[step];
+    const uiStep = canonicalReportStep(step);
+    const build = ACHIEVEMENT_COPY[uiStep];
     if (!build) return null;
     const a = chromeAgg(data, projectData);
-    const { headline, body, badges } = build(a);
+    const { headline, body, badges } = build(a, data.required_hours || 16);
     return (
         <div className="cer-achievement">
             <div className="trophy">🏆</div>
@@ -397,10 +404,11 @@ export function ReportSectionBridge({
     if (!meta) return null;
 
     const a = chromeAgg(data, projectData);
-    const { context, title, sdgs, hours, members, acts, reach, evidence, competency, bestPct, pkr } = a;
+    const { context, title, sdgs, members, acts, reach, evidence, competency, bestPct, pkr } = a;
+    const loggedHours = sumNonRejectedLoggedHours(data.section1.attendance_logs || []);
 
     const pills: Array<[string, string]> = [];
-    if (uiStep > 1 && hours) pills.push([`${Math.round(hours * 10) / 10}h`, "VERIFIED HOURS"]);
+    if (uiStep > 1 && loggedHours) pills.push([`${Math.round(loggedHours * 10) / 10}h`, "TEAM-HOURS LOGGED"]);
     if (uiStep > 1) pills.push([String(members), "MEMBERS"]);
     if (uiStep > 2 && data.section2?.problem_statement) pills.push(["📍", "BASELINE SET"]);
     if (uiStep > 3 && sdgs.length) pills.push([String(sdgs.length), "SDGs MAPPED"]);
@@ -463,6 +471,154 @@ export function ReportSectionBridge({
             {meta.note ? <div className="cer-note">{meta.note}</div> : null}
         </>
     );
+}
+
+const EXAMPLE_SPOTS: Record<number, [string, string, string]> = {
+    1: [
+        "Verified hours are the foundation of every claim in your report — effort, reach and value all start here.",
+        "20 May 2026 · 09:00–12:00 · SOS Children’s Village · Training Workshop — “Delivered a digital-safety workshop to 35 students, facilitated two group exercises and collected participant feedback.” + attendance sheet, activity photo, feedback form.",
+        "“Worked for 3 hours at NGO.” No time, no place, no proof — and remember: pooled team hours never satisfy your personal minimum.",
+    ],
+    2: [
+        "A specific, evidence-aware baseline is what makes your outcomes believable later.",
+        "“Classroom 4 had damaged lighting, limited learning displays and broken storage. Approximately 120 children used the space. We found this through a site visit, teacher interviews and direct observation.”",
+        "“The community had many problems and needed help.”",
+    ],
+    3: [
+        "CIEL maps your work to the UN framework without inflating claims: SDG → official target → indicator (optional) → your local metric → contribution logic.",
+        "SDG 4 · Target 4.a · Local metric: 1 classroom improved · “Our project improved classroom lighting, learning displays and physical usability, supporting a safer, more functional learning environment.”",
+        "Selecting five SDGs with no evidence. One well-argued SDG beats five decorative ones.",
+    ],
+    4: [
+        "Reviewers look for the difference between doing things and changing things. Activity = what you did · Output = what you can count · Outcome = what changed.",
+        "Activity: Repainted and reorganised Classroom 4. Outputs: 1 classroom improved, 14 displays installed, 6 storage units repaired. Reach: 120 students (class register, counted once). Outcome: usability up — baseline 2 of 6 storage units usable → endline 6 of 6, teacher-confirmed.",
+        "“Improved education.” “Helped 90 families and improved food security.” (an output and an outcome merged, with no baseline)",
+    ],
+    5: [
+        "Resources make your project’s real cost and mobilisation visible — including things you got for free.",
+        "Materials · 12 litres paint · from a local hardware store (discounted) · “made the wall painting possible” · verified by invoice. Cash · PKR 10,000 · student self-funded · receipts attached.",
+        "Typing “volunteer time” as a resource (your hours are already counted in Section 1) or listing money with no receipt and calling it verified.",
+    ],
+    6: [
+        "Partnerships of all sizes count — an NGO, a small store, a professional, a community elder — when the role and contribution are real and verifiable.",
+        "Imran Sheikh · Village Director · SOS Children’s Village · Role: community access + attendance verification · “Coordinated with teachers, gave classroom access and confirmed delivery of the upgraded space.”",
+        "“SOS — partner.” A name with no role, no contribution and no contact that can be verified.",
+    ],
+    7: [
+        "Your good work deserves to be seen. Five strong pieces of evidence beat twenty repetitive photographs — and visibility never changes your CII.",
+        "Attendance sheets (participation) · before/after photos with consent (outputs) · teacher feedback summary (outcomes) · receipts (resources) · partner sign-off (verification).",
+        "Twenty near-identical group photos; public images of children without consent; evidence that supports no specific claim.",
+    ],
+    8: [
+        "Reflection shows the learning behind the service — and separates a real experience from a template.",
+        "“I assumed the classroom needed more furniture, but teacher interviews showed lighting and storage were the urgent barriers. That changed our budget and taught me to validate assumptions before designing an intervention.”",
+        "“I learned teamwork and communication. It was a great experience.”",
+    ],
+    9: [
+        "Impact that outlives the project is the strongest signal — but only when it is credible. Small and true beats big and vague.",
+        "“SOS retains the display templates and storage labels. The house supervisor runs a monthly classroom check; we handed over a one-page maintenance guide and trained two staff. Weekly tutoring stops unless SOS assigns a volunteer.”",
+        "“The project will continue in the future.” or promising national scaling with nothing to back it.",
+    ],
+};
+
+/** V12 example spotlight — why / strong example / avoid — on every report section. */
+export function ReportExampleSpot({ step }: { step: number }) {
+    const uiStep = canonicalReportStep(step);
+    const spot = EXAMPLE_SPOTS[uiStep];
+    const [open, setOpen] = useState(true);
+    if (!spot) return null;
+    return (
+        <div className="cer-spot-wrap">
+            <button type="button" className="cer-spot-toggle" onClick={() => setOpen((v) => !v)}>
+                {open ? "Hide example ▴" : "Show me an example ▾"}
+            </button>
+            {open ? (
+                <div className="cer-spot">
+                    <div className="why"><b>Why this matters</b>{spot[0]}</div>
+                    <div className="ex"><b>Strong example</b>{spot[1]}</div>
+                    <div className="no"><b>Avoid this</b>{spot[2]}</div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+/** V12 live models that sit above the form on SDG, activities, resources, reflection, and sustainability. */
+export function ReportSectionModel({ step, data }: { step: number; data: ReportData }) {
+    const uiStep = canonicalReportStep(step);
+    const a = chromeAgg(data);
+    if (uiStep === 3) {
+        const primary = a.sdgs.find((row) => row.role === "primary") || a.sdgs[0];
+        const words = (data.section3?.contribution_intent_statement || "").trim().split(/\s+/).filter(Boolean).length;
+        return (
+            <div className="cer-model">
+                <div className="n" style={{ ["--c" as string]: "#7c5cff" }}><b>1 · SDG</b><span>{primary ? `SDG ${primary.goalNumber}` : "Not mapped yet"}</span><small>registered · locked</small></div>
+                <div className="n" style={{ ["--c" as string]: "#5b7cfa" }}><b>2 · Official target</b><span>{primary?.targetId || "Pick a target"}</span><small>from the UN list</small></div>
+                <div className="n" style={{ ["--c" as string]: "#8ea2b3" }}><b>3 · UN indicator · optional</b><span>{primary?.indicatorId || "Optional"}</span><small>reference only — never blocks you</small></div>
+                <div className="n" style={{ ["--c" as string]: "#2ec4b6" }}><b>4 · Local metric</b><span>{a.outputs ? `${a.outputs} countable outputs` : "your project metric"}</span><small>CIEL/project metric</small></div>
+                <div className="n" style={{ ["--c" as string]: "#0f9d79" }}><b>5 · Contribution logic</b><span>{words} words written</span><small>how your work moved the target</small></div>
+            </div>
+        );
+    }
+    if (uiStep === 4) {
+        return (
+            <div className="cer-model">
+                <div className="n" style={{ ["--c" as string]: "#ff766f" }}><b>Activity</b><span>{a.acts.length} logged</span><small>what your team did</small></div>
+                <div className="n" style={{ ["--c" as string]: "#ffa062" }}><b>Output</b><span>{a.outputs} countable</span><small>what was produced — count it</small></div>
+                <div className="n" style={{ ["--c" as string]: "#ffc247" }}><b>Reach</b><span>{a.reach || 0} people</span><small>each person counted once</small></div>
+                <div className="n" style={{ ["--c" as string]: "#2ec4b6" }}><b>Outcome</b><span>{a.measured.length} measured{a.bestPct != null ? ` · best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}</span><small>what changed — baseline → endline</small></div>
+            </div>
+        );
+    }
+    if (uiStep === 5 && data.section6?.use_resources === "yes") {
+        const resources = data.section6.resources || [];
+        const byType = new Map<string, number>();
+        resources.forEach((row) => {
+            const key = pickString(row.type, row.type_other) || "Other";
+            byType.set(key, (byType.get(key) || 0) + 1);
+        });
+        return (
+            <div className="cer-resource-model">
+                <b>What your project ran on</b>
+                <div>
+                    {byType.size
+                        ? [...byType.entries()].map(([label, count]) => <span key={label}>{label} · {count}</span>)
+                        : <span>Add resource entries and this fills itself.</span>}
+                </div>
+            </div>
+        );
+    }
+    if (uiStep === 8) {
+        const scores = Object.values(data.section9?.competency_scores || {}).filter((n) => typeof n === "number" && n > 0);
+        const avg = scores.length ? (scores.reduce((sum, n) => sum + Number(n), 0) / scores.length).toFixed(1) : "—";
+        return (
+            <div className="cer-model">
+                <div className="n" style={{ ["--c" as string]: "#6f62d9" }}><b>Competencies rated</b><span>{scores.length}/12</span><small>honest beats a row of 5s</small></div>
+                <div className="n" style={{ ["--c" as string]: "#0f9d79" }}><b>Average self-rating</b><span>{avg}{avg === "—" ? "" : "/5"}</span><small>the rubric reads the reflection, not the score</small></div>
+            </div>
+        );
+    }
+    if (uiStep === 9) {
+        const status = String(data.section10?.continuation_status || "");
+        const rungs: Array<[string, string, string, boolean]> = [
+            ["⏸️", "Stops when we leave", "Honest and fine — say what would be needed.", status === "no"],
+            ["♻️", "Partly continues", "Some elements live on with support.", status === "partially" || status === "partial"],
+            ["🌿", "Continues on its own", "Named owner + handover mechanism.", status === "yes"],
+        ];
+        return (
+            <div className="cer-ladder">
+                {rungs.map(([icon, title, body, on]) => (
+                    <div key={title} className={on ? "on" : ""}>
+                        <span className="e">{icon}</span>
+                        <b>{title}</b>
+                        <br />
+                        {body}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    return null;
 }
 
 function BannerShell({

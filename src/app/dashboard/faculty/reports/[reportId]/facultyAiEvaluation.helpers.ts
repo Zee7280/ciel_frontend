@@ -18,6 +18,7 @@ import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { dataSectionReviewBannerLabel } from "@/app/dashboard/student/report/utils/reportWizardNav";
+import { sumNonRejectedLoggedHours, type AttendanceLog } from "@/app/dashboard/student/report/utils/engagementMetrics";
 
 export const CONDITIONAL_REMARK_PREFIX = "[Conditional badge]";
 export const ADMIN_REVIEW_REMARK_PREFIX = "[Admin review requested]";
@@ -277,7 +278,12 @@ export function buildFacultyAiEvaluationModel(raw: unknown): FacultyAiEvaluation
         };
     });
 
+    const attendanceLogs = Array.isArray(section1.attendance_logs)
+        ? (section1.attendance_logs as AttendanceLog[])
+        : [];
+    const loggedHours = attendanceLogs.length > 0 ? sumNonRejectedLoggedHours(attendanceLogs) : null;
     const hours =
+        loggedHours ??
         pickNumber(metrics.total_verified_hours) ??
         pickNumber(opportunity.hours) ??
         pickNumber(opportunity.expected_hours);

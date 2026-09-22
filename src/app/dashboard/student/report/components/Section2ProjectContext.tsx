@@ -451,7 +451,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             </div>
 
             {/* ── Quick questions ────────────────────────────────────────── */}
-            <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="cer-card space-y-5">
                 <div>
                     <div className="cer-secl">
                         <span className="cer-secn">2.1</span>

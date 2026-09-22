@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import {
-    TrendingUp, Info, Plus, Trash2, CheckCircle2, AlertCircle,
+    TrendingUp, Info, Plus, CheckCircle2, AlertCircle,
     BarChart3, PlusCircle, ChevronDown, Target, Lock, Pencil, Repeat, Sparkle,
 } from "lucide-react";
 import { Label } from "./ui/label";
@@ -256,36 +256,27 @@ function OutcomeCard({
     const explanationWords = wordCount(outcome.measurement_explanation || "");
 
     return (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-sm font-bold text-indigo-700">
-                        {index + 1}
-                    </div>
-                    <div className="min-w-0">
-                        <h4 className="truncate text-sm font-semibold text-slate-900">
-                            {outcomeTitle(outcome)}
-                        </h4>
-                        {outcome.outcome_area ? (
-                            <span className="mt-1 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                {outcome.outcome_area.replace(/^\d+\.\s*/, "")}
-                            </span>
-                        ) : null}
-                    </div>
-                </div>
+        <div className="overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
+            <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
+                    {index + 1}
+                </span>
+                <h4 className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
+                    {outcomeTitle(outcome)}
+                </h4>
                 {canRemove ? (
                     <button
                         type="button"
                         onClick={onRemove}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-500 transition-colors hover:bg-red-500 hover:text-white"
+                        className="rounded-lg border border-[#f6cfd8] bg-[#fdf1f4] px-2 py-1 text-[8.5px] font-extrabold text-[#e11d48]"
                         aria-label="Remove outcome"
                     >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
                     </button>
                 ) : null}
             </div>
 
-            <div className="space-y-5 p-4 sm:p-5">
+            <div className="space-y-4 px-3.5 pb-3.5 pt-3">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-1.5">
                         <Label className={fieldLabel}>Outcome category</Label>
@@ -621,7 +612,7 @@ export default function Section5Outcomes() {
     };
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
             {/* Header */}
             <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -673,7 +664,7 @@ export default function Section5Outcomes() {
             </div>
 
             {/* 5.1 Observed Change */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         5.1
@@ -780,7 +771,7 @@ export default function Section5Outcomes() {
             </section>
 
             {/* 5.2 Measurable Outcomes */}
-            <section className="space-y-4">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         5.2
@@ -815,7 +806,7 @@ export default function Section5Outcomes() {
             </section>
 
             {/* 5.3 Challenges */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
+            <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
                         5.3

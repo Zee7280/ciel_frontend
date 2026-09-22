@@ -9,6 +9,7 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { countWords, reportTextWordMeter } from "../utils/validation";
+import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const continuationOptions = [
@@ -61,8 +62,8 @@ function StepHeader({
     status?: "mandatory" | "required";
 }) {
     return (
-        <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+        <div className="cer-secl">
+            <span className="cer-secn">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
@@ -212,7 +213,7 @@ export default function Section10Sustainability() {
         }
     }, [autoNarrative, section10.summary_text, updateSection]);
 
-    const verifiedHours = data.section1.metrics?.total_verified_hours || 0;
+    const loggedHours = sumNonRejectedLoggedHours(data.section1.attendance_logs || []);
     const requiredHours = data.required_hours || 16;
 
     if (!isEligibleForSubmission) {
@@ -227,7 +228,7 @@ export default function Section10Sustainability() {
                         <p className="text-sm leading-relaxed text-slate-500">
                             Sustainability analysis activates once the{" "}
                             <span className="font-semibold text-[var(--teal)]">{requiredHours}-hour minimum</span>{" "}
-                            engagement is verified. Complete your attendance logs in Section 1 to unlock this step.
+                            is logged. Complete your attendance logs in Section 1 to unlock this step. Faculty reviews the flash card after you submit.
                         </p>
                     </div>
                     <div>
@@ -235,12 +236,12 @@ export default function Section10Sustainability() {
                             <div
                                 className="h-full bg-[var(--gold)]"
                                 style={{
-                                    width: `${Math.min((verifiedHours / Math.max(requiredHours, 1)) * 100, 100)}%`,
+                                    width: `${Math.min((loggedHours / Math.max(requiredHours, 1)) * 100, 100)}%`,
                                 }}
                             />
                         </div>
                         <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                            Current progress: {verifiedHours} / {requiredHours} hours
+                            Current progress: {loggedHours} / {requiredHours} hours
                         </p>
                     </div>
                 </div>
@@ -249,7 +250,7 @@ export default function Section10Sustainability() {
     }
 
     return (
-        <div className="mx-auto max-w-6xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3 pb-10">
                 {/* Header */}
                 <div className="cer-dup-head space-y-4">
                     <div className="flex items-center gap-3.5">
@@ -278,7 +279,7 @@ export default function Section10Sustainability() {
                 </div>
 
                 {/* 10.1 Continuation status */}
-                <section className="space-y-4">
+                <section className="cer-card space-y-4">
                     <StepHeader n="10.1" title="Step 1 — Continuation status" status="required" />
 
                     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -324,7 +325,7 @@ export default function Section10Sustainability() {
 
                 {/* 10.2 Explanation */}
                 {continuation_status ? (
-                    <section className="space-y-4">
+                    <section className="cer-card space-y-4">
                         <StepHeader n="10.2" title="What continues, what stops?" status="mandatory" />
 
                         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -383,7 +384,7 @@ export default function Section10Sustainability() {
                 ) : null}
 
                 {/* 10.3 Mechanisms */}
-                <section className="space-y-4">
+                <section className="cer-card space-y-4">
                     <StepHeader n="10.3" title="Step 3 — Sustainability mechanisms" status="required" />
 
                     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -418,7 +419,7 @@ export default function Section10Sustainability() {
                 </section>
 
                 {/* 10.4 Scaling & influence */}
-                <section className="space-y-4">
+                <section className="cer-card space-y-4">
                     <StepHeader n="10.4" title="Scaling &amp; system influence" status="required" />
 
                     <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -477,7 +478,7 @@ export default function Section10Sustainability() {
                 </section>
 
                 {/* System summary */}
-                <section className="space-y-4 border-t border-slate-200 pt-8">
+                <section className="cer-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
@@ -552,7 +553,7 @@ export default function Section10Sustainability() {
                 </section>
 
                 {/* Auto narrative */}
-                <section className="space-y-4 border-t border-slate-200 pt-8">
+                <section className="cer-card space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
