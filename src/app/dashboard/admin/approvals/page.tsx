@@ -26,15 +26,11 @@ import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
-import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
-import { readActivityPlan, readObjectiveItems } from "@/utils/opportunityDetailView";
 import {
-    ApprovalPipelineMini,
-    computeApprovalPipelineSteps,
-    type ApprovalLineStatus,
-    type ApprovalPipelineStepState,
-} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 
 type AdminApprovalHistoryEntry = {
     line: "faculty" | "partner" | "admin";
@@ -45,28 +41,6 @@ type AdminApprovalHistoryEntry = {
     version: number;
     reason?: string | null;
 };
-
-/** CIEL PK is the final stage here, so — unlike the Create Opportunity tab's "my own opportunity"
- * pipeline — every line up to and including Admin is shown as a real, live stage. */
-function adminApprovalPipelineSteps(row: Record<string, unknown>) {
-    const requiresPartner = row.requiresPartnerApproval === true || row.requires_partner_approval === true;
-    const lines: { label: string; status: ApprovalLineStatus }[] = [
-        { label: "Faculty", status: (row.facultyApprovalStatus ?? row.faculty_approval_status) as ApprovalLineStatus },
-        ...(requiresPartner
-            ? [{ label: "Partner / NGO", status: (row.partnerApprovalStatus ?? row.partner_approval_status) as ApprovalLineStatus }]
-            : []),
-        { label: "CIEL PK", status: (row.adminApprovalStatus ?? row.admin_approval_status) as ApprovalLineStatus },
-    ];
-    const status = readWorkflowStage(row);
-    const decisionState: ApprovalPipelineStepState =
-        status === "rejected" ? "bad" : readAdminApproved(row) || status === "live" || status === "active" ? "done" : "locked";
-    return computeApprovalPipelineSteps(lines, decisionState);
-}
-
-function readOpportunityVersion(row: Record<string, unknown>): number {
-    const v = row.version;
-    return typeof v === "number" && Number.isFinite(v) ? v : 1;
-}
 
 function readApprovalHistory(row: Record<string, unknown>): AdminApprovalHistoryEntry[] {
     const v = row.approvalHistory ?? row.approval_history;
@@ -846,15 +820,6 @@ export default function AdminApprovalsPage() {
         return selectedOpportunity as Record<string, unknown>;
     }, [selectedOpportunity, opportunityDetail]);
 
-    const adminObjectiveContent = useMemo(
-        () => (adminDetailView ? readObjectiveItems(adminDetailView) : { description: "", items: [] }),
-        [adminDetailView],
-    );
-    const adminActivityPlan = useMemo(
-        () => (adminDetailView ? readActivityPlan(adminDetailView) : { full: "", preview: "", isLong: false, skills: [] }),
-        [adminDetailView],
-    );
-
     return (
         <div className="p-0 lg:p-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -1084,38 +1049,14 @@ export default function AdminApprovalsPage() {
                         const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow);
                         const canRequestRevision = canRequestOpportunityRevision(projRow);
                         return (
-                        <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
-                            <div className="min-w-0">
-                                <h3 className="text-lg font-bold text-slate-900">{proj.title}</h3>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
-                                    <span className="font-bold text-blue-600">{proj.partner_name || "Unknown Partner"}</span>
-                                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded">{proj.types?.[0] || "General"}</span>
-                                    {flowLabel ? (
-                                        <span
-                                            className="bg-violet-50 text-violet-800 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider border border-violet-100"
-                                            title="Workflow position in the approval chain"
-                                        >
-                                            {flowLabel}
-                                        </span>
-                                    ) : null}
-                                    {isLiveApproved ? (
-                                        <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider border border-emerald-100">
-                                            CIEL approved
-                                        </span>
-                                    ) : null}
-                                    <span>
-                                        • Submitted:{" "}
-                                        {formatDateTime(
-                                            proj.submitted_at || proj.submittedAt || proj.created_at || proj.createdAt,
-                                        )}{" "}
-                                        · Opp v{readOpportunityVersion(projRow)}
-                                    </span>
-                                </div>
-                                <div className="mt-2">
-                                    <ApprovalPipelineMini steps={adminApprovalPipelineSteps(projRow)} />
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-3 lg:justify-end">
+                        <OpportunityApprovalCard
+                            key={proj.id}
+                            {...buildOpportunityApprovalModel(projRow, "admin", {
+                                mode: showApproveButton ? "pending" : "decided",
+                            })}
+                            statusPill={flowLabel || undefined}
+                            actions={
+                            <div className="flex w-full flex-wrap items-center justify-start gap-2">
                                 <button
                                     type="button"
                                     title="View full opportunity details"
@@ -1226,15 +1167,9 @@ export default function AdminApprovalsPage() {
                                     )}
                                 </button>
                                 ) : null}
-                                {/* <button
-                                    onClick={() => handleChatWithPartner(proj)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
-                                    title="Chat with Partner"
-                                >
-                                    <MessageSquare className="w-4 h-4" />
-                                </button> */}
                             </div>
-                        </div>
+                            }
+                        />
                         );
                     })
                 )}
@@ -1266,7 +1201,7 @@ export default function AdminApprovalsPage() {
             {/* View Details Modal */}
             {isDetailModalOpen && selectedOpportunity && adminDetailView && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                                 <div>
                                     {(() => {
@@ -1612,220 +1547,11 @@ export default function AdminApprovalsPage() {
                                     );
                                 })()}
 
-                                {/* Section 1: Overview & Logistics */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Overview & Logistics</h3>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 md:gap-6">
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Mode</span>
-                                            <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded text-sm">{String(adminDetailView.mode ?? "N/A")}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Location</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {adminDetailView.location
-                                                    ? `${(adminDetailView.location as { venue?: string }).venue || ""}, ${(adminDetailView.location as { city?: string }).city || ""}`
-                                                    : "Remote"}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Timeline Type</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {String((adminDetailView.timeline as { type?: string } | undefined)?.type || "N/A")}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Visibility</span>
-                                            <span className="font-bold text-slate-900 text-sm capitalize">{String(adminDetailView.visibility || "Public")}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 md:gap-6">
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Start Date</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {(adminDetailView.timeline as { start_date?: string } | undefined)?.start_date
-                                                    ? new Date(
-                                                          String((adminDetailView.timeline as { start_date?: string }).start_date),
-                                                      ).toLocaleDateString()
-                                                    : "TBD"}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">End Date</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {(adminDetailView.timeline as { end_date?: string } | undefined)?.end_date
-                                                    ? new Date(
-                                                          String((adminDetailView.timeline as { end_date?: string }).end_date),
-                                                      ).toLocaleDateString()
-                                                    : "TBD"}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Expected Hours (Per Student)</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {Number((adminDetailView.timeline as { expected_hours?: number } | undefined)?.expected_hours) || 0}{" "}
-                                                hrs/student
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Volunteers Needed</span>
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {Number((adminDetailView.timeline as { volunteers_required?: number } | undefined)?.volunteers_required) || 0}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 2: Objectives & Impact */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-teal-600 uppercase tracking-wider mb-4 border-b border-teal-100 pb-2 flex items-center gap-2">
-                                        <Building2 className="w-4 h-4" /> Objectives & Impact
-                                    </h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Project Objective</span>
-                                            {adminObjectiveContent.items.length > 1 ? (
-                                                <ol className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 space-y-2 list-decimal list-inside">
-                                                    {adminObjectiveContent.items.map((item, idx) => (
-                                                        <li key={idx} className="leading-relaxed">
-                                                            {item}
-                                                        </li>
-                                                    ))}
-                                                </ol>
-                                            ) : (
-                                                <p className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 whitespace-pre-wrap">
-                                                    {adminObjectiveContent.description ||
-                                                        String(
-                                                            (adminDetailView.objectives as { description?: string } | undefined)?.description ||
-                                                                adminDetailView.description ||
-                                                                "No objective provided.",
-                                                        )}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <span className="text-xs text-slate-500 block mb-1">Beneficiaries Count</span>
-                                                <span className="font-bold text-slate-900 text-sm">
-                                                    {Number((adminDetailView.objectives as { beneficiaries_count?: number } | undefined)?.beneficiaries_count) || 0}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs text-slate-500 block mb-1">Beneficiary Types</span>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {(
-                                                        (adminDetailView.objectives as { beneficiaries_type?: string[] } | undefined)?.beneficiaries_type || []
-                                                    ).map((t: string, i: number) => (
-                                                        <span key={i} className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-                                                            {t}
-                                                        </span>
-                                                    )) || <span className="text-xs text-slate-500">N/A</span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 3: SDG Alignment */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-4 border-b border-purple-100 pb-2 flex items-center gap-2">
-                                        <TrendingUp className="w-4 h-4" /> SDG Alignment
-                                    </h3>
-                                    <OpportunitySdgAlignmentSection raw={adminDetailView} />
-                                </div>
-
-                                {/* Section 4: Activities & Skills */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-4 border-b border-indigo-100 pb-2 flex items-center gap-2">
-                                        <FileText className="w-4 h-4" /> Activities & Skills
-                                    </h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Student Responsibilities</span>
-                                            <CollapsibleDetailText
-                                                fullText={adminActivityPlan.full}
-                                                previewText={adminActivityPlan.preview}
-                                                isLong={adminActivityPlan.isLong}
-                                                emptyLabel="No details provided."
-                                            />
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-500 block mb-2">Skills Gained</span>
-                                            <div className="flex flex-wrap gap-2">
-                                                {(
-                                                    (adminDetailView.activity_details as { skills_gained?: string[] } | undefined)?.skills_gained || []
-                                                ).map((skill: string, idx: number) => (
-                                                    <span
-                                                        key={idx}
-                                                        className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold border border-indigo-100"
-                                                    >
-                                                        {skill}
-                                                    </span>
-                                                )) || <span className="text-xs text-slate-500">None specified</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 5: Supervision & Verification */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div>
-                                        <h3 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4 border-b border-orange-100 pb-2 flex items-center gap-2">
-                                            <Users className="w-4 h-4" /> Supervision (full)
-                                        </h3>
-                                        <div className="space-y-3 bg-orange-50/50 p-4 rounded-xl">
-                                            <div>
-                                                <span className="text-xs text-slate-500 block">Supervisor</span>
-                                                <span className="font-bold text-slate-900 text-sm">
-                                                    {String((adminDetailView.supervision as { supervisor_name?: string } | undefined)?.supervisor_name || "N/A")}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs text-slate-500 block">Role</span>
-                                                <span className="text-slate-900 text-sm">
-                                                    {String((adminDetailView.supervision as { role?: string } | undefined)?.role || "N/A")}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs text-slate-500 block">Contact</span>
-                                                <span className="text-slate-900 text-sm">
-                                                    {String((adminDetailView.supervision as { contact?: string } | undefined)?.contact || "N/A")}
-                                                </span>
-                                            </div>
-                                            <div className="flex gap-4 mt-2">
-                                                {(adminDetailView.supervision as { safe_environment?: boolean } | undefined)?.safe_environment && (
-                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 font-bold">
-                                                        <CheckCircle className="w-3 h-3" /> Safe Env
-                                                    </span>
-                                                )}
-                                                {(adminDetailView.supervision as { supervised?: boolean } | undefined)?.supervised && (
-                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1 font-bold">
-                                                        <CheckCircle className="w-3 h-3" /> Supervised
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-xs font-bold text-cyan-600 uppercase tracking-wider mb-4 border-b border-cyan-100 pb-2 flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4" /> Verification
-                                        </h3>
-                                        <div className="bg-cyan-50/50 p-4 rounded-xl">
-                                            <ul className="list-disc pl-5 space-y-1 text-sm text-slate-700">
-                                                {Array.isArray(adminDetailView.verification_method) ? (
-                                                    (adminDetailView.verification_method as string[]).map((method: string, i: number) => (
-                                                        <li key={i}>{method}</li>
-                                                    ))
-                                                ) : (
-                                                    <li>No verification method specified</li>
-                                                )}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
+                                <StudentOpportunityFlashcard
+                                    model={buildOpportunityRecordFlashcard(adminDetailView as Record<string, unknown>)}
+                                />
                             </div>
+
                             <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap justify-end gap-3">
                                 <button
                                     onClick={() => {

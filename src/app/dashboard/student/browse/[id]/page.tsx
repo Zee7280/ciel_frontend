@@ -13,13 +13,10 @@ import {
 } from "@/utils/opportunityWorkflow";
 import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
 import { formatDisplayId } from "@/utils/displayIds";
-import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
 import {
-    pickOpportunityDetailView,
-    readActivityPlan,
-    readObjectiveItems,
-    readSupervisionStakeholders,
-} from "@/utils/opportunityDetailView";
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 import { Loader2, MapPin, Calendar, ArrowLeft, Share2, Printer, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
 import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
 import { toast } from "sonner";
@@ -282,11 +279,6 @@ export default function OpportunityDetailsPage() {
     const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
     const oppRecord = opportunity as Record<string, unknown>;
-    const detailView = pickOpportunityDetailView(oppRecord);
-    const activityPlan = readActivityPlan(oppRecord);
-    const objectiveContent = readObjectiveItems(oppRecord);
-    const stakeholders = readSupervisionStakeholders(oppRecord);
-    const secondarySdgs = detailView?.sdg?.secondary ?? (opportunity as { secondary_sdgs?: unknown[] }).secondary_sdgs ?? [];
     const detailStatusBadgeLabel = formatOpportunityDetailStatusBadge(oppRecord);
     const detailWorkflowStageRaw =
         typeof (oppRecord.workflow_stage ?? oppRecord.workflowStage) === "string"
@@ -535,236 +527,20 @@ export default function OpportunityDetailsPage() {
                     ) : null}
                 </div>
 
-                {/* Content Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                    {/* Left Column: Organization & key details */}
-                    <div className="p-8 space-y-8 md:col-span-4 lg:col-span-3 bg-slate-50/30">
-                        <div>
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Organization</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="text-sm font-bold text-slate-900">{opportunity.organization?.name || opportunity.organization_name || "Partner Organization"}</div>
-                                    <div className="text-xs text-slate-500">Verified Partner</div>
-                                </div>
-                                {opportunity.organization && (
-                                    <div>
-                                        <div className="text-xs text-slate-500 mb-1">Contact</div>
-                                        <div className="text-sm font-medium text-slate-900">{opportunity.organization.city || "Lahore"}</div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="h-px bg-slate-200"></div>
-                        <div>
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">SDG Alignment</h3>
-                            <div className="bg-white p-4 rounded-xl border border-slate-100 text-center space-y-3">
-                                <div>
-                                    <div className="text-4xl font-bold text-slate-900 mb-1">
-                                        {opportunity.sdg_info?.sdg_id ?? opportunity.sdg ?? "?"}
-                                    </div>
-                                    <div className="text-xs text-slate-500 uppercase font-bold">
-                                        Goal {opportunity.sdg_info?.sdg_id ?? opportunity.sdg ?? "N/A"}
-                                    </div>
-                                    {opportunity.sdg_info?.target_id ? (
-                                        <p className="text-[10px] text-slate-500 mt-2">
-                                            Target {String(opportunity.sdg_info.target_id)} · Indicator{" "}
-                                            {String(opportunity.sdg_info.indicator_id ?? "—")}
-                                        </p>
-                                    ) : null}
-                                </div>
-                                {Array.isArray(secondarySdgs) && secondarySdgs.length > 0 ? (
-                                    <div className="pt-2 border-t border-slate-100 text-left">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Also aligned</p>
-                                        <ul className="space-y-1">
-                                            {(secondarySdgs as Record<string, unknown>[]).map((s, i) => (
-                                                <li key={i} className="text-[10px] text-slate-600">
-                                                    SDG {String(s.sdg_id ?? "?")}
-                                                    {s.target_id ? ` · ${String(s.target_id)}` : ""}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                ) : null}
-                            </div>
-                        </div>
-                        {opportunity.verification_method && opportunity.verification_method.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Verification</h3>
-                                <ul className="space-y-2">
-                                    {opportunity.verification_method.map((v: string) => (
-                                        <li key={v} className="text-sm text-slate-600 flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" /> {v}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Middle/Right Column: Main Details */}
-                    <div className="p-8 space-y-8 md:col-span-8 lg:col-span-9">
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                            <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
-                                <div className="text-xs font-bold text-orange-600 uppercase mb-1">Volunteers Needed</div>
-                                <div className="text-2xl font-bold text-orange-900">{opportunity.timeline?.volunteers_required || opportunity.volunteers_needed || "Open"}</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-                                <div className="text-xs font-bold text-blue-600 uppercase mb-1">Hours/Student</div>
-                                <div className="text-2xl font-bold text-blue-900">{opportunity.timeline?.expected_hours || opportunity.hours || 0}</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-purple-50 border border-purple-100">
-                                <div className="text-xs font-bold text-purple-600 uppercase mb-1">Duration</div>
-                                <div className="text-2xl font-bold text-purple-900">{opportunity.timeline?.type || opportunity.timeline_type || "Flexible"}</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                                <div className="text-xs font-bold text-emerald-600 uppercase mb-1">Beneficiaries</div>
-                                <div className="text-2xl font-bold text-emerald-900">{opportunity.objectives?.beneficiaries_count || "N/A"}</div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <section>
-                                <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Objectives</h3>
-                                {objectiveContent.items.length > 1 ? (
-                                    <ol className="text-slate-600 text-sm space-y-2 list-decimal list-inside border-l-4 border-slate-200 pl-2">
-                                        {objectiveContent.items.map((item, idx) => (
-                                            <li key={idx} className="leading-relaxed">
-                                                {item}
-                                            </li>
-                                        ))}
-                                    </ol>
-                                ) : (
-                                    <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm border-l-4 border-slate-200 pl-4">
-                                        {objectiveContent.description || "No description provided."}
-                                    </p>
-                                )}
-                                {opportunity.objectives?.beneficiaries_type && (
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {Array.isArray(opportunity.objectives.beneficiaries_type)
-                                            ? opportunity.objectives.beneficiaries_type.map((b: string) => (
-                                                <span key={b} className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">{b}</span>
-                                            ))
-                                            : <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">{opportunity.objectives.beneficiaries_type}</span>
-                                        }
-                                    </div>
-                                )}
-                            </section>
-                            <section>
-                                <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Student Activities</h3>
-                                <CollapsibleDetailText
-                                    fullText={activityPlan.full}
-                                    previewText={activityPlan.preview}
-                                    isLong={activityPlan.isLong}
-                                    emptyLabel="No specific responsibilities listed."
-                                    className="mb-4"
-                                />
-                                {activityPlan.skills.length > 0 ? (
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Skills to be Gained</span>
-                                        <div className="flex flex-wrap gap-2">
-                                            {activityPlan.skills.map((s: string) => (
-                                                <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">{s}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </section>
-                        </div>
-
-                        <div className="h-px bg-slate-100"></div>
-
-                        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2">
-                                <h3 className="text-sm font-bold text-slate-900 mb-3">Timeline & Location</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <div className="text-xs text-slate-500 mb-1">Start Date</div>
-                                        <div className="text-sm font-medium text-slate-900">{opportunity.timeline?.start_date ? new Date(opportunity.timeline.start_date).toLocaleDateString() : (opportunity.start_date ? new Date(opportunity.start_date).toLocaleDateString() : "Flexible")}</div>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <div className="text-xs text-slate-500 mb-1">End Date</div>
-                                        <div className="text-sm font-medium text-slate-900">{opportunity.timeline?.end_date ? new Date(opportunity.timeline.end_date).toLocaleDateString() : (opportunity.end_date ? new Date(opportunity.end_date).toLocaleDateString() : "Flexible")}</div>
-                                    </div>
-                                    <div className="col-span-2 bg-slate-50 p-3 rounded-lg">
-                                        <div className="text-xs text-slate-500 mb-1">Venue</div>
-                                        <div className="text-sm font-medium text-slate-900">{opportunity.location?.venue || "N/A"}</div>
-                                        <div className="text-xs text-slate-500 mt-0.5">{opportunity.location?.city}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="md:col-span-1">
-                                <h3 className="text-sm font-bold text-slate-900 mb-3">Supervision & Partner</h3>
-                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 h-full">
-                                    {opportunity.supervision ? (
-                                        <div className="space-y-4">
-                                            <div>
-                                                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Faculty</div>
-                                                <div className="font-medium text-slate-900">
-                                                    {stakeholders.faculty?.name || opportunity.supervision?.supervisor_name || "N/A"}
-                                                </div>
-                                                {(stakeholders.faculty?.role || opportunity.supervision?.role) ? (
-                                                    <div className="text-xs text-slate-500">
-                                                        {stakeholders.faculty?.role || opportunity.supervision?.role}
-                                                    </div>
-                                                ) : null}
-                                                {stakeholders.faculty?.department ? (
-                                                    <div className="text-xs text-slate-500 mt-0.5">{stakeholders.faculty.department}</div>
-                                                ) : null}
-                                                {stakeholders.faculty?.university ? (
-                                                    <div className="text-xs text-slate-500">{stakeholders.faculty.university}</div>
-                                                ) : null}
-                                                {stakeholders.faculty?.email ? (
-                                                    <div className="text-xs text-indigo-700 mt-1">{stakeholders.faculty.email}</div>
-                                                ) : null}
-                                                {stakeholders.faculty?.whatsapp ? (
-                                                    <a
-                                                        href={`https://wa.me/${stakeholders.faculty.whatsapp.replace(/\D/g, "")}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 mt-1 hover:underline"
-                                                    >
-                                                        💬 WhatsApp
-                                                    </a>
-                                                ) : null}
-                                            </div>
-                                            {(stakeholders.partner?.organization || opportunity.supervision?.partner_org_name) ? (
-                                                <div className="pt-3 border-t border-slate-200">
-                                                    <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Partner</div>
-                                                    <div className="font-medium text-slate-900">
-                                                        {stakeholders.partner?.organization || opportunity.supervision?.partner_org_name}
-                                                    </div>
-                                                    {(stakeholders.partner?.contact_person || opportunity.supervision?.partner_contact_person) ? (
-                                                        <div className="text-xs text-slate-500 mt-0.5">
-                                                            {stakeholders.partner?.contact_person || opportunity.supervision?.partner_contact_person}
-                                                        </div>
-                                                    ) : null}
-                                                    {(stakeholders.partner?.email || opportunity.supervision?.partner_email) ? (
-                                                        <div className="text-xs text-indigo-700 mt-1">
-                                                            {stakeholders.partner?.email || opportunity.supervision?.partner_email}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            ) : null}
-                                            <div className="pt-2 border-t border-slate-200">
-                                                <div className="space-y-2">
-                                                    <span className={`flex items-center gap-1.5 text-xs font-medium ${opportunity.supervision.safe_environment ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {opportunity.supervision.safe_environment ? <CheckCircle2 className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full bg-red-500" />} Safe environment
-                                                    </span>
-                                                    <span className={`flex items-center gap-1.5 text-xs font-medium ${opportunity.supervision.supervised ? 'text-green-600' : 'text-amber-500'}`}>
-                                                        {opportunity.supervision.supervised ? <CheckCircle2 className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full bg-amber-500" />} Supervised activity
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-slate-400 text-sm">No supervision details provided.</div>
-                                    )}
-                                </div>
-                            </div>
-                        </section>
-                    </div>
+                <div className="p-4 sm:p-6">
+                    <StudentOpportunityFlashcard
+                        model={{
+                            ...buildOpportunityRecordFlashcard(opportunity as Record<string, unknown>, {
+                                studentName: opportunity.isStudentOwner ? "You" : undefined,
+                                university: opportunity.organization?.name || opportunity.organization_name,
+                                partnerOrg: opportunity.organization?.name || opportunity.organization_name,
+                            }),
+                            eligible: applyEligibility.canApply,
+                            eligibilityWhy:
+                                applyEligibility.blockedReason ||
+                                "Students who match the application scope can apply.",
+                        }}
+                    />
                 </div>
             </div>
 

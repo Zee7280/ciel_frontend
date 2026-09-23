@@ -14,6 +14,7 @@ import {
     resolvePartnerOpportunityListLabels,
 } from "@/utils/opportunityWorkflow";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 
 type Row = {
     id: string;
@@ -440,7 +441,7 @@ export default function FacultyMyOpportunitiesPage() {
                     No opportunities match this search or filter.
                 </div>
             ) : (
-                <div ref={listRef} className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100 bg-white">
+                <div ref={listRef} className="space-y-3">
                     {visibleRows.map((row) => {
                         const labels = resolvePartnerOpportunityListLabels(asRecord(row));
                         const live = isMineLive(row);
@@ -465,12 +466,12 @@ export default function FacultyMyOpportunitiesPage() {
                             <article
                                 key={row.id}
                                 id={`faculty-opp-${row.id}`}
-                                className={`px-4 py-5 sm:px-5 ${highlighted ? "bg-amber-50/70" : "bg-white"}`}
+                                className={`overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] ${highlighted ? "ring-2 ring-amber-300" : ""}`}
                             >
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <OpportunityListFlashHead title={row.title} />
+                                <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
                                     <div className="min-w-0 flex-1 space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="truncate text-[15px] font-semibold text-slate-900">{row.title}</h2>
                                             <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${statusTextClass(badgeTone)}`}>
                                                 <span className={`h-2 w-2 rounded-full ${statusDotClass(badgeTone)}`} />
                                                 {primaryLabel}

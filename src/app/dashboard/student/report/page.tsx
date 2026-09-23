@@ -48,6 +48,10 @@ import Section8Evidence from './components/Section8Evidence';
 import Section9Reflection from './components/Section9Reflection'; // New
 import Section10Sustainability from './components/Section10Sustainability'; // Renamed
 import Section11Summary from './components/Section11Summary'; // New
+import {
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
 import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel } from './ReportFormChrome';
@@ -169,6 +173,7 @@ function ReportFormContent() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [showGuide, setShowGuide] = React.useState(true);
     const [helpSignal, setHelpSignal] = React.useState(0);
+    const [opportunityFlashOpen, setOpportunityFlashOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -832,26 +837,23 @@ function ReportFormContent() {
         <div className="cer">
             <div className="cer-wrap">
                 <div className="cer-sticky-head">
-                <div className="cer-apph">
-                    <div className="min-w-0 flex-1">
+                <div className="cer-apph cer-apph-actions">
+                    <div className="cer-actions">
                         <button
                             type="button"
-                            className="cer-back"
+                            className="cer-ghost"
                             onClick={() => router.push("/dashboard/student/projects")}
                         >
                             ← Back to my reports
                         </button>
-                        <h1 className="cer-htitle">{projectTitle}</h1>
-                        <p className="cer-proj">
-                            Community engagement report
-                            {onFlash
-                                ? ` • ${
-                                      sectionsCompleteCount >= REPORT_UI_SECTION_TOTAL
-                                          ? "all 9 sections complete"
-                                          : `${sectionsCompleteCount}/${REPORT_UI_SECTION_TOTAL} sections complete`
-                                  }`
-                                : ""}
-                        </p>
+                        <button
+                            type="button"
+                            className="cer-ghost"
+                            onClick={() => setOpportunityFlashOpen(true)}
+                            disabled={!projectDetails}
+                        >
+                            Opportunity flash card
+                        </button>
                     </div>
                     <div className="cer-actions">
                         {onFlash ? (
@@ -998,6 +1000,14 @@ function ReportFormContent() {
                     <ReportLiveBanner step={activeStep} data={data} projectData={projectDetails} />
                 ) : null}
 
+            <button
+                type="button"
+                className="cer-back cer-back-below"
+                onClick={() => router.push("/dashboard/student/projects")}
+            >
+                ← Back to my reports
+            </button>
+
             {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && activeStep !== 1 && (
                 <div className="cer-foot">
                     <div>
@@ -1050,6 +1060,20 @@ function ReportFormContent() {
                 </div>
             )}
             </div>
+
+            <Dialog open={opportunityFlashOpen} onOpenChange={setOpportunityFlashOpen}>
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Opportunity flash card</DialogTitle>
+                        <DialogDescription>
+                            The approved opportunity connected to this report.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {projectDetails ? (
+                        <StudentOpportunityFlashcard model={buildOpportunityRecordFlashcard(projectDetails)} />
+                    ) : null}
+                </DialogContent>
+            </Dialog>
 
             {/* Submit Confirmation Dialog */}
             <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>

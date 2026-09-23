@@ -19,9 +19,14 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import OpportunityApprovalCard, {
+    approvalActionClass,
+    buildOpportunityApprovalModel,
+} from "@/components/ciel/community-service/OpportunityApprovalCard";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { formatDisplayId } from "@/utils/displayIds";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     NGO_CS_ANALYTICS as ANALYTICS,
@@ -538,23 +543,27 @@ export default function NgoCommunityServiceHub() {
                                     <Link
                                         key={row.id}
                                         href={
-                                            createTab === "drafts" || createTab === "action"
-                                                ? `${MY_OPPS}/${encodeURIComponent(row.id)}?edit=true`
-                                                : `${MY_OPPS}/${encodeURIComponent(row.id)}`
+                                            createTab === "drafts"
+                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}&draft=1`
+                                                : createTab === "action"
+                                                  ? `${MY_OPPS}/${encodeURIComponent(row.id)}?edit=true`
+                                                  : `${MY_OPPS}/${encodeURIComponent(row.id)}`
                                         }
-                                        className="block rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
+                                        className="block overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] transition hover:border-[#bcd4d8]"
                                     >
-                                        <b className="block text-[14px] text-[#16313d]">{row.title}</b>
-                                        <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                            {formatDisplayId(row.id, "OPP")} ·{" "}
-                                            {createTab === "review" ? ngoPendingStageLabel(row) : String(row.status || "in review")}
-                                            {pickNum(row, "applicants_count", "applicantsCount") > 0
-                                                ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
-                                                : ""}
-                                        </small>
-                                        {createTab === "review" || createTab === "published" ? (
-                                            <ApprovalPipelineMini steps={ngoOwnPipeline(row, createTab)} />
-                                        ) : null}
+                                        <OpportunityListFlashHead title={row.title} />
+                                        <div className="px-4 py-3">
+                                            <small className="block text-[11.5px] text-[#6b7c86]">
+                                                {formatDisplayId(row.id, "OPP")} ·{" "}
+                                                {createTab === "review" ? ngoPendingStageLabel(row) : String(row.status || "in review")}
+                                                {pickNum(row, "applicants_count", "applicantsCount") > 0
+                                                    ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
+                                                    : ""}
+                                            </small>
+                                            {createTab === "review" || createTab === "published" ? (
+                                                <ApprovalPipelineMini steps={ngoOwnPipeline(row, createTab)} />
+                                            ) : null}
+                                        </div>
                                     </Link>
                                 ))}
                         </div>
@@ -604,17 +613,37 @@ export default function NgoCommunityServiceHub() {
                                 );
                             }
                             return (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {list.map((row) => (
-                                        <CommunityQueueCard
-                                            key={row.id}
-                                            href={`${APPROVALS}?tab=${tab === "pending" ? "pending" : "history"}&opportunity=${encodeURIComponent(row.id)}`}
-                                            title={row.title}
-                                            student={pickStr(row, "creator_name", "student_name", "submitted_by_name") || "Creator"}
-                                            cta={tab === "done" ? "Open record →" : tab === "rev" ? "View Flashcard →" : "View Flashcard & Approve →"}
-                                            tone={tab === "done" ? "approved" : "waiting"}
-                                        />
-                                    ))}
+                                <div className="grid gap-3">
+                                    {list.map((row) => {
+                                        const mode = tab === "done" ? "decided" : tab === "rev" ? "revision" : "pending";
+                                        const model = buildOpportunityApprovalModel(row, "ngo", { orgName, mode });
+                                        const href = `${APPROVALS}?tab=${tab === "pending" ? "pending" : "history"}&opportunity=${encodeURIComponent(row.id)}`;
+                                        return (
+                                            <OpportunityApprovalCard
+                                                key={row.id}
+                                                {...model}
+                                                actions={
+                                                    mode === "pending" ? (
+                                                        <>
+                                                            <Link href={href} className={approvalActionClass.green}>
+                                                                View Flashcard & Approve
+                                                            </Link>
+                                                            <Link href={href} className={approvalActionClass.gold}>
+                                                                Request Revision
+                                                            </Link>
+                                                            <Link href={href} className={approvalActionClass.red}>
+                                                                Reject
+                                                            </Link>
+                                                        </>
+                                                    ) : (
+                                                        <Link href={href} className={approvalActionClass.soft}>
+                                                            {mode === "decided" ? "Open record" : "View Flashcard"}
+                                                        </Link>
+                                                    )
+                                                }
+                                            />
+                                        );
+                                    })}
                                 </div>
                             );
                         })()

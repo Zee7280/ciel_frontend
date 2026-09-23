@@ -15,6 +15,7 @@ import {
     resolvePartnerOpportunityListLabels,
 } from "@/utils/opportunityWorkflow";
 import { toast } from "sonner";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 
 function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
     const createdByRole = String(opportunity.created_by_role ?? opportunity.creator_role ?? "").toLowerCase();
@@ -239,12 +240,16 @@ export default function PartnerRequestsPage() {
                                                 : "bg-slate-50 text-slate-600 border-slate-100";
                                     return (
                                     <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => router.push(`/dashboard/partner/requests/${req.id}`)}
+                                                    className="overflow-hidden rounded-2xl text-left"
+                                                >
+                                                    <OpportunityListFlashHead title={req.title} />
+                                                </button>
                                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                    <h3 className="font-bold text-slate-900 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => router.push(`/dashboard/partner/requests/${req.id}`)}>
-                                                        {req.title}
-                                                    </h3>
                                                     <span
                                                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${listToneClass}`}
                                                     >

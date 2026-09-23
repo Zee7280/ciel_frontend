@@ -12,6 +12,10 @@ import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { formatOpportunityDetailStatusBadge } from "@/utils/opportunityWorkflow";
+import {
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -511,224 +515,75 @@ function OpportunityDetailsContent() {
                     </div>
                 </div>
 
-                {/* Document View */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
-                    {/* Title Section */}
-                    <div className="border-b border-slate-100 bg-slate-50/50 p-5 print:border-none print:bg-white sm:p-8">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h1 className="text-3xl font-bold text-slate-900 mb-2">{formData.title}</h1>
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                                        <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {formData.location.city || "Remote"}</span>
-                                        <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Last Updated: {new Date().toLocaleDateString()}</span>
-                                        <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{formData.mode}</span>
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${formData.visibility === 'public' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>{formData.visibility}</span>
-                                        {partnerDetailStatusBadge ? (
-                                            <span
-                                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
-                                                    partnerDetailStatusBadge === "Live"
-                                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                                        : partnerDetailStatusBadge === "Rejected"
-                                                          ? "bg-rose-50 text-rose-800 border-rose-200"
-                                                          : "bg-slate-50 text-slate-700 border-slate-200"
-                                                }`}
-                                            >
-                                                {partnerDetailStatusBadge}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                    {partnerDetailWorkflowRaw ? (
-                                        <p className="text-[11px] text-slate-500">
-                                            <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
-                                            {partnerDetailWorkflowRaw.replace(/_/g, " ")}
-                                        </p>
-                                    ) : null}
-                                    {needsExecConfirm ? (
-                                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-left text-sm text-amber-950">
-                                            <p className="font-semibold text-amber-900 mb-1">Executing organization confirmation</p>
-                                            <p className="text-amber-900/90 mb-3">
-                                                {canExecConfirm
-                                                    ? "Review the opportunity below, then confirm so CIEL Admin can proceed with final approval."
-                                                    : `This step must be completed in the portal by the official executing-organization contact${
-                                                          execOfficial ? ` (${execOfficial})` : ""
-                                                      } after signing in with that CIEL account.`}
-                                            </p>
-                                            {canExecConfirm ? (
-                                                <button
-                                                    type="button"
-                                                    disabled={execVerifySubmitting}
-                                                    onClick={() => void handleConfirmExecution()}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                                                >
-                                                    {execVerifySubmitting ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    )}
-                                                    Confirm execution details
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-sm text-slate-400">Opportunity ID</div>
-                                <div className="font-mono font-bold text-slate-600" title={String(id)}>
-                                    {formatDisplayId(id, "OPP")}
-                                </div>
-                            </div>
-                        </div>
+                {(partnerDetailStatusBadge || partnerDetailWorkflowRaw) ? (
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span className="font-mono text-xs text-slate-400" title={String(id)}>
+                            {formatDisplayId(id, "OPP")}
+                        </span>
+                        {partnerDetailStatusBadge ? (
+                            <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
+                                    partnerDetailStatusBadge === "Live"
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        : partnerDetailStatusBadge === "Rejected"
+                                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                                          : "bg-slate-50 text-slate-700 border-slate-200"
+                                }`}
+                            >
+                                {partnerDetailStatusBadge}
+                            </span>
+                        ) : null}
+                        {partnerDetailWorkflowRaw ? (
+                            <span className="text-[11px] text-slate-500">
+                                Pipeline: {partnerDetailWorkflowRaw.replace(/_/g, " ")}
+                            </span>
+                        ) : null}
                     </div>
-
-                    {/* Content Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                        {/* Left Column: Organization & key details */}
-                        <div className="space-y-8 bg-slate-50/30 p-5 sm:p-8 md:col-span-4 lg:col-span-3">
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Organization</h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="text-sm font-bold text-slate-900">{orgDetails.organizationName || "Your Organization"}</div>
-                                        <div className="text-xs text-slate-500">{orgDetails.organizationType}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-slate-500 mb-1">Focal Person</div>
-                                        <div className="text-sm font-medium text-slate-900">{orgDetails.focalPerson.name}</div>
-                                        <div className="text-xs text-slate-500">{orgDetails.focalPerson.contact}</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="h-px bg-slate-200"></div>
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">SDG Alignment</h3>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 text-center space-y-3">
-                                    <div>
-                                        <div className="text-4xl font-bold text-slate-900 mb-1">{formData.sdg || "?"}</div>
-                                        <div className="text-xs text-slate-500 uppercase font-bold">Goal {formData.sdg}</div>
-                                    </div>
-                                    {formData.target && <div className="text-xs bg-slate-100 py-1.5 px-3 rounded-lg font-medium">Target {formData.target}</div>}
-                                    {formData.indicator && <div className="text-xs bg-slate-50 py-1.5 px-3 rounded-lg text-slate-500 italic">Indicator: {formData.indicator}</div>}
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Verification</h3>
-                                <ul className="space-y-2">
-                                    {formData.verification.map(v => (
-                                        <li key={v} className="text-sm text-slate-600 flex items-start gap-2">
-                                            <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" /> {v}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-
-                        {/* Middle/Right Column: Main Details */}
-                        <div className="space-y-8 p-5 sm:p-8 md:col-span-8 lg:col-span-9">
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                                <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
-                                    <div className="text-xs font-bold text-orange-600 uppercase mb-1">Volunteers Needed</div>
-                                    <div className="text-2xl font-bold text-orange-900">{formData.capacity.volunteers || "-"}</div>
-                                </div>
-                                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-                                    <div className="text-xs font-bold text-blue-600 uppercase mb-1">Hours/Student</div>
-                                    <div className="text-2xl font-bold text-blue-900">{formData.capacity.hours || "-"}</div>
-                                </div>
-                                <div className="p-4 rounded-xl bg-purple-50 border border-purple-100">
-                                    <div className="text-xs font-bold text-purple-600 uppercase mb-1">Duration</div>
-                                    <div className="text-2xl font-bold text-purple-900">{formData.timelineType}</div>
-                                </div>
-                                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                                    <div className="text-xs font-bold text-emerald-600 uppercase mb-1">Beneficiaries</div>
-                                    <div className="text-2xl font-bold text-emerald-900">{formData.objectives.beneficiariesCount || "-"}</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <section>
-                                    <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Objectives</h3>
-                                    <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm border-l-4 border-slate-200 pl-4">
-                                        {formData.objectives.description || "No description provided."}
-                                    </p>
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {formData.objectives.beneficiariesType.map(b => (
-                                            <span key={b} className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">{b}</span>
-                                        ))}
-                                    </div>
-                                </section>
-                                <section>
-                                    <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Student Activities</h3>
-                                    <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm mb-4 border-l-4 border-slate-200 pl-4">
-                                        {formData.activity.responsibilities || "No specific responsibilities listed."}
-                                    </p>
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Skills to be Gained</span>
-                                        <div className="flex flex-wrap gap-2">
-                                            {(
-                                                formData.activity.isOtherSkillChecked
-                                                    ? [
-                                                        ...formData.activity.skills,
-                                                        ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
-                                                    ]
-                                                    : formData.activity.skills
-                                            ).map((s, i) => (
-                                                <span key={`${i}-${s}`} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">{s}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </section>
-                            </div>
-
-                            <div className="h-px bg-slate-100"></div>
-
-                            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="md:col-span-2">
-                                    <h3 className="text-sm font-bold text-slate-900 mb-3">Timeline & Location</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-slate-50 p-3 rounded-lg">
-                                            <div className="text-xs text-slate-500 mb-1">Start Date</div>
-                                            <div className="text-sm font-medium text-slate-900">{formData.dates.start || "Flexible"}</div>
-                                        </div>
-                                        <div className="bg-slate-50 p-3 rounded-lg">
-                                            <div className="text-xs text-slate-500 mb-1">End Date</div>
-                                            <div className="text-sm font-medium text-slate-900">{formData.dates.end || "Flexible"}</div>
-                                        </div>
-                                        <div className="col-span-2 bg-slate-50 p-3 rounded-lg">
-                                            <div className="text-xs text-slate-500 mb-1">Venue</div>
-                                            <div className="text-sm font-medium text-slate-900">{formData.location.venue || "N/A"}</div>
-                                            <div className="text-xs text-slate-500 mt-0.5">{formData.location.city}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-1">
-                                    <h3 className="text-sm font-bold text-slate-900 mb-3">Supervision</h3>
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 h-full">
-                                        <div className="space-y-4">
-                                            <div>
-                                                <div className="text-slate-500 text-xs">Supervisor</div>
-                                                <div className="font-medium text-slate-900">{formData.supervision.name || "N/A"}</div>
-                                                <div className="text-xs text-slate-500">{formData.supervision.role}</div>
-                                            </div>
-                                            <div className="pt-2 border-t border-slate-200">
-                                                <div className="space-y-2">
-                                                    <span className={`flex items-center gap-1.5 text-xs font-medium ${!formData.supervision.isHarmful ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {!formData.supervision.isHarmful ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} Safe Env.
-                                                    </span>
-                                                    <span className={`flex items-center gap-1.5 text-xs font-medium ${formData.supervision.isSupervised ? 'text-green-600' : 'text-amber-500'}`}>
-                                                        {formData.supervision.isSupervised ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} Supervised
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-                        </div>
+                ) : null}
+                {needsExecConfirm ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-left text-sm text-amber-950">
+                        <p className="font-semibold text-amber-900 mb-1">Executing organization confirmation</p>
+                        <p className="text-amber-900/90 mb-3">
+                            {canExecConfirm
+                                ? "Review the opportunity below, then confirm so CIEL Admin can proceed with final approval."
+                                : `This step must be completed in the portal by the official executing-organization contact${
+                                      execOfficial ? ` (${execOfficial})` : ""
+                                  } after signing in with that CIEL account.`}
+                        </p>
+                        {canExecConfirm ? (
+                            <button
+                                type="button"
+                                disabled={execVerifySubmitting}
+                                onClick={() => void handleConfirmExecution()}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                                {execVerifySubmitting ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <CheckCircle className="w-4 h-4" />
+                                )}
+                                Confirm execution details
+                            </button>
+                        ) : null}
                     </div>
-                </div>
+                ) : null}
+                {opportunityApiRecord ? (
+                    <StudentOpportunityFlashcard
+                        model={(() => {
+                            const built = buildOpportunityRecordFlashcard(opportunityApiRecord, {
+                                partnerOrg: orgDetails.organizationName,
+                                university: orgDetails.organizationName,
+                                facultyName: orgDetails.focalPerson.name,
+                                facultyEmail: orgDetails.focalPerson.contact,
+                            });
+                            return {
+                                ...built,
+                                title: formData.title || built.title,
+                                badgeLabel: "Created opportunity",
+                            };
+                        })()}
+                    />
+                ) : null}
             </div>
         );
     }

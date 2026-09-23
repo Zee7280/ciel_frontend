@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from "lucide-react";
@@ -140,16 +140,11 @@ function formatSimilarOpportunityStatus(row: SimilarOpportunityMatch): string {
     return st.replace(/_/g, " ");
 }
 
-function isPlainObject(x: unknown): x is Record<string, unknown> {
-    return typeof x === "object" && x !== null && !Array.isArray(x);
-}
-
 /** Wizard opens only with ?new=1 or ?edit=<id>. Bare /create-opportunity is the drafts hub. */
 function hasCreateOpportunityWizardIntent(search: URLSearchParams): boolean {
     return Boolean(search.get("edit")?.trim() || search.get("new") === "1");
 }
 
-/** Merge saved draft over current form state (nested objects, arrays replaced from draft). */
 function normalizeSupervisionIndependentPhone<T extends { supervision: Record<string, unknown> }>(fd: T): T {
     const s = fd.supervision as { independentContactPhoneKey?: unknown; independentContactPhone?: unknown };
     const key = typeof s.independentContactPhoneKey === "string" ? s.independentContactPhoneKey : "";
@@ -164,20 +159,6 @@ function normalizeSupervisionIndependentPhone<T extends { supervision: Record<st
             independentContactPhone: parsed.national,
         },
     };
-}
-
-function deepMergeDraft<T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T {
-    const out = { ...target } as Record<string, unknown>;
-    for (const key of Object.keys(source)) {
-        const s = source[key];
-        const t = out[key];
-        if (isPlainObject(s) && isPlainObject(t)) {
-            out[key] = deepMergeDraft(t, s);
-        } else if (s !== undefined) {
-            out[key] = s;
-        }
-    }
-    return out as T;
 }
 
 function StudentOpportunityCreationPageInner() {
@@ -200,6 +181,10 @@ function StudentOpportunityCreationPageInner() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(editFromUrl || null);
+    const draftIdRef = useRef<string | null>(editFromUrl || null);
+    const draftSaveChain = useRef(Promise.resolve());
+    /** The id we just created should not be fetched back over the form the student is still filling. */
+    const skipDraftHydrateRef = useRef(false);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
     /** Opened via "Continue Editing" — the record behind editingOpportunityId is still a draft, not a
      * submitted opportunity, so Save Draft stays enabled and Submit promotes it into a fresh
@@ -986,10 +971,16 @@ function StudentOpportunityCreationPageInner() {
         setActiveStep(key);
         if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     }, []);
+    const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        if (i >= 0 && i < WIZARD_STEPS.length - 1) goToStep(WIZARD_STEPS[i + 1].key);
-    }, [activeStep, goToStep]);
+        if (i >= 0 && i < WIZARD_STEPS.length - 1) {
+            if (!editingOpportunityId || isDraftMode) {
+                void persistDraftRef.current(true);
+            }
+            goToStep(WIZARD_STEPS[i + 1].key);
+        }
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -1107,53 +1098,59 @@ function StudentOpportunityCreationPageInner() {
         };
     }, [formData, studentDetails, flashViewer]);
 
-    const handleSaveDraft = async () => {
-        try {
-            localStorage.setItem(
-                STUDENT_OPPORTUNITY_DRAFT_KEY,
-                JSON.stringify({
-                    v: 1,
-                    savedAt: Date.now(),
-                    formData,
-                    studentDetails,
-                    expandedSections,
-                }),
-            );
-        } catch (e) {
-            console.error("Draft save failed", e);
-            toast.error("Could not save draft. Check browser storage.");
-            return;
-        }
+    const handleSaveDraft = async (quiet = false) => {
+        if (editingOpportunityId && !isDraftMode) return;
+        const job = draftSaveChain.current.then(async () => {
+            try {
+                localStorage.setItem(
+                    STUDENT_OPPORTUNITY_DRAFT_KEY,
+                    JSON.stringify({
+                        v: 1,
+                        savedAt: Date.now(),
+                        formData,
+                        studentDetails,
+                        expandedSections,
+                    }),
+                );
+            } catch (e) {
+                console.error("Draft save failed", e);
+                if (!quiet) toast.error("Could not save draft. Check browser storage.");
+                return;
+            }
 
-        // Best-effort sync to the account so the draft also shows up under "Saved Opportunity
-        // Drafts" on another device — the on-device save above already succeeded either way.
-        if (formData.title.trim()) {
             setIsSavingDraft(true);
             try {
-                const payload = { ...buildOpportunityPayload(), draft: true };
+                const payload = {
+                    ...buildOpportunityPayload(),
+                    draft: true,
+                    title: formData.title.trim() || "Untitled opportunity",
+                };
+                const existingId = draftIdRef.current;
                 const res = await authenticatedFetch(
-                    editingOpportunityId
-                        ? `/api/v1/student/opportunity/${encodeURIComponent(editingOpportunityId)}`
+                    existingId
+                        ? `/api/v1/student/opportunity/${encodeURIComponent(existingId)}`
                         : `/api/v1/student/opportunity`,
                     { method: "POST", body: JSON.stringify(payload) },
                     { redirectToLogin: false },
                 );
                 const data = await res?.json().catch(() => null);
                 const newId = (data as { data?: { id?: string } } | null)?.data?.id;
-                if (res?.ok && newId && !editingOpportunityId) {
+                if (res?.ok && newId && !existingId) {
+                    draftIdRef.current = newId;
+                    skipDraftHydrateRef.current = true;
                     setEditingOpportunityId(newId);
                     setIsDraftMode(true);
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("edit", newId);
-                    url.searchParams.set("draft", "1");
-                    window.history.replaceState(null, "", url.toString());
+                    router.replace(
+                        `/dashboard/student/create-opportunity?edit=${encodeURIComponent(newId)}&draft=1`,
+                        { scroll: false },
+                    );
                 }
                 if (!res?.ok) {
                     const msg =
                         typeof (data as { message?: unknown } | null)?.message === "string"
                             ? (data as { message: string }).message
                             : "Could not sync this draft to your account.";
-                    toast.warning(`Saved on this device. ${msg}`);
+                    toast.warning(quiet ? msg : `Saved on this device. ${msg}`);
                     return;
                 }
             } catch (e) {
@@ -1163,14 +1160,30 @@ function StudentOpportunityCreationPageInner() {
             } finally {
                 setIsSavingDraft(false);
             }
-        }
 
-        toast.success("Draft saved.");
+            toast.success(quiet ? "Saved to drafts." : "Draft saved.", { id: "student-opp-draft" });
+        });
+        draftSaveChain.current = job.then(
+            () => undefined,
+            () => undefined,
+        );
+        return job;
     };
+    persistDraftRef.current = handleSaveDraft;
 
     useEffect(() => {
         if (!isWizard) return;
         const fetchProfile = async () => {
+            // ?new=1 is a blank proposal. The on-device copy is the last form saved in this
+            // browser, and it stays after that opportunity is submitted and approved.
+            const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+            if (!params?.get("edit")?.trim() && params?.get("new") === "1") {
+                try {
+                    localStorage.removeItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
+                } catch {
+                    /* ignore */
+                }
+            }
             try {
                 let base: Record<string, unknown> = {};
                 try {
@@ -1283,42 +1296,6 @@ function StudentOpportunityCreationPageInner() {
                     city,
                     contact,
                 });
-
-                const editParam =
-                    typeof window !== "undefined"
-                        ? new URLSearchParams(window.location.search).get("edit")?.trim()
-                        : "";
-                if (!editParam) {
-                    try {
-                        const draftRaw = localStorage.getItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
-                        if (draftRaw) {
-                            const draft = JSON.parse(draftRaw) as {
-                                formData?: Record<string, unknown>;
-                                studentDetails?: Record<string, string>;
-                                expandedSections?: string[];
-                            };
-                            if (draft.formData && typeof draft.formData === "object") {
-                                setFormData((prev) =>
-                                    normalizeSupervisionIndependentPhone(
-                                        deepMergeDraft(
-                                            prev as unknown as Record<string, unknown>,
-                                            draft.formData!,
-                                        ) as typeof prev,
-                                    ),
-                                );
-                            }
-                            if (draft.studentDetails && typeof draft.studentDetails === "object") {
-                                setStudentDetails((prev) => ({ ...prev, ...draft.studentDetails }));
-                            }
-                            if (Array.isArray(draft.expandedSections) && draft.expandedSections.length > 0) {
-                                setExpandedSections(draft.expandedSections);
-                            }
-                            toast.success("Saved draft restored.");
-                        }
-                    } catch {
-                        /* ignore corrupt draft */
-                    }
-                }
             } catch (error) {
                 console.error("Failed to fetch profile", error);
             } finally {
@@ -1332,7 +1309,10 @@ function StudentOpportunityCreationPageInner() {
     useEffect(() => {
         if (editFromUrl) {
             setEditingOpportunityId(editFromUrl);
-            setIsDraftMode(searchParams.get("draft") === "1");
+            const draftFlag =
+                searchParams.get("draft") === "1" ||
+                new URLSearchParams(window.location.search).get("draft") === "1";
+            setIsDraftMode((prev) => draftFlag || prev);
             setShowTeamLeadNotice(false);
         }
     }, [editFromUrl, searchParams]);
@@ -1347,6 +1327,10 @@ function StudentOpportunityCreationPageInner() {
 
     useEffect(() => {
         if (!editingOpportunityId || isLoadingProfile) return;
+        if (skipDraftHydrateRef.current) {
+            skipDraftHydrateRef.current = false;
+            return;
+        }
         let cancelled = false;
         (async () => {
             setIsLoadingEdit(true);
@@ -2067,6 +2051,10 @@ function StudentOpportunityCreationPageInner() {
                     onToggle={() => toggleSection("SCHED")}
                 />
                 <div className={`${!expandedSections.includes('SCHED') ? 'hidden' : ''}`}>
+                    <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                        <span className="font-semibold text-slate-900">Application Deadline: </span>
+                        This is the final date to apply for the opportunity. Community engagement activities may continue beyond this date, but applications must be submitted before the deadline. After the deadline, the opportunity will be marked as Expired and will no longer accept applications.
+                    </p>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div>
                             <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
@@ -3160,7 +3148,7 @@ function StudentOpportunityCreationPageInner() {
                 <div className="mt-3.5 flex gap-2.5">
                     <button
                         type="button"
-                        onClick={handleSaveDraft}
+                        onClick={() => void handleSaveDraft(false)}
                         className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
                         disabled={isSubmitting || isLoadingEdit || isSavingDraft || (Boolean(editingOpportunityId) && !isDraftMode)}
                     >
@@ -3188,15 +3176,27 @@ function StudentOpportunityCreationPageInner() {
                         {activeStepIndex > 0 ? (
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
-                        {activeStep !== "SUBMIT" ? (
-                            <button
-                                type="button"
-                                className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
-                                onClick={goNextStep}
-                            >
-                                {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
-                            </button>
-                        ) : null}
+                        <div className="flex gap-2">
+                            {!editingOpportunityId || isDraftMode ? (
+                                <button
+                                    type="button"
+                                    className="co-nav-btn back"
+                                    onClick={() => void handleSaveDraft(false)}
+                                    disabled={isSavingDraft}
+                                >
+                                    {isSavingDraft ? "Saving…" : "Save draft"}
+                                </button>
+                            ) : null}
+                            {activeStep !== "SUBMIT" ? (
+                                <button
+                                    type="button"
+                                    className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
+                                    onClick={goNextStep}
+                                >
+                                    {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -11,9 +11,14 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import OpportunityApprovalCard, {
+    approvalActionClass,
+    buildOpportunityApprovalModel,
+} from "@/components/ciel/community-service/OpportunityApprovalCard";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { formatDisplayId } from "@/utils/displayIds";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { authenticatedFetch } from "@/utils/api";
 import {
@@ -563,16 +568,20 @@ export default function UniversityCommunityServiceHub() {
                                     <Link
                                         key={row.id}
                                         href={
-                                            createTab === "drafts" || createTab === "action"
-                                                ? `${MY_OPPS}/${encodeURIComponent(row.id)}?edit=true`
-                                                : `${MY_OPPS}/${encodeURIComponent(row.id)}`
+                                            createTab === "drafts"
+                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}&draft=1`
+                                                : createTab === "action"
+                                                  ? `${MY_OPPS}/${encodeURIComponent(row.id)}?edit=true`
+                                                  : `${MY_OPPS}/${encodeURIComponent(row.id)}`
                                         }
-                                        className="block rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5"
+                                        className="block overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)]"
                                     >
-                                        <b className="block text-[14px] text-[#16313d]">{row.title}</b>
-                                        <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                            {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
-                                        </small>
+                                        <OpportunityListFlashHead title={row.title} />
+                                        <div className="px-4 py-3">
+                                            <small className="block text-[11.5px] text-[#6b7c86]">
+                                                {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
+                                            </small>
+                                        </div>
                                     </Link>
                                 ))}
                         </div>
@@ -668,13 +677,23 @@ export default function UniversityCommunityServiceHub() {
                         approvalOpps.filter(filterOpp).length === 0 ? (
                             <EmptyPanel title="Nothing here" text="Opportunities still moving through Faculty → Partner → CIEL PK appear here." />
                         ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {approvalOpps.filter(filterOpp).map((row) => (
-                                    <div key={row.id}>
-                                        <CommunityQueueCard href={`${MY_OPPS}/${encodeURIComponent(row.id)}`} title={row.title} student={pickStr(row, "creator_name", "faculty_name") || "In approval"} cta="Open Flashcard →" />
-                                        <UniRemindButtons email={pickStr(row, "creator_email", "faculty_email")} title={row.title} />
-                                    </div>
-                                ))}
+                            <div className="grid gap-3">
+                                {approvalOpps.filter(filterOpp).map((row) => {
+                                    const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: "pending" });
+                                    return (
+                                        <div key={row.id}>
+                                            <OpportunityApprovalCard
+                                                {...model}
+                                                actions={
+                                                    <Link href={`${MY_OPPS}/${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                                        Open Flashcard
+                                                    </Link>
+                                                }
+                                            />
+                                            <UniRemindButtons email={pickStr(row, "creator_email", "faculty_email")} title={row.title} />
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )
                     ) : (

@@ -326,7 +326,7 @@ export default function FacultyJoinApplicationsPage() {
                     if (!open) setListingRecord(null);
                 }}
             >
-                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Opportunity listing</DialogTitle>
                         <DialogDescription>

@@ -12,6 +12,10 @@ import CommunityAwardAnalytics from "@/components/ciel/community-service/Communi
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import OpportunityApprovalCard, {
+    approvalActionClass,
+    buildOpportunityApprovalModel,
+} from "@/components/ciel/community-service/OpportunityApprovalCard";
 import {
     mapCommunityPipelineRow,
     mergeCommunityLiveDeck,
@@ -27,6 +31,7 @@ import {
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
 import { formatDisplayId } from "@/utils/displayIds";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 
 const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "files", "run", "analytics", "pending", "approved"] as const;
 type CsView = (typeof CS_VIEWS)[number];
@@ -706,16 +711,22 @@ export default function PartnerCommunityServiceHub() {
                                 .map((row) => (
                                     <Link
                                         key={row.id}
-                                        href={`${MY_OPPS}/${encodeURIComponent(row.id)}`}
-                                        className="block rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
+                                        href={
+                                            createTab === "drafts"
+                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}&draft=1`
+                                                : `${MY_OPPS}/${encodeURIComponent(row.id)}`
+                                        }
+                                        className="block overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] transition hover:border-[#bcd4d8]"
                                     >
-                                        <b className="block text-[14px] text-[#16313d]">{row.title}</b>
-                                        <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                            {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
-                                            {pickNum(row, "applicants_count", "applicantsCount") > 0
-                                                ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
-                                                : ""}
-                                        </small>
+                                        <OpportunityListFlashHead title={row.title} />
+                                        <div className="px-4 py-3">
+                                            <small className="block text-[11.5px] text-[#6b7c86]">
+                                                {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
+                                                {pickNum(row, "applicants_count", "applicantsCount") > 0
+                                                    ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
+                                                    : ""}
+                                            </small>
+                                        </div>
                                     </Link>
                                 ))}
                         </div>
@@ -771,17 +782,38 @@ export default function PartnerCommunityServiceHub() {
                                 );
                             }
                             return (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {list.map((row) => (
-                                        <CommunityQueueCard
-                                            key={row.id}
-                                            href={`${APPROVALS}?tab=${tab === "done" || tab === "rev" ? "history" : "pending"}&opportunity=${encodeURIComponent(row.id)}`}
-                                            title={row.title}
-                                            student={pickStr(row, "creator_name", "student_name", "submitted_by_name") || "Creator"}
-                                            cta={tab === "done" ? "Open record →" : tab === "rev" ? "View Flashcard →" : "View Flashcard & Approve →"}
-                                            tone={tab === "done" ? "approved" : "waiting"}
-                                        />
-                                    ))}
+                                <div className="grid gap-3">
+                                    {list.map((row) => {
+                                        const mode = tab === "done" ? "decided" : tab === "rev" ? "revision" : "pending";
+                                        const model = buildOpportunityApprovalModel(row, "partner", { orgName, mode });
+                                        const href = `${APPROVALS}?tab=${mode === "pending" ? "pending" : "history"}&opportunity=${encodeURIComponent(row.id)}`;
+                                        const acknowledge = lower(row.created_by_role ?? row.creator_role) === "faculty";
+                                        return (
+                                            <OpportunityApprovalCard
+                                                key={row.id}
+                                                {...model}
+                                                actions={
+                                                    mode === "pending" ? (
+                                                        <>
+                                                            <Link href={href} className={approvalActionClass.green}>
+                                                                {acknowledge ? "View Flashcard & Acknowledge" : "View Flashcard & Approve"}
+                                                            </Link>
+                                                            <Link href={href} className={approvalActionClass.gold}>
+                                                                Request Revision
+                                                            </Link>
+                                                            <Link href={href} className={approvalActionClass.red}>
+                                                                Reject
+                                                            </Link>
+                                                        </>
+                                                    ) : (
+                                                        <Link href={href} className={approvalActionClass.soft}>
+                                                            {mode === "decided" ? "Open record" : "View Flashcard"}
+                                                        </Link>
+                                                    )
+                                                }
+                                            />
+                                        );
+                                    })}
                                 </div>
                             );
                         })()

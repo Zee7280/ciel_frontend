@@ -29,12 +29,17 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import OpportunityApprovalCard, {
+    approvalActionClass,
+    buildOpportunityApprovalModel,
+} from "@/components/ciel/community-service/OpportunityApprovalCard";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { formatDisplayId } from "@/utils/displayIds";
+import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 
 const CS_VIEWS = [
     "home",
@@ -599,23 +604,25 @@ function FacultyCommunityServiceHub() {
                                     .map((row) => {
                                         const href =
                                             createTab === "drafts" || createTab === "action"
-                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}`
+                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}${createTab === "drafts" ? "&draft=1" : ""}`
                                                 : `${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`;
                                         return (
                                         <Link
                                             key={row.id}
                                             href={href}
-                                            className="block rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
+                                            className="block overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] transition hover:border-[#bcd4d8]"
                                         >
-                                            <b className="block text-[14px] text-[#16313d]">{row.title}</b>
-                                            <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                                {formatDisplayId(row.id, "OPP")} ·{" "}
-                                                {createTab === "review" ? facultyPendingStageLabel(row) : row.status || "in review"}
-                                                {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
-                                            </small>
-                                            {createTab === "review" || createTab === "published" ? (
-                                                <ApprovalPipelineMini steps={facultyOwnPipeline(row, createTab)} />
-                                            ) : null}
+                                            <OpportunityListFlashHead title={row.title} />
+                                            <div className="px-4 py-3">
+                                                <small className="block text-[11.5px] text-[#6b7c86]">
+                                                    {formatDisplayId(row.id, "OPP")} ·{" "}
+                                                    {createTab === "review" ? facultyPendingStageLabel(row) : row.status || "in review"}
+                                                    {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
+                                                </small>
+                                                {createTab === "review" || createTab === "published" ? (
+                                                    <ApprovalPipelineMini steps={facultyOwnPipeline(row, createTab)} />
+                                                ) : null}
+                                            </div>
                                         </Link>
                                         );
                                     })
@@ -651,35 +658,89 @@ function FacultyCommunityServiceHub() {
                         pendingOppRows.length === 0 ? (
                             <EmptyPanel title="No opportunities pending" text="New student submissions appear here with their Flashcard." />
                         ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {pendingOppRows.map((row) => (
-                                    <CommunityQueueCard
-                                        key={row.id}
-                                        href={`${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`}
-                                        title={row.projectTitle}
-                                        student={row.studentName}
-                                        hours={row.totalHours}
-                                        cta="View Flashcard & Approve →"
-                                    />
-                                ))}
+                            <div className="grid gap-3">
+                                {pendingOppRows.map((row) => {
+                                    const href = `${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`;
+                                    const model = buildOpportunityApprovalModel(
+                                        {
+                                            id: row.id,
+                                            title: row.projectTitle,
+                                            student_name: row.studentName,
+                                            version: row.version,
+                                            faculty_approval_status: row.facultyApprovalStatus,
+                                            partner_approval_status: row.partnerApprovalStatus,
+                                            admin_approval_status: row.adminApprovalStatus,
+                                            requires_partner_approval: row.requiresPartnerApproval,
+                                            created_by_role: row.createdByRole,
+                                            status: row.opportunityStatus,
+                                            workflow_stage: row.workflowStage,
+                                            total_hours: row.totalHours,
+                                            submitted_at: row.submittedDate,
+                                            isStudentCreated: true,
+                                        },
+                                        "faculty",
+                                        { mode: "pending" },
+                                    );
+                                    return (
+                                        <OpportunityApprovalCard
+                                            key={row.id}
+                                            {...model}
+                                            actions={
+                                                <>
+                                                    <Link href={href} className={approvalActionClass.green}>
+                                                        View Flashcard & Approve
+                                                    </Link>
+                                                    <Link href={href} className={approvalActionClass.gold}>
+                                                        Request Revision
+                                                    </Link>
+                                                    <Link href={href} className={approvalActionClass.red}>
+                                                        Reject
+                                                    </Link>
+                                                </>
+                                            }
+                                        />
+                                    );
+                                })}
                             </div>
                         )
                     ) : reviewTab === "revision" ? (
                         revisionOpps.length === 0 ? (
                             <EmptyPanel title="None" text="Proposals you returned for correction stay visible here." />
                         ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {revisionOpps.map((row) => (
-                                    <div key={row.id}>
-                                        <CommunityQueueCard
-                                            href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`}
-                                            title={row.projectTitle}
-                                            student={row.studentName}
-                                            cta="Open record →"
-                                        />
-                                        <FacultyRemindButtons email={row.studentEmail} title={row.projectTitle} />
-                                    </div>
-                                ))}
+                            <div className="grid gap-3">
+                                {revisionOpps.map((row) => {
+                                    const href = `${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`;
+                                    const model = buildOpportunityApprovalModel(
+                                        {
+                                            id: row.id,
+                                            title: row.projectTitle,
+                                            student_name: row.studentName,
+                                            version: row.version,
+                                            faculty_approval_status: row.facultyApprovalStatus,
+                                            partner_approval_status: row.partnerApprovalStatus,
+                                            admin_approval_status: row.adminApprovalStatus,
+                                            requires_partner_approval: row.requiresPartnerApproval,
+                                            status: row.opportunityStatus,
+                                            workflow_stage: row.workflowStage,
+                                            isStudentCreated: true,
+                                        },
+                                        "faculty",
+                                        { mode: "revision" },
+                                    );
+                                    return (
+                                        <div key={row.id}>
+                                            <OpportunityApprovalCard
+                                                {...model}
+                                                actions={
+                                                    <Link href={href} className={approvalActionClass.soft}>
+                                                        View Flashcard
+                                                    </Link>
+                                                }
+                                            />
+                                            <FacultyRemindButtons email={row.studentEmail} title={row.projectTitle} />
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )
                     ) : reviewTab === "apps" ? (
@@ -701,17 +762,37 @@ function FacultyCommunityServiceHub() {
                     ) : historyOppRows.length === 0 && historyAppRows.length === 0 ? (
                         <EmptyPanel title="No decided records yet" text="Completed approval decisions stay here for audit history." />
                     ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {historyOppRows.map((row) => (
-                                <CommunityQueueCard
-                                    key={`opp-${row.id}`}
-                                    href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`}
-                                    title={row.projectTitle}
-                                    student={row.studentName}
-                                    tone="approved"
-                                    cta="History →"
-                                />
-                            ))}
+                        <div className="grid gap-3">
+                            {historyOppRows.map((row) => {
+                                const model = buildOpportunityApprovalModel(
+                                    {
+                                        id: row.id,
+                                        title: row.projectTitle,
+                                        student_name: row.studentName,
+                                        version: row.version,
+                                        faculty_approval_status: row.facultyApprovalStatus,
+                                        partner_approval_status: row.partnerApprovalStatus,
+                                        admin_approval_status: row.adminApprovalStatus,
+                                        requires_partner_approval: row.requiresPartnerApproval,
+                                        status: row.opportunityStatus,
+                                        workflow_stage: row.workflowStage,
+                                        isStudentCreated: true,
+                                    },
+                                    "faculty",
+                                    { mode: "decided" },
+                                );
+                                return (
+                                    <OpportunityApprovalCard
+                                        key={`opp-${row.id}`}
+                                        {...model}
+                                        actions={
+                                            <Link href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                                History
+                                            </Link>
+                                        }
+                                    />
+                                );
+                            })}
                             {historyAppRows.map((row) => (
                                 <CommunityQueueCard
                                     key={`app-${row.id}`}

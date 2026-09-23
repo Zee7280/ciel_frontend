@@ -12,6 +12,10 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
 import {
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import {
     readActivityPlan,
     readObjectiveItems,
     readSupervisionStakeholders,
@@ -318,211 +322,13 @@ export default function ProjectDetailsPage() {
             <div className="px-6 max-w-5xl mx-auto">
                 <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 animate-fade-in-up">
                     
-                    {/* Key Metrics Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-10 mb-10 border-b border-slate-100">
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <MapPin className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Location</span>
-                            </div>
-                            <span className="text-sm font-bold text-slate-900">{displayLocation}</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <Users className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Volunteers</span>
-                            </div>
-                            <span className="text-sm font-bold text-slate-900">{volunteersNeeded} Needed</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <Clock className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Hours</span>
-                            </div>
-                            <span className="text-sm font-bold text-slate-900">{expectedHours || 0} Hours</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <Tag className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Category</span>
-                            </div>
-                            <span className="text-sm font-bold text-slate-900">{category}</span>
-                        </div>
-                    </div>
-
-                    {/* Objectives */}
-                    <div className="mb-10">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Project Objectives</h3>
-                        {objectiveContent.items.length > 1 ? (
-                            <ol className="text-base text-slate-600 leading-7 space-y-3 list-decimal list-inside border-l-4 border-[#4285F4]/30 pl-4">
-                                {objectiveContent.items.map((item, idx) => (
-                                    <li key={idx}>{item}</li>
-                                ))}
-                            </ol>
-                        ) : (
-                            <p className="text-base text-slate-600 leading-7 whitespace-pre-line border-l-4 border-[#4285F4]/30 pl-4">
-                                {objectiveContent.description || project.description || "No objectives provided."}
-                            </p>
-                        )}
-                        {beneficiaryTypes.length > 0 ? (
-                            <div className="flex flex-wrap gap-2 mt-4">
-                                {beneficiaryTypes.map((b) => (
-                                    <span key={b} className="px-3 py-1 rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                                        {b}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Building2 className="w-5 h-5 text-[#4285F4]" />
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Organization</h3>
-                            </div>
-                            <div className="space-y-2 text-sm text-slate-600">
-                                <p><span className="font-bold text-slate-900">Name:</span> {partnerName}</p>
-                                <p><span className="font-bold text-slate-900">City:</span> {orgCity || "Not provided"}</p>
-                                <p><span className="font-bold text-slate-900">Mode:</span> {project.mode || "Not provided"}</p>
-                            </div>
-                        </div>
-                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Globe2 className="w-5 h-5 text-[#4285F4]" />
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">SDG Alignment</h3>
-                            </div>
-                            <div className="space-y-2 text-sm text-slate-600">
-                                <p><span className="font-bold text-slate-900">Goal:</span> {sdgLabel}</p>
-                                {sdgInfo?.target_id ? (
-                                    <p className="text-xs text-slate-500">
-                                        Target {String(sdgInfo.target_id)} · Indicator {String(sdgInfo.indicator_id ?? "—")}
-                                    </p>
-                                ) : null}
-                                <p className="leading-6">{sdgDescription}</p>
-                                {Array.isArray(secondarySdgs) && secondarySdgs.length > 0 ? (
-                                    <ul className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-200">
-                                        {(secondarySdgs as Record<string, unknown>[]).map((s, i) => (
-                                            <li key={i}>
-                                                Also: SDG {String(s.sdg_id ?? "?")}
-                                                {s.target_id ? ` · ${String(s.target_id)}` : ""}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : null}
-                            </div>
-                        </div>
-                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Clock className="w-5 h-5 text-[#4285F4]" />
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Quick Info</h3>
-                            </div>
-                            <div className="space-y-2 text-sm text-slate-600">
-                                <p><span className="font-bold text-slate-900">Start:</span> {startDate}</p>
-                                <p><span className="font-bold text-slate-900">End:</span> {endDate}</p>
-                                <p><span className="font-bold text-slate-900">Duration:</span> {duration}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Target className="w-5 h-5 text-[#4285F4]" />
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Student Responsibilities</h3>
-                            </div>
-                            <CollapsibleDetailText
-                                fullText={activityPlan.full}
-                                previewText={activityPlan.preview}
-                                isLong={activityPlan.isLong}
-                                emptyLabel="Detailed student responsibilities will be shared after login through the student dashboard."
-                                className="text-sm"
-                            />
-                        </div>
-                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Building2 className="w-5 h-5 text-[#4285F4]" />
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Timeline & Venue</h3>
-                            </div>
-                            <div className="space-y-3 text-sm text-slate-600">
-                                <p><span className="font-bold text-slate-900">Start:</span> {startDate}</p>
-                                <p><span className="font-bold text-slate-900">End:</span> {endDate}</p>
-                                <p><span className="font-bold text-slate-900">Venue:</span> {venue}</p>
-                                <p><span className="font-bold text-slate-900">Location:</span> {displayLocation}</p>
-                                <p><span className="font-bold text-slate-900">Beneficiaries:</span> {beneficiaries}</p>
-                                <p><span className="font-bold text-slate-900">Beneficiary Type:</span> {beneficiaryTypes.length > 0 ? beneficiaryTypes.join(", ") : "Not provided"}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {(skills.length > 0 || verificationMethods.length > 0 || project.supervision) && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                            <div className="md:col-span-2 bg-white border border-slate-100 rounded-3xl p-6">
-                                <div className="flex items-center gap-3 mb-5">
-                                    <Sparkles className="w-5 h-5 text-[#4285F4]" />
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Skills & Verification</h3>
-                                </div>
-                                {skills.length > 0 ? (
-                                    <div className="flex flex-wrap gap-3 mb-6">
-                                        {skills.map((skill) => (
-                                            <span key={skill} className="px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-blue-700">
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                ) : null}
-                                {verificationMethods.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {verificationMethods.map((method) => (
-                                            <div key={method} className="flex items-start gap-2 text-sm text-slate-600">
-                                                <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-500 shrink-0" />
-                                                <span>{method}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : null}
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 rounded-3xl p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <Globe2 className="w-5 h-5 text-[#4285F4]" />
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Supervision</h3>
-                                </div>
-                                <div className="space-y-3 text-sm text-slate-600">
-                                    {(stakeholders.faculty?.name || project.supervision?.supervisor_name) ? (
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Faculty</p>
-                                            <p className="font-bold text-slate-900">
-                                                {stakeholders.faculty?.name || project.supervision?.supervisor_name}
-                                            </p>
-                                            {(stakeholders.faculty?.role || project.supervision?.role) ? (
-                                                <p className="text-xs">{stakeholders.faculty?.role || project.supervision?.role}</p>
-                                            ) : null}
-                                            {stakeholders.faculty?.department ? (
-                                                <p className="text-xs">{stakeholders.faculty.department}</p>
-                                            ) : null}
-                                            {stakeholders.faculty?.university ? (
-                                                <p className="text-xs">{stakeholders.faculty.university}</p>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-                                    {(stakeholders.partner?.organization || project.supervision?.partner_org_name) ? (
-                                        <div className="pt-2 border-t border-slate-200">
-                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Partner</p>
-                                            <p className="font-bold text-slate-900">
-                                                {stakeholders.partner?.organization || project.supervision?.partner_org_name}
-                                            </p>
-                                            {(stakeholders.partner?.contact_person || project.supervision?.partner_contact_person) ? (
-                                                <p className="text-xs">
-                                                    {stakeholders.partner?.contact_person || project.supervision?.partner_contact_person}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-                                    <p><span className="font-bold text-slate-900">Safe Environment:</span> {project.supervision?.safe_environment ? "Confirmed" : "Shared after onboarding"}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <StudentOpportunityFlashcard
+                        model={buildOpportunityRecordFlashcard(projectRecord, {
+                            partnerOrg: partnerName,
+                            university: stakeholders.faculty?.university || project.organization?.name,
+                            facultyName: stakeholders.faculty?.name || project.supervision?.supervisor_name,
+                        })}
+                    />
 
                     {/* Apply Action */}
                     <Link 

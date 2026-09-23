@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Briefcase, CheckCircle, Eye, Filter, Loader2, User, XCircle } from "lucide-react";
+import { CheckCircle, Eye, Filter, Loader2, XCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
-import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import {
     Dialog,
@@ -25,31 +24,17 @@ import {
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
-import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
-import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 import {
-    ApprovalPipelineMini,
-    computeApprovalPipelineSteps,
-    type ApprovalLineStatus,
-    type ApprovalPipelineStepState,
-} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 import { History } from "lucide-react";
+import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 
 /** Partner/NGO's own line has already been reached here — their pending decision IS the "Partner /
  * NGO" stage, so (unlike the Create Opportunity tab's "my own opportunity" pipeline) it's shown as
  * a real, live stage rather than skipped. */
-function partnerApprovalPipelineSteps(row: PartnerApprovalRow) {
-    const lines: { label: string; status: ApprovalLineStatus }[] = [
-        { label: "Faculty", status: row.facultyApprovalStatus as ApprovalLineStatus },
-        { label: "Partner / NGO", status: row.partnerApprovalStatus as ApprovalLineStatus },
-        { label: "CIEL PK", status: row.adminApprovalStatus as ApprovalLineStatus },
-    ];
-    const status = (row.opportunityStatus || "").toLowerCase();
-    const decisionState: ApprovalPipelineStepState =
-        status === "rejected" ? "bad" : status === "active" || status === "live" ? "done" : "locked";
-    return computeApprovalPipelineSteps(lines, decisionState);
-}
-
 function approvalHistoryLabel(entry: ApprovalHistoryEntry): string {
     const line = entry.line === "admin" ? "CIEL PK" : entry.line === "partner" ? "Partner / NGO" : "Faculty";
     const action =
@@ -586,65 +571,31 @@ export default function VerifyWorkPage() {
                     </div>
                 ) : (
                     filtered.map((row) => (
-                        <Card key={row.id} className="overflow-hidden">
-                            <div className="flex flex-col md:flex-row">
-                                <div className="p-6 flex-1 space-y-4">
-                            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                <h3 className="font-bold text-lg text-slate-900">{row.projectTitle}</h3>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        tab === "pending"
-                                                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                                                            : "bg-slate-100 text-slate-700 border-slate-200"
-                                                    }
-                                                >
-                                                    {tab === "pending" ? "Pending partner review" : row.workflowLabel}
-                                                </Badge>
-                                            </div>
-                                    <p className="flex flex-col gap-1 text-sm text-slate-500 sm:flex-row sm:items-center sm:gap-4">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <User className="w-3.5 h-3.5" />
-                                                    <strong className="text-slate-700">{row.studentName}</strong> ({formatDisplayId(row.studentId, "STU")})
-                                                </span>
-                                                {row.studentEmail ? <span className="break-all text-slate-600">· {row.studentEmail}</span> : null}
-                                                <span>Submitted {row.submittedDate} · Opp v{row.version ?? 1}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p className="mb-1.5 text-xs font-bold uppercase text-slate-500">Approval chain</p>
-                                        <ApprovalPipelineMini steps={partnerApprovalPipelineSteps(row)} />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Workflow Stage</p>
-                                            <p className="font-medium text-slate-800 text-sm">{row.workflowLabel}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Impact Hours</p>
-                                            <p className="font-bold text-blue-600 text-lg">{row.totalHours ?? "—"}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Primary SDG</p>
-                                            <p className="font-medium text-slate-800 text-sm">{row.sdg || "—"}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Briefcase className="w-4 h-4 text-blue-600" />
-                                            <p className="text-xs font-bold text-slate-500 uppercase">Queue Note</p>
-                                        </div>
-                                        <p className="text-sm text-slate-700">{row.queueMessage}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-56 md:flex-col md:border-l md:border-t-0 md:p-6">
+                        <Card key={row.id} className="overflow-hidden border-0 bg-transparent shadow-none">
+                            <OpportunityApprovalCard
+                                {...buildOpportunityApprovalModel(
+                                    {
+                                        id: row.id,
+                                        title: row.projectTitle,
+                                        student_name: row.studentName,
+                                        version: row.version,
+                                        faculty_approval_status: row.facultyApprovalStatus,
+                                        partner_approval_status: row.partnerApprovalStatus,
+                                        admin_approval_status: row.adminApprovalStatus,
+                                        requires_partner_approval: true,
+                                        status: row.opportunityStatus,
+                                        workflow_stage: row.workflowStage,
+                                        total_hours: row.totalHours,
+                                        sdg: row.sdg,
+                                        summary: row.queueMessage,
+                                        submitted_at: row.submittedDate,
+                                        isStudentCreated: true,
+                                    },
+                                    "partner",
+                                    { mode: tab === "pending" ? "pending" : "decided" },
+                                )}
+                                actions={
+                                    <div className="grid w-full gap-2">
                                     {tab === "pending" ? (
                                         <>
                                             {!row.partnerDecisionActionsEnabled ? (
@@ -697,8 +648,9 @@ export default function VerifyWorkPage() {
                                             <History className="w-4 h-4 mr-2" /> History
                                         </Button>
                                     ) : null}
-                                </div>
-                            </div>
+                                    </div>
+                                }
+                            />
                         </Card>
                     ))
                 )}
@@ -770,81 +722,9 @@ export default function VerifyWorkPage() {
                                     <p className="text-slate-800">{pickStr(detailRecord, "workflow_stage", "approval_stage").replace(/_/g, " ") || "—"}</p>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Mode</p>
-                                    <p className="text-slate-800">{pickStr(detailRecord, "mode") || "—"}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Visibility</p>
-                                    <p className="text-slate-800">{pickStr(detailRecord, "visibility") || "—"}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Types</p>
-                                    <p className="text-slate-800">{normalizeStrArray(detailRecord.types).join(", ") || "—"}</p>
-                                </div>
-                            </div>
-
-                            {(() => {
-                                const timeline = pickObj(detailRecord, "timeline");
-                                if (!timeline) return null;
-                                return (
-                                    <div className="rounded-xl border border-slate-200 p-4">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Timeline</p>
-                                        <ul className="space-y-1 text-slate-800">
-                                            <li><span className="text-slate-500">Type:</span> {pickStr(timeline, "type") || "—"}</li>
-                                            <li><span className="text-slate-500">Dates:</span> {[pickStr(timeline, "start_date"), pickStr(timeline, "end_date")].filter(Boolean).join(" to ") || "—"}</li>
-                                            <li><span className="text-slate-500">Expected hours:</span> {String(timeline.expected_hours ?? detailRecord.requiredHours ?? "—")}</li>
-                                            <li><span className="text-slate-500">Volunteers:</span> {String(timeline.volunteers_required ?? "—")}</li>
-                                        </ul>
-                                    </div>
-                                );
-                            })()}
-
-                            {(() => {
-                                const objectives = pickObj(detailRecord, "objectives");
-                                if (!objectives) return null;
-                                return (
-                                    <div className="rounded-xl border border-slate-200 p-4">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Objectives</p>
-                                        <p className="text-slate-800 whitespace-pre-wrap">{pickStr(objectives, "description") || "—"}</p>
-                                        <p className="text-slate-700 mt-2">
-                                            <span className="text-slate-500">Beneficiaries:</span>{" "}
-                                            {String(objectives.beneficiaries_count ?? "—")}
-                                            {normalizeStrArray(objectives.beneficiaries_type).length
-                                                ? ` (${normalizeStrArray(objectives.beneficiaries_type).join(", ")})`
-                                                : ""}
-                                        </p>
-                                    </div>
-                                );
-                            })()}
-
-                            {(() => {
-                                const activity = pickObj(detailRecord, "activity_details", "activityDetails");
-                                if (!activity) return null;
-                                return (
-                                    <div className="rounded-xl border border-slate-200 p-4">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Activity details</p>
-                                        <p className="text-slate-800 whitespace-pre-wrap">
-                                            {pickStr(activity, "student_responsibilities", "studentResponsibilities") || "—"}
-                                        </p>
-                                        <p className="text-slate-700 mt-2">
-                                            <span className="text-slate-500">Skills:</span>{" "}
-                                            {normalizeStrArray(activity.skills_gained ?? activity.skillsGained).join(", ") || "—"}
-                                        </p>
-                                    </div>
-                                );
-                            })()}
-
-                            <OpportunitySdgAlignmentSection raw={detailRecord} heading="SDG alignment" />
-                            {normalizeStrArray(detailRecord.verification_method).length > 0 ? (
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Verification method</p>
-                                    <p className="text-slate-800">
-                                        {normalizeStrArray(detailRecord.verification_method).join(", ")}
-                                    </p>
-                                </div>
-                            ) : null}
+                            <StudentOpportunityFlashcard
+                                model={buildOpportunityRecordFlashcard(detailRecord)}
+                            />
                             {needsExecDialog && detailOppId ? (
                                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                                     <p className="text-xs font-bold text-emerald-900 uppercase mb-2">Executing organization confirmation</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Info, MapPin, AlertCircle, ChevronDown, Loader2, Plus, X } from "lucide-react";
@@ -167,6 +167,13 @@ export default function OpportunityPostingPage() {
     const router = useRouter();
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    const [isDraftMode, setIsDraftMode] = useState(false);
+    const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+    const draftIdRef = useRef<string | null>(null);
+    const draftSaveChain = useRef(Promise.resolve());
+    const skipDraftHydrateRef = useRef(false);
+    const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
 
     // Organization Details State (fetched from API)
     const [orgDetails, setOrgDetails] = useState({
@@ -290,8 +297,13 @@ export default function OpportunityPostingPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        if (i >= 0 && i < WIZARD_STEPS.length - 1) goToStep(WIZARD_STEPS[i + 1].key);
-    }, [activeStep, goToStep]);
+        if (i >= 0 && i < WIZARD_STEPS.length - 1) {
+            if (!editingOpportunityId || isDraftMode) {
+                void persistDraftRef.current(true);
+            }
+            goToStep(WIZARD_STEPS[i + 1].key);
+        }
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -502,11 +514,7 @@ export default function OpportunityPostingPage() {
         return true;
     };
 
-    const handleSubmit = async () => {
-        if (!validateForm()) return;
-
-        setIsSubmitting(true);
-        try {
+    const buildOpportunityPayload = () => {
             // Transform state to match API Spec
             const otherTypeLabels = formData.isOtherTypeChecked
                 ? formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean).map((s) => `Other: ${s}`)
@@ -687,7 +695,17 @@ export default function OpportunityPostingPage() {
                 visibility,
                 restricted_universities: applyRestrictedUnis.length ? applyRestrictedUnis : null
             };
+            return payload;
+    };
 
+    const handleSubmit = async () => {
+        if (isLoadingEdit) return;
+        if (!validateForm()) return;
+
+        setIsSubmitting(true);
+        try {
+            const payload = buildOpportunityPayload();
+            const promotingDraft = Boolean(editingOpportunityId) && isDraftMode;
             const res = await authenticatedFetch(`/api/v1/opportunities`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
@@ -698,6 +716,20 @@ export default function OpportunityPostingPage() {
                 // Check for success flag OR direct object return (id/title)
                 if (data.success || data.id || data.title) {
                     toast.success("Submitted for review. Your opportunity will appear as Live after admin approval.");
+                    try {
+                        localStorage.removeItem(PARTNER_OPPORTUNITY_DRAFT_KEY);
+                    } catch {
+                        /* ignore */
+                    }
+                    if (promotingDraft && editingOpportunityId) {
+                        authenticatedFetch(
+                            `/api/v1/opportunities/${encodeURIComponent(editingOpportunityId)}`,
+                            { method: "DELETE" },
+                            { redirectToLogin: false },
+                        ).catch(() => {
+                            /* the submitted listing already exists */
+                        });
+                    }
                     router.push("/dashboard/partner/community-service?view=create");
                 } else {
                     toast.error(data.message || data.error || "Failed to create opportunity");
@@ -725,24 +757,54 @@ export default function OpportunityPostingPage() {
         }
     };
 
-    const handleSaveDraft = () => {
-        try {
-            localStorage.setItem(
-                PARTNER_OPPORTUNITY_DRAFT_KEY,
-                JSON.stringify({
-                    v: 1,
-                    savedAt: Date.now(),
-                    formData,
-                    orgDetails,
-                    expandedSections,
-                }),
+    const handleSaveDraft = async (quiet = false) => {
+        if (editingOpportunityId && !isDraftMode) return;
+        const job = draftSaveChain.current.then(async () => {
+            const payload = {
+                ...buildOpportunityPayload(),
+                draft: true,
+                title: formData.title.trim() || "Untitled opportunity",
+            };
+            const existingId = draftIdRef.current;
+            const res = await authenticatedFetch(
+                existingId ? `/api/v1/opportunities/update` : `/api/v1/opportunities`,
+                {
+                    method: "POST",
+                    body: JSON.stringify(existingId ? { id: existingId, ...payload } : payload),
+                },
+                { redirectToLogin: false },
             );
-            toast.success("Draft saved on this device.");
-        } catch (error) {
-            console.error("Partner draft save failed", error);
-            toast.error("Could not save draft. Check browser storage.");
-        }
+            const data = await res?.json().catch(() => null);
+            const newId =
+                (data as { data?: { id?: string } } | null)?.data?.id ||
+                (data as { id?: string } | null)?.id;
+            if (!res?.ok || !newId) {
+                const msg =
+                    typeof (data as { message?: unknown } | null)?.message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not save this draft.";
+                toast.warning(msg);
+                return;
+            }
+            if (!existingId) {
+                draftIdRef.current = newId;
+                skipDraftHydrateRef.current = true;
+                setEditingOpportunityId(newId);
+                setIsDraftMode(true);
+                router.replace(
+                    `/dashboard/partner/requests/new?edit=${encodeURIComponent(newId)}&draft=1`,
+                    { scroll: false },
+                );
+            }
+            toast.success(quiet ? "Saved to drafts." : "Draft saved.", { id: "partner-opp-draft" });
+        });
+        draftSaveChain.current = job.then(
+            () => undefined,
+            () => undefined,
+        );
+        return job;
     };
+    persistDraftRef.current = handleSaveDraft;
 
     const toggleType = (type: string) => {
         setFormData(prev => {
@@ -758,6 +820,19 @@ export default function OpportunityPostingPage() {
     // Fetch Organization Profile on Mount
     useEffect(() => {
         const fetchProfile = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const editId = params.get("edit")?.trim() || "";
+            if (params.get("draft") === "1") setIsDraftMode(true);
+            if (editId) {
+                draftIdRef.current = editId;
+                setEditingOpportunityId(editId);
+            } else {
+                try {
+                    localStorage.removeItem(PARTNER_OPPORTUNITY_DRAFT_KEY);
+                } catch {
+                    /* ignore */
+                }
+            }
             try {
                 // Get user ID from local storage
                 const storedUser = localStorage.getItem("ciel_user");
@@ -854,6 +929,137 @@ export default function OpportunityPostingPage() {
 
         fetchProfile();
     }, [router]);
+
+    useEffect(() => {
+        if (!editingOpportunityId || isLoadingProfile) return;
+        if (skipDraftHydrateRef.current) {
+            skipDraftHydrateRef.current = false;
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            setIsLoadingEdit(true);
+            try {
+                const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: editingOpportunityId }),
+                });
+                if (!res?.ok) {
+                    toast.error("Could not load this opportunity");
+                    return;
+                }
+                const json = await res.json();
+                const d = json?.data as Record<string, unknown> | undefined;
+                if (!d || cancelled) return;
+                if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
+                const str = (v: unknown) => (typeof v === "string" ? v : "");
+                const timeline = (d.timeline && typeof d.timeline === "object" ? d.timeline : {}) as Record<string, unknown>;
+                const sdgInfo = (d.sdg_info && typeof d.sdg_info === "object" ? d.sdg_info : {}) as Record<string, unknown>;
+                const objectives = (d.objectives && typeof d.objectives === "object" ? d.objectives : {}) as Record<string, unknown>;
+                const activity = (d.activity_details && typeof d.activity_details === "object" ? d.activity_details : {}) as Record<string, unknown>;
+                const scope = (d.participation_scope && typeof d.participation_scope === "object" ? d.participation_scope : {}) as Record<string, unknown>;
+                const exec = (d.executing_organization && typeof d.executing_organization === "object" ? d.executing_organization : {}) as Record<string, unknown>;
+                const partner = (d.partner_organization && typeof d.partner_organization === "object" ? d.partner_organization : {}) as Record<string, unknown>;
+                const linkage = (d.visibility_and_academic_linkage && typeof d.visibility_and_academic_linkage === "object" ? d.visibility_and_academic_linkage : {}) as Record<string, unknown>;
+                const facultyRep = (linkage.faculty_institutional_representative && typeof linkage.faculty_institutional_representative === "object"
+                    ? linkage.faculty_institutional_representative
+                    : {}) as Record<string, unknown>;
+                const loc = (d.location && typeof d.location === "object" ? d.location : {}) as Record<string, unknown>;
+                const types = Array.isArray(d.types) ? d.types.map(String) : [];
+                const otherTypes = types.filter((t) => t.startsWith("Other:")).map((t) => t.slice("Other:".length).trim());
+                const applyScope = str(scope.apply_scope);
+                const allowedScopes = ["all", "multi_all", "multi_depts", "one_all", "one_depts"];
+                if (cancelled) return;
+                setFormData((prev) => ({
+                    ...prev,
+                    title: str(d.title) === "Untitled opportunity" ? "" : str(d.title),
+                    hook: str(objectives.hook),
+                    creatorDetailType: str(exec.organization_type) || prev.creatorDetailType,
+                    creatorSector: str(exec.sector),
+                    opportunityType: types.filter((t) => !t.startsWith("Other:")),
+                    isOtherTypeChecked: otherTypes.length > 0,
+                    otherTypeSpecs: otherTypes.length ? otherTypes : [""],
+                    mode: str(d.mode),
+                    location: {
+                        city: str(loc.city),
+                        venue: str(loc.venue),
+                        pin: str(loc.pin),
+                    },
+                    timelineType: str(timeline.type) || prev.timelineType,
+                    dates: {
+                        start: str(timeline.start_date),
+                        end: str(timeline.end_date),
+                        fromTime: str(timeline.from_time),
+                        endTime: str(timeline.to_time),
+                    },
+                    applicationDeadline: str(timeline.application_deadline),
+                    scheduleNotes: str(timeline.schedule_notes),
+                    capacity: {
+                        hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",
+                        volunteers: timeline.volunteers_required != null ? String(timeline.volunteers_required) : "",
+                    },
+                    sdg: str(sdgInfo.sdg_id),
+                    target: str(sdgInfo.target_id),
+                    indicator: str(sdgInfo.indicator_id),
+                    subIndicator: str(sdgInfo.sub_indicator_id),
+                    sdgWhy: str(sdgInfo.why_relevant),
+                    objectives: {
+                        ...prev.objectives,
+                        description: str(objectives.description),
+                        outputs: str(objectives.outputs),
+                        outcome: str(objectives.outcome),
+                        beneficiariesCount: objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
+                        beneficiariesType: Array.isArray(objectives.beneficiaries_type) ? objectives.beneficiaries_type.map(String) : [],
+                    },
+                    activity: {
+                        ...prev.activity,
+                        responsibilities: str(activity.student_responsibilities),
+                        skills: Array.isArray(activity.skills_gained) ? activity.skills_gained.map(String) : [],
+                        prerequisites: str(activity.prerequisites),
+                        resources: str(activity.resources),
+                    },
+                    verificationSafety: {
+                        ...prev.verificationSafety,
+                        executingOrg: {
+                            ...prev.verificationSafety.executingOrg,
+                            contactPersonName: str(exec.contact_person_name),
+                            officialEmail: str(exec.official_email),
+                        },
+                        partnerOrg: {
+                            ...prev.verificationSafety.partnerOrg,
+                            hasPartner: Boolean(partner.organization_name || partner.official_email),
+                            orgName: str(partner.organization_name),
+                            contactPerson: str(partner.contact_person_name),
+                            officialEmail: str(partner.official_email),
+                            designation: str(partner.designation),
+                            orgType: str(partner.organization_type),
+                            functionInOpportunity: str(partner.function_in_opportunity),
+                        },
+                    },
+                    restrictedFacultyLinkage: {
+                        ...prev.restrictedFacultyLinkage,
+                        hasFacultyLink: Boolean(facultyRep.official_email || facultyRep.name),
+                        representativeName: str(facultyRep.name),
+                        designation: str(facultyRep.designation),
+                        officialEmail: str(facultyRep.official_email),
+                        university: str(facultyRep.university),
+                        department: str(facultyRep.department),
+                    },
+                    applyScope: (allowedScopes.includes(applyScope) ? applyScope : prev.applyScope) as NgoApplyScope,
+                    restrictedUniversities: Array.isArray(d.restricted_universities) ? d.restricted_universities.map(String) : prev.restrictedUniversities,
+                    verification: Array.isArray(d.verification_method) ? d.verification_method.map(String) : prev.verification,
+                }));
+            } catch {
+                if (!cancelled) toast.error("Could not load this opportunity");
+            } finally {
+                if (!cancelled) setIsLoadingEdit(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [editingOpportunityId, isLoadingProfile]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -1378,6 +1584,10 @@ export default function OpportunityPostingPage() {
                     expanded
                 />
                 <div>
+                    <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                        <span className="font-semibold text-slate-900">Application Deadline: </span>
+                        This is the final date to apply for the opportunity. Community engagement activities may continue beyond this date, but applications must be submitted before the deadline. After the deadline, the opportunity will be marked as Expired and will no longer accept applications.
+                    </p>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div>
                             <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
@@ -2703,7 +2913,7 @@ export default function OpportunityPostingPage() {
                 <div className="mt-3.5 flex gap-2.5">
                     <button
                         type="button"
-                        onClick={handleSaveDraft}
+                        onClick={() => void handleSaveDraft(false)}
                         className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
                         disabled={isSubmitting}
                     >
@@ -2727,15 +2937,22 @@ export default function OpportunityPostingPage() {
                         {activeStepIndex > 0 ? (
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
-                        {activeStep !== "SUBMIT" ? (
-                            <button
-                                type="button"
-                                className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
-                                onClick={goNextStep}
-                            >
-                                {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
-                            </button>
-                        ) : null}
+                        <div className="flex gap-2">
+                            {!editingOpportunityId || isDraftMode ? (
+                                <button type="button" className="co-nav-btn back" onClick={() => void handleSaveDraft(false)} disabled={isLoadingEdit}>
+                                    Save draft
+                                </button>
+                            ) : null}
+                            {activeStep !== "SUBMIT" ? (
+                                <button
+                                    type="button"
+                                    className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
+                                    onClick={goNextStep}
+                                >
+                                    {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             </div>

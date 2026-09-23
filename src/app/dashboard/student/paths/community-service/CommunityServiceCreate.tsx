@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
+import { toast } from "sonner";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import {
     CommunityCrumb,
@@ -13,7 +14,8 @@ import {
     ZoneRule,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { ApprovalChain, buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { whatsappShareHref } from "@/utils/reminderLinks";
 import {
     canEditReturnedOpportunity,
     isOpportunityPermanentlyRejected,
@@ -115,69 +117,6 @@ function pendingStageLabel(op: MineRow): string {
         return "Pending Partner";
     }
     return "Pending CIEL PK";
-}
-
-type PipelineStepState = "done" | "cur" | "bad" | "locked";
-
-/** Faculty → Partner/NGO (only if required) → CIEL PK → Decision, each colored by its own approval line. */
-function approvalPipelineSteps(op: MineRow): { label: string; state: PipelineStepState }[] {
-    const lines: { label: string; status: ApprovalLineStatus }[] = [
-        { label: "Faculty", status: op.faculty_approval_status },
-        ...(op.requires_partner_approval ? [{ label: "Partner / NGO", status: op.partner_approval_status }] : []),
-        { label: "CIEL PK", status: op.admin_approval_status },
-    ];
-
-    let blocked = false;
-    let curAssigned = false;
-    const steps = lines.map(({ label, status }) => {
-        if (lineBlocked(status)) {
-            blocked = true;
-            return { label, state: "bad" as PipelineStepState };
-        }
-        if (blocked) return { label, state: "locked" as PipelineStepState };
-        if (lineDone(status)) return { label, state: "done" as PipelineStepState };
-        if (!curAssigned) {
-            curAssigned = true;
-            return { label, state: "cur" as PipelineStepState };
-        }
-        return { label, state: "locked" as PipelineStepState };
-    });
-
-    const decisionState: PipelineStepState = isOpportunityPermanentlyRejected(op as unknown as Record<string, unknown>)
-        ? "bad"
-        : opportunityFullyApproved(op)
-          ? "done"
-          : "locked";
-    steps.push({ label: "Decision", state: decisionState });
-    return steps;
-}
-
-function PipelineMini({ op }: { op: MineRow }) {
-    const steps = approvalPipelineSteps(op);
-    return (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {steps.map((step, i) => (
-                <span key={step.label} className="flex items-center gap-1.5">
-                    <span
-                        className={
-                            "rounded-[9px] border px-2 py-1 text-[9.5px] font-black " +
-                            (step.state === "done"
-                                ? "border-[#cfeadf] bg-[#eff9f5] text-[#1c765d]"
-                                : step.state === "cur"
-                                  ? "border-[#efddb7] bg-[#fff8e9] text-[#9d6810]"
-                                  : step.state === "bad"
-                                    ? "border-[#f3d4d4] bg-[#fdeeee] text-[#b34c4c]"
-                                    : "border-[#e4e9eb] bg-[#f7fafb] text-[#96a3a9]")
-                        }
-                    >
-                        {step.label}
-                        {step.state === "locked" ? " · Locked" : null}
-                    </span>
-                    {i < steps.length - 1 ? <span className="text-[10px] font-black text-[#a8b6bb]">→</span> : null}
-                </span>
-            ))}
-        </div>
-    );
 }
 
 function formatWhen(iso?: string): string {
@@ -530,10 +469,41 @@ export default function CommunityServiceCreate() {
 
 function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab; onOpenHistory: () => void }) {
     const who = currentReviewer(op);
+    const [sendingEmail, setSendingEmail] = useState(false);
     const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`;
     const viewHref = `/dashboard/student/browse/${encodeURIComponent(op.id)}`;
     const remindSubject = `CIEL PK reminder — ${op.title}`;
     const remindBody = `Hi ${who},\n\nA polite reminder that "${op.title}" is waiting for review on CIEL PK.\n`;
+    const canSendReviewerEmail = tab === "review" && who !== "CIEL PK";
+
+    const sendReviewerEmail = async () => {
+        if (sendingEmail) return;
+        setSendingEmail(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/student/opportunity/${encodeURIComponent(op.id)}/remind-reviewer`,
+                { method: "POST" },
+            );
+            const body = await res?.json().catch(() => null);
+            const raw = body?.message;
+            const message = Array.isArray(raw) ? raw.filter(Boolean).join(" ") : raw;
+            if (!res?.ok || body?.success === false) {
+                toast.error(typeof message === "string" && message ? message : "Could not send the email.");
+                return;
+            }
+            toast.success(typeof message === "string" && message ? message : `Email sent to ${who}.`);
+        } catch {
+            toast.error("Could not send the email.");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    const chain = buildOpportunityApprovalModel(
+        { ...op, isStudentCreated: true, student_name: "You" },
+        "student",
+        { mode: tab === "history" ? "decided" : tab === "closed" ? "decided" : tab === "action" ? "revision" : "pending" },
+    );
 
     let statusTitle = pendingStageLabel(op);
     let statusText = who === "CIEL PK" ? "Waiting for final platform approval" : `Waiting for ${who}`;
@@ -581,7 +551,13 @@ function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab;
                     </span>
                 </div>
                 <p className="mt-1 text-[10.5px] text-[#70808a]">Last opportunity activity {formatWhen(op.updated_at || op.created_at) || "—"}</p>
-                {tab === "review" || tab === "history" ? <PipelineMini op={op} /> : null}
+                <div className="mt-3 rounded-[13px] border border-[#e8edef] bg-[#fafbfb] p-3">
+                    <div className="mb-2 flex items-center justify-between text-[11px] font-black uppercase tracking-[0.04em] text-[#4d6069]">
+                        <span>Approval chain</span>
+                        <span className="rounded-lg bg-[#f1eef8] px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-[#6b2bd9]">{chain.versionLabel}</span>
+                    </div>
+                    <ApprovalChain steps={chain.steps} badWord={tab === "closed" ? "Rejected" : "Revision"} />
+                </div>
                 {(tab === "action" || tab === "closed") && op.rejection_reason ? (
                     <div className="mt-3 rounded-[13px] border border-[#f3d4d4] bg-[#fdeeee] p-3">
                         <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#b34c4c]">
@@ -633,15 +609,20 @@ function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab;
                     >
                         {tab === "action" ? "History" : tab === "closed" ? "View History" : "Approval History"}
                     </button>
+                    {canSendReviewerEmail ? (
+                        <button
+                            type="button"
+                            disabled={sendingEmail}
+                            onClick={() => void sendReviewerEmail()}
+                            className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f] disabled:opacity-60"
+                        >
+                            {sendingEmail ? "Sending…" : `Email ${who}`}
+                        </button>
+                    ) : null}
                     {tab === "review" ? (
-                        <>
-                            <a href={mailtoHref(op.faculty_contact_email || op.partner_contact_email || "", remindSubject, remindBody)} className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f]">
-                                Email {who}
-                            </a>
-                            <a href={whatsappShareHref(`${remindSubject}\n\n${remindBody}`)} className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f]">
-                                WhatsApp {who}
-                            </a>
-                        </>
+                        <a href={whatsappShareHref(`${remindSubject}\n\n${remindBody}`)} className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f]">
+                            WhatsApp {who}
+                        </a>
                     ) : null}
                 </div>
             </div>

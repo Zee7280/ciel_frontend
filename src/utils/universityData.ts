@@ -96,3 +96,82 @@ export const pakistaniUniversities = [
     "Virtual University of Pakistan",
     "Ziauddin University"
 ].sort();
+
+/** Beaconhouse National University — report identity uses this list as a dropdown. */
+export const BNU_UNIVERSITY_NAME = "Beaconhouse National University (BNU)";
+
+export function isBnuUniversity(name: string | null | undefined): boolean {
+    const folded = String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    return folded.includes("beaconhouse national university") || /(^| )bnu( |$)/.test(folded);
+}
+
+export const BNU_DEGREE_PROGRAMS: { school: string; programs: string[] }[] = [
+    {
+        school: "Mariam Dawood School of Visual Arts & Design",
+        programs: [
+            "BFA Visual Arts",
+            "BDes Visual Communication Design",
+            "BDes Textile, Fashion & Accessories Design",
+            "BA (Hons) Interdisciplinary Expanded Design & Art",
+            "MA Art & Design Studies",
+        ],
+    },
+    {
+        school: "Razia Hassan School of Architecture",
+        programs: ["Bachelor of Architecture (B.Arch)", "Bachelor in Interior Design"],
+    },
+    {
+        school: "Seeta Majeed School of Liberal Arts & Social Sciences",
+        programs: [
+            "BS Liberal Arts & Social Sciences",
+            "BS Political Science",
+            "BS Political Science with International Relations",
+        ],
+    },
+    {
+        school: "School of Media & Mass Communication",
+        programs: [
+            "BS Journalism & Media Studies",
+            "BS Immersive Media",
+            "BS Theatre, Film & TV",
+            "MS Public Relations & Advertising",
+            "MS Film Direction",
+        ],
+    },
+    {
+        school: "School of Computer & Information Technology",
+        programs: [
+            "BS Computer Science",
+            "BS Software Engineering",
+            "BS Artificial Intelligence",
+            "BS Management & Business Computing",
+            "MS Computer Science",
+        ],
+    },
+    {
+        school: "School of Education",
+        programs: [
+            "Bachelor of Education (B.Ed)",
+            "MPhil Linguistics & TESOL",
+            "MPhil Educational Leadership and Management",
+        ],
+    },
+    {
+        school: "School of Management Sciences",
+        programs: [
+            "BBA (Hons)",
+            "BS Business Intelligence & Analytics",
+            "BS Economics",
+            "BS Economics & Finance",
+            "BS Economics with Data Analytics",
+            "BS Hospitality Management",
+        ],
+    },
+    {
+        school: "Institute of Psychology",
+        programs: ["BS Applied Psychology", "MS Clinical & Counseling Psychology"],
+    },
+];

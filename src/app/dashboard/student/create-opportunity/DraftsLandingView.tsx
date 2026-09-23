@@ -6,16 +6,10 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { DashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
-import { findSdgById } from "@/utils/sdgData";
-
-function readStr(obj: unknown, path: string[]): string {
-    let cur: unknown = obj;
-    for (const key of path) {
-        if (!cur || typeof cur !== "object") return "";
-        cur = (cur as Record<string, unknown>)[key];
-    }
-    return typeof cur === "string" ? cur : typeof cur === "number" ? String(cur) : "";
-}
+import {
+    buildOpportunityRecordFlashcard,
+    StudentOpportunityFlashcard,
+} from "./StudentOpportunityFlashcard";
 
 type DraftRow = {
     id: string;
@@ -265,78 +259,40 @@ export default function DraftsLandingView({
             {previewId ? (() => {
                 const detail = details[previewId];
                 const draftRow = drafts.find((d) => d.id === previewId);
-                const sdg = findSdgById(readStr(detail, ["sdg_info", "sdg_id"]));
-                const types = Array.isArray((detail as { types?: unknown } | undefined)?.types)
-                    ? ((detail as { types?: unknown[] }).types as unknown[]).filter((t): t is string => typeof t === "string")
-                    : [];
                 const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(previewId)}&draft=1`;
+                const built = detail ? buildOpportunityRecordFlashcard(detail) : null;
+                const previewModel = built
+                    ? {
+                          ...built,
+                          title: draftRow?.title && draftRow.title !== "Untitled opportunity" ? draftRow.title : built.title,
+                          badgeLabel: "Draft",
+                          eligible: false,
+                          eligibilityWhy: "This draft is not submitted yet. Students can apply only after it is approved and live.",
+                      }
+                    : null;
                 return (
                     <div
                         className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
                         onClick={(e) => e.target === e.currentTarget && setPreviewId(null)}
                     >
-                        <div className="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-                            <div className="flex items-start justify-between gap-3">
-                                <h3 className="m-0 text-[16px] font-bold text-[#16313d]">
-                                    {draftRow?.title || "Untitled opportunity"}
-                                </h3>
+                        <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[#f4f7f8] p-4 shadow-2xl sm:p-6">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="m-0 text-[10px] font-black uppercase tracking-[0.06em] text-[#70808a]">
+                                    Preview — read only · draft not yet submitted
+                                </p>
                                 <button
                                     type="button"
                                     onClick={() => setPreviewId(null)}
-                                    className="shrink-0 rounded-full border border-[#dde5ea] px-2.5 py-1 text-[11px] font-bold text-[#3c5968]"
+                                    className="shrink-0 rounded-full border border-[#dde5ea] bg-white px-2.5 py-1 text-[11px] font-bold text-[#3c5968]"
                                 >
                                     ✕
                                 </button>
                             </div>
-                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.06em] text-[#70808a]">
-                                Preview — read only · draft not yet submitted
-                            </p>
 
-                            {!detail ? (
+                            {!previewModel ? (
                                 <p className="mt-4 text-[12px] text-[#70808a]">Could not load this draft's details.</p>
                             ) : (
-                                <div className="mt-4 space-y-3 text-[12px] text-[#16313d]">
-                                    {readStr(detail, ["objectives", "hook"]) ? (
-                                        <p className="italic text-[#3c5968]">“{readStr(detail, ["objectives", "hook"])}”</p>
-                                    ) : null}
-                                    {readStr(detail, ["objectives", "summary"]) ? (
-                                        <p>{readStr(detail, ["objectives", "summary"])}</p>
-                                    ) : null}
-                                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#eef1f2] bg-[#fafbfc] p-3">
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Mode</b>
-                                            {readStr(detail, ["mode"]) || "—"}
-                                        </div>
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Activity type</b>
-                                            {types.length ? types.join(", ") : "—"}
-                                        </div>
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">SDG</b>
-                                            {sdg ? `SDG ${sdg.number} · ${sdg.title}` : "—"}
-                                        </div>
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Hours / seats</b>
-                                            {readStr(detail, ["timeline", "expected_hours"]) || "—"} h ·{" "}
-                                            {readStr(detail, ["timeline", "volunteers_required"]) || "—"} seats
-                                        </div>
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Dates</b>
-                                            {readStr(detail, ["timeline", "start_date"]) || "—"} →{" "}
-                                            {readStr(detail, ["timeline", "end_date"]) || "—"}
-                                        </div>
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">Beneficiaries</b>
-                                            {readStr(detail, ["objectives", "beneficiary_group"]) || "—"}
-                                        </div>
-                                    </div>
-                                    {readStr(detail, ["activity_details", "student_responsibilities"]) ? (
-                                        <div>
-                                            <b className="block text-[9.5px] uppercase text-[#70808a]">What students will do</b>
-                                            <p className="mt-1">{readStr(detail, ["activity_details", "student_responsibilities"])}</p>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                <StudentOpportunityFlashcard model={previewModel} />
                             )}
 
                             <div className="mt-5 flex justify-end gap-2">

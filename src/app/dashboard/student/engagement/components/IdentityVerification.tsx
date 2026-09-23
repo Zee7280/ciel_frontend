@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { School, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { pakistaniUniversities } from "@/utils/universityData";
+import { BNU_DEGREE_PROGRAMS, isBnuUniversity, pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
@@ -33,6 +33,29 @@ export interface Participant {
 }
 
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
+
+function BnuUniversityIcon() {
+    return (
+        <svg viewBox="0 0 32 32" className="h-5 w-5 shrink-0" aria-hidden>
+            <rect width="32" height="32" rx="8" fill="#0e4d4e" />
+            <path
+                d="M16 5.5c.4 2.4.2 4.2-.6 5.6 1.5-.3 2.8.2 3.6 1.4-1.8.2-3 .9-3.6 2.2.9-2.6.4-4.6-.8-6.2-.2 2.2-1.2 3.8-2.8 4.8 1.2-1.6 1.8-3.4 1.6-5.4-1.3 1.5-3.2 2.2-5.4 2.1 2.2-.8 3.8-2.2 4.6-4.5Z"
+                fill="#f4c56a"
+            />
+            <text
+                x="16"
+                y="27.2"
+                textAnchor="middle"
+                fontSize="7"
+                fontWeight="700"
+                fill="#ffffff"
+                fontFamily="Arial, Helvetica, sans-serif"
+            >
+                BNU
+            </text>
+        </svg>
+    );
+}
 
 export default function IdentityVerification({
     projectId,
@@ -500,17 +523,25 @@ export default function IdentityVerification({
                     <div className="relative" ref={dropdownRef}>
                         <label className="cer-field-label">University / institution</label>
                         <div className="relative">
-                            <School className="absolute left-3 top-[10px] w-3.5 h-3.5 text-[var(--muted)] z-10" />
-                            <input
-                                placeholder="Search and select your university..."
-                                value={formData.universityName}
-                                onFocus={() => setShowUniDropdown(true)}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, universityName: e.target.value });
-                                    setShowUniDropdown(true);
-                                }}
-                                className="cer-input pl-8"
-                            />
+                            <div className="flex items-center gap-2">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[var(--line)] bg-white">
+                                    {isBnuUniversity(formData.universityName) ? (
+                                        <BnuUniversityIcon />
+                                    ) : (
+                                        <School className="h-4 w-4 text-[var(--teal)]" />
+                                    )}
+                                </span>
+                                <input
+                                    placeholder="Search and select your university..."
+                                    value={formData.universityName}
+                                    onFocus={() => setShowUniDropdown(true)}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, universityName: e.target.value });
+                                        setShowUniDropdown(true);
+                                    }}
+                                    className="cer-input min-w-0"
+                                />
+                            </div>
                             {showUniDropdown && (
                                 <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-xl border border-[var(--line)] z-[100] max-h-[260px] overflow-y-auto p-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
                                     {pakistaniUniversities
@@ -524,7 +555,11 @@ export default function IdentityVerification({
                                                 }}
                                                 className="w-full text-left px-2.5 py-2 hover:bg-[var(--teal-soft)] rounded-lg transition-colors flex items-center gap-2 text-xs font-bold text-[var(--ink)]"
                                             >
-                                                <School className="w-3 h-3 text-[var(--teal)]" />
+                                                {isBnuUniversity(uni) ? (
+                                                    <BnuUniversityIcon />
+                                                ) : (
+                                                    <School className="w-3 h-3 text-[var(--teal)]" />
+                                                )}
                                                 {uni}
                                             </button>
                                         ))}
@@ -550,12 +585,37 @@ export default function IdentityVerification({
                         </div>
                         <div>
                             <label className="cer-field-label">Degree program</label>
-                            <input
-                                placeholder="BS Computer Science"
-                                value={formData.academicProgram}
-                                onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
-                                className="cer-input"
-                            />
+                            {isBnuUniversity(formData.universityName) ? (
+                                <select
+                                    value={formData.academicProgram}
+                                    onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
+                                    className="cer-input"
+                                >
+                                    <option value="">Select degree program…</option>
+                                    {formData.academicProgram &&
+                                    !BNU_DEGREE_PROGRAMS.some((group) =>
+                                        group.programs.includes(formData.academicProgram),
+                                    ) ? (
+                                        <option value={formData.academicProgram}>{formData.academicProgram}</option>
+                                    ) : null}
+                                    {BNU_DEGREE_PROGRAMS.map((group) => (
+                                        <optgroup key={group.school} label={group.school}>
+                                            {group.programs.map((program) => (
+                                                <option key={program} value={program}>
+                                                    {program}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    placeholder="BS Computer Science"
+                                    value={formData.academicProgram}
+                                    onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
+                                    className="cer-input"
+                                />
+                            )}
                         </div>
                     </div>
 

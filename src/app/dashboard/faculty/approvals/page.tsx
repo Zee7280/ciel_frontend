@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { CheckCircle, XCircle, Clock, Eye, Filter, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Filter, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
@@ -27,30 +27,11 @@ import {
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
-import {
-    ApprovalPipelineMini,
-    computeApprovalPipelineSteps,
-    type ApprovalLineStatus,
-    type ApprovalPipelineStepState,
-} from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { History } from "lucide-react";
 
 /** Faculty is reviewing a student-created opportunity here, so — unlike the Create Opportunity
  * tab's "my own opportunity" pipeline — the Faculty line itself is shown as a real, live stage. */
-function facultyApprovalPipelineSteps(project: FacultyApprovalRow) {
-    const lines: { label: string; status: ApprovalLineStatus }[] = [
-        { label: "Faculty", status: project.facultyApprovalStatus as ApprovalLineStatus },
-        ...(project.requiresPartnerApproval
-            ? [{ label: "Partner / NGO", status: project.partnerApprovalStatus as ApprovalLineStatus }]
-            : []),
-        { label: "CIEL PK", status: project.adminApprovalStatus as ApprovalLineStatus },
-    ];
-    const status = (project.opportunityStatus || "").toLowerCase();
-    const decisionState: ApprovalPipelineStepState =
-        status === "rejected" ? "bad" : status === "active" || status === "live" ? "done" : "locked";
-    return computeApprovalPipelineSteps(lines, decisionState);
-}
-
 function approvalHistoryLabel(entry: ApprovalHistoryEntry): string {
     const line = entry.line === "admin" ? "CIEL PK" : entry.line === "partner" ? "Partner / NGO" : "Faculty";
     const action =
@@ -414,73 +395,39 @@ export default function FacultyApprovalsPage() {
                     </div>
                 ) : (
                     filtered.map((project) => (
-                        <Card key={project.id} className="overflow-hidden">
-                            <div className="flex flex-col md:flex-row">
-                                <div className="flex-1 space-y-4 p-5 sm:p-6">
-                                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                                        <div className="min-w-0">
-                                            <div className="mb-1 flex flex-wrap items-center gap-2">
-                                                <h3 className="text-lg font-bold text-slate-900">{project.projectTitle}</h3>
-                                                <ApprovalVisibilityBadges visibility={project.approvalVisibility} />
-                                                {project.approvalAction === "partner_ack" ? (
-                                                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-900 text-xs">
-                                                        Partner acknowledgement
-                                                    </Badge>
-                                                ) : null}
-                                                {tab === "pending" ? (
-                                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-                                                        <Clock className="mr-1 h-3 w-3" /> Pending review
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="border-slate-200 bg-slate-100 text-slate-700">
-                                                        {formatHistoryStatus(project)}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <p className="text-slate-500 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                                                <span>
-                                                    Student:{" "}
-                                                    <strong className="text-slate-700">{project.studentName}</strong> ({formatDisplayId(project.studentId, "STU")})
-                                                </span>
-                                                {project.studentEmail ? (
-                                                    <span className="break-all text-slate-600">· {project.studentEmail}</span>
-                                                ) : null}
-                                                <span className="hidden sm:inline w-1 h-1 bg-slate-300 rounded-full shrink-0" />
-                                                <span>
-                                                    Submitted {project.submittedDate} · Opp v{project.version ?? 1}
-                                                </span>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p className="mb-1.5 text-xs font-bold uppercase text-slate-500">Approval chain</p>
-                                        <ApprovalPipelineMini steps={facultyApprovalPipelineSteps(project)} />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Impact Hours</p>
-                                            <p className="font-bold text-blue-600 text-lg">
-                                                {formatApprovalMetric(project.totalHours)}{" "}
-                                                <span className="text-xs font-medium text-slate-400">(after verification)</span>
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">EIS Score</p>
-                                            <p className="font-bold text-amber-600 text-lg">
-                                                {formatApprovalMetric(project.eisScore)}
-                                                <span className="text-xs font-medium text-slate-400">/100</span>
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Primary SDG</p>
-                                            <p className="font-medium text-slate-800 text-sm">{project.sdg || "—"}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-48 md:flex-col md:border-l md:border-t-0 md:p-6">
+                        <Card key={project.id} className="overflow-hidden border-0 bg-transparent shadow-none">
+                            <OpportunityApprovalCard
+                                {...buildOpportunityApprovalModel(
+                                    {
+                                        id: project.id,
+                                        title: project.projectTitle,
+                                        student_name: project.studentName,
+                                        version: project.version,
+                                        faculty_approval_status: project.facultyApprovalStatus,
+                                        partner_approval_status: project.partnerApprovalStatus,
+                                        admin_approval_status: project.adminApprovalStatus,
+                                        requires_partner_approval: project.requiresPartnerApproval,
+                                        created_by_role: project.createdByRole,
+                                        status: project.opportunityStatus,
+                                        workflow_stage: project.workflowStage,
+                                        total_hours: project.totalHours,
+                                        submitted_at: project.submittedDate,
+                                        sdg: project.sdg,
+                                        isStudentCreated: true,
+                                    },
+                                    project.approvalAction === "partner_ack" ? "partner" : "faculty",
+                                    { mode: tab === "pending" ? "pending" : "decided" },
+                                )}
+                                facts={[
+                                    project.sdg ? `SDG ${project.sdg}` : "",
+                                    project.totalHours != null ? `${project.totalHours}h` : "",
+                                    project.eisScore != null ? `EIS ${project.eisScore}` : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                actions={
+                                    <div className="grid w-full gap-2">
+                                        <ApprovalVisibilityBadges visibility={project.approvalVisibility} />
                                     {tab === "pending" ? (
                                         <>
                                             <Button
@@ -545,8 +492,9 @@ export default function FacultyApprovalsPage() {
                                             <History className="w-4 h-4 mr-2" /> History
                                         </Button>
                                     ) : null}
-                                </div>
-                            </div>
+                                    </div>
+                                }
+                            />
                         </Card>
                     ))
                 )}
@@ -563,7 +511,7 @@ export default function FacultyApprovalsPage() {
                     }
                 }}
             >
-                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Student opportunity</DialogTitle>
                         <DialogDescription>
@@ -701,17 +649,4 @@ export default function FacultyApprovalsPage() {
             </Dialog>
         </div>
     );
-}
-
-function formatHistoryStatus(project: FacultyApprovalRow): string {
-    const st = (project.opportunityStatus || "").replace(/_/g, " ").trim();
-    const ws = (project.workflowStage || "").replace(/_/g, " ").trim();
-    if (ws) return ws;
-    if (st) return st;
-    return "In workflow";
-}
-
-function formatApprovalMetric(value?: number): string | number {
-    if (typeof value !== "number" || Number.isNaN(value) || value <= 0) return "—";
-    return value;
 }

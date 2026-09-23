@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Info, MapPin, AlertCircle, ChevronDown, Loader2, Plus } from "lucide-react";
@@ -120,6 +120,13 @@ export default function FacultyOpportunityCreationPage() {
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    const [isDraftMode, setIsDraftMode] = useState(false);
+    /** Set once this visit has been submitted, so the autosave timer cannot write that form back. */
+    const deviceDraftClosed = useRef(false);
+    const draftIdRef = useRef<string | null>(null);
+    const draftSaveChain = useRef(Promise.resolve());
+    const skipDraftHydrateRef = useRef(false);
+    const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
 
     const [facultyDetails, setFacultyDetails] = useState({
@@ -241,8 +248,13 @@ export default function FacultyOpportunityCreationPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        if (i >= 0 && i < WIZARD_STEPS.length - 1) goToStep(WIZARD_STEPS[i + 1].key);
-    }, [activeStep, goToStep]);
+        if (i >= 0 && i < WIZARD_STEPS.length - 1) {
+            if (!editingOpportunityId || isDraftMode) {
+                void persistDraftRef.current(true);
+            }
+            goToStep(WIZARD_STEPS[i + 1].key);
+        }
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -485,12 +497,7 @@ export default function FacultyOpportunityCreationPage() {
         return true;
     };
 
-    const handleSubmit = async () => {
-        if (isLoadingEdit) return;
-        if (!validateForm()) return;
-
-        setIsSubmitting(true);
-        try {
+    const buildOpportunityPayload = () => {
             // Transform state to match API Spec
             const otherTypeStrings = formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean);
             const typesPayload =
@@ -680,8 +687,18 @@ export default function FacultyOpportunityCreationPage() {
                 },
                 restricted_universities: restrictedUniversitiesPayload
             };
+            return payload;
+    };
 
-            const isEdit = Boolean(editingOpportunityId);
+    const handleSubmit = async () => {
+        if (isLoadingEdit) return;
+        if (!validateForm()) return;
+
+        setIsSubmitting(true);
+        try {
+            const payload = buildOpportunityPayload();
+            const promotingDraft = Boolean(editingOpportunityId) && isDraftMode;
+            const isEdit = Boolean(editingOpportunityId) && !promotingDraft;
             const res = await authenticatedFetch(
                 isEdit ? `/api/v1/opportunities/update` : `/api/v1/opportunities`,
                 {
@@ -699,10 +716,20 @@ export default function FacultyOpportunityCreationPage() {
                             ? "Opportunity updated successfully."
                             : "Opportunity submitted. Track partner (if any) and admin approval under My Opportunities.",
                     );
+                    deviceDraftClosed.current = true;
                     try {
                         localStorage.removeItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
                     } catch {
                         // best-effort cleanup only
+                    }
+                    if (promotingDraft && editingOpportunityId) {
+                        authenticatedFetch(
+                            `/api/v1/opportunities/${encodeURIComponent(editingOpportunityId)}`,
+                            { method: "DELETE" },
+                            { redirectToLogin: false },
+                        ).catch(() => {
+                            /* the submitted listing already exists */
+                        });
                     }
                     router.push("/dashboard/faculty/community-service?view=create");
                 } else {
@@ -734,20 +761,54 @@ export default function FacultyOpportunityCreationPage() {
         }
     };
 
-    const handleSaveDraft = () => {
-        // There is no faculty draft endpoint on the backend — this must stay a local-only save and
-        // must never call handleSubmit(), which posts a real, live opportunity into the approval queue.
-        try {
-            localStorage.setItem(
-                FACULTY_OPPORTUNITY_DRAFT_KEY,
-                JSON.stringify({ v: 1, savedAt: Date.now(), formData }),
+    const handleSaveDraft = async (quiet = false) => {
+        if (editingOpportunityId && !isDraftMode) return;
+        const job = draftSaveChain.current.then(async () => {
+            const payload = {
+                ...buildOpportunityPayload(),
+                draft: true,
+                title: formData.title.trim() || "Untitled opportunity",
+            };
+            const existingId = draftIdRef.current;
+            const res = await authenticatedFetch(
+                existingId ? `/api/v1/opportunities/update` : `/api/v1/opportunities`,
+                {
+                    method: "POST",
+                    body: JSON.stringify(existingId ? { id: existingId, ...payload } : payload),
+                },
+                { redirectToLogin: false },
             );
-            toast.success("Draft saved on this device — resume it next time you open this page.");
-        } catch (e) {
-            console.error("Draft save failed", e);
-            toast.error("Could not save draft. Check browser storage.");
-        }
+            const data = await res?.json().catch(() => null);
+            const newId =
+                (data as { data?: { id?: string } } | null)?.data?.id ||
+                (data as { id?: string } | null)?.id;
+            if (!res?.ok || !newId) {
+                const msg =
+                    typeof (data as { message?: unknown } | null)?.message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not save this draft.";
+                toast.warning(msg);
+                return;
+            }
+            if (!existingId) {
+                draftIdRef.current = newId;
+                skipDraftHydrateRef.current = true;
+                setEditingOpportunityId(newId);
+                setIsDraftMode(true);
+                router.replace(
+                    `/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(newId)}&draft=1`,
+                    { scroll: false },
+                );
+            }
+            toast.success(quiet ? "Saved to drafts." : "Draft saved.", { id: "faculty-opp-draft" });
+        });
+        draftSaveChain.current = job.then(
+            () => undefined,
+            () => undefined,
+        );
+        return job;
     };
+    persistDraftRef.current = handleSaveDraft;
 
     const toggleType = (type: string) => {
         setFormData(prev => {
@@ -875,23 +936,18 @@ export default function FacultyOpportunityCreationPage() {
         if (typeof window === "undefined") return;
         const p = new URLSearchParams(window.location.search);
         const e = p.get("edit")?.trim();
+        if (p.get("draft") === "1") setIsDraftMode(true);
         if (e) {
+            draftIdRef.current = e;
             setEditingOpportunityId(e);
             return;
         }
+        // A new opportunity must not reopen the last form saved on this device.
+        // That copy stayed after submit, and the page asked to resume it.
         try {
-            const raw = localStorage.getItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
-            if (!raw) return;
-            const parsed = JSON.parse(raw) as { formData?: typeof formData; savedAt?: number };
-            if (!parsed?.formData) return;
-            const savedAt = parsed.savedAt ? new Date(parsed.savedAt).toLocaleString() : "earlier";
-            if (window.confirm(`Resume the opportunity draft you saved on this device (${savedAt})?`)) {
-                setFormData(parsed.formData);
-            } else {
-                localStorage.removeItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
-            }
-        } catch (err) {
-            console.error("Failed to restore local draft", err);
+            localStorage.removeItem(FACULTY_OPPORTUNITY_DRAFT_KEY);
+        } catch {
+            /* ignore */
         }
     }, []);
 
@@ -899,8 +955,9 @@ export default function FacultyOpportunityCreationPage() {
      * so leaving the page anywhere in Steps 1-8 silently lost all progress. This mirrors the same
      * local-only, validation-free save handleSaveDraft already does, just fired automatically. */
     useEffect(() => {
-        if (editingOpportunityId) return; // editing a live opportunity, not a local draft
+        if (editingOpportunityId || deviceDraftClosed.current) return; // editing a live opportunity, not a local draft
         const timer = setTimeout(() => {
+            if (deviceDraftClosed.current) return;
             try {
                 localStorage.setItem(
                     FACULTY_OPPORTUNITY_DRAFT_KEY,
@@ -915,6 +972,10 @@ export default function FacultyOpportunityCreationPage() {
 
     useEffect(() => {
         if (!editingOpportunityId || isLoadingProfile) return;
+        if (skipDraftHydrateRef.current) {
+            skipDraftHydrateRef.current = false;
+            return;
+        }
         let cancelled = false;
         (async () => {
             setIsLoadingEdit(true);
@@ -951,6 +1012,7 @@ export default function FacultyOpportunityCreationPage() {
                 }
                 const { facultyDetailsPatch, formDataPatch } = mapOpportunityDetailToFacultyForm(d);
                 if (cancelled) return;
+                if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 setFacultyDetails((prev) => ({
                     ...prev,
                     ...facultyDetailsPatch,
@@ -1444,6 +1506,10 @@ export default function FacultyOpportunityCreationPage() {
                     expanded
                 />
                 <div>
+                    <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                        <span className="font-semibold text-slate-900">Application Deadline: </span>
+                        This is the final date to apply for the opportunity. Community engagement activities may continue beyond this date, but applications must be submitted before the deadline. After the deadline, the opportunity will be marked as Expired and will no longer accept applications.
+                    </p>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div>
                             <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
@@ -2741,7 +2807,7 @@ export default function FacultyOpportunityCreationPage() {
                 <div className="mt-3.5 flex gap-2.5">
                     <button
                         type="button"
-                        onClick={handleSaveDraft}
+                        onClick={() => void handleSaveDraft(false)}
                         className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
                         disabled={isSubmitting || isLoadingEdit}
                     >
@@ -2754,7 +2820,7 @@ export default function FacultyOpportunityCreationPage() {
                         className="flex-[2] rounded-[13px] bg-[linear-gradient(90deg,#0e7d74,#2dd4bf)] py-3 text-[13px] font-extrabold text-white disabled:opacity-70"
                     >
                         {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : null}
-                        {isSubmitting ? "Submitting..." : editingOpportunityId ? "Save changes" : "🚀 Submit opportunity"}
+                        {isSubmitting ? "Submitting..." : editingOpportunityId && !isDraftMode ? "Save changes" : "🚀 Submit opportunity"}
                     </button>
                 </div>
             </div>
@@ -2765,6 +2831,12 @@ export default function FacultyOpportunityCreationPage() {
                         {activeStepIndex > 0 ? (
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
+                        <div className="flex gap-2">
+                        {!editingOpportunityId || isDraftMode ? (
+                            <button type="button" className="co-nav-btn back" onClick={() => void handleSaveDraft(false)}>
+                                Save draft
+                            </button>
+                        ) : null}
                         {activeStep !== "SUBMIT" ? (
                             <button
                                 type="button"
@@ -2774,6 +2846,7 @@ export default function FacultyOpportunityCreationPage() {
                                 {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
                             </button>
                         ) : null}
+                        </div>
                     </div>
                 </div>
             </div>
