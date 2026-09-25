@@ -10,14 +10,14 @@ import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
 import { formatIncompleteSectionHeading, REVIEW_DOSSIER_FORM_NAV, tabIsComplete } from "../utils/reportWizardNav";
-import { calculateCII } from "../utils/calculateCII";
+import { resolveReportCii } from "../utils/resolveReportCii";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import clsx from "clsx";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
+import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
 import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
 
@@ -335,13 +335,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         };
     }, [showCertificate]);
 
-    const beneficiariesRaw = section4.project_summary?.distinct_total_beneficiaries;
-    const beneficiaries =
-        beneficiariesRaw !== undefined &&
-        beneficiariesRaw !== null &&
-        String(beneficiariesRaw).trim() !== ""
-            ? String(beneficiariesRaw)
-            : "0";
+    const beneficiaries = String(distinctBeneficiaryTotal(section4) || 0);
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
     const loggedHours = sumNonRejectedLoggedHours(section1.attendance_logs || []);
     const incompleteSectionNums = useMemo(
@@ -399,25 +393,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         return executiveSummary;
     }, [data.section11?.summary_text, executiveSummary]);
 
-    const ciiResult = useMemo(() => {
-        const calculated = calculateCII(data);
-        const persisted = readPersistedCiiSnapshot(data);
-        return persisted
-            ? {
-                  ...calculated,
-                  ...persisted,
-                  totalScore: Math.round(persisted.totalScore),
-                  // Prefer the backend's own per-section breakdown (it's what actually produced
-                  // totalScore) — only fall back to the frontend's independent heuristic scorer
-                  // per-section when the backend didn't persist a value for that section, so the
-                  // badges below the gauge always agree with the headline number.
-                  breakdown: persisted.breakdown
-                      ? { ...calculated.breakdown, ...persisted.breakdown }
-                      : calculated.breakdown,
-                  suggestions: persisted.suggestions ?? calculated.suggestions,
-              }
-            : calculated;
-    }, [data]);
+    const ciiResult = useMemo(() => resolveReportCii(data), [data]);
 
     const section11AuditMeta = section11AuditMetaEarly;
 

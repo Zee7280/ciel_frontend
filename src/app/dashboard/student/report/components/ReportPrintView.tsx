@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
 import { Landmark } from "lucide-react";
-import { calculateCII } from "../utils/calculateCII";
+import { resolveReportCii } from "../utils/resolveReportCii";
 import { CII_BREAKDOWN_ORDER, CII_SECTION_LABELS, CII_SECTION_MAX, ciiSectionWeightLabel } from "../utils/ciiSectionWeights";
 import {
     buildIndividualRosterFromSection1,
@@ -12,6 +12,7 @@ import {
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 import { dataSectionUiMark } from "../utils/reportWizardNav";
+import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
@@ -588,17 +589,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         },
     };
 
-    const calculatedCiiResult = calculateCII({ ...reportForCii, required_hours: reqH });
+    const ciiResult = resolveReportCii(data);
     const persistedCii = readPersistedCiiSnapshot(data);
-    const ciiResult = persistedCii
-        ? {
-              ...calculatedCiiResult,
-              ...persistedCii,
-              totalScore: Math.round(persistedCii.totalScore),
-              breakdown: persistedCii.breakdown ?? calculatedCiiResult.breakdown,
-              suggestions: persistedCii.suggestions ?? calculatedCiiResult.suggestions,
-          }
-        : calculatedCiiResult;
     const { totalScore, breakdown } = ciiResult;
     const ciiBadge = getCiiCertificateBadge(Math.round(totalScore));
     const penaltyApplied =
@@ -650,7 +642,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             total_verified_hours: verifiedHours,
             eis_score: totalScore,
             attendance_frequency: reportForCii.section1?.metrics?.attendance_frequency || 0,
-            total_beneficiaries: data.section4?.project_summary?.distinct_total_beneficiaries || 0,
+            total_beneficiaries: distinctBeneficiaryTotal(data.section4) || 0,
             engagement_span: engagementSpanForPrint,
         };
         return metrics;

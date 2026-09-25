@@ -1,7 +1,6 @@
 "use client";
 import React, { useMemo, useState, useLayoutEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Building, AlertCircle, CheckCircle2, MapPin, Calendar, Users } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
@@ -113,21 +112,54 @@ function listJoin(items: string[]): string {
 }
 
 const GAP_OPTIONS = [
-    "Skills",
-    "Knowledge",
-    "Access",
-    "Resources",
-    "Infrastructure",
-    "Funding",
-    "Services",
-    "Technology",
-    "Systems",
-    "Awareness",
-    "Inclusion",
-    "Safety",
-    "Community Participation",
-    "Data / Information",
-    "Other",
+    { value: "Skills", label: "🧰 Skills" },
+    { value: "Knowledge", label: "🧠 Knowledge" },
+    { value: "Access", label: "🚪 Access" },
+    { value: "Resources", label: "📦 Resources" },
+    { value: "Infrastructure", label: "🏗️ Infrastructure" },
+    { value: "Funding", label: "💰 Funding" },
+    { value: "Services", label: "🩺 Services" },
+    { value: "Technology", label: "💻 Technology" },
+    { value: "Systems", label: "⚙️ Systems / Processes" },
+    { value: "Awareness", label: "💡 Awareness" },
+    { value: "Inclusion", label: "♿ Inclusion" },
+    { value: "Safety", label: "🛡️ Safety" },
+    { value: "Community Participation", label: "👥 Community Participation" },
+    { value: "Data / Information", label: "📊 Data / Information" },
+    { value: "Other", label: "✏️ Other" },
+];
+
+const EVIDENCE_OPTIONS = [
+    { value: "Observation", label: "👀 Observation" },
+    { value: "Survey Data", label: "📋 Survey data" },
+    { value: "Community Interviews", label: "💬 Community interviews" },
+    { value: "Focus Group", label: "👥 Focus group" },
+    { value: "Partner-Provided Data", label: "🤝 Partner-provided data" },
+    { value: "Attendance / Administrative Records", label: "📁 Attendance / administrative records" },
+    { value: "Government Data", label: "🏛️ Government / public data" },
+    { value: "Academic Research", label: "🎓 Academic research" },
+    { value: "Needs Assessment", label: "🧭 Needs assessment" },
+    { value: "Environmental Measurement", label: "🌿 Environmental measurement" },
+    { value: "Digital Analytics", label: "💻 Digital analytics" },
+    { value: "Previous Project Data", label: "🗂️ Previous project data" },
+    { value: "Other", label: "✏️ Other" },
+];
+
+const DISCIPLINES = [
+    "Architecture & Design",
+    "Business & Management",
+    "Computer Science & IT",
+    "Economics",
+    "Education",
+    "Engineering",
+    "Environmental Sciences",
+    "Fine Arts",
+    "Law",
+    "Liberal Arts & Social Sciences",
+    "Mass Communication & Media",
+    "Psychology",
+    "Public Health",
+    "Other…",
 ];
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
@@ -201,6 +233,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const composeBaseline = (
         problemStatement: string,
         affectedGroup: string,
+        affectedCount: string,
         gaps: string[],
         gapsOther: string,
         evidenceList: string,
@@ -213,7 +246,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         if (problemLead) parts.push(`Before this project, ${lowerFirst(problemLead)}`);
 
         if (affectedGroup.trim()) {
-            parts.push(`This affected ${lowerFirst(affectedGroup.trim().replace(/\.$/, ""))}.`);
+            const who = lowerFirst(affectedGroup.trim().replace(/\.$/, ""));
+            const count = affectedCount.trim();
+            parts.push(`Those most affected were ${count ? `around ${count} ` : ""}${who}.`);
         }
 
         if (gaps.length) {
@@ -251,6 +286,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         const hasAnyInput =
             problemStatement.trim() ||
             (sectionData.affected_group || "").trim() ||
+            (sectionData.affected_count || "").trim() ||
             gaps.length > 0 ||
             evidenceArray.length > 0 ||
             sectionData.discipline;
@@ -259,6 +295,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             const composed = composeBaseline(
                 problemStatement,
                 sectionData.affected_group || "",
+                sectionData.affected_count || "",
                 gaps,
                 sectionData.system_gaps_other || "",
                 evidenceSource,
@@ -287,6 +324,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         sectionData.baseline_evidence_other,
         sectionData.baseline_other_entries,
         sectionData.affected_group,
+        sectionData.affected_count,
         sectionData.system_gaps,
         sectionData.system_gaps_other,
         updateSection,
@@ -313,39 +351,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         return [];
     }, [otherCount, sectionData.baseline_evidence, sectionData.baseline_other_entries, sectionData.baseline_evidence_other]);
 
-    // ─── Data ────────────────────────────────────────────────────────────────
-    const disciplines = [
-        "Business & Economics",
-        "Computing & Technology",
-        "Engineering & Built Environment",
-        "Health Sciences",
-        "Natural & Environmental Sciences",
-        "Social Sciences & Development",
-        "Arts & Humanities",
-        "Media & Creative Industries",
-        "Education",
-        "Law",
-        "Agriculture & Food Sciences",
-        "Hospitality & Services",
-        "Interdisciplinary Studies",
-        "Other…",
-    ];
-
-    const evidenceTypes = [
-        "Observation",
-        "Survey Data",
-        "Community Interviews",
-        "Focus Group",
-        "Partner-Provided Data",
-        "Attendance / Administrative Records",
-        "Government Data",
-        "Academic Research",
-        "Needs Assessment",
-        "Environmental Measurement",
-        "Digital Analytics",
-        "Previous Project Data",
-        "Other",
-    ];
+    const disciplineOptions = sectionData.discipline && !DISCIPLINES.includes(sectionData.discipline)
+        ? [sectionData.discipline, ...DISCIPLINES]
+        : DISCIPLINES;
 
     const toggleEvidence = (opt: string) => {
         const cur = sectionData.baseline_evidence || [];
@@ -396,6 +404,41 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const charCount = (sectionData.problem_statement || "").length;
     const disciplineCharCount = (sectionData.discipline_contribution || "").length;
 
+    const generateSmartDraft = () => {
+        const problem = (sectionData.problem_statement || "").trim();
+        if (!problem) {
+            toast.error("Answer question 1 first.");
+            return;
+        }
+        const who = (sectionData.affected_group || "").trim();
+        const num = (sectionData.affected_count || "").trim();
+        const gaps = (sectionData.system_gaps || []).map((g) =>
+            g === "Other" ? (sectionData.system_gaps_other || "").trim() || "other factors" : g,
+        );
+        const sources = formatBaselineEvidenceForDisplay(sectionData)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const disc = sectionData.discipline === "Other…"
+            ? (sectionData.discipline_other || "").trim()
+            : (sectionData.discipline || "").trim();
+        const how = (sectionData.discipline_contribution || "").trim();
+        let text = `Before our project began, ${problem.replace(/\.$/, "")}. `;
+        if (who) {
+            text += `This weighed most heavily on ${num ? `roughly ${num} ` : ""}${who.replace(/\.$/, "")}, for whom the situation was a daily reality rather than a statistic. `;
+        }
+        if (gaps.length) {
+            text += `At its core, the gap came down to ${listJoin(gaps.map((g) => g.toLowerCase()))} — needs that were visible but going unmet. `;
+        }
+        if (sources.length) {
+            text += `Our understanding was not guesswork: it was grounded in ${listJoin(sources.map((s) => s.toLowerCase()))}. `;
+        }
+        if (disc && how) {
+            text += `Coming from ${disc}, ${how.replace(/\.$/, "")} — which is why a structured intervention, rather than goodwill alone, was the right response.`;
+        }
+        updateSection("section2", { baseline_smart_draft: text.trim() });
+    };
+
     const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[var(--teal)] focus:bg-white focus:ring-2 focus:ring-[var(--aqua-soft)]";
     const chipClass = (isSel: boolean) =>
         clsx(
@@ -423,30 +466,10 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 </p>
             </div>
 
-            {/* ── Compact project strip ─────────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5">
-                {[
-                    { label: "Partner Organization", value: partner, icon: Building },
-                    { label: "Location", value: locationDisplay, icon: MapPin },
-                    { label: "Project Duration", value: `${startDate} – ${endDate}`, icon: Calendar },
-                ].map((item) => (
-                    <div key={item.label} className="flex min-w-0 items-center gap-2" title={item.label}>
-                        <item.icon className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
-                        <span className="truncate text-sm font-semibold text-slate-800">{item.value}</span>
-                    </div>
-                ))}
-                <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Auto-filled
-                </span>
-            </div>
-
-            {/* ── One-rule banner ────────────────────────────────────────── */}
-            <div className="cer-note !mb-0 !text-sm sm:px-5">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="cer-note !mb-0">
+                <span aria-hidden>☝️</span>
                 <p>
-                    One rule only: describe things <span className="font-semibold">before</span> your project —
-                    save activities and results for later sections.
+                    <span className="font-semibold">One rule:</span> describe things <span className="font-semibold">before</span> your project — activities &amp; results live in Sections 4 &amp; 5.
                 </p>
             </div>
 
@@ -478,32 +501,44 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             value={sectionData.problem_statement}
                             onChange={(e) => updateSection("section2", { problem_statement: e.target.value })}
                         />
-                        <div className="flex items-center justify-between">
-                            <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).barClass)}
-                                    style={{ width: `${reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).widthPct}%` }}
-                                />
-                            </div>
-                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).textClass)}>
-                                {wordCount} / {PROBLEM_WORD_RANGE.max} words · {charCount} chars
-                            </p>
-                        </div>
+                        <p className={clsx("text-[11px] font-semibold uppercase tracking-wide tabular-nums", reportTextWordMeter(wordCount, PROBLEM_WORD_RANGE.min, PROBLEM_WORD_RANGE.max).textClass)}>
+                            {wordCount} words · aim {PROBLEM_WORD_RANGE.min}–{PROBLEM_WORD_RANGE.max}
+                        </p>
                         <FieldError message={getFieldError("problem_statement")} />
                     </div>
 
-                    {/* Q2 */}
-                    <div className="space-y-1.5 border-t border-slate-100 pt-5">
-                        <p className="text-sm font-semibold text-slate-900">2 · Who was affected?</p>
-                        <p className="text-xs text-slate-500">Add a rough number if you know it.</p>
-                        <Input
-                            placeholder="e.g. around 120 children aged 5–12 at the SOS Village"
-                            readOnly={isReadOnly}
-                            disabled={isReadOnly}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
-                            value={sectionData.affected_group || ""}
-                            onChange={(e) => updateSection("section2", { affected_group: e.target.value })}
-                        />
+                    <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <p className="text-sm font-semibold text-slate-900">2 · Who was affected?</p>
+                            <Input
+                                placeholder="e.g. children aged 5–12 at the SOS Village"
+                                readOnly={isReadOnly}
+                                disabled={isReadOnly}
+                                className={clsx(
+                                    "h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#4285f4] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#4285f4]/20",
+                                    getFieldError("affected_group") && "border-red-400 bg-red-50/30",
+                                )}
+                                value={sectionData.affected_group || ""}
+                                onChange={(e) => updateSection("section2", { affected_group: e.target.value })}
+                            />
+                            <FieldError message={getFieldError("affected_group")} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <p className="text-sm font-semibold text-slate-900">≈ How many?</p>
+                            <Input
+                                inputMode="numeric"
+                                placeholder="e.g. 120"
+                                readOnly={isReadOnly}
+                                disabled={isReadOnly}
+                                className={clsx(
+                                    "h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#4285f4] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#4285f4]/20",
+                                    getFieldError("affected_count") && "border-red-400 bg-red-50/30",
+                                )}
+                                value={sectionData.affected_count || ""}
+                                onChange={(e) => updateSection("section2", { affected_count: e.target.value.replace(/[^\d]/g, "") })}
+                            />
+                            <FieldError message={getFieldError("affected_count")} />
+                        </div>
                     </div>
 
                     {/* Q3 */}
@@ -512,19 +547,20 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex flex-wrap gap-2">
                             {GAP_OPTIONS.map((g) => (
                                 <button
-                                    key={g}
+                                    key={g.value}
                                     type="button"
                                     disabled={isReadOnly}
-                                    onClick={() => toggleGap(g)}
-                                    className={chipClass((sectionData.system_gaps || []).includes(g))}
+                                    onClick={() => toggleGap(g.value)}
+                                    className={chipClass((sectionData.system_gaps || []).includes(g.value))}
                                 >
-                                    {g}
+                                    {g.label}
                                 </button>
                             ))}
                         </div>
+                        <FieldError message={getFieldError("system_gaps")} />
                         {(sectionData.system_gaps || []).includes("Other") ? (
                             <Input
-                                placeholder="Describe what was missing…"
+                                placeholder="What else was missing?"
                                 readOnly={isReadOnly}
                                 disabled={isReadOnly}
                                 className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
@@ -538,15 +574,15 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     <div className="space-y-2 border-t border-slate-100 pt-5">
                         <p className="text-sm font-semibold text-slate-900">4 · How did you know? <span className="font-normal text-slate-400">(tap all that apply)</span></p>
                         <div className="flex flex-wrap gap-2">
-                            {evidenceTypes.map((opt) => (
+                            {EVIDENCE_OPTIONS.map((opt) => (
                                 <button
-                                    key={opt}
+                                    key={opt.value}
                                     type="button"
                                     disabled={isReadOnly}
-                                    onClick={() => toggleEvidence(opt)}
-                                    className={chipClass(isEvidenceSelected(opt))}
+                                    onClick={() => toggleEvidence(opt.value)}
+                                    className={chipClass(isEvidenceSelected(opt.value))}
                                 >
-                                    {opt}
+                                    {opt.label}
                                 </button>
                             ))}
                         </div>
@@ -560,7 +596,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Other source {i + 1}</p>
                                         ) : null}
                                         <Input
-                                            placeholder="Describe the source…"
+                                            placeholder="What else informed you?"
                                             readOnly={isReadOnly}
                                             disabled={isReadOnly}
                                             className={clsx(
@@ -612,7 +648,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             </span>
                         </div>
                         <SingleSelect
-                            options={disciplines}
+                            options={disciplineOptions}
                             value={sectionData.discipline}
                             onChange={(val) => updateSection("section2", { discipline: val })}
                             placeholder="Select your discipline…"
@@ -630,27 +666,46 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         ) : null}
                         <p className="text-xs text-slate-500">Be specific: how was your academic background applied — not &ldquo;my degree helped me understand society.&rdquo;</p>
                         <Textarea
-                            placeholder="e.g. we used engineering optimization models to identify inefficiencies in waste collection routing…"
+                            placeholder="e.g. we used our design training to audit lighting and seating against classroom standards"
                             readOnly={isReadOnly}
                             disabled={isReadOnly}
                             className={clsx(fieldClass, getFieldError("discipline_contribution") && "border-red-400 bg-red-50/30")}
                             value={sectionData.discipline_contribution}
                             onChange={(e) => updateSection("section2", { discipline_contribution: e.target.value })}
                         />
-                        <div className="flex items-center justify-between">
-                            <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).barClass)}
-                                    style={{ width: `${reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).widthPct}%` }}
-                                />
-                            </div>
-                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).textClass)}>
-                                {disciplineWordCount} / {DISCIPLINE_WORD_RANGE.max} words · {disciplineCharCount} chars
-                            </p>
-                        </div>
+                        <p className={clsx("text-[11px] font-semibold uppercase tracking-wide tabular-nums", reportTextWordMeter(disciplineWordCount, DISCIPLINE_WORD_RANGE.min, DISCIPLINE_WORD_RANGE.max).textClass)}>
+                            {disciplineWordCount} words · aim {DISCIPLINE_WORD_RANGE.min}–{DISCIPLINE_WORD_RANGE.max}
+                        </p>
                         <FieldError message={getFieldError("discipline_contribution")} />
                     </div>
             </div>
+
+            <section className="cer-card space-y-3">
+                <div className="cer-secl">
+                    <span className="cer-secn">2.2</span>
+                    <h2>Your baseline statement</h2>
+                    <span className="cer-tag auto">Builds itself live</span>
+                </div>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-800">
+                    {sectionData.summary_text?.trim()
+                        ? sectionData.summary_text
+                        : <span className="text-slate-400">Answer the questions above — your statement appears here…</span>}
+                </div>
+                {!isReadOnly ? (
+                    <button
+                        type="button"
+                        onClick={generateSmartDraft}
+                        className="rounded-full border border-[#25b8d8] bg-[#f0fbfd] px-4 py-2 text-sm font-semibold text-[#0e7490]"
+                    >
+                        ✨ Generate smart draft summary — one strong paragraph
+                    </button>
+                ) : null}
+                {sectionData.baseline_smart_draft?.trim() ? (
+                    <div className="rounded-xl border border-[#25b8d8] bg-[#f0fbfd] px-4 py-3 text-sm leading-relaxed text-slate-800">
+                        {sectionData.baseline_smart_draft}
+                    </div>
+                ) : null}
+            </section>
         </div>
     );
 }

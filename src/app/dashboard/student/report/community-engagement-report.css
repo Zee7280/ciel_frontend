@@ -48,8 +48,7 @@
 .cer .cer-apph-actions {
     justify-content: space-between;
     align-items: center;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
+    background: var(--bg);
     border: 1px solid #dcebed;
     border-radius: 18px;
     padding: 13px 15px;
@@ -84,7 +83,7 @@
 
 @media (min-width: 1024px) {
     .cer .cer-back-below {
-        left: calc(var(--ciel-sidebar-width, 305px) + 28px);
+        left: calc(var(--ciel-sidebar-width, 280px) + 28px);
         bottom: 20px;
     }
 }
@@ -240,6 +239,100 @@
     margin-bottom: 13px;
 }
 
+.cer .cer-bridge-s1,
+.cer .cer-bridge-s2,
+.cer .cer-bridge-s3,
+.cer .cer-bridge-s4,
+.cer .cer-bridge-s5,
+.cer .cer-bridge-s6,
+.cer .cer-bridge-s7,
+.cer .cer-bridge-s8,
+.cer .cer-bridge-s9 {
+    border-radius: 23px;
+    background: linear-gradient(125deg, #16394d 0%, var(--pane, #12a5a0) 160%);
+    box-shadow: 0 14px 35px rgba(22, 57, 77, 0.12);
+}
+
+.cer .cer-bridge-s1 { --pane: #34a853; }
+.cer .cer-bridge-s2 { --pane: #4285f4; }
+.cer .cer-bridge-s3 { --pane: #7c5cff; }
+.cer .cer-bridge-s4 { --pane: #ff766f; }
+.cer .cer-bridge-s5 { --pane: #f4b400; }
+.cer .cer-bridge-s6 { --pane: #e86bb5; }
+.cer .cer-bridge-s7 { --pane: #25b8d8; }
+.cer .cer-bridge-s8 { --pane: #6f62d9; }
+.cer .cer-bridge-s9 { --pane: #0f9d79; }
+
+.cer .cer-wordguide {
+    border: 1px solid #dce7e9;
+    background: #fbfdfd;
+    border-radius: 13px;
+    padding: 9px 11px;
+    margin: 0 0 12px;
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 12.5px;
+    color: #667a81;
+    line-height: 1.45;
+}
+
+.cer .cer-wordguide b {
+    font-size: 12px;
+    color: #244d52;
+}
+
+.cer .cer-wordguide span {
+    border-radius: 99px;
+    background: #eef7f5;
+    color: #346b63;
+    padding: 4px 8px;
+    font-weight: 800;
+    font-size: 12px;
+}
+
+.cer .cer-global {
+    border: 1px solid #cfe5e2;
+    background: #f4fbf9;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #3e6664;
+}
+
+.cer .cer-global b {
+    color: #12675d;
+}
+
+.cer .cer-global .domains {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.cer .cer-global .domains span {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 99px;
+    background: #fff;
+    border: 1px solid #d8e8e5;
+    color: #3e6664;
+}
+
+.cer .cer-dup-head {
+    display: none;
+}
+
+.cer .cer-s4 > section,
+.cer .cer-s4 section.space-y-4 {
+    border-top: 4px solid #ff766f;
+}
+
 .cer .cer-bridge .k {
     font-size: 11px;
     letter-spacing: 0.16em;
@@ -297,6 +390,21 @@
     font-weight: 800;
 }
 
+.cer .cer-mission .cer-bpills {
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.cer .cer-mission .cer-bp {
+    border-radius: 8px;
+    padding: 3px 8px;
+    min-width: 64px;
+}
+
+.cer .cer-mission .cer-bp .v {
+    font-size: 12px;
+}
+
 .cer .cer-bp .kk {
     font-size: 7px;
     font-weight: 800;
@@ -308,34 +416,34 @@
 .cer .cer-mission {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 6px;
     background: linear-gradient(125deg, #163d61 0%, #335dc4 48%, #7657d7 100%);
     color: #fff;
-    border-radius: 26px;
-    padding: 21px 23px;
-    margin-bottom: 14px;
-    box-shadow: 0 20px 52px rgba(54, 74, 167, 0.2);
+    border-radius: 16px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 10px 26px rgba(54, 74, 167, 0.16);
     position: relative;
     overflow: hidden;
 }
 
 .cer .cer-mission .ey {
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 900;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.16em;
     color: #dce6ff;
 }
 
 .cer .cer-mission h1 {
-    font-size: 20px;
-    margin: 5px 0 6px;
-    line-height: 1.3;
+    font-size: 15px;
+    margin: 2px 0;
+    line-height: 1.2;
     font-weight: 800;
 }
 
 .cer .cer-mission p {
-    font-size: 10.5px;
-    line-height: 1.65;
+    font-size: 10px;
+    line-height: 1.35;
     color: #e8edff;
 }
 
@@ -889,13 +997,25 @@
 }
 
 .cer .cer-joy-stat .jbar > div {
+    position: relative;
     height: 8px;
     border-radius: 99px;
     background: #e7eef0;
     overflow: hidden;
 }
 
+.cer .cer-joy-stat .jbar.two em {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 99px;
+    background: #c5d5da;
+}
+
 .cer .cer-joy-stat .jbar i {
+    position: relative;
+    z-index: 1;
     display: block;
     height: 100%;
     border-radius: 99px;
@@ -1033,13 +1153,54 @@
     margin-bottom: 10px;
 }
 
+.cer .cer-scale {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.cer .cer-scale > div {
+    flex: 1;
+    min-width: 100px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    background: #f5fbfa;
+}
+
+.cer .cer-scale b {
+    display: block;
+    font-size: 14px;
+    color: var(--ink);
+}
+
+.cer .cer-scale small {
+    display: block;
+    margin-top: 2px;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+}
+
 .cer .cer-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     font-size: 10.5px;
     padding: 5px 0;
     border-bottom: 1px dashed var(--line);
     align-items: center;
+}
+
+.cer .cer-row > b {
+    min-width: 0;
+}
+
+.cer .cer-row > span {
+    min-width: 0;
 }
 
 .cer .cer-fcwrap {
@@ -2238,12 +2399,12 @@
     /* Below the mobile dashboard header and the Save draft bar. */
     top: calc(56px + 92px);
     z-index: 28;
-    margin: 0 0 10px;
-    padding: 16px 18px;
-    border-radius: 22px;
+    margin: 0 0 8px;
+    padding: 10px 14px 12px;
+    border-radius: 16px;
     background: linear-gradient(135deg, #fff, #f5f8ff);
     border: 1px solid #e3eaf3;
-    box-shadow: 0 12px 30px rgba(31, 55, 70, 0.07);
+    box-shadow: 0 8px 20px rgba(31, 55, 70, 0.06);
 }
 
 @media (min-width: 1024px) {
@@ -2257,26 +2418,26 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 .cer .cer-journey-map .head b {
-    font-size: 14px;
+    font-size: 12.5px;
     color: #17323d;
 }
 
 .cer .cer-journey-map .head span {
-    font-size: 12px;
+    font-size: 11px;
     color: #6b7c86;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .cer .cer-journey-path {
     display: grid;
     grid-template-columns: repeat(9, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
     position: relative;
 }
 
@@ -2285,9 +2446,9 @@
     position: absolute;
     left: 5%;
     right: 5%;
-    top: 26px;
-    height: 6px;
-    border-radius: 6px;
+    top: 18px;
+    height: 4px;
+    border-radius: 4px;
     background: linear-gradient(90deg, #3ddc84, #5b7cfa, #c86dd7, #ff7a59, #ffc247, #e86bb5, #25b8d8, #6f62d9, #0f9d79);
     opacity: 0.28;
     pointer-events: none;
@@ -2307,27 +2468,27 @@
 .cer .cer-journey-stop .orb {
     position: relative;
     z-index: 1;
-    width: 52px;
-    height: 52px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     margin: 0 auto;
     display: grid;
     place-items: center;
-    font-size: 22px;
+    font-size: 15px;
     background: #fff;
-    border: 3px solid var(--c);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    border: 2px solid var(--c);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.07);
     transition: 0.18s;
 }
 
 .cer .cer-journey-stop:hover .orb {
-    transform: translateY(-3px) scale(1.06);
+    transform: translateY(-2px) scale(1.05);
 }
 
 .cer .cer-journey-stop.on .orb {
     background: var(--c);
     color: #fff;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
 }
 
 .cer .cer-journey-stop.done .orb {
@@ -2343,34 +2504,34 @@
 .cer .cer-journey-stop.done .orb::after {
     content: "★";
     position: absolute;
-    top: -6px;
-    right: -4px;
+    top: -5px;
+    right: -3px;
     background: #ffc247;
     color: #5a3d00;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
     display: grid;
     place-items: center;
-    border: 2px solid #fff;
+    border: 1.5px solid #fff;
 }
 
 .cer .cer-journey-stop b {
     display: block;
-    font-size: 11px;
-    margin-top: 6px;
+    font-size: 10px;
+    margin-top: 4px;
     color: #2f4650;
-    line-height: 1.2;
+    line-height: 1.15;
     overflow-wrap: anywhere;
 }
 
 .cer .cer-journey-grade {
     display: inline-block;
-    margin-top: 4px;
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-size: 8.5px;
+    margin-top: 2px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 8px;
     font-weight: 900;
     letter-spacing: 0.03em;
 }
@@ -2413,11 +2574,11 @@
 .cer .cer-journey-xp {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 14px;
+    gap: 10px;
     align-items: center;
-    margin: 12px 0 0;
-    padding: 12px 14px;
-    border-radius: 16px;
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    border-radius: 12px;
     background: linear-gradient(120deg, #163d61, #335dc4 55%, #7657d7);
     color: #fff;
     overflow: hidden;
@@ -2428,34 +2589,34 @@
 }
 
 .cer .cer-journey-xp .lvl {
-    width: 54px;
-    height: 54px;
-    border-radius: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
     background: rgba(255, 255, 255, 0.14);
     display: grid;
     place-items: center;
-    font-size: 26px;
+    font-size: 18px;
 }
 
 .cer .cer-journey-xp b {
-    font-size: 14px;
+    font-size: 12.5px;
     display: block;
 }
 
 .cer .cer-journey-xp small {
     display: block;
     color: #dbe4ff;
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: 10px;
+    line-height: 1.35;
     overflow-wrap: anywhere;
 }
 
 .cer .cer-journey-xp .bar {
-    height: 9px;
-    border-radius: 9px;
+    height: 7px;
+    border-radius: 7px;
     background: rgba(255, 255, 255, 0.2);
     overflow: hidden;
-    margin-top: 6px;
+    margin-top: 4px;
 }
 
 .cer .cer-journey-xp .bar i {
@@ -2470,11 +2631,11 @@
 }
 
 .cer .cer-journey-xp .pts b {
-    font-size: 22px;
+    font-size: 16px;
 }
 
 .cer .cer-journey-xp .pts small {
-    font-size: 9px;
+    font-size: 8px;
     letter-spacing: 0.06em;
 }
 
@@ -3365,4 +3526,241 @@
     :is(.cer, .cer-scope) .cer-ladder {
         grid-template-columns: 1fr;
     }
+}
+
+/* V17 flashcard — one card, same CII as the detailed report, print matches the screen */
+:is(.cer, .cer-scope) .cer-v17-flash {
+    width: min(1160px, 100%);
+    margin: 0 auto 16px;
+    background: #fff;
+    border: 1px solid #d6e4e2;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 22px 60px rgba(4, 37, 43, 0.12);
+}
+:is(.cer, .cer-scope) .cer-v17-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    background: linear-gradient(120deg, #07373d, #0e6966);
+    color: #fff;
+    padding: 18px 22px 15px;
+}
+:is(.cer, .cer-scope) .cer-v17-hero .kicker {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #a7f3e7;
+}
+:is(.cer, .cer-scope) .cer-v17-hero h1 {
+    font-size: 27px;
+    line-height: 1.15;
+    margin: 5px 0;
+    letter-spacing: -0.02em;
+}
+:is(.cer, .cer-scope) .cer-v17-hero p {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #d7f7f2;
+}
+:is(.cer, .cer-scope) .cer-v17-score {
+    min-width: 148px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    padding: 10px 12px;
+    text-align: center;
+}
+:is(.cer, .cer-scope) .cer-v17-score b {
+    display: block;
+    font-size: 36px;
+    line-height: 1;
+}
+:is(.cer, .cer-scope) .cer-v17-score small {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+:is(.cer, .cer-scope) .cer-v17-score span {
+    display: block;
+    margin-top: 6px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: #d7f7f2;
+}
+:is(.cer, .cer-scope) .cer-v17-metrics {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-bottom: 1px solid #e0eae8;
+    background: #fbfefd;
+}
+:is(.cer, .cer-scope) .cer-v17-metrics div {
+    padding: 12px 8px;
+    text-align: center;
+    border-right: 1px solid #e0eae8;
+}
+:is(.cer, .cer-scope) .cer-v17-metrics div:last-child { border-right: 0; }
+:is(.cer, .cer-scope) .cer-v17-metrics b {
+    display: block;
+    color: #0e7d74;
+    font-size: 18px;
+}
+:is(.cer, .cer-scope) .cer-v17-metrics small {
+    display: block;
+    margin-top: 3px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a919a;
+}
+:is(.cer, .cer-scope) .cer-v17-body { padding: 18px 20px 16px; }
+:is(.cer, .cer-scope) .cer-v17-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+:is(.cer, .cer-scope) .cer-v17-title h2 {
+    font-size: 14px;
+    color: #0c6d65;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+:is(.cer, .cer-scope) .cer-v17-title span { font-size: 11px; color: #7a919a; font-weight: 700; }
+:is(.cer, .cer-scope) .cer-v17-spots {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+}
+:is(.cer, .cer-scope) .cer-v17-spots div {
+    border-radius: 14px;
+    padding: 11px 12px;
+    border: 1px solid #dbe7e5;
+    background: #f7fbfa;
+}
+:is(.cer, .cer-scope) .cer-v17-spots small {
+    display: block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a919a;
+}
+:is(.cer, .cer-scope) .cer-v17-spots b { display: block; margin: 4px 0; font-size: 16px; color: #0d2b33; }
+:is(.cer, .cer-scope) .cer-v17-spots p { font-size: 11px; line-height: 1.4; color: #3c5a5c; }
+:is(.cer, .cer-scope) .cer-v17-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+    margin-bottom: 14px;
+}
+:is(.cer, .cer-scope) .cer-v17-bars div {
+    display: grid;
+    grid-template-columns: 118px 1fr 42px;
+    gap: 8px;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #3c5a5c;
+}
+:is(.cer, .cer-scope) .cer-v17-bars i {
+    display: block;
+    height: 7px;
+    border-radius: 99px;
+    background: #e8f2f0;
+    overflow: hidden;
+}
+:is(.cer, .cer-scope) .cer-v17-bars i b {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #0e5f63, #2dd4bf);
+}
+:is(.cer, .cer-scope) .cer-v17-bars em { font-style: normal; text-align: right; color: #0e7d74; }
+:is(.cer, .cer-scope) .cer-v17-sections {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+:is(.cer, .cer-scope) .cer-v17-sections section {
+    border: 1px solid #dbe7e5;
+    border-radius: 16px;
+    padding: 12px;
+    background: #fff;
+}
+:is(.cer, .cer-scope) .cer-v17-sections b {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #0c6d65;
+}
+:is(.cer, .cer-scope) .cer-v17-sections p {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: #1d3a3d;
+    margin-top: 4px;
+}
+:is(.cer, .cer-scope) .cer-v17-note {
+    margin-top: 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #7a919a;
+}
+:is(.cer, .cer-scope) .cer-v17-foot {
+    border-top: 1px solid #dde9e6;
+    background: #f8fbfa;
+    padding: 11px 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+}
+:is(.cer, .cer-scope) .cer-v17-foot b { display: block; font-size: 12px; color: #0d2b33; }
+:is(.cer, .cer-scope) .cer-v17-foot span { font-size: 11px; color: #7a919a; }
+:is(.cer, .cer-scope) .cer-v17-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+:is(.cer, .cer-scope) .cer-v17-actions button {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    background: #0e7d74;
+    color: #fff;
+}
+:is(.cer, .cer-scope) .cer-v17-actions button.gold { background: #b45309; }
+:is(.cer, .cer-scope) .cer-v17-actions button:disabled { background: #c7dcd9; cursor: not-allowed; }
+:is(.cer, .cer-scope) .cer-v17-missing {
+    padding: 0 18px 12px;
+    font-size: 11px;
+    color: #7a919a;
+    background: #f8fbfa;
+}
+@media (max-width: 930px) {
+    :is(.cer, .cer-scope) .cer-v17-spots,
+    :is(.cer, .cer-scope) .cer-v17-metrics { grid-template-columns: repeat(2, 1fr); }
+    :is(.cer, .cer-scope) .cer-v17-sections { grid-template-columns: 1fr; }
+    :is(.cer, .cer-scope) .cer-v17-hero,
+    :is(.cer, .cer-scope) .cer-v17-foot { flex-direction: column; }
+}
+@media print {
+    body.cer-print-flash * { visibility: hidden !important; }
+    body.cer-print-flash .cer-v17-flash,
+    body.cer-print-flash .cer-v17-flash * { visibility: visible !important; }
+    body.cer-print-flash .cer-v17-flash {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        box-shadow: none !important;
+        border: 0 !important;
+    }
+    body.cer-print-flash .cer-v17-actions,
+    body.cer-print-flash .cer-v17-missing { display: none !important; }
 }

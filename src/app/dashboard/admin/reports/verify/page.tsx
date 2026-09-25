@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Award } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Award, Trash2 } from 'lucide-react';
 import { downloadAdminReportAiPayload, regenerateAdminReportAiScore, regenerateAdminReportMasterRubricAiScore } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -303,6 +303,13 @@ export default function AdminReportsVerificationPage() {
     const [mergeKeepId, setMergeKeepId] = useState("");
     const [mergeSubmitting, setMergeSubmitting] = useState(false);
     const [duplicatesOnly, setDuplicatesOnly] = useState(false);
+    const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Report | null>(null);
+    const [deleteChoices, setDeleteChoices] = useState({
+        report: true,
+        attendance: false,
+        payment: false,
+    });
 
     const fetchOrganizations = async () => {
         try {
@@ -753,6 +760,77 @@ export default function AdminReportsVerificationPage() {
         }
     };
 
+    const openDeleteDialog = useCallback((report: Report) => {
+        setDeleteChoices({ report: true, attendance: false, payment: false });
+        setDeleteTarget(report);
+    }, []);
+
+    const confirmDeleteChoices = useCallback(async () => {
+        const report = deleteTarget;
+        if (!report) return;
+        if (!deleteChoices.report && !deleteChoices.attendance && !deleteChoices.payment) {
+            toast.error("Choose at least one item to delete.");
+            return;
+        }
+        setDeletingReportId(report.id);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/reports/${encodeURIComponent(report.id)}`,
+                {
+                    method: "DELETE",
+                    body: JSON.stringify({
+                        delete_report: deleteChoices.report,
+                        delete_attendance: deleteChoices.attendance,
+                        delete_payment: deleteChoices.payment,
+                    }),
+                },
+                { redirectToLogin: false },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (!res?.ok) {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not delete the selected items",
+                );
+                return;
+            }
+            toast.success(
+                typeof (data as { message?: string }).message === "string"
+                    ? (data as { message: string }).message
+                    : "Deleted",
+            );
+            if (deleteChoices.report) {
+                const deletedIds = Array.isArray(
+                    (data as { deleted?: { report_ids?: string[] } }).deleted?.report_ids,
+                )
+                    ? (data as { deleted: { report_ids: string[] } }).deleted.report_ids
+                    : [report.id];
+                const removed = new Set(deletedIds.length ? deletedIds : [report.id]);
+                setReports((prev) => prev.filter((row) => !removed.has(row.id)));
+                setTotalLoadedReports((count) => Math.max(0, count - removed.size));
+                setMergeSelectedIds((prev) => prev.filter((id) => !removed.has(id)));
+                setMergeKeepId((current) => (removed.has(current) ? "" : current));
+                setCiiScores((prev) => {
+                    let changed = false;
+                    const next = { ...prev };
+                    for (const id of removed) {
+                        if (id in next) {
+                            delete next[id];
+                            changed = true;
+                        }
+                    }
+                    return changed ? next : prev;
+                });
+            }
+            setDeleteTarget(null);
+        } catch {
+            toast.error("Could not delete the selected items");
+        } finally {
+            setDeletingReportId(null);
+        }
+    }, [deleteChoices, deleteTarget]);
+
     const tableColumns = useMemo((): TableColumn<Report>[] => {
         const cols: TableColumn<Report>[] = [];
 
@@ -966,18 +1044,34 @@ export default function AdminReportsVerificationPage() {
             },
             {
                 name: '',
-                width: '96px',
-                minWidth: '96px',
+                width: '148px',
+                minWidth: '148px',
                 right: true,
                 cell: (report) => (
-                    <button
-                        type="button"
-                        onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
-                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                    >
-                        <Eye className="h-3.5 w-3.5 shrink-0" />
-                        Review
-                    </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
+                            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                        >
+                            <Eye className="h-3.5 w-3.5 shrink-0" />
+                            Review
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => openDeleteDialog(report)}
+                            disabled={deletingReportId === report.id}
+                            title="Delete report"
+                            aria-label={`Delete report for ${report.student_name || "student"}`}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {deletingReportId === report.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            ) : (
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                        </button>
+                    </div>
                 ),
             },
         );
@@ -993,6 +1087,8 @@ export default function AdminReportsVerificationPage() {
         refreshingMasterRubricReportIds,
         downloadingAiPayloadIds,
         router,
+        deletingReportId,
+        openDeleteDialog,
     ]);
 
     return (
@@ -1351,6 +1447,101 @@ export default function AdminReportsVerificationPage() {
                     </div>
                 )}
             </div>
+            {deleteTarget ? (
+                <div className="fixed inset-0 z-[80] flex items-end justify-center p-3 sm:items-center">
+                    <button
+                        type="button"
+                        aria-label="Close"
+                        className="absolute inset-0 bg-[#073b42]/45"
+                        onClick={() => {
+                            if (!deletingReportId) setDeleteTarget(null);
+                        }}
+                    />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-report-title"
+                        className="relative w-full max-w-md rounded-[22px] border border-[#dde5ea] bg-white p-5 shadow-[0_18px_40px_rgba(7,59,66,.22)]"
+                    >
+                        <h2 id="delete-report-title" className="text-lg font-[950] text-[#16313d]">
+                            Choose what to delete
+                        </h2>
+                        <p className="mt-1 text-sm text-[#70808a]">
+                            {deleteTarget.student_name || "Student"} — {deleteTarget.project_title || "Project"}. Only ticked items are removed. The opportunity and enrollment stay.
+                        </p>
+                        {String(deleteTarget.status || "").toLowerCase() === "verified" ||
+                        String(deleteTarget.admin_status || "").toLowerCase() === "approved" ? (
+                            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                                This report is already verified or admin-approved.
+                            </p>
+                        ) : null}
+                        <div className="mt-4 space-y-2">
+                            {(
+                                [
+                                    {
+                                        key: "report" as const,
+                                        label: "Report",
+                                        hint: "The community service report for this student and project.",
+                                    },
+                                    {
+                                        key: "attendance" as const,
+                                        label: "Attendance",
+                                        hint: "Session hours and session evidence for this team on this project.",
+                                    },
+                                    {
+                                        key: "payment" as const,
+                                        label: "Payment slips",
+                                        hint: "Payment records for this team on this project.",
+                                    },
+                                ]
+                            ).map((item) => (
+                                <label
+                                    key={item.key}
+                                    className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        className="mt-1 h-4 w-4 accent-[#0e756e]"
+                                        checked={deleteChoices[item.key]}
+                                        onChange={(event) =>
+                                            setDeleteChoices((current) => ({
+                                                ...current,
+                                                [item.key]: event.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-semibold text-[#16313d]">{item.label}</span>
+                                        <span className="block text-xs text-[#70808a]">{item.hint}</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                disabled={Boolean(deletingReportId)}
+                                onClick={() => setDeleteTarget(null)}
+                                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#dde5ea] px-4 text-sm font-semibold text-[#16313d] hover:bg-[#f7fafb] disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={
+                                    Boolean(deletingReportId) ||
+                                    (!deleteChoices.report && !deleteChoices.attendance && !deleteChoices.payment)
+                                }
+                                onClick={() => void confirmDeleteChoices()}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-rose-700 px-4 text-sm font-bold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {deletingReportId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Delete selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

@@ -790,49 +790,52 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
 
     return (
         <>
-            <div className="fixed inset-0 z-[85] bg-slate-900/45" aria-hidden onClick={onClose} />
+            <div className="fixed inset-0 z-[85] bg-[#073b42]/45" aria-hidden onClick={onClose} />
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="project-tracker-title"
-                className="fixed left-1/2 top-1/2 z-[95] flex max-h-[min(92vh,56rem)] w-[calc(100vw-0.75rem)] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                className="fixed left-1/2 top-1/2 z-[95] flex max-h-[min(92dvh,56rem)] w-[calc(100vw-1rem)] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[22px] border border-[#dde5ea] bg-[#f7fafb] shadow-[0_18px_40px_rgba(7,59,66,.22)] sm:w-[calc(100vw-1.5rem)]"
             >
-                <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 shrink-0">
+                <div
+                    className="flex shrink-0 items-start justify-between gap-3 px-4 py-4 text-white sm:px-5 sm:py-5"
+                    style={{ background: "linear-gradient(120deg,#073b42,#11978f)" }}
+                >
                     <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-blue-700">
-                            <ClipboardList className="h-5 w-5 shrink-0" />
-                            <h2 id="project-tracker-title" className="text-lg font-extrabold text-slate-900 tracking-tight">
+                        <div className="flex items-center gap-2">
+                            <ClipboardList className="h-5 w-5 shrink-0 text-[#9df2df]" />
+                            <h2 id="project-tracker-title" className="text-lg font-[950] tracking-tight sm:text-[22px]">
                                 Project tracker
                             </h2>
                         </div>
-                        <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-                            Full picture for <span className="font-semibold text-slate-700">{row.title}</span> — join
+                        <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-[#d9f0ef] sm:text-sm">
+                            Full picture for <span className="font-semibold text-white">{row.title}</span> — join
                             queue, impact report approvals, attendance reviews, and enrollments.
                         </p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0"
+                        className="shrink-0 rounded-xl p-2 text-white/80 hover:bg-white/10 hover:text-white"
                         aria-label="Close"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="overflow-y-auto flex-1 min-h-0 px-5 py-4 space-y-6">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-5 sm:py-5">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                            <Loader2 className="w-8 h-8 animate-spin text-[#0e756e]" />
                             <p className="text-sm font-medium">Loading tracker…</p>
                         </div>
                     ) : (
                         <>
                             {snapshot?.awaitingLane ? (
-                                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-900">
+                                <div className="rounded-[15px] border border-[#f3c3c8] bg-[#fff1f2] px-4 py-3 text-sm font-semibold text-[#9f3040]">
                                     {snapshot.awaitingLane}
                                     {!snapshot.partnerOrganizationName && !snapshot.organizationName ? (
-                                        <p className="mt-1 text-xs font-medium text-rose-800/90">
+                                        <p className="mt-1 text-xs font-medium text-[#9f3040]/90">
                                             No partner organization is linked yet — attendance review and partner gates may
                                             not appear until the student adds and the partner approves the listing.
                                         </p>
@@ -840,35 +843,35 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 </div>
                             ) : null}
 
-                            <section>
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3">
+                            <section className="rounded-[22px] border border-[#dde5ea] bg-white p-3.5 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
+                                <h3 className="mb-3 text-[11px] font-black uppercase tracking-[0.08em] text-[#70808a]">
                                     Project details
                                 </h3>
-                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                                <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                                     {detailRows.map((d) => (
-                                        <div key={d.label} className="min-w-0 border-b border-slate-50 pb-2">
-                                            <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        <div key={d.label} className="min-w-0 rounded-[15px] border border-[#dde5ea] bg-[#f7fafb] px-3.5 py-3">
+                                            <dt className="text-[9px] font-black uppercase tracking-[0.05em] text-[#70808a]">
                                                 {d.label}
                                             </dt>
-                                            <dd className="font-semibold text-slate-800 break-words mt-0.5">{d.value}</dd>
+                                            <dd className="mt-1 break-words text-sm font-semibold text-[#16313d]">{d.value}</dd>
                                         </div>
                                     ))}
                                 </dl>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     <Link
                                         href={`/dashboard/student/browse/${encodeURIComponent(row.id)}`}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0e756e] hover:text-[#073b42]"
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" /> Open public listing
                                     </Link>
                                 </div>
                             </section>
 
-                            <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                            <section className="rounded-[22px] border border-[#dde5ea] bg-white p-3.5 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
                                 <div className="flex items-start gap-2 mb-3">
                                     <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
                                     <div>
-                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.08em] text-[#16313d]">
                                             Faculty &amp; partner contacts
                                         </h3>
                                         <p className="text-xs text-slate-500 mt-1">
@@ -886,7 +889,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             type="text"
                                             value={facultySupervisorName}
                                             onChange={(e) => setFacultySupervisorName(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                             placeholder="e.g. Nighat Akbar"
                                         />
                                     </label>
@@ -898,7 +901,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             type="email"
                                             value={facultySupervisorEmail}
                                             onChange={(e) => setFacultySupervisorEmail(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                             placeholder="faculty@university.edu"
                                         />
                                     </label>
@@ -910,7 +913,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             type="text"
                                             value={partnerOrganizationName}
                                             onChange={(e) => setPartnerOrganizationName(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                             placeholder="Organization name"
                                         />
                                     </label>
@@ -922,7 +925,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             type="text"
                                             value={partnerContactPerson}
                                             onChange={(e) => setPartnerContactPerson(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                             placeholder="Optional"
                                         />
                                     </label>
@@ -934,7 +937,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             type="email"
                                             value={partnerContactEmail}
                                             onChange={(e) => setPartnerContactEmail(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                             placeholder="partner@org.org"
                                         />
                                     </label>
@@ -944,7 +947,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                         type="button"
                                         onClick={() => void saveContacts()}
                                         disabled={contactsSaving || !contactsDirty}
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e756e] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 sm:w-auto"
                                     >
                                         {contactsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                         Save contacts
@@ -952,11 +955,11 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 </div>
                             </section>
 
-                            <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                            <section className="rounded-[22px] border border-[#dde5ea] bg-white p-3.5 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
                                 <div className="flex items-start gap-2 mb-3">
                                     <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
                                     <div>
-                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.08em] text-[#16313d]">
                                             Attendance routing override
                                         </h3>
                                         <p className="text-xs text-slate-500 mt-1">
@@ -977,7 +980,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                                     e.target.value as "auto" | "partner" | "faculty",
                                                 )
                                             }
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            className="w-full rounded-xl border border-[#dde5ea] bg-[#f7fafb] px-3 py-2.5 text-sm font-semibold text-[#16313d] outline-none focus:border-[#15988b] focus:bg-white focus:ring-4 focus:ring-[#15988b]/15"
                                         >
                                             <option value="auto">Auto (partner if contact exists)</option>
                                             <option value="partner">Force partner queue</option>
@@ -991,7 +994,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                             attendanceRoutingSaving ||
                                             attendanceRoutingOverride === snapshot?.attendanceRoutingOverride
                                         }
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e756e] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 sm:w-auto"
                                     >
                                         {attendanceRoutingSaving ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -1001,8 +1004,8 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 </div>
                             </section>
 
-                            <section>
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            <section className="rounded-[22px] border border-[#dde5ea] bg-white p-3.5 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
+                                <h3 className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-[#16313d]">
                                     Join applications pipeline
                                 </h3>
                                 {pipelineChips.length === 0 && snapshot?.pipelineTotal === 0 ? (
@@ -1042,12 +1045,12 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 </p>
                             </section>
 
-                            <section>
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
+                            <section className="rounded-[22px] border border-[#dde5ea] bg-white p-3.5 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                    <h3 className="text-[11px] font-black uppercase tracking-[0.08em] text-[#16313d]">
                                         Who applied — join, report &amp; attendance
                                     </h3>
-                                    <span className="text-[11px] font-bold text-slate-500">{roster.length} total</span>
+                                    <span className="text-[11px] font-bold text-[#70808a]">{roster.length} total</span>
                                 </div>
                                 {roster.length === 0 ? (
                                     <p className="text-sm text-slate-600 rounded-xl border border-slate-100 bg-slate-50 px-4 py-6 text-center">
@@ -1056,9 +1059,9 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 ) : (
                                     <div className="space-y-3">
                                         <TrackerReadingGuide />
-                                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                        <div className="overflow-x-auto rounded-[15px] border border-[#dde5ea]">
                                         <table className="min-w-[920px] w-full text-left text-sm">
-                                            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <thead className="bg-[#f7fafb] text-[10px] font-black uppercase tracking-wider text-[#70808a]">
                                                 <tr>
                                                     <th
                                                         className="px-3 py-2.5"
@@ -1232,12 +1235,12 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                 )}
                             </section>
 
-                            <section className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <div>
-                                    <div className="text-xs font-black uppercase tracking-wider text-blue-800">
+                            <section className="flex flex-col gap-3 rounded-[22px] border border-[#c9ebe6] bg-[#f3fbf9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] font-black uppercase tracking-[0.08em] text-[#0e756e]">
                                         Enrollments &amp; reports
                                     </div>
-                                    <p className="text-sm text-blue-900/90 mt-0.5 leading-snug">
+                                    <p className="mt-0.5 text-sm leading-snug text-[#16313d]">
                                         {enrollmentCount} enrolled group
                                         {enrollmentCount === 1 ? "" : "s"} (teams or individuals with active seats).
                                         Open for per-member roster, edits, aggregated report milestones, and admin actions on
@@ -1250,7 +1253,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                         onClose();
                                         onOpenTeamsEnrollments();
                                     }}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800 shrink-0"
+                                    className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0e756e] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#073b42] sm:w-auto"
                                 >
                                     <Users className="w-4 h-4" /> Teams &amp; enrollments
                                 </button>

@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-    ShieldCheck, Camera, FileUp, Globe, FileText, CheckCircle2,
-    Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2, Upload,
-} from "lucide-react";
+import { FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useReportForm } from "../context/ReportContext";
@@ -11,61 +8,44 @@ import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
-import { REPORT_TEXT_RANGE_LABEL, countWords, reportTextWordMeter } from "../utils/validation";
+import { countWords } from "../utils/validation";
 
-// ─── Static configuration ───────────────────────────────────────────────────
-const evidenceOptions = [
-    { id: "Activity photos (with consent)", icon: ImageIcon },
-    { id: "Attendance sheet", icon: Users },
-    { id: "Training materials / presentations", icon: BookOpen },
-    { id: "Partner confirmation letter or email", icon: FileText },
-    { id: "Survey results / feedback data", icon: Activity },
-    { id: "Media coverage", icon: Globe },
-    { id: "Resource delivery proof", icon: ShieldCheck },
-    { id: "Other supporting document", icon: FileUp },
+const EVIDENCE_TYPES = [
+    { id: "Activity photos (with consent)", label: "📸 Activity photos (with consent)" },
+    { id: "Attendance sheet", label: "📋 Attendance sheet" },
+    { id: "Training materials / presentations", label: "🎓 Training materials" },
+    { id: "Partner confirmation letter or email", label: "🤝 Partner confirmation letter" },
+    { id: "Survey results / feedback data", label: "📊 Survey results / feedback" },
+    { id: "Media coverage", label: "📰 Media coverage" },
+    { id: "Resource delivery proof", label: "📦 Resource delivery proof" },
+    { id: "Other supporting document", label: "✏️ Other supporting document" },
 ];
 
+const OTHER_EVIDENCE_TYPE = "Other supporting document";
 
 const visibilityOptions = [
     {
-        id: "public",
+        id: "public" as const,
         label: "Public",
         emoji: "🌐",
-        desc: "Website, social media, public reports",
+        desc: "Website & public reports — only when consent and institutional policy permit.",
     },
     {
-        id: "limited",
+        id: "limited" as const,
         label: "Institutional",
         emoji: "🏛️",
-        desc: "University & HEC reports only",
+        desc: "University & HEC only.",
     },
     {
-        id: "internal",
+        id: "internal" as const,
         label: "Private",
         emoji: "🔒",
-        desc: "Verification purposes only",
+        desc: "Verification only.",
     },
 ];
 
-const verificationTypes = [
-    "Signed letter",
-    "Official email confirmation",
-    "Attendance verification",
-    "Institutional stamp or seal",
-];
-
-const textareaClasses =
-    "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
-
-type StepStatus = "mandatory" | "required" | "optional";
-
-const statusBadgeClasses: Record<StepStatus, string> = {
-    mandatory: "border-amber-200 bg-amber-50 text-amber-700",
-    required: "border-rose-200 bg-rose-50 text-rose-600",
-    optional: "border-slate-200 bg-slate-50 text-slate-500",
-};
 
 type EvidenceFileItem = File | {
     file?: File;
@@ -217,78 +197,8 @@ function EvidenceFullFilePreview({ file, name }: { file: EvidenceFileItem; name:
     );
 }
 
-function EvidenceDropzone({
-    label,
-    hint,
-    multiple = true,
-    accept,
-    onChange,
-}: {
-    label: string;
-    hint?: string;
-    multiple?: boolean;
-    accept?: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-    return (
-        <div className="cer-dropzone relative px-6 py-10 text-center">
-            <Upload className="mx-auto h-8 w-8 text-[var(--teal)]" />
-            <p className="mt-3 text-sm font-medium text-[var(--ink)]">{label}</p>
-            {hint ? <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p> : null}
-            <input
-                type="file"
-                multiple={multiple}
-                accept={accept}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                onChange={onChange}
-            />
-        </div>
-    );
-}
-
-function classifyVerification(filesCount: number, typesCount: number, partnerAssessed: boolean): {
-    label: string; color: string; desc: string;
-} {
-    if (partnerAssessed) {
-        return {
-            label: "Verified by Partner",
-            color: "border-[var(--teal)]/25 bg-[var(--teal-soft)] text-[var(--teal)]",
-            desc: "External confirmation included",
-        };
-    }
-    if (filesCount > 1 && typesCount > 1) {
-        return {
-            label: "Structured Verification",
-            color: "border-[var(--aqua)]/25 bg-[var(--aqua-soft)] text-[var(--aqua)]",
-            desc: "Multiple evidence types, documented outputs",
-        };
-    }
-    return {
-        label: "Basic Verification",
-        color: "border-[var(--gold)]/25 bg-[var(--gold-soft)] text-[var(--gold)]",
-        desc: "Single file, limited documentation",
-    };
-}
-
-function StepHeader({ n, title, status }: { n: string; title: string; status?: StepStatus }) {
-    return (
-        <div className="flex flex-wrap items-center gap-2.5">
-            <span className="cer-secn">
-                {n}
-            </span>
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            {status ? (
-                <span
-                    className={clsx(
-                        "ml-auto shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                        statusBadgeClasses[status],
-                    )}
-                >
-                    {status}
-                </span>
-            ) : null}
-        </div>
-    );
+function evidenceTypeOn(selected: string[], id: string) {
+    return selected.some((value) => value === id || value.replace(/^✏️\s*/, "") === id);
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -300,24 +210,19 @@ export default function Section8Evidence() {
         evidence_types = [],
         evidence_files = [],
         description = "",
-        linked_items = [],
         ethical_compliance = {},
         media_visible = "",
-        partner_verification = false,
-        partner_verification_type = "",
-        partner_verification_files = [],
     } = section8;
+    const evidenceTypeOther = section8.evidence_type_other || "";
     const descriptionWords = countWords(description);
-    const descriptionMeter = reportTextWordMeter(descriptionWords);
+    const captionInRange = descriptionWords >= 10 && descriptionWords <= 45;
 
     const update = (field: string, val: unknown) => updateSection("section8", { [field]: val });
     const toggleEvidenceType = (type: string) => {
         const cur = evidence_types || [];
-        update("evidence_types", cur.includes(type) ? cur.filter((t) => t !== type) : [...cur, type]);
-    };
-    const toggleLinkedItem = (item: string) => {
-        const cur = linked_items || [];
-        update("linked_items", cur.includes(item) ? cur.filter((t) => t !== item) : [...cur, item]);
+        const on = evidenceTypeOn(cur, type);
+        const next = cur.filter((value) => value !== type && value.replace(/^✏️\s*/, "") !== type);
+        update("evidence_types", on ? next : [...next, type]);
     };
     /** One combined confirmation drives all four ethics keys at once — the checks themselves are unchanged. */
     const setAllEthics = (checked: boolean) => {
@@ -354,41 +259,23 @@ export default function Section8Evidence() {
         Object.values(ethical_compliance || {}).every((v) => v === true) &&
         Object.keys(ethical_compliance || {}).length === 4;
 
-    const linkOptions = useMemo(() => {
-        const activityTitles = (data.section4?.activity_blocks || [])
-            .map((b) => (b.title || "").trim())
-            .filter(Boolean);
-        const outcomeLabels = (data.section5?.measurable_outcomes || [])
-            .map((o) => {
-                const area = (o.outcome_area_other || o.outcome_area || "").trim();
-                const metric = (o.metric_other || o.metric || "").trim();
-                if (area && metric) return `${area}: ${metric}`;
-                return area || metric;
-            })
-            .filter(Boolean);
-        return Array.from(new Set([...activityTitles, ...outcomeLabels]));
-    }, [data.section4?.activity_blocks, data.section5?.measurable_outcomes]);
-
-    const classification = classifyVerification(
-        evidence_files?.length || 0,
-        evidence_types?.length || 0,
-        partner_verification && !!partner_verification_type,
+    const legacyTypes = (evidence_types || []).filter(
+        (value) => !EVIDENCE_TYPES.some((type) => evidenceTypeOn([value], type.id)),
     );
+    const otherTypeOn = evidenceTypeOn(evidence_types || [], OTHER_EVIDENCE_TYPE);
 
     const autoNarrative = (() => {
-        if (section8.summary_text && (section8.summary_text.length > 50 || !section8.summary_text.includes("The report includes"))) {
-            return section8.summary_text;
-        }
-
-        const filesCount = evidence_files?.length || 0;
-        if (filesCount === 0) return "Evidence statement will be generated once files are uploaded and classified.";
-        const typeNames = evidence_types?.map((t: string) => t.split(" ")[0].toLowerCase()) || [];
-        const typesStr = typeNames.length > 0 ? ` including ${typeNames.slice(0, 2).join(" and ")} documentation` : "";
-        const ethicalStr = allEthicalChecked ? "Ethical compliance was fully confirmed." : "Ethical compliance checks are pending.";
-        const partnerStr = partner_verification
-            ? `External partner verification was provided via ${partner_verification_type || "documentation"}.`
-            : "External partner verification was not provided.";
-        return `The report includes ${filesCount} supporting evidence ${filesCount === 1 ? "file" : "files"}${typesStr}. ${ethicalStr} ${partnerStr}`;
+        const onFile = collectedElsewhere.length;
+        const added = evidence_files?.length || 0;
+        const total = onFile + added;
+        const consent = allEthicalChecked ? "Ethical consent is confirmed." : "Ethical consent is pending.";
+        const visibility =
+            media_visible === "public" ? "Visibility: public."
+            : media_visible === "limited" ? "Visibility: institutional."
+            : media_visible === "internal" ? "Visibility: private."
+            : "Visibility is still pending.";
+        if (!total) return `Evidence already on file will appear here as pictures. ${consent} ${visibility}`;
+        return `${total} evidence file${total === 1 ? "" : "s"} sit on record — ${onFile} from earlier sections${added ? ` and ${added} added here` : ""}. ${consent} ${visibility}`;
     })();
 
     useEffect(() => {
@@ -399,48 +286,17 @@ export default function Section8Evidence() {
 
     return (
         <div className="mx-auto max-w-6xl space-y-3 pb-10">
-            {/* Header */}
-            <div className="cer-dup-head space-y-4">
-                <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                        <ShieldCheck className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 7:</span> Evidence &amp; verification
-                        </h2>
-                    </div>
+            <section className="cer-card space-y-4">
+                <div className="cer-secl">
+                    <span className="cer-secn">7.1</span>
+                    <h3>Evidence already on file</h3>
+                    <span className="cer-tag auto">Auto-collected · always pictures</span>
                 </div>
-
-                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                    <div>
-                        <p className="text-sm font-semibold text-indigo-900">
-                            This section confirms that your reported work is verifiable, ethical, and audit-ready.
-                        </p>
-                        <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
-                            It strengthens your report for university documentation, HEC audit, QS impact submissions,
-                            government reporting, and SDG contribution validation. This is the credibility layer of your project.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Already collected — pulled from earlier sections, nothing to redo */}
-            {collectedElsewhere.length > 0 ? (
-                <section className="cer-card space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Already collected <span className="font-normal text-slate-500">({collectedElsewhere.length})</span>
-                        </h3>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Pulled from your earlier sections
-                        </span>
-                    </div>
-                    <p className="text-sm text-slate-500">
-                        Nothing to re-upload or re-describe — each item keeps the note you gave it originally.
-                    </p>
+                <p className="cer-sub">
+                    Every file uploaded anywhere in this report lands here automatically — shown as images, never file lists.
+                    Saved session evidence is included. A resource entry is not counted unless a supporting file is attached.
+                </p>
+                {collectedElsewhere.length ? (
                     <div className="cer-gal">
                         {collectedElsewhere.map((item, i) => (
                             <div key={`${item.source}-${i}`} className="space-y-1">
@@ -455,326 +311,186 @@ export default function Section8Evidence() {
                                 <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={item.label}>
                                     {item.label}
                                 </p>
-                                <p className="truncate text-[9px] font-semibold text-[var(--teal)]">from {item.source}</p>
+                                <p className="truncate text-[9px] font-semibold text-[var(--teal)]">{item.source}</p>
                             </div>
                         ))}
                     </div>
-                </section>
-            ) : null}
-
-            {/* 8.1 Upload evidence */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="8.1" title="Step 1 — Upload evidence" status="mandatory" />
-
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>Do you have evidence to upload?</Label>
-                        <p className="mt-1.5 text-sm text-slate-500">
-                            Selecting &ldquo;No&rdquo; will bypass evidence requirements, but may affect report credibility.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <button
-                            type="button"
-                            onClick={() => update("has_evidence", "no")}
-                            className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
-                                section8.has_evidence === "no"
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
-                            )}
-                        >
-                            <p className="text-sm font-semibold">No — I do not have evidence</p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                section8.has_evidence === "no" ? "text-slate-300" : "text-slate-500",
-                            )}>
-                                Evidence requirements will be skipped for this report.
-                            </p>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => update("has_evidence", "yes")}
-                            className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
-                                section8.has_evidence === "yes"
-                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
-                            )}
-                        >
-                            <p className="text-sm font-semibold">Yes — I have evidence to upload</p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                section8.has_evidence === "yes" ? "text-[#cdf5f0]" : "text-slate-500",
-                            )}>
-                                Continue below to upload and classify your files.
-                            </p>
-                        </button>
-                    </div>
-
-                    {section8.has_evidence === "yes" && (
-                        <>
-                            <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2 sm:p-5">
-                                <div className="space-y-2">
-                                    <p className={fieldLabel}>Accepted formats</p>
-                                    <ul className="space-y-1 text-sm text-slate-600">
-                                        <li>JPG, PNG, WebP, HEIC — phone photos supported</li>
-                                        <li>PDF — attendance sheets and scans</li>
-                                        <li>Video — MP4, MOV, WebM (up to 500 MB)</li>
-                                        <li>Word (.doc/.docx) — letters and confirmations</li>
-                                    </ul>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className={fieldLabel}>Evidence should show</p>
-                                    <ul className="space-y-1 text-sm text-slate-600">
-                                        <li>The activity took place</li>
-                                        <li>You participated</li>
-                                        <li>Beneficiaries were engaged</li>
-                                        <li>Outputs were delivered</li>
-                                    </ul>
-                                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-500">
-                                        <AlertCircle className="h-3.5 w-3.5" /> Do not upload unrelated material
-                                    </p>
-                                </div>
-                            </div>
-
-                            <EvidenceDropzone
-                                label="Drag & drop files here, or click to browse"
-                                hint={`Images, PDF, Word, Video — max ${MAX_REPORT_UPLOAD_LABEL} per file`}
-                                multiple
-                                accept={REPORT_ATTACHMENT_ACCEPT}
-                                onChange={(e) => {
-                                    if (e.target.files) {
-                                        const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
-                                        if (!acceptedFiles.length) return;
-                                        update("evidence_files", [
-                                            ...(evidence_files || []),
-                                            ...acceptedFiles.map(toEvidenceFileItem),
-                                        ]);
-                                    }
-                                }}
-                            />
-
-                            <FieldError message={getFieldError("section8.evidence_files")} />
-
-                            {evidence_files && evidence_files.length > 0 && (
-                                <div className="space-y-3">
-                                    <Label className={fieldLabel}>
-                                        Attached evidence ({evidence_files.length})
-                                    </Label>
-                                    <div className="cer-gal">
-                                        {evidence_files.map((file: EvidenceFileItem, fIdx: number) => {
-                                            const fileName = getFileName(file, fIdx);
-                                            return (
-                                                <div key={`${fileName}-${fIdx}`} className="space-y-1">
-                                                    <div
-                                                        className="cer-ph cursor-pointer"
-                                                        onClick={() => setPreviewFile({ file, name: fileName })}
-                                                    >
-                                                        <EvidenceFilePreview file={file} name={fileName} />
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const kept = evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
-                                                                update("evidence_files", kept);
-                                                            }}
-                                                            className="cer-ph-badge transition hover:bg-[var(--red)]"
-                                                            title="Remove file"
-                                                        >
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                    <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={fileName}>
-                                                        {fileName}
-                                                    </p>
-                                                    <p className="truncate text-[9px] text-[var(--muted)]">
-                                                        {formatFileSize(file)}
-                                                    </p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                                <span className="text-xs text-slate-500">Upload status</span>
-                                {evidence_files?.length ? (
-                                    <span className="flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                        {evidence_files.length} files attached
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-1 rounded-md bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                                        <Camera className="h-3.5 w-3.5" />
-                                        No files yet
-                                    </span>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
+                ) : (
+                    <p className="text-sm text-slate-500">No pictures on file yet. Session photos appear here as soon as they are saved.</p>
+                )}
             </section>
 
-            {/* 8.2 Classify */}
             <section className="cer-card space-y-4">
-                <StepHeader n="8.2" title="Step 2 — Classify the evidence" status="required" />
+                <div className="cer-secl">
+                    <span className="cer-secn">7.2</span>
+                    <h3>Anything else to add?</h3>
+                    <span className="cer-tag">Mandatory</span>
+                </div>
 
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>Evidence type</Label>
-                        <p className="mt-1.5 text-sm text-slate-500">
-                            Select all categories that apply (at least one required).
-                        </p>
-                    </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <button
+                        type="button"
+                        onClick={() => update("has_evidence", "no")}
+                        className={clsx(
+                            "rounded-xl border-2 p-5 text-center transition-colors",
+                            section8.has_evidence === "no"
+                                ? "border-[#25b8d8] bg-[#eefbfe] shadow-sm"
+                                : "border-slate-200 bg-white hover:border-[#25b8d8]/40",
+                        )}
+                    >
+                        <p className="text-2xl">✅</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">No — it&apos;s all on file above</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">The report relies on auto-collected evidence.</p>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => update("has_evidence", "yes")}
+                        className={clsx(
+                            "rounded-xl border-2 p-5 text-center transition-colors",
+                            section8.has_evidence === "yes"
+                                ? "border-[#25b8d8] bg-[#eefbfe] shadow-sm"
+                                : "border-slate-200 bg-white hover:border-[#25b8d8]/40",
+                        )}
+                    >
+                        <p className="text-2xl">📎</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">Yes — I have more</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Upload &amp; classify below.</p>
+                    </button>
+                </div>
+                <FieldError message={getFieldError("section8.has_evidence")} />
 
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                        {evidenceOptions.map((opt) => {
-                            const active = (evidence_types || []).includes(opt.id);
-                            return (
-                                <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => toggleEvidenceType(opt.id)}
-                                    className={clsx(
-                                        "flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors",
-                                        active
-                                            ? "border-[var(--teal)]/40 bg-[var(--teal-soft)] text-[var(--teal)]"
-                                            : "border-slate-200 bg-white text-slate-600 hover:border-[var(--teal)]/30 hover:bg-slate-50",
-                                    )}
-                                >
-                                    <opt.icon className="h-4 w-4 shrink-0 opacity-70" />
-                                    <span className="flex-1 text-sm font-medium">{opt.id}</span>
-                                    <span
-                                        className={clsx(
-                                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                                            active
-                                                ? "border-[var(--teal)] bg-[var(--teal)] text-white"
-                                                : "border-slate-300 bg-white",
-                                        )}
-                                    >
-                                        {active ? <CheckCircle2 className="h-3 w-3" /> : null}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <FieldError message={getFieldError("section8.evidence_types")} />
-
-                    {linkOptions.length > 0 && (
-                        <div className="space-y-3 border-t border-slate-100 pt-5">
-                            <div>
-                                <Label className={fieldLabel}>Link to activity / outcome (optional)</Label>
-                                <p className="mt-1.5 text-sm text-slate-500">
-                                    Tag this evidence to items from Sections 4 and 5.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {linkOptions.map((item) => {
-                                    const active = (linked_items || []).includes(item);
+                {section8.has_evidence === "yes" ? (
+                    <div className="space-y-4">
+                        <div>
+                            <Label className={fieldLabel}>Classify · select all that apply</Label>
+                            <div className="cer-chips mt-2">
+                                {EVIDENCE_TYPES.map((opt) => {
+                                    const active = evidenceTypeOn(evidence_types || [], opt.id);
                                     return (
                                         <button
-                                            key={item}
+                                            key={opt.id}
                                             type="button"
-                                            onClick={() => toggleLinkedItem(item)}
-                                            className={clsx(
-                                                "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
-                                                active
-                                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/50",
-                                            )}
+                                            onClick={() => toggleEvidenceType(opt.id)}
+                                            className={clsx("cer-chip", active && "on")}
                                         >
-                                            {item}
+                                            {opt.label}
                                         </button>
                                     );
                                 })}
+                                {legacyTypes.map((value) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => toggleEvidenceType(value)}
+                                        className="cer-chip on"
+                                    >
+                                        {value}
+                                    </button>
+                                ))}
                             </div>
+                            <FieldError message={getFieldError("section8.evidence_types")} />
                         </div>
+
+                        {otherTypeOn ? (
+                            <input
+                                className="cer-input"
+                                value={evidenceTypeOther}
+                                placeholder="What kind of document?"
+                                onChange={(e) => update("evidence_type_other", e.target.value)}
+                            />
+                        ) : null}
+                        <FieldError message={getFieldError("section8.evidence_type_other")} />
+
+                        <label className="cer-aibtn inline-flex cursor-pointer">
+                            ⬆️ Add files (JPG, PNG, PDF, Word)
+                            <input
+                                type="file"
+                                multiple
+                                accept={REPORT_ATTACHMENT_ACCEPT}
+                                className="sr-only"
+                                onChange={(e) => {
+                                    if (!e.target.files) return;
+                                    const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
+                                    if (!acceptedFiles.length) return;
+                                    update("evidence_files", [
+                                        ...(evidence_files || []),
+                                        ...acceptedFiles.map(toEvidenceFileItem),
+                                    ]);
+                                }}
+                            />
+                        </label>
+                        <p className="text-[11px] text-slate-500">Max {MAX_REPORT_UPLOAD_LABEL} per file.</p>
+                        <FieldError message={getFieldError("section8.evidence_files")} />
+
+                        {evidence_files && evidence_files.length > 0 ? (
+                            <div className="cer-gal">
+                                {evidence_files.map((file: EvidenceFileItem, fIdx: number) => {
+                                    const fileName = getFileName(file, fIdx);
+                                    return (
+                                        <div key={`${fileName}-${fIdx}`} className="space-y-1">
+                                            <div
+                                                className="cer-ph cursor-pointer"
+                                                onClick={() => setPreviewFile({ file, name: fileName })}
+                                            >
+                                                <EvidenceFilePreview file={file} name={fileName} />
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        update("evidence_files", evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx));
+                                                    }}
+                                                    className="cer-ph-badge transition hover:bg-[var(--red)]"
+                                                    title="Remove file"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                            <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={fileName}>{fileName}</p>
+                                            <p className="truncate text-[9px] text-[var(--muted)]">{formatFileSize(file)}</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+
+                        <div>
+                            <Label className={fieldLabel}>What does your evidence show?</Label>
+                            <input
+                                className="cer-input mt-2"
+                                value={description}
+                                placeholder="e.g. the attendance sheet confirms 40 participants across three sessions"
+                                onChange={(e) => update("description", e.target.value)}
+                            />
+                            <p className={clsx("cer-wc", captionInRange && "ok")}>
+                                {descriptionWords} WORDS · TARGET 10–45
+                            </p>
+                            <FieldError message={getFieldError("section8.description")} />
+                        </div>
+                    </div>
+                ) : null}
+
+                <label
+                    className={clsx(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border border-dashed px-4 py-3",
+                        allEthicalChecked ? "border-[#0e7d74] bg-[#fbfefd]" : "border-[#cbe7e3] bg-[#fbfefd]",
                     )}
-                </div>
-            </section>
-
-            {/* 8.3 Describe */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="8.3" title="Step 3 — What does your evidence show?" />
-
-                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>A few lines is enough</Label>
-                        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">
-                            What do these files show, and what do they verify — attendance, outputs, outcomes, resource use? {REPORT_TEXT_RANGE_LABEL}.
-                        </p>
-                    </div>
-
-                    <textarea
-                        spellCheck={true}
-                        placeholder="e.g. Photos show students running hygiene awareness sessions at the community school; the attendance sheet confirms 60 participants across three sessions."
-                        value={description}
-                        onChange={(e) => update("description", e.target.value)}
-                        rows={3}
-                        className={textareaClasses}
+                >
+                    <input
+                        type="checkbox"
+                        checked={allEthicalChecked}
+                        onChange={(e) => setAllEthics(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e7d74]"
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                            <div className={clsx("h-full rounded-full transition-all", descriptionMeter.barClass)} style={{ width: `${descriptionMeter.widthPct}%` }} />
-                        </div>
-                        <p className={clsx("text-[11px] tabular-nums", descriptionMeter.textClass)}>
-                            {descriptionWords} / 200 words
-                        </p>
-                    </div>
+                    <span className="text-[11px] leading-relaxed text-[var(--ink)]">
+                        <b>I confirm this evidence is genuine and gathered responsibly</b> — from this project, with photo consent, privacy and dignity respected.{" "}
+                        <span className="text-[var(--gold)]">False submissions may result in rejection and institutional action.</span>
+                    </span>
+                </label>
+                <FieldError message={getFieldError("section8.ethical_compliance")} />
 
-                    <FieldError message={getFieldError("section8.description")} />
-                </div>
-            </section>
-
-            {/* 8.4 Ethical */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="8.4" title="Step 4 — Ethical & consent confirmation" />
-
-                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <label
-                        className={clsx(
-                            "flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-4 transition-colors",
-                            allEthicalChecked ? "border-indigo-200 bg-indigo-50" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                        )}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={allEthicalChecked}
-                            onChange={(e) => setAllEthics(e.target.checked)}
-                            className="mt-1 h-[18px] w-[18px] shrink-0 accent-indigo-600"
-                        />
-                        <span>
-                            <span className="block text-sm font-semibold text-slate-900">
-                                I confirm this evidence is genuine and was gathered respectfully.
-                            </span>
-                            <span className="mt-1.5 block text-xs leading-relaxed text-slate-500">
-                                That means: it&apos;s from this project · people in photos agreed to them · no one is shown in a harmful or misleading way · beneficiaries&apos; privacy and dignity are respected.
-                            </span>
-                        </span>
-                    </label>
-                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        <p className="text-sm leading-relaxed text-amber-900">
-                            False or misleading submissions may result in rejection and institutional action.
-                        </p>
-                    </div>
-                    <FieldError message={getFieldError("section8.ethical_compliance")} />
-                </div>
-            </section>
-
-            {/* 8.5 Visibility */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="8.5" title="Step 5 — Media visibility preference" />
-
-                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <Label className={fieldLabel}>Evidence usage permission</Label>
-
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                    <Label className={fieldLabel}>Default media visibility</Label>
+                    <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
                         {visibilityOptions.map((opt) => {
                             const active = media_visible === opt.id;
                             return (
@@ -785,232 +501,21 @@ export default function Section8Evidence() {
                                     className={clsx(
                                         "rounded-xl border-2 p-5 text-center transition-colors",
                                         active
-                                            ? "border-indigo-500 bg-indigo-50 shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
+                                            ? "border-[#25b8d8] bg-[#eefbfe] shadow-sm"
+                                            : "border-slate-200 bg-white hover:border-[#25b8d8]/40",
                                     )}
                                 >
                                     <p className="text-2xl">{opt.emoji}</p>
                                     <p className="mt-2 text-sm font-semibold text-slate-900">{opt.label}</p>
-                                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                                        {opt.desc}
-                                    </p>
+                                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{opt.desc}</p>
                                 </button>
                             );
                         })}
                     </div>
-
-                    <FieldError message={getFieldError("section8.media_visible")} />
-                </div>
-            </section>
-
-            {/* 8.6 Partner verification */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="8.6" title="Step 6 — Partner verification" status="optional" />
-
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                        <div>
-                            <Label className={fieldLabel}>Did a partner verify this project?</Label>
-                            <p className="mt-1.5 text-sm text-slate-500">
-                                External verification significantly strengthens credibility.
-                            </p>
-                        </div>
-
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={partner_verification}
-                            onClick={() => update("partner_verification", !partner_verification)}
-                            className={clsx(
-                                "relative h-[30px] w-[52px] shrink-0 rounded-full transition-colors",
-                                partner_verification ? "bg-[#0e7d74]" : "bg-slate-200",
-                            )}
-                        >
-                            <span
-                                className={clsx(
-                                    "absolute top-[3px] h-6 w-6 rounded-full bg-white shadow transition-all",
-                                    partner_verification ? "left-[25px]" : "left-[3px]",
-                                )}
-                            />
-                        </button>
-                    </div>
-
-                    {partner_verification && (
-                        <div className="space-y-5 border-t border-slate-100 pt-5">
-                            <div className="space-y-2">
-                                <Label className={fieldLabel}>Verification type</Label>
-                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                                    {verificationTypes.map((v) => (
-                                        <button
-                                            key={v}
-                                            type="button"
-                                            onClick={() => update("partner_verification_type", v)}
-                                            className={clsx(
-                                                "rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors",
-                                                partner_verification_type === v
-                                                    ? "border-[var(--teal)]/40 bg-[var(--teal-soft)] text-[var(--teal)]"
-                                                    : "border-slate-200 bg-white text-slate-600 hover:border-[var(--teal)]/30 hover:bg-slate-50",
-                                            )}
-                                        >
-                                            {v}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <EvidenceDropzone
-                                label="Drag & drop files here, or click to browse"
-                                hint={`Partner verification documents — max ${MAX_REPORT_UPLOAD_LABEL} per file`}
-                                multiple
-                                accept={REPORT_ATTACHMENT_ACCEPT}
-                                onChange={(e) => {
-                                    if (e.target.files) {
-                                        const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
-                                        if (!acceptedFiles.length) return;
-                                        update(
-                                            "partner_verification_files",
-                                            [...(partner_verification_files || []), ...acceptedFiles.map(toEvidenceFileItem)],
-                                        );
-                                    }
-                                }}
-                            />
-
-                            {partner_verification_files && partner_verification_files.length > 0 && (
-                                <div className="space-y-3">
-                                    <Label className={fieldLabel}>
-                                        Partner documents ({partner_verification_files.length})
-                                    </Label>
-                                    <div className="cer-gal">
-                                        {partner_verification_files.map((file: EvidenceFileItem, fIdx: number) => {
-                                            const fileName = getFileName(file, fIdx);
-                                            return (
-                                                <div key={`${fileName}-${fIdx}`} className="space-y-1">
-                                                    <div
-                                                        className="cer-ph cursor-pointer"
-                                                        onClick={() => setPreviewFile({ file, name: fileName })}
-                                                    >
-                                                        <EvidenceFilePreview file={file} name={fileName} />
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const kept = partner_verification_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
-                                                                update("partner_verification_files", kept);
-                                                            }}
-                                                            className="cer-ph-badge transition hover:bg-[var(--red)]"
-                                                            title="Remove file"
-                                                        >
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                    <p className="truncate text-[10px] font-semibold text-[var(--ink)]" title={fileName}>
-                                                        {fileName}
-                                                    </p>
-                                                    <p className="truncate text-[9px] text-[var(--muted)]">
-                                                        {formatFileSize(file)}
-                                                    </p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </section>
-
-            {/* System evidence status */}
-            <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                            <ShieldCheck className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            System-generated evidence status
-                        </h3>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Read-only
-                    </span>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-                    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-8 sm:p-6">
-                        <p className={fieldLabel}>Evidence profile</p>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-4">
-                                <p className="text-2xl font-semibold text-indigo-700">{evidence_files?.length || 0}</p>
-                                <p className="mt-1 text-xs text-indigo-600/80">Files submitted</p>
-                            </div>
-                            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-4">
-                                <p className="text-2xl font-semibold text-indigo-700">{evidence_types?.length || 0}</p>
-                                <p className="mt-1 text-xs text-indigo-600/80">Types covered</p>
-                            </div>
-                            <div className={clsx(
-                                "rounded-lg border p-4",
-                                allEthicalChecked
-                                    ? "border-indigo-100 bg-indigo-50/70"
-                                    : "border-amber-200 bg-amber-50",
-                            )}>
-                                <p className={clsx(
-                                    "text-2xl font-semibold",
-                                    allEthicalChecked ? "text-indigo-700" : "text-amber-700",
-                                )}>
-                                    {allEthicalChecked ? "Yes" : "No"}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">Ethical confirmed</p>
-                            </div>
-                            <div className={clsx(
-                                "rounded-lg border p-4",
-                                partner_verification
-                                    ? "border-indigo-100 bg-indigo-50/70"
-                                    : "border-slate-200 bg-slate-50",
-                            )}>
-                                <p className={clsx(
-                                    "text-2xl font-semibold",
-                                    partner_verification ? "text-indigo-700" : "text-slate-900",
-                                )}>
-                                    {partner_verification ? "Verified" : "None"}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">Partner status</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="md:col-span-4">
-                        <div className={clsx("space-y-2 rounded-xl border p-6 text-center", classification.color)}>
-                            <ShieldCheck className="mx-auto h-7 w-7 opacity-70" />
-                            <p className="text-xs opacity-60">Verification strength</p>
-                            <p className="text-lg font-semibold uppercase">{classification.label}</p>
-                            <p className="text-xs opacity-70">{classification.desc}</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Auto summary */}
-            <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                            <ShieldCheck className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900">Evidence summary</h3>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Auto-generated
-                    </span>
-                </div>
-
-                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <div className="absolute -bottom-10 -right-10 rotate-12 opacity-5">
-                        <ShieldCheck className="h-64 w-64 text-slate-900" />
-                    </div>
-                    <p className="relative z-10 text-sm leading-relaxed text-slate-700">
-                        {autoNarrative}
+                    <p className="cer-hint mt-2">
+                        Privacy does not reduce verification quality. Choose Public only when consent and institutional policy permit it. Institutional or Private evidence can still be fully verified. Blur or redact identifying details whenever needed.
                     </p>
+                    <FieldError message={getFieldError("section8.media_visible")} />
                 </div>
             </section>
 

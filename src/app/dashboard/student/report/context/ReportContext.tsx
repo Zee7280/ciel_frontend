@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
@@ -148,6 +148,10 @@ export interface ReportData {
         summary_text?: string;
         /** Short free-text answer to "who was affected?" — feeds the composed baseline statement. */
         affected_group?: string;
+        /** Approximate number affected (mockup “≈ How many?”). */
+        affected_count?: string;
+        /** Longer one-paragraph draft from “Generate smart draft summary”. */
+        baseline_smart_draft?: string;
         /** Tapped chips answering "what was missing?" (Skills/Access/Resources/Systems/Awareness/Other) — feeds the composed baseline statement. */
         system_gaps?: string[];
         /** Custom text when "Other" is tapped in system_gaps. */
@@ -296,8 +300,11 @@ export interface ReportData {
             pakistan_contact_email?: string;
             type: string;
             type_other?: string;
+            designation?: string;
+            website?: string;
             role: string[]; // Multi-select — role in project
-            contribution: string[]; // Multi-select
+            contribution: string[]; // One-line contribution is stored as a single entry
+            contribution_line?: string;
             verification: string;
             /** True only for the program partner auto-added from project setup — drives the "added for you" badge. */
             _seeded?: boolean;
@@ -310,6 +317,7 @@ export interface ReportData {
     section8: {
         has_evidence: 'yes' | 'no' | '';
         evidence_types: string[];
+        evidence_type_other?: string;
         evidence_files: File[];
         description: string;
         linked_items?: string[]; // optional tags linking evidence to activities / outcomes
@@ -362,6 +370,7 @@ export interface ReportData {
         mechanisms: string[];
         scaling_potential: string;
         policy_influence: string;
+        mechanism_other?: string;
         summary_text?: string;
         /** Guided two-line inputs that compose continuation_details — kept alongside it so the blanks survive navigation. */
         continuation_keep_going?: string;
@@ -426,6 +435,8 @@ export const defaultReportData: ReportData = {
         primary_beneficiary: '',
         summary_text: '',
         affected_group: '',
+        affected_count: '',
+        baseline_smart_draft: '',
         system_gaps: [],
         system_gaps_other: ''
     },
@@ -567,13 +578,11 @@ function firstSdgCode(...values: unknown[]): string {
 
 /** Backend stores `target_code` / `indicator_code`; the form reads `target_id` / `indicator_id`. */
 function normalizeLoadedSection3(
-    incoming: ReportData["section3"],
-    prev: ReportData["section3"],
+    incoming?: ReportData["section3"] | null,
 ): ReportData["section3"] {
-    const merged = { ...defaultReportData.section3, ...prev, ...incoming };
+    const merged = { ...defaultReportData.section3, ...(incoming || {}) };
     const primaryIn = {
         ...defaultReportData.section3.primary_sdg,
-        ...prev?.primary_sdg,
         ...incoming?.primary_sdg,
     } as ReportData["section3"]["primary_sdg"] & {
         target_code?: string;
@@ -644,6 +653,25 @@ interface ReportContextType {
 }
 
 
+function coerceReportArrays(report: ReportData) {
+    const lists: Array<[Record<string, unknown> | null | undefined, string]> = [
+        [report.section1 as unknown as Record<string, unknown>, "team_members"],
+        [report.section1 as unknown as Record<string, unknown>, "attendance_logs"],
+        [report.section4 as unknown as Record<string, unknown>, "activity_blocks"],
+        [report.section5 as unknown as Record<string, unknown>, "measurable_outcomes"],
+        [report.section6 as unknown as Record<string, unknown>, "resources"],
+        [report.section7 as unknown as Record<string, unknown>, "partners"],
+        [report.section8 as unknown as Record<string, unknown>, "evidence_files"],
+        [report.section8 as unknown as Record<string, unknown>, "evidence_types"],
+        [report.section9 as unknown as Record<string, unknown>, "skills_grown"],
+        [report.section10 as unknown as Record<string, unknown>, "mechanisms"],
+    ];
+    for (const [section, key] of lists) {
+        if (!section || Array.isArray(section[key])) continue;
+        section[key] = [];
+    }
+}
+
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
 
 export function ReportProvider({ children }: { children: React.ReactNode }) {
@@ -674,21 +702,24 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         data.required_hours,
     ]);
 
+    // Full 1–10 validation walks every section. Defer it so a keystroke paints first.
+    const deferredData = useDeferredValue(data);
+
     const areAllSectionsComplete = useMemo(() => {
         const checks = [
-            validateSection1(data.section1),
-            validateSection2(data.section2),
-            validateSection3(data.section3),
-            validateSection4(data.section4),
-            validateSection5(data.section5),
-            validateSection6(data.section6),
-            validateSection7(data.section7),
-            validateSection8(data.section8),
-            validateSection9(data.section9),
-            validateSection10(data.section10),
+            validateSection1(deferredData.section1),
+            validateSection2(deferredData.section2),
+            validateSection3(deferredData.section3),
+            validateSection4(deferredData.section4),
+            validateSection5(deferredData.section5),
+            validateSection6(deferredData.section6),
+            validateSection7(deferredData.section7),
+            validateSection8(deferredData.section8),
+            validateSection9(deferredData.section9),
+            validateSection10(deferredData.section10),
         ];
         return checks.every((r) => r.isValid);
-    }, [data]);
+    }, [deferredData]);
 
     /** Final report declaration & electronic sign-off — 5 checkboxes + typed name, completed once at the very end. */
     const finalDeclarationComplete = useMemo(() => {
@@ -733,8 +764,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     );
 
     const incompleteSectionsSummary = useMemo(
-        () => getIncompleteSectionsSummary(data),
-        [data],
+        () => getIncompleteSectionsSummary(deferredData),
+        [deferredData],
     );
 
     const showVerifiedImpactScores = useMemo(() => {
@@ -815,24 +846,51 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const setFullData = useCallback((newData: Partial<ReportData>) => {
         if (!newData || Object.keys(newData).length === 0) return;
 
-        setData(prev => {
-            const merged = { ...prev, ...newData };
-            // Ensure each section is also merged with its defaults to prevent undefined sub-properties
-            if (newData.section1) merged.section1 = { ...defaultReportData.section1, ...prev.section1, ...newData.section1 };
-            if (newData.section2) merged.section2 = { ...defaultReportData.section2, ...prev.section2, ...newData.section2 };
-            if (newData.section3) merged.section3 = normalizeLoadedSection3(newData.section3, prev.section3);
-            if (newData.section4) merged.section4 = { ...defaultReportData.section4, ...prev.section4, ...newData.section4 };
-            if (newData.section5) merged.section5 = { ...defaultReportData.section5, ...prev.section5, ...newData.section5 };
-            if (newData.section6) merged.section6 = { ...defaultReportData.section6, ...prev.section6, ...newData.section6 };
-            if (newData.section7) merged.section7 = { ...defaultReportData.section7, ...prev.section7, ...newData.section7 };
-            if (newData.section8) merged.section8 = { ...defaultReportData.section8, ...prev.section8, ...newData.section8 };
-            if (newData.section9) merged.section9 = { ...defaultReportData.section9, ...prev.section9, ...newData.section9 };
-            if (newData.section10) merged.section10 = { ...defaultReportData.section10, ...prev.section10, ...newData.section10 };
-            if (newData.section11) merged.section11 = { ...defaultReportData.section11, ...prev.section11, ...newData.section11 };
+        // Full document replace for section bodies — never keep previous reflection / CII /
+        // summaries after admin delete or a fresh project bootstrap (status: none).
+        setData(() => {
+            const merged: ReportData = {
+                ...defaultReportData,
+                ...newData,
+                section1: { ...defaultReportData.section1, ...(newData.section1 || {}) },
+                section2: { ...defaultReportData.section2, ...(newData.section2 || {}) },
+                section3: normalizeLoadedSection3(newData.section3),
+                section4: { ...defaultReportData.section4, ...(newData.section4 || {}) },
+                section5: { ...defaultReportData.section5, ...(newData.section5 || {}) },
+                section6: { ...defaultReportData.section6, ...(newData.section6 || {}) },
+                section7: { ...defaultReportData.section7, ...(newData.section7 || {}) },
+                section8: { ...defaultReportData.section8, ...(newData.section8 || {}) },
+                section9: { ...defaultReportData.section9, ...(newData.section9 || {}) },
+                section10: { ...defaultReportData.section10, ...(newData.section10 || {}) },
+                section11: { ...defaultReportData.section11, ...(newData.section11 || {}) },
+                cii_index: newData.cii_index,
+                ciiV2: newData.ciiV2 ?? null,
+                ciiV2Lock: newData.ciiV2Lock ?? null,
+            };
+            if (newData.section1?.metrics) {
+                merged.section1 = {
+                    ...merged.section1,
+                    metrics: {
+                        ...defaultReportData.section1.metrics,
+                        ...newData.section1.metrics,
+                    },
+                };
+            }
+            if (newData.section9?.competency_scores) {
+                merged.section9 = {
+                    ...merged.section9,
+                    competency_scores: {
+                        ...defaultReportData.section9.competency_scores,
+                        ...newData.section9.competency_scores,
+                    },
+                };
+            }
             const verifyPick = pickImpactVerifyUrlFromPayload(merged);
             if (verifyPick) {
                 merged.impact_verify_url = verifyPick;
             }
+            // Saved rows sometimes store null instead of [] . A later .map/.length would blank the report.
+            coerceReportArrays(merged);
             // Section 6: resource verification is multi-select (string[]); normalize legacy string values
             if (merged.section6?.resources?.length) {
                 merged.section6 = {

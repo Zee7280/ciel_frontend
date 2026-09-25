@@ -2,8 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useReportForm } from '../context/ReportContext';
-import { calculateCII } from '../utils/calculateCII';
-import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
+import { resolveReportCii } from '../utils/resolveReportCii';
 import {
     CII_APPROVED_LABELS,
     CII_BREAKDOWN_ORDER,
@@ -15,21 +14,7 @@ import clsx from 'clsx';
 export default function CIIDashboardMeter() {
     const { data } = useReportForm();
 
-    const ciiResult = useMemo(() => {
-        const calculated = calculateCII(data);
-        const persisted = readPersistedCiiSnapshot(data);
-        return persisted
-            ? {
-                  ...calculated,
-                  ...persisted,
-                  totalScore: Math.round(persisted.totalScore),
-                  breakdown: persisted.breakdown
-                      ? { ...calculated.breakdown, ...persisted.breakdown }
-                      : calculated.breakdown,
-                  suggestions: persisted.suggestions ?? calculated.suggestions,
-              }
-            : calculated;
-    }, [data]);
+    const ciiResult = useMemo(() => resolveReportCii(data), [data]);
 
     const { totalScore, breakdown } = ciiResult;
     const band = ciiContributorBand(totalScore);

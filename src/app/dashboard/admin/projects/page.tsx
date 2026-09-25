@@ -1993,17 +1993,18 @@ export default function AdminProjectsPage() {
     }, [studentEmailFiltered, activeMenu]);
 
     return (
-        <div className="mx-auto max-w-7xl p-0 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Projects Overview</h1>
-                    <p className="text-slate-500 mt-1 text-base">Monitor all active and past social impact projects.</p>
+        <div className="mx-auto min-w-0 max-w-[1500px] p-0">
+            <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-end">
+                <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.13em] text-[#0e756e]">All projects</p>
+                    <h1 className="mt-1 text-[22px] font-[950] tracking-tight text-[#16313d] sm:text-[28px]">Projects Overview</h1>
+                    <p className="mt-1 text-sm text-[#70808a]">Monitor all active and past social impact projects.</p>
                 </div>
                 <button
                     type="button"
                     onClick={handleExport}
                     disabled={!filteredRows.length}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e756e] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(14,117,110,.18)] transition-all hover:bg-[#073b42] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                     <FileDown className="w-4 h-4" /> Export report
                 </button>
@@ -2045,7 +2046,7 @@ export default function AdminProjectsPage() {
                 </div>
             ) : null}
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+            <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                 {[
                     { label: "All projects", value: summaryStats.total, caption: "this session", dot: "bg-slate-400" },
                     { label: "Active", value: summaryStats.active, caption: "running now", dot: "bg-emerald-500" },
@@ -2063,18 +2064,18 @@ export default function AdminProjectsPage() {
                         dot: "bg-slate-400",
                     },
                 ].map((card) => (
-                    <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                            <span className={`w-1.5 h-1.5 rounded-full ${card.dot}`} />
+                    <div key={card.label} className="rounded-[15px] border border-[#dde5ea] bg-white p-3.5">
+                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.05em] text-[#70808a]">
+                            <span className={`h-1.5 w-1.5 rounded-full ${card.dot}`} />
                             {card.label}
                         </div>
-                        <div className="text-2xl font-extrabold text-slate-900 mt-1">{card.value}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{card.caption}</div>
+                        <div className="mt-1.5 text-2xl font-semibold text-[#16313d]">{card.value}</div>
+                        <div className="mt-0.5 text-[10px] text-[#18806a]">{card.caption}</div>
                     </div>
                 ))}
             </div>
 
-            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-3">
+            <div className="mb-6 flex flex-col gap-3 rounded-[22px] border border-[#dde5ea] bg-white p-3 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
                 <div className="flex flex-col lg:flex-row gap-3">
                     <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -2083,7 +2084,7 @@ export default function AdminProjectsPage() {
                             placeholder="Search projects..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#15988b] focus:ring-4 focus:ring-[#15988b]/15 transition-all outline-none font-medium text-slate-700 text-sm"
                         />
                     </div>
                     <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:shrink-0">
@@ -2092,7 +2093,7 @@ export default function AdminProjectsPage() {
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b] outline-none appearance-none cursor-pointer"
                                 aria-label="Filter by status"
                             >
                                 {statusOptions.map((opt) => (
@@ -2107,7 +2108,7 @@ export default function AdminProjectsPage() {
                             <select
                                 value={locationFilter}
                                 onChange={(e) => setLocationFilter(e.target.value)}
-                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b] outline-none appearance-none cursor-pointer"
                                 aria-label="Filter by location"
                             >
                                 {locationOptions.map((opt) => (
@@ -2122,7 +2123,7 @@ export default function AdminProjectsPage() {
                             <select
                                 value={degreeFilter}
                                 onChange={(e) => setDegreeFilter(e.target.value)}
-                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b] outline-none appearance-none cursor-pointer"
                                 aria-label="Filter by degree"
                             >
                                 {degreeOptions.map((opt) => (
@@ -2137,7 +2138,7 @@ export default function AdminProjectsPage() {
                             <select
                                 value={facultyEmailFilter}
                                 onChange={(e) => setFacultyEmailFilter(e.target.value)}
-                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b] outline-none appearance-none cursor-pointer"
                                 aria-label="Filter by faculty email"
                             >
                                 {facultyEmailOptions.map((opt) => (
@@ -2158,7 +2159,7 @@ export default function AdminProjectsPage() {
                             placeholder="Student email — show only projects where they applied or enrolled…"
                             value={studentEmailInput}
                             onChange={(e) => setStudentEmailInput(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
+                            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#15988b] focus:ring-4 focus:ring-[#15988b]/15 transition-all outline-none font-medium text-slate-700 text-sm"
                             aria-label="Filter projects by student email"
                         />
                         {studentEmailInput.trim() ? (
@@ -2178,7 +2179,7 @@ export default function AdminProjectsPage() {
                 </div>
             </div>
 
-            <div className="min-h-[320px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-100 bg-white shadow-sm">
+            <div className="min-h-[320px] overflow-x-auto overflow-y-visible rounded-[22px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
                 {filteredRows.length === 0 && !isLoading ? (
                     <div className="text-center py-24 px-4">
                         <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -2410,7 +2411,7 @@ export default function AdminProjectsPage() {
                                             onChange={(e) =>
                                                 setIncompleteApplicantStatusFilter(e.target.value as IncompleteApplicantStatusFilter)
                                             }
-                                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 outline-none focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b]"
                                         >
                                             <option value="all">All statuses</option>
                                             <option value="not_started">No report started</option>
@@ -2699,7 +2700,7 @@ export default function AdminProjectsPage() {
                                             onChange={(e) =>
                                                 setTeamOverviewParticipationFilter(e.target.value as "all" | "team" | "individual")
                                             }
-                                            className="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                                            className="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 outline-none focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b]"
                                         >
                                             <option value="all">All: teams &amp; individuals</option>
                                             <option value="team">Teams only</option>

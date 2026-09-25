@@ -119,7 +119,7 @@ export function buildStudentDashboardMock() {
 
 /**
  * Proxies GET to the Nest backend, trying URLs in order. Stops on first non-404 response (returns it).
- * Use a single path for dedicated routes, or multiple for legacy `/student/dashboard`.
+ * Dedicated dashboard route is `/students/me/dashboard`.
  */
 export async function proxyStudentDashboardGet(request: Request, backendRelativePaths: string[]): Promise<NextResponse> {
     const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");

@@ -10,13 +10,13 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
-    PRIMARY_CATEGORIES, SUB_CATEGORIES, DELIVERY_MODES,
-    IMPLEMENTATION_MODELS, OUTPUT_TYPES, UNIVERSAL_UNITS,
-    BENEFICIARY_CATEGORIES, RELEVANCE_TYPES, OVERLAP_STATUSES,
-    GEOGRAPHIC_REACH_OPTIONS, GEOGRAPHIC_SUB_CATEGORIES,
+    OUTPUT_TYPES, UNIVERSAL_UNITS,
+    BENEFICIARY_CATEGORIES, OVERLAP_STATUSES,
+    GEOGRAPHIC_REACH_OPTIONS,
     COUNTING_METHODS
 } from '../utils/section4Constants';
-import { REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from '../utils/validation';
+import { ACTIVITY_FAMILY_OPTIONS, GLOBAL_ACTIVITY_TAXONOMY, isOtherTaxonomyChoice } from '../utils/globalActivityTaxonomy';
+import { reportTextWordMeter } from '../utils/validation';
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
@@ -42,7 +42,7 @@ function wordCount(text: string): number {
 }
 
 function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
-    const meter = reportTextWordMeter(count);
+    const meter = reportTextWordMeter(count, 15, 200);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
@@ -166,17 +166,15 @@ export default function Section4Activities() {
         update('activity_blocks', [...(section4.activity_blocks || []), newActivity]);
     };
 
-    const removeActivity = (id: string) => {
-        update('activity_blocks', section4.activity_blocks.filter((a: any) => a.id !== id));
+    const removeActivity = (index: number) => {
+        update('activity_blocks', section4.activity_blocks.filter((_: any, i: number) => i !== index));
     };
 
-    const updateActivity = (id: string, updates: Record<string, any>) => {
-        const blocks = [...section4.activity_blocks];
-        const idx = blocks.findIndex((a: any) => a.id === id);
-        if (idx > -1) {
-            blocks[idx] = { ...blocks[idx], ...updates };
-            update('activity_blocks', blocks);
-        }
+    const updateActivity = (index: number, updates: Record<string, any>) => {
+        const blocks = (section4.activity_blocks || []).map((block: any, i: number) => (
+            i === index ? { ...block, ...updates } : block
+        ));
+        update('activity_blocks', blocks);
     };
 
     const updateProjectSummary = (field: string, val: any) => {
@@ -211,8 +209,6 @@ export default function Section4Activities() {
 
     const partnersCount = Array.isArray(section7?.partners) ? section7.partners.length : 0;
 
-    const implementationWords = wordCount(section4.project_summary?.project_implementation_explanation || '');
-
     // ── Finalise Section 4 — "the effort" shortlist card ────────────────────
     const activities: any[] = section4.activity_blocks || [];
     const sessionsTotal = activities.reduce((sum, a) => sum + (parseInt(a.sessions_count) || 0), 0);
@@ -225,7 +221,7 @@ export default function Section4Activities() {
         // `activities` is a plain `section4.activity_blocks || []` alias, not independent state.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [section4.activity_blocks]);
-    const canFinalizeSection4 = activities.length > 0 && !!distinctPeople && !!countingMethod;
+    const canFinalizeSection4 = activities.length > 0;
     const isSection4Finalized = !!section4.finalized;
 
     const section4Snapshot = useMemo(
@@ -306,6 +302,9 @@ export default function Section4Activities() {
                     <h3 className="text-base font-semibold text-slate-900">Activity blocks</h3>
                     <span className={badgeMandatory}>Mandatory</span>
                 </div>
+                <p className="text-[12.5px] leading-relaxed text-[#3c5a5c]">
+                    Activity integrity: every activity needs a title, status, category, responsibility statement, a countable output or beneficiary reach, counting method, geographic/site detail and an overlap/unique-reach declaration. This prevents double-counting.
+                </p>
 
                 {section4.activity_blocks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-10 text-center">
@@ -342,87 +341,6 @@ export default function Section4Activities() {
                     <PlusCircle className="h-4 w-4" />
                     Add new activity
                 </button>
-            </section>
-
-            {/* 4.6 Project Summary */}
-            <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                            4.6
-                        </span>
-                        <h3 className="text-base font-semibold text-slate-900">Project-level summary</h3>
-                    </div>
-                    <span className="rounded-full bg-[#e3f4fa] px-2.5 py-1 text-[8px] font-extrabold uppercase tracking-[0.08em] text-[#0891b2]">
-                        Auto — editable
-                    </span>
-                </div>
-
-                <div className="space-y-5">
-                    <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2">
-                        <div className="flex min-w-0 flex-col gap-2">
-                            <Label className={fieldLabel}>Distinct total beneficiaries</Label>
-                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
-                                Total unique individuals reached across all activities.
-                            </p>
-                            <Input
-                                type="number"
-                                placeholder="e.g. 250"
-                                value={section4.project_summary?.distinct_total_beneficiaries || ''}
-                                onChange={e => updateProjectSummary('distinct_total_beneficiaries', e.target.value)}
-                                className={clsx(inputClasses, "mt-auto")}
-                            />
-                            <FieldError message={getFieldError('section4.project_summary.distinct_total_beneficiaries')} />
-                        </div>
-
-                        <div className="flex min-w-0 flex-col gap-2">
-                            <Label className={fieldLabel}>Beneficiary counting method</Label>
-                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
-                                How that distinct total was counted.
-                            </p>
-                            <div className="relative mt-auto">
-                                <select
-                                    value={section4.project_summary?.counting_method || ''}
-                                    onChange={e => updateProjectSummary('counting_method', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Select method...</option>
-                                    {COUNTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <FieldError message={getFieldError('section4.project_summary.counting_method')} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 items-stretch gap-5 border-t border-[#dcebee] pt-5 md:grid-cols-2">
-                        <div className="flex min-w-0 flex-col gap-2">
-                            <Label className={fieldLabel}>Overall beneficiary overlap</Label>
-                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
-                                Whether the same people are counted in more than one activity.
-                            </p>
-                            <SingleChip
-                                options={OVERLAP_STATUSES}
-                                value={section4.project_summary?.overall_overlap || ''}
-                                onChange={(val) => updateProjectSummary('overall_overlap', val)}
-                            />
-                        </div>
-
-                        <div className="flex min-w-0 flex-col gap-2">
-                            <Label className={fieldLabel}>Project implementation explanation</Label>
-                            <p className="min-h-[2.25rem] text-xs leading-snug text-slate-500">
-                                {REPORT_TEXT_RANGE_LABEL} · how activities integrated to achieve goals.
-                            </p>
-                            <Textarea
-                                placeholder="Explain the project synergy…"
-                                value={section4.project_summary?.project_implementation_explanation || ''}
-                                onChange={e => updateProjectSummary('project_implementation_explanation', e.target.value)}
-                                className={textareaClasses}
-                            />
-                            <WordMeterBar count={implementationWords} extra="if filled" />
-                        </div>
-                    </div>
-                </div>
             </section>
 
             {/* 4.7 Scale Dashboard */}
@@ -466,7 +384,7 @@ export default function Section4Activities() {
                         <p className="text-center text-xs text-slate-500">
                             {canFinalizeSection4
                                 ? 'Ready ✨'
-                                : 'Add at least one activity plus distinct beneficiaries and counting method above to finalise.'}
+                                : 'Add at least one activity to finalise.'}
                         </p>
                     </>
                 ) : (
@@ -502,8 +420,7 @@ export default function Section4Activities() {
 
                             <div className="divide-y divide-slate-100 bg-white">
                                 {activities.map((a, i) => {
-                                    const catMeta = PRIMARY_CATEGORIES.find((c) => c.id === a.primary_category);
-                                    const CatIcon = catMeta?.icon || Target;
+                                    const CatIcon = Target;
                                     const statusEmoji = a.status === 'Completed' ? '✅' : a.status === 'Ongoing' ? '⏳' : a.status ? '🔶' : '';
                                     return (
                                         <div key={a.id || i} className="flex gap-4 p-5 sm:px-6">
@@ -570,21 +487,13 @@ export default function Section4Activities() {
 function ActivityBlockComponent({ activity, index, updateActivity, removeActivity, getFieldError }: any) {
     const [isExpanded, setIsExpanded] = React.useState(true);
     const descWords = wordCount(activity.description);
-    const deliveryWords = wordCount(activity.delivery_explanation);
-    const beneficiaryDescWords = wordCount(activity.beneficiary_description);
 
     const update = (fieldOrUpdates: string | Record<string, any>, val?: any) => {
         if (typeof fieldOrUpdates === 'string') {
-            updateActivity(activity.id, { [fieldOrUpdates]: val });
+            updateActivity(index, { [fieldOrUpdates]: val });
         } else {
-            updateActivity(activity.id, fieldOrUpdates);
+            updateActivity(index, fieldOrUpdates);
         }
-    };
-
-    const toggleImplementationModel = (model: string) => {
-        const current = activity.implementation_models || [];
-        if (current.includes(model)) update('implementation_models', current.filter((m: string) => m !== model));
-        else update('implementation_models', [...current, model]);
     };
 
     const addOutput = () => update('outputs', [...(activity.outputs || []), { title: '', type: '', type_other: '', quantity: '', unit: '', unit_other: '', verification_note: '', is_shared: false }]);
@@ -601,21 +510,19 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
         else update('beneficiary_categories', [...current, cat]);
     };
 
-    const toggleRelevanceType = (type: string) => {
-        const current = activity.relevance_types || [];
-        if (current.includes(type)) update('relevance_types', current.filter((t: string) => t !== type));
-        else update('relevance_types', [...current, type]);
-    };
-
     return (
         <div className="mt-2.5 overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
             <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
                 <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
                     {index + 1}
                 </span>
-                <h4 className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
-                    {activity.title || 'Unnamed activity'}
-                </h4>
+                <input
+                    value={activity.title || ''}
+                    onChange={(e) => update('title', e.target.value)}
+                    placeholder="Unnamed activity — click to name it"
+                    aria-label="Activity name"
+                    className="min-w-0 flex-1 border-0 bg-transparent px-1 text-[12px] font-extrabold text-[#0d2b33] outline-none placeholder:font-semibold placeholder:text-[#7a9498] focus:rounded-md focus:bg-white focus:ring-2 focus:ring-[#0e7d74]"
+                />
                 <button
                     type="button"
                     onClick={() => setIsExpanded(!isExpanded)}
@@ -625,7 +532,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                 </button>
                 <button
                     type="button"
-                    onClick={() => removeActivity(activity.id)}
+                    onClick={() => removeActivity(index)}
                     className="rounded-lg border border-[#f6cfd8] bg-[#fdf1f4] px-2 py-1 text-[8.5px] font-extrabold text-[#e11d48]"
                     aria-label="Remove activity"
                 >
@@ -638,9 +545,9 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     {/* 4.1 fields */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity title</Label>
+                            <Label className={fieldLabel}>Activity title <span className="text-rose-500">*</span></Label>
                             <Input
-                                placeholder="e.g. Hygiene Awareness Session"
+                                placeholder="Describe the real activity, not the project title"
                                 value={activity.title}
                                 onChange={e => update('title', e.target.value)}
                                 className={inputClasses}
@@ -648,7 +555,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.title`)} />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Status</Label>
+                            <Label className={fieldLabel}>Status <span className="text-rose-500">*</span></Label>
                             <div className="relative">
                                 <select
                                     value={activity.status || 'Ongoing'}
@@ -664,65 +571,67 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Primary activity category</Label>
-                            <div className="flex flex-wrap gap-2">
-                                {PRIMARY_CATEGORIES.map(cat => {
-                                    const active = activity.primary_category === cat.id;
-                                    return (
-                                        <button
-                                            key={cat.id}
-                                            type="button"
-                                            onClick={() => update({ primary_category: cat.id, sub_category: '' })}
-                                            className={clsx(
-                                                "s4-chip flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
-                                                active
-                                                    ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
-                                                    : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
-                                            )}
-                                        >
-                                            <cat.icon className="h-3.5 w-3.5" />
-                                            {cat.label}
-                                        </button>
-                                    );
-                                })}
+                            <Label className={fieldLabel}>Activity family <span className="text-rose-500">*</span></Label>
+                            <div className="relative">
+                                <select
+                                    value={activity.primary_category || ''}
+                                    onChange={e => update({ primary_category: e.target.value, sub_category: '', other_category_text: '', other_sub_category_text: '' })}
+                                    className={selectClasses}
+                                >
+                                    <option value="">Choose the closest family…</option>
+                                    {ACTIVITY_FAMILY_OPTIONS.map((family) => (
+                                        <option key={family} value={family}>{family}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
+                            <p className="text-[11px] text-slate-500">Global library across all disciplines and all 17 SDGs.</p>
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.primary_category`)} />
+                            {isOtherTaxonomyChoice(activity.primary_category) ? (
+                                <Input
+                                    placeholder="Name your activity family…"
+                                    value={activity.other_category_text || ''}
+                                    onChange={e => update('other_category_text', e.target.value)}
+                                    className={clsx(inputClasses, "mt-2")}
+                                />
+                            ) : null}
                         </div>
-                        {activity.primary_category ? (
-                            <div className="space-y-1.5">
-                                <Label className={fieldLabel}>Activity sub-category</Label>
-                                <div className="relative max-w-md">
-                                    <select
-                                        value={activity.sub_category}
-                                        onChange={e => update('sub_category', e.target.value)}
-                                        className={selectClasses}
-                                    >
-                                        <option value="">Select sub-category...</option>
-                                        {(SUB_CATEGORIES[activity.primary_category] || []).map(sub => (
-                                            <option key={sub} value={sub}>{sub}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                </div>
-                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
-                                {isOtherChoice(activity.sub_category) ? (
-                                    <Input
-                                        placeholder="Describe your sub-category…"
-                                        value={activity.other_sub_category_text || ''}
-                                        onChange={e => update('other_sub_category_text', e.target.value)}
-                                        className={clsx(inputClasses, "mt-2")}
-                                    />
-                                ) : null}
+                        <div className="space-y-1.5">
+                            <Label className={fieldLabel}>
+                                Sub-category {activity.primary_category && (GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).length > 0 ? <span className="text-rose-500">*</span> : null}
+                            </Label>
+                            <div className="relative">
+                                <select
+                                    value={activity.sub_category || ''}
+                                    disabled={!activity.primary_category}
+                                    onChange={e => update('sub_category', e.target.value)}
+                                    className={selectClasses}
+                                >
+                                    <option value="">Choose closest sub-category…</option>
+                                    {(GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).map((sub) => (
+                                        <option key={sub} value={sub}>{sub}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
-                        ) : null}
+                            <p className="text-[11px] text-slate-500">Choose closest fit; use Other / Custom whenever needed.</p>
+                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
+                            {isOtherTaxonomyChoice(activity.sub_category) ? (
+                                <Input
+                                    placeholder="Describe your sub-category…"
+                                    value={activity.other_sub_category_text || ''}
+                                    onChange={e => update('other_sub_category_text', e.target.value)}
+                                    className={clsx(inputClasses, "mt-2")}
+                                />
+                            ) : null}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity date / period</Label>
-                            <p className="text-xs text-slate-500">Optional if these dates are already in the session log.</p>
+                            <Label className={fieldLabel}>Activity date / period <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Optional if already in session log</span></Label>
                             <Input
                                 placeholder="e.g. 12–18 Oct 2026"
                                 value={activity.activity_period || ''}
@@ -731,10 +640,9 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Partner / host involved</Label>
-                            <p className="text-xs text-slate-500">Optional.</p>
+                            <Label className={fieldLabel}>Partner / host involved <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Optional</span></Label>
                             <Input
-                                placeholder="Organization, department, or community group"
+                                placeholder="Organization / department / community group"
                                 value={activity.partner_host || ''}
                                 onChange={e => update('partner_host', e.target.value)}
                                 className={inputClasses}
@@ -742,27 +650,15 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         </div>
                     </div>
 
-                    {activity.primary_category === 'Other' ? (
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Please specify category</Label>
-                            <Input
-                                placeholder="Other activity category..."
-                                value={activity.other_category_text}
-                                onChange={e => update('other_category_text', e.target.value)}
-                                className={inputClasses}
-                            />
-                        </div>
-                    ) : null}
-
                     <div className="space-y-1.5">
-                        <Label className={fieldLabel}>Activity description</Label>
+                        <Label className={fieldLabel}>What was done & who did what <span className="text-rose-500">*</span></Label>
                         <Textarea
-                            placeholder="Describe what was done and the role of those involved…"
+                            placeholder="15–60 words. Mention the key action and team responsibilities."
                             value={activity.description}
                             onChange={e => update('description', e.target.value)}
                             className={textareaClasses}
                         />
-                        <WordMeterBar count={descWords} extra={`${REPORT_TEXT_RANGE_LABEL} required`} />
+                        <WordMeterBar count={descWords} extra="15–200 words required" />
                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
                     </div>
 
@@ -770,7 +666,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         <summary>📦 Countable outputs — what was delivered?</summary>
                         <div className="space-y-4 px-3 pb-3">
                         <p className="rounded-[10px] bg-[#e6f6f4] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
-                            Count what was delivered here. Changes in knowledge, health, behaviour, or systems belong in outcomes.
+                            Choose from the global output library. Count delivery here; changes in knowledge, health, behaviour, environment or systems belong in Outcomes below.
                         </p>
                         <div className="space-y-3">
                             {activity.outputs?.map((out: any, idx: number) => (
@@ -796,7 +692,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                     onChange={e => updateOutput(idx, 'type', e.target.value)}
                                                     className={selectClasses}
                                                 >
-                                                    <option value="">Select type...</option>
+                                                    <option value="">Choose output type…</option>
                                                     {OUTPUT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                                 </select>
                                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -844,26 +740,6 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                                        <div className="min-w-0 flex-1 space-y-1.5">
-                                            <Label className={fieldLabel}>Verification note</Label>
-                                            <Input
-                                                placeholder="e.g. Verified by attendance registry"
-                                                value={out.verification_note}
-                                                onChange={e => updateOutput(idx, 'verification_note', e.target.value)}
-                                                className={inputClasses}
-                                            />
-                                        </div>
-                                        <label className="flex shrink-0 items-center gap-2 pb-2 text-xs font-medium text-slate-600">
-                                            <input
-                                                type="checkbox"
-                                                checked={out.is_shared}
-                                                onChange={e => updateOutput(idx, 'is_shared', e.target.checked)}
-                                                className="h-4 w-4 rounded border-slate-300 text-[var(--teal)] focus:ring-[var(--teal-soft)]"
-                                            />
-                                            Shared output
-                                        </label>
-                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => removeOutput(idx)}
@@ -890,40 +766,10 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         <summary>🫶 Direct beneficiaries / reach</summary>
                         <div className="space-y-4 px-3 pb-3">
                         <p className="rounded-[10px] border border-[#bfe6e2] bg-[#e3f4fa] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
-                            Gross engagements may count repeat contacts. Estimated unique reach should leave out the same people where you can.
+                            <b>Double-counting protection:</b> gross engagements may count repeat contacts; estimated unique reach should remove repeat beneficiaries where reasonably possible.
                         </p>
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <Label className="text-sm font-medium text-slate-700">
-                                Did this activity directly serve beneficiaries?
-                            </Label>
-                            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                                {(['Yes', 'No'] as const).map((opt) => {
-                                    const active =
-                                        opt === 'Yes'
-                                            ? activity.serves_beneficiaries === true
-                                            : activity.serves_beneficiaries === false;
-                                    return (
-                                        <button
-                                            key={opt}
-                                            type="button"
-                                            onClick={() => update('serves_beneficiaries', opt === 'Yes')}
-                                            className={clsx(
-                                                "rounded-md px-4 py-1.5 text-xs font-semibold transition-colors",
-                                                active
-                                                    ? "bg-[#0e7d74] text-white shadow-sm"
-                                                    : "text-[#3c5a5c] hover:text-[#0e7d74]",
-                                            )}
-                                        >
-                                            {opt}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {activity.serves_beneficiaries ? (
-                            <div className="space-y-4">
+                        <div className="space-y-4">
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="space-y-1.5">
                                         <Label className={fieldLabel}>Gross people reached</Label>
@@ -994,7 +840,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className={fieldLabel}>Beneficiary categories</Label>
+                                    <Label className={fieldLabel}>Who / what directly benefited? · choose all that apply</Label>
                                     <PillToggle
                                         options={BENEFICIARY_CATEGORIES}
                                         selected={activity.beneficiary_categories || []}
@@ -1010,131 +856,32 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     ) : null}
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label className={fieldLabel}>Relevance types</Label>
-                                    <PillToggle
-                                        options={RELEVANCE_TYPES}
-                                        selected={activity.relevance_types || []}
-                                        onToggle={toggleRelevanceType}
-                                    />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <Label className={fieldLabel}>Target population description</Label>
-                                    <p className="text-xs text-slate-500">
-                                        Briefly explain who these people are and why they were reached.
-                                    </p>
-                                    <Textarea
-                                        placeholder="Explain here…"
-                                        value={activity.beneficiary_description}
-                                        onChange={e => update('beneficiary_description', e.target.value)}
-                                        className={clsx(textareaClasses, "min-h-[88px]")}
-                                    />
-                                    <WordMeterBar count={beneficiaryDescWords} extra="if filled" />
-                                </div>
-                            </div>
-                        ) : null}
-
-                    <div className="space-y-4 border-t border-[#dcebee] pt-4">
-                        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#0e7d74]">Where it happened</p>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="space-y-1.5">
-                                <Label className={fieldLabel}>Geographic reach</Label>
-                                <div className="relative">
-                                    <select
-                                        value={activity.geographic_reach}
-                                        onChange={e => update({ geographic_reach: e.target.value, geographic_sub_category: '' })}
-                                        className={selectClasses}
-                                    >
-                                        <option value="">Select reach...</option>
-                                        {GEOGRAPHIC_REACH_OPTIONS.map(opt => (
-                                            <option key={opt} value={opt}>{opt}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                </div>
-                                <p className="text-[11px] text-slate-400">
-                                    Choose the broadest area where this activity took place.
-                                </p>
-                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.geographic_reach`)} />
-                            </div>
-                            {GEOGRAPHIC_SUB_CATEGORIES[activity.geographic_reach] ? (
-                                <div className="space-y-1.5">
-                                    <Label className={fieldLabel}>Specific setting / sub-category</Label>
-                                    <div className="relative">
-                                        <select
-                                            value={activity.geographic_sub_category}
-                                            onChange={e => update('geographic_sub_category', e.target.value)}
-                                            className={selectClasses}
-                                        >
-                                            <option value="">Select sub-category...</option>
-                                            {GEOGRAPHIC_SUB_CATEGORIES[activity.geographic_reach].map(sub => (
-                                                <option key={sub} value={sub}>{sub}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                        <Label className={fieldLabel}>Geographic reach</Label>
+                                        <div className="relative">
+                                            <select
+                                                value={activity.geographic_reach}
+                                                onChange={e => update('geographic_reach', e.target.value)}
+                                                className={selectClasses}
+                                            >
+                                                <option value="">Select reach…</option>
+                                                {GEOGRAPHIC_REACH_OPTIONS.map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        </div>
                                     </div>
-                                </div>
-                            ) : null}
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Site / community note</Label>
-                            <Input
-                                placeholder="e.g. Conducted at Govt. Boys High School, Model Town"
-                                value={activity.site_note}
-                                onChange={e => update('site_note', e.target.value)}
-                                className={inputClasses}
-                            />
-                        </div>
-                    </div>
-                        </div>
-                    </details>
-
-                    <details className="s4-fold">
-                        <summary>🚚 Delivery execution</summary>
-                        <div className="space-y-4 px-3 pb-3">
-                            <div className="space-y-1.5">
-                                <Label className={fieldLabel}>Mode of delivery</Label>
-                                <SingleChip
-                                    options={DELIVERY_MODES}
-                                    value={activity.delivery_mode || ''}
-                                    onChange={(val) => update('delivery_mode', val)}
-                                />
-                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.delivery_mode`)} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className={fieldLabel}>Implementation model</Label>
-                                <PillToggle
-                                    options={IMPLEMENTATION_MODELS}
-                                    selected={activity.implementation_models || []}
-                                    onToggle={toggleImplementationModel}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="space-y-1.5">
-                                    <Label className={fieldLabel}>Number of sessions / events / drives</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="e.g. 5"
-                                        value={activity.sessions_count}
-                                        onChange={e => update('sessions_count', e.target.value)}
-                                        className={inputClasses}
-                                    />
-                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.sessions_count`)} />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className={fieldLabel}>Delivery explanation</Label>
-                                    <Textarea
-                                        placeholder="Briefly explain implementation roles…"
-                                        value={activity.delivery_explanation}
-                                        onChange={e => update('delivery_explanation', e.target.value)}
-                                        className={clsx(textareaClasses, "min-h-[88px]")}
-                                    />
-                                    <WordMeterBar count={deliveryWords} extra="if filled" />
+                                    <div className="space-y-1.5">
+                                        <Label className={fieldLabel}>Specific site / community / platform</Label>
+                                        <Input
+                                            placeholder="Specific site / community / platform"
+                                            value={activity.site_note}
+                                            onChange={e => update('site_note', e.target.value)}
+                                            className={inputClasses}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

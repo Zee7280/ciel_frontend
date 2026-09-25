@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
+import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
@@ -936,7 +937,7 @@ export function ExecutiveReportDossierPage({ config }: { config: ExecutiveReport
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Engagement Details</h3>
                                         <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            <LabelValue label="Total Beneficiaries" value={report.section4?.project_summary?.distinct_total_beneficiaries} />
+                                            <LabelValue label="Total Beneficiaries" value={distinctBeneficiaryTotal(report.section4) || undefined} />
                                             <LabelValue label="Total Sessions" value={section4TotalSessions} />
                                             <LabelValue label="Counting Method" value={report.section4?.project_summary?.counting_method} />
                                             <LabelValue label="Overall Overlap" value={report.section4?.project_summary?.overall_overlap} />

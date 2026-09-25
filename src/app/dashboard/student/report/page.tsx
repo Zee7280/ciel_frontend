@@ -54,7 +54,14 @@ import {
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel } from './ReportFormChrome';
+import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+
+const MissionHeroView = React.memo(ReportMissionHero);
+const JourneyView = React.memo(ReportImpactJourney);
+const BridgeView = React.memo(ReportSectionBridge);
+const AchievementView = React.memo(ReportAchievementBanner);
+const SectionModelView = React.memo(ReportSectionModel);
+const LiveBannerView = React.memo(ReportLiveBanner);
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -374,18 +381,18 @@ function ReportFormContent() {
                         if (attendanceRes && attendanceRes.ok) {
                             const attendanceJson = await attendanceRes.json();
                             const rawLogs = Array.isArray(attendanceJson.data) ? attendanceJson.data : [];
-                            if (rawLogs.length > 0) {
-                                const section1 = ((reportForState.section1 as Record<string, unknown> | undefined) || {});
-                                reportForState = {
-                                    ...reportForState,
-                                    section1: {
-                                        ...section1,
-                                        attendance_logs: rawLogs.map((log: Record<string, unknown>) =>
-                                            normalizeEngagementAttendanceLog(log),
-                                        ),
-                                    },
-                                };
-                            }
+                            // Live project logs win — including an empty list after admin delete.
+                            // Do not keep stale section1.attendance_logs when the API returns [].
+                            const section1 = ((reportForState.section1 as Record<string, unknown> | undefined) || {});
+                            reportForState = {
+                                ...reportForState,
+                                section1: {
+                                    ...section1,
+                                    attendance_logs: rawLogs.map((log: Record<string, unknown>) =>
+                                        normalizeEngagementAttendanceLog(log),
+                                    ),
+                                },
+                            };
                         }
                     } catch (attendanceErr) {
                         console.warn("[Report] Attendance log refresh skipped:", attendanceErr);
@@ -439,7 +446,23 @@ function ReportFormContent() {
                     } else if (shouldSkipPreReportGuide(reportForState)) {
                         setShowGuide(false);
                     }
+                } else {
+                    // Report deleted / empty payload — wipe reflection, CII, and section bodies.
+                    setFullData({
+                        project_id: projectId,
+                        project_title: pickOpportunityTitle(projectPayload),
+                        status: "none",
+                    } as typeof data);
+                    setReadOnly(false);
                 }
+            } else {
+                // 404 after admin delete — start clean so old reflection cannot stick in client state.
+                setFullData({
+                    project_id: projectId,
+                    project_title: pickOpportunityTitle(projectPayload),
+                    status: "none",
+                } as typeof data);
+                setReadOnly(false);
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -675,6 +698,7 @@ function ReportFormContent() {
                             summary_text: section11Res.summary,
                             is_ai_generated: true,
                             audit_meta: section11Res.auditMeta ?? null,
+                            cii_index: readPersistedCiiSnapshot(submitData) ?? ciiResult,
                         },
                     };
                     submitData = {
@@ -775,6 +799,33 @@ function ReportFormContent() {
     );
     const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
     const stepperLockedToSection1Only = isTeamMemberAttendanceOnly;
+    const deferredData = React.useDeferredValue(data);
+    const incompleteStepNums = React.useMemo(
+        () => new Set(incompleteSectionsSummary.map((block) => block.section)),
+        [incompleteSectionsSummary],
+    );
+    const sectionsCompleteCount = uiSectionsCompleteCount(incompleteStepNums);
+    const progressPct = Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100);
+    const openSectionHelp = React.useCallback(() => setHelpSignal((n) => n + 1), []);
+    const goJourneyRef = React.useRef<(step: number) => void>(() => {});
+    goJourneyRef.current = (step: number) => {
+        const lockedSummary = stepperLockedToSummaryOnly && step !== FLASH_CARD_STEP;
+        const lockedSection1 = stepperLockedToSection1Only && step !== 1;
+        if (lockedSummary || lockedSection1) return;
+        const isActive = tabMatchesStep(step, activeStep);
+        const isCompleted = activeStep > step;
+        if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
+            setStep(step);
+        } else if (!isActive && validateCurrentSection()) {
+            setStep(step);
+        } else if (!isActive) {
+            toast.info("Navigating to step. Please complete mandatory fields later.");
+            setStep(step);
+        }
+    };
+    const goJourney = React.useCallback((step: number) => {
+        goJourneyRef.current(step);
+    }, []);
 
     React.useEffect(() => {
         if (isLoading || showGuide) return;
@@ -790,9 +841,6 @@ function ReportFormContent() {
         );
     }
 
-    const incompleteStepNums = new Set(incompleteSectionsSummary.map((block) => block.section));
-    const sectionsCompleteCount = uiSectionsCompleteCount(incompleteStepNums);
-    const progressPct = Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100);
     const projectTitle = String(projectDetails?.title || data?.project_title || "").trim() || "Community engagement report";
     const projectPaymentId = String(
         data?.project_id ||
@@ -902,39 +950,25 @@ function ReportFormContent() {
                     />
                 ) : null}
 
-                <ReportMissionHero data={data} projectData={projectDetails} />
+                <MissionHeroView data={deferredData} projectData={projectDetails} />
 
                 {!onFlash && !stepperLockedToSummaryOnly && !stepperLockedToSection1Only ? (
-                    <ReportImpactJourney
-                        data={data}
+                    <JourneyView
+                        data={deferredData}
                         activeStep={activeStep}
                         incompleteStepNums={incompleteStepNums}
                         sectionsCompleteCount={sectionsCompleteCount}
-                        onGo={(step) => {
-                            const lockedSummary = stepperLockedToSummaryOnly && step !== FLASH_CARD_STEP;
-                            const lockedSection1 = stepperLockedToSection1Only && step !== 1;
-                            if (lockedSummary || lockedSection1) return;
-                            const isActive = tabMatchesStep(step, activeStep);
-                            const isCompleted = activeStep > step;
-                            if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
-                                setStep(step);
-                            } else if (!isActive && validateCurrentSection()) {
-                                setStep(step);
-                            } else if (!isActive) {
-                                toast.info("Navigating to step. Please complete mandatory fields later.");
-                                setStep(step);
-                            }
-                        }}
+                        onGo={goJourney}
                     />
                 ) : null}
 
                 {!onFlash ? (
                     <>
-                        <ReportSectionBridge
+                        <BridgeView
                             step={activeStep}
-                            data={data}
+                            data={deferredData}
                             projectData={projectDetails}
-                            onOpenHelp={() => setHelpSignal((n) => n + 1)}
+                            onOpenHelp={openSectionHelp}
                         />
                         {activeStep === 1 ? (
                             <div className="cer-own">
@@ -949,9 +983,12 @@ function ReportFormContent() {
                                 </div>
                             </div>
                         ) : null}
-                        <ReportAchievementBanner step={activeStep} data={data} projectData={projectDetails} />
+                        <ReportWritingGuide step={activeStep} />
+                        <AchievementView step={activeStep} data={deferredData} projectData={projectDetails} />
                         <ReportExampleSpot step={activeStep} />
-                        <ReportSectionModel step={activeStep} data={data} />
+                        <ReportGlobalCoverage step={activeStep} />
+                        <ReportSectionLeadNote step={activeStep} />
+                        <SectionModelView step={activeStep} data={deferredData} />
                     </>
                 ) : null}
 
@@ -960,12 +997,12 @@ function ReportFormContent() {
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                     {isMergedActivitiesStep(activeStep) && (
-                        <>
+                        <div className="cer-s4">
                             <div className="cer-partk">PART A · WHAT WE DID — ACTIVITY BY ACTIVITY</div>
                             <Section4Activities />
                             <div className="cer-partk">PART B · WHAT CHANGED BECAUSE OF IT</div>
                             <Section5Outcomes />
-                        </>
+                        </div>
                     )}
                     {activeStep === 5 && <Section6Resources projectData={projectDetails} />}
                     {activeStep === 6 && <Section7Partnerships projectData={projectDetails} />}
@@ -997,7 +1034,7 @@ function ReportFormContent() {
                     )}
                 </div>
                 {activeStep >= 1 && activeStep < FLASH_CARD_STEP && activeStep !== 3 ? (
-                    <ReportLiveBanner step={activeStep} data={data} projectData={projectDetails} />
+                    <LiveBannerView step={activeStep} data={deferredData} projectData={projectDetails} />
                 ) : null}
 
             <button

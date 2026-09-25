@@ -1,4 +1,5 @@
 import type { ReportData } from "../context/ReportContext";
+import { distinctBeneficiaryTotal } from "./activityReach";
 
 /**
  * Purely decorative "fun meter" layer — every function here is a derived read of data the real
@@ -69,7 +70,7 @@ export function sectionStrength(step: number, data: ReportData): JourneyGrade {
                 if (!acts.length) return 0;
                 const done4 = acts.some((a) => a.title && a.primary_category);
                 const outs = acts.reduce((sum, a) => sum + (a.outputs?.length || 0), 0);
-                const reach = Number(data.section4.project_summary?.distinct_total_beneficiaries) || 0;
+                const reach = distinctBeneficiaryTotal(data.section4);
                 const meas = (data.section5.measurable_outcomes || []).filter((o) => (o.metric || o.outcome_area) && o.baseline && o.endline);
                 const done5 = wc(data.section5.observed_change) >= 30 && (data.section5.measurable_outcomes || []).some((o) => o.metric || o.outcome_area);
                 const good = outs > 0 && reach > 0 && meas.length > 0;

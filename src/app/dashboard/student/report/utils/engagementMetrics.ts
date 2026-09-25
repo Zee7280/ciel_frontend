@@ -169,9 +169,16 @@ export function calculateEngagementMetrics(
     leadProfile?: any,
     /** When set for team flows, splits hours strictly by roster participant (fixes merged "Team Lead" card). */
     individualRosterIds?: readonly string[],
+    /**
+     * Student report views count sessions faculty has not reviewed yet.
+     * Certificate and verifier views leave this off so only approved rows count.
+     */
+    options?: { includeUnreviewed?: boolean },
 ): CalculatedMetrics {
     const redFlags: string[] = [];
-    const countedLogs = filterAttendanceLogsForVerifiedMetrics(logs || []);
+    const countedLogs = options?.includeUnreviewed
+        ? (logs || []).filter(isLogCountedBeforeFacultyReview)
+        : filterAttendanceLogsForVerifiedMetrics(logs || []);
 
     if (!countedLogs || countedLogs.length === 0) {
         return {
@@ -191,11 +198,16 @@ export function calculateEngagementMetrics(
     const rosterIds =
         individualRosterIds && individualRosterIds.length > 0 ? individualRosterIds : null;
     /** Team flows: ignore bulk rows that cannot be attributed to current roster — they inflated totals vs individual cards. */
-    const aggregateLogs = rosterIds
+    const matchedLogs = rosterIds
         ? countedLogs.filter((log) =>
               rosterIds.some((id) => engagementParticipantIdsMatch(log.participantId, id)),
           )
         : countedLogs;
+    /** Student view: a roster miss must not hide every logged session. */
+    const aggregateLogs =
+        options?.includeUnreviewed && rosterIds && matchedLogs.length === 0 && countedLogs.length > 0
+            ? countedLogs
+            : matchedLogs;
 
     if (
         rosterIds &&

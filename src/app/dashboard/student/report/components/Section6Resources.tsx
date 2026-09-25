@@ -1,15 +1,11 @@
 import {
-    Package, Plus, Trash2, FileText, Info, AlertCircle,
+    Package, Plus, Trash2, FileText, Info,
     Banknote, Activity, Users, BarChart3, Upload, ChevronDown,
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
-import {
-    formatMergedSdgGoalsSnapshotLabels,
-    mergeReportSdgSnapshotRows,
-} from "../utils/reportSdgMerge";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
@@ -28,70 +24,39 @@ function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
 }
 
 const resourceTypes = [
-    "Financial (Cash Funding)",
-    "In-kind Materials (Food / Books / Supplies / Kits)",
-    "Equipment / Tools (Medical, Digital, Technical)",
-    "Infrastructure Access (Venue / Lab / Clinic / Classroom)",
-    "Digital Platform / Software Access",
-    "Human Resources (Trainers / Experts / Volunteers)",
-    "Transport Support",
-    "Energy / Utility Support",
-    "Communication / Media Support",
-    "Policy / Legal Support",
-    "Research / Data Access",
-    "Community Mobilization Support",
-    "Corporate / CSR Sponsorship",
-    "Government Program Support",
-    "International Development Support",
-    "Other (Specify)",
+    "Cash / Funding", "Materials / Consumables", "Food / Water / Nutrition Supplies", "Medical / Health Supplies",
+    "Educational / Learning Materials", "Technology / Devices", "Software / Cloud / Digital Services", "Equipment / Tools / Machinery",
+    "Venue / Space / Land", "Transport / Fuel / Logistics", "Utilities / Energy / Internet", "Professional Expertise / Consultancy",
+    "Legal / Technical / Clinical Services", "Staff Time", "Volunteer Time", "Research / Laboratory Access", "Data / Information / Licences",
+    "Media / Creative Production", "Government Permission / Support", "Corporate / CSR Support", "University / Institutional Support",
+    "Community Contribution", "Donated Goods", "Pro-bono Services", "Discounts / Waivers", "Other / Custom",
 ];
 
-/** Emoji + a sensible default unit (from `unitOptions`) per resource type, for the tile picker. */
-const RESOURCE_TYPE_META: Record<string, { emoji: string; defaultUnit?: string }> = {
-    "Financial (Cash Funding)": { emoji: "💵", defaultUnit: "PKR" },
-    "In-kind Materials (Food / Books / Supplies / Kits)": { emoji: "📦", defaultUnit: "Kits" },
-    "Equipment / Tools (Medical, Digital, Technical)": { emoji: "🛠️", defaultUnit: "Devices" },
-    "Infrastructure Access (Venue / Lab / Clinic / Classroom)": { emoji: "🏢", defaultUnit: "Sessions" },
-    "Digital Platform / Software Access": { emoji: "💻", defaultUnit: "Licenses" },
-    "Human Resources (Trainers / Experts / Volunteers)": { emoji: "👥", defaultUnit: "Number (#)" },
-    "Transport Support": { emoji: "🚐", defaultUnit: "Number (#)" },
-    "Energy / Utility Support": { emoji: "🔌", defaultUnit: "Units" },
-    "Communication / Media Support": { emoji: "📣", defaultUnit: "Units" },
-    "Policy / Legal Support": { emoji: "⚖️", defaultUnit: "Units" },
-    "Research / Data Access": { emoji: "📊", defaultUnit: "Units" },
-    "Community Mobilization Support": { emoji: "🤝", defaultUnit: "Number (#)" },
-    "Corporate / CSR Sponsorship": { emoji: "🏭", defaultUnit: "PKR" },
-    "Government Program Support": { emoji: "🏛️", defaultUnit: "PKR" },
-    "International Development Support": { emoji: "🌐", defaultUnit: "PKR" },
-    "Other (Specify)": { emoji: "✨" },
-};
-
 const unitOptions = [
-    "PKR", "USD", "Number (#)", "Hours", "Units", "Kg", "Liters",
-    "Sessions", "Licenses", "Devices", "Kits", "Other (Specify)",
+    "People", "Households", "Participants", "Students", "Patients / Clients", "Farmers / Businesses", "Sessions", "Hours", "Days",
+    "Items", "Kits", "Meals / Packages", "Books / Materials", "Devices", "Facilities", "Rooms / Classrooms", "m²", "Hectares",
+    "Kilograms", "Tonnes", "Litres", "m³", "kWh", "Trees", "Referrals", "Cases", "Policies / SOPs", "Datasets", "Reports",
+    "Applications / Platforms", "Posts / Media Pieces", "Views / Impressions", "Events", "Partnerships", "Local Currency",
+    "PKR", "USD", "EUR", "GBP", "Percent (%)", "Other…",
 ];
 
 const sourceOptions = [
-    "Students (Personal Contribution)",
-    "Partner Organization",
-    "University / Institution",
-    "Government Body",
-    "Private Sponsor / Donor",
-    "Corporate / CSR",
-    "Community Members",
-    "International Organization",
-    "Self-Funded",
-    "Other (Specify)",
+    "Student Team", "University / Institution", "Faculty / Department / School", "Research / Academic Grant", "Partner Organization",
+    "NGO / Nonprofit / Civil Society", "Government / Public Agency", "Corporate / CSR", "Foundation / Philanthropy",
+    "International / Multilateral Organization", "Private Sponsor", "Individual Donor", "Community Members / Beneficiaries",
+    "Fundraising Event / Campaign", "Crowdfunding", "Self-funded", "In-kind Donation", "Pro-bono Contributor", "Other / Custom Source",
 ];
 
 const verificationOptions = [
-    "Evidence Uploaded",
-    "Partner Confirmed",
-    "University Confirmed",
-    "Official Documentation",
-    "Self-Reported",
-    "Pending Verification",
+    "Receipt / Invoice", "Bank / Payment Record", "Donation / Handover Record", "Inventory / Distribution Log", "Partner Confirmation",
+    "University Confirmation", "Government / Official Documentation", "Photographic Evidence", "Contract / MoU / Letter",
+    "Digital / Platform Record", "Timesheet / Volunteer Log", "Valuation / Quotation", "Self-Reported — Requires Review", "Other Verification",
 ];
+
+function isCustomOption(value: unknown, customLabels: string[]): boolean {
+    const text = String(value || "").trim();
+    return customLabels.includes(text);
+}
 
 const evidenceDocTypes = [
     "Receipts", "Sponsorship letters", "Official emails", "Photos",
@@ -215,7 +180,7 @@ function FullFilePreview({ file }: { file: any }) {
 }
 
 function ResourceCard({
-    res, idx, onUpdate, onUpdateFields, onRemove, canRemove, getFieldError,
+    res, idx, onUpdate, onRemove, canRemove, getFieldError,
 }: {
     res: any; idx: number; canRemove: boolean;
     onUpdate: (field: string, val: any) => void;
@@ -245,7 +210,7 @@ function ResourceCard({
                     {idx + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
-                    Resource entry
+                    {isCustomOption(res.type, ["Other / Custom", "Other (Specify)"]) ? (res.type_other || res.type) : (res.type || "Resource entry")}
                 </span>
                 {canRemove ? (
                     <button
@@ -259,131 +224,119 @@ function ResourceCard({
             </div>
             <div className="space-y-4 px-3.5 pb-3.5 pt-3">
 
-            <div className="space-y-1.5">
-                <Label className={fieldLabel}>
-                    6.2.1 Resource type — what kind?
-                </Label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {resourceTypes.map(t => {
-                        const active = res.type === t;
-                        const meta = RESOURCE_TYPE_META[t];
-                        return (
-                            <button
-                                key={t}
-                                type="button"
-                                onClick={() => onUpdateFields(
-                                    !res.unit && meta?.defaultUnit
-                                        ? { type: t, unit: meta.defaultUnit }
-                                        : { type: t },
-                                )}
-                                className={clsx(
-                                    "flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 text-center transition-colors",
-                                    active
-                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
-                                )}
-                            >
-                                <span className="text-xl">{meta?.emoji || "📦"}</span>
-                                <span className="text-[11px] font-semibold leading-tight">{t.split(" (")[0]}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-                {res.type === "Other (Specify)" ? (
-                    <div className="space-y-1.5 pt-1">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>Resource type <span className="text-rose-500">*</span></Label>
+                    <div className="relative">
+                        <select
+                            value={res.type || ""}
+                            onChange={e => onUpdate("type", e.target.value)}
+                            className={selectClasses}
+                        >
+                            <option value="">Choose resource type…</option>
+                            {res.type && !resourceTypes.includes(res.type) ? (
+                                <option value={res.type}>{res.type}</option>
+                            ) : null}
+                            {resourceTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                    {isCustomOption(res.type, ["Other / Custom", "Other (Specify)"]) ? (
                         <Input
-                            placeholder="Describe the resource type in a few words…"
+                            placeholder="Describe resource type…"
                             value={res.type_other || ""}
                             onChange={e => onUpdate("type_other", e.target.value)}
                             className={inputClasses}
                         />
-                        <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
-                    </div>
-                ) : null}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    ) : null}
+                    <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
+                </div>
                 <div className="space-y-1.5">
-                    <Label className={fieldLabel}>6.2.2 Amount</Label>
+                    <Label className={fieldLabel}>Amount / quantity <span className="text-rose-500">*</span></Label>
                     <Input
-                        type="number"
-                        placeholder="0"
+                        inputMode="decimal"
+                        placeholder="e.g. 8000 or 25"
                         value={res.amount}
                         onChange={e => onUpdate("amount", e.target.value)}
                         className={inputClasses}
                     />
                     <FieldError message={getFieldError(`resources.${idx}.amount`)} />
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                    <Label className={fieldLabel}>6.2.3 Unit</Label>
+                    <Label className={fieldLabel}>Unit <span className="text-rose-500">*</span></Label>
                     <div className="relative">
                         <select
-                            value={res.unit}
+                            value={res.unit || ""}
                             onChange={e => onUpdate("unit", e.target.value)}
                             className={selectClasses}
                         >
-                            <option value="">Select unit...</option>
-                            {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                            <option value="">Choose unit…</option>
+                            {res.unit && !unitOptions.includes(res.unit) ? (
+                                <option value={res.unit}>{res.unit}</option>
+                            ) : null}
+                            {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
                         </select>
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     </div>
-                </div>
-            </div>
-
-            {res.unit === "Other (Specify)" ? (
-                <div className="space-y-1.5">
-                    <Input
-                        placeholder="Describe the unit in a few words…"
-                        value={res.unit_other || ""}
-                        onChange={e => onUpdate("unit_other", e.target.value)}
-                        className={inputClasses}
-                    />
-                    <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
-                </div>
-            ) : null}
-
-            <div className="space-y-2">
-                <Label className={fieldLabel}>6.2.4 Source of resource</Label>
-                <p className="text-xs text-slate-500">Select all that apply</p>
-                <CheckGrid options={sourceOptions} selected={sources} onToggle={toggleSource} />
-                {sources.includes("Other (Specify)") ? (
-                    <div className="space-y-1.5 pt-1">
+                    {isCustomOption(res.unit, ["Other…", "Other (Specify)"]) ? (
                         <Input
-                            placeholder="Describe the source in a few words…"
-                            value={res.source_other || ""}
-                            onChange={e => onUpdate("source_other", e.target.value)}
+                            placeholder="Custom unit…"
+                            value={res.unit_other || ""}
+                            onChange={e => onUpdate("unit_other", e.target.value)}
                             className={inputClasses}
                         />
-                        <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
-                    </div>
-                ) : null}
+                    ) : null}
+                    <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
+                </div>
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>What did it make possible? <span className="text-rose-500">*</span></Label>
+                    <Input
+                        placeholder="One clear line linking the resource to delivery"
+                        value={res.purpose}
+                        onChange={e => onUpdate("purpose", e.target.value)}
+                        className={inputClasses}
+                    />
+                    <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
+                </div>
             </div>
 
             <div className="space-y-2">
-                <Label className={fieldLabel}>6.2.5 Verification status</Label>
-                <p className="text-xs text-slate-500">Select all that apply</p>
-                <CheckGrid options={verificationOptions} selected={verifications} onToggle={toggleVerification} />
+                <Label className={fieldLabel}>Source · choose all that apply <span className="text-rose-500">*</span></Label>
+                <CheckGrid options={sourceOptions} selected={sources} onToggle={toggleSource} />
+                {sources.some((item) => isCustomOption(item, ["Other / Custom Source", "Other (Specify)"])) ? (
+                    <Input
+                        placeholder="Specify other source…"
+                        value={res.source_other || ""}
+                        onChange={e => onUpdate("source_other", e.target.value)}
+                        className={inputClasses}
+                    />
+                ) : null}
+                <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
             </div>
 
-            <div className="space-y-1.5">
-                <Label className={fieldLabel}>6.2.6 What did it make possible? (one line)</Label>
-                <Input
-                    placeholder="e.g. bought paint and furniture for both classrooms"
-                    value={res.purpose}
-                    onChange={e => onUpdate("purpose", e.target.value)}
-                    className={inputClasses}
-                />
-                <p className="text-xs text-slate-500">One clear line beats a 50-word minimum. ✂️</p>
-                <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
+            <div className="space-y-2">
+                <Label className={fieldLabel}>Verification · choose all that apply <span className="text-rose-500">*</span></Label>
+                <CheckGrid options={verificationOptions} selected={verifications} onToggle={toggleVerification} />
+                {verifications.some((item) => item === "Other Verification") ? (
+                    <Input
+                        placeholder="Describe other verification…"
+                        value={res.verification_other || ""}
+                        onChange={e => onUpdate("verification_other", e.target.value)}
+                        className={inputClasses}
+                    />
+                ) : null}
             </div>
             </div>
         </div>
     );
 }
 
-export default function Section6Resources({ projectData }: { projectData?: unknown } = {}) {
+export default function Section6Resources({ projectData: _projectData }: { projectData?: unknown } = {}) {
     const { data, updateSection, getFieldError } = useReportForm();
-    const { section1, section3, section4, section6 } = data;
+    const { section1, section6 } = data;
     const { use_resources, resources } = section6;
 
     const [previewFile, setPreviewFile] = useState<any>(null);
@@ -423,21 +376,6 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
         data.required_hours,
     ]);
 
-    const { goalsLine: mappedSdgsDisplay, targetsLine: mappedSdgTargetsDisplay } = useMemo(() => {
-        const rows = mergeReportSdgSnapshotRows(projectData ?? null, section3);
-        return formatMergedSdgGoalsSnapshotLabels(rows);
-    }, [projectData, section3]);
-
-    const activityTypesCount = useMemo(
-        () => (section4.activity_blocks || []).filter((a: any) => a.primary_category || a.title).length,
-        [section4.activity_blocks],
-    );
-
-    const outputsCount = useMemo(
-        () => (section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0),
-        [section4.activity_blocks],
-    );
-
     const autoNarrative = useMemo(() => {
         if (use_resources === "no" || use_resources === "") {
             return `Resource Model: Volunteer-Based Implementation. Total Verified Hours: ${verifiedHoursSnapshot}h. Financial Mobilization: 0.`;
@@ -455,14 +393,14 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
     }, [autoNarrative, section6.summary_text, updateSection]);
 
     const financialTypes = resources.filter(r =>
-        r.type?.toLowerCase().includes("financial") || r.unit === "PKR" || r.unit === "USD",
+        /cash|funding|financial/i.test(String(r.type || "")) || ["PKR", "USD", "EUR", "GBP"].includes(r.unit),
     );
     const inKindTypes = resources.filter(r => !financialTypes.includes(r));
     const uniqueSources = new Set(resources.flatMap(r => r.sources || [])).size;
     const moneyByUnit = useMemo(() => {
         const totals: Record<string, number> = {};
         resources.forEach(r => {
-            if (r.unit !== "PKR" && r.unit !== "USD") return;
+            if (!["PKR", "USD", "EUR", "GBP"].includes(r.unit)) return;
             const amt = parseFloat(r.amount) || 0;
             if (!amt) return;
             totals[r.unit] = (totals[r.unit] || 0) + amt;
@@ -501,60 +439,16 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                 </div>
             </div>
 
-            {/* 6.0 Project Snapshot */}
-            <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                            6.0
-                        </span>
-                        <h3 className="text-base font-semibold text-slate-900">Project snapshot</h3>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Auto-generated · read-only
-                    </span>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                        {[
-                            { label: "SDG goals", val: mappedSdgsDisplay },
-                            { label: "SDG targets", val: mappedSdgTargetsDisplay },
-                            { label: "Beneficiaries", val: `${section4.project_summary?.distinct_total_beneficiaries || "0"} reached` },
-                            { label: "Verified hours", val: `${verifiedHoursSnapshot}h` },
-                            { label: "Activity types", val: `${activityTypesCount} recorded` },
-                            { label: "Outputs", val: `${outputsCount} recorded` },
-                        ].map(({ label, val }) => (
-                            <div key={label} className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
-                                <p className={clsx(fieldLabel, "mb-1")}>{label}</p>
-                                <p className="truncate text-sm font-semibold text-slate-900" title={typeof val === "string" ? val : undefined}>
-                                    {val}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                    <p className="text-sm leading-relaxed text-indigo-900/90">
-                        This information is automatically pulled from previous sections and cannot be edited.
-                    </p>
-                </div>
-            </section>
-
-            {/* 6.1 Resource Confirmation */}
+            {/* 5.1 What did the project run on */}
             <section className="cer-card space-y-4">
                 <div className="flex items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        6.1
+                        5.1
                     </span>
-                    <h3 className="text-base font-semibold text-slate-900">Step 1 — Resource confirmation</h3>
+                    <h3 className="text-base font-semibold text-slate-900">What did your project run on?</h3>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <Label className={fieldLabel}>What did your project run on?</Label>
-
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <button
                             type="button"
@@ -620,10 +514,10 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
                                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                    6.2
+                                    5.2
                                 </span>
                                 <h3 className="text-base font-semibold text-slate-900">
-                                    Step 2 — Resource contribution details
+                                    Resource entries
                                 </h3>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-3">

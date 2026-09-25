@@ -282,70 +282,57 @@ function LoginContent() {
 
             // Store token if available (for future API calls)
             if (authToken) {
+                localStorage.setItem("ciel_token", authToken);
+                syncStoredUser(loginUser);
                 const token = authToken;
-                localStorage.setItem("ciel_token", token);
-
-                // Fetch full user profile immediately to cache it
-                try {
-                    const profileRes = await fetch("/api/v1/users/me", {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${token}`
-                        }
-                    });
-
-                    if (profileRes.ok) {
+                void fetch("/api/v1/users/me", {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                })
+                    .then(async (profileRes) => {
+                        if (!profileRes.ok) return;
                         const profileData = await profileRes.json();
-                        if (profileData.success) {
-                            const profileUser = extractProfileUser(profileData);
-                            const normalizedProfileUser = profileUser ? flattenProfilePayload(profileUser) : {};
-                            const baseUser = loginUser;
-                            const fullUser: Record<string, unknown> = {
-                                ...mergeMeaningfulFields(baseUser, normalizedProfileUser),
-                                role,
-                            };
-                            const resolvedUserId =
-                                pickUserId(fullUser) ?? pickUserId(baseUser) ?? pickUserId(normalizedProfileUser);
-                            if (resolvedUserId != null) {
-                                if (fullUser.id == null || fullUser.id === "") fullUser.id = resolvedUserId;
-                                if (fullUser.userId == null || fullUser.userId === "") fullUser.userId = resolvedUserId;
-                            }
-                            syncStoredUser(fullUser);
-                        } else {
-                            // Fallback to basic data
-                            syncStoredUser(loginUser);
+                        if (!profileData.success) return;
+                        const profileUser = extractProfileUser(profileData);
+                        const normalizedProfileUser = profileUser ? flattenProfilePayload(profileUser) : {};
+                        const fullUser: Record<string, unknown> = {
+                            ...mergeMeaningfulFields(loginUser, normalizedProfileUser),
+                            role,
+                        };
+                        const resolvedUserId =
+                            pickUserId(fullUser) ?? pickUserId(loginUser) ?? pickUserId(normalizedProfileUser);
+                        if (resolvedUserId != null) {
+                            if (fullUser.id == null || fullUser.id === "") fullUser.id = resolvedUserId;
+                            if (fullUser.userId == null || fullUser.userId === "") fullUser.userId = resolvedUserId;
                         }
-                    } else {
-                        // Fallback to basic data
-                        syncStoredUser(loginUser);
-                    }
-                } catch (e) {
-                    console.error("Failed to pre-fetch profile", e);
-                    // Fallback to basic data
-                    syncStoredUser(loginUser);
-                }
+                        syncStoredUser(fullUser);
+                    })
+                    .catch((e) => {
+                        console.error("Failed to pre-fetch profile", e);
+                    });
             }
 
             const roleNormalized = String(role).trim().toLowerCase().replace(/\s+/g, "_");
             if (authToken && roleNormalized === "student") {
-                try {
-                    clearStudentDashboardCache();
-                    const dash = await fetchStudentDashboardData({ redirectToLogin: false });
-                    if (dash) persistStudentDashboardCache(dash);
-                } catch {
-                    /* dashboard prefetch is optional */
-                }
+                clearStudentDashboardCache();
+                void fetchStudentDashboardData({ redirectToLogin: false })
+                    .then((dash) => {
+                        if (dash) persistStudentDashboardCache(dash);
+                    })
+                    .catch(() => {
+                        /* dashboard prefetch is optional */
+                    });
             } else {
                 clearStudentDashboardCache();
             }
 
             if (authToken && roleHasNotificationInbox(role)) {
-                try {
-                    await fetchAndPersistUnreadNotificationsCount();
-                } catch {
+                void fetchAndPersistUnreadNotificationsCount().catch(() => {
                     /* optional */
-                }
+                });
             }
 
             let targetPath = getDashboardHomePathForRole(role);

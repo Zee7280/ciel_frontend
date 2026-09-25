@@ -30,6 +30,8 @@ import { CIEL_PATHS } from "@/utils/cielPaths";
 import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
+const SIDEBAR_EXPANDED_WIDTH = "280px";
+const SIDEBAR_COLLAPSED_WIDTH = "64px";
 
 type NavItem = {
     label: string;
@@ -66,12 +68,12 @@ function NavRow({
             href={href}
             scroll
             className={clsx(
-                "ciel-transition relative mx-[10px] mb-[5px] flex w-[calc(100%-20px)] items-center gap-[13px] rounded-[14px] px-3.5 py-3.5 text-left text-[14px] font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]",
+                "ciel-transition relative mb-[5px] flex items-center gap-[13px] rounded-[14px] py-3.5 text-left text-[14px] font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]",
+                collapsed ? "mx-1 w-[calc(100%-8px)] justify-center px-0" : "mx-[10px] w-[calc(100%-20px)] px-3.5",
                 active ? "bg-[#22515b] text-white shadow-[inset_4px_0_0_#42ddb2]" : "text-[#c8d4da] hover:bg-white/[0.055] hover:text-white",
                 impact && !active && "mt-2 border border-[rgba(62,218,157,.18)] bg-[rgba(43,202,139,.10)]",
                 impact && active && "mt-2",
                 indent && !collapsed && "mb-1 ml-5 w-[calc(100%-40px)] py-2.5 text-[13px] font-bold",
-                collapsed && "justify-center px-0",
             )}
             title={collapsed ? label : undefined}
         >
@@ -382,9 +384,9 @@ export default function Sidebar() {
     }, []);
 
     useEffect(() => {
-        document.documentElement.style.setProperty("--ciel-sidebar-width", collapsed ? "72px" : "305px");
+        document.documentElement.style.setProperty("--ciel-sidebar-width", collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH);
         return () => {
-            document.documentElement.style.setProperty("--ciel-sidebar-width", "305px");
+            document.documentElement.style.setProperty("--ciel-sidebar-width", SIDEBAR_EXPANDED_WIDTH);
         };
     }, [collapsed]);
 
@@ -728,14 +730,20 @@ export default function Sidebar() {
         <aside
             className={clsx(
                 "fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] flex-col text-white lg:flex ciel-transition",
-                collapsed ? "w-[72px]" : "w-[305px]",
+                collapsed ? "w-[64px]" : "w-[280px]",
             )}
             style={{ background: "linear-gradient(180deg,#133747,#0f2d3a)" }}
         >
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-[18px] py-5">
+            <div className={clsx(
+                "flex shrink-0 border-b border-white/10",
+                collapsed ? "flex-col items-center gap-2 px-1.5 py-3" : "flex-row items-center justify-between gap-3 px-[18px] py-5",
+            )}>
                 <Link href="/" className="flex min-w-0 items-center gap-3.5">
-                    <div className="relative grid h-[62px] w-[62px] shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/5 bg-white/[0.06] p-1">
-                        <img src="/iel-pk-logo.png" alt="IEL PK" className="h-11 w-11 object-contain" width={44} height={44} />
+                    <div className={clsx(
+                        "relative grid shrink-0 place-items-center overflow-hidden border border-white/5 bg-white/[0.06]",
+                        collapsed ? "h-10 w-10 rounded-xl p-0.5" : "h-[62px] w-[62px] rounded-2xl p-1",
+                    )}>
+                        <img src="/iel-pk-logo.png" alt="IEL PK" className={clsx("object-contain", collapsed ? "h-8 w-8" : "h-11 w-11")} width={44} height={44} />
                     </div>
                     {!collapsed && (
                         <div className="flex min-w-0 flex-col">
@@ -766,7 +774,10 @@ export default function Sidebar() {
                     type="button"
                     onClick={toggleCollapsed}
                     aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    className="ciel-transition flex h-8 w-8 shrink-0 items-center justify-center rounded-ciel-xs text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                    className={clsx(
+                        "ciel-transition flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
+                        collapsed ? "bg-white/15 text-white" : "text-white/50",
+                    )}
                 >
                     {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
                 </button>

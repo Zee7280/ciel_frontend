@@ -18,6 +18,7 @@ import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { dataSectionReviewBannerLabel } from "@/app/dashboard/student/report/utils/reportWizardNav";
+import { distinctBeneficiaryTotal } from "@/app/dashboard/student/report/utils/activityReach";
 import { sumNonRejectedLoggedHours, type AttendanceLog } from "@/app/dashboard/student/report/utils/engagementMetrics";
 
 export const CONDITIONAL_REMARK_PREFIX = "[Conditional badge]";
@@ -289,11 +290,12 @@ export function buildFacultyAiEvaluationModel(raw: unknown): FacultyAiEvaluation
         pickNumber(opportunity.expected_hours);
 
     const impactScale = asRecord(section4.impact_scale);
+    const activityReach = distinctBeneficiaryTotal(section4 as Parameters<typeof distinctBeneficiaryTotal>[0]);
     const reached =
         pickString(impactScale.distinct_total_beneficiaries) ||
         pickString(impactScale.beneficiaries_reached) ||
         pickString(section4.primary_beneficiary) ||
-        "—";
+        (activityReach > 0 ? String(activityReach) : "—");
 
     const outcomes = Array.isArray(section5.measurable_outcomes) ? section5.measurable_outcomes : [];
     let attendanceLabel = "—";

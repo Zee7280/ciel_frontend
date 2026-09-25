@@ -151,7 +151,12 @@ const metricHierarchy: Record<string, string[]> = {
 
 const metricCategories = Object.keys(metricHierarchy);
 const METRIC_CATEGORY_OTHER = "🔹 Other";
+const METRIC_UNIT_OTHER = "Other";
 const confidenceLevels = ["Directly Measured", "Partner Confirmed", "Observed", "Estimated"];
+
+function isMetricUnitOther(value?: string): boolean {
+    return /^other$/i.test(String(value || "").trim());
+}
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
@@ -342,6 +347,8 @@ function OutcomeCard({
                                     onUpdateFields({
                                         metric_category: e.target.value,
                                         metric: "",
+                                        metric_other: "",
+                                        unit: "",
                                     });
                                 }}
                                 className={selectClasses}
@@ -360,11 +367,21 @@ function OutcomeCard({
                             <Label className={fieldLabel}>Specific metric unit</Label>
                             <div className="relative">
                                 <select
-                                    value={outcome.metric}
+                                    value={isMetricUnitOther(outcome.metric) ? METRIC_UNIT_OTHER : outcome.metric}
                                     onChange={e => {
+                                        const next = e.target.value;
+                                        if (isMetricUnitOther(next)) {
+                                            onUpdateFields({
+                                                metric: METRIC_UNIT_OTHER,
+                                                metric_other: "",
+                                                unit: "",
+                                            });
+                                            return;
+                                        }
                                         onUpdateFields({
-                                            metric: e.target.value,
-                                            unit: e.target.value,
+                                            metric: next,
+                                            metric_other: "",
+                                            unit: next,
                                         });
                                     }}
                                     className={selectClasses}
@@ -373,9 +390,28 @@ function OutcomeCard({
                                     {metricHierarchy[outcome.metric_category]?.map(unit => (
                                         <option key={unit} value={unit}>{unit}</option>
                                     ))}
+                                    <option value={METRIC_UNIT_OTHER}>Other</option>
                                 </select>
                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
+                            {isMetricUnitOther(outcome.metric) ? (
+                                <>
+                                    <Input
+                                        placeholder="e.g. Number of solar panels installed"
+                                        value={outcome.metric_other ?? ""}
+                                        onChange={e => {
+                                            const v = e.target.value;
+                                            onUpdateFields({
+                                                metric: METRIC_UNIT_OTHER,
+                                                metric_other: v,
+                                                unit: v.trim(),
+                                            });
+                                        }}
+                                        className={clsx(inputClasses, "mt-2")}
+                                    />
+                                    <FieldError message={getFieldError(`measurable_outcomes.${index}.metric_other`)} />
+                                </>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -388,7 +424,7 @@ function OutcomeCard({
                                 onChange={e => {
                                     const v = e.target.value;
                                     onUpdateFields({
-                                        metric: v.trim() ? v : "Other",
+                                        metric: v.trim() ? v : METRIC_UNIT_OTHER,
                                         metric_other: v,
                                         unit: v.trim(),
                                     });
@@ -666,10 +702,8 @@ export default function Section5Outcomes() {
             {/* 5.1 Observed Change */}
             <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        5.1
-                    </span>
-                    <h3 className="text-base font-semibold text-slate-900">Observed change (narrative)</h3>
+                    <span className="cer-secn">4.3</span>
+                    <h3 className="text-base font-semibold text-slate-900">The story of the change</h3>
                     <span className={clsx(badgeMandatory, "ml-auto")}>
                         Mandatory · {wordRangeLabel(OBSERVED_CHANGE_WORD_RANGE.min, OBSERVED_CHANGE_WORD_RANGE.max)}
                     </span>
@@ -773,9 +807,7 @@ export default function Section5Outcomes() {
             {/* 5.2 Measurable Outcomes */}
             <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        5.2
-                    </span>
+                    <span className="cer-secn">4.4</span>
                     <h3 className="text-base font-semibold text-slate-900">Measurable outcomes</h3>
                     <span className={badgeMandatory}>Mandatory</span>
                 </div>
@@ -808,9 +840,7 @@ export default function Section5Outcomes() {
             {/* 5.3 Challenges */}
             <section className="cer-card space-y-4">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        5.3
-                    </span>
+                    <span className="cer-secn">4.5</span>
                     <h3 className="text-base font-semibold text-slate-900">Challenges &amp; limitations</h3>
                     <span className={clsx(badgeMandatory, "ml-auto")}>
                         Mandatory · {wordRangeLabel(CHALLENGES_WORD_RANGE.min, CHALLENGES_WORD_RANGE.max)}

@@ -17,7 +17,7 @@ import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
 import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
 import { formTeamFromLead } from "@/utils/participationGuide";
-import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog } from "../utils/engagementMetrics";
+import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
 import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
@@ -794,6 +794,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     teamSize,
                     data.section1.team_lead,
                     rosterIds,
+                    { includeUnreviewed: true },
                 );
 
                 const finalMetrics = {
@@ -1022,7 +1023,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 // Recalculate metrics
                 const teamSize = 1 + data.section1.team_members.length;
                 const rosterIds = buildIndividualRosterFromSection1(data.section1, participantId ?? data.section1.team_lead?.id);
-                const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize, undefined, rosterIds);
+                const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize, undefined, rosterIds, { includeUnreviewed: true });
+                const countedLogs = (uniqueLogs as Array<{ approval_status?: string | null; evidence_file?: unknown; evidence_url?: unknown; evidence_urls?: unknown }>).filter(
+                    (log) => String(log.approval_status || "").toLowerCase() !== "rejected",
+                );
+                const withEvidence = countedLogs.filter((log) => {
+                    if (log.evidence_file) return true;
+                    if (typeof log.evidence_url === "string" && log.evidence_url.trim()) return true;
+                    return Array.isArray(log.evidence_urls) && log.evidence_urls.length > 0;
+                }).length;
                 setVerifiedMetrics({
                     totalHours: calc.total_verified_hours,
                     sessionCount: calc.verified_session_count,
@@ -1033,8 +1042,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     eis: calc.eis_score,
                     category: calc.engagement_category,
                     hecStatus: calc.hec_compliance,
-                    evidenceCount: uniqueLogs.filter((l: any) => l.evidence_file).length,
-                    evidenceRatio: Math.round((uniqueLogs.filter((l: any) => l.evidence_file).length / (uniqueLogs.length || 1)) * 100),
+                    evidenceCount: withEvidence,
+                    evidenceRatio: Math.round((withEvidence / (countedLogs.length || 1)) * 100),
                     individual_metrics: calc.individual_metrics,
                 });
             }
@@ -1046,6 +1055,51 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
 
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
+
+    const liveStudentMetrics = React.useMemo(() => {
+        const logs = data.section1.attendance_logs || [];
+        const rosterIds = buildIndividualRosterFromSection1(
+            data.section1,
+            participantId ?? data.section1.team_lead?.id,
+        );
+        const calc = calculateEngagementMetrics(
+            logs,
+            requiredHoursPerStudent,
+            1 + team_members.length,
+            data.section1.team_lead,
+            rosterIds,
+            { includeUnreviewed: true },
+        );
+        const counted = logs.filter((log) => isLogCountedBeforeFacultyReview(log));
+        const withEvidence = counted.filter((log) => {
+            if (log.evidence_file) return true;
+            const url = (log as { evidence_url?: unknown }).evidence_url;
+            if (typeof url === "string" && url.trim()) return true;
+            const urls = (log as { evidence_urls?: unknown }).evidence_urls;
+            return Array.isArray(urls) && urls.length > 0;
+        }).length;
+        return {
+            totalHours: calc.total_verified_hours,
+            sessionCount: calc.verified_session_count,
+            activeDays: calc.total_active_days,
+            spanWeeks: Math.ceil(calc.engagement_span / 7),
+            frequency: calc.attendance_frequency,
+            weeklyContinuity: calc.weekly_continuity,
+            eis: calc.eis_score,
+            category: calc.engagement_category,
+            hecStatus: calc.hec_compliance,
+            evidenceCount: withEvidence,
+            evidenceRatio: Math.round((withEvidence / (counted.length || 1)) * 100),
+            redFlags: calc.redFlags,
+            isNonCompliant: calc.isNonCompliant,
+            individual_metrics: calc.individual_metrics,
+        };
+    }, [
+        data.section1,
+        participantId,
+        requiredHoursPerStudent,
+        team_members.length,
+    ]);
 
     /** Sum hours only for roster members (matches per-student cards); excludes other project participants in bulk API. */
     const collectiveProjectHours = React.useMemo(() => {
@@ -1869,15 +1923,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 ) : null}
                             </div>
 
-                            {verifiedMetrics ? (
+                            {liveStudentMetrics.sessionCount > 0 || liveStudentMetrics.totalHours > 0 || verifiedMetrics ? (
                                 <div className="animate-in slide-in-from-bottom-4 duration-500">
                                     <EngagementOverview
                                         metrics={{
-                                            ...verifiedMetrics,
+                                            ...(verifiedMetrics || {}),
+                                            ...liveStudentMetrics,
                                             projectGoal,
                                             requiredHours: requiredHoursPerStudent,
                                             individual_metrics:
-                                                verifiedMetrics.individual_metrics ??
+                                                liveStudentMetrics.individual_metrics ??
                                                 data.section1.metrics.individual_metrics,
                                         }}
                                         isTeam={participation_type === "team"}

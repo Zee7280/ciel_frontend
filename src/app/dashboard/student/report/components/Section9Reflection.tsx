@@ -1,39 +1,32 @@
-import React, { useMemo, useEffect, useRef, useState } from "react";
-import {
-    GraduationCap, BrainCircuit, Star, Info, TrendingUp,
-    Users2, ChevronDown, Compass,
-} from "lucide-react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { Label } from "./ui/label";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
-import { reportTextWordMeter } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const integrationOptions = [
-    { id: "Voluntary extracurricular activity", label: "🙋 Voluntary / extracurricular" },
-    { id: "Course-linked assignment", label: "📖 Part of a course" },
+    { id: "Voluntary extracurricular activity", label: "💛 Voluntary / extracurricular" },
+    { id: "Course-linked assignment", label: "📘 Part of a course" },
     { id: "Credit-bearing component", label: "🎓 For credit" },
-    { id: "Capstone / Thesis-linked project", label: "📑 Capstone / thesis" },
+    { id: "Capstone / Thesis-linked project", label: "📖 Capstone / thesis" },
     { id: "Research-integrated project", label: "🔬 Research project" },
 ];
 
 const SKILL_OTHER = "✏️ Other";
 
 const SKILL_OPTIONS = [
-    "🗣️ Communication",
+    "💬 Communication",
     "🤝 Teamwork",
-    "📋 Planning",
-    "🧩 Problem-solving",
+    "🗓️ Planning",
+    "🧩 Problem solving",
     "📊 Working with data",
-    "🎤 Leadership",
+    "⭐ Leadership",
     "💗 Empathy",
-    "⏰ Time management",
+    "⏱️ Time management",
     "🔬 Research & inquiry",
     "🎨 Design thinking",
-    "🗣️ Public speaking",
+    "🎤 Public speaking",
     "✍️ Writing & documentation",
     "💻 Digital tools",
     "💰 Budgeting & finance",
@@ -44,6 +37,15 @@ const SKILL_OPTIONS = [
     "🌱 Systems thinking",
     SKILL_OTHER,
 ];
+
+const SKILL_ALIASES: Record<string, string[]> = {
+    "💬 Communication": ["🗣️ Communication"],
+    "🗓️ Planning": ["📋 Planning"],
+    "🧩 Problem solving": ["🧩 Problem-solving"],
+    "⭐ Leadership": ["🎤 Leadership"],
+    "⏱️ Time management": ["⏰ Time management"],
+    "🎤 Public speaking": ["🗣️ Public speaking"],
+};
 
 function stripEmoji(s: string): string {
     return (s || "").replace(/^[^\s]+\s/, "");
@@ -57,108 +59,124 @@ function joinList(items: string[]): string {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-const ratingGuide = [
-    { val: "1", meaning: "Low", context: "No meaningful engagement — little to no involvement in this area" },
-    { val: "2", meaning: "Basic", context: "Initial exposure — limited opportunity to apply independently" },
-    { val: "3", meaning: "Moderate", context: "Developing capability — applied with some guidance" },
-    { val: "4", meaning: "Strong", context: "Independent application — effective use in real situations" },
-    { val: "5", meaning: "Advanced", context: "High proficiency — initiative or leadership demonstrated" },
-];
-
 const competencies = [
     {
         id: "cognitive",
-        icon: Compass,
-        label: "Cognitive competencies",
+        emoji: "🧠",
+        label: "Cognitive",
         items: [
-            { key: "cognitive_systemic", label: "Understanding interconnected issues", description: "You can confidently connect theory to real-life problems." },
-            { key: "cognitive_critical", label: "Critical and ethical reasoning", description: "You are developing judgment but can improve independent decision-making." },
-            { key: "cognitive_evaluate", label: "Ability to evaluate impact", description: "You can evaluate effectiveness, not just participation." },
+            { key: "cognitive_systemic", label: "Understanding interconnected issues" },
+            { key: "cognitive_critical", label: "Critical and ethical reasoning" },
+            { key: "cognitive_evaluate", label: "Ability to evaluate impact" },
         ],
     },
     {
         id: "practical",
-        icon: Star,
-        label: "Practical competencies",
+        emoji: "🛠️",
+        label: "Practical",
         items: [
-            { key: "practical_design", label: "Project design & implementation", description: "You can turn ideas into action." },
-            { key: "practical_evidence", label: "Evidence-based reporting", description: "You worked at a professional, audit-ready level." },
-            { key: "practical_engagement", label: "Community engagement", description: "You showed strong field presence and interpersonal impact." },
+            { key: "practical_design", label: "Project design & implementation" },
+            { key: "practical_evidence", label: "Evidence-based reporting" },
+            { key: "practical_engagement", label: "Community engagement" },
         ],
     },
     {
         id: "social",
-        icon: Users2,
-        label: "Social & civic competencies",
+        emoji: "👥",
+        label: "Social & civic",
         items: [
-            { key: "social_empathy", label: "Responsibility & empathy", description: "You went beyond task completion and connected on a human level." },
-            { key: "social_diversity", label: "Awareness of diversity & inclusion", description: "You respected and adapted to diverse community needs." },
-            { key: "social_collaboration", label: "Collaborative problem-solving", description: "You demonstrated leadership and teamwork." },
+            { key: "social_empathy", label: "Responsibility & empathy" },
+            { key: "social_diversity", label: "Awareness of diversity & inclusion" },
+            { key: "social_collaboration", label: "Collaborative problem solving" },
         ],
     },
     {
         id: "transformative",
-        icon: TrendingUp,
-        label: "Transformative competencies",
+        emoji: "📈",
+        label: "Transformative",
         items: [
-            { key: "transformative_longterm", label: "Long-term thinking", description: "You are beginning to think beyond short-term results." },
-            { key: "transformative_benefits", label: "Understanding benefits & downsides", description: "You think in a balanced and realistic way." },
-            { key: "transformative_sustainability", label: "Sustainability-oriented decision making", description: "You are developing a sustainability mindset." },
+            { key: "transformative_longterm", label: "Long-term thinking" },
+            { key: "transformative_benefits", label: "Understanding benefits & downsides" },
+            { key: "transformative_sustainability", label: "Sustainability-oriented decisions" },
         ],
     },
 ];
 
-const textareaClasses =
-    "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
-const badgeMandatory =
-    "ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
-const badgeRequired =
-    "ml-auto shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
-const badgeOptional =
-    "ml-auto shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
-
-function StepHeader({
-    n,
-    title,
-    status,
-}: {
-    n: string;
-    title: string;
-    status?: "mandatory" | "required" | "optional";
-}) {
-    return (
-        <div className="flex items-center gap-2.5">
-            <span className="cer-secn">
-                {n}
-            </span>
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            {status === "mandatory" ? (
-                <span className={badgeMandatory}>Mandatory</span>
-            ) : status === "required" ? (
-                <span className={badgeRequired}>Required</span>
-            ) : status === "optional" ? (
-                <span className={badgeOptional}>Optional</span>
-            ) : null}
-        </div>
-    );
+function skillOn(selected: string[], id: string) {
+    if (selected.includes(id)) return true;
+    return (SKILL_ALIASES[id] || []).some((alias) => selected.includes(alias));
 }
 
-function WordCount({ count }: { count: number }) {
-    const meter = reportTextWordMeter(count);
+function CompetencyRadar({
+    scores,
+}: {
+    scores: Record<string, number>;
+}) {
+    const axes = competencies.flatMap((group) =>
+        group.items.map((item) => ({
+            emoji: group.emoji,
+            value: Number(scores[item.key]) || 0,
+        })),
+    );
+    const count = axes.length;
+    const cx = 120;
+    const cy = 120;
+    const radius = 78;
+    const point = (index: number, r: number) => {
+        const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
+        return [cx + Math.cos(angle) * r, cy + Math.sin(angle) * r];
+    };
+    const ring = (level: number) =>
+        axes.map((_, index) => point(index, radius * level / 5).join(",")).join(" ");
+    const hasScore = axes.some((axis) => axis.value > 0);
+    const shape = axes.map((axis, index) => point(index, radius * axis.value / 5).join(",")).join(" ");
+
     return (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                <div
-                    className={clsx("h-full rounded-full transition-all", meter.barClass)}
-                    style={{ width: `${meter.widthPct}%` }}
-                />
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-[#e2d9f7] bg-[#fbfaff] p-4 sm:flex-row sm:items-center sm:p-5">
+            <svg viewBox="0 0 240 240" className="h-52 w-52 shrink-0" aria-hidden>
+                {[1, 2, 3, 4, 5].map((level) => (
+                    <polygon key={level} points={ring(level)} fill="none" stroke="#d9d3f3" strokeWidth="1" />
+                ))}
+                {hasScore ? (
+                    <polygon points={shape} fill="rgba(111,98,217,0.28)" stroke="#6f62d9" strokeWidth="2" />
+                ) : null}
+                {axes.map((axis, index) => {
+                    if (!axis.value) return null;
+                    const [x, y] = point(index, radius * axis.value / 5);
+                    return <circle key={index} cx={x} cy={y} r="3.5" fill="#6f62d9" />;
+                })}
+                {axes.map((axis, index) => {
+                    const [x, y] = point(index, radius + 16);
+                    return (
+                        <text key={`label-${index}`} x={x} y={y} fontSize="12" textAnchor="middle" fill="#58707a">
+                            {axis.emoji}
+                        </text>
+                    );
+                })}
+            </svg>
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">Your competency radar</p>
+                <div className="mt-3 space-y-1.5">
+                    {competencies.map((group) => {
+                        const values = group.items.map((item) => Number(scores[item.key]) || 0).filter((value) => value > 0);
+                        const avg = values.length
+                            ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)
+                            : "—";
+                        return (
+                            <div key={group.id} className="flex items-center justify-between gap-3 text-xs">
+                                <span className="font-semibold text-slate-600">{group.emoji} {group.label}</span>
+                                <b className="text-slate-900">{avg}/5</b>
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                    Fills in live as you rate yourself below. Honest beats high — the rubric reads reflection quality, not the score.
+                </p>
             </div>
-            <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / 200 words (min 20)
-            </p>
         </div>
     );
 }
@@ -177,8 +195,6 @@ export default function Section9Reflection() {
         reflection_moment = "",
         reflection_discipline_help = "",
     } = section9;
-
-    const [showRatingGuide, setShowRatingGuide] = useState(false);
 
     const update = (field: string, val: unknown) => updateSection("section9", { [field]: val });
     const updateScore = (key: string, val: number) =>
@@ -200,11 +216,14 @@ export default function Section9Reflection() {
         const namedSkills = skills.filter((s) => s !== SKILL_OTHER || skillsOther.trim()).map((s) => skillLabel(s, skillsOther));
 
         const personalParts: string[] = [];
-        if (namedSkills.length) personalParts.push(`Through this project I grew my ${joinList(namedSkills)}.`);
+        if (namedSkills.length) personalParts.push(`Through this project, I grew my ${joinList(namedSkills)} skills while working with community members.`);
         if (biggest) personalParts.push(`The biggest thing I learned was ${lowerFirst(biggest)}.`);
-        if (moment) personalParts.push(`A moment that changed how I see things was ${lowerFirst(moment)}.`);
+        if (moment) personalParts.push(`A moment that changed how I see things: ${lowerFirst(moment)}.`);
         const composedPersonal = personalParts.join(" ");
-        const composedApplication = disciplineHelp ? `My field of study helped because ${lowerFirst(disciplineHelp)}.` : "";
+        const discipline = (section2?.discipline || "").trim();
+        const composedApplication = disciplineHelp
+            ? `As a ${discipline || "university"} student, ${lowerFirst(disciplineHelp)} — connecting my coursework directly to the community’s daily reality.`
+            : "";
 
         const patch: Record<string, unknown> = { ...fieldPatch };
         const personalStillAuto = !personal_learning || personal_learning === lastAutoPersonalRef.current;
@@ -221,33 +240,28 @@ export default function Section9Reflection() {
     };
 
     const toggleSkill = (skill: string) => {
-        const next = skills_grown.includes(skill) ? skills_grown.filter((s) => s !== skill) : [...skills_grown, skill];
-        composeAndUpdate({ skills_grown: next });
+        const aliases = SKILL_ALIASES[skill] || [];
+        const on = skillOn(skills_grown, skill);
+        const next = skills_grown.filter((value) => value !== skill && !aliases.includes(value));
+        composeAndUpdate({ skills_grown: on ? next : [...next, skill] });
     };
-
-    /** Combined preview only — the real, validated text lives in personal_learning / academic_application below. */
-    const reflectionPreview = useMemo(() => {
-        const namedSkills = skills_grown
-            .filter((s) => s !== SKILL_OTHER || skills_grown_other.trim())
-            .map((s) => skillLabel(s, skills_grown_other));
-        const parts: string[] = [];
-        if (namedSkills.length) parts.push(`Through this project I grew my ${joinList(namedSkills)}.`);
-        if (reflection_biggest_learning) parts.push(`The biggest thing I learned was ${lowerFirst(reflection_biggest_learning)}.`);
-        if (reflection_moment) parts.push(`A moment that changed how I see things was ${lowerFirst(reflection_moment)}.`);
-        if (reflection_discipline_help) parts.push(`My field of study helped because ${lowerFirst(reflection_discipline_help)}.`);
-        return parts.join(" ");
-    }, [skills_grown, skills_grown_other, reflection_biggest_learning, reflection_moment, reflection_discipline_help]);
 
     const getWordCount = (text: string) =>
         (text || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
     const plWords = getWordCount(personal_learning);
     const aaWords = getWordCount(academic_application);
 
+    const ratedCount = useMemo(
+        () => Object.values(competency_scores || {}).filter((value) => Number(value) > 0).length,
+        [competency_scores],
+    );
     const avgScore = useMemo(() => {
-        const values = Object.values(competency_scores || {}).map(Number);
+        const values = Object.values(competency_scores || {}).map(Number).filter((value) => value > 0);
         if (!values.length) return 0;
-        return values.reduce((a, b) => a + b, 0) / 12;
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
     }, [competency_scores]);
+    const overallLabel = ratedCount === 12 ? `${avgScore.toFixed(1)} / 5` : ratedCount ? `${ratedCount}/12 rated` : "— / 5";
+    const legacySkills = skills_grown.filter((skill) => !SKILL_OPTIONS.some((option) => skillOn([skill], option)));
 
     const autoNarrative = useMemo(() => {
         const typeStr =
@@ -278,369 +292,194 @@ export default function Section9Reflection() {
 
     return (
         <div className="mx-auto max-w-6xl space-y-3 pb-10">
-            {/* Header */}
-            <div className="cer-dup-head space-y-4">
-                <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--teal)] text-white shadow-sm">
-                        <GraduationCap className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-[var(--teal)]">SECTION 8:</span> Reflection
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-xl border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aqua)]" />
-                    <div>
-                        <p className="text-sm font-semibold text-[var(--ink)]">
-                            This section captures what you learned, how your academic knowledge was applied, and which competencies you developed.
-                        </p>
-                        <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/80">
-                            It transforms your report from simple volunteering into structured academic engagement.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* 9.0 Academic integration */}
             <section className="cer-card space-y-4">
-                <StepHeader n="9.0" title="Step 1 — Academic integration level" status="mandatory" />
-
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <Label className={fieldLabel}>
-                        How does this project connect to your academic program?
-                    </Label>
-
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                        {integrationOptions.map((opt) => {
-                            const active = academic_integration === opt.id;
-                            return (
-                                <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => update("academic_integration", opt.id)}
-                                    className={clsx(
-                                        "rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors",
-                                        active
-                                            ? "border-[var(--teal)] bg-[var(--teal)] text-white shadow-sm"
-                                            : "border-slate-200 bg-white text-slate-700 hover:border-[var(--teal)]/40 hover:bg-[var(--teal-soft)]",
-                                    )}
-                                >
-                                    {opt.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <FieldError message={getFieldError("academic_integration")} />
+                <div className="cer-secl">
+                    <span className="cer-secn">8.1</span>
+                    <h3>Academic integration</h3>
+                    <span className="cer-tag auto">Carried from your program — tap to change</span>
                 </div>
-            </section>
-
-            {/* 9.1 + 9.2 merged — guided reflection */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="9.1" title="Step 2 — Your reflection" status="mandatory" />
-
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <p className="text-sm text-slate-500">
-                        Tap the skills you grew, then finish three sentences — that composes the reflection below. Edit it directly any time.
-                    </p>
-
-                    <div className="space-y-2">
-                        <Label className={fieldLabel}>Skills I grew (tap all that apply)</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {SKILL_OPTIONS.map((skill) => {
-                                const active = skills_grown.includes(skill);
-                                return (
-                                    <button
-                                        key={skill}
-                                        type="button"
-                                        onClick={() => toggleSkill(skill)}
-                                        className={clsx("cer-chip", active && "on")}
-                                    >
-                                        {skill}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {skills_grown.includes(SKILL_OTHER) ? (
-                            <Input
-                                placeholder="Name the skill you grew…"
-                                value={skills_grown_other}
-                                onChange={(e) => composeAndUpdate({ skills_grown_other: e.target.value })}
-                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
-                            />
-                        ) : null}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label className={fieldLabel}>The biggest thing I learned was…</Label>
-                        <Input
-                            placeholder="e.g. that listening to the community matters more than my plan"
-                            value={reflection_biggest_learning}
-                            onChange={(e) => composeAndUpdate({ reflection_biggest_learning: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label className={fieldLabel}>A moment that changed how I see things…</Label>
-                        <Input
-                            placeholder="e.g. seeing children choose books over the playground on day one"
-                            value={reflection_moment}
-                            onChange={(e) => composeAndUpdate({ reflection_moment: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label className={fieldLabel}>My field of study helped because…</Label>
-                        {section2?.discipline ? (
-                            <p className="text-xs font-semibold text-[var(--teal)]">Your discipline: {section2.discipline}</p>
-                        ) : null}
-                        <Input
-                            placeholder="e.g. I used simple data tracking to measure attendance improvements"
-                            value={reflection_discipline_help}
-                            onChange={(e) => composeAndUpdate({ reflection_discipline_help: e.target.value })}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[var(--teal-soft)]"
-                        />
-                    </div>
-
-                    <div className="rounded-xl border border-dashed border-[var(--aqua)]/40 bg-[var(--aqua-soft)] p-4 text-sm leading-relaxed text-slate-700">
-                        {reflectionPreview || <span className="text-slate-400">Your reflection builds here as you tap and type…</span>}
-                    </div>
-
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div>
-                            <Label className={fieldLabel}>Personal learning reflection</Label>
-                            <p className="mt-1.5 text-xs text-slate-500">Filled in from your answers above — fine-tune it here if you like.</p>
-                        </div>
-                        <Textarea
-                            placeholder="Through this project, I improved my communication and teamwork skills while working with community members..."
-                            value={personal_learning}
-                            onChange={(e) => update("personal_learning", e.target.value)}
-                            className={textareaClasses}
-                        />
-                        <WordCount count={plWords} />
-                        <FieldError message={getFieldError("personal_learning")} />
-                    </div>
-
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div>
-                            <Label className={fieldLabel}>Academic application &amp; discipline contribution</Label>
-                            <p className="mt-1.5 text-xs text-slate-500">Filled in from your answer above — fine-tune it here if you like.</p>
-                        </div>
-                        <Textarea
-                            placeholder="As a student, I applied basic data analysis techniques to track attendance and measure improvement..."
-                            value={academic_application}
-                            onChange={(e) => update("academic_application", e.target.value)}
-                            className={textareaClasses}
-                        />
-                        <WordCount count={aaWords} />
-                        <FieldError message={getFieldError("academic_application")} />
-                    </div>
-                </div>
-            </section>
-
-            {/* 9.3 Competency self-assessment */}
-            <section className="cer-card space-y-4">
-                <StepHeader n="9.2" title="Step 3 — Rate yourself, be honest" />
-
-                <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <button
-                        type="button"
-                        onClick={() => setShowRatingGuide((v) => !v)}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--teal)] hover:text-[var(--teal)]/80"
-                    >
-                        Rating guide — what each score means
-                        <ChevronDown
-                            className={clsx(
-                                "h-4 w-4 transition-transform",
-                                showRatingGuide && "rotate-180",
-                            )}
-                        />
-                    </button>
-
-                    {showRatingGuide ? (
-                        <div className="overflow-x-auto rounded-xl border border-slate-200">
-                            <table className="w-full text-left">
-                                <thead className="border-b border-slate-100 bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                            Rating
-                                        </th>
-                                        <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                            Meaning
-                                        </th>
-                                        <th className="hidden px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:table-cell">
-                                            What it looks like
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {ratingGuide.map((r) => (
-                                        <tr key={r.val}>
-                                            <td className="px-4 py-3">
-                                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--ink)] text-[10px] font-bold text-white">
-                                                    {r.val}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-xs font-semibold text-slate-700">
-                                                {r.meaning}
-                                            </td>
-                                            <td className="hidden px-4 py-3 text-xs text-slate-500 sm:table-cell">
-                                                {r.context}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                <div className="cer-chips">
+                    {integrationOptions.map((opt) => (
+                        <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => update("academic_integration", opt.id)}
+                            className={clsx("cer-chip", academic_integration === opt.id && "on")}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                    {academic_integration && !integrationOptions.some((opt) => opt.id === academic_integration) ? (
+                        <button type="button" className="cer-chip on" onClick={() => update("academic_integration", academic_integration)}>
+                            {academic_integration}
+                        </button>
                     ) : null}
+                </div>
+                <FieldError message={getFieldError("academic_integration")} />
+            </section>
 
-                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                        {competencies.map((cat) => (
-                            <div
-                                key={cat.id}
-                                className="space-y-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5"
+            <section className="cer-card space-y-4">
+                <div className="cer-secl">
+                    <span className="cer-secn">8.2</span>
+                    <h3>Your reflection</h3>
+                    <span className="cer-tag">Mandatory</span>
+                </div>
+
+                <div>
+                    <Label className={fieldLabel}>Skills I grew · any discipline · tap all that apply</Label>
+                    <div className="cer-chips mt-2">
+                        {SKILL_OPTIONS.map((skill) => (
+                            <button
+                                key={skill}
+                                type="button"
+                                onClick={() => toggleSkill(skill)}
+                                className={clsx("cer-chip", skillOn(skills_grown, skill) && "on")}
                             >
-                                <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
-                                    <cat.icon className="h-4 w-4 text-[var(--teal)]" />
-                                    <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-800">
-                                        {cat.label}
-                                    </h4>
-                                </div>
-
-                                <div className="space-y-5">
-                                    {cat.items.map((item) => {
-                                        const score =
-                                            competency_scores[item.key as keyof typeof competency_scores] || 0;
-                                        return (
-                                            <div key={item.key} className="space-y-2.5">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0 space-y-0.5">
-                                                        <p className="text-xs font-semibold leading-snug text-slate-900">
-                                                            {item.label}
-                                                        </p>
-                                                        {item.description ? (
-                                                            <p className="text-[11px] italic leading-relaxed text-slate-400">
-                                                                {item.description}
-                                                            </p>
-                                                        ) : null}
-                                                    </div>
-                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-800">
-                                                        {score > 0 ? score : "—"}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex gap-1.5">
-                                                    {[1, 2, 3, 4, 5].map((v) => (
-                                                        <button
-                                                            key={v}
-                                                            type="button"
-                                                            onClick={() => updateScore(item.key, v)}
-                                                            className={clsx(
-                                                                "flex h-9 flex-1 items-center justify-center rounded-md text-xs font-semibold transition-colors",
-                                                                score === v
-                                                                    ? "bg-[var(--teal)] text-white shadow-sm"
-                                                                    : score > v
-                                                                        ? "bg-[var(--teal-soft)] text-[var(--teal)]"
-                                                                        : "bg-white text-slate-400 hover:bg-slate-100 border border-slate-200",
-                                                            )}
-                                                        >
-                                                            {v}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                                {skill}
+                            </button>
+                        ))}
+                        {legacySkills.map((skill) => (
+                            <button key={skill} type="button" className="cer-chip on" onClick={() => toggleSkill(skill)}>
+                                {skill}
+                            </button>
                         ))}
                     </div>
+                    {skillOn(skills_grown, SKILL_OTHER) ? (
+                        <input
+                            className="cer-input mt-2"
+                            placeholder="What else did you grow?"
+                            value={skills_grown_other}
+                            onChange={(e) => composeAndUpdate({ skills_grown_other: e.target.value })}
+                        />
+                    ) : null}
+                    <FieldError message={getFieldError("skills_grown_other")} />
+                    <FieldError message={getFieldError("skills_grown")} />
+                </div>
 
-                    <div className="flex items-center justify-between rounded-xl border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--aqua)]">
-                            Average competency score
-                        </p>
-                        <p className="text-sm font-semibold text-[var(--ink)]">
-                            {avgScore > 0 ? avgScore.toFixed(1) : "—"} / 5
-                        </p>
+                <div>
+                    <div className="flex items-end justify-between gap-3">
+                        <Label className={fieldLabel}>The biggest thing I learned was…</Label>
+                        <span className="cer-wc">{getWordCount(reflection_biggest_learning)} words · 5–30 recommended</span>
                     </div>
+                    <input
+                        className="cer-input mt-2"
+                        placeholder="e.g. that listening to the community matters more than my plan"
+                        value={reflection_biggest_learning}
+                        onChange={(e) => composeAndUpdate({ reflection_biggest_learning: e.target.value })}
+                    />
+                    <FieldError message={getFieldError("reflection_biggest_learning")} />
+                </div>
+
+                <div>
+                    <div className="flex items-end justify-between gap-3">
+                        <Label className={fieldLabel}>A moment that changed how I see things…</Label>
+                        <span className="cer-wc">{getWordCount(reflection_moment)} words · 5–30 recommended</span>
+                    </div>
+                    <input
+                        className="cer-input mt-2"
+                        placeholder="e.g. seeing children choose books over the playground on day one"
+                        value={reflection_moment}
+                        onChange={(e) => composeAndUpdate({ reflection_moment: e.target.value })}
+                    />
+                    <FieldError message={getFieldError("reflection_moment")} />
+                </div>
+
+                <div>
+                    <div className="flex items-end justify-between gap-3">
+                        <Label className={fieldLabel}>An academic skill I actually applied…</Label>
+                        <span className="cer-wc">{getWordCount(reflection_discipline_help)} words · 5–30 recommended</span>
+                    </div>
+                    {section2?.discipline ? (
+                        <p className="mt-1 text-xs font-semibold text-[var(--teal)]">Your discipline: {section2.discipline}</p>
+                    ) : null}
+                    <input
+                        className="cer-input mt-2"
+                        placeholder="e.g. I used simple data tracking to measure attendance improvements"
+                        value={reflection_discipline_help}
+                        onChange={(e) => composeAndUpdate({ reflection_discipline_help: e.target.value })}
+                    />
+                    <FieldError message={getFieldError("reflection_discipline_help")} />
+                </div>
+
+                <div>
+                    <div className="flex items-end justify-between gap-3">
+                        <Label className={fieldLabel}>Personal learning reflection · auto-drafted, edit freely</Label>
+                        <span className="cer-wc">{plWords} words · recommended 40–100</span>
+                    </div>
+                    <textarea
+                        className="cer-input mt-2 min-h-[96px]"
+                        value={personal_learning}
+                        onChange={(e) => update("personal_learning", e.target.value)}
+                    />
+                    <FieldError message={getFieldError("personal_learning")} />
+                </div>
+
+                <div>
+                    <div className="flex items-end justify-between gap-3">
+                        <Label className={fieldLabel}>Academic application · auto-drafted, edit freely</Label>
+                        <span className="cer-wc">{aaWords} words · recommended 25–70</span>
+                    </div>
+                    <textarea
+                        className="cer-input mt-2 min-h-[96px]"
+                        value={academic_application}
+                        onChange={(e) => update("academic_application", e.target.value)}
+                    />
+                    <FieldError message={getFieldError("academic_application")} />
                 </div>
             </section>
 
-            {/* System summary */}
+            <CompetencyRadar scores={competency_scores || {}} />
+
             <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">
-                            <BrainCircuit className="h-4 w-4" />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            System-generated academic summary
-                        </h3>
-                    </div>
-                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Read-only
-                    </span>
+                <div className="cer-secl">
+                    <span className="cer-secn">8.3</span>
+                    <h3>Rate yourself — be honest</h3>
+                    <span className="cer-tag">Mandatory</span>
                 </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <p className={clsx(fieldLabel, "mb-4")}>Academic integration overview</p>
-                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-sm font-semibold leading-snug text-slate-900 line-clamp-2">
-                                {integrationOptions.find((o) => o.id === academic_integration)?.label || "Pending"}
+                <p className="cer-hint">
+                    <b>1</b> just starting · <b>3</b> did it independently · <b>5</b> could teach it. Honest middles beat a row of 5s — the rubric checks ratings against evidence.
+                </p>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {competencies.map((group) => (
+                        <div key={group.id} className="rounded-xl border border-slate-200 p-4">
+                            <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-700">
+                                {group.emoji} {group.label}
                             </p>
-                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                Integration level
-                            </p>
+                            <div className="space-y-3">
+                                {group.items.map((item) => {
+                                    const score = Number(competency_scores?.[item.key as keyof typeof competency_scores]) || 0;
+                                    return (
+                                        <div key={item.key} className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="min-w-0 flex-1 text-xs font-semibold text-slate-800">{item.label}</p>
+                                            <div className="flex gap-1">
+                                                {[1, 2, 3, 4, 5].map((value) => (
+                                                    <button
+                                                        key={value}
+                                                        type="button"
+                                                        onClick={() => updateScore(item.key, value)}
+                                                        className={clsx(
+                                                            "flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold",
+                                                            score === value
+                                                                ? "border-[#6f62d9] bg-[#6f62d9] text-white"
+                                                                : "border-slate-200 bg-white text-slate-500 hover:border-[#6f62d9]",
+                                                        )}
+                                                    >
+                                                        {value}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-sm font-semibold leading-snug text-slate-900 line-clamp-2">
-                                {section2?.discipline || "N/A"}
-                            </p>
-                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                Discipline applied
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-[var(--aqua)]/25 bg-[var(--aqua-soft)] p-4 col-span-2 lg:col-span-1">
-                            <p className="text-2xl font-semibold text-[var(--ink)]">
-                                {avgScore > 0 ? avgScore.toFixed(1) : "—"}
-                            </p>
-                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]">
-                                Avg competency score
-                            </p>
-                        </div>
-                    </div>
+                    ))}
                 </div>
-            </section>
-
-            {/* Auto narrative */}
-            <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--aqua)] text-white">
-                            <BrainCircuit className="h-4 w-4" />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Academic reflection summary
-                        </h3>
-                    </div>
-                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Auto-generated
-                    </span>
+                <div className="flex items-center text-xs font-extrabold text-[var(--teal)]">
+                    Overall competency
+                    <span className="ml-auto text-sm">{overallLabel}</span>
                 </div>
-
-                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <div className="absolute -bottom-10 -right-10 rotate-12 opacity-5">
-                        <BrainCircuit className="h-64 w-64 text-slate-900" />
-                    </div>
-                    <p className="relative z-10 text-sm leading-relaxed text-slate-700">
-                        {autoNarrative}
-                    </p>
-                </div>
+                <FieldError message={getFieldError("competency_scores")} />
             </section>
         </div>
     );

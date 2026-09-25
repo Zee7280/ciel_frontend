@@ -7,8 +7,9 @@ import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, tabIsComplete, wizardStepToDataSections } from "./utils/reportWizardNav";
 import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journeyLevel, sectionStrength } from "./utils/impactJourney";
-import { effectiveHoursFromLog, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
-import { filterAttendanceLogsForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
+import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
+import { distinctBeneficiaryTotal } from "./utils/activityReach";
+import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -19,7 +20,7 @@ export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: bool
     { step: 6, label: "6 Partnerships" },
     { step: 7, label: "7 Evidence" },
     { step: 8, label: "8 Reflection" },
-    { step: 9, label: "9 Sustainability" },
+    { step: 9, label: "9 Sustainability + review" },
     { step: 10, label: "Flash card", flash: true },
 ];
 
@@ -46,8 +47,8 @@ const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: st
     8: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What it did to you" },
     9: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "What survives after you leave",
-        note: "Not all projects continue — a candid answer is stronger than an optimistic one.",
+        title: "The last mile — what survives, and where it all travels",
+        note: "Not all projects continue — a candid answer is stronger than an optimistic one. The consistency review below is what the CII score reads.",
     },
     10: {
         kicker: "SUMMARY CARD · ONE RECORD",
@@ -124,9 +125,15 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
             ? 1 + (Array.isArray(data.section1.team_members) ? data.section1.team_members.length : 0)
             : 1) || 1;
     const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
-    const acts = Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : [];
-    const outputs = acts.reduce((sum, block) => sum + (Array.isArray(block.outputs) ? block.outputs.length : 0), 0);
-    const reach = pickString(data.section4?.project_summary?.distinct_total_beneficiaries);
+    const acts = (Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : []).filter(
+        (block) => pickString(block.title, block.primary_category),
+    );
+    const outputs = acts.reduce((sum, block) => {
+        const rows = Array.isArray(block.outputs) ? block.outputs : [];
+        return sum + rows.filter((row) => String(row?.quantity ?? "").trim()).length;
+    }, 0);
+    const reachCount = distinctBeneficiaryTotal(data.section4);
+    const reach = reachCount > 0 ? String(reachCount) : "";
     const outcomes = Array.isArray(data.section5?.measurable_outcomes) ? data.section5.measurable_outcomes : [];
     const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && (o.baseline || o.endline));
     const pcts = measured
@@ -288,52 +295,74 @@ export function ReportImpactJourney({
     );
 }
 
-const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>, requiredHours: number) => { headline: string; body: string; badges: string[] }> = {
+const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>, requiredHours: number, data: ReportData) => { headline: string; body: string; badges: string[] }> = {
     1: (a, requiredHours) => ({
         headline: "READY TO BEGIN",
         body: "Your opportunity is connected. Build your participation record first.",
-        badges: [`🎯 ${requiredHours}h target/member`, `🌍 ${a.sdgs.length} registered SDG${a.sdgs.length === 1 ? "" : "s"}`],
+        badges: [`🎯 ${requiredHours}h target/member`, `🌍 ${a.sdgs.filter((row) => row.role === "primary").length || a.sdgs.length} registered SDG${(a.sdgs.filter((row) => row.role === "primary").length || a.sdgs.length) === 1 ? "" : "s"}`],
     }),
     2: (a) => ({
         headline: "PARTICIPATION RECORD STARTED",
         body: `${a.logs.length} evidence-backed session${a.logs.length === 1 ? "" : "s"} · ${Math.round(a.hours * 10) / 10} team-hours logged.`,
         badges: [`👥 ${a.members} team member${a.members === 1 ? "" : "s"}`, `📸 ${a.evidence} evidence files`],
     }),
-    3: (a) => ({
+    3: (a, _hours, data) => ({
         headline: "BASELINE ESTABLISHED",
-        body: a.context ? "Your starting-point story is on record." : "Your starting-point story is being built.",
-        badges: [`🌍 ${a.sdgs.length} SDG${a.sdgs.length === 1 ? "" : "s"} mapped`],
+        body: firstSentence(data.section2?.problem_statement || "") || "Your starting-point story is being built.",
+        badges: [
+            `👥 ${data.section2?.affected_count ? `≈${data.section2.affected_count} ` : ""}${data.section2?.affected_group || "—"} affected`,
+            `🎓 ${data.section2?.discipline || "discipline pending"}`,
+        ],
     }),
-    4: (a) => ({
-        headline: "SDG STORY MAPPED",
-        body: `${a.sdgs.length} SDG alignment${a.sdgs.length === 1 ? "" : "s"} captured.`,
-        badges: [`🧭 contribution logic captured`],
-    }),
+    4: (a) => {
+        const registered = a.sdgs.filter((row) => row.role === "primary").length;
+        const added = a.sdgs.filter((row) => row.role !== "primary").length;
+        return {
+            headline: "SDG STORY MAPPED",
+            body: `${registered} registered + ${added} student-added SDG alignment${registered + added === 1 ? "" : "s"}.`,
+            badges: [`🌍 ${a.sdgs.length} total SDG${a.sdgs.length === 1 ? "" : "s"}`, "🧭 contribution logic captured"],
+        };
+    },
     5: (a) => ({
         headline: "ACTIVITIES & OUTCOMES BUILT",
-        body: `${a.acts.length} activities · ${a.outputs} countable outputs${a.reach ? ` · ${a.reach} reached` : ""}.`,
+        body: `${a.acts.length} activities · ${a.outputs} countable outputs · ${a.reach || 0} estimated unique beneficiaries.`,
         badges: [`📈 ${a.measured.length} measurable outcome${a.measured.length === 1 ? "" : "s"}`, `🛠 ${a.acts.length} activities`],
     }),
-    6: (a) => ({
-        headline: "RESOURCE STORY BUILT",
-        body: a.pkr ? `PKR ${a.pkr.toLocaleString()} mobilized.` : "Resource story on record.",
-        badges: [`📦 resources logged`, `💪 student contribution captured`],
-    }),
-    7: (a) => ({
-        headline: "PARTNERSHIP STORY BUILT",
-        body: `${a.context.partnerOrganization || "Your partner"} relationship documented.`,
-        badges: [`🤝 ${a.context.partnerOrganization || "Partner"}`, `🔗 roles recorded`],
-    }),
+    6: (a, _hours, data) => {
+        const resources = data.section6?.resources || [];
+        const timeOnly = data.section6?.use_resources === "no";
+        return {
+            headline: "RESOURCE STORY BUILT",
+            body: timeOnly
+                ? "This project ran primarily on student time and effort."
+                : `${a.pkr ? `PKR ${a.pkr.toLocaleString()} mobilized · ` : ""}${resources.length} resource entr${resources.length === 1 ? "y" : "ies"}.`,
+            badges: [`📦 ${resources.length} resources`, "💪 student contribution captured"],
+        };
+    },
+    7: (a, _hours, data) => {
+        const partners = (data.section7?.partners || []).filter((partner) => partner.name);
+        const count = Math.max(partners.length, a.context.partnerOrganization ? 1 : 0);
+        return {
+            headline: "PARTNERSHIP STORY BUILT",
+            body: `${count} partner relationship${count === 1 ? "" : "s"} documented.`,
+            badges: [`🤝 ${a.context.partnerOrganization || "Partner"}`, "🔗 roles recorded"],
+        };
+    },
     8: (a) => ({
         headline: "EVIDENCE VAULT BUILT",
         body: `${a.evidence} evidence item${a.evidence === 1 ? "" : "s"} linked to the report.`,
         badges: [`🔐 consent captured`, `📎 evidence classified`],
     }),
-    9: (a) => ({
-        headline: "LEARNING RECORD BUILT",
-        body: a.competency ? `Overall competency ${a.competency}/5.` : "Your learning evidence is ready to be completed.",
-        badges: [`🎓 academic application`, `🧠 reflective learning`],
-    }),
+    9: (a, _hours, data) => {
+        const skills = data.section9?.skills_grown || [];
+        return {
+            headline: "LEARNING RECORD BUILT",
+            body: a.competency
+                ? `Overall competency ${a.competency}/5 · ${skills.length} skills selected.`
+                : "Your learning evidence is ready to be completed.",
+            badges: ["🎓 academic application", "🧠 reflective learning"],
+        };
+    },
 };
 
 /** 🏆 Recap of the previous section's real numbers — shown above the bridge from step 2 onward. */
@@ -350,7 +379,7 @@ export function ReportAchievementBanner({
     const build = ACHIEVEMENT_COPY[uiStep];
     if (!build) return null;
     const a = chromeAgg(data, projectData);
-    const { headline, body, badges } = build(a, data.required_hours || 16);
+    const { headline, body, badges } = build(a, data.required_hours || 16, data);
     return (
         <div className="cer-achievement">
             <div className="trophy">🏆</div>
@@ -400,7 +429,7 @@ export function ReportSectionBridge({
 
     return (
         <>
-            <div className="cer-bridge">
+            <div className={`cer-bridge cer-bridge-s${uiStep}`}>
                 <div className="k">{meta.kicker}</div>
                 <h1>{meta.title}</h1>
                 <p>
@@ -447,8 +476,83 @@ export function ReportSectionBridge({
                     </button>
                 ) : null}
             </div>
-            {meta.note ? <div className="cer-note">{meta.note}</div> : null}
+            {meta.note && uiStep !== 4 ? <div className="cer-note">{meta.note}</div> : null}
         </>
+    );
+}
+
+const WRITING_GUIDES: Record<number, string[]> = {
+    2: ["Short factual answers", "20–60 words for the main problem", "15–50 words for your academic lens"],
+    3: ["Evidence-backed SDG logic", "30–80 words for registered contribution", "20–60 words per student-added SDG"],
+    4: ["Impact over essays", "15–60 words for activity responsibilities", "40–100 words for the before→after story"],
+    6: ["Partnership evidence", "15–60 words for partner contribution"],
+    7: ["Evidence captions", "10–45 words is enough to explain what the evidence proves"],
+    8: ["Reflection, not an essay", "5–30 words per prompt", "40–100 words personal reflection", "25–70 words academic application"],
+    9: ["Sustainability with substance", "60–120 words for what continues / stops / transfers"],
+};
+
+const GLOBAL_DOMAINS = [
+    "Medicine & Health",
+    "Engineering",
+    "Computing & AI",
+    "Architecture & Design",
+    "Law & Policy",
+    "Business",
+    "Arts & Media",
+    "Education",
+    "Environment",
+    "Agriculture",
+    "Social Sciences",
+    "Sports",
+    "Research",
+    "Humanitarian",
+];
+
+export function ReportWritingGuide({ step }: { step: number }) {
+    const chips = WRITING_GUIDES[canonicalReportStep(step)];
+    if (!chips) return null;
+    return (
+        <div className="cer-wordguide">
+            <b>Writing guide</b>
+            {chips.map((chip) => (
+                <span key={chip}>{chip}</span>
+            ))}
+        </div>
+    );
+}
+
+export function ReportGlobalCoverage({ step }: { step: number }) {
+    const uiStep = canonicalReportStep(step);
+    if (uiStep === 4) {
+        return (
+            <div className="cer-global">
+                <b>🌍 Global Community Engagement Library:</b> Section 4 is designed for students in any programme, country or discipline. Choose the closest structured option so CIEL PK can compare impact across institutions; use <b>Other / Custom</b> whenever your activity does not fit.
+                <div className="domains">
+                    {GLOBAL_DOMAINS.map((domain) => (
+                        <span key={domain}>{domain}</span>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    if (uiStep === 5) {
+        return (
+            <div className="cer-global">
+                <b>📦 Resource Source Distribution:</b> record cash, in-kind, time, expertise, technology, logistics, institutional support and community contributions. The summary automatically shows where project capacity came from.
+            </div>
+        );
+    }
+    return null;
+}
+
+export function ReportSectionLeadNote({ step }: { step: number }) {
+    if (canonicalReportStep(step) !== 4) return null;
+    return (
+        <div className="cer-note">
+            <span>
+                <b>One section, two easy parts:</b> <b>Part A</b> — what you did (things you can count) · <b>Part B</b> — what changed because of it (before → after). Fill A, and B almost writes itself.
+            </span>
+        </div>
     );
 }
 
@@ -620,13 +724,113 @@ function gapLabel(gap: string, section: ReportData["section2"]): string {
     return (section?.system_gaps_other || "").trim() || "Other";
 }
 
+function stripChoiceLabel(value: unknown): string {
+    return String(value ?? "")
+        .replace(/^[^\p{L}\p{N}]+/u, "")
+        .trim();
+}
+
+function isSummaryOtherChoice(value: unknown): boolean {
+    const text = stripChoiceLabel(value);
+    if (!text) return false;
+    if (/^other(?:…|\.\.\.)?$/i.test(text)) return true;
+    if (/^other\s+supporting/i.test(text)) return true;
+    return /other\s*\/\s*custom/i.test(text);
+}
+
+function activityFamilyLabel(block: ReportData["section4"]["activity_blocks"][number]): string {
+    const family = isSummaryOtherChoice(block.primary_category)
+        ? pickString(block.other_category_text, block.primary_category)
+        : pickString(block.primary_category);
+    const sub = isSummaryOtherChoice(block.sub_category)
+        ? pickString(block.other_sub_category_text, block.sub_category)
+        : pickString(block.sub_category);
+    return [stripChoiceLabel(family), stripChoiceLabel(sub)].filter(Boolean).join(" → ");
+}
+
+function resourceChoiceLabel(value: unknown, custom: unknown): string {
+    const raw = pickString(value);
+    if (!raw) return "";
+    if (isSummaryOtherChoice(raw) || /other/i.test(stripChoiceLabel(raw))) return pickString(custom, raw);
+    return raw;
+}
+
+function partnerRoleLabels(partner: ReportData["section7"]["partners"][number]): string[] {
+    const other = pickString((partner as { role_other?: string }).role_other);
+    const roles = Array.isArray(partner.role) ? partner.role : [];
+    return roles
+        .map((role) => (isSummaryOtherChoice(role) ? other : role))
+        .map((role) => role.trim())
+        .filter((role) => role && !isSummaryOtherChoice(role));
+}
+
+const CONTINUATION_TITLES: Record<string, string> = {
+    yes: "Continues on its own",
+    partially: "Partly continues",
+    partial: "Partly continues",
+    no: "Stops when we leave",
+};
+
+const VISIBILITY_TITLES: Record<string, string> = {
+    public: "PUBLIC — EXTRA POINTS",
+    limited: "INSTITUTIONAL",
+    internal: "PRIVATE",
+};
+
+const INTEGRATION_TITLES: Record<string, string> = {
+    "Voluntary extracurricular activity": "VOLUNTARY / EXTRACURRICULAR",
+    "Course-linked assignment": "PART OF A COURSE",
+    "Credit-bearing component": "FOR CREDIT",
+    "Capstone / Thesis-linked project": "CAPSTONE / THESIS",
+    "Research-integrated project": "RESEARCH PROJECT",
+};
+
+function cleanedList(values: string[] | undefined, otherText?: string): string[] {
+    return (values || [])
+        .map((item) => (isSummaryOtherChoice(item) ? pickString(otherText) : item))
+        .map((item) => item.trim())
+        .filter((item) => item && !isSummaryOtherChoice(item));
+}
+
+function partnerContributionLine(partner: ReportData["section7"]["partners"][number]): string {
+    const line = pickString(partner.contribution_line);
+    if (line) return line;
+    return (partner.contribution || []).map((item) => item.trim()).filter(Boolean).join("; ");
+}
+
+function resourceVerifications(row: ReportData["section6"]["resources"][number]): string[] {
+    const extra = pickString((row as { verification_other?: string }).verification_other);
+    const listed = Array.isArray(row.verification)
+        ? row.verification
+        : typeof row.verification === "string" && row.verification
+          ? [row.verification]
+          : [];
+    return listed
+        .map((item) => (isSummaryOtherChoice(item) || /other verification/i.test(item) ? extra || stripChoiceLabel(item) : item))
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function outcomeSummaryLabel(row: ReportData["section5"]["measurable_outcomes"][number]): string {
+    if (isSummaryOtherChoice(row.metric)) return pickString(row.metric_other, row.metric) || "Outcome";
+    return pickString(row.metric, row.outcome_sub_category, row.outcome_area) || "Outcome";
+}
+
 function StatChart({
     title,
     bars,
     tiles,
 }: {
     title: string;
-    bars?: Array<{ label: string; value: number; max: number; color: string; suffix?: string }>;
+    bars?: Array<{
+        label: string;
+        value: number;
+        max: number;
+        color: string;
+        suffix?: string;
+        baseline?: number;
+        display?: string;
+    }>;
     tiles?: string[];
 }) {
     if (!bars?.length && !tiles?.length) return null;
@@ -635,15 +839,22 @@ function StatChart({
             <div className="t">{title}</div>
             {bars?.map((bar, index) => {
                 const width = bar.max ? Math.min(100, Math.round((bar.value / bar.max) * 100)) : 0;
+                const baselineWidth =
+                    bar.baseline != null && bar.max ? Math.min(100, Math.round((bar.baseline / bar.max) * 100)) : null;
                 return (
-                    <div className="jbar" key={`${bar.label}-${index}`}>
+                    <div className={baselineWidth != null ? "jbar two" : "jbar"} key={`${bar.label}-${index}`}>
                         <span>{bar.label}</span>
                         <div>
+                            {baselineWidth != null ? <em style={{ width: `${baselineWidth}%` }} /> : null}
                             <i style={{ width: `${width}%`, background: bar.color }} />
                         </div>
                         <b>
-                            {bar.value}
-                            {bar.suffix || ""}
+                            {bar.display || (
+                                <>
+                                    {bar.value}
+                                    {bar.suffix || ""}
+                                </>
+                            )}
                         </b>
                     </div>
                 );
@@ -699,7 +910,7 @@ function SectionSummaryStats({
     }
     if (uiStep === 4) {
         const reachOf = (block: (typeof agg.acts)[number]) =>
-            finiteNumber(block.beneficiaries_reached || block.unique_beneficiaries);
+            finiteNumber(block.beneficiaries_reached) || finiteNumber(block.unique_beneficiaries);
         const maxReach = Math.max(1, ...agg.acts.map(reachOf));
         const measuredMax = Math.max(
             1,
@@ -721,13 +932,20 @@ function SectionSummaryStats({
                 {agg.measured.length ? (
                     <StatChart
                         title="📈 Measured change · baseline → endline"
-                        bars={agg.measured.map((row) => ({
-                            label: pickString(row.metric, row.outcome_area) || "Outcome",
-                            value: finiteNumber(row.endline),
-                            max: measuredMax,
-                            color: "#2ec4b6",
-                            suffix: ` ← ${row.baseline || 0}`,
-                        }))}
+                        bars={agg.measured.map((row) => {
+                            const baseline = finiteNumber(row.baseline);
+                            const endline = finiteNumber(row.endline);
+                            const delta = endline - baseline;
+                            const pct = baseline > 0 ? Math.round((delta / baseline) * 100) : null;
+                            return {
+                                label: outcomeSummaryLabel(row),
+                                value: endline,
+                                baseline,
+                                max: measuredMax,
+                                color: "#2ec4b6",
+                                display: `${row.baseline || 0} → ${row.endline || 0}${pct != null ? ` (${pct >= 0 ? "+" : ""}${pct}%)` : ""}`,
+                            };
+                        })}
                     />
                 ) : null}
             </>
@@ -743,19 +961,22 @@ function SectionSummaryStats({
             <StatChart
                 title="📊 Resources · amount by entry"
                 bars={resources.map((row) => ({
-                    label: pickString(row.type) || "Resource",
+                    label: resourceChoiceLabel(row.type, row.type_other) || "Resource",
                     value: finiteNumber(row.amount),
                     max: maxAmount,
                     color: "#f4b400",
-                    suffix: row.unit ? ` ${row.unit}` : "",
+                    suffix: resourceChoiceLabel(row.unit, row.unit_other) ? ` ${resourceChoiceLabel(row.unit, row.unit_other)}` : "",
                 }))}
                 tiles={agg.pkr ? [`💵 PKR ${agg.pkr.toLocaleString()} traced`] : []}
             />
         );
     }
     if (uiStep === 6) {
-        const partners = data.section7?.partners || [];
-        const roles = partners.flatMap((partner) => partner.role || []);
+        const partners =
+            data.section7?.has_partners === "no"
+                ? []
+                : (data.section7?.partners || []).filter((partner) => pickString(partner.name));
+        const roles = [...new Set(partners.flatMap((partner) => partnerRoleLabels(partner)))];
         return (
             <StatChart
                 title="📊 Partnership network"
@@ -763,7 +984,7 @@ function SectionSummaryStats({
                     ...new Set(
                         [
                             agg.context.partnerOrganization ? `🤝 ${agg.context.partnerOrganization}` : "",
-                            ...partners.map((partner) => (partner.name ? `🤝 ${partner.name}` : "")),
+                            ...partners.map((partner) => `🤝 ${partner.name}`),
                             ...roles.map((role) => `🔧 ${role}`),
                         ].filter(Boolean),
                     ),
@@ -772,7 +993,8 @@ function SectionSummaryStats({
         );
     }
     if (uiStep === 7) {
-        const types = data.section8?.evidence_types || [];
+        const types = cleanedList(data.section8?.evidence_types, data.section8?.evidence_type_other);
+        const visibility = VISIBILITY_TITLES[data.section8?.media_visible || ""] || "";
         return (
             <StatChart
                 title="📊 Evidence on file"
@@ -780,7 +1002,8 @@ function SectionSummaryStats({
                     ...types.map((type) => `📎 ${type}`),
                     `${agg.evidence} evidence items`,
                     `🔐 consent ${agg.ethicsOk ? "confirmed" : "pending"}`,
-                ]}
+                    visibility ? `👁 ${visibility}` : "",
+                ].filter(Boolean)}
             />
         );
     }
@@ -804,14 +1027,15 @@ function SectionSummaryStats({
         );
     }
     if (uiStep === 9) {
-        const status = data.section10?.continuation_status;
-        const score = status === "yes" ? 3 : status === "partially" ? 2 : status === "no" ? 1 : 0;
+        const status = String(data.section10?.continuation_status || "").toLowerCase();
+        const score = status === "yes" ? 3 : status === "partially" || status === "partial" ? 2 : status === "no" ? 1 : 0;
+        const mechanisms = cleanedList(data.section10?.mechanisms, data.section10?.mechanism_other);
         return (
             <StatChart
                 title="📊 Continuity"
                 bars={[{ label: "Continuation outlook", value: score, max: 3, color: "#0f9d79", suffix: "/3" }]}
                 tiles={[
-                    ...(data.section10?.mechanisms || []),
+                    ...mechanisms,
                     data.section10?.scaling_potential || "",
                     data.section10?.policy_influence || "",
                 ].filter(Boolean)}
@@ -910,16 +1134,16 @@ function Section1ExecutiveSummary({ data }: { data: ReportData }) {
               }))
             : []),
     ];
-    const logs = filterAttendanceLogsForVerifiedMetrics(data.section1?.attendance_logs || []);
-    const logsNameOwners = logs.some((log) => Boolean(log.participantId));
+    const logs = (data.section1?.attendance_logs || []).filter((log) => isLogCountedBeforeFacultyReview(log));
+    const ownerOnRoster = (owner?: string | null) =>
+        Boolean(owner) && roster.some((person) => sameParticipant(owner, person.id));
     const hoursFor = (id: string, isLead: boolean) =>
         logs.reduce((sum, log) => {
             const owner = log.participantId;
-            if (!owner) {
-                if (!logsNameOwners && (roster.length === 1 || isLead)) return sum + effectiveHoursFromLog(log);
-                return sum;
-            }
-            return sameParticipant(owner, id) ? sum + effectiveHoursFromLog(log) : sum;
+            const mine = owner ? sameParticipant(owner, id) : isLead;
+            const orphan = Boolean(owner) && !ownerOnRoster(owner);
+            if (mine || (orphan && isLead)) return sum + effectiveHoursFromLog(log);
+            return sum;
         }, 0);
     const rows = roster.map((person) => ({
         ...person,
@@ -1075,7 +1299,18 @@ export function ReportLiveBanner({
     }
 
     if (isMergedActivitiesStep(uiStep)) {
-        const challengeTags = Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : [];
+        const challengeTags = (Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : []).filter(
+            (tag) => !isSummaryOtherChoice(tag),
+        );
+        const broadest =
+            [...a.acts.map((block) => pickString(block.geographic_reach))].filter(Boolean).slice(-1)[0] ||
+            pickString(data.section4?.project_summary?.overall_geographic_reach) ||
+            "—";
+        const directMeasured = a.measured.some((row) =>
+            (Array.isArray(row.confidence_level) ? row.confidence_level : []).some((level) =>
+                /direct/i.test(String(level)),
+            ),
+        );
         return (
             <BannerShell
                 step={4}
@@ -1083,6 +1318,20 @@ export function ReportLiveBanner({
                 ai={ai}
                 stats={<SectionSummaryStats uiStep={4} data={data} agg={a} />}
             >
+                <div className="cer-scale">
+                    {[
+                        ["🛠️", String(a.acts.length), "ACTIVITIES"],
+                        ["📦", String(a.outputs), "OUTPUTS"],
+                        ["🫶", a.reach || "—", "REACHED"],
+                        ["🗺️", broadest, "BROADEST REACH"],
+                    ].map(([icon, value, label]) => (
+                        <div key={label}>
+                            <span>{icon}</span>
+                            <b>{value}</b>
+                            <small>{label}</small>
+                        </div>
+                    ))}
+                </div>
                 {a.acts.length ? (
                     <>
                         <div className="cer-bsec">PART A · WHAT WE DID</div>
@@ -1091,7 +1340,7 @@ export function ReportLiveBanner({
                                 <b>
                                     {i + 1}. {block.title || "Unnamed"}
                                 </b>
-                                <span style={{ color: "#7a919a" }}>{block.primary_category}</span>
+                                <span style={{ color: "#7a919a", flex: 1 }}>{activityFamilyLabel(block)}</span>
                                 <span style={{ marginLeft: "auto", color: "#0e7d74", fontWeight: 800 }}>{block.status}</span>
                             </div>
                         ))}
@@ -1106,14 +1355,30 @@ export function ReportLiveBanner({
                 {a.measured.length ? (
                     <>
                         <div className="cer-bsec">BEFORE → AFTER</div>
-                        {a.measured.map((o) => (
-                            <div key={o.id} className="cer-row">
-                                <b style={{ flex: 1 }}>{o.metric || o.outcome_area}</b>
-                                <span>
-                                    {o.baseline} → <b>{o.endline}</b>
-                                </span>
-                            </div>
-                        ))}
+                        {a.measured.map((row, index) => {
+                            const baseline = finiteNumber(row.baseline);
+                            const endline = finiteNumber(row.endline);
+                            const delta = endline - baseline;
+                            const pct = baseline > 0 ? Math.round((delta / baseline) * 100) : null;
+                            const confidence = (Array.isArray(row.confidence_level) ? row.confidence_level : [])
+                                .map((level) => stripChoiceLabel(level))
+                                .filter(Boolean)
+                                .slice(0, 1);
+                            return (
+                                <div key={row.id || index} className="cer-row">
+                                    <b style={{ flex: 1 }}>{outcomeSummaryLabel(row)}</b>
+                                    <span>
+                                        {row.baseline || 0} → <b>{row.endline || 0}</b>
+                                    </span>
+                                    <b style={{ color: "#0e7d74" }}>
+                                        {delta >= 0 ? "+" : ""}
+                                        {delta}
+                                        {pct != null ? ` (${pct >= 0 ? "+" : ""}${pct}%)` : ""}
+                                    </b>
+                                    {confidence[0] ? <span className="cer-mtag">{confidence[0].toUpperCase()}</span> : null}
+                                </div>
+                            );
+                        })}
                     </>
                 ) : null}
                 {challengeTags.length ? (
@@ -1121,97 +1386,166 @@ export function ReportLiveBanner({
                         <div className="cer-bsec">WHAT WAS HARD</div>
                         <div className="cer-mrow">
                             {challengeTags.map((tag) => (
-                                <span key={tag} className="cer-mtag">
+                                <span key={tag} className="cer-mtag" style={{ background: "#fff6e8", color: "#9a6700" }}>
                                     {tag}
                                 </span>
                             ))}
                         </div>
                     </>
                 ) : null}
+                <div className="cer-mrow">
+                    <span className="cer-mtag">🛠 {a.acts.length} ACTIVITIES</span>
+                    <span className="cer-mtag">📦 {a.outputs} OUTPUTS</span>
+                    <span className="cer-mtag">🫶 {a.reach || 0} REACHED</span>
+                    <span className="cer-mtag">
+                        📊 {a.measured.length} MEASURED{directMeasured ? " · DIRECT" : ""}
+                    </span>
+                    {a.bestPct != null ? (
+                        <span className="cer-mtag">
+                            📈 BEST {a.bestPct >= 0 ? "+" : ""}
+                            {a.bestPct}%
+                        </span>
+                    ) : null}
+                    {challengeTags.length ? <span className="cer-mtag">🧗 {challengeTags.length} LIMITS NAMED</span> : null}
+                </div>
             </BannerShell>
         );
     }
 
     if (uiStep === 5) {
         const timeOnly = data.section6?.use_resources === "no";
-        const resources = data.section6?.resources || [];
+        const resources = (data.section6?.resources || []).filter((row) => pickString(row.type));
+        const hasVerification = resources.some((row) => resourceVerifications(row).length > 0);
         return (
             <BannerShell
                 step={5}
                 title={
                     timeOnly
-                        ? "Ran on time & effort alone"
-                        : `${resources.length} resource entries${a.pkr ? ` · PKR ${a.pkr.toLocaleString()}` : ""}`
+                        ? "Ran on time & effort alone 💪"
+                        : `${resources.length} resource entr${resources.length === 1 ? "y" : "ies"}${a.pkr ? ` · PKR ${a.pkr.toLocaleString()}` : ""}`
                 }
                 ai={ai}
                 stats={<SectionSummaryStats uiStep={5} data={data} agg={a} />}
             >
                 {timeOnly ? (
-                    <div className="cer-quote">Zero-budget project — declared proudly, not apologetically.</div>
+                    <div className="cer-quote">💪 Zero-budget project — declared proudly, not apologetically.</div>
                 ) : (
-                    resources.map((r, i) => (
-                        <div key={`${r.type}-${i}`} className="cer-row">
-                            <b>
-                                {r.type}
-                                {r.amount ? ` — ${r.amount} ${r.unit}` : ""}
-                            </b>
-                            <span style={{ flex: 1, color: "#7a919a" }}>{(r.sources || []).join(", ")}</span>
-                        </div>
-                    ))
+                    resources.map((row, index) => {
+                        const amount = finiteNumber(row.amount);
+                        const unit = resourceChoiceLabel(row.unit, row.unit_other);
+                        const sources = (row.sources || [])
+                            .map((source) => resourceChoiceLabel(source, row.source_other))
+                            .filter(Boolean);
+                        return (
+                            <div key={`${row.type}-${index}`} className="cer-row">
+                                <b>
+                                    {resourceChoiceLabel(row.type, row.type_other)}
+                                    {amount ? ` — ${amount.toLocaleString()} ${unit}` : ""}
+                                </b>
+                                <span style={{ flex: 1, color: "#7a919a" }}>{sources.join(", ")}</span>
+                                {resourceVerifications(row).slice(0, 2).map((tag) => (
+                                    <span key={tag} className="cer-mtag">
+                                        {tag.toUpperCase()}
+                                    </span>
+                                ))}
+                            </div>
+                        );
+                    })
                 )}
+                <div className="cer-mrow">
+                    {timeOnly ? <span className="cer-mtag">💪 ZERO-BUDGET · DECLARED</span> : <span className="cer-mtag">📦 {resources.length} ENTRIES</span>}
+                    {!timeOnly && a.pkr ? <span className="cer-mtag">💵 PKR {a.pkr.toLocaleString()}</span> : null}
+                    {!timeOnly && hasVerification ? <span className="cer-mtag">✅ VERIFICATION ON RECORD</span> : null}
+                </div>
             </BannerShell>
         );
     }
 
     if (uiStep === 6) {
-        const partners = data.section7?.partners || [];
-        const roles = partners.flatMap((p) => p.role || []);
+        const linked = a.context.partnerOrganization;
+        const partners =
+            data.section7?.has_partners === "no"
+                ? []
+                : (data.section7?.partners || []).filter((partner) => pickString(partner.name));
+        const roles = [...new Set(partners.flatMap((partner) => partnerRoleLabels(partner)))];
+        const leadQuote = partners.map(partnerContributionLine).find(Boolean) || "";
+        const partnerCount = (linked ? 1 : 0) + partners.filter((partner) => partner.name !== linked).length;
         return (
             <BannerShell
                 step={6}
-                title={`${a.context.partnerOrganization || "Your partner"}${roles.length ? ` · ${roles.length} roles` : ""}`}
+                title={`${linked || partners[0]?.name || "Your partner"}${roles.length ? ` · ${roles.length} roles` : ""}`}
                 ai={ai}
                 stats={<SectionSummaryStats uiStep={6} data={data} agg={a} />}
             >
                 {roles.length ? (
                     <div className="cer-mrow">
-                        {roles.slice(0, 8).map((role) => (
+                        {roles.map((role) => (
                             <span key={role} className="cer-mtag">
                                 {role}
                             </span>
                         ))}
                     </div>
                 ) : null}
-                {partners
-                    .filter((p) => p.contribution?.length)
-                    .slice(0, 2)
-                    .map((p) => (
-                        <div key={p.name} className="cer-quote">
-                            “{(p.contribution || []).join("; ")}”
-                        </div>
-                    ))}
+                {leadQuote ? <div className="cer-quote">“{leadQuote}”</div> : null}
+                {partners.map((partner, index) => (
+                    <div key={`${partner.name}-${index}`} className="cer-row">
+                        <b>🤝 {partner.name}</b>
+                        <span style={{ flex: 1, color: "#7a919a" }}>
+                            {[resourceChoiceLabel(partner.type, partner.type_other), partnerRoleLabels(partner).join(", ")]
+                                .filter(Boolean)
+                                .join(" — ")}
+                        </span>
+                    </div>
+                ))}
+                <div className="cer-mrow">
+                    <span className="cer-mtag">🤝 {roles.length} ROLES CONFIRMED</span>
+                    <span className="cer-mtag">🏛️ {Math.max(partnerCount, partners.length)} PARTNERS</span>
+                    {linked ? <span className="cer-mtag">🔗 LINKED SINCE §1</span> : null}
+                </div>
             </BannerShell>
         );
     }
 
     if (uiStep === 7) {
+        const types = cleanedList(data.section8?.evidence_types, data.section8?.evidence_type_other);
+        const visibility = VISIBILITY_TITLES[data.section8?.media_visible || ""] || "";
+        const noEvidence = data.section8?.has_evidence === "no";
         return (
-            <BannerShell step={7} title={`${a.evidence} evidence files on record`} ai={ai} stats={<SectionSummaryStats uiStep={7} data={data} agg={a} />}>
-                {(data.section8?.evidence_types || []).length ? (
+            <BannerShell
+                step={7}
+                title={
+                    noEvidence
+                        ? "No extra evidence files"
+                        : `${a.evidence} evidence file${a.evidence === 1 ? "" : "s"} on record`
+                }
+                ai={ai}
+                stats={<SectionSummaryStats uiStep={7} data={data} agg={a} />}
+            >
+                {types.length ? (
                     <div className="cer-mrow">
-                        {data.section8.evidence_types.map((t) => (
-                            <span key={t} className="cer-mtag">
-                                {t}
+                        {types.map((type) => (
+                            <span key={type} className="cer-mtag">
+                                {type}
                             </span>
                         ))}
                     </div>
                 ) : null}
+                <div className="cer-mrow">
+                    <span className="cer-mtag">📸 {a.evidence} FILES ON RECORD</span>
+                    <span className="cer-mtag">{a.ethicsOk ? "✅ CONSENT CONFIRMED" : "⏳ CONSENT PENDING"}</span>
+                    {visibility ? (
+                        <span className="cer-mtag">{data.section8?.media_visible === "public" ? "🌟" : "👁"} {visibility}</span>
+                    ) : (
+                        <span className="cer-mtag">👁 VISIBILITY PENDING</span>
+                    )}
+                </div>
             </BannerShell>
         );
     }
 
     if (uiStep === 8) {
-        const skills = data.section9?.skills_grown || [];
+        const skills = cleanedList(data.section9?.skills_grown, data.section9?.skills_grown_other);
+        const integration = INTEGRATION_TITLES[data.section9?.academic_integration || ""] || stripChoiceLabel(data.section9?.academic_integration).toUpperCase();
         return (
             <BannerShell
                 step={8}
@@ -1221,46 +1555,52 @@ export function ReportLiveBanner({
             >
                 {skills.length ? (
                     <div className="cer-mrow">
-                        {skills.map((s) => (
-                            <span key={s} className="cer-mtag">
-                                {s}
+                        {skills.map((skill) => (
+                            <span key={skill} className="cer-mtag">
+                                {skill}
                             </span>
                         ))}
                     </div>
                 ) : null}
-                {data.section9?.personal_learning ? (
-                    <div className="cer-quote">{data.section9.personal_learning}</div>
-                ) : null}
+                {data.section9?.personal_learning ? <div className="cer-quote">{data.section9.personal_learning}</div> : null}
+                {data.section9?.academic_application ? <div className="cer-quote">{data.section9.academic_application}</div> : null}
+                <div className="cer-mrow">
+                    <span className="cer-mtag">🌟 {skills.length} SKILLS GROWN</span>
+                    <span className="cer-mtag">{a.competency ? `⭐ ${a.competency}/5 SELF-RATED` : "⏳ RATINGS PENDING"}</span>
+                    {integration ? <span className="cer-mtag">🎓 {integration}</span> : null}
+                </div>
             </BannerShell>
         );
     }
 
     if (uiStep !== 9) return null;
 
-    const mechs = data.section10?.mechanisms || [];
+    const statusKey = String(data.section10?.continuation_status || "").toLowerCase();
+    const statusTitle = CONTINUATION_TITLES[statusKey] || "";
+    const mechs = cleanedList(data.section10?.mechanisms, data.section10?.mechanism_other);
+    const scaling = pickString(data.section10?.scaling_potential);
     return (
         <BannerShell
             step={9}
-            title={
-                data.section10?.continuation_status
-                    ? `Continues: ${data.section10.continuation_status}${mechs.length ? ` · ${mechs.length} mechanisms` : ""}`
-                    : "The last question"
-            }
+            title={statusTitle ? `Continues: ${statusTitle}${mechs.length ? ` · ${mechs.length} mechanisms` : ""}` : "The last question"}
             ai={ai}
             stats={<SectionSummaryStats uiStep={9} data={data} agg={a} />}
         >
-            {data.section10?.continuation_details ? (
-                <div className="cer-quote">{data.section10.continuation_details}</div>
-            ) : null}
+            {data.section10?.continuation_details ? <div className="cer-quote">{data.section10.continuation_details}</div> : null}
             {mechs.length ? (
                 <div className="cer-mrow">
-                    {mechs.map((m) => (
-                        <span key={m} className="cer-mtag">
-                            {m}
+                    {mechs.map((item) => (
+                        <span key={item} className="cer-mtag">
+                            {item}
                         </span>
                     ))}
                 </div>
             ) : null}
+            <div className="cer-mrow">
+                <span className="cer-mtag">{statusTitle ? `🌱 ${statusTitle.toUpperCase()}` : "⏳ STATUS PENDING"}</span>
+                <span className="cer-mtag">🛡 {mechs.length} MECHANISMS</span>
+                {scaling ? <span className="cer-mtag">📐 {scaling.toUpperCase()}</span> : null}
+            </div>
         </BannerShell>
     );
 }
@@ -1402,7 +1742,7 @@ function FlashHighlights({
         ["🏛️", "Organization / partner", agg.context.partnerOrganization || "—", partners[0]?.name || ""],
         ["🎓", "University", pickString(lead?.universityName, lead?.university) || "—", pickString(lead?.academicProgram, lead?.degree)],
         ["🧑‍🏫", "Faculty verifier", data.section1?.faculty_supervisor_email ? "Reviewer on file" : "—", "Approves once, at the end"],
-        ["🎯", "Who was affected", data.section2?.affected_group || "—", ""],
+        ["🎯", "Who was affected", data.section2?.affected_group || "—", data.section2?.affected_count ? `≈ ${data.section2.affected_count}` : ""],
         ["📍", "Where", agg.context.projectLocation && agg.context.projectLocation !== "N/A" ? agg.context.projectLocation : "—", locations.join(" · ")],
         ["📅", "When", span, `${logs.length} session${logs.length === 1 ? "" : "s"} · ${Math.round(agg.hours * 10) / 10}h`],
         [
@@ -1479,220 +1819,17 @@ export function ReportFlashCard({
     onSend?: () => void;
     sending?: boolean;
 }) {
-    const a = chromeAgg(data, projectData);
-    const st = flashStatus(data);
-    const baseline = firstSentence(data.section2?.problem_statement || "");
-    const firstMeas = a.measured[0];
-    const dossier: Array<[string, string, string, string]> = [];
-
-    if (baseline) {
-        dossier.push([
-            "Purpose",
-            "Why this mattered",
-            `“${baseline}” ${data.section2?.affected_group ? `Around ${data.section2.affected_group} lived this daily.` : ""} Anchored to ${a.sdgs.length || 0} SDG target${a.sdgs.length === 1 ? "" : "s"}.`,
-            "Baseline on record",
-        ]);
-    }
-    if (a.acts.length) {
-        dossier.push([
-            "What was done",
-            "Execution and scale",
-            `${a.members} students · ${Math.round(a.hours * 10) / 10} verified-track hours · ${a.logs.length} session${a.logs.length === 1 ? "" : "s"} → ${a.acts.length} activit${a.acts.length === 1 ? "y" : "ies"} delivering ${a.outputs} counted outputs${a.reach ? ` and serving ${a.reach}` : ""}.`,
-            "Counted",
-        ]);
-    }
-    if (firstMeas) {
-        dossier.push([
-            "Measured change",
-            "Before → after, with proof",
-            a.measured
-                .map((o) => `${o.metric || o.outcome_area}: ${o.baseline} → ${o.endline}`)
-                .join(" · "),
-            "Measured",
-        ]);
-    }
-    if (data.section6?.use_resources === "no") {
-        dossier.push([
-            "Resources",
-            "Every rupee traced",
-            `Zero budget — this ran on time and effort alone. ${Math.round(a.hours * 10) / 10} verified hours were the resource base.`,
-            "On file",
-        ]);
-    } else if ((data.section6?.resources || []).length) {
-        dossier.push([
-            "Resources",
-            "Every rupee traced",
-            `${a.pkr ? `PKR ${a.pkr.toLocaleString()} in cash` : "In-kind and other support"} across ${data.section6.resources.length} resource ${data.section6.resources.length === 1 ? "entry" : "entries"}.`,
-            "On file",
-        ]);
-    }
-    if ((data.section7?.partners || []).length) {
-        dossier.push([
-            "Who vouches",
-            "Partnership and verification",
-            `${a.context.partnerOrganization || data.section7.partners[0]?.name || "Partner"} stood with the team. ${a.evidence} evidence files back the record.`,
-            `${a.evidence} files`,
-        ]);
-    }
-    if (a.competency || (data.section9?.skills_grown || []).length) {
-        dossier.push([
-            "Learning",
-            "The academic return",
-            `${(data.section9?.skills_grown || []).join(", ")}${a.competency ? ` Self-rated ${a.competency}/5 across 12 competencies.` : ""}`,
-            a.competency ? `Honest spread` : "Reflected",
-        ]);
-    }
-    if (data.section10?.continuation_status) {
-        dossier.push([
-            "Continuity",
-            "What survives the team leaving",
-            `Continuation: ${data.section10.continuation_status}. ${(data.section10.mechanisms || []).length ? `Held in place by ${(data.section10.mechanisms || []).join(", ")}.` : ""}`,
-            `${(data.section10.mechanisms || []).length || 1} mechanism${(data.section10.mechanisms || []).length === 1 ? "" : "s"}`,
-        ]);
-    }
-
     return (
-        <div className="cer-fcwrap">
-            <div className="cer-fcard">
-                <div className="cer-fch">
-                    <span className="cer-ribbon">CIEL PK · COMMUNITY ENGAGEMENT</span>
-                    <h1>{a.title}</h1>
-                    <div className="cer-fm">
-                        {[
-                            a.context.projectLocation && a.context.projectLocation !== "N/A"
-                                ? a.context.projectLocation
-                                : a.context.partnerOrganization,
-                            `${a.members} student${a.members === 1 ? "" : "s"}`,
-                        ]
-                            .filter(Boolean)
-                            .join(" • ")}
-                    </div>
-                    {a.sdgs.length ? (
-                        <div className="cer-sdgrow">
-                            {a.sdgs.map((row) => {
-                                const sdg = findSdgById(row.goalNumber);
-                                return (
-                                    <span
-                                        key={`${row.goalNumber}-${row.targetId}`}
-                                        className="cer-sdgc"
-                                        style={{ background: "rgba(255,255,255,0.16)" }}
-                                        title={sdg?.title}
-                                    >
-                                        SDG {row.goalNumber}
-                                        {row.targetId ? ` - target ${row.targetId}` : ""}
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    ) : null}
-                    {a.names.length ? (
-                        <div className="cer-avrow">
-                            {a.names.slice(0, 6).map((name, i) => (
-                                <div
-                                    key={`${name}-${i}`}
-                                    className="cer-av"
-                                    style={{
-                                        background: `linear-gradient(135deg,${AVATAR_COLORS[i % AVATAR_COLORS.length]})`,
-                                    }}
-                                    title={name}
-                                >
-                                    {name.charAt(0).toUpperCase()}
-                                </div>
-                            ))}
-                        </div>
-                    ) : null}
-                    <div className="cer-fstats cer-fstats-onhero">
-                        <div className="cer-fs">
-                            <div className="v">{Math.round(a.hours * 10) / 10} h</div>
-                            <div className="k">Hours logged</div>
-                        </div>
-                        <div className="cer-fs">
-                            <div className="v">{a.reach || "—"}</div>
-                            <div className="k">People reached</div>
-                        </div>
-                        <div className="cer-fs">
-                            <div className="v">
-                                {a.bestPct != null ? `${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : "—"}
-                            </div>
-                            <div className="k">Measured change</div>
-                        </div>
-                        <div className="cer-fs">
-                            <div className="v">{a.evidence}</div>
-                            <div className="k">Evidence files</div>
-                        </div>
-                    </div>
-                </div>
-                <FlashHighlights data={data} agg={a} />
-                <div className="cer-fbody">
-                    {baseline && firstMeas ? (
-                        <div className="cer-arrow">
-                            <div className="a">
-                                <b>Before · section 2</b>
-                                {baseline}
-                            </div>
-                            <span className="mid">→</span>
-                            <div className="a">
-                                <b>After · section 4</b>
-                                {firstMeas.metric || firstMeas.outcome_area}: {firstMeas.baseline} →{" "}
-                                <span className="hl">{firstMeas.endline}</span>
-                            </div>
-                        </div>
-                    ) : null}
-                    <p className="cer-record-k">The record behind the numbers</p>
-                    {dossier.length ? (
-                        dossier.map((row) => (
-                            <div key={row[0]} className="cer-dr">
-                                <div className="bx">
-                                    <div className="crit">{row[0]}</div>
-                                    <div className="sub">{row[1]}</div>
-                                </div>
-                                <div className="txt">{row[2]}</div>
-                                <span className="ev">{row[3]}</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="cer-missing">Fill the sections — each one becomes a scored criterion row here.</div>
-                    )}
-                </div>
-                {st === "draft" || st === "live" ? (
-                <div className="cer-fcfoot">
-                    {st === "draft" ? (
-                        <>
-                            <div className="cer-status cer-st-draft">
-                                DRAFT — {sectionsComplete}/{REPORT_UI_SECTION_TOTAL} sections complete
-                            </div>
-                            {onSend ? (
-                                <button
-                                    type="button"
-                                    className="cer-bigbtn"
-                                    disabled={!canSend || sending}
-                                    onClick={onSend}
-                                >
-                                    {sending ? "Working…" : "Send to faculty for approval"}
-                                </button>
-                            ) : null}
-                            {!canSend && missingLabels.length ? (
-                                <div className="cer-missing">
-                                    Complete {missingLabels.join(", ")} to unlock — every section you fill raises your
-                                    score.
-                                </div>
-                            ) : null}
-                        </>
-                    ) : null}
-                    {st === "live" ? (
-                        <>
-                            <div className="cer-status cer-st-live">APPROVED & LIVE</div>
-                            <div className="cer-dash">
-                                <span className="cer-dchip">STUDENT DASHBOARD</span>
-                                <span className="cer-dchip">FACULTY DASHBOARD</span>
-                                <span className="cer-dchip">UNIVERSITY DASHBOARD</span>
-                                <span className="cer-dchip">CIEL PK DASHBOARD</span>
-                            </div>
-                        </>
-                    ) : null}
-                </div>
-                ) : null}
-            </div>
-        </div>
+        <V17ImpactFlashcard
+            data={data}
+            agg={chromeAgg(data, projectData)}
+            sectionsComplete={sectionsComplete}
+            sectionTotal={REPORT_UI_SECTION_TOTAL}
+            missingLabels={missingLabels}
+            canSend={canSend}
+            onSend={onSend}
+            sending={sending}
+            status={flashStatus(data)}
+        />
     );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
+import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import {
     ArrowLeft,
     BarChart3,
@@ -1682,7 +1683,7 @@ export default function AdminReportDetailPage() {
                                             Engagement details
                                         </h3>
                                         <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            <LabelValue label="Total Beneficiaries" value={report.section4?.project_summary?.distinct_total_beneficiaries} />
+                                            <LabelValue label="Total Beneficiaries" value={distinctBeneficiaryTotal(report.section4) || undefined} />
                                             <LabelValue label="Total Sessions" value={section4TotalSessions} />
                                             <LabelValue label="Counting method" value={report.section4?.project_summary?.counting_method} />
                                             <LabelValue label="Overall overlap" value={report.section4?.project_summary?.overall_overlap} />

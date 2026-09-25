@@ -6,8 +6,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import React, { useMemo, useEffect, useRef, useState } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
@@ -16,25 +15,15 @@ import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 
 const partnerTypes = [
-    "NGO",
-    "School / University",
-    "Government Department",
-    "Private Company",
-    "Public Limited Company",
-    "Community Group",
-    "Non-profit Organization / Charity",
-    "Social Enterprise",
-    "Local Business / Small Enterprise",
-    "Hospital / Healthcare Organization",
-    "Religious Organization (Mosque, Church, Temple etc.)",
-    "International Organization (UN agencies, INGOs etc.)",
-    "Volunteer Network",
-    "Environmental Organization",
-    "Youth Organization",
-    "Local Council / Municipal Authority",
-    "Foundation / Trust",
-    "Research Institute / Think Tank",
-    "Others (please specify)",
+    "👤 Individual",
+    "🏪 Small shop / local business",
+    "🏢 Company / corporate",
+    "🤝 NGO / Nonprofit",
+    "🏫 University unit",
+    "🏛️ Government body",
+    "🧑‍⚕️ Professional / expert",
+    "🧑‍🤝‍🧑 Community representative",
+    "✏️ Other",
 ];
 
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
@@ -47,36 +36,13 @@ function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
 }
 
 const roleOptions = [
-    "Project Host",
-    "Venue Provider",
-    "Technical Support",
-    "Funding Partner",
-    "Beneficiary Coordinator",
-    "Implementation Partner",
-    "Verification Authority",
-    "Content / Expert Support",
-    "Policy / Advisory Support",
-];
-
-const contributionOptions = [
-    "Financial Support",
-    "In-kind Materials",
-    "Human Resources",
-    "Venue / Infrastructure",
-    "Equipment / Technical Support",
-    "Access to Beneficiaries",
-    "Data / Research Support",
-    "Monitoring & Verification",
-    "Other",
-];
-
-const verificationOptions = [
-    "Attendance Verified",
-    "Activity Verified",
-    "Output Verified",
-    "Outcome Verified",
-    "Resource Support Verified",
-    "Self-Reported (No External Confirmation)",
+    "🏫 Host site",
+    "🤝 Co-delivery",
+    "💵 Funding / sponsorship",
+    "🧑‍🏫 Mentorship / expertise",
+    "🧾 Verification & records",
+    "📣 Community access",
+    "✏️ Other",
 ];
 
 const formalizationOptions = [
@@ -232,28 +198,19 @@ function FullFilePreview({ file }: { file: any }) {
 }
 
 function PartnerCard({
-    p, idx, canRemove, onUpdate, onRemove, getFieldError,
+    p, idx, canRemove, onUpdate, onUpdateFields, onRemove, getFieldError,
 }: {
     p: any; idx: number; canRemove: boolean;
     onUpdate: (field: string, val: any) => void;
+    onUpdateFields: (fields: Record<string, any>) => void;
     onRemove: () => void;
     getFieldError: (key: string) => string | undefined;
 }) {
-    const contribution: string[] = p.contribution || [];
     const roles: string[] = Array.isArray(p.role)
         ? p.role
         : typeof p.role === "string" && p.role
             ? [p.role]
             : [];
-
-    const toggleContribution = (opt: string) => {
-        onUpdate(
-            "contribution",
-            contribution.includes(opt)
-                ? contribution.filter(c => c !== opt)
-                : [...contribution, opt],
-        );
-    };
 
     const toggleRole = (opt: string) => {
         onUpdate(
@@ -271,7 +228,7 @@ function PartnerCard({
                     {idx + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[11.5px] font-extrabold text-[#0d2b33]">
-                    Partner entry
+                    {p.name || "Partner"}
                 </span>
                 {canRemove ? (
                     <button
@@ -306,12 +263,12 @@ function PartnerCard({
             <div className="cer-pgrid">
                 <div>
                     <Label className="cer-field-label">
-                        Contact name in Pakistan
+                        Contact person
                         <span className="cer-soft-req">RECOMMENDED</span>
                     </Label>
                     <Input
                         type="text"
-                        placeholder="Focal person name…"
+                        placeholder="e.g. Imran Sheikh"
                         value={p.pakistan_contact_name ?? ""}
                         onChange={e => onUpdate("pakistan_contact_name", e.target.value)}
                         className={inputClasses}
@@ -350,11 +307,11 @@ function PartnerCard({
                 <div className="cer-full">
                     <Label className="cer-field-label">
                         Email
-                        <span className="cer-soft-req">RECOMMENDED</span>
+                        <span className="cer-soft-req">RECOMMENDED · LINKS THEIR DASHBOARD</span>
                     </Label>
                     <Input
                         type="email"
-                        placeholder="Contact email…"
+                        placeholder="name@organisation.org"
                         value={p.pakistan_contact_email ?? ""}
                         onChange={e => onUpdate("pakistan_contact_email", e.target.value)}
                         className={inputClasses}
@@ -362,13 +319,14 @@ function PartnerCard({
                 </div>
             </div>
 
-            <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>What kind of organization?</Label>
-                    <span className={badgeRequired}>Required</span>
-                </div>
+            <div className="rounded-xl border border-[#c8e7dc] bg-[#eef9f4] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#1e4d40]">
+                A partner can be a person, a shop, a professional, an NGO, or a large organization. Email and WhatsApp stay private and are not shown on the public flash card.
+            </div>
+
+            <div className="space-y-2">
+                <Label className={fieldLabel}>What kind of partner is this? <span className="ml-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-amber-800">Recommended</span></Label>
                 <div className="flex flex-wrap gap-2">
-                    {partnerTypes.map(t => {
+                    {(p.type && !partnerTypes.includes(p.type) ? [p.type, ...partnerTypes] : partnerTypes).map(t => {
                         const active = p.type === t;
                         return (
                             <button
@@ -378,8 +336,8 @@ function PartnerCard({
                                 className={clsx(
                                     "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                                     active
-                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                        ? "border-[#e86bb5] bg-[#e86bb5] text-white"
+                                        : "border-slate-200 bg-white text-slate-600 hover:border-[#e86bb5]",
                                 )}
                             >
                                 {t}
@@ -387,59 +345,71 @@ function PartnerCard({
                         );
                     })}
                 </div>
-                {p.type === "Others (please specify)" ? (
-                    <div className="space-y-1.5 pt-1">
-                        <Input
-                            placeholder="Describe the organization type in a few words…"
-                            value={p.type_other || ""}
-                            onChange={e => onUpdate("type_other", e.target.value)}
-                            className={inputClasses}
-                        />
-                    </div>
+                {p.type === "✏️ Other" || p.type === "Others (please specify)" ? (
+                    <Input
+                        placeholder="Describe the partner type"
+                        value={p.type_other || ""}
+                        onChange={e => onUpdate("type_other", e.target.value)}
+                        className={inputClasses}
+                    />
                 ) : null}
                 <FieldError message={getFieldError(`partners.${idx}.type`)} />
             </div>
 
-            <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>What role did they play?</Label>
-                    <span className={badgeRequired}>Required</span>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>Designation / role</Label>
+                    <Input
+                        placeholder="e.g. Village Director · Shop owner · Volunteer"
+                        value={p.designation || ""}
+                        onChange={e => onUpdate("designation", e.target.value)}
+                        className={inputClasses}
+                    />
                 </div>
-                <p className="text-xs text-slate-500">Select all that apply</p>
-                <CheckGrid options={roleOptions} selected={roles} onToggle={toggleRole} />
+                <div className="space-y-1.5 md:col-span-2">
+                    <Label className={fieldLabel}>Website / LinkedIn / social <span className="ml-1 text-[9px] font-extrabold tracking-wide text-slate-400">Optional</span></Label>
+                    <Input
+                        placeholder="https://…"
+                        value={p.website || ""}
+                        onChange={e => onUpdate("website", e.target.value)}
+                        className={inputClasses}
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label className={fieldLabel}>What role did they play? · tap all that apply <span className="text-rose-500">*</span></Label>
+                <CheckGrid
+                    options={[...roles.filter((role) => !roleOptions.includes(role)), ...roleOptions]}
+                    selected={roles}
+                    onToggle={toggleRole}
+                />
+                {roles.includes("✏️ Other") ? (
+                    <Input
+                        placeholder="What else did they do?"
+                        value={p.role_other || ""}
+                        onChange={e => onUpdate("role_other", e.target.value)}
+                        className={inputClasses}
+                    />
+                ) : null}
                 <FieldError message={getFieldError(`partners.${idx}.role`)} />
             </div>
 
-            <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>What did they contribute?</Label>
-                    <span className={badgeRequired}>Required</span>
-                </div>
-                <p className="text-xs text-slate-500">Select all that apply</p>
-                <CheckGrid options={contributionOptions} selected={contribution} onToggle={toggleContribution} />
+            <div className="space-y-1.5">
+                <Label className={fieldLabel}>What did they contribute, in one line? <span className="text-rose-500">*</span></Label>
+                <Input
+                    placeholder="e.g. gave us the classroom, staff time, and verified our attendance"
+                    value={p.contribution_line ?? (Array.isArray(p.contribution) ? p.contribution.join(", ") : "")}
+                    onChange={e => {
+                        const text = e.target.value;
+                        onUpdateFields({
+                            contribution_line: text,
+                            contribution: text.trim() ? [text] : [],
+                        });
+                    }}
+                    className={inputClasses}
+                />
                 <FieldError message={getFieldError(`partners.${idx}.contribution`)} />
-            </div>
-
-            <div className="space-y-2">
-                <Label className={fieldLabel}>Verification level</Label>
-                <p className="text-xs text-slate-500">Higher verification strengthens partnership credibility.</p>
-                <div className="flex flex-wrap gap-2">
-                    {verificationOptions.map(v => (
-                        <button
-                            key={v}
-                            type="button"
-                            onClick={() => onUpdate("verification", v)}
-                            className={clsx(
-                                "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
-                                p.verification === v
-                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
-                            )}
-                        >
-                            {v}
-                        </button>
-                    ))}
-                </div>
             </div>
             </div>
         </div>
@@ -448,9 +418,7 @@ function PartnerCard({
 
 export default function Section7Partnerships({ projectData }: { projectData?: any } = {}) {
     const { data, updateSection, getFieldError } = useReportForm();
-    const { has_partners, partners, formalization_status, formalization_files } = data.section7;
-
-    const [previewFile, setPreviewFile] = useState<any>(null);
+    const { has_partners, partners, formalization_status } = data.section7;
 
     const update = (field: string, val: any) => updateSection("section7", { [field]: val });
 
@@ -460,8 +428,11 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
         pakistan_contact_number: "",
         pakistan_contact_email: "",
         type: "",
+        designation: "",
+        website: "",
         role: [],
         contribution: [],
+        contribution_line: "",
         verification: "",
     });
 
@@ -484,6 +455,11 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
     const updatePartner = (i: number, field: string, val: any) => {
         const next = [...partners];
         next[i] = { ...next[i], [field]: val };
+        update("partners", next);
+    };
+    const updatePartnerFields = (i: number, fields: Record<string, any>) => {
+        const next = [...partners];
+        next[i] = { ...next[i], ...fields };
         update("partners", next);
     };
     const toggleFormalization = (opt: string) => {
@@ -584,11 +560,8 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             {/* 7.0 Confirmation */}
             <section className="cer-card space-y-4">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        7.0
-                    </span>
                     <h3 className="text-base font-semibold text-slate-900">
-                        Step 1 — Partnership confirmation
+                        Did anyone stand with you?
                     </h3>
                     <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
                 </div>
@@ -649,274 +622,71 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
             {has_partners === "yes" ? (
                 <div className="space-y-8">
                     <section className="cer-card space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                    7.1
-                                </span>
-                                <h3 className="text-base font-semibold text-slate-900">
-                                    Step 2 — Enter partner details
-                                </h3>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3">
-                                {partners[0]?._seeded ? (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Program partner added for you
-                                    </span>
-                                ) : null}
-                                <span className={badgeMandatory}>Mandatory</span>
-                            </div>
+                        <div className="cer-secl">
+                            <span className="cer-secn">6.1</span>
+                            <h3>Your partner</h3>
+                            <span className={clsx("cer-tag", partners[0]?._seeded && "auto")}>
+                                {partners[0]?._seeded ? "From section 1 · auto" : "Required"}
+                            </span>
                         </div>
                         {partners[0]?._seeded ? (
-                            <p className="text-xs text-slate-500">
-                                {programPartnerName} is already here from your project setup — finish tagging what they did below.
+                            <p className="cer-sub">
+                                {programPartnerName} is already here from your project setup. Contact details stay off the public flash card.
                             </p>
                         ) : null}
 
                         {partners.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
-                                <Users2 className="h-10 w-10 text-slate-300" />
-                                <p className="text-sm font-semibold text-slate-700">No partners added yet</p>
-                                <button
-                                    type="button"
-                                    onClick={addPartner}
-                                    className="cer-addbig flex max-w-xs items-center justify-center gap-1.5"
-                                >
-                                    <Plus className="h-3.5 w-3.5" />
-                                    Add first partner
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={addPartner}
+                                className="cer-addbig"
+                            >
+                                ＋ Add your partner
+                            </button>
                         ) : (
-                            <div className="space-y-4">
-                                {partners.map((p, idx) => (
-                                    <PartnerCard
-                                        key={idx}
-                                        p={p}
-                                        idx={idx}
-                                        canRemove={partners.length > 1}
-                                        onUpdate={(field, val) => updatePartner(idx, field, val)}
-                                        onRemove={() => removePartner(idx)}
-                                        getFieldError={getFieldError}
-                                    />
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={addPartner}
-                                    className="cer-addbig flex items-center justify-center gap-1.5"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    Add partner
-                                </button>
-                            </div>
+                            <PartnerCard
+                                p={partners[0]}
+                                idx={0}
+                                canRemove={false}
+                                onUpdate={(field, val) => updatePartner(0, field, val)}
+                                onUpdateFields={(fields) => updatePartnerFields(0, fields)}
+                                onRemove={() => removePartner(0)}
+                                getFieldError={getFieldError}
+                            />
                         )}
                     </section>
 
                     <section className="cer-card space-y-4">
-                        <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                7.2
-                            </span>
-                            <h3 className="text-base font-semibold text-slate-900">
-                                Step 3 — Formalization status
-                            </h3>
-                            <span className={clsx(badgeOptional, "ml-auto")}>Optional</span>
+                        <div className="cer-secl">
+                            <span className="cer-secn">6.2</span>
+                            <h3>Any other partners?</h3>
+                            <span className="cer-tag auto">Optional</span>
                         </div>
-
-                        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                            <div>
-                                <Label className="text-sm font-medium text-slate-800">
-                                    Was this partnership supported by formal documentation?
-                                </Label>
-                                <p className="mt-1 text-xs text-slate-500">
-                                    Select all that apply. Formalized partnerships increase SDG 17 classification strength.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                                {formalizationOptions.map(opt => {
-                                    const active = formalization_status?.includes(opt);
-                                    return (
-                                        <button
-                                            key={opt}
-                                            type="button"
-                                            onClick={() => toggleFormalization(opt)}
-                                            className={clsx(
-                                                "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors",
-                                                active
-                                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
-                                            )}
-                                        >
-                                            <span>{opt}</span>
-                                            {active ? (
-                                                <ShieldCheck className="h-4 w-4 shrink-0" />
-                                            ) : (
-                                                <span className="h-4 w-4 shrink-0 rounded border border-slate-300" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="cer-dropzone relative px-5 py-8 text-center">
-                                <Upload className="mx-auto h-7 w-7 text-slate-300" />
-                                <p className="mt-2 text-sm font-medium text-slate-600">
-                                    Upload supporting documentation (optional)
-                                </p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                    MOUs, letters of collaboration, official emails, government approvals
-                                </p>
-                                <input
-                                    type="file"
-                                    multiple
-                                    accept={REPORT_ATTACHMENT_ACCEPT}
-                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                    onChange={e => {
-                                        if (e.target.files) {
-                                            const acceptedFiles = filterOversizedImages(
-                                                Array.from(e.target.files),
-                                                e.currentTarget,
-                                            );
-                                            if (!acceptedFiles.length) return;
-                                            updateSection("section7", {
-                                                formalization_files: [
-                                                    ...(formalization_files || []),
-                                                    ...acceptedFiles,
-                                                ],
-                                            });
-                                        }
-                                    }}
+                        {partners.slice(1).map((p, offset) => {
+                            const idx = offset + 1;
+                            return (
+                                <PartnerCard
+                                    key={idx}
+                                    p={p}
+                                    idx={idx}
+                                    canRemove
+                                    onUpdate={(field, val) => updatePartner(idx, field, val)}
+                                    onUpdateFields={(fields) => updatePartnerFields(idx, fields)}
+                                    onRemove={() => removePartner(idx)}
+                                    getFieldError={getFieldError}
                                 />
-                            </div>
-
-                            {formalization_files && formalization_files.length > 0 ? (
-                                <div className="space-y-3">
-                                    <Label className={fieldLabel}>
-                                        Selected files ({formalization_files.length})
-                                    </Label>
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        {formalization_files.map((file, fIdx) => (
-                                            <div
-                                                key={fIdx}
-                                                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
-                                            >
-                                                <div
-                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
-                                                    onClick={() => setPreviewFile(file)}
-                                                >
-                                                    <FilePreview file={file} />
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-sm font-medium text-slate-700">
-                                                            {file.name}
-                                                        </p>
-                                                        <p className="text-xs text-slate-400">
-                                                            {file.size ? (file.size / (1024 * 1024)).toFixed(2) : 0} MB
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const kept = formalization_files.filter((_, i) => i !== fIdx);
-                                                        update("formalization_files", kept);
-                                                    }}
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                                                    aria-label="Remove file"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
+                            );
+                        })}
+                        <button
+                            type="button"
+                            onClick={addPartner}
+                            className="cer-addbig"
+                        >
+                            ＋ Add another partner
+                        </button>
                     </section>
                 </div>
             ) : null}
-
-            {/* 7.3 Analytics — always visible (zeros when No) */}
-            <section className="cer-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                            <Activity className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            System-generated partnership analytics
-                        </h3>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Read-only
-                    </span>
-                </div>
-
-                <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-5 sm:p-6">
-                    <span className="inline-flex rounded-full border border-indigo-100 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                        Recalculates automatically as partners are added
-                    </span>
-
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                        {[
-                            { label: "Total active partners", val: activePartners.length },
-                            { label: "Government partners", val: govPartners.length },
-                            { label: "Private / CSR partners", val: privatePartners.length },
-                            { label: "Academic institutions", val: academicPartners.length },
-                        ].map(({ label, val }) => (
-                            <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <p className="text-2xl font-semibold text-slate-900">{val}</p>
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                    {label}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
-                        {[
-                            { label: "Fully verified", val: fullyVerified, color: "text-emerald-600" },
-                            { label: "Partially verified", val: partiallyVerified, color: "text-indigo-600" },
-                            { label: "Self-reported", val: selfReportedPartners.length, color: "text-amber-600" },
-                        ].map(({ label, val, color }) => (
-                            <div key={label}>
-                                <p className={clsx("text-xl font-semibold", color)}>{val}</p>
-                                <p className="mt-0.5 text-[11px] text-slate-500">{label}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className={clsx("flex items-center justify-between gap-4 rounded-xl border p-4", classification.color)}>
-                        <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
-                                SDG 17 engagement classification
-                            </p>
-                            <p className="mt-1 text-sm font-semibold uppercase tracking-wide">
-                                {classification.label}
-                            </p>
-                            <p className="mt-0.5 text-xs opacity-70">{classification.desc}</p>
-                        </div>
-                        <Globe className="h-7 w-7 shrink-0 opacity-40" />
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                        {autoNarrative}
-                    </div>
-                </div>
-            </section>
-
-            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-                <DialogContent className="flex max-w-4xl flex-col items-center bg-white p-6">
-                    <DialogHeader className="mb-4 flex w-full flex-col items-start justify-start">
-                        <DialogTitle className="w-full truncate break-all pr-8 text-sm font-bold text-slate-800">
-                            {previewFile?.name}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="flex max-h-[80vh] w-full items-center justify-center overflow-auto rounded-xl border border-slate-100 bg-slate-50 p-2">
-                        <FullFilePreview file={previewFile} />
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Search, Filter, Edit, Trash2, Eye, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { distinctBeneficiaryTotal } from "@/app/dashboard/student/report/utils/activityReach";
 import { toast } from "sonner";
 
 import Link from "next/link";
@@ -108,7 +109,7 @@ function getBeneficiaries(r: Report): number {
         r.totalBeneficiaries,
         r.section4?.project_summary?.distinct_total_beneficiaries,
         r.section4?.project_summary?.total_beneficiaries
-    );
+    ) || distinctBeneficiaryTotal(r.section4);
 }
 
 function getHoursLogged(r: Report): number {

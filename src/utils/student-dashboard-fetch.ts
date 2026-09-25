@@ -9,11 +9,8 @@ export {
     readStudentDashboardCache,
 } from "@/utils/student-dashboard-cache";
 
-/** Prefer new JWT-scoped routes; fall back to legacy `/api/v1/student/dashboard`. */
 const STUDENT_DASHBOARD_PATHS = [
     "/api/v1/students/me/dashboard",
-    "/api/v1/student/me/dashboard",
-    "/api/v1/student/dashboard",
 ] as const;
 
 export async function fetchStudentDashboardData(config: { redirectToLogin?: boolean } = {}): Promise<DashboardData | null> {
