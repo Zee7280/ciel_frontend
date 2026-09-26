@@ -29,6 +29,7 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import FacultyReportReviewCard from "@/components/ciel/community-service/FacultyReportReviewCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
@@ -40,6 +41,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { formatDisplayId } from "@/utils/displayIds";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
+import { CII_V2_LEVELS } from "@/utils/communityCiiAnalyser";
 
 const CS_VIEWS = [
     "home",
@@ -103,19 +105,19 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
     reports: {
         desc: "Final academic review of submitted Community Service Reports.",
         items: [
-            ["Pending Review", "Reports where AI analysis is complete and your decision is required."],
+            ["Pending Review", "Submitted reports waiting for your review; run the Analyzer when you are ready to assess the locked report."],
             ["Revision with Student", "Reports returned for correction."],
             ["Decided", "Approved or rejected report decisions retained for history."],
-            ["CII Breakdown", "Review the provisional AI assessment and evidence logic."],
-            ["Approve / Revise / Reject", "Your final academic report decision; moderation requires a recorded reason."],
+            ["CII Breakdown", "Review the provisional System CII, evidence logic and section reasoning."],
+            ["Approve / Review / Reject", "Your final academic report decision; moderation requires a recorded reason."],
         ],
-        rule: "AI CII is provisional until Faculty approval.",
+        rule: "System CII is provisional until Faculty approval.",
     },
     impact: {
         desc: "Verified impact from projects you supervised.",
         items: [
             ["Impact Wall", "Verified visible records under the permitted visibility setting."],
-            ["Flashcard & Credentials", "Open the verified project summary, CII, badge, certificate and QR."],
+            ["Flashcard & package", "Open the verified flashcard, CII, badge, ranking + trend, detailed report and PDF. QR stays on the flashcard."],
         ],
         rule: "Rejected work never appears as verified impact.",
     },
@@ -222,23 +224,35 @@ function HubTabs({
     onChange: (id: string) => void;
 }) {
     return (
-        <div className="mb-3.5 flex flex-wrap gap-2">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => onChange(tab.id)}
-                    className={
-                        "rounded-[10px] border px-3 py-2 text-[11px] font-extrabold " +
-                        (active === tab.id
-                            ? "border-[#cbece4] bg-[#e8f7f3] text-[#08756b]"
-                            : "border-[#dce6ea] bg-white text-[#52636e]")
-                    }
-                >
-                    {tab.label}
-                    {typeof tab.count === "number" ? <span className="ml-1.5 text-[10px] opacity-70">{tab.count}</span> : null}
-                </button>
-            ))}
+        <div className="mb-3.5 flex flex-wrap gap-1.5">
+            {tabs.map((tab) => {
+                const on = active === tab.id;
+                return (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => onChange(tab.id)}
+                        className={
+                            "inline-flex items-center gap-1.5 rounded-[18px] border px-3 py-1.5 text-[12px] font-extrabold " +
+                            (on
+                                ? "border-[#153f47] bg-[#153f47] text-white"
+                                : "border-[#dce6ea] bg-white text-[#5c6d76]")
+                        }
+                    >
+                        {tab.label}
+                        {typeof tab.count === "number" ? (
+                            <span
+                                className={
+                                    "rounded-[10px] px-1.5 py-0.5 text-[10.5px] font-black " +
+                                    (on ? "bg-white/20 text-white" : "bg-[#eef1f2] text-[#5c6d76]")
+                                }
+                            >
+                                {tab.count}
+                            </span>
+                        ) : null}
+                    </button>
+                );
+            })}
         </div>
     );
 }
@@ -393,7 +407,7 @@ function FacultyCommunityServiceHub() {
             key: "reports",
             n: pendingReports.length,
             title: "Reports for review",
-            sub: "AI Review complete · CII provisional",
+            sub: "Locked report received · Analyzer may be pending",
             href: `${CS_BASE}?view=reports&tab=pending`,
             tone: pendingReports.length ? "bad" : "default",
         },
@@ -883,9 +897,38 @@ function FacultyCommunityServiceHub() {
                 <div>
                     <MockupSectionHead
                         title="Reports for Review"
-                        subtitle="Faculty-only academic approval. AI score is provisional until you approve; overrides need a recorded reason."
+                        subtitle="Faculty-only academic approval. Review the locked Flashcard + Detailed Report first. System CII is provisional until you approve; overrides need a recorded reason."
                     />
-                    <UserGuideBanner {...FACULTY_CS_GUIDES.reports} />
+                    <div className="mb-3.5 overflow-hidden rounded-[18px] border border-[#d8e5e8] bg-[linear-gradient(135deg,#ffffff,#f5fbfa)] shadow-[0_8px_22px_rgba(24,52,64,.045)]">
+                        <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2 xl:grid-cols-5">
+                            {(FACULTY_CS_GUIDES.reports.items || []).map(([title, text]) => (
+                                <div key={title} className="rounded-xl border border-[#e0e8ea] bg-white px-2.5 py-2">
+                                    <b className="block text-[10px] text-[#173e47]">{title}</b>
+                                    <span className="mt-1 block text-[10px] leading-relaxed text-[#6d7e85]">{text}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {FACULTY_CS_GUIDES.reports.rule ? (
+                            <div className="mx-3 mb-3 rounded-[11px] border border-[#ead9ad] bg-[#fff8e8] px-2.5 py-2 text-[10.5px] leading-relaxed text-[#725e2a]">
+                                <b>Simple rule:</b> {FACULTY_CS_GUIDES.reports.rule}
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="mb-3 rounded-[14px] border border-[#cfe6ef] bg-[#f3f9fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#3e515b]">
+                        <b>CII recognition scale — locked to the live analyser:</b>{" "}
+                        {CII_V2_LEVELS.map((lvl, i) => (
+                            <span key={lvl.level}>
+                                {i > 0 ? " · " : null}
+                                <b>
+                                    L{lvl.level} · {lvl.min === 0 ? "0" : String(lvl.min)}–{Math.floor(lvl.max)}
+                                </b>{" "}
+                                {lvl.name}
+                            </span>
+                        ))}
+                        <span className="mt-1 block text-[11px] text-[#6b7c86]">
+                            Highest levels require quality gates; the numerical total alone is not enough. The Analyzer is not run until you trigger it.
+                        </span>
+                    </div>
                     <HubTabs
                         tabs={[
                             { id: "pending", label: "Pending review", count: pendingReports.length },
@@ -906,24 +949,21 @@ function FacultyCommunityServiceHub() {
                                         title={reportTab === "pending" ? "No reports waiting" : "None"}
                                         text={
                                             reportTab === "pending"
-                                                ? "Submitted reports arrive here after the AI Review."
-                                                : "Decided reports stay here for history."
+                                                ? "Submitted reports arrive here as a locked Flashcard + Detailed Report. The Analyzer runs only when you choose to run it."
+                                                : reportTab === "rev"
+                                                  ? "Reports you return for correction stay here until the student resubmits."
+                                                  : "Decided reports stay here for history."
                                         }
                                     />
                                 );
                             }
                             return (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-3">
                                     {list.map((row) => (
                                         <div key={row.id}>
-                                            <CommunityQueueCard
-                                                href={`${REPORTS}/${row.id}`}
-                                                title={row.project_title}
-                                                student={row.student_name}
-                                                org={row.organization_name}
-                                                hours={row.hours}
-                                                tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                                cta="Open report →"
+                                            <FacultyReportReviewCard
+                                                row={row}
+                                                mode={reportTab === "rev" ? "revision" : reportTab === "done" ? "decided" : "pending"}
                                             />
                                             {reportTab === "rev" ? (
                                                 <FacultyRemindButtons email={row.student_email} title={row.project_title} />
@@ -944,8 +984,8 @@ function FacultyCommunityServiceHub() {
             {(view === "impact" || view === "approved") && (
                 <div>
                     <MockupSectionHead
-                        title="Community Service Impact"
-                        subtitle="Approved records only; visibility permissions respected."
+                        title="My Impact Wall"
+                        subtitle="Approved records after faculty sign-off: flashcard, badge, ranking + trend, CII, detailed report, PDF, combined package. QR sits on the flashcard. No certificate download."
                         action={
                             <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open Impact Wall →
@@ -960,7 +1000,17 @@ function FacultyCommunityServiceHub() {
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (
-                                <CommunityFlashCard key={c.id} card={c} href={`${REPORTS}/${c.id}`} />
+                                            <CommunityFlashCard
+                                                key={c.id}
+                                                card={c}
+                                                href={`${REPORTS}/${c.id}`}
+                                                viewer="faculty"
+                                                packageHrefs={{
+                                                    detailedPdf: `${REPORTS}/${c.id}?view=dossier`,
+                                                    combinedPdf: `${REPORTS}/${c.id}?view=dossier`,
+                                                    verify: c.impact_verify_url || undefined,
+                                                }}
+                                            />
                             ))}
                         </div>
                     )}
@@ -1120,7 +1170,7 @@ function FacultyCommunityServiceHub() {
                                 <b>Review</b> — Opportunity review and participation approval are separate decisions.
                             </p>
                             <p>
-                                <b>Reports</b> — AI CII is provisional until Faculty approval.
+                                <b>Reports</b> — System CII is provisional until Faculty approval. The Analyzer runs only when Faculty triggers it.
                             </p>
                         </div>
                     </div>

@@ -715,8 +715,8 @@ export default function NgoCommunityServiceHub() {
             {(view === "impact" || view === "approved") && (
                 <div className="mt-4">
                     <MockupSectionHead
-                        title={`Impact linked to ${orgName}`}
-                        subtitle="Approved records only. Confidential records show restricted placeholders."
+                        title={`My Impact Wall · ${orgName}`}
+                        subtitle="Approved records: flashcard, badge, ranking + trend, CII and on-screen detailed report. QR stays on the flashcard. No PDF or certificate download."
                         action={
                             <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open Impact Wall →
@@ -730,7 +730,7 @@ export default function NgoCommunityServiceHub() {
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (
-                                <CommunityFlashCard key={c.id} card={c} href={reportHref(c.id)} />
+                                <CommunityFlashCard key={c.id} card={c} href={reportHref(c.id)} viewer="ngo" />
                             ))}
                         </div>
                     )}
@@ -824,7 +824,7 @@ export default function NgoCommunityServiceHub() {
                         <CommunityAwardPanel
                             cards={deckCards}
                             kind="par"
-                            scopeName={`${orgName}-linked projects`}
+                            scopeName={`${orgName} NGO cohort`}
                             notifyEndpoint="/api/v1/partners/community-service/award-notify"
                             filters={{ university: true }}
                         />

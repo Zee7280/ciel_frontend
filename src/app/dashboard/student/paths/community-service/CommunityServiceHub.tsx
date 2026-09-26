@@ -13,7 +13,7 @@ const BROWSE_HREF = "/dashboard/student/browse";
 const WORKSPACE_HREF = `${HUB}?view=workspace`;
 const LOG_HOURS_HREF = `${HUB}?tab=log-hours`;
 const GUIDE_HREF = `${HUB}?view=guide`;
-const CS_IMPACT_HREF = "/dashboard/student/impact?area=Community%20Service";
+const CS_IMPACT_HREF = `${HUB}?view=wall`;
 const RANKINGS_HREF = `${HUB}?view=rankings`;
 const FILES_HREF = `${HUB}?view=files`;
 
@@ -181,8 +181,8 @@ export default function CommunityServiceHub({
                     href={CS_IMPACT_HREF}
                     emoji="🏅"
                     ghost="🏅"
-                    title="My Community Service Impact"
-                    subtitle="Verified records: CII score, badge, certificate, QR verification, Flashcard and PDF."
+                    title="My Impact Wall"
+                    subtitle="Verified records after faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, certificate and QR."
                     badge="MY IMPACT"
                     background={MOCKUP_GRADIENTS.green}
                 />

@@ -80,6 +80,7 @@ export type CommunityAwardCard = {
     level?: CommunityServiceLevel;
     awardBadges?: CommunityAwardBadge[];
     awardBadgeHistory?: CommunityAwardBadge[];
+    impact_verify_url?: string | null;
 };
 
 export function awardTier(ratio: number) {
@@ -117,6 +118,42 @@ export const BADGE_CLASS: Record<CommunityAwardKind, string> = {
 };
 
 export const BADGE_ICON: Record<CommunityAwardKind, string> = { uni: "🏛️", par: "🤝", ciel: "🌍", fac: "🧑‍🏫" };
+
+export function awardBadgeKey(badge: Pick<CommunityAwardBadge, "kind" | "scope">): string {
+    return `${badge.kind}|${badge.scope}`;
+}
+
+export type RankingTrendInsight = {
+    currentRank: number;
+    of: number;
+    bestRank: number;
+    trend: number | null;
+    last6: number[];
+};
+
+/** Current / best / trend / last-6 ranks for one cohort (kind+scope) from award history. */
+export function rankingTrendInsight(
+    history: CommunityAwardBadge[] | undefined,
+    badge: CommunityAwardBadge,
+): RankingTrendInsight {
+    const hist = (history || [])
+        .filter((h) => awardBadgeKey(h) === awardBadgeKey(badge))
+        .slice()
+        .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    const series = hist.length ? hist : [badge];
+    const last6 = series.slice(-6).map((h) => h.rank);
+    const idx = hist.findIndex((h) => h.at === badge.at && h.rank === badge.rank);
+    const prev = idx > 0 ? hist[idx - 1] : hist.length >= 2 ? hist[hist.length - 2] : null;
+    const trend = prev ? prev.rank - badge.rank : hist.length >= 2 ? hist[hist.length - 2].rank - badge.rank : null;
+    const bestRank = Math.min(...series.map((h) => h.rank));
+    return {
+        currentRank: badge.rank,
+        of: badge.of,
+        bestRank,
+        trend,
+        last6,
+    };
+}
 
 export function reportRowToAwardCard(row: {
     id: string;

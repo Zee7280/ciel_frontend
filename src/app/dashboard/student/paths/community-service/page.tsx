@@ -19,6 +19,7 @@ import CommunityServiceCreate from "./CommunityServiceCreate";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import CommunityServiceRankings from "./CommunityServiceRankings";
 import CommunityServiceFiles from "./CommunityServiceFiles";
+import CommunityImpactWall from "./CommunityImpactWall";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DetailedStudentReportGuide from "./DetailedStudentReportGuide";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
@@ -290,13 +291,10 @@ function CommunityServiceContent() {
         if (rawTab === "find") {
             router.replace("/dashboard/student/browse");
         }
-        if (wallView) {
-            router.replace("/dashboard/student/impact?area=Community%20Service");
-        }
         if (workspaceView && rawFilter === "opportunity") {
             router.replace(`${HUB}?view=create&filter=review`);
         }
-    }, [rawTab, wallView, workspaceView, rawFilter, router]);
+    }, [rawTab, workspaceView, rawFilter, router]);
 
     const setTab = (key: string) => {
         if (key === "find") {
@@ -310,7 +308,10 @@ function CommunityServiceContent() {
 
     if (loading) return <WorkspaceSkeleton />;
     if (rawTab === "find") return <WorkspaceSkeleton />;
-    if (wallView) return <WorkspaceSkeleton />;
+
+    if (showHub && wallView) {
+        return <CommunityImpactWall />;
+    }
 
     if (showHub && guideView) {
         return (

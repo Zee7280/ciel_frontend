@@ -50,6 +50,17 @@ function mergeBreakdown(
     return merged;
 }
 
+function isCiiFacultyLocked(lock: { locked?: unknown } | null | undefined): boolean {
+    return lock?.locked === true || lock?.locked === "true";
+}
+
+function readCiiV2Final(data: ReportData): number | null {
+    const raw = (data.ciiV2 as { final?: unknown } | null | undefined)?.final;
+    if (typeof raw === "number" && Number.isFinite(raw)) return clampCii(raw);
+    if (typeof raw === "string" && raw.trim() && Number.isFinite(Number(raw))) return clampCii(Number(raw));
+    return null;
+}
+
 /** Draft / revision (e.g. after admin delete + new start) must not keep an old submit snapshot. */
 function hasSubmittedLifecycle(data: ReportData): boolean {
     const status = `${data.status || ""} ${data.report_status || ""} ${data.admin_status || ""}`.toLowerCase();
@@ -69,12 +80,7 @@ export function resolveReportCii(data: ReportData): ResolvedReportCii {
     } catch {
         live = emptyLive();
     }
-    const facultyFinal =
-        data.ciiV2Lock?.locked === true &&
-        typeof data.ciiV2?.final === "number" &&
-        Number.isFinite(data.ciiV2.final)
-            ? clampCii(data.ciiV2.final)
-            : null;
+    const facultyFinal = isCiiFacultyLocked(data.ciiV2Lock) ? readCiiV2Final(data) : null;
 
     if (facultyFinal != null) {
         const persisted = readPersistedCiiSnapshot(data);

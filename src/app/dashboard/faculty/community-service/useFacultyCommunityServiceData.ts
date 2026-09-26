@@ -34,6 +34,19 @@ export type FacultyCsReportRow = {
     hours?: number;
     submission_date?: string;
     report_submitted_at?: string;
+    updated_at?: string;
+    university?: string | null;
+    faculty_name?: string | null;
+    story?: string | null;
+    evidence_count?: number;
+    participation_type?: string;
+    member_hours?: Array<{ name: string; hours: number; required: number }>;
+    required_hours?: number;
+    cii_analyser_run?: boolean;
+    cii_provisional?: number | null;
+    cii_locked?: boolean;
+    cii_level_name?: string | null;
+    cii_numeric_level?: number | null;
 };
 
 export type FacultyCsMineRow = {
@@ -154,8 +167,21 @@ export function useFacultyCommunityServiceData() {
                                 item.metrics && typeof item.metrics === "object"
                                     ? (item.metrics as Record<string, unknown>)
                                     : {};
-                            const hoursRaw = metrics.total_verified_hours ?? metrics.total_hours ?? item.hours;
-                            const hours = typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0);
+                            const hoursRaw = item.hours ?? metrics.total_verified_hours ?? metrics.total_hours;
+                            const hours =
+                                typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
+                                    ? hoursRaw
+                                    : typeof hoursRaw === "string" && Number.isFinite(Number(hoursRaw))
+                                      ? Number(hoursRaw)
+                                      : 0;
+                            const ciiRaw = item.cii_provisional ?? item.ciiProvisional;
+                            const ciiProvisional =
+                                typeof ciiRaw === "number" && Number.isFinite(ciiRaw)
+                                    ? ciiRaw
+                                    : typeof ciiRaw === "string" && ciiRaw.trim() && Number.isFinite(Number(ciiRaw))
+                                      ? Number(ciiRaw)
+                                      : null;
+                            const levelRaw = item.cii_numeric_level ?? item.ciiNumericLevel;
                             return {
                                 id: String(item.id || ""),
                                 student_name: pickStr(item, "student_name", "studentName") || "Student",
@@ -168,9 +194,45 @@ export function useFacultyCommunityServiceData() {
                                 project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
                                 faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
                                 status: pickStr(item, "status"),
-                                hours: Number.isFinite(hours) ? hours : 0,
+                                hours,
                                 submission_date: pickStr(item, "submission_date", "submissionDate"),
                                 report_submitted_at: pickStr(item, "report_submitted_at", "reportSubmittedAt"),
+                                cii_analyser_run: item.cii_analyser_run === true || item.ciiAnalyserRun === true || ciiProvisional != null,
+                                cii_provisional: ciiProvisional,
+                                cii_locked:
+                                    item.cii_locked === true ||
+                                    item.cii_locked === "true" ||
+                                    item.ciiLocked === true ||
+                                    item.ciiLocked === "true",
+                                cii_level_name: pickStr(item, "cii_level_name", "ciiLevelName") || null,
+                                cii_numeric_level:
+                                    typeof levelRaw === "number" && Number.isFinite(levelRaw)
+                                        ? levelRaw
+                                        : typeof levelRaw === "string" && Number.isFinite(Number(levelRaw))
+                                          ? Number(levelRaw)
+                                          : null,
+                                university: pickStr(item, "university") || null,
+                                faculty_name: pickStr(item, "faculty_name", "facultyName") || null,
+                                story: pickStr(item, "story") || null,
+                                evidence_count:
+                                    typeof item.evidence_count === "number" && Number.isFinite(item.evidence_count)
+                                        ? item.evidence_count
+                                        : Number(item.evidence_count || 0) || 0,
+                                participation_type: pickStr(item, "participation_type", "participationType") || "individual",
+                                required_hours:
+                                    typeof item.required_hours === "number" && Number.isFinite(item.required_hours)
+                                        ? item.required_hours
+                                        : 16,
+                                member_hours: Array.isArray(item.member_hours)
+                                    ? item.member_hours
+                                          .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
+                                          .map((row) => ({
+                                              name: pickStr(row, "name") || "Student",
+                                              hours: Number(row.hours || 0) || 0,
+                                              required: Number(row.required || 16) || 16,
+                                          }))
+                                    : [],
+                                updated_at: pickStr(item, "updated_at", "updatedAt"),
                             };
                         })
                         .filter((r: FacultyCsReportRow) => r.id),
@@ -196,8 +258,11 @@ export function useFacultyCommunityServiceData() {
     }, []);
 
     const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
-    const pendingReports = useMemo(() => rows.filter((r) => isFacultyCommunityWaiting(r)), [rows]);
     const revisionReports = useMemo(() => rows.filter(isFacultyCsReportRevision), [rows]);
+    const pendingReports = useMemo(
+        () => rows.filter((r) => isFacultyCommunityWaiting(r) && !isFacultyCsReportRevision(r)),
+        [rows],
+    );
     const decidedReports = useMemo(
         () => rows.filter((r) => isFacultyCommunityLiveCard(r) || isCommunityReportRejected(r)),
         [rows],
@@ -234,9 +299,13 @@ export function useFacultyCommunityServiceData() {
                 key: `rep-${row.id}`,
                 kind: "report" as const,
                 title: row.project_title,
-                meta: `${formatDisplayId(row.id, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · AI CII provisional`,
+                meta: `${formatDisplayId(row.id, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · ${
+                    typeof row.cii_provisional === "number"
+                        ? `System CII ${Math.round(row.cii_provisional)} (Provisional)`
+                        : "Analyzer not run"
+                }`,
                 href: `${FACULTY_CS_REPORTS}/${row.id}`,
-                cta: "View Report & Approve",
+                cta: "Open locked package",
                 studentEmail: row.student_email,
             })),
         ],

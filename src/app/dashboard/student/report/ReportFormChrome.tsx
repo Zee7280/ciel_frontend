@@ -78,6 +78,28 @@ function pickNumber(value: unknown): number | null {
     return null;
 }
 
+function countSectionMediaUrls(data: ReportData): number {
+    const keys = [
+        "section1",
+        "section2",
+        "section3",
+        "section4",
+        "section5",
+        "section6",
+        "section7",
+        "section8",
+        "section9",
+        "section10",
+    ] as const;
+    let n = 0;
+    for (const key of keys) {
+        const rec = asRecord(data[key]);
+        if (!Array.isArray(rec.media_urls)) continue;
+        n += rec.media_urls.filter((item) => (typeof item === "string" ? Boolean(item.trim()) : Boolean(item))).length;
+    }
+    return n;
+}
+
 const BANNER_KICKERS: Record<number, string> = {
     1: "SECTION 1 · PARTICIPATION",
     2: "SECTION 2 · PROJECT CONTEXT",
@@ -119,12 +141,26 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
     const context = getReportProjectContextDisplay({ ...asRecord(projectData), opportunity: projectData, ...data });
     const title = pickString(asRecord(projectData).title, data.project_title) || "Community engagement";
     const sdgs = mergeReportSdgSnapshotRows({ ...asRecord(projectData), ...data }, data.section3);
-    const hours = pickNumber(data.section1?.metrics?.total_verified_hours) || 0;
+    const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
+    const metricHours = pickNumber(data.section1?.metrics?.total_verified_hours) || 0;
+    const logHours = sumNonRejectedLoggedHours(logs);
+    const rosterHours =
+        (pickNumber(data.section1?.team_lead?.hours) || 0) +
+        (Array.isArray(data.section1?.team_members)
+            ? data.section1.team_members.reduce((sum, member) => sum + (pickNumber(member.hours) || 0), 0)
+            : 0);
+    const individualHours = Array.isArray(data.section1?.metrics?.individual_metrics)
+        ? data.section1.metrics.individual_metrics.reduce(
+              (sum, row) => sum + (pickNumber((row as { individual_hours?: unknown })?.individual_hours) || 0),
+              0,
+          )
+        : 0;
+    const hours =
+        metricHours > 0 ? metricHours : logHours > 0 ? logHours : individualHours > 0 ? individualHours : rosterHours;
     const members =
         (data.section1?.participation_type === "team"
             ? 1 + (Array.isArray(data.section1.team_members) ? data.section1.team_members.length : 0)
             : 1) || 1;
-    const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
     const acts = (Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : []).filter(
         (block) => pickString(block.title, block.primary_category),
     );
@@ -132,7 +168,7 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
         const rows = Array.isArray(block.outputs) ? block.outputs : [];
         return sum + rows.filter((row) => String(row?.quantity ?? "").trim()).length;
     }, 0);
-    const reachCount = distinctBeneficiaryTotal(data.section4);
+    const reachCount = distinctBeneficiaryTotal(data.section4) || pickNumber(data.section2?.affected_count) || 0;
     const reach = reachCount > 0 ? String(reachCount) : "";
     const outcomes = Array.isArray(data.section5?.measurable_outcomes) ? data.section5.measurable_outcomes : [];
     const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && (o.baseline || o.endline));
@@ -145,14 +181,15 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
         })
         .filter((n): n is number => n != null);
     const bestPct = pcts.length ? Math.max(...pcts) : null;
-    const evidence =
-        (Array.isArray(data.section8?.evidence_files) ? data.section8.evidence_files.length : 0) +
-        (Array.isArray(data.evidence_urls) ? data.evidence_urls.length : 0);
+    const evidenceFiles = Array.isArray(data.section8?.evidence_files) ? data.section8.evidence_files.length : 0;
+    const evidenceUrls = Array.isArray(data.evidence_urls) ? data.evidence_urls.length : 0;
+    const logEvidence = logs.filter((log) => logHasEvidence(log)).length;
+    const evidence = Math.max(evidenceFiles + evidenceUrls, logEvidence, countSectionMediaUrls(data));
     const competencyScores = Object.values(data.section9?.competency_scores || {});
-    const ratedCompetencyCount = competencyScores.filter((n) => typeof n === "number" && n > 0).length;
+    const ratedCompetency = competencyScores.filter((n) => typeof n === "number" && n > 0);
     const competency =
-        ratedCompetencyCount === 12
-            ? (competencyScores.reduce((sum, n) => sum + (Number(n) || 0), 0) / 12).toFixed(1)
+        ratedCompetency.length > 0
+            ? (ratedCompetency.reduce((sum, n) => sum + (Number(n) || 0), 0) / ratedCompetency.length).toFixed(1)
             : "";
     const ethicsVals = Object.values(data.section8?.ethical_compliance || {});
     const ethicsOk = ethicsVals.length > 0 && ethicsVals.every(Boolean);
@@ -182,6 +219,10 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
         names,
         pkr,
     };
+}
+
+export function buildReportFlashAgg(data: ReportData, projectData?: unknown) {
+    return chromeAgg(data, projectData);
 }
 
 /** Top-of-wizard hero — shown once, above the tab bar, for the life of the report. */
@@ -721,6 +762,10 @@ function baselineSourceLabel(token: string, section: ReportData["section2"]): st
 
 function gapLabel(gap: string, section: ReportData["section2"]): string {
     if (gap !== "Other") return gap;
+    const entries = Array.isArray(section?.system_gaps_other_entries)
+        ? section.system_gaps_other_entries.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    if (entries.length) return entries.join(" · ");
     return (section?.system_gaps_other || "").trim() || "Other";
 }
 
@@ -1719,87 +1764,6 @@ function flashStatus(data: ReportData): "draft" | "pending" | "live" {
     if (/(verified|approved|live)/.test(status)) return "live";
     if (/(submitted|pending|payment)/.test(status)) return "pending";
     return "draft";
-}
-
-function FlashHighlights({
-    data,
-    agg,
-}: {
-    data: ReportData;
-    agg: ReturnType<typeof chromeAgg>;
-}) {
-    const lead = data.section1?.team_lead as { university?: string; universityName?: string; degree?: string; academicProgram?: string } | undefined;
-    const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
-    const dates = logs.map((log) => log.date).filter(Boolean).sort();
-    const span = dates.length
-        ? dates.length > 1
-            ? `${sessionDateLabel(dates[0])} → ${sessionDateLabel(dates[dates.length - 1])}`
-            : sessionDateLabel(dates[0])
-        : "—";
-    const locations = [...new Set(logs.map((log) => log.location).filter(Boolean))].slice(0, 2);
-    const partners = data.section7?.partners || [];
-    const cards: Array<[string, string, string, string]> = [
-        ["🏛️", "Organization / partner", agg.context.partnerOrganization || "—", partners[0]?.name || ""],
-        ["🎓", "University", pickString(lead?.universityName, lead?.university) || "—", pickString(lead?.academicProgram, lead?.degree)],
-        ["🧑‍🏫", "Faculty verifier", data.section1?.faculty_supervisor_email ? "Reviewer on file" : "—", "Approves once, at the end"],
-        ["🎯", "Who was affected", data.section2?.affected_group || "—", data.section2?.affected_count ? `≈ ${data.section2.affected_count}` : ""],
-        ["📍", "Where", agg.context.projectLocation && agg.context.projectLocation !== "N/A" ? agg.context.projectLocation : "—", locations.join(" · ")],
-        ["📅", "When", span, `${logs.length} session${logs.length === 1 ? "" : "s"} · ${Math.round(agg.hours * 10) / 10}h`],
-        [
-            "📦",
-            "Resources",
-            data.section6?.use_resources === "no" ? "Time & effort only" : agg.pkr ? `PKR ${agg.pkr.toLocaleString()} traced` : `${(data.section6?.resources || []).length} entries`,
-            "",
-        ],
-        ["🌍", "SDGs", agg.sdgs.map((row) => `SDG ${row.goalNumber}`).join(" · ") || "—", ""],
-        ["📈", "Best measured change", agg.bestPct != null ? `${agg.bestPct >= 0 ? "+" : ""}${agg.bestPct}%` : "—", ""],
-        ["🌱", "Afterwards", data.section10?.continuation_status || "—", (data.section10?.mechanisms || []).slice(0, 2).join(" · ")],
-    ];
-    const briefs: Array<[string, string, string]> = [
-        ["01", "Participation", `${agg.members} student${agg.members === 1 ? "" : "s"} · ${Math.round(agg.hours * 10) / 10}h · ${logs.length} sessions`],
-        ["02", "Context", firstSentence(data.section2?.problem_statement || "") || "Baseline not written yet"],
-        ["03", "SDGs", `${agg.sdgs.length} goal${agg.sdgs.length === 1 ? "" : "s"} mapped`],
-        ["04", "Activities & outcomes", `${agg.acts.length} activities · ${agg.outputs} outputs · ${agg.measured.length} measured`],
-        ["05", "Resources", data.section6?.use_resources === "no" ? "Time and effort only" : `${(data.section6?.resources || []).length} resource entries`],
-        ["06", "Partnerships", `${partners.length} partner record${partners.length === 1 ? "" : "s"}`],
-        ["07", "Evidence", `${agg.evidence} evidence items`],
-        ["08", "Reflection", `${(data.section9?.skills_grown || []).length} skills${agg.competency ? ` · ${agg.competency}/5` : ""}`],
-        ["09", "Sustainability", data.section10?.continuation_status || "Continuation not chosen yet"],
-    ];
-    return (
-        <>
-            <div className="cer-fchi">
-                <div className="k">🔦 HIGHLIGHTS — WHO, WHERE, FOR WHOM, WITH WHAT</div>
-                <div className="grid">
-                    {cards.map(([icon, label, value, note]) => (
-                        <div key={label}>
-                            <span>
-                                {icon} {label}
-                            </span>
-                            <b>{value}</b>
-                            {note ? <small>{note}</small> : null}
-                        </div>
-                    ))}
-                </div>
-                <div className="foot">
-                    These highlights also sit on the scored summary. Private contact details stay off the public card.
-                </div>
-            </div>
-            <div className="cer-fcnine">
-                <div className="k">🧩 ALL NINE SECTIONS — ONE LINE EACH</div>
-                <div className="grid">
-                    {briefs.map(([num, title, text]) => (
-                        <div key={num}>
-                            <b>
-                                {num} · {title}
-                            </b>
-                            {text}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </>
-    );
 }
 
 export function ReportFlashCard({

@@ -6,8 +6,10 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { CommunityCrumb } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
+import RankingBadgeTrendInsights from "@/components/ciel/community-service/RankingBadgeTrendInsights";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { resolveCiiLevelBadge } from "@/utils/ciiLevelBadge";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -29,6 +31,7 @@ type WallRow = {
     partner_verified?: boolean;
     status?: string;
     awardBadges?: CommunityAwardBadge[];
+    awardBadgeHistory?: CommunityAwardBadge[];
     cii_score?: number | null;
     level?: CommunityServiceLevel;
     section1?: { metrics?: { total_verified_hours?: number } };
@@ -801,7 +804,7 @@ export default function CommunityImpactWall(_props: {
     }, []);
 
     const openFlash = (r: WallRow) => {
-        const hours = Number(r.section1?.metrics?.total_verified_hours || r.hours || 0);
+        const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
         const year = yearOf(r.created_at);
         const sdgs = sdgNumbers(r.sdgs);
         const uni = r.university || r.organization_name || "Community Service";
@@ -877,13 +880,14 @@ export default function CommunityImpactWall(_props: {
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="Impact" />
+            <CommunityCrumb role="Student" view="Impact Wall" />
+            <HubBackButton href={HUB} label="← Back to Community Service" />
             <MockupSectionHead
-                title="My Community Service Impact"
-                subtitle="Approved Community Service reports shown as verified impact flashcards."
+                title="My Impact Wall"
+                subtitle="After faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, combined package, certificate and QR."
                 action={
-                    <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
-                        ← Back to module buttons
+                    <Link href="/dashboard/student/impact?area=Community%20Service" className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
+                        Open full portfolio →
                     </Link>
                 }
             />
@@ -897,7 +901,7 @@ export default function CommunityImpactWall(_props: {
             ) : (
                 <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
                     {rows.map((r) => {
-                        const hours = Number(r.section1?.metrics?.total_verified_hours || r.hours || 0);
+                        const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
                         const year = yearOf(r.created_at);
                         const sdgs = sdgNumbers(r.sdgs);
                         const uni = r.university || r.organization_name || "Community Service";
@@ -947,12 +951,23 @@ export default function CommunityImpactWall(_props: {
                                             {extraBadges[0]?.label || r.level || "Verified Impact"}
                                         </span>
                                     </div>
+                                    <div className="mt-2">
+                                        <RankingBadgeTrendInsights badges={extraBadges} history={r.awardBadgeHistory} />
+                                    </div>
+                                    {r.impact_verify_url ? (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <ReportVerificationQr impactVerifyUrl={r.impact_verify_url} size={56} caption="Verify" />
+                                        </div>
+                                    ) : null}
                                     <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-2.5">
                                         <button type="button" onClick={() => openFlash(r)} className="rounded-[9px] bg-[#174b43] px-2.5 py-1.5 text-[9px] font-black text-white">
                                             Open Flashcard
                                         </button>
                                         <button type="button" onClick={() => openOrToast(r.actions?.pdf_url, "PDF is not attached yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
                                             PDF Report
+                                        </button>
+                                        <button type="button" onClick={() => openFlash(r)} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
+                                            Combined package
                                         </button>
                                         <button
                                             type="button"

@@ -764,7 +764,7 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "wall" && (
                 <div className="mt-4">
-                    <MockupSectionHead title={`${orgName} Impact Wall`} subtitle="Approved public and institutional work. Rejected work never appears beside verified projects." action={<Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">Open Impact Wall →</Link>} />
+                    <MockupSectionHead title={`${orgName} Impact Wall`} subtitle="After faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF and combined package. QR stays on the flashcard. No certificate download." action={<Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">Open Impact Wall →</Link>} />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
@@ -772,7 +772,17 @@ export default function UniversityCommunityServiceHub() {
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (
-                                <CommunityFlashCard key={c.id} card={c} href={IMPACT} />
+                                <CommunityFlashCard
+                                    key={c.id}
+                                    card={c}
+                                    href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}`}
+                                    viewer="university"
+                                    packageHrefs={{
+                                        detailedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}`,
+                                        combinedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}`,
+                                        verify: c.impact_verify_url || undefined,
+                                    }}
+                                />
                             ))}
                         </div>
                     )}

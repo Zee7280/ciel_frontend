@@ -12,7 +12,7 @@ import {
     type CIIBreakdownKey,
 } from "@/app/dashboard/student/report/utils/ciiSectionWeights";
 import { mergeReportSdgSnapshotRows } from "@/app/dashboard/student/report/utils/reportSdgMerge";
-import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
+import { defaultReportData, type ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 import { findSdgById } from "@/utils/sdgData";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
@@ -84,6 +84,38 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" && !Array.isArray(value)
         ? (value as Record<string, unknown>)
         : {};
+}
+
+/** Overlay faculty/report API payload onto the student report shape the V23 flashcard reads. */
+export function coerceFlashReportData(raw: Record<string, unknown>): ReportData {
+    const opportunity = asRecord(raw.opportunity);
+    const section = (key: keyof Pick<ReportData, "section1" | "section2" | "section3" | "section4" | "section5" | "section6" | "section7" | "section8" | "section9" | "section10" | "section11">) =>
+        ({ ...defaultReportData[key], ...asRecord(raw[key]) }) as ReportData[typeof key];
+    return {
+        ...defaultReportData,
+        ...raw,
+        project_id: pickString(raw.project_id) || pickString(raw.projectId) || pickString(opportunity.id) || defaultReportData.project_id,
+        project_title: pickString(raw.project_title) || pickString(opportunity.title) || pickString(raw.title) || defaultReportData.project_title,
+        report_id: pickString(raw.report_id) || pickString(raw.id) || undefined,
+        id: pickString(raw.id) || undefined,
+        impact_verify_url: pickString(raw.impact_verify_url) || pickString(raw.impactVerifyUrl) || null,
+        required_hours:
+            pickNumber(raw.required_hours) ??
+            pickNumber(raw.requiredHours) ??
+            pickNumber(asRecord(raw.opportunity).expected_hours) ??
+            defaultReportData.required_hours,
+        section1: section("section1") as ReportData["section1"],
+        section2: section("section2") as ReportData["section2"],
+        section3: section("section3") as ReportData["section3"],
+        section4: section("section4") as ReportData["section4"],
+        section5: section("section5") as ReportData["section5"],
+        section6: section("section6") as ReportData["section6"],
+        section7: section("section7") as ReportData["section7"],
+        section8: section("section8") as ReportData["section8"],
+        section9: section("section9") as ReportData["section9"],
+        section10: section("section10") as ReportData["section10"],
+        section11: section("section11") as ReportData["section11"],
+    } as ReportData;
 }
 
 function pickString(value: unknown): string {

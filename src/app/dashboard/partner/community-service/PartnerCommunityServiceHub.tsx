@@ -881,8 +881,8 @@ export default function PartnerCommunityServiceHub() {
             {(view === "impact" || view === "approved") && (
                 <div className="mt-4">
                     <MockupSectionHead
-                        title={`Impact linked to ${orgName}`}
-                        subtitle="Approved records only. Confidential records show restricted placeholders."
+                        title={`My Impact Wall · ${orgName}`}
+                        subtitle="Approved records: flashcard, badge, ranking + trend, CII and on-screen detailed report. QR stays on the flashcard. No PDF or certificate download."
                         action={
                             <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open Impact Wall →
@@ -896,7 +896,12 @@ export default function PartnerCommunityServiceHub() {
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (
-                                <CommunityFlashCard key={c.id} card={c} href={reportHref(c.id)} />
+                                <CommunityFlashCard
+                                    key={c.id}
+                                    card={c}
+                                    href={reportHref(c.id)}
+                                    viewer="partner"
+                                />
                             ))}
                         </div>
                     )}

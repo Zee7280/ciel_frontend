@@ -443,4 +443,5 @@ export const approvalActionClass = {
     red: "rounded-[10px] bg-[#fdeeee] px-3 py-2 text-[12px] font-black text-[#b34c4c] hover:brightness-95",
     soft: "rounded-[10px] bg-[#eef2f3] px-3 py-2 text-[12px] font-black text-[#29454f] hover:brightness-95",
     purple: "rounded-[10px] bg-[#f1eef8] px-3 py-2 text-[12px] font-black text-[#6b2bd9] hover:brightness-95",
+    blue: "rounded-[10px] bg-[#edf4fb] px-3 py-2 text-[12px] font-black text-[#376d9f] hover:brightness-95",
 } as const;

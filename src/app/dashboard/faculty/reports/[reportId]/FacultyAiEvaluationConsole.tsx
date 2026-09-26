@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
@@ -10,10 +10,15 @@ import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import {
     buildFacultyActionBody,
     buildFacultyAiEvaluationModel,
+    coerceFlashReportData,
     type FacultyDecisionKind,
     type FacultyEvidenceItem,
 } from "./facultyAiEvaluation.helpers";
-import "./faculty-ai-evaluation.css";
+import { V17ImpactFlashcard } from "@/app/dashboard/student/report/components/V17ImpactFlashcard";
+import { buildReportFlashAgg } from "@/app/dashboard/student/report/ReportFormChrome";
+import { REPORT_UI_SECTION_TOTAL } from "@/app/dashboard/student/report/utils/reportWizardNav";
+import "@/app/dashboard/student/report/community-engagement-report.css";
+import FacultyLockedV17Modal from "./FacultyLockedV17Modal";
 
 const PIPE = [
     { id: 0, label: "STUDENT COMPLETES 9 SECTIONS — FLASH CARD IS 10" },
@@ -44,7 +49,10 @@ function pipeClass(index: number, current: number): string {
 
 export default function FacultyAiEvaluationConsole() {
     const params = useParams();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const reportId = String(params.reportId ?? "");
+    const skipAutoAi = searchParams.get("intent") === "decide";
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [rawReport, setRawReport] = useState<Record<string, unknown> | null>(null);
@@ -60,10 +68,20 @@ export default function FacultyAiEvaluationConsole() {
     // Phase 4: Independent AI Analysis states
     const [independentAnalysisRunning, setIndependentAnalysisRunning] = useState(false);
     const [showIndependentAnalyses, setShowIndependentAnalyses] = useState(false);
+    const [lockedOpen, setLockedOpen] = useState(false);
 
     const model = useMemo(
         () => (rawReport ? buildFacultyAiEvaluationModel(rawReport) : null),
         [rawReport],
+    );
+
+    const flashReport = useMemo(
+        () => (rawReport ? coerceFlashReportData(rawReport) : null),
+        [rawReport],
+    );
+    const flashAgg = useMemo(
+        () => (flashReport ? buildReportFlashAgg(flashReport, rawReport?.opportunity ?? rawReport) : null),
+        [flashReport, rawReport],
     );
 
     // Check if CII v2 analysis exists on the report
@@ -187,6 +205,7 @@ export default function FacultyAiEvaluationConsole() {
 
     // Phase 1: Auto-trigger AI analysis if report loaded but no analysis exists
     useEffect(() => {
+        if (skipAutoAi) return;
         if (
             !loading &&
             rawReport &&
@@ -201,7 +220,7 @@ export default function FacultyAiEvaluationConsole() {
             }, 1200);
             return () => clearTimeout(timer);
         }
-    }, [loading, rawReport, hasCiiV2Analysis, model?.hasAiEvaluation, model?.decision, aiAnalysisStatus, runAutoAiAnalysis]);
+    }, [skipAutoAi, loading, rawReport, hasCiiV2Analysis, model?.hasAiEvaluation, model?.decision, aiAnalysisStatus, runAutoAiAnalysis]);
 
     const submitDecision = async (kind: Exclude<FacultyDecisionKind, "">) => {
         if (!reportId || saving) return;
@@ -364,6 +383,9 @@ export default function FacultyAiEvaluationConsole() {
                 </div>
                 <div className="fae-nav">
                     <Link href="/dashboard/faculty/reports">Back to student reports</Link>
+                    <button type="button" onClick={() => setLockedOpen(true)}>
+                        Open Locked V17 Package
+                    </button>
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
                         Open full dossier
                     </Link>
@@ -391,89 +413,25 @@ export default function FacultyAiEvaluationConsole() {
                     ))}
                 </div>
 
-                {/* Phase 1: Clear Two-Column Layout — Flash Card | AI Analysis & Score */}
-                <div className="fae-two-col">
-                    {/* ═══════════════════════════════════════════════════════════════════
-                        LEFT COLUMN: Student Impact Flash Card
-                    ═══════════════════════════════════════════════════════════════════ */}
-                    <div className="fae-col-left">
-                        <div className="fae-card" style={{ padding: 0, overflow: "hidden" }}>
-                            <div className="fae-fc">
-                                <div className="fae-fch">
-                                    <span className="fae-rb">FLASH CARD · IN FACULTY INBOX</span>
-                                    <h1>{model.title}</h1>
-                                    <div className="m">
-                                        {model.studentsLine}
-                                        {model.university ? ` · ${model.university}` : ""}
-                                        {model.discipline ? ` · ${model.discipline}` : ""}
-                                        {model.partnerLine ? ` · ${model.partnerLine}` : ""}
-                                        {model.timelineLine ? ` · ${model.timelineLine}` : ""}
-                                    </div>
-                                    {model.sdgs.length > 0 ? (
-                                        <div className="fae-sdgrow">
-                                            {model.sdgs.map((sdg) => (
-                                                <span
-                                                    key={`${sdg.goalNumber}-${sdg.label}`}
-                                                    className="fae-sdgc"
-                                                    style={{ background: sdg.color }}
-                                                >
-                                                    {sdg.primary ? "★ " : ""}
-                                                    {sdg.label}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : null}
-                                </div>
-                                <div className="fae-fstats">
-                                    <div className="fae-fs">
-                                        <div className="v">{model.hoursLabel}</div>
-                                        <div className="kk">LOGGED HOURS</div>
-                                    </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.reachedLabel}</div>
-                                        <div className="kk">REACHED</div>
-                                    </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.attendanceLabel}</div>
-                                        <div className="kk">ATTENDANCE</div>
-                                    </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.evidenceCount}</div>
-                                        <div className="kk">EVIDENCE FILES</div>
-                                    </div>
-                                </div>
-                                <div className="fae-fbody">
-                                    <div className="fae-k">EVIDENCE — TAP TO ENLARGE</div>
-                                    {model.evidence.length ? (
-                                        <div className="fae-gal" style={{ marginTop: 8 }}>
-                                            {model.evidence.map((item) => (
-                                                <button
-                                                    key={item.url}
-                                                    type="button"
-                                                    className="fae-ph"
-                                                    onClick={() => setLightbox(item)}
-                                                    title={item.label}
-                                                >
-                                                    {item.isImage ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={item.url} alt={item.label} />
-                                                    ) : (
-                                                        item.ext
-                                                    )}
-                                                    <span className="b">{item.ext}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="fae-sub" style={{ marginTop: 8 }}>
-                                            No evidence files attached to this report.
-                                        </p>
-                                    )}
-                                    <div className="fae-dq">{model.aiQuote}</div>
-                                </div>
-                            </div>
-                        </div>
+                {/* Exhibition flash card — same card the student submitted */}
+                {flashReport && flashAgg ? (
+                    <div className="cer-scope fae-v23-host">
+                        <V17ImpactFlashcard
+                            data={flashReport}
+                            agg={flashAgg}
+                            sectionsComplete={REPORT_UI_SECTION_TOTAL}
+                            sectionTotal={REPORT_UI_SECTION_TOTAL}
+                            missingLabels={[]}
+                            status={model.decision === "ap" ? "live" : "pending"}
+                            audience="faculty"
+                            onOpenDetailed={() => router.push(`/dashboard/faculty/reports/${reportId}?view=dossier`)}
+                        />
+                    </div>
+                ) : null}
 
+                {/* Phase 1: Clear Two-Column Layout — Section feed | AI Analysis & Score */}
+                <div className="fae-two-col">
+                    <div className="fae-col-left">
                         {/* Section summaries collapsed under Flash Card */}
                         <div className="fae-card">
                             <div className="fae-k">PROJECT DETAIL · HOW EACH SECTION FED THIS CARD</div>
@@ -1117,6 +1075,7 @@ export default function FacultyAiEvaluationConsole() {
                     recalculated on the faculty console.
                 </p>
             </div>
+            {lockedOpen ? <FacultyLockedV17Modal reportId={reportId} onClose={() => setLockedOpen(false)} /> : null}
         </div>
     );
 }

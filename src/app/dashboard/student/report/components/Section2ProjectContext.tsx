@@ -111,6 +111,31 @@ function listJoin(items: string[]): string {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
+/** Prefer multi-entry Other texts; fall back to legacy single string. */
+function resolveSystemGapsOtherEntries(section: {
+    system_gaps_other_entries?: string[];
+    system_gaps_other?: string;
+}): string[] {
+    if (Array.isArray(section.system_gaps_other_entries) && section.system_gaps_other_entries.length > 0) {
+        return section.system_gaps_other_entries.map((entry) => String(entry ?? ""));
+    }
+    const legacy = String(section.system_gaps_other || "");
+    return [legacy];
+}
+
+function joinSystemGapsOther(entries: string[]): string {
+    return entries
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .join("\n\n---\n\n");
+}
+
+function formatSystemGapsOtherLabels(entries: string[]): string {
+    const cleaned = entries.map((entry) => entry.trim()).filter(Boolean);
+    if (!cleaned.length) return "other factors";
+    return listJoin(cleaned.map((entry) => entry.toLowerCase()));
+}
+
 const GAP_OPTIONS = [
     { value: "Skills", label: "🧰 Skills" },
     { value: "Knowledge", label: "🧠 Knowledge" },
@@ -235,7 +260,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         affectedGroup: string,
         affectedCount: string,
         gaps: string[],
-        gapsOther: string,
+        gapsOtherEntries: string[],
         evidenceList: string,
         discipline: string,
         disciplineContribution: string,
@@ -252,7 +277,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         }
 
         if (gaps.length) {
-            const gapLabels = gaps.map((g) => (g === "Other" ? (gapsOther.trim() || "other factors") : g.toLowerCase()));
+            const gapLabels = gaps.map((g) =>
+                g === "Other" ? formatSystemGapsOtherLabels(gapsOtherEntries) : g.toLowerCase(),
+            );
             parts.push(`The core gaps were in ${listJoin(gapLabels)}.`);
         }
 
@@ -297,7 +324,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 sectionData.affected_group || "",
                 sectionData.affected_count || "",
                 gaps,
-                sectionData.system_gaps_other || "",
+                resolveSystemGapsOtherEntries(sectionData),
                 evidenceSource,
                 sectionData.discipline,
                 sectionData.discipline_contribution,
@@ -327,6 +354,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         sectionData.affected_count,
         sectionData.system_gaps,
         sectionData.system_gaps_other,
+        sectionData.system_gaps_other_entries,
         updateSection,
     ]);
 
@@ -381,7 +409,36 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const toggleGap = (gap: string) => {
         const cur = sectionData.system_gaps || [];
         const next = cur.includes(gap) ? cur.filter((x) => x !== gap) : [...cur, gap];
+        if (gap === "Other" && !cur.includes("Other")) {
+            const entries = resolveSystemGapsOtherEntries(sectionData);
+            updateSection("section2", {
+                system_gaps: next,
+                system_gaps_other_entries: entries.length ? entries : [""],
+                system_gaps_other: joinSystemGapsOther(entries.length ? entries : [""]),
+            });
+            return;
+        }
+        if (gap === "Other" && cur.includes("Other")) {
+            updateSection("section2", {
+                system_gaps: next,
+                system_gaps_other_entries: [],
+                system_gaps_other: "",
+            });
+            return;
+        }
         updateSection("section2", { system_gaps: next });
+    };
+
+    const gapOtherEntries = useMemo(
+        () => resolveSystemGapsOtherEntries(sectionData),
+        [sectionData.system_gaps_other, sectionData.system_gaps_other_entries],
+    );
+
+    const updateGapOtherEntries = (entries: string[]) => {
+        updateSection("section2", {
+            system_gaps_other_entries: entries,
+            system_gaps_other: joinSystemGapsOther(entries),
+        });
     };
 
     // Project identity fields
@@ -413,7 +470,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         const who = (sectionData.affected_group || "").trim();
         const num = (sectionData.affected_count || "").trim();
         const gaps = (sectionData.system_gaps || []).map((g) =>
-            g === "Other" ? (sectionData.system_gaps_other || "").trim() || "other factors" : g,
+            g === "Other"
+                ? formatSystemGapsOtherLabels(resolveSystemGapsOtherEntries(sectionData))
+                : g,
         );
         const sources = formatBaselineEvidenceForDisplay(sectionData)
             .split(",")
@@ -559,14 +618,57 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         </div>
                         <FieldError message={getFieldError("system_gaps")} />
                         {(sectionData.system_gaps || []).includes("Other") ? (
-                            <Input
-                                placeholder="What else was missing?"
-                                readOnly={isReadOnly}
-                                disabled={isReadOnly}
-                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]"
-                                value={sectionData.system_gaps_other || ""}
-                                onChange={(e) => updateSection("section2", { system_gaps_other: e.target.value })}
-                            />
+                            <div className="space-y-3 pt-1">
+                                {gapOtherEntries.map((entryText, i) => (
+                                    <div key={`system-gap-other-${i}`} className="space-y-1">
+                                        {gapOtherEntries.length > 1 ? (
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                                    Other gap {i + 1}
+                                                </p>
+                                                {!isReadOnly && gapOtherEntries.length > 1 ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const next = gapOtherEntries.filter((_, idx) => idx !== i);
+                                                            updateGapOtherEntries(next.length ? next : [""]);
+                                                        }}
+                                                        className="text-[10px] font-semibold text-rose-600 hover:underline"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        <Input
+                                            placeholder="What else was missing?"
+                                            readOnly={isReadOnly}
+                                            disabled={isReadOnly}
+                                            className={clsx(
+                                                "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--aqua-soft)]",
+                                                getFieldError(`system_gaps_other_entries.${i}`) && "border-red-400 bg-red-50/30",
+                                            )}
+                                            value={entryText}
+                                            onChange={(e) => {
+                                                const next = [...gapOtherEntries];
+                                                next[i] = e.target.value;
+                                                updateGapOtherEntries(next);
+                                            }}
+                                        />
+                                        <FieldError message={getFieldError(`system_gaps_other_entries.${i}`)} />
+                                    </div>
+                                ))}
+                                <FieldError message={getFieldError("system_gaps_other")} />
+                                {!isReadOnly ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => updateGapOtherEntries([...gapOtherEntries, ""])}
+                                        className="text-xs font-semibold text-[var(--teal)] hover:underline"
+                                    >
+                                        + Add another &apos;Other&apos;
+                                    </button>
+                                ) : null}
+                            </div>
                         ) : null}
                     </div>
 

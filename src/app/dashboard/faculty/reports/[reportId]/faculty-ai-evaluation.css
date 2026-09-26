@@ -123,6 +123,16 @@
 /* ═══════════════════════════════════════════════════════════════════
    Phase 1: Clear Two-Column Layout — Flash Card | AI Analysis
 ═══════════════════════════════════════════════════════════════════ */
+.fae .fae-v23-host {
+    width: 100%;
+    margin: 0 0 18px;
+    min-width: 0;
+}
+.fae .fae-v23-host .cer-c22-flash,
+.fae .fae-v23-host .cer-v23-flash {
+    max-width: none;
+    margin-bottom: 0;
+}
 .fae .fae-two-col {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);

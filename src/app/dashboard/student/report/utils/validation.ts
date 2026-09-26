@@ -161,10 +161,26 @@ export function validateSection2(data: any): ValidationResult {
         errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
     }
 
-    // "Other" system-gap chip reveals a required free-text field (Section2ProjectContext.tsx) that
-    // was never actually enforced here — a blank box passed submit silently.
-    if (Array.isArray(data.system_gaps) && data.system_gaps.includes('Other') && !String(data.system_gaps_other || '').trim()) {
-        errors.push({ field: 'system_gaps_other', message: 'Please specify the "Other" system gap' });
+    // "Other" system-gap chip reveals required free-text row(s); support multi-entry Add another.
+    if (Array.isArray(data.system_gaps) && data.system_gaps.includes('Other')) {
+        const entries: string[] =
+            Array.isArray(data.system_gaps_other_entries) && data.system_gaps_other_entries.length > 0
+                ? data.system_gaps_other_entries
+                : [String(data.system_gaps_other || '')];
+        let anyFilled = false;
+        for (let i = 0; i < entries.length; i++) {
+            if (!String(entries[i] || '').trim()) {
+                errors.push({
+                    field: `system_gaps_other_entries.${i}`,
+                    message: `Other gap #${i + 1} is required`,
+                });
+            } else {
+                anyFilled = true;
+            }
+        }
+        if (!anyFilled && entries.length === 0) {
+            errors.push({ field: 'system_gaps_other', message: 'Please specify the "Other" system gap' });
+        }
     }
 
     const hasOtherToken = Array.isArray(data.baseline_evidence) && (data.baseline_evidence as string[]).some((s) => /^__o_(\d+)$/.test(String(s)));

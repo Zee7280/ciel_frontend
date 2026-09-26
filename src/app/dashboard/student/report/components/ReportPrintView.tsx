@@ -930,7 +930,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const formatCiiScore = (score: number) => Number.isInteger(score) ? String(score) : score.toFixed(1);
 
     return (
-        <div className="dossier-root group relative mx-auto max-w-5xl bg-white px-4 py-6 font-sans text-slate-900 sm:px-8 sm:py-10 print:max-w-none print:p-0">
+        <div data-ciel-full-report className="dossier-root group relative mx-auto max-w-5xl bg-white px-4 py-6 font-sans text-slate-900 sm:px-8 sm:py-10 print:max-w-none print:p-0">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {

@@ -55,7 +55,7 @@ export interface ReportData {
      * present once faculty has locked it; takes priority over the legacy `calculateCII` used by
      * other path types (FYP/Coursework/Venture), which never populate this field. */
     ciiV2?: { final?: number } | null;
-    ciiV2Lock?: { locked?: boolean } | null;
+    ciiV2Lock?: { locked?: boolean | string } | null;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
@@ -154,8 +154,10 @@ export interface ReportData {
         baseline_smart_draft?: string;
         /** Tapped chips answering "what was missing?" (Skills/Access/Resources/Systems/Awareness/Other) — feeds the composed baseline statement. */
         system_gaps?: string[];
-        /** Custom text when "Other" is tapped in system_gaps. */
+        /** Custom text when "Other" is tapped in system_gaps (legacy single string; prefer system_gaps_other_entries). */
         system_gaps_other?: string;
+        /** Multiple custom "Other" gap texts when Add another is used. */
+        system_gaps_other_entries?: string[];
     };
     // Section 3: SDG Contribution Mapping
     section3: {
@@ -382,6 +384,13 @@ export interface ReportData {
         is_ai_generated?: boolean;
         /** Structured fields parsed from Section 11 AI final audit (cross-section red flags). */
         audit_meta?: ReportCIIauditMeta | null;
+        /** Submit-time CII snapshot nested for backend persistence / reload. */
+        cii_index?: {
+            totalScore: number;
+            level: string;
+            breakdown?: Record<string, number>;
+            suggestions?: string[];
+        };
         /** Final report declaration — 5 checkboxes gating submission, replacing a per-section sign-off. */
         final_declaration?: boolean[];
         /** Typed full-name electronic signature accompanying the final declaration. */
@@ -438,7 +447,8 @@ export const defaultReportData: ReportData = {
         affected_count: '',
         baseline_smart_draft: '',
         system_gaps: [],
-        system_gaps_other: ''
+        system_gaps_other: '',
+        system_gaps_other_entries: [],
     },
     section3: {
         primary_sdg: {

@@ -171,7 +171,17 @@ export default function FacultyImpactWallPage() {
                 <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
                     {showCommunity &&
                         community.map((card) => (
-                            <CommunityFlashCard key={`c-${card.id}`} card={card} href={`/dashboard/faculty/reports/${card.id}`} />
+                            <CommunityFlashCard
+                                key={`c-${card.id}`}
+                                card={card}
+                                href={`/dashboard/faculty/reports/${card.id}`}
+                                viewer="faculty"
+                                packageHrefs={{
+                                    detailedPdf: `/dashboard/faculty/reports/${card.id}?view=dossier`,
+                                    combinedPdf: `/dashboard/faculty/reports/${card.id}?view=dossier`,
+                                    verify: card.impact_verify_url || undefined,
+                                }}
+                            />
                         ))}
                     {showCoursework &&
                         coursework.map((entry) => (

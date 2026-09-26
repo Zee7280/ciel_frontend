@@ -250,7 +250,7 @@ export default function AdminCommunityServicePage() {
             {(view === "approved" || view === "hec") && (
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900">
-                        {view === "hec" ? "HEC / Government lens" : "Approved Opportunities"}
+                        {view === "hec" ? "HEC / Government lens" : "My Impact Wall"}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
                         {view === "hec"
@@ -277,6 +277,13 @@ export default function AdminCommunityServicePage() {
                                     key={c.id}
                                     card={c}
                                     href={view === "hec" ? undefined : reportHref(c.id)}
+                                    viewer="admin"
+                                    packageHrefs={{
+                                        detailedPdf: reportHref(c.id),
+                                        combinedPdf: reportHref(c.id),
+                                        certificate: reportHref(c.id),
+                                        verify: c.impact_verify_url || undefined,
+                                    }}
                                     actions={
                                         <>
                                             <button

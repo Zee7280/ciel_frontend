@@ -55,6 +55,8 @@ import {
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
 import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
+import "./community-engagement-report.css";
 
 const MissionHeroView = React.memo(ReportMissionHero);
 const JourneyView = React.memo(ReportImpactJourney);
@@ -62,7 +64,6 @@ const BridgeView = React.memo(ReportSectionBridge);
 const AchievementView = React.memo(ReportAchievementBanner);
 const SectionModelView = React.memo(ReportSectionModel);
 const LiveBannerView = React.memo(ReportLiveBanner);
-import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
 
@@ -181,6 +182,28 @@ function ReportFormContent() {
     const [showGuide, setShowGuide] = React.useState(true);
     const [helpSignal, setHelpSignal] = React.useState(0);
     const [opportunityFlashOpen, setOpportunityFlashOpen] = React.useState(false);
+
+    const goBackToPreviousPage = React.useCallback(() => {
+        const reportsHome = "/dashboard/student/paths/community-service";
+        if (typeof window === "undefined") {
+            router.push(reportsHome);
+            return;
+        }
+        let fromPath = "";
+        try {
+            const ref = document.referrer;
+            if (ref) {
+                const url = new URL(ref);
+                if (url.origin === window.location.origin) fromPath = url.pathname;
+            }
+        } catch {
+            fromPath = "";
+        }
+        const onCommunityService =
+            fromPath === reportsHome || fromPath.startsWith(`${reportsHome}/`);
+        // Never return to My Projects — that list is not the Community Service reports hub.
+        router.push(onCommunityService ? fromPath : reportsHome);
+    }, [router]);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -854,17 +877,10 @@ function ReportFormContent() {
     const onFlash = isFlashCardStep(activeStep);
 
     const shareReport = async () => {
-        const url = typeof window !== "undefined" ? window.location.href : "";
-        try {
-            if (navigator.share) {
-                await navigator.share({ title: projectTitle, url });
-                return;
-            }
-            await navigator.clipboard.writeText(url);
-            toast.success("Link copied");
-        } catch {
-            toast.error("Could not share this report");
-        }
+        await shareExhibitionFlashcard({
+            title: projectTitle,
+            verifyUrl: pickImpactVerifyUrlFromPayload(data) || data?.impact_verify_url,
+        });
     };
 
     if (showGuide) {
@@ -890,7 +906,7 @@ function ReportFormContent() {
                         <button
                             type="button"
                             className="cer-ghost"
-                            onClick={() => router.push("/dashboard/student/projects")}
+                            onClick={goBackToPreviousPage}
                         >
                             ← Back to my reports
                         </button>
@@ -906,7 +922,11 @@ function ReportFormContent() {
                     <div className="cer-actions">
                         {onFlash ? (
                             <>
-                                <button type="button" className="cer-ghost" onClick={() => window.print()}>
+                                <button
+                                    type="button"
+                                    className="cer-ghost"
+                                    onClick={() => void downloadExhibitionFlashcard(projectTitle)}
+                                >
                                     Download
                                 </button>
                                 <button type="button" className="cer-ghost" onClick={() => void shareReport()}>
@@ -1011,7 +1031,6 @@ function ReportFormContent() {
                     {activeStep === 9 && <Section10Sustainability />}
                     {isFlashCardStep(activeStep) && (
                         <>
-                            {!showVerifiedImpactScores ? (
                             <ReportFlashCard
                                 data={data}
                                 projectData={projectDetails}
@@ -1023,7 +1042,6 @@ function ReportFormContent() {
                                 onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
                                 sending={isSaving}
                             />
-                            ) : null}
                             <Section11Summary
                                 onRequestFinalSubmit={
                                     summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
@@ -1040,7 +1058,7 @@ function ReportFormContent() {
             <button
                 type="button"
                 className="cer-back cer-back-below"
-                onClick={() => router.push("/dashboard/student/projects")}
+                onClick={goBackToPreviousPage}
             >
                 ← Back to my reports
             </button>

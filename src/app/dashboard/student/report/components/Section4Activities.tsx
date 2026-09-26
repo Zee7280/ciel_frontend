@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea';
 import { FieldError } from './ui/FieldError';
 import {
     Plus, Trash2, Target, Info, Layers,
-    ChevronDown, PlusCircle, Lock, Pencil, CheckCircle2,
+    ChevronDown, PlusCircle, Lock, Pencil, CheckCircle2, Calendar,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -20,6 +20,8 @@ import { reportTextWordMeter } from '../utils/validation';
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
+const dateInputClasses =
+    `${inputClasses} [color-scheme:light]`;
 const selectClasses =
     "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
 const textareaClasses =
@@ -39,6 +41,25 @@ function isOtherChoice(value: unknown): boolean {
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Parse stored activity_period into calendar From/To (ISO YYYY-MM-DD). */
+function parseActivityPeriod(raw?: string): { from: string; to: string; legacy: string } {
+    const text = String(raw || "").trim();
+    if (!text) return { from: "", to: "", legacy: "" };
+    const range = text.match(
+        /^(\d{4}-\d{2}-\d{2})\s*(?:–|—|-|to)\s*(\d{4}-\d{2}-\d{2})$/i,
+    );
+    if (range) return { from: range[1], to: range[2], legacy: "" };
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return { from: text, to: "", legacy: "" };
+    return { from: "", to: "", legacy: text };
+}
+
+function formatActivityPeriod(from: string, to: string): string {
+    const start = (from || "").trim();
+    const end = (to || "").trim();
+    if (start && end) return start === end ? start : `${start} – ${end}`;
+    return start || end || "";
 }
 
 function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
@@ -631,13 +652,64 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity date / period <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Optional if already in session log</span></Label>
-                            <Input
-                                placeholder="e.g. 12–18 Oct 2026"
-                                value={activity.activity_period || ''}
-                                onChange={e => update('activity_period', e.target.value)}
-                                className={inputClasses}
-                            />
+                            <Label className={fieldLabel}>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Calendar className="h-3 w-3 text-slate-400" aria-hidden />
+                                    Activity date / period
+                                </span>{" "}
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                    Optional if already in session log
+                                </span>
+                            </Label>
+                            {(() => {
+                                const parsed = parseActivityPeriod(activity.activity_period);
+                                const setPeriod = (from: string, to: string) => {
+                                    let nextTo = to;
+                                    if (from && nextTo && nextTo < from) nextTo = from;
+                                    update("activity_period", formatActivityPeriod(from, nextTo));
+                                };
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                                    From
+                                                </p>
+                                                <Input
+                                                    type="date"
+                                                    value={parsed.from}
+                                                    onChange={(e) => setPeriod(e.target.value, parsed.to)}
+                                                    className={dateInputClasses}
+                                                    aria-label="Activity start date"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                                    To
+                                                </p>
+                                                <Input
+                                                    type="date"
+                                                    value={parsed.to}
+                                                    min={parsed.from || undefined}
+                                                    onChange={(e) => setPeriod(parsed.from, e.target.value)}
+                                                    className={dateInputClasses}
+                                                    aria-label="Activity end date"
+                                                />
+                                            </div>
+                                        </div>
+                                        {parsed.legacy ? (
+                                            <p className="text-[11px] text-slate-500">
+                                                Previous note: <span className="font-medium text-slate-700">{parsed.legacy}</span>
+                                                {" — "}pick dates above to replace it.
+                                            </p>
+                                        ) : (
+                                            <p className="text-[11px] text-slate-400">
+                                                Single day: set From only. Period: set From and To.
+                                            </p>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                         <div className="space-y-1.5">
                             <Label className={fieldLabel}>Partner / host involved <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Optional</span></Label>

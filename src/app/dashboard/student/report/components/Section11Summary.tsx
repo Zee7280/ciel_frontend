@@ -302,6 +302,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         else if (autoOpenView === "print") setShowPreview(true);
     }, [autoOpenView, showVerifiedImpactScores]);
 
+    useEffect(() => {
+        const openFullReport = () => setShowPreview(true);
+        window.addEventListener("ciel-open-full-report", openFullReport);
+        return () => window.removeEventListener("ciel-open-full-report", openFullReport);
+    }, []);
+
     const clearCertificatePrintScale = () => {
         document.documentElement.style.removeProperty("--cert-print-scale");
     };
