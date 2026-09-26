@@ -23,6 +23,10 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+function asArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+}
+
 function pickNumber(value: unknown): number {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string") {
@@ -36,7 +40,7 @@ function reportHours(report: Record<string, unknown>): number {
     const s1 = asRecord(report.section1);
     const metrics = asRecord(s1.metrics);
     const metricHours = pickNumber(metrics.total_verified_hours);
-    const logs = Array.isArray(s1.attendance_logs) ? s1.attendance_logs : [];
+    const logs = asArray(s1.attendance_logs);
     const logHours = sumNonRejectedLoggedHours(
         logs.map((log) => {
             const row = asRecord(log);
@@ -51,16 +55,15 @@ function reportHours(report: Record<string, unknown>): number {
     );
     const rosterHours =
         pickNumber(asRecord(s1.team_lead).hours) +
-        (Array.isArray(s1.team_members)
-            ? (s1.team_members as unknown[]).reduce((sum, member) => sum + pickNumber(asRecord(member).hours), 0)
-            : 0);
-    const individualHours = Array.isArray(metrics.individual_metrics)
-        ? (metrics.individual_metrics as unknown[]).reduce(
-              (sum, row) => sum + pickNumber(asRecord(row).individual_hours),
-              0,
-          )
-        : 0;
-    return metricHours > 0 ? metricHours : logHours > 0 ? logHours : individualHours > 0 ? individualHours : rosterHours;
+        asArray(s1.team_members).reduce((sum: number, member) => sum + pickNumber(asRecord(member).hours), 0);
+    const individualHours = asArray(metrics.individual_metrics).reduce(
+        (sum: number, row) => sum + pickNumber(asRecord(row).individual_hours),
+        0,
+    );
+    if (metricHours > 0) return metricHours;
+    if (logHours > 0) return logHours;
+    if (individualHours > 0) return individualHours;
+    return rosterHours;
 }
 
 function evidenceCount(report: Record<string, unknown>): number {
