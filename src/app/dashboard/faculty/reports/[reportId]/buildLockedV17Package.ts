@@ -1,7 +1,8 @@
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 import { buildReportFlashAgg } from "@/app/dashboard/student/report/ReportFormChrome";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
-import { CII_SECTION_LABELS, CII_BREAKDOWN_ORDER, CII_SECTION_MAX } from "@/app/dashboard/student/report/utils/ciiSectionWeights";
+import { buildLockedV17DetailAndAssessment, v19OverallCopy } from "./buildLockedV17Assessment";
+import { buildLockedV17SourceTabs, emptyLockedV17SourceTabs, type LockedV17SourceTabs } from "./buildLockedV17SourceTabs";
 
 function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -23,11 +24,36 @@ function firstSentence(text: string): string {
 
 export type LockedV17Spot = { ey: string; value: string; note: string; tone: "blue" | "coral" | "gold" | "pink" | "green" };
 export type LockedV17Section = { n: string; title: string; cls?: string; bullets: string[] };
+export type LockedV17FieldRow = {
+    field: string;
+    value: string;
+    status: "Recorded" | "Required data" | "Optional / not provided";
+    required: boolean;
+};
+
+export type LockedV17FlowNode = { k: string; v: string };
+
+export type LockedV17DetailBlock = {
+    n: string;
+    title: string;
+    body: string[];
+    hold: { code: "HOLD" | "READY" | "REVIEW"; cls: "hold" | "ready" | "review"; label: string };
+    coveragePct: number;
+    reqFilled: number;
+    reqTotal: number;
+    narrative: string;
+    flow: LockedV17FlowNode[];
+    evidence: string;
+    limitation: string;
+    fields: LockedV17FieldRow[];
+};
+
 export type LockedV17Assess = {
     no: string;
     name: string;
     score: string;
     max: number;
+    chips: Array<{ label: string; weight: number }>;
     reason: string;
     strengths: string[];
     limits: string[];
@@ -47,7 +73,7 @@ export type LockedV17PackageModel = {
     evidence: number;
     spots: LockedV17Spot[];
     sections: LockedV17Section[];
-    detailBlocks: Array<{ n: string; title: string; body: string[] }>;
+    detailBlocks: LockedV17DetailBlock[];
     ciiLocked: boolean;
     ciiScore: number | null;
     ciiSource: string;
@@ -56,6 +82,8 @@ export type LockedV17PackageModel = {
     lockNote: string;
     assessment: LockedV17Assess[];
     overall: string;
+    requiredGaps: number;
+    sourceTabs: LockedV17SourceTabs;
 };
 
 function listJoin(items: string[]): string {
@@ -79,24 +107,13 @@ function finiteNum(value: unknown): number | null {
     return null;
 }
 
-function asLines(value: unknown): string[] {
-    if (Array.isArray(value)) {
-        return value.map((item) => txt(item)).filter(Boolean);
-    }
-    const line = txt(value);
-    return line ? [line] : [];
-}
-
 export function buildLockedV17Package(data: ReportData, projectData?: unknown): LockedV17PackageModel {
     const agg = buildReportFlashAgg(data, projectData);
     const cii = resolveReportCii(data);
     const s1 = data.section1;
     const s2 = data.section2;
-    const s3 = data.section3;
-    const s5 = data.section5;
     const s6 = data.section6;
     const s7 = data.section7;
-    const s8 = data.section8;
     const s9 = data.section9;
     const s10 = data.section10;
     const logs = Array.isArray(s1?.attendance_logs) ? s1.attendance_logs : agg.logs;
@@ -107,7 +124,11 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         return status !== "rejected";
     });
     const sessions = countedLogs.length || logs.length;
-    const hours = agg.hours;
+    const logHours = countedLogs.reduce((sum, log) => {
+        const n = Number(log.hours);
+        return sum + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    const hours = logHours > 0 ? logHours : agg.hours;
     const hoursLabel = hours ? `${Math.round(hours * 10) / 10}h` : "0h";
     const members = agg.members || 1;
     const reach = agg.reach || "0";
@@ -285,111 +306,8 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         },
     ];
 
-    const detailBlocks = [
-        {
-            n: "01",
-            title: "Participation & verified effort",
-            body: [
-                txt(s1?.participation_type) ? `Participation: ${s1?.participation_type}` : "",
-                memberHours.length ? `Hours: ${memberHours.join(" · ")}` : "",
-                `${sessions} session${sessions === 1 ? "" : "s"} · ${hoursLabel}`,
-                txt(s1?.verified_summary),
-            ].filter(Boolean),
-        },
-        {
-            n: "02",
-            title: "Community need, beneficiaries & baseline",
-            body: [txt(s2?.problem_statement), txt(s2?.summary_text), txt(s2?.affected_group), txt(s2?.affected_count) ? `Approx. number affected: ${s2?.affected_count}` : ""].filter(Boolean),
-        },
-        {
-            n: "03",
-            title: "SDG contribution",
-            body: sdgLine
-                ? [sdgLine, txt(s3?.student_contribution_intent_statement, s3?.contribution_intent_statement)].filter(Boolean)
-                : ["Not provided."],
-        },
-        {
-            n: "04",
-            title: "Activities, outputs & reach",
-            body: agg.acts.length
-                ? agg.acts.map((block) => txt(block.title, block.primary_category, block.description) || "Activity")
-                : ["Not provided."],
-        },
-        {
-            n: "05",
-            title: "Outcomes & measurable change",
-            body: Array.isArray(s5?.measurable_outcomes) && s5.measurable_outcomes.length
-                ? s5.measurable_outcomes.map((row) => `${txt(row.metric, row.outcome_area)}: ${txt(row.baseline)} → ${txt(row.endline)}`)
-                : ["Not provided."],
-        },
-        {
-            n: "06",
-            title: "Resources mobilised",
-            body: resources.length ? resources.map((row) => `${txt(row.type)} · ${txt(row.amount)} ${txt(row.unit)}`.trim()) : ["Not provided."],
-        },
-        {
-            n: "07",
-            title: "Partnerships developed",
-            body: partners.length
-                ? partners.map((p) => `${txt(p.name)}${Array.isArray(p.role) && p.role.length ? ` · ${p.role.join(", ")}` : ""}`)
-                : ["Not provided."],
-        },
-        {
-            n: "08",
-            title: "Evidence, ethics & verification",
-            body: [
-                `${evidence} evidence item${evidence === 1 ? "" : "s"}`,
-                txt(s8?.description),
-                s8?.ethical_compliance?.informed_consent ? "Informed consent recorded." : "Ethics / consent confirmation is pending.",
-            ].filter(Boolean),
-        },
-        {
-            n: "09",
-            title: "Reflection & academic growth",
-            body: [
-                txt(s9?.reflection_biggest_learning, s9?.personal_learning),
-                txt(s9?.reflection_moment),
-                txt(s9?.academic_integration, s9?.academic_application),
-            ].filter(Boolean),
-        },
-        {
-            n: "10",
-            title: "Sustainability & handover",
-            body: [txt(s10?.continuation_status), txt(s10?.scaling_potential), asLines(s10?.mechanisms).join(" · ")].filter(Boolean),
-        },
-    ];
-
     const v2Sections = Array.isArray(ciiV2.sections) ? (ciiV2.sections as Array<Record<string, unknown>>) : [];
-    const v2KeyAlias: Record<string, string> = { outputs: "execution", outcomes: "execution" };
-    const assessmentFromV2 = (fromV2: Record<string, unknown> | undefined, index: number, fallbackName: string, fallbackMax: number): LockedV17Assess => {
-        const scoreRaw = finiteNum(fromV2?.score);
-        const good = txt(fromV2?.good);
-        const limit = txt(fromV2?.limit);
-        const improve = txt(fromV2?.improve, fromV2?.improvement, fromV2?.comment);
-        return {
-            no: String(index + 1).padStart(2, "0"),
-            name: txt(fromV2?.title) || fallbackName,
-            score: scoreRaw == null ? "HOLD" : String(scoreRaw),
-            max: finiteNum(fromV2?.weight) || fallbackMax,
-            reason:
-                txt(fromV2?.reason, fromV2?.good, fromV2?.limit, fromV2?.comment) ||
-                "Assessment layer appears after Faculty runs the Analyzer. Student-source text is not rewritten.",
-            strengths: good ? [good] : ["Pending Analyzer run."],
-            limits: limit ? [limit] : ["Pending Analyzer run."],
-            improvements: improve ? [improve] : [],
-        };
-    };
-    const assessment: LockedV17Assess[] = v2Sections.length
-        ? v2Sections.map((row, index) =>
-              assessmentFromV2(row, index, txt(row.title) || `Section ${index + 1}`, finiteNum(row.weight) || 0),
-          )
-        : CII_BREAKDOWN_ORDER.map((key, index) => {
-              const lookup = v2KeyAlias[key] || key;
-              const fromV2 =
-                  v2Sections.find((row) => String(row.key || row.id || "").toLowerCase() === lookup) ||
-                  v2Sections.find((row) => String(row.title || "").toLowerCase().includes(key));
-              return assessmentFromV2(fromV2, index, CII_SECTION_LABELS[key], CII_SECTION_MAX[key]);
-          });
+    const { detailBlocks, assessment } = buildLockedV17DetailAndAssessment(data, agg, { locked, v2Sections });
 
     const levelRec = asRecord(ciiV2.level);
     const feedbackRaw = ciiV2.studentFeedback;
@@ -403,12 +321,19 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
           ? "System score awaiting Faculty verification"
           : "Badge pending";
     const displayScore = locked ? cii.totalScore : finalNum;
-    const overall = locked
-        ? feedback || `Faculty-Verified CII ${cii.totalScore}/100.`
-        : finalNum != null
-          ? feedback ||
-            `Provisional System CII ${finalNum}/100. The badge updates on the flashcard only after Faculty verification.`
-          : "A provisional CII is available only after Faculty runs the Analyzer. The badge updates on the flashcard only after Faculty verification.";
+    const overall = v19OverallCopy(detailBlocks, locked, displayScore, feedback);
+    const requiredGaps = detailBlocks.reduce((sum, block) => sum + block.fields.filter((row) => row.status === "Required data").length, 0);
+    let sourceTabs: LockedV17SourceTabs;
+    try {
+        sourceTabs = buildLockedV17SourceTabs(data, assessment, {
+            ciiLocked: locked,
+            ciiScore: displayScore,
+            badgeLabel,
+            overall,
+        });
+    } catch {
+        sourceTabs = { ...emptyLockedV17SourceTabs() };
+    }
 
     return {
         title: agg.title,
@@ -432,5 +357,7 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         lockNote,
         assessment,
         overall,
+        requiredGaps,
+        sourceTabs,
     };
 }

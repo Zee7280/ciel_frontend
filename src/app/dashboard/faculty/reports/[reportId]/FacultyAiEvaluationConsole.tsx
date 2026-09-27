@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
@@ -11,6 +11,7 @@ import {
     buildFacultyActionBody,
     buildFacultyAiEvaluationModel,
     coerceFlashReportData,
+    unwrapFacultyReportPayload,
     type FacultyDecisionKind,
     type FacultyEvidenceItem,
 } from "./facultyAiEvaluation.helpers";
@@ -24,7 +25,7 @@ const PIPE = [
     { id: 0, label: "STUDENT COMPLETES 9 SECTIONS — FLASH CARD IS 10" },
     { id: 1, label: "SUMMARIES ACCUMULATE → FLASH CARD" },
     { id: 2, label: "SENT TO FACULTY" },
-    { id: 3, label: "AI EVALUATOR v8.2 SCORES AUTOMATICALLY" },
+    { id: 3, label: "FACULTY RUNS AI ANALYZER WHEN READY" },
     { id: 4, label: "FACULTY DECIDES" },
     { id: 5, label: "LIVE + PDF REPORT" },
 ];
@@ -50,9 +51,7 @@ function pipeClass(index: number, current: number): string {
 export default function FacultyAiEvaluationConsole() {
     const params = useParams();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const reportId = String(params.reportId ?? "");
-    const skipAutoAi = searchParams.get("intent") === "decide";
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [rawReport, setRawReport] = useState<Record<string, unknown> | null>(null);
@@ -134,7 +133,12 @@ export default function FacultyAiEvaluationConsole() {
                 return;
             }
             const data = await response.json();
-            const raw = (data.data || data.report || data) as Record<string, unknown>;
+            const raw = unwrapFacultyReportPayload(data);
+            if (!raw) {
+                toast.error("This report could not be opened.");
+                setRawReport(null);
+                return;
+            }
             setRawReport(prepareReportForVerifyDossier(raw) as Record<string, unknown>);
         } catch {
             toast.error("Failed to load report");
@@ -144,7 +148,7 @@ export default function FacultyAiEvaluationConsole() {
         }
     }, [reportId]);
 
-    // Auto-trigger AI analysis when report loads without existing analysis
+    // Faculty-triggered Analyzer (inbox: run only when chosen)
     const runAutoAiAnalysis = useCallback(async () => {
         if (!reportId || aiAnalysisStatus === "running") return;
         
@@ -202,25 +206,6 @@ export default function FacultyAiEvaluationConsole() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model?.facultyRemarks]);
-
-    // Phase 1: Auto-trigger AI analysis if report loaded but no analysis exists
-    useEffect(() => {
-        if (skipAutoAi) return;
-        if (
-            !loading &&
-            rawReport &&
-            !hasCiiV2Analysis &&
-            !model?.hasAiEvaluation &&
-            aiAnalysisStatus === "idle" &&
-            model?.decision !== "ap" // Don't auto-run if already approved
-        ) {
-            // Small delay to let user see the interface before analysis starts
-            const timer = setTimeout(() => {
-                void runAutoAiAnalysis();
-            }, 1200);
-            return () => clearTimeout(timer);
-        }
-    }, [skipAutoAi, loading, rawReport, hasCiiV2Analysis, model?.hasAiEvaluation, model?.decision, aiAnalysisStatus, runAutoAiAnalysis]);
 
     const submitDecision = async (kind: Exclude<FacultyDecisionKind, "">) => {
         if (!reportId || saving) return;
@@ -477,7 +462,7 @@ export default function FacultyAiEvaluationConsole() {
                                         </div>
                                         <h3 className="fae-ai-progress-title">AI Analysis in Progress…</h3>
                                         <p className="fae-ai-progress-sub">
-                                            The AI Evaluator is automatically analyzing the Flash Card and report sections.
+                                            The AI Evaluator is analyzing the Flash Card and report sections.
                                             This panel will populate with scores and feedback momentarily.
                                         </p>
                                         <div className="fae-ai-progress-bar">
@@ -752,7 +737,7 @@ export default function FacultyAiEvaluationConsole() {
                                 <div className="fae-no-eval">
                                     <p className="fae-sub" style={{ marginTop: 12 }}>
                                         This report does not yet have a stored AI evaluation.
-                                        The AI Analyzer will run automatically, or you can proceed with manual review.
+                                        Review the locked Flashcard + Detailed Report first, then run the Analyzer when you choose.
                                     </p>
                                     <button
                                         type="button"

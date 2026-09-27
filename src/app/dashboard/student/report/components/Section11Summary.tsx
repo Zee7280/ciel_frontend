@@ -6,10 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
+import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
-import { formatIncompleteSectionHeading, REVIEW_DOSSIER_FORM_NAV, tabIsComplete } from "../utils/reportWizardNav";
+import { formatIncompleteSectionHeading, dataSectionToWizardStep, REVIEW_DOSSIER_FORM_NAV, tabIsComplete } from "../utils/reportWizardNav";
 import { resolveReportCii } from "../utils/resolveReportCii";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
@@ -222,6 +223,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const {
         data,
         updateSection,
+        setStep,
         isEligibleForSubmission,
         areAllSectionsComplete,
         finalDeclarationComplete,
@@ -286,26 +288,32 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         !["verified", "partner_verified"].includes(reportSt);
 
     const [showPreview, setShowPreview] = useState(false);
+    const [showLockedV17, setShowLockedV17] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
 
-    // Lets My Impact Wall's "Certificate"/"Full report" actions link straight into the real,
-    // already-built views here (?view=certificate | print) instead of a fake stand-in — see
-    // student-reports.service.ts's mapReportListing. Opens the modal only; printing still needs
-    // the visible "Print / Save PDF" click (a real user gesture), since browsers can silently
-    // block window.print() called without one.
+    // Lets My Impact Wall's Certificate / official dossier / V17 package actions link straight
+    // into the real views here (?view=certificate | print | v17). V17 opens without waiting for
+    // score unlock (it is the locked source record). Certificate/print still wait for
+    // showVerifiedImpactScores. Printing still needs a visible "Print / Save PDF" click.
     const autoOpenView = searchParams.get("view");
     const autoOpenedViewRef = useRef(false);
     useEffect(() => {
-        if (autoOpenedViewRef.current || !autoOpenView || !showVerifiedImpactScores) return;
+        if (autoOpenedViewRef.current || !autoOpenView) return;
+        if (autoOpenView === "v17") {
+            autoOpenedViewRef.current = true;
+            setShowLockedV17(true);
+            return;
+        }
+        if (!showVerifiedImpactScores) return;
         autoOpenedViewRef.current = true;
         if (autoOpenView === "certificate") setShowCertificate(true);
         else if (autoOpenView === "print") setShowPreview(true);
     }, [autoOpenView, showVerifiedImpactScores]);
 
     useEffect(() => {
-        const openFullReport = () => setShowPreview(true);
+        const openFullReport = () => setShowLockedV17(true);
         window.addEventListener("ciel-open-full-report", openFullReport);
         return () => window.removeEventListener("ciel-open-full-report", openFullReport);
     }, []);
@@ -768,6 +776,30 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 </div>
             </div>
 
+            <div className={clsx("overflow-hidden", surfaceCard)}>
+                <div className={clsx("flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5", surfaceHeaderRow)}>
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+                            Same template faculty receives
+                        </p>
+                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
+                            V17 Flashcard + Detailed Report
+                        </h3>
+                        <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                            Locked source record, field traceability, and the CII assessment layer — identical to the faculty package.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="cer-bigbtn shrink-0"
+                        style={{ marginTop: 0, width: "auto", padding: "12px 18px" }}
+                        onClick={() => setShowLockedV17(true)}
+                    >
+                        Open locked package
+                    </button>
+                </div>
+            </div>
+
             {/* ── Final Action Hub ── */}
             <div
                 className={clsx(
@@ -846,6 +878,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div className="cer-cert-actions">
                                 <button type="button" className="cer-cert-solid" onClick={() => setShowCertificate(true)}>
                                     Download certificate
+                                </button>
+                                <button type="button" className="cer-cert-ghost" onClick={() => setShowLockedV17(true)}>
+                                    V17 detailed report
                                 </button>
                                 <button
                                     type="button"
@@ -1007,7 +1042,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </div>
                                     <div className="space-y-0.5 text-left">
                                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none">Min. hours met</p>
-                                        <p className="text-xs font-semibold">{verifiedHours} / {data.required_hours || 16} Hours</p>
+                                        <p className="text-xs font-semibold">{loggedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
                                 <div className="p-5 rounded-xl border border-[var(--gold-soft)] bg-[var(--gold-soft)] flex flex-col gap-3 text-left">
@@ -1025,17 +1060,23 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         </div>
                                     </div>
                                     {incompleteSectionsSummary.length > 0 && (
-                                        <ul className="max-h-48 overflow-y-auto space-y-2.5 pl-1 border-t border-[var(--gold-soft)] pt-3 text-[11px] text-[var(--gold)]">
+                                        <ul className="max-h-80 overflow-y-auto space-y-2.5 pl-1 border-t border-[var(--gold-soft)] pt-3 text-[11px] text-[var(--gold)]">
                                             {incompleteSectionsSummary.map((block) => (
-                                                <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-[var(--gold-soft)]">
-                                                    <span className="font-semibold text-[var(--gold)]">
-                                                        {formatIncompleteSectionHeading(block.section, block.label)}
-                                                    </span>
-                                                    <ul className="mt-1 ml-3 list-disc text-[var(--gold)] font-medium space-y-0.5">
-                                                        {block.errors.map((err, j) => (
-                                                            <li key={`${block.section}-${err.field}-${j}`}>{err.message}</li>
-                                                        ))}
-                                                    </ul>
+                                                <li key={block.section}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setStep(dataSectionToWizardStep(block.section))}
+                                                        className="w-full rounded-lg bg-white/70 px-2.5 py-2 border border-[var(--gold-soft)] text-left hover:bg-white"
+                                                    >
+                                                        <span className="font-semibold text-[var(--gold)]">
+                                                            {formatIncompleteSectionHeading(block.section, block.label)}
+                                                        </span>
+                                                        <ul className="mt-1 ml-3 list-disc text-[var(--gold)] font-medium space-y-0.5">
+                                                            {block.errors.map((err, j) => (
+                                                                <li key={`${block.section}-${err.field}-${j}`}>{err.message}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </button>
                                                 </li>
                                             ))}
                                         </ul>
@@ -1049,35 +1090,31 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             />
                         </div>
                     </>
-                ) : isEligibleForSubmission && areAllSectionsComplete && !finalDeclarationComplete ? (
-                    <FinalDeclarationCard
-                        declaration={data.section11?.final_declaration || [false, false, false, false, false]}
-                        signatureName={data.section11?.signature_name || ""}
-                        requiresFee={requiresFee}
-                        onToggle={(i) => {
-                            const next = [...(data.section11?.final_declaration || [false, false, false, false, false])];
-                            next[i] = !next[i];
-                            const allNowChecked = next.slice(0, 5).every(Boolean);
-                            updateSection("section11", {
-                                final_declaration: next,
-                                ...(allNowChecked && (data.section11?.signature_name || "").trim()
-                                    ? { signed_at: new Date().toISOString() }
-                                    : {}),
-                            });
-                        }}
-                        onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
-                    />
-                ) : (
+                ) : isEligibleForSubmission && areAllSectionsComplete ? (
                     <>
-                        <div className="w-16 h-16 bg-[var(--teal-soft)] rounded-xl flex items-center justify-center">
-                            <ShieldCheck className="w-8 h-8 text-[var(--teal)]" />
-                        </div>
-                        <div className="max-w-md space-y-4">
-                            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Ready for final submission</h3>
-                            <p className="text-sm font-semibold text-slate-400 leading-relaxed">
-                                All sections are complete, hour requirements are met, and your declaration is signed.
-                                Review and submit when ready.
-                            </p>
+                        {/* Stays mounted through completion (rather than being swapped out the instant
+                            finalDeclarationComplete flips true) — unmounting this the moment a checkbox/the
+                            signature field became "complete" used to yank the input out from under the
+                            student mid-keystroke. FinalDeclarationCard already renders its own
+                            complete/incomplete messaging internally. */}
+                        <FinalDeclarationCard
+                            declaration={data.section11?.final_declaration || [false, false, false, false, false]}
+                            signatureName={data.section11?.signature_name || ""}
+                            requiresFee={requiresFee}
+                            onToggle={(i) => {
+                                const next = [...(data.section11?.final_declaration || [false, false, false, false, false])];
+                                next[i] = !next[i];
+                                const allNowChecked = next.slice(0, 5).every(Boolean);
+                                updateSection("section11", {
+                                    final_declaration: next,
+                                    ...(allNowChecked && (data.section11?.signature_name || "").trim()
+                                        ? { signed_at: new Date().toISOString() }
+                                        : {}),
+                                });
+                            }}
+                            onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
+                        />
+                        {finalDeclarationComplete ? (
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1096,10 +1133,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     <Lock className="w-4 h-4" /> Submit final report
                                 </span>
                             </button>
-                            <ReportTravelsCard requiresFee={requiresFee} />
-                        </div>
+                        ) : null}
+                        <ReportTravelsCard requiresFee={requiresFee} />
                     </>
-                )}
+                ) : null}
             </div>
 
             {/* ── Modals (Print Handled via Visibility/Display) ── */}
@@ -1181,6 +1218,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     }
                 }
             `}} />
+
+            {showLockedV17 ? (
+                <FacultyLockedV17Modal
+                    report={data as unknown as Record<string, unknown>}
+                    projectData={projectData}
+                    initialTab="assessedView"
+                    onClose={() => setShowLockedV17(false)}
+                />
+            ) : null}
 
             {showPreview && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none transition-all print-active-modal">

@@ -1,5 +1,31 @@
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 
+/** Prefer a team seat when the student also has a leftover individual row on the same project. */
+export function pickPreferredEngagementSeat<T extends Record<string, unknown>>(
+    rows: T[],
+    projectId: string,
+): T | null {
+    const pid = String(projectId || "").trim();
+    const matches = rows.filter((row) => {
+        const id = String(row.projectId ?? row.project_id ?? "").trim();
+        return Boolean(pid) && id === pid;
+    });
+    if (!matches.length) return null;
+    const teamish = matches.filter((row) => {
+        const mode = String(row.participationMode ?? row.participation_mode ?? "").toLowerCase();
+        const teamId = String(row.teamId ?? row.team_id ?? "").trim();
+        return mode === "team" || Boolean(teamId);
+    });
+    const pool = teamish.length ? teamish : matches;
+    const lead = pool.find(
+        (row) =>
+            row.isTeamLead === true ||
+            row.is_team_lead === true ||
+            String(row.is_team_lead ?? "").toLowerCase() === "true",
+    );
+    return lead || pool[0] || null;
+}
+
 /** Team projects: only the canonical team lead may edit/submit (backend enforces too). */
 export function isTeamLeadForReportSubmit(
     data: Pick<ReportData, "section1">,

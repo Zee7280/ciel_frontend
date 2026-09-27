@@ -2,23 +2,46 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
-import { coerceFlashReportData } from "./facultyAiEvaluation.helpers";
-import { buildLockedV17Package, type LockedV17PackageModel } from "./buildLockedV17Package";
+import { coerceFlashReportData, unwrapFacultyReportPayload } from "./facultyAiEvaluation.helpers";
+import { buildLockedV17Package, type LockedV17Assess, type LockedV17DetailBlock, type LockedV17PackageModel } from "./buildLockedV17Package";
+import type { LockedV17ClaimState, LockedV17SourceTabs } from "./buildLockedV17SourceTabs";
+import { emptyLockedV17SourceTabs } from "./buildLockedV17SourceTabs";
+import { V19_ASSESSMENT_RULE } from "./buildLockedV17Assessment";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
 import "./faculty-locked-v17.css";
 
-type TabId = "flashView" | "reportView" | "assessedView" | "badgeView";
+type TabId = "flashView" | "reportView" | "evidenceView" | "attendanceView" | "analyzerView" | "assessedView" | "badgeView";
 
 const TABS: Array<{ id: TabId; label: string }> = [
-    { id: "flashView", label: "Raw Flashcard" },
-    { id: "reportView", label: "Raw Detailed Report" },
+    { id: "flashView", label: "01 · Flashcard" },
+    { id: "reportView", label: "02 · Detailed Report" },
+    { id: "evidenceView", label: "03 · Evidence" },
+    { id: "attendanceView", label: "04 · Attendance & Hours" },
+    { id: "analyzerView", label: "05 · CII Analyzer" },
     { id: "assessedView", label: "Detailed Report + CII Assessment" },
     { id: "badgeView", label: "Flashcard + CII Badge" },
 ];
+
+function sourceTabsOf(model: LockedV17PackageModel | null | undefined): LockedV17SourceTabs {
+    return model?.sourceTabs ?? emptyLockedV17SourceTabs();
+}
+
+function claimStateClass(state: string): string {
+    return state.toLowerCase().replace(/\s+/g, "-");
+}
+
+function evIcon(kind: string, name: string): string {
+    const blob = `${kind} ${name}`.toLowerCase();
+    if (/photo|image|jpg|jpeg|png|webp/.test(blob)) return "▣";
+    if (/video|mp4/.test(blob)) return "▶";
+    if (/pdf/.test(blob)) return "PDF";
+    return "DOC";
+}
 
 function V16Flashcard({ model }: { model: LockedV17PackageModel }) {
     const provisional = !model.ciiLocked && model.ciiScore != null;
@@ -142,6 +165,61 @@ function V16Flashcard({ model }: { model: LockedV17PackageModel }) {
     );
 }
 
+function ReportSectionBlock({ block }: { block: LockedV17DetailBlock }) {
+    return (
+        <section className="flv17-rsec">
+            <h3>
+                {block.n} · {block.title}
+            </h3>
+            <div className="flv17-rsec-sub">
+                <span className={`flv17-state ${block.hold.cls}`}>{block.hold.label}</span>
+                {" · "}
+                {block.coveragePct}% required-field coverage · {block.reqFilled}/{block.reqTotal} required fields represented
+            </div>
+            <div className="flv17-narrative">{block.narrative}</div>
+            {block.flow.length ? (
+                <div className="flv17-miniflow">
+                    {block.flow.map((node) => (
+                        <div key={node.k}>
+                            <b>{node.k}</b>
+                            {node.v}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+            <div className="flv17-gap">
+                <b>Evidence:</b> {block.evidence}
+                <br />
+                <b>Limitation / review point:</b> {block.limitation}
+            </div>
+            <details open>
+                <summary>Field traceability</summary>
+                <table className="flv17-trace">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Recorded value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {block.fields.map((row) => (
+                            <tr key={row.field}>
+                                <td>
+                                    {row.field}
+                                    {row.required ? " *" : ""}
+                                </td>
+                                <td>{row.value}</td>
+                                <td>{row.status}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </details>
+        </section>
+    );
+}
+
 function DetailedReport({ model }: { model: LockedV17PackageModel }) {
     return (
         <div className="reportWrap">
@@ -152,107 +230,503 @@ function DetailedReport({ model }: { model: LockedV17PackageModel }) {
                 </p>
             </div>
             {model.detailBlocks.map((block) => (
-                <section key={block.n} className="flv17-detail-sec">
-                    <h3>
-                        {block.n} · {block.title}
-                    </h3>
-                    {block.body.length ? (
-                        <ul>
-                            {block.body.map((line, index) => (
-                                <li key={`${block.n}-${index}`}>{line}</li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p>Not provided in the locked submission.</p>
-                    )}
-                </section>
+                <ReportSectionBlock key={block.n} block={block} />
             ))}
         </div>
     );
 }
 
+function EvidencePane({ tabs }: { tabs: LockedV17SourceTabs }) {
+    return (
+        <div className="flv17-evpage">
+            <div className="flv17-evhead">
+                <div>
+                    <small>CIEL PK · CLAIM-AWARE EVIDENCE RECORD</small>
+                    <h2>Evidence manifest · {tabs.evidenceItems.length} records</h2>
+                    <p>Evidence is not proof merely because it was uploaded. Actual content should be inspected and mapped to the claim it is intended to substantiate.</p>
+                </div>
+                <div>
+                    <b>{tabs.claimCoverage}/6</b>
+                    <span>material claim areas covered</span>
+                </div>
+            </div>
+            <div className="flv17-evcards">
+                {tabs.evidenceItems.length ? (
+                    tabs.evidenceItems.map((item) => (
+                        <article key={item.url}>
+                            <div className="ico">{evIcon(item.kind, item.name)}</div>
+                            <div>
+                                <h3>{item.name}</h3>
+                                <p>
+                                    <b>Mapped claim area:</b> {item.supports}
+                                </p>
+                                <p>{item.caption || "No additional caption recorded."}</p>
+                                <div className="flv17-evVerify">
+                                    <span className={`flv17-evState ${claimStateClass(item.state)}`}>{item.state}</span>
+                                    {!item.inspected ? <span className="flv17-contentPending">CONTENT INSPECTION PENDING</span> : null}
+                                </div>
+                                <p className="flv17-evFinding">
+                                    <b>AI finding:</b> {item.finding}
+                                </p>
+                                <small>
+                                    {item.kind} · {item.verified ? "On record" : "Pending verification"}
+                                </small>
+                                {item.url ? (
+                                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                        Open original ↗
+                                    </a>
+                                ) : null}
+                            </div>
+                        </article>
+                    ))
+                ) : (
+                    <div className="flv17-empty">No evidence attached to this locked report.</div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function AttendancePane({ tabs }: { tabs: LockedV17SourceTabs }) {
+    return (
+        <div className="flv17-attendance">
+            <div className="flv17-attHead">
+                <div>
+                    <small>ATTENDANCE & HOURS</small>
+                    <h2>Participation verification</h2>
+                    <p>Student-level hours remain the compliance source. Team totals never replace individual verified hours.</p>
+                </div>
+                <div>
+                    <b>{tabs.personHours}h</b>
+                    <span>verified person-hours</span>
+                </div>
+            </div>
+            <div className="flv17-attMembers">
+                {tabs.attendanceMembers.map((member, index) => (
+                    <div key={`${member.name}-${index}`} className={member.met ? "met" : "pending"}>
+                        <span>{member.name}</span>
+                        <b>
+                            {member.hours}/{member.required}h
+                        </b>
+                        <small>{member.met ? "Requirement met" : "Hours pending"}</small>
+                    </div>
+                ))}
+            </div>
+            <div className="flv17-attTable">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Member</th>
+                            <th>Hours</th>
+                            <th>Location</th>
+                            <th>Work type</th>
+                            <th>Accomplishment</th>
+                            <th>Verification</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tabs.attendanceSessions.length ? (
+                            tabs.attendanceSessions.map((session, index) => (
+                                <tr key={`${session.date}-${session.member}-${index}`}>
+                                    <td>{session.date}</td>
+                                    <td>{session.member}</td>
+                                    <td>{session.hours}</td>
+                                    <td>{session.location}</td>
+                                    <td>{session.type}</td>
+                                    <td>{session.description}</td>
+                                    <td>
+                                        <span className={`flv17-attStatus ${session.verified ? "verified" : "pending"}`}>
+                                            {session.verified ? "Verified" : "Pending"}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={7}>No service sessions recorded.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function ClaimEvidencePanel({ tabs }: { tabs: LockedV17SourceTabs }) {
+    const [showMap, setShowMap] = useState(false);
+    const counts = tabs.claimCounts;
+    const total = tabs.evidenceItems.length;
+    let statusChip = "NO EVIDENCE SUBMITTED";
+    let statusTone = "none";
+    let stateNote = "Evidence confidence cannot be assessed because no evidence files are attached to this locked report.";
+    if (total > 0 && tabs.inspectedCount < total) {
+        statusChip = "MULTIMODAL CONTENT CHECK REQUIRED";
+        statusTone = "pending";
+        stateNote = `${tabs.inspectedCount}/${total} evidence file(s) have been content-inspected. Evidence-based claims remain provisional until the actual file content is inspected.`;
+    } else if (total > 0) {
+        statusChip = "CONTENT INSPECTION COMPLETE";
+        statusTone = "ok";
+        stateNote = "All submitted evidence files have been content-inspected; the confidence rating below reflects the inspected claim–evidence relationships.";
+    }
+    const stats: Array<{ cls: string; label: string; key: LockedV17ClaimState }> = [
+        { cls: "supports", label: "Supports", key: "Supports Claim" },
+        { cls: "partial", label: "Partially supports", key: "Partially Supports" },
+        { cls: "cannot", label: "Cannot verify", key: "Cannot Verify" },
+        { cls: "unrelated", label: "Unrelated", key: "Unrelated" },
+        { cls: "contradicts", label: "Contradicts", key: "Contradicts" },
+    ];
+    return (
+        <>
+            <section className="flv17-ecred">
+                <div className="flv17-ecredHead">
+                    <div>
+                        <small>CLAIM ↔ EVIDENCE VERIFICATION</small>
+                        <h3>Evidence Credibility</h3>
+                        <p>Every material claim is mapped to evidence. Uploaded files are not treated as proof until their actual content is inspected where technically available.</p>
+                    </div>
+                    <button type="button" className="flv17-claimBtn" onClick={() => setShowMap((open) => !open)}>
+                        {showMap ? "Hide Claim–Evidence Map" : "View Claim–Evidence Map"}
+                    </button>
+                </div>
+                <div className="flv17-credStats">
+                    {stats.map((stat) => (
+                        <div key={stat.key} className={`flv17-credStat ${stat.cls}`}>
+                            <b>{counts[stat.key]}</b>
+                            <span>{stat.label}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="flv17-credFoot">
+                    <b>Evidence Confidence: {tabs.evidenceConfidence}</b>
+                    <span>
+                        {tabs.inspectedCount}/{total} evidence file(s) content-inspected
+                    </span>
+                    <span className={`flv17-contentPending ${statusTone}`}>{statusChip}</span>
+                </div>
+                <div className="flv17-claimIssue info">ℹ {stateNote}</div>
+                {tabs.claimIssues.slice(0, 2).map((issue) => (
+                    <div key={issue} className="flv17-claimIssue">
+                        ⚠ {issue}
+                    </div>
+                ))}
+            </section>
+            {showMap ? (
+                <section className="flv17-claimMap">
+                    <div className="flv17-claimMapHead">
+                        <b>Claim–Evidence Map</b>
+                        <span>Claim → Evidence → AI finding → Confidence</span>
+                    </div>
+                    <div className="flv17-claimTable">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Material claim</th>
+                                    <th>Mapped evidence</th>
+                                    <th>Relationship</th>
+                                    <th>Confidence</th>
+                                    <th>AI finding</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tabs.claimRows.length ? (
+                                    tabs.claimRows.map((row, index) => (
+                                        <tr key={`${row.files}-${index}`}>
+                                            <td>
+                                                <b>{row.category}</b>
+                                                <div className="flv17-claimFinding">{row.text}</div>
+                                            </td>
+                                            <td>{row.files}</td>
+                                            <td>
+                                                <span className={`flv17-claimState ${claimStateClass(row.state)}`}>{row.state}</span>
+                                            </td>
+                                            <td>{row.confidence}</td>
+                                            <td className="flv17-claimFinding">{row.finding}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5}>No material claims could be mapped from this report.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            ) : null}
+        </>
+    );
+}
+
+function AnalyzerPane({
+    model,
+    analyzerHref,
+}: {
+    model: LockedV17PackageModel;
+    analyzerHref?: string;
+}) {
+    const tabs = sourceTabsOf(model);
+    if (!tabs.analyzerReady) {
+        return (
+            <div className="flv17-analyzer">
+                <div className="flv17-analyzerTop">
+                    <div className="flv17-analyzerTitle">
+                        <span className="flv17-analyzerIcon">AI</span>
+                        <div>
+                            <small>CIEL PK · CII ANALYZER</small>
+                            <h2>Evaluate the locked Report Package</h2>
+                            <p>
+                                v9.0 Hybrid scoring uses the Detailed Report, verified Attendance/Hours and a Claim ↔ Evidence Verification Layer. Actual evidence files must be supplied to the multimodal evaluator; filenames alone are never treated as proof.
+                            </p>
+                        </div>
+                    </div>
+                    {analyzerHref ? (
+                        <Link className="flv17-run" href={analyzerHref}>
+                            Run AI Analyzer
+                        </Link>
+                    ) : null}
+                </div>
+                <ClaimEvidencePanel tabs={tabs} />
+            </div>
+        );
+    }
+    return (
+        <div className="flv17-analyzer">
+            <div className={`flv17-analyzerTop ${model.ciiLocked ? "verified" : "results"}`}>
+                <div className="flv17-analyzerTitle">
+                    <span className="flv17-analyzerIcon">{model.ciiLocked ? "✓" : "AI"}</span>
+                    <div>
+                        <small>CIEL PK · v9.0 HYBRID CII ANALYZER</small>
+                        <h2>{model.ciiLocked ? "Faculty-Verified CII" : "System assessment ready"}</h2>
+                        <p>
+                            Review the score, claim-evidence findings, reasoning and evidence confidence. Faculty can inspect mismatches before final approval. The Analyzer never rewrites student-entered facts.
+                        </p>
+                    </div>
+                </div>
+                <span className={`flv17-analyzerStatus ${model.ciiLocked ? "" : "ready"}`}>
+                    {model.ciiLocked ? "LOCKED · VERIFIED" : "READY FOR FACULTY REVIEW"}
+                </span>
+            </div>
+            <div className="flv17-summaryStrip">
+                <div className="flv17-summaryCard primary">
+                    <small>{model.ciiLocked ? "FACULTY-VERIFIED CII" : "SYSTEM PROVISIONAL CII"}</small>
+                    <b>
+                        {model.ciiScore}
+                        <em>/100</em>
+                    </b>
+                    <span>{tabs.levelLabel}</span>
+                </div>
+                <div className="flv17-summaryCard">
+                    <small>EVIDENCE CONFIDENCE</small>
+                    <b className="word">{tabs.evidenceConfidence}</b>
+                    <span>Locked report source · faculty review</span>
+                </div>
+                <div className="flv17-summaryCard">
+                    <small>BADGE READINESS</small>
+                    <b className="word smallword">{tabs.badgeReadiness}</b>
+                    <span>{model.badgeLabel}</span>
+                </div>
+            </div>
+            <ClaimEvidencePanel tabs={tabs} />
+            <div className="flv17-a2">
+                <div>
+                    <h3>Why this badge</h3>
+                    <p>{tabs.whyBadge}</p>
+                    <h3>Why not higher</h3>
+                    <p>{tabs.whyNotHigher}</p>
+                </div>
+                <div>
+                    <h3>Strongest dimensions</h3>
+                    <ul>
+                        {tabs.strengths.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                    <h3>Priority development areas</h3>
+                    <ul>
+                        {tabs.needs.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+            {analyzerHref ? (
+                <div className="flv17-analyzerFoot">
+                    <Link className="flv17-run" href={analyzerHref}>
+                        {model.ciiLocked ? "Open Faculty CII record" : "Open Analyzer to moderate / finalise"}
+                    </Link>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function AssessCard({ row }: { row: LockedV17Assess }) {
+    const hold = row.score === "HOLD";
+    return (
+        <article className="assessCard">
+            <div className="assessTop">
+                <div>
+                    <span className="assessNo">{row.no}</span>
+                    <strong>{row.name}</strong>
+                </div>
+                <div className={`assessScore ${hold ? "holdScore" : "scored"}`}>
+                    <b>{hold ? "HOLD · NOT SCORED" : `${row.score}/${row.max}`}</b>
+                    <small>Maximum {row.max} points</small>
+                </div>
+            </div>
+            {row.chips.length ? (
+                <div className="rubricRow">
+                    {row.chips.map((chip) => (
+                        <span key={chip.label} className="rubChip">
+                            {chip.label} · {chip.weight}
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+            <div className="finding">
+                <b>System finding</b>
+                <p>{row.reason}</p>
+            </div>
+            <div className="threeCol">
+                <div className="fb good">
+                    <b>Strengths</b>
+                    <ul>
+                        {(row.strengths.length ? row.strengths : ["Pending Analyzer / Faculty moderation."]).map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="fb warn">
+                    <b>Limitations / marks currently unavailable</b>
+                    <ul>
+                        {(row.limits.length ? row.limits : ["Pending Analyzer / Faculty moderation."]).map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="fb improve">
+                    <b>What would improve the score</b>
+                    <ul>
+                        {(row.improvements.length ? row.improvements : ["Pending Analyzer / Faculty moderation."]).map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+            <div className="scoreLogic">
+                <b>Assessment rule:</b> {V19_ASSESSMENT_RULE}
+            </div>
+        </article>
+    );
+}
+
 function AssessmentLayer({ model }: { model: LockedV17PackageModel }) {
+    const byNo = new Map(model.assessment.map((row) => [row.no, row]));
     return (
         <div>
             <div className="assessmentIntro">
                 <b>Assessed Detailed Report.</b> The original student record is preserved exactly. After each section, the assessment layer explains the rubric that applies. In a CII-ready approved submission, HOLD states become section marks with reasoning, strengths, limitations and improvement guidance.
             </div>
-            <DetailedReport model={model} />
             <div className="assessWrap">
-                <div className="pageAssessmentLabel">CII assessment layer · outside the locked source</div>
-                {model.assessment.map((row) => (
-                    <article key={row.no} className="assessCard">
-                        <div className="assessTop">
-                            <div>
-                                <span className="assessNo">{row.no}</span>
-                                <strong>{row.name}</strong>
-                            </div>
-                            <div className="assessScore">
-                                <b>{row.score === "HOLD" ? "HOLD" : `${row.score}/${row.max}`}</b>
-                                <small>Max {row.max}</small>
-                            </div>
+                {model.detailBlocks.map((block) => {
+                    const row = byNo.get(block.n);
+                    return (
+                        <div key={block.n} className="flv17-assess-stack">
+                            <ReportSectionBlock block={block} />
+                            {row ? <AssessCard row={row} /> : null}
                         </div>
-                        <div className="finding">
-                            <b>Why this score</b>
-                            <p>{row.reason}</p>
-                        </div>
-                        <div className="threeCol">
-                            <div className="fb good">
-                                <b>Strengths</b>
-                                <ul>
-                                    {row.strengths.map((item) => (
-                                        <li key={item}>{item}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div className="fb warn">
-                                <b>Limitations</b>
-                                <ul>
-                                    {row.limits.map((item) => (
-                                        <li key={item}>{item}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div className="fb improve">
-                                <b>What would raise the score</b>
-                                <ul>
-                                    {(row.improvements.length ? row.improvements : ["Pending Analyzer / Faculty moderation."]).map((item) => (
-                                        <li key={item}>{item}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    </article>
-                ))}
+                    );
+                })}
             </div>
             <div className="overallAssessment">
                 <div className="overallHead">
                     <div>
-                        <span>OVERALL SYSTEM ASSESSMENT</span>
-                        <h2>{model.title}</h2>
+                        <span>COMPOSITE IMPACT INDICATOR</span>
+                        <h2>
+                            {model.ciiLocked
+                                ? `Faculty-Verified CII ${model.ciiScore}/100`
+                                : model.ciiScore != null
+                                  ? `Provisional CII ${model.ciiScore}/100`
+                                  : "Current status: HOLD CII · REQUIRED CORRECTIONS"}
+                        </h2>
                     </div>
                     <div className="ciiHold">
-                        {model.ciiLocked ? `Faculty-Verified CII ${model.ciiScore}/100` : model.ciiScore != null ? `Provisional CII ${model.ciiScore}/100` : "CII HOLD"}
-                        <small>System CII is provisional until Faculty approval</small>
+                        {model.ciiLocked ? `${model.ciiScore}/100` : model.ciiScore != null ? `Provisional ${model.ciiScore}/100` : "NOT YET SCORED"}
+                        <small>100-point CII · System CII is provisional until Faculty approval</small>
                     </div>
                 </div>
                 <p>{model.overall}</p>
+                <div className="mapping">
+                    {model.assessment.map((row) => (
+                        <div key={row.no}>
+                            <b>Report {row.no}</b>
+                            <span>{row.name}</span>
+                            <strong>
+                                {row.score === "HOLD" ? "" : row.score}/{row.max}
+                            </strong>
+                        </div>
+                    ))}
+                </div>
+                <div className="mappingNote">
+                    <b>Important:</b> Report Sections 04 and 05 roll up into the canonical 20-point CII dimension “Activities, Outputs, Reach & Outcomes” (13 + 7 = 20). Total CII remains 100. The System Assessment never rewrites this source record.
+                </div>
             </div>
+            <section className="badgeRules">
+                <h2>Recognition after Faculty approval</h2>
+                <div className="badgeGrid">
+                    <div>
+                        <b>L1 · 0–47</b>
+                        <span>Participation Acknowledgement</span>
+                    </div>
+                    <div>
+                        <b>L2 · 48–57</b>
+                        <span>Foundation Stage Contributor</span>
+                    </div>
+                    <div>
+                        <b>L3 · 58–66</b>
+                        <span>Emerging Community Contributor</span>
+                    </div>
+                    <div>
+                        <b>L4 · 67–83</b>
+                        <span>Developing Impact Contributor</span>
+                    </div>
+                    <div>
+                        <b>L5 · 84–91</b>
+                        <span>Distinguished Impact Contributor</span>
+                    </div>
+                    <div>
+                        <b>L6 · 92–100</b>
+                        <span>Transformative Impact Contributor</span>
+                    </div>
+                </div>
+                <p>Premium recognition is subject to evidence/outcome/sustainability quality gates. A numerical score alone does not guarantee Distinguished or Transformative recognition.</p>
+            </section>
         </div>
     );
 }
 
 export default function FacultyLockedV17Modal({
     reportId,
+    report,
+    projectData,
+    initialTab = "flashView",
     onClose,
 }: {
-    reportId: string;
+    reportId?: string;
+    /** Skip the faculty API and render from an already-loaded student/faculty report record. */
+    report?: Record<string, unknown>;
+    projectData?: unknown;
+    initialTab?: TabId;
     onClose: () => void;
 }) {
-    const [tab, setTab] = useState<TabId>("flashView");
-    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<TabId>(initialTab);
+    const [loading, setLoading] = useState(!report);
     const [loadError, setLoadError] = useState(false);
-    const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
+    const [raw, setRaw] = useState<Record<string, unknown> | null>(() =>
+        report ? (prepareReportForVerifyDossier(report) as Record<string, unknown>) : null,
+    );
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -260,6 +734,12 @@ export default function FacultyLockedV17Modal({
     }, []);
 
     useEffect(() => {
+        if (report) return;
+        if (!reportId) {
+            setLoadError(true);
+            setLoading(false);
+            return;
+        }
         let cancelled = false;
         setLoading(true);
         setLoadError(false);
@@ -277,7 +757,7 @@ export default function FacultyLockedV17Modal({
                     setLoadError(true);
                     return;
                 }
-                const rec = (payload.data || payload.report || payload) as Record<string, unknown>;
+                const rec = unwrapFacultyReportPayload(payload as Record<string, unknown>);
                 if (!rec || typeof rec !== "object") {
                     setLoadError(true);
                     return;
@@ -296,18 +776,19 @@ export default function FacultyLockedV17Modal({
         return () => {
             cancelled = true;
         };
-    }, [reportId]);
+    }, [reportId, report]);
 
     const flash = useMemo(() => (raw ? coerceFlashReportData(raw) : null), [raw]);
     const model = useMemo(() => {
         if (!flash) return null;
         try {
-            return buildLockedV17Package(flash, raw?.opportunity ?? raw);
+            return buildLockedV17Package(flash, projectData ?? raw?.opportunity ?? raw);
         } catch {
             return null;
         }
-    }, [flash, raw]);
+    }, [flash, raw, projectData]);
     const cii = flash ? resolveReportCii(flash) : null;
+    const analyzerHref = reportId ? `/dashboard/faculty/reports/${reportId}?view=cii-v2` : undefined;
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -357,12 +838,12 @@ export default function FacultyLockedV17Modal({
                         ×
                     </button>
                     <span className="pill">LOCKED STUDENT SUBMISSION</span>
-                    <h3 id="flv17-title">V17 Flashcard + Detailed Report</h3>
-                    <p>The student submission is shown in the same locked template received by Faculty. The System Assessment never rewrites this source record.</p>
+                    <h3 id="flv17-title">Locked Faculty Report Package</h3>
+                    <p>Locked Faculty review package · Flashcard · Detailed Report · Evidence · Attendance/Hours · CII Analyzer + Claim–Evidence Verification. The System Assessment never rewrites this source record.</p>
                 </div>
                 <div className="flv17-modal-body" id="flv17-print-root">
                     <div className="flv17-lock-banner">
-                        <b>Source of truth:</b> Flashcard + full Detailed Report. CII is calculated mainly from the Detailed Report because it carries the complete section/sub-section narrative, source facts, evidence status and traceability.
+                        <b>One locked source package:</b> Flashcard + Detailed Report + Evidence + Attendance/Hours. The CII Analyzer reads these records, maps material claims to evidence and never rewrites student-entered facts.
                         {cii?.source === "faculty_locked" ? ` Faculty-Verified CII ${cii.totalScore}/100.` : ""}
                     </div>
                     <div className="flv17">
@@ -373,16 +854,22 @@ export default function FacultyLockedV17Modal({
                                     <span>Locked V17 outputs + Faculty/System assessment layer</span>
                                 </div>
                                 <div className="tabs">
-                                    {TABS.map((item) => (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            className={`tab ${tab === item.id ? "on" : ""}`}
-                                            onClick={() => setTab(item.id)}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    ))}
+                                    {TABS.map((item) => {
+                                        const evidenceCount = sourceTabsOf(model).evidenceItems.length;
+                                        const analyzerReady = Boolean(sourceTabsOf(model).analyzerReady);
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                className={`tab ${tab === item.id ? "on" : ""}`}
+                                                onClick={() => setTab(item.id)}
+                                            >
+                                                {item.label}
+                                                {item.id === "evidenceView" ? <i>{evidenceCount}</i> : null}
+                                                {item.id === "analyzerView" && analyzerReady ? <i>READY</i> : null}
+                                            </button>
+                                        );
+                                    })}
                                     <button type="button" className="tab" onClick={printPackage}>
                                         Print Package
                                     </button>
@@ -408,6 +895,15 @@ export default function FacultyLockedV17Modal({
                                     </section>
                                     <section className={`view ${tab === "reportView" ? "on" : ""}`}>
                                         <DetailedReport model={model} />
+                                    </section>
+                                    <section className={`view ${tab === "evidenceView" ? "on" : ""}`}>
+                                        <EvidencePane tabs={sourceTabsOf(model)} />
+                                    </section>
+                                    <section className={`view ${tab === "attendanceView" ? "on" : ""}`}>
+                                        <AttendancePane tabs={sourceTabsOf(model)} />
+                                    </section>
+                                    <section className={`view ${tab === "analyzerView" ? "on" : ""}`}>
+                                        <AnalyzerPane model={model} analyzerHref={analyzerHref} />
                                     </section>
                                     <section className={`view ${tab === "assessedView" ? "on" : ""}`}>
                                         <AssessmentLayer model={model} />

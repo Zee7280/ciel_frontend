@@ -86,6 +86,20 @@ function asRecord(value: unknown): Record<string, unknown> {
         : {};
 }
 
+/** Faculty/report APIs wrap the row as `{ data }` or `{ data: { data } }`. */
+export function unwrapFacultyReportPayload(payload: unknown): Record<string, unknown> | null {
+    if (!payload || typeof payload !== "object") return null;
+    const root = payload as Record<string, unknown>;
+    const rec = (root.data || root.report || root) as Record<string, unknown>;
+    if (!rec || typeof rec !== "object") return null;
+    if (rec.section1 || rec.section6 || rec.id) return rec;
+    const nested = rec.data || rec.report;
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+    }
+    return rec;
+}
+
 /** Overlay faculty/report API payload onto the student report shape the V23 flashcard reads. */
 export function coerceFlashReportData(raw: Record<string, unknown>): ReportData {
     const opportunity = asRecord(raw.opportunity);

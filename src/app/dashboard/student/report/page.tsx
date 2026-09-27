@@ -4,7 +4,7 @@ import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { Button } from './components/ui/button';
 import {
     Dialog,
@@ -17,6 +17,7 @@ import {
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
 import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
+import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
     dataSectionsToSummarize,
@@ -24,6 +25,8 @@ import {
     formatIncompleteSectionHeading,
     isFlashCardStep,
     isMergedActivitiesStep,
+    nextReportStep,
+    prevReportStep,
     REPORT_UI_SECTION_TOTAL,
     uiSectionsCompleteCount,
     tabMatchesStep,
@@ -55,14 +58,13 @@ import {
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportAchievementBanner, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
 const MissionHeroView = React.memo(ReportMissionHero);
 const JourneyView = React.memo(ReportImpactJourney);
 const BridgeView = React.memo(ReportSectionBridge);
-const AchievementView = React.memo(ReportAchievementBanner);
 const SectionModelView = React.memo(ReportSectionModel);
 const LiveBannerView = React.memo(ReportLiveBanner);
 
@@ -165,6 +167,9 @@ function ReportFormContent() {
     const searchParams = useSearchParams();
     const projectId = searchParams.get('project') || searchParams.get('projectId');
     const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
+    const packageView = searchParams.get('view');
+    const wantsPackageView =
+        packageView === 'v17' || packageView === 'print' || packageView === 'certificate';
     const {
         activeStep,
         nextStep,
@@ -233,17 +238,18 @@ function ReportFormContent() {
         }
     }, [memberAttendanceMode, setMyParticipationIsTeamLead]);
 
+    React.useEffect(() => {
+        if (!wantsPackageView) return;
+        setShowGuide(false);
+        setStep(FLASH_CARD_STEP);
+    }, [wantsPackageView, setStep]);
+
     const resolveEngagementSeatForProject = React.useCallback(async () => {
         const myRes = await authenticatedFetch(`/api/v1/engagement/my`);
         if (!myRes?.ok) return null;
         const myJson = await myRes.json().catch(() => ({}));
         const rows = Array.isArray(myJson.data) ? myJson.data : [];
-        return (
-            rows.find(
-                (p: { projectId?: string; project_id?: string }) =>
-                    p && (p.projectId === projectId || p.project_id === projectId),
-            ) ?? null
-        );
+        return pickPreferredEngagementSeat(rows, projectId || "");
     }, [projectId]);
 
     // Initial Load
@@ -265,6 +271,30 @@ function ReportFormContent() {
                 authenticatedFetch(`/api/v1/student/reports/${projectId}`)
             ]);
 
+            const myPart = await resolveEngagementSeatForProject();
+            const isLeadFlag = Boolean(
+                myPart &&
+                    (myPart.isTeamLead === true ||
+                        myPart.is_team_lead === true ||
+                        String(myPart.is_team_lead ?? "").toLowerCase() === "true"),
+            );
+            const teamSeatId = String(myPart?.teamId || myPart?.team_id || "").trim();
+            const isTeamSeat = Boolean(
+                myPart &&
+                    (myPart.participationMode === "team" ||
+                        myPart.participation_mode === "team" ||
+                        teamSeatId),
+            );
+            const isTeamMemberSeat = isTeamSeat && !isLeadFlag;
+            if (isTeamMemberSeat || memberAttendanceMode) {
+                setMyParticipationIsTeamLead(false);
+                setShowGuide(false);
+            } else if (myPart) {
+                setMyParticipationIsTeamLead(isLeadFlag);
+            } else {
+                setMyParticipationIsTeamLead(null);
+            }
+
             let projectPayload: Record<string, unknown> | null = null;
 
             if (projectRes && projectRes.ok) {
@@ -277,34 +307,16 @@ function ReportFormContent() {
                     pInfo.is_student_owner === true ||
                         pInfo.isStudentOwner === true,
                 );
-                // 🚨 SECURITY CHECK: project status + join application (when API sends application_status)
-                if (!canStudentAccessReportForProjectPayload(pInfo as Record<string, unknown>, { isStudentOwner })) {
+                // Team members already have a seat — they must be able to read the shared report
+                // even if a leftover pending join-application overlay is still on the project payload.
+                if (
+                    !isTeamMemberSeat &&
+                    !canStudentAccessReportForProjectPayload(pInfo as Record<string, unknown>, { isStudentOwner })
+                ) {
                     toast.error('Approval is required to start/edit a report for this project.');
                     router.push('/dashboard/student');
                     return;
                 }
-            }
-
-            const myPart = await resolveEngagementSeatForProject();
-            if (myPart) {
-                const isLeadFlag =
-                    myPart.isTeamLead === true ||
-                    myPart.is_team_lead === true ||
-                    String(myPart.is_team_lead ?? "").toLowerCase() === "true";
-                const isTeamMemberSeat =
-                    (myPart.participationMode === "team" || myPart.participation_mode === "team") &&
-                    !isLeadFlag;
-                if (isTeamMemberSeat && !memberAttendanceMode) {
-                    router.replace(
-                        `/dashboard/student/projects/${encodeURIComponent(projectId)}/participation`,
-                    );
-                    return;
-                }
-                setMyParticipationIsTeamLead(isLeadFlag);
-            } else if (memberAttendanceMode) {
-                setMyParticipationIsTeamLead(false);
-            } else {
-                setMyParticipationIsTeamLead(null);
             }
 
             const pickOpportunityTitle = (p: Record<string, unknown> | null): string => {
@@ -347,25 +359,24 @@ function ReportFormContent() {
                         if (myRes && myRes.ok) {
                             const myJson = await myRes.json();
                             const rows = Array.isArray(myJson.data) ? myJson.data : [];
-                            const myPart = rows.find(
-                                (p: { projectId?: string; project_id?: string }) =>
-                                    p && (p.projectId === projectId || p.project_id === projectId),
-                            );
+                            const myPart = pickPreferredEngagementSeat(rows, projectId || "");
                             if (myPart) {
                                 const isLeadFlag =
                                     myPart.isTeamLead === true ||
                                     myPart.is_team_lead === true ||
                                     String(myPart.is_team_lead ?? "").toLowerCase() === "true";
-                                const isTeamMemberSeat =
-                                    (myPart.participationMode === "team" || myPart.participation_mode === "team") &&
-                                    !isLeadFlag;
-                                if (isTeamMemberSeat && !memberAttendanceMode) {
-                                    router.replace(
-                                        `/dashboard/student/projects/${encodeURIComponent(projectId)}/participation`,
-                                    );
-                                    return;
+                                const teamSeatId = String(myPart.teamId || myPart.team_id || "").trim();
+                                const isTeamSeat =
+                                    myPart.participationMode === "team" ||
+                                    myPart.participation_mode === "team" ||
+                                    Boolean(teamSeatId);
+                                const isTeamMemberSeat = isTeamSeat && !isLeadFlag;
+                                if (isTeamMemberSeat) {
+                                    setMyParticipationIsTeamLead(false);
+                                    setShowGuide(false);
+                                } else {
+                                    setMyParticipationIsTeamLead(isLeadFlag);
                                 }
-                                setMyParticipationIsTeamLead(isLeadFlag);
                                 const teamRes = await authenticatedFetch(
                                     `/api/v1/engagement/project/${encodeURIComponent(projectId)}/team`,
                                 );
@@ -433,10 +444,18 @@ function ReportFormContent() {
                     }
 
                     const reportAccess = reportForState.report_access as
-                        | { is_team_lead?: boolean }
+                        | { is_team_lead?: boolean; can_submit_report?: boolean }
                         | undefined;
-                    if (reportAccess && typeof reportAccess.is_team_lead === "boolean") {
-                        setMyParticipationIsTeamLead(reportAccess.is_team_lead);
+                    if (reportAccess) {
+                        if (
+                            reportAccess.can_submit_report === false ||
+                            reportAccess.is_team_lead === false
+                        ) {
+                            setMyParticipationIsTeamLead(false);
+                            setShowGuide(false);
+                        } else if (typeof reportAccess.is_team_lead === "boolean") {
+                            setMyParticipationIsTeamLead(reportAccess.is_team_lead);
+                        }
                     }
 
                     setFullData(reportForState as typeof mergedReport);
@@ -506,21 +525,17 @@ function ReportFormContent() {
             e.stopPropagation();
         }
 
-        // --- FLEXIBLE NAVIGATION (Progress Mode) ---
-        // If not at the final step, allow navigation even if validation fails
-        if (isTeamMemberAttendanceOnly && activeStep !== 1) {
-            setStep(1);
-            toast.info("Only your team lead advances report sections. Update your attendance in Section 1.");
+        // Team members may read every section of the shared report. They still cannot save
+        // or submit sections 2–10 — only the team lead files the body.
+        if (isTeamMemberAttendanceOnly) {
+            if (isFlashCardStep(activeStep)) return;
+            setStep(nextReportStep(activeStep));
             return;
         }
 
         const isValid = validateCurrentSection();
         
         if (activeStep < FLASH_CARD_STEP) {
-            if (isTeamMemberAttendanceOnly) {
-                toast.info("Only your team lead advances report sections. Update your attendance in Section 1.");
-                return;
-            }
             setIsSaving(true);
             let updatedData = { ...data };
 
@@ -864,7 +879,6 @@ function ReportFormContent() {
         [canSubmitReport, isReadOnly, needsRevision, reportStatusLower],
     );
     const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
-    const stepperLockedToSection1Only = isTeamMemberAttendanceOnly;
     const deferredData = React.useDeferredValue(data);
     const incompleteStepNums = React.useMemo(
         () => new Set(incompleteSectionsSummary.map((block) => block.section)),
@@ -893,8 +907,8 @@ function ReportFormContent() {
     const goJourneyRef = React.useRef<(step: number) => void>(() => {});
     goJourneyRef.current = (step: number) => {
         const lockedSummary = stepperLockedToSummaryOnly && step !== FLASH_CARD_STEP;
-        const lockedSection1 = stepperLockedToSection1Only && step !== 1;
-        if (lockedSummary || lockedSection1) return;
+        // Team members can read every shared-report stop; they still cannot save/submit the body.
+        if (lockedSummary) return;
         const isActive = tabMatchesStep(step, activeStep);
         const isCompleted = activeStep > step;
         if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
@@ -1018,7 +1032,17 @@ function ReportFormContent() {
 
                 {isTeamMemberAttendanceOnly ? (
                     <div className="cer-note">
-                        Team member — attendance only. Your team lead files this report. You may update Section 1 only.
+                        Team member — you can read the full shared report. Only Section 1 attendance can be updated. Your team lead files and submits.
+                        {" "}
+                        {onFlash ? (
+                            <button type="button" className="cer-ghost" onClick={() => goJourney(1)}>
+                                ← Back to Section 1
+                            </button>
+                        ) : (
+                            <button type="button" className="cer-ghost" onClick={() => goJourney(FLASH_CARD_STEP)}>
+                                View Flash Card →
+                            </button>
+                        )}
                     </div>
                 ) : null}
 
@@ -1032,7 +1056,7 @@ function ReportFormContent() {
 
                 <MissionHeroView data={deferredData} projectData={projectDetails} />
 
-                {!onFlash && !stepperLockedToSummaryOnly && !stepperLockedToSection1Only ? (
+                {!onFlash && !stepperLockedToSummaryOnly ? (
                     <JourneyView
                         data={deferredData}
                         activeStep={activeStep}
@@ -1057,14 +1081,13 @@ function ReportFormContent() {
                                     <b>{isTeamMemberAttendanceOnly ? "Team member · attendance only" : "Master Student · Report Owner"}</b>
                                     <p>
                                         {isTeamMemberAttendanceOnly
-                                            ? "You can read the shared report and edit only your own attendance. The Master Student writes Sections 2–9 and submits."
+                                            ? "You can read every section of the shared report. Only your own attendance can be edited. The team lead writes Sections 2–9 and submits."
                                             : "You control Sections 1–9, team setup, final declarations and submission."}
                                     </p>
                                 </div>
                             </div>
                         ) : null}
                         <ReportWritingGuide step={activeStep} />
-                        <AchievementView step={activeStep} data={deferredData} projectData={projectDetails} />
                         <ReportExampleSpot step={activeStep} />
                         <ReportGlobalCoverage step={activeStep} />
                         <ReportSectionLeadNote step={activeStep} />
@@ -1101,6 +1124,24 @@ function ReportFormContent() {
                                 sending={isSaving}
                                 paymentHref={paymentHref || undefined}
                             />
+                            {isTeamMemberAttendanceOnly ? (
+                                <div className="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-[var(--line)] bg-gradient-to-br from-[var(--teal-soft)] via-white to-white p-6">
+                                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--teal-soft)]">
+                                        <CheckCircle className="h-8 w-8 text-[var(--teal)]" />
+                                    </div>
+                                    <div className="min-w-[220px] flex-1 space-y-2">
+                                        <span className="inline-block rounded-full bg-[var(--teal-soft)] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[var(--teal)]">
+                                            Project Complete
+                                        </span>
+                                        <h3 className="text-2xl font-extrabold text-[var(--ink)]">Great work, team!</h3>
+                                        <p className="text-sm text-[var(--muted)]">Your project is ready for final reporting.</p>
+                                        <span className="inline-flex items-center gap-2 rounded-full bg-[var(--gold-soft)] px-4 py-2 text-sm font-bold text-[var(--gold)]">
+                                            <span className="h-2 w-2 rounded-full bg-[var(--gold)]" />
+                                            Only the Team Lead can submit the Final Report.
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : null}
                             <Section11Summary
                                 onRequestFinalSubmit={
                                     summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
@@ -1127,11 +1168,11 @@ function ReportFormContent() {
                 !(isFlashCardStep(activeStep) && postSubmitAwaitingReview && isReadOnly) && (
                 <div className="cer-foot">
                     <div>
-                        {!isReadOnly && !summaryOnlyWorkspace && (
+                        {((!isReadOnly && !summaryOnlyWorkspace) || isTeamMemberAttendanceOnly) && (
                             <button
                                 type="button"
                                 className="cer-prev"
-                                onClick={prevStep}
+                                onClick={() => (isTeamMemberAttendanceOnly ? setStep(prevReportStep(activeStep)) : prevStep())}
                                 disabled={activeStep === 1}
                             >
                                 Previous step
@@ -1162,8 +1203,8 @@ function ReportFormContent() {
                                 disabled={
                                     isSaving ||
                                     submitSucceeded ||
-                                    (isFlashCardStep(activeStep) && !canFinalizeSubmit && !needsRevision) ||
-                                    (isTeamMemberAttendanceOnly && activeStep === 1)
+                                    (isFlashCardStep(activeStep) &&
+                                        (isTeamMemberAttendanceOnly || (!canFinalizeSubmit && !needsRevision)))
                                 }
                             >
                                 {isSaving ? (
