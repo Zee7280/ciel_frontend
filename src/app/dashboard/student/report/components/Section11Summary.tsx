@@ -20,7 +20,7 @@ import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/report
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
 import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
-import { reportRequiresReportingFee, communityReportReviewerName } from "@/utils/reviewQueue";
+import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
@@ -252,21 +252,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         return typeof fromAudit === "string" && fromAudit.trim() ? fromAudit.trim() : "";
     }, [data.admin_feedback, data.feedback, section11AuditMetaEarly?.student_feedback]);
     const inPostSubmitLifecycle =
-        !needsAdminRevision &&
-        (reportSt === "submitted" ||
-            reportSt === "under_review" ||
-            reportSt === "payment_pending" ||
-            reportSt === "pending_payment" ||
-            reportSt === "payment_under_review" ||
-            reportSt === "paid" ||
-            reportSt === "approved" ||
-            reportSt === "partner_verified" ||
-            reportRs === "pending_payment" ||
-            reportRs === "payment_under_review" ||
-            reportRs === "paid" ||
-            paymentSt === "payment_under_review" ||
-            paymentSt === "paid" ||
-            paymentSt === "approved");
+        !needsAdminRevision && isStudentReportAwaitingReview(data);
     const feeOrSlipRecorded =
         reportSt === "paid" ||
         reportSt === "payment_under_review" ||

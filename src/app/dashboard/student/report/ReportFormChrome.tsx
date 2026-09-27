@@ -10,7 +10,7 @@ import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journe
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
-import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta } from "@/utils/reviewQueue";
+import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -1667,18 +1667,7 @@ export function ReportLifecycleBanner({
     const requiresFee = reportRequiresReportingFee(data);
     const reviewer = communityReportReviewerName(data);
     const sendCta = communityReportSendCta(data);
-    const submitted = [
-        "submitted",
-        "under_review",
-        "payment_pending",
-        "pending_payment",
-        "payment_under_review",
-        "paid",
-        "approved",
-        "verified",
-        "partner_verified",
-        "finalized",
-    ].includes(reportSt) || ["pending_payment", "payment_under_review", "paid"].includes(reportRs);
+    const submitted = isStudentReportAwaitingReview(data);
     const feeDone =
         !requiresFee ||
         reportSt === "paid" ||
@@ -1789,14 +1778,12 @@ function flashStatus(data: ReportData): "draft" | "fee" | "pending" | "live" {
     const rs = String(data.report_status || "").toLowerCase();
     const admin = String(data.admin_status || "").toLowerCase();
     if (["verified", "approved"].includes(st) || ["verified", "approved"].includes(admin)) return "live";
-    // Only the report lifecycle counts as fee-hold. A stray payment_status=pending on a
-    // draft must not hide Send to Faculty / the next-step message.
     const reportFeeHold =
         reportRequiresReportingFee(data) &&
         (["pending_payment", "payment_pending", "payment_under_review"].includes(st) ||
             ["pending_payment", "payment_under_review"].includes(rs));
     if (reportFeeHold && data.payment_verified !== true) return "fee";
-    if (["paid", "partner_verified", "under_review", "finalized"].includes(st) || st.includes("submitted")) return "pending";
+    if (isStudentReportAwaitingReview(data)) return "pending";
     return "draft";
 }
 

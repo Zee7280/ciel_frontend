@@ -18,7 +18,6 @@ import CommunityServiceHub from "./CommunityServiceHub";
 import CommunityServiceCreate from "./CommunityServiceCreate";
 import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import CommunityServiceRankings from "./CommunityServiceRankings";
-import CommunityServiceFiles from "./CommunityServiceFiles";
 import CommunityImpactWall from "./CommunityImpactWall";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DetailedStudentReportGuide from "./DetailedStudentReportGuide";
@@ -294,7 +293,10 @@ function CommunityServiceContent() {
         if (workspaceView && rawFilter === "opportunity") {
             router.replace(`${HUB}?view=create&filter=review`);
         }
-    }, [rawTab, workspaceView, rawFilter, router]);
+        if (filesView) {
+            router.replace(HUB);
+        }
+    }, [rawTab, workspaceView, rawFilter, filesView, router]);
 
     const setTab = (key: string) => {
         if (key === "find") {
@@ -309,11 +311,11 @@ function CommunityServiceContent() {
     if (loading) return <WorkspaceSkeleton />;
     if (rawTab === "find") return <WorkspaceSkeleton />;
 
-    if (showHub && wallView) {
+    if (wallView) {
         return <CommunityImpactWall />;
     }
 
-    if (showHub && guideView) {
+    if (guideView) {
         return (
             <div className="mx-auto min-w-0 max-w-[1180px] pb-24">
                 <CommunityCrumb role="Student" view="Guide" />
@@ -323,11 +325,11 @@ function CommunityServiceContent() {
         );
     }
 
-    if (showHub && createView) {
+    if (createView) {
         return <CommunityServiceCreate />;
     }
 
-    if (showHub && workspaceView) {
+    if (workspaceView) {
         return (
             <CommunityServiceWorkspace
                 projects={projects}
@@ -339,12 +341,12 @@ function CommunityServiceContent() {
         );
     }
 
-    if (showHub && rankingsView) {
+    if (rankingsView) {
         return <CommunityServiceRankings />;
     }
 
-    if (showHub && filesView) {
-        return <CommunityServiceFiles />;
+    if (filesView) {
+        return <WorkspaceSkeleton />;
     }
 
     if (showHub) {

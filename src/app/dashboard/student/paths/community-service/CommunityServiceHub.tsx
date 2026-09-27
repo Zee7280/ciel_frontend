@@ -15,7 +15,6 @@ const LOG_HOURS_HREF = `${HUB}?tab=log-hours`;
 const GUIDE_HREF = `${HUB}?view=guide`;
 const CS_IMPACT_HREF = `${HUB}?view=wall`;
 const RANKINGS_HREF = `${HUB}?view=rankings`;
-const FILES_HREF = `${HUB}?view=files`;
 
 export type CommunityServiceAttentionItem = {
     key: string;
@@ -194,15 +193,6 @@ export default function CommunityServiceHub({
                     subtitle="Run the AI Analyzer on your projects (dated badge + trend shared with faculty, partners, university and CIEL PK) and see official ranking snapshots."
                     badge="ANALYZE"
                     background={MOCKUP_GRADIENTS.navy}
-                />
-                <MockupActionCard
-                    href={FILES_HREF}
-                    emoji="📁"
-                    ghost="📁"
-                    title="Shared Analysis Files"
-                    subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard."
-                    badge="SHARED"
-                    background={MOCKUP_GRADIENTS.purple}
                 />
             </div>
 

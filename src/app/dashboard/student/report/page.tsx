@@ -15,7 +15,7 @@ import {
     DialogTitle,
 } from "./components/ui/dialog";
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
-import { reportRequiresReportingFee, communityReportReviewerName } from '@/utils/reviewQueue';
+import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
@@ -216,17 +216,16 @@ function ReportFormContent() {
             filter = "completed";
         } else if (
             reportRequiresReportingFee(data) &&
+            isStudentReportAwaitingReview(data) &&
             (["pending_payment", "payment_pending", "payment_under_review"].includes(st) ||
                 ["pending_payment", "payment_under_review"].includes(rs))
         ) {
             filter = "reports";
-        } else if (["submitted", "under_review", "paid", "partner_verified"].includes(st)) {
-            filter = "review";
-        } else if (st && st !== "draft" && st !== "continue" && st !== "none") {
+        } else if (isStudentReportAwaitingReview(data)) {
             filter = "review";
         }
         router.push(`/dashboard/student/paths/community-service?view=workspace&filter=${filter}`);
-    }, [router, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route]);
+    }, [router, data, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route, data?.is_editable]);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -374,14 +373,6 @@ function ReportFormContent() {
                                     const teamJson = await teamRes.json();
                                     const teamRows =
                                         teamJson.success && Array.isArray(teamJson.data) ? teamJson.data : [];
-                                    const stPreview = String(
-                                        (reportForState.status as string | undefined) || "",
-                                    ).toLowerCase();
-                                    const adminStPreview = String(
-                                        (reportForState.admin_status as string | undefined) ||
-                                            (reportForState.admin_approval_status as string | undefined) ||
-                                            "",
-                                    ).toLowerCase();
                                     const needsRevisionPreview = isReportReturnedForRevision({
                                         status: reportForState.status as string | undefined,
                                         report_status: reportForState.report_status as string | undefined,
@@ -392,19 +383,15 @@ function ReportFormContent() {
                                     });
                                     reportIsSubmitted =
                                         !needsRevisionPreview &&
-                                        ([
-                                            "submitted",
-                                            "approved",
-                                            "under_review",
-                                            "payment_pending",
-                                            "pending_payment",
-                                            "payment_under_review",
-                                            "paid",
-                                            "verified",
-                                            "finalized",
-                                            "partner_verified",
-                                        ].includes(stPreview) ||
-                                            ["verified", "approved"].includes(adminStPreview));
+                                        isStudentReportAwaitingReview({
+                                            status: reportForState.status as string | undefined,
+                                            report_status: reportForState.report_status as string | undefined,
+                                            admin_status: reportForState.admin_status as string | undefined,
+                                            admin_approval_status: reportForState.admin_approval_status as
+                                                | string
+                                                | undefined,
+                                            is_editable: reportForState.is_editable as boolean | undefined,
+                                        });
                                     reportForState = reportIsSubmitted
                                         ? mergeReportSection1TeamScopeForCertificate(
                                               reportForState,
@@ -470,19 +457,12 @@ function ReportFormContent() {
                     const isSubmitted =
                         reportIsSubmitted ||
                         (!needsRevision &&
-                            ([
-                                "submitted",
-                                "approved",
-                                "under_review",
-                                "payment_pending",
-                                "pending_payment",
-                                "payment_under_review",
-                                "paid",
-                                "verified",
-                                "finalized",
-                                "partner_verified",
-                            ].includes(st) ||
-                                ["verified", "approved"].includes(adminSt)));
+                            isStudentReportAwaitingReview({
+                                status: st,
+                                report_status: reportForState.report_status as string | undefined,
+                                admin_status: adminSt,
+                                is_editable: reportForState.is_editable as boolean | undefined,
+                            }));
                     if (needsRevision) {
                         setShowGuide(false);
                         setReadOnly(false);
@@ -863,21 +843,8 @@ function ReportFormContent() {
     );
     const postSubmitAwaitingReview = React.useMemo(() => {
         if (needsRevision) return false;
-        return (
-            [
-                "submitted",
-                "approved",
-                "under_review",
-                "pending_payment",
-                "payment_under_review",
-                "paid",
-                "verified",
-                "finalized",
-                "partner_verified",
-            ].includes(reportStatusLower) ||
-            ["verified", "approved"].includes(adminStatusLower)
-        );
-    }, [needsRevision, reportStatusLower, adminStatusLower]);
+        return isStudentReportAwaitingReview(data);
+    }, [needsRevision, data]);
     /** Same gate as Section 11 “Report Approved & Impact Verified” — CII index must stay on summary only. */
     const ciiVerifiedSummaryLock = React.useMemo(
         () =>

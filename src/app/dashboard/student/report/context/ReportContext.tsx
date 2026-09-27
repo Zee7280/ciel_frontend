@@ -11,6 +11,7 @@ import {
     isTeamLeadForReportSubmit,
     isTeamMemberAttendanceOnlyMode,
 } from '@/utils/teamReportSubmitAccess';
+import { isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
@@ -1031,23 +1032,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 if (!silent) toast.error('Project ID missing — cannot save. Please reload the page.');
                 return false;
             }
-            const st = String(data.status || '').toLowerCase();
-            const rs = String(data.report_status || '').toLowerCase();
-            if (
-                [
-                    'submitted',
-                    'pending_payment',
-                    'payment_pending',
-                    'payment_under_review',
-                    'paid',
-                    'partner_verified',
-                    'verified',
-                    'approved',
-                    'finalized',
-                    'under_review',
-                ].includes(st) ||
-                ['pending_payment', 'payment_under_review', 'paid'].includes(rs)
-            ) {
+            if (isStudentReportAwaitingReview(data)) {
                 return true;
             }
 

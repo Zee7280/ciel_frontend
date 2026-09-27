@@ -108,6 +108,43 @@ const REPORT_FEE_HOLD_KEYS = new Set([
     "payment_under_review",
 ]);
 
+const STUDENT_SUBMITTED_REVIEW_KEYS = new Set([
+    "submitted",
+    "under_review",
+    "payment_pending",
+    "pending_payment",
+    "payment_under_review",
+    "paid",
+    "approved",
+    "verified",
+    "partner_verified",
+    "finalized",
+]);
+
+/**
+ * Student wizard: only lock / show “waiting on review” after a real submit.
+ * `is_editable: true` wins — a stray paid/submitted public status on a draft must not
+ * skip Send or jump the student to the flash-card waiting state.
+ */
+export function isStudentReportAwaitingReview(row: {
+    status?: string | null;
+    report_status?: string | null;
+    admin_status?: string | null;
+    admin_approval_status?: string | null;
+    is_editable?: boolean | null;
+} | null | undefined): boolean {
+    if (!row) return false;
+    if (row.is_editable === true) return false;
+    const st = normalizeReviewStatus(row.status);
+    const rs = normalizeReviewStatus(row.report_status);
+    const admin = normalizeReviewStatus(row.admin_status ?? row.admin_approval_status);
+    if (["verified", "approved"].includes(st) || ["verified", "approved"].includes(admin)) {
+        return true;
+    }
+    if (STUDENT_SUBMITTED_REVIEW_KEYS.has(st)) return true;
+    return ["pending_payment", "payment_under_review", "paid"].includes(rs);
+}
+
 /** Private-candidate reports still pay after submit. University fee is paused (Dr Moeed). */
 export function reportRequiresReportingFee(row: {
     private_candidate?: boolean | null;

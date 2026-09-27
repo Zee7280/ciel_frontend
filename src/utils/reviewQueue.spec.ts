@@ -4,6 +4,7 @@ import {
     communityReportSendCta,
     isCommunityReportAwaitingFee,
     isCommunityReportWaitingForFaculty,
+    isStudentReportAwaitingReview,
     reportRequiresReportingFee,
 } from "./reviewQueue";
 
@@ -42,5 +43,13 @@ assert.equal(communityReportReviewerName(uniSubmitted), "Faculty");
 assert.equal(communityReportSendCta(uniSubmitted), "Send to Faculty");
 assert.equal(communityReportReviewerName(privateFeeHold), "CIEL PK");
 assert.equal(communityReportSendCta(privateFeeHold), "Send to CIEL PK");
+
+assert.equal(
+    isStudentReportAwaitingReview({ status: "paid", is_editable: true }),
+    false,
+    "editable draft must not look submitted because of a leftover payment row",
+);
+assert.equal(isStudentReportAwaitingReview({ status: "submitted", is_editable: false }), true);
+assert.equal(isStudentReportAwaitingReview({ status: "draft" }), false);
 
 console.log("reviewQueue student/faculty/admin buckets ok");
