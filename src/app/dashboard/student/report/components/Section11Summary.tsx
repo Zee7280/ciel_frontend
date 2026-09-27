@@ -20,6 +20,7 @@ import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/report
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
 import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
+import { reportRequiresReportingFee, communityReportReviewerName } from "@/utils/reviewQueue";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
@@ -60,23 +61,31 @@ function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMe
     };
 }
 
-const FINAL_DECLARATION_ITEMS = [
-    "I confirm every section of this report is accurate to the best of my knowledge.",
-    "I understand that after final submission, no further edits are possible.",
-    "I understand my whole report — not each session — is verified once, by faculty, from the flash card.",
-    "I consent to this report and its evidence being shared with CIEL PK, my faculty, and my institution for verification.",
-    "I understand a reporting fee may apply before my score and certificate are unlocked.",
-];
+function finalDeclarationItems(requiresFee: boolean): string[] {
+    return [
+        "I confirm every section of this report is accurate to the best of my knowledge.",
+        "I understand that after final submission, no further edits are possible.",
+        requiresFee
+            ? "I understand my whole report — not each session — is verified once, by CIEL PK, from the flash card."
+            : "I understand my whole report — not each session — is verified once, by faculty, from the flash card.",
+        "I consent to this report and its evidence being shared with CIEL PK, my faculty, and my institution for verification.",
+        requiresFee
+            ? "I understand a reporting fee applies before CIEL PK can review my score and certificate."
+            : "I understand faculty reviews this report next. Hours are confirmed when they lock the flash-card score.",
+    ];
+}
 
 /** Mockup 10.5 — the final declaration + electronic sign-off that gates submission, once all sections are complete. */
 function FinalDeclarationCard({
     declaration,
     signatureName,
+    requiresFee,
     onToggle,
     onSignatureChange,
 }: {
     declaration: boolean[];
     signatureName: string;
+    requiresFee: boolean;
     onToggle: (index: number) => void;
     onSignatureChange: (value: string) => void;
 }) {
@@ -97,7 +106,7 @@ function FinalDeclarationCard({
                     </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
-                    {FINAL_DECLARATION_ITEMS.map((text, i) => (
+                    {finalDeclarationItems(requiresFee).map((text, i) => (
                         <label key={i} className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50">
                             <input
                                 type="checkbox"
@@ -136,12 +145,18 @@ function FinalDeclarationCard({
 }
 
 /** Mockup 10.7 — how a submitted report actually reaches each stakeholder. Static, informational only. */
-function ReportTravelsCard() {
-    const steps: Array<[string, string]> = [
-        ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
-        ["2 · Faculty approves once", "Faculty reviews the whole report from your flash card — not session by session."],
-        ["3 · Delivered per stakeholder", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK, faculty, and your institution."],
-    ];
+function ReportTravelsCard({ requiresFee }: { requiresFee: boolean }) {
+    const steps: Array<[string, string]> = requiresFee
+        ? [
+              ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
+              ["2 · Reporting fee", "Pay the reporting fee so CIEL PK can review the whole report from your flash card."],
+              ["3 · CIEL PK reviews", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK and your institution."],
+          ]
+        : [
+              ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
+              ["2 · Faculty approves once", "Faculty reviews the whole report from your flash card — not session by session."],
+              ["3 · Delivered per stakeholder", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK, faculty, and your institution."],
+          ];
     return (
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
             <h4 className="text-sm font-semibold text-slate-900">Where your report travels</h4>
@@ -264,6 +279,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         data.payment_verified === true;
     const paymentSlipInReview =
         reportSt === "payment_under_review" || reportRs === "payment_under_review" || paymentSt === "payment_under_review";
+    const requiresFee = reportRequiresReportingFee(data);
     const projectPaymentId = String(
         data.project_id ||
             (data as { projectId?: string }).projectId ||
@@ -605,7 +621,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         <div className="min-w-0">
                             <h3>Five things unlock together</h3>
                             <p>
-                                CII, hours, beneficiaries, SDG alignment, and the auditor narrative stay locked until your reporting fee is confirmed and an administrator verifies this submission.
+                                CII, hours, beneficiaries, SDG alignment, and the auditor narrative stay locked until{" "}
+                                {requiresFee
+                                    ? "your reporting fee is confirmed and CIEL PK verifies this submission."
+                                    : "faculty locks the flash-card score."}
                             </p>
                         </div>
                     </div>
@@ -737,8 +756,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     <div className="px-6 py-8 md:px-8 md:py-9 border-t border-slate-100/80 bg-slate-50/40">
                         <p className="text-sm font-medium text-slate-600 leading-relaxed">
                             Final auditor narrative, CII transparency (scores, penalties, risk), and section-wise flags
-                            stay hidden until your reporting fee is confirmed and an administrator approves your
-                            submission—the same unlock as quantified scores above.
+                            stay hidden until{" "}
+                            {requiresFee
+                                ? "your reporting fee is confirmed and CIEL PK approves your submission"
+                                : "faculty locks the flash-card score"}
+                            —the same unlock as quantified scores above.
                         </p>
                     </div>
                 </div>
@@ -782,8 +804,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <h3 className="text-lg font-semibold text-slate-900">Resubmit after revision</h3>
                             <p className="text-sm font-medium text-slate-500 leading-relaxed">
                                 Update the required sections (use the steps above), save your changes, then resubmit for
-                                admin review. You do not need to pay the reporting fee again unless the payment team asks
-                                you to.
+                                review.
+                                {requiresFee
+                                    ? " You do not need to pay the reporting fee again unless the payment team asks you to."
+                                    : ""}
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                 <div className="w-full sm:w-56">
@@ -863,7 +887,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         ) : null}
                     </div>
                 ) : inPostSubmitLifecycle ? (
-                    !feeOrSlipRecorded && paymentHref ? (
+                    requiresFee && !feeOrSlipRecorded && paymentHref ? (
                         <>
                             <div className="w-16 h-16 bg-[var(--gold-soft)] rounded-xl flex items-center justify-center border border-[var(--gold-soft)]">
                                 <CreditCard className="w-7 h-7 text-[var(--gold)]" />
@@ -884,7 +908,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 </button>
                             </div>
                         </>
-                    ) : paymentSlipInReview && paymentHref ? (
+                    ) : requiresFee && paymentSlipInReview && paymentHref ? (
                         <>
                             <div className="w-16 h-16 bg-[var(--bg)] rounded-xl flex items-center justify-center border border-[var(--line)]">
                                 <Clock className="w-7 h-7 text-[var(--muted)]" />
@@ -924,10 +948,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <ShieldAlert className="w-7 h-7 text-[var(--muted)]" />
                             </div>
                             <div className="max-w-md space-y-3">
-                                <h3 className="text-lg font-semibold text-slate-900">Report locked pending admin approval</h3>
+                                <h3 className="text-lg font-semibold text-slate-900">Report submitted — waiting on review</h3>
                                 <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                    Your report and fee are on file. The CII index, report preview, and certificate unlock
-                                    after partner review (if required) and CIEL Admin final approval.
+                                    {communityReportReviewerName(data)} reviews next. Hours are confirmed when the flash-card score is locked.
                                 </p>
                             </div>
                         </>
@@ -968,7 +991,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <AlertTriangle className="w-5 h-5 text-[var(--gold)] shrink-0 mt-0.5" />
                                 <p className="text-xs font-semibold text-[var(--gold)] leading-relaxed text-left">
                                     Final submission and <strong>Section 10 (Sustainability)</strong> stay locked until all{" "}
-                                    {data.required_hours || 16} hours are logged. Faculty approves the flash card after you submit.
+                                    {data.required_hours || 16} hours are logged. {communityReportReviewerName(data)}{" "}
+                                    approves the flash card after you submit.
                                 </p>
                             </div>
                             <ReadinessChecklist
@@ -1043,6 +1067,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     <FinalDeclarationCard
                         declaration={data.section11?.final_declaration || [false, false, false, false, false]}
                         signatureName={data.section11?.signature_name || ""}
+                        requiresFee={requiresFee}
                         onToggle={(i) => {
                             const next = [...(data.section11?.final_declaration || [false, false, false, false, false])];
                             next[i] = !next[i];
@@ -1085,7 +1110,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     <Lock className="w-4 h-4" /> Submit final report
                                 </span>
                             </button>
-                            <ReportTravelsCard />
+                            <ReportTravelsCard requiresFee={requiresFee} />
                         </div>
                     </>
                 )}

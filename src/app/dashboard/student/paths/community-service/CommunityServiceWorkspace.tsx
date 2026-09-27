@@ -15,6 +15,8 @@ import {
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
+    communityReportReviewerName,
+    isCommunityReportAwaitingFee,
     isCommunityReportOnLiveDeck,
     isCommunityReportRejected,
     isReviewDraftStatus,
@@ -67,6 +69,10 @@ type ReportRow = {
     admin_status?: string;
     faculty_name?: string | null;
     faculty_email?: string | null;
+    report_submitted_at?: string | null;
+    submission_date?: string | null;
+    private_candidate?: boolean | null;
+    review_route?: string | null;
 };
 
 type JourneyNode = { title: string; detail: string; state: NodeState };
@@ -127,14 +133,10 @@ function buildReminderActions(
     ];
 }
 
-/** Submitting a report sets the backend status to `payment_pending` (public `pending_payment`) —
- * the reporting fee is the student's own next action, and Partner/CIEL PK verification is blocked
- * until it clears. Treating it as "Pending Faculty Approval" sent students to nag a reviewer who
- * could not move the record. Status strings mirror `utils/studentBrowseReportCta.ts`. */
-const REPORT_FEE_STATUSES = new Set(["pending_payment", "payment_pending", "payment_under_review"]);
-
+/** Private-candidate reports still hold for the reporting-fee gateway. University
+ * submit is `submitted` and goes to faculty — never treat that as a fee card. */
 function reportAwaitingFee(row: ReportRow): boolean {
-    return REPORT_FEE_STATUSES.has(normalizeReviewStatus(row.status));
+    return isCommunityReportAwaitingFee(row);
 }
 
 function reportBucket(row: ReportRow): WsFilter {
@@ -351,7 +353,7 @@ export default function CommunityServiceWorkspace({
                     note: {
                         kind: "notify",
                         title: "Draft Status",
-                        body: "Your unfinished report stays editable. Nothing is sent to Faculty until you press Submit Report.",
+                        body: `Your unfinished report stays editable. Nothing is sent to ${communityReportReviewerName(report)} until you press Submit Report.`,
                     },
                     sideTitle: "Your Next Action",
                     sideDetail: "Continue your report",
@@ -363,28 +365,31 @@ export default function CommunityServiceWorkspace({
                 continue;
             }
             if (bucket === "review") {
+                const reviewer = communityReportReviewerName(report);
                 out.push({
                     id: `rep-${report.id}`,
                     filter: "review",
-                    stageLabel: "Stage 2 — Faculty Report Decision",
+                    stageLabel: `Stage 2 — ${reviewer} Report Decision`,
                     title,
                     meta: "Report submitted",
                     journeyHead: "REPORT SUBMITTED",
-                    journeySub: "Faculty decision pending",
+                    journeySub: `${reviewer} decision pending`,
                     pills: [
                         { label: "Report Submitted", kind: "ok" },
-                        { label: "Pending Faculty Approval", kind: "wait" },
+                        { label: `Pending ${reviewer} Approval`, kind: "wait" },
                     ],
                     note: {
                         kind: "notify",
-                        title: "Faculty Options",
-                        body: "Faculty may Approve, Request Revision, or Reject. Your submitted version is locked while under review.",
+                        title: `${reviewer} Options`,
+                        body: `${reviewer} may Approve, Request Revision, or Reject. Your submitted version is locked while under review.`,
                     },
                     sideTitle: "Current Status",
-                    sideDetail: "Pending Faculty Approval",
+                    sideDetail: `Pending ${reviewer} Approval`,
                     actions: [
                         { label: "View Submitted Report", href, style: "soft" },
-                        ...buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email),
+                        ...(reviewer === "Faculty"
+                            ? buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email)
+                            : []),
                     ],
                 });
                 continue;

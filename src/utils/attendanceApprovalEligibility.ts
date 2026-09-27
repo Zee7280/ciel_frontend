@@ -1,6 +1,7 @@
 /**
- * Aligns client-side hour/session calculations with backend attendance approval:
- * legacy rows (approval_status null/empty) count; approved/verified rows count otherwise.
+ * Aligns client-side hour/session calculations with backend attendance:
+ * rejected rows never count. Pending/logged rows count until Faculty (or CIEL PK)
+ * locks the flash-card score; after that they are `approved`.
  */
 
 export type AttendanceApprovalLike = {

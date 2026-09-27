@@ -119,9 +119,25 @@ function splitLines(text: string | undefined): string[] {
         .slice(0, 4);
 }
 
-export default function CommunityCiiAnalyser() {
+export default function CommunityCiiAnalyser({
+    publisher = "faculty",
+}: {
+    publisher?: "faculty" | "ciel_pk";
+} = {}) {
     const params = useParams();
     const reportId = String(params.reportId ?? "");
+    const isCielPk = publisher === "ciel_pk";
+    const reportPath = isCielPk
+        ? `/api/v1/admin/reports/${reportId}`
+        : `/api/v1/faculty/reports/${reportId}`;
+    const analysePath = isCielPk
+        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v2/analyse`
+        : `/api/v1/faculty/reports/${reportId}/cii-v2/analyse`;
+    const approvePath = isCielPk
+        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v2/approve`
+        : `/api/v1/faculty/reports/${reportId}/cii-v2/approve`;
+    const inboxHref = isCielPk ? "/dashboard/admin/community-service" : "/dashboard/faculty/reports";
+    const inboxLabel = isCielPk ? "Back to CIEL PK community service" : "Back to student reports";
 
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<Record<string, unknown> | null>(null);
@@ -139,7 +155,7 @@ export default function CommunityCiiAnalyser() {
         if (!reportId) return;
         try {
             setLoading(true);
-            const res = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}`);
+            const res = await authenticatedFetch(reportPath);
             if (!res?.ok) {
                 toast.error("Report not available");
                 setReport(null);
@@ -171,7 +187,7 @@ export default function CommunityCiiAnalyser() {
         if (!reportId || analysing || locked) return;
         try {
             setAnalysing(true);
-            const res = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/cii-v2/analyse`, {
+            const res = await authenticatedFetch(analysePath, {
                 method: "POST",
             });
             if (!res?.ok) {
@@ -211,7 +227,7 @@ export default function CommunityCiiAnalyser() {
                 body.facultyAdjustedScore = facultyFinal;
                 body.scoreAdjustmentReason = facultyNote.trim();
             }
-            const res = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/cii-v2/approve`, {
+            const res = await authenticatedFetch(approvePath, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
@@ -238,11 +254,20 @@ export default function CommunityCiiAnalyser() {
         }
         try {
             setDeciding(true);
-            const res = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/action`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "rejected", remarks: `[Return for revision] ${facultyNote.trim()}` }),
-            });
+            const res = await authenticatedFetch(
+                isCielPk
+                    ? `/api/v1/admin/reports/${reportId}/verify`
+                    : `/api/v1/faculty/reports/${reportId}/action`,
+                {
+                    method: isCielPk ? "PATCH" : "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(
+                        isCielPk
+                            ? { action: "reject", feedback: facultyNote.trim() }
+                            : { status: "revision_requested", remarks: facultyNote.trim() },
+                    ),
+                },
+            );
             if (!res?.ok) {
                 const payload = res ? await res.json().catch(() => ({})) : {};
                 toast.error((payload as { message?: string }).message || "Could not save decision");
@@ -296,8 +321,8 @@ export default function CommunityCiiAnalyser() {
         return (
             <div className="mx-auto max-w-[1180px] p-5">
                 <p className="text-[12px] text-[#687d82]">Report unavailable.</p>
-                <Link href="/dashboard/faculty/reports" className="text-[12px] underline" style={{ color: TEAL }}>
-                    Back to student reports
+                <Link href={inboxHref} className="text-[12px] underline" style={{ color: TEAL }}>
+                    {inboxLabel}
                 </Link>
             </div>
         );
@@ -336,15 +361,15 @@ export default function CommunityCiiAnalyser() {
         <div className="fx23-analyzer">
             <div className="fx23-workhead">
                 <div>
-                    <span>Faculty review workspace · A Analyzer</span>
+                    <span>{isCielPk ? "CIEL PK private-candidate review · A Analyzer" : "Faculty review workspace · A Analyzer"}</span>
                     <h2>{projectTitle}</h2>
                     <p>
                         {studentName} · submitted Flashcard + Detailed Report stay locked. The Analyzer runs only when you choose to run it.
                     </p>
                 </div>
                 <div>
-                    <Link href="/dashboard/faculty/reports">Back to reports</Link>
-                    <Link href={`/dashboard/faculty/reports/${reportId}`}>Standard console</Link>
+                    <Link href={inboxHref}>{isCielPk ? "Back to community service" : "Back to reports"}</Link>
+                    {!isCielPk ? <Link href={`/dashboard/faculty/reports/${reportId}`}>Standard console</Link> : <Link href={`/dashboard/admin/reports/verify/${reportId}`}>Review dossier</Link>}
                 </div>
             </div>
 
@@ -592,11 +617,13 @@ export default function CommunityCiiAnalyser() {
                             <button type="button" className="rev" disabled={locked || deciding} onClick={returnForRevision}>
                                 Request revision
                             </button>
+                            {!isCielPk ? (
                             <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
                                 Reject
                             </button>
+                            ) : null}
                             <button type="button" className="approve" disabled={locked || approving || !ciiV2} onClick={approveAndLock}>
-                                {approving ? "Locking…" : "Approve & lock"}
+                                {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
                             </button>
                         </div>
                     </div>

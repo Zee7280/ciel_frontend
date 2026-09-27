@@ -56,7 +56,7 @@ export function shouldShowJoinApplicationApplyUi(
     raw: Record<string, unknown>,
     opts: { isStudentOwner: boolean },
 ): boolean {
-    if (!opts.isStudentOwner) return true;
+    if (opts.isStudentOwner) return false;
     if (canEditReturnedOpportunity(raw)) return false;
     if (!isStudentOpportunityLiveForReporting(raw) && !isOpportunityPubliclyLive(raw)) return false;
     return true;

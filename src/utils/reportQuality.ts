@@ -279,16 +279,25 @@ export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult
     else if (sessions >= 4) attendance = 1.0;
     else if (sessions > 0) attendance = 0.5;
 
-    // RED FLAG CHECK: Inflation & Overlaps
-    const hoursPerDay: Record<string, number> = {};
-    countedAttendanceLogs.forEach(log => {
-        const date = log.date;
+    // RED FLAG CHECK: Inflation — per person per day. Same-day team logs are allowed.
+    const hoursPerPersonDay: Record<string, number> = {};
+    countedAttendanceLogs.forEach((log) => {
+        const date = String(log.date || "").trim().slice(0, 10);
+        if (!date) return;
+        const person =
+            participationMode === "team"
+                ? String(log.participantId || log.participant_id || log.id || "")
+                : "solo";
         const h = parseFloat(log.hours) || 0;
-        hoursPerDay[date] = (hoursPerDay[date] || 0) + h;
+        const key = `${person}|${date}`;
+        hoursPerPersonDay[key] = (hoursPerPersonDay[key] || 0) + h;
     });
-
-    Object.entries(hoursPerDay).forEach(([date, hrs]) => {
-        if (hrs > 9) redFlags.push(`Unrealistic daily output detected on ${date} (>9 hrs)`);
+    const inflatedDates = new Set<string>();
+    Object.entries(hoursPerPersonDay).forEach(([key, hrs]) => {
+        if (hrs > 9) inflatedDates.add(key.slice(key.lastIndexOf("|") + 1));
+    });
+    inflatedDates.forEach((date) => {
+        redFlags.push(`Unrealistic daily output detected on ${date} (>9 hrs)`);
     });
 
     // Patterns (e.g., exact same time range repeated too many times)

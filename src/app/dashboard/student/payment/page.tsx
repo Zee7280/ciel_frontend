@@ -33,6 +33,7 @@ import {
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 import { CepExperienceFeedbackPrompt } from '@/components/feedback/CepExperienceFeedbackPrompt';
 import { CIEL_OFFICIAL_BANK } from '@/config/cielBankDetails';
+import { reportRequiresReportingFee } from '@/utils/reviewQueue';
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -109,6 +110,21 @@ function PaymentContent() {
                 const headcount = resolveReportPaymentHeadcountMerged(project, reportPayload);
                 setFeeHeadcount(headcount);
                 setPaidAmountPkr(String(computeReportingFeeTotalPkr(headcount)));
+
+                const reportRow =
+                    reportPayload && typeof reportPayload === "object"
+                        ? (reportPayload as {
+                              private_candidate?: boolean;
+                              review_route?: string;
+                              status?: string;
+                          })
+                        : null;
+                if (reportRow && !reportRequiresReportingFee(reportRow)) {
+                    router.replace(
+                        `/dashboard/student/report?projectId=${encodeURIComponent(String(projectId))}`,
+                    );
+                    return;
+                }
 
                 // 🚀 Check report/payment status to potentially skip this page
                 const storedUser = localStorage.getItem("ciel_user");

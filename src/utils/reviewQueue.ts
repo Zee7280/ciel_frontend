@@ -25,6 +25,8 @@ export type CommunityReviewRow = {
     faculty_status?: string | null;
     admin_status?: string | null;
     partner_status?: string | null;
+    private_candidate?: boolean | null;
+    review_route?: string | null;
 };
 
 /** Submitted (or later) — not a student draft. */
@@ -34,6 +36,26 @@ export function isCommunityReportInFlight(row: CommunityReviewRow): boolean {
 
 export function isCommunityReportFacultyApproved(row: CommunityReviewRow): boolean {
     return SIGNED_OFF_KEYS.has(normalizeReviewStatus(row.faculty_status));
+}
+
+function isPrivateCandidateReview(row: {
+    private_candidate?: boolean | null;
+    review_route?: string | null;
+}): boolean {
+    return row.private_candidate === true || row.review_route === "ciel_pk";
+}
+
+/** Who reviews after submit (and after the private-candidate fee, when that applies). */
+export function communityReportReviewerName(
+    row: { private_candidate?: boolean | null; review_route?: string | null } | null | undefined,
+): "Faculty" | "CIEL PK" {
+    return isPrivateCandidateReview(row ?? {}) ? "CIEL PK" : "Faculty";
+}
+
+export function communityReportSendCta(
+    row: { private_candidate?: boolean | null; review_route?: string | null } | null | undefined,
+): "Send to Faculty" | "Send to CIEL PK" {
+    return isPrivateCandidateReview(row ?? {}) ? "Send to CIEL PK" : "Send to Faculty";
 }
 
 export function isCommunityReportRejected(row: CommunityReviewRow): boolean {
@@ -80,8 +102,30 @@ function isWaitingReviewInbox(row: CommunityReviewRow): boolean {
     return true;
 }
 
+const REPORT_FEE_HOLD_KEYS = new Set([
+    "pending_payment",
+    "payment_pending",
+    "payment_under_review",
+]);
+
+/** Private-candidate reports still pay after submit. University fee is paused (Dr Moeed). */
+export function reportRequiresReportingFee(row: {
+    private_candidate?: boolean | null;
+    review_route?: string | null;
+} | null | undefined): boolean {
+    return isPrivateCandidateReview(row ?? {});
+}
+
+/** Faculty / admin must not see a private-candidate report until the fee is cleared. */
+export function isCommunityReportAwaitingFee(row: CommunityReviewRow): boolean {
+    if (!reportRequiresReportingFee(row)) return false;
+    return REPORT_FEE_HOLD_KEYS.has(normalizeReviewStatus(row.status));
+}
+
 /** Faculty hub: waiting for *this* faculty click. */
 export function isCommunityReportWaitingForFaculty(row: CommunityReviewRow): boolean {
+    if (isPrivateCandidateReview(row)) return false;
+    if (isCommunityReportAwaitingFee(row)) return false;
     return isWaitingReviewInbox(row);
 }
 
@@ -97,7 +141,9 @@ export function isFacultyCommunityLiveCard(row: CommunityReviewRow & { hours?: n
 }
 
 export function isFacultyCommunityWaiting(row: CommunityReviewRow & { hours?: number }): boolean {
+    if (isPrivateCandidateReview(row)) return false;
     if (!isCommunityReportInFlight(row) || isCommunityReportRejected(row)) return false;
+    if (isCommunityReportAwaitingFee(row)) return false;
     return !isFacultyCommunityLiveCard(row);
 }
 
@@ -108,12 +154,14 @@ export function isFacultyCommunityWaiting(row: CommunityReviewRow & { hours?: nu
 export function isAdminCommunityLiveCard(row: CommunityReviewRow): boolean {
     if (isCommunityReportRejected(row)) return false;
     if (normalizeReviewStatus(row.status) === "draft") return false;
+    if (isPrivateCandidateReview(row)) return isCommunityReportAdminSignedOff(row);
     if (!isCommunityReportFacultyApproved(row)) return false;
     return isCommunityReportAdminSignedOff(row);
 }
 
 export function isAdminCommunityWaiting(row: CommunityReviewRow): boolean {
     if (!isCommunityReportInFlight(row) || isCommunityReportRejected(row)) return false;
+    if (isCommunityReportAwaitingFee(row)) return false;
     return !isAdminCommunityLiveCard(row);
 }
 
@@ -124,6 +172,7 @@ export function isCommunityReportWaitingForAdmin(row: CommunityReviewRow): boole
 
 /** Partner / university: submitted and not yet a live faculty-approved card. */
 export function isCommunityReportWaitingForPartner(row: CommunityReviewRow): boolean {
+    if (isCommunityReportAwaitingFee(row)) return false;
     return isWaitingReviewInbox(row);
 }
 

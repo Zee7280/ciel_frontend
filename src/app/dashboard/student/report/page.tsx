@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from "./components/ui/dialog";
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
+import { reportRequiresReportingFee, communityReportReviewerName } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
@@ -68,6 +69,23 @@ const LiveBannerView = React.memo(ReportLiveBanner);
 type ProjectDetails = { title?: string } & Record<string, unknown>;
 
 type SaveReportResult = { ok: true } | { ok: false; message: string };
+
+function isSubmittedReportLifecycle(status?: string, reportStatus?: string): boolean {
+    const st = String(status || "").toLowerCase();
+    const rs = String(reportStatus || "").toLowerCase();
+    return [
+        "submitted",
+        "pending_payment",
+        "payment_pending",
+        "payment_under_review",
+        "paid",
+        "partner_verified",
+        "verified",
+        "approved",
+        "finalized",
+        "under_review",
+    ].includes(st) || ["pending_payment", "payment_under_review", "paid"].includes(rs);
+}
 
 function formatSaveCatchError(error: unknown, mode: "save" | "submit" = "save"): string {
     const fallback =
@@ -162,6 +180,7 @@ function ReportFormContent() {
         isReadOnly,
         isEligibleForSubmission,
         areAllSectionsComplete,
+        finalDeclarationComplete,
         canSubmitReport,
         canFinalizeSubmit,
         isTeamLeadForSubmit,
@@ -184,26 +203,30 @@ function ReportFormContent() {
     const [opportunityFlashOpen, setOpportunityFlashOpen] = React.useState(false);
 
     const goBackToPreviousPage = React.useCallback(() => {
-        const reportsHome = "/dashboard/student/paths/community-service";
-        if (typeof window === "undefined") {
-            router.push(reportsHome);
-            return;
+        const st = String(data?.status || "").toLowerCase();
+        const rs = String(data?.report_status || "").toLowerCase();
+        const adm = String(data?.admin_status || data?.admin_approval_status || "").toLowerCase();
+        const fac = String(data?.faculty_status || "").toLowerCase();
+        let filter: "ready" | "reports" | "review" | "action" | "completed" | "archived" = "reports";
+        if (st.includes("revision") || fac.includes("revision") || adm.includes("revision")) {
+            filter = "action";
+        } else if (st === "rejected" || fac === "rejected") {
+            filter = "archived";
+        } else if (["verified", "approved"].includes(st) || ["verified", "approved"].includes(adm)) {
+            filter = "completed";
+        } else if (
+            reportRequiresReportingFee(data) &&
+            (["pending_payment", "payment_pending", "payment_under_review"].includes(st) ||
+                ["pending_payment", "payment_under_review"].includes(rs))
+        ) {
+            filter = "reports";
+        } else if (["submitted", "under_review", "paid", "partner_verified"].includes(st)) {
+            filter = "review";
+        } else if (st && st !== "draft" && st !== "continue" && st !== "none") {
+            filter = "review";
         }
-        let fromPath = "";
-        try {
-            const ref = document.referrer;
-            if (ref) {
-                const url = new URL(ref);
-                if (url.origin === window.location.origin) fromPath = url.pathname;
-            }
-        } catch {
-            fromPath = "";
-        }
-        const onCommunityService =
-            fromPath === reportsHome || fromPath.startsWith(`${reportsHome}/`);
-        // Never return to My Projects — that list is not the Community Service reports hub.
-        router.push(onCommunityService ? fromPath : reportsHome);
-    }, [router]);
+        router.push(`/dashboard/student/paths/community-service?view=workspace&filter=${filter}`);
+    }, [router, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route]);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -359,13 +382,14 @@ function ReportFormContent() {
                                             (reportForState.admin_approval_status as string | undefined) ||
                                             "",
                                     ).toLowerCase();
-                                    const needsRevisionPreview =
-                                        adminStPreview === "rejected" ||
-                                        String((reportForState.partner_status as string | undefined) || "").toLowerCase() ===
-                                            "rejected" ||
-                                        stPreview === "rejected" ||
-                                        stPreview === "revision" ||
-                                        reportForState.is_editable === true;
+                                    const needsRevisionPreview = isReportReturnedForRevision({
+                                        status: reportForState.status as string | undefined,
+                                        report_status: reportForState.report_status as string | undefined,
+                                        admin_status: reportForState.admin_status as string | undefined,
+                                        admin_approval_status: reportForState.admin_approval_status as string | undefined,
+                                        partner_status: reportForState.partner_status as string | undefined,
+                                        faculty_status: reportForState.faculty_status as string | undefined,
+                                    });
                                     reportIsSubmitted =
                                         !needsRevisionPreview &&
                                         ([
@@ -435,13 +459,14 @@ function ReportFormContent() {
                             (reportForState.admin_approval_status as string | undefined) ||
                             "",
                     ).toLowerCase();
-                    const partnerSt = String((reportForState.partner_status as string | undefined) || "").toLowerCase();
-                    const needsRevision =
-                        adminSt === "rejected" ||
-                        partnerSt === "rejected" ||
-                        st === "rejected" ||
-                        st === "revision" ||
-                        reportForState.is_editable === true;
+                    const needsRevision = isReportReturnedForRevision({
+                        status: reportForState.status as string | undefined,
+                        report_status: reportForState.report_status as string | undefined,
+                        admin_status: reportForState.admin_status as string | undefined,
+                        admin_approval_status: reportForState.admin_approval_status as string | undefined,
+                        partner_status: reportForState.partner_status as string | undefined,
+                        faculty_status: reportForState.faculty_status as string | undefined,
+                    });
                     const isSubmitted =
                         reportIsSubmitted ||
                         (!needsRevision &&
@@ -578,6 +603,16 @@ function ReportFormContent() {
             if (!isValid) {
                 toast.info("Draft saved. Some fields need attention before submission.");
             }
+
+            if (activeStep === FLASH_CARD_STEP - 1 && !isEligibleForSubmission && !needsRevision) {
+                toast.error(
+                    "Summary unlocks when every student has met the required hours (100% compliance). Log attendance in Section 1 first.",
+                );
+                setBlockedSubmitOpen(true);
+                setAiStatus("");
+                setIsSaving(false);
+                return;
+            }
             
             nextStep();
             window.scrollTo(0, 0);
@@ -611,6 +646,9 @@ function ReportFormContent() {
                 if (!silent) {
                     toast.info('Only your team lead can save report sections. Update your attendance in Section 1.');
                 }
+                return { ok: true };
+            }
+            if (isSubmittedReportLifecycle(customData.status, customData.report_status)) {
                 return { ok: true };
             }
 
@@ -741,7 +779,12 @@ function ReportFormContent() {
 
             const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {
                 method: 'POST',
-                body: JSON.stringify(submitData)
+                body: JSON.stringify({
+                    ...submitData,
+                    submit: true,
+                    opportunityId: projectId || submitData.project_id,
+                    project_id: projectId || submitData.project_id,
+                })
             }, {
                 timeoutMs: 45000
             });
@@ -758,11 +801,43 @@ function ReportFormContent() {
                 return;
             }
 
-            toast.success('Report submitted! Redirecting to payment...');
+            const payload = (await res.json().catch(() => null)) as {
+                data?: {
+                    status?: string;
+                    private_candidate?: boolean;
+                    review_route?: string;
+                };
+            } | null;
+            const submittedStatus = String(payload?.data?.status || "").toLowerCase();
+            const routeFlags = {
+                private_candidate:
+                    payload?.data?.private_candidate ??
+                    (submitData as { private_candidate?: boolean }).private_candidate,
+                review_route:
+                    payload?.data?.review_route ??
+                    (submitData as { review_route?: string }).review_route,
+            };
+            const feeRequired = reportRequiresReportingFee(routeFlags);
+            const nextStatus = feeRequired
+                ? submittedStatus || "pending_payment"
+                : submittedStatus || "submitted";
+
             setSubmitSucceeded(true);
-            setTimeout(() => {
-                window.location.href = `/dashboard/student/payment?projectId=${projectId}`;
-            }, 2000);
+            setFullData({
+                ...submitData,
+                status: nextStatus,
+                report_status: nextStatus,
+                private_candidate: routeFlags.private_candidate,
+                review_route: routeFlags.review_route,
+            });
+            if (feeRequired) {
+                toast.success("Report submitted! Redirecting to payment...");
+                setTimeout(() => {
+                    window.location.href = `/dashboard/student/payment?projectId=${projectId}`;
+                }, 2000);
+            } else {
+                toast.success(`Report submitted. ${communityReportReviewerName(routeFlags)} will review it next.`);
+            }
         } catch (error) {
             console.error(error);
             toast.error(formatSaveCatchError(error, "submit"));
@@ -782,8 +857,9 @@ function ReportFormContent() {
                 admin_status: data?.admin_status,
                 admin_approval_status: data?.admin_approval_status,
                 partner_status: data?.partner_status,
+                faculty_status: data?.faculty_status,
             }),
-        [data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.partner_status],
+        [data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.partner_status, data?.faculty_status],
     );
     const postSubmitAwaitingReview = React.useMemo(() => {
         if (needsRevision) return false;
@@ -829,6 +905,23 @@ function ReportFormContent() {
     );
     const sectionsCompleteCount = uiSectionsCompleteCount(incompleteStepNums);
     const progressPct = Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100);
+    const sendBlockLabels = React.useMemo(() => {
+        const labels = incompleteSectionsSummary.map((block) =>
+            formatIncompleteSectionHeading(block.section, block.label),
+        );
+        if (!isEligibleForSubmission && !labels.some((label) => /section 1|hours|attendance|participation/i.test(label))) {
+            labels.push("minimum hours (every teammate)");
+        }
+        if (!finalDeclarationComplete) labels.push("final declaration");
+        if (canSubmitReport && !isTeamLeadForSubmit) labels.push("team-lead submit only");
+        return labels;
+    }, [
+        incompleteSectionsSummary,
+        isEligibleForSubmission,
+        finalDeclarationComplete,
+        canSubmitReport,
+        isTeamLeadForSubmit,
+    ]);
     const openSectionHelp = React.useCallback(() => setHelpSignal((n) => n + 1), []);
     const goJourneyRef = React.useRef<(step: number) => void>(() => {});
     goJourneyRef.current = (step: number) => {
@@ -1035,12 +1128,11 @@ function ReportFormContent() {
                                 data={data}
                                 projectData={projectDetails}
                                 sectionsComplete={sectionsCompleteCount}
-                                missingLabels={incompleteSectionsSummary.map((block) =>
-                                    formatIncompleteSectionHeading(block.section, block.label),
-                                )}
+                                missingLabels={sendBlockLabels}
                                 canSend={(canFinalizeSubmit || needsRevision) && !isReadOnly && !isTeamMemberAttendanceOnly}
                                 onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
                                 sending={isSaving}
+                                paymentHref={paymentHref || undefined}
                             />
                             <Section11Summary
                                 onRequestFinalSubmit={
@@ -1063,10 +1155,12 @@ function ReportFormContent() {
                 ← Back to my reports
             </button>
 
-            {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && activeStep !== 1 && (
+            {!ciiVerifiedSummaryLock &&
+                activeStep !== 1 &&
+                !(isFlashCardStep(activeStep) && postSubmitAwaitingReview && isReadOnly) && (
                 <div className="cer-foot">
                     <div>
-                        {!isReadOnly && (
+                        {!isReadOnly && !summaryOnlyWorkspace && (
                             <button
                                 type="button"
                                 className="cer-prev"
@@ -1078,7 +1172,10 @@ function ReportFormContent() {
                         )}
                     </div>
 
-                    {!isReadOnly && activeStep < FLASH_CARD_STEP && !isTeamMemberAttendanceOnly && (
+                    {!isReadOnly &&
+                        !summaryOnlyWorkspace &&
+                        activeStep < FLASH_CARD_STEP &&
+                        !isTeamMemberAttendanceOnly && (
                         <button
                             type="button"
                             className="cer-save"

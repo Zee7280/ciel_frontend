@@ -27,23 +27,10 @@ import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoi
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
 import { fetchSection1Analytics } from "@/utils/section1Analytics";
 import {
-    participationAttendanceVerificationRequested,
     resolveStudentAdminAttendanceUnlock,
 } from "@/utils/adminEnrollmentAttendance";
 import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
 import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
-
-/**
- * Legacy copy for reports that already went through the old mid-flow "request attendance
- * verification" mechanic before it was replaced by the declaration in Step 3 — kept only to
- * render a read-only status for those already-locked in-flight reports, not to start new ones.
- */
-const ATTENDANCE_VERIFICATION_INFO = {
-    afterSent:
-        "Attendance is locked until a reviewer completes approval.",
-    afterSentWho:
-        "Your selected Faculty or Partner reviewer has been notified and will see a pending attendance item on their dashboard.",
-} as const;
 
 /** Align dropdown ids (`lead:uuid`, `member:0:…`) with API `participantId` (bare uuid/key). */
 function engagementParticipantCompareKey(id: string | undefined | null): string {
@@ -405,7 +392,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
         } : null
     );
     const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1.verified_summary || "");
-    const isSubmittedReport = data.status === 'submitted' || data.status === 'verified' || data.status === 'partner_verified' || data.status === 'finalized';
+    const isSubmittedReport = [
+        "submitted",
+        "pending_payment",
+        "payment_pending",
+        "payment_under_review",
+        "paid",
+        "verified",
+        "partner_verified",
+        "finalized",
+        "under_review",
+        "approved",
+    ].includes(String(data.status || "").toLowerCase()) ||
+        ["pending_payment", "payment_under_review", "paid"].includes(
+            String(data.report_status || "").toLowerCase(),
+        );
     const [isSubmitted, setIsSubmitted] = React.useState(isSubmittedReport);
     const reviewChecked = data.section1.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
@@ -416,12 +417,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
     const [isLeavingTeam, setIsLeavingTeam] = React.useState(false);
-    const [myParticipationVerificationRequested, setMyParticipationVerificationRequested] =
-        React.useState(false);
 
     const applyAdminParticipationUnlock = React.useCallback(() => {
         setParticipationUnlocked(true);
-        setMyParticipationVerificationRequested(false);
         const section1 = data.section1 as Record<string, unknown>;
         if (
             section1.attendance_verification_requested_at ||
@@ -441,11 +439,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
             const adminUnlocked = resolveStudentAdminAttendanceUnlock(myPart, teamRows);
             if (adminUnlocked) {
                 applyAdminParticipationUnlock();
-                return;
             }
-            setMyParticipationVerificationRequested(
-                participationAttendanceVerificationRequested(myPart),
-            );
         },
         [applyAdminParticipationUnlock],
     );
@@ -887,20 +881,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
     };
 
 
-    const attendanceVerificationRequestedAt =
-        (data.section1 as any).attendance_verification_requested_at ||
-        (data.section1 as any).attendanceVerificationRequestedAt ||
-        "";
-    const isLeadReportVerificationRequested = !!attendanceVerificationRequestedAt;
-    const isAttendanceVerificationRequested = isTeamMemberAttendanceOnly
-        ? myParticipationVerificationRequested && !isParticipationUnlocked
-        : isLeadReportVerificationRequested;
-    const isAttendanceFormLocked = isTeamMemberAttendanceOnly
-        ? !isParticipationUnlocked &&
-          (isSubmittedReport || myParticipationVerificationRequested)
-        : !isParticipationUnlocked && (isSubmittedReport || isLeadReportVerificationRequested);
-    const lockTeamMemberAdd =
-        !isParticipationUnlocked && (isSubmittedReport || isAttendanceVerificationRequested);
+    const isAttendanceFormLocked = !isParticipationUnlocked && isSubmittedReport;
+    const lockTeamMemberAdd = isAttendanceFormLocked;
 
     const currentUserIsTeamLead = React.useMemo(() => {
         if (myParticipationIsTeamLead === true) return true;
@@ -1635,29 +1617,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             isLocked={isAttendanceFormLocked}
                                             isParticipationUnlocked={isParticipationUnlocked}
                                             setParticipationUnlocked={setParticipationUnlocked}
-                                            allowManualUnlock={!isAttendanceVerificationRequested}
+                                            allowManualUnlock={!isSubmittedReport}
                                         />
 
                                         {!isSubmittedReport && !isParticipationUnlocked ? (
                                             <div className="mt-5 border-t border-[#dcebee] pt-4">
-                                                {isAttendanceVerificationRequested ? (
-                                                    <div className="space-y-1.5">
-                                                        <p className="text-xs font-semibold text-[#0e7d74]">
-                                                            Verification request sent
-                                                        </p>
-                                                        <p className="text-sm leading-relaxed text-slate-600">
-                                                            {ATTENDANCE_VERIFICATION_INFO.afterSent}
-                                                            <span className="mt-1.5 block text-slate-500">
-                                                                {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
-                                                            </span>
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs leading-relaxed text-slate-500">
-                                                        Sessions stay editable here until you submit the whole
-                                                        report in Step 3 — no separate verification request needed.
-                                                    </p>
-                                                )}
+                                                <p className="text-xs leading-relaxed text-slate-500">
+                                                    Sessions stay editable here until you submit the whole
+                                                    report — no separate verification request needed. Faculty
+                                                    (or CIEL PK) confirms hours when they lock the flash-card score.
+                                                </p>
                                             </div>
                                         ) : null}
                                     </div>
@@ -1887,19 +1856,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Legacy status only — reports that already requested attendance verification
-                                before this was replaced by the declaration above stay visibly locked; no
-                                new requests can be created any more. */}
-                            {!isSubmittedReport && !isTeamMemberAttendanceOnly && isAttendanceVerificationRequested ? (
-                                <div className="rounded-lg border border-[#bfe6e2] bg-[#e6f6f4] px-4 py-3 text-sm text-[#0f5e57]">
-                                    <p className="font-semibold">Verification request sent</p>
-                                    <p className="mt-1 text-xs text-[#0f5e57]">
-                                        {ATTENDANCE_VERIFICATION_INFO.afterSent}{" "}
-                                        {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
-                                    </p>
-                                </div>
-                            ) : null}
 
                         </div>
                     )}

@@ -35,11 +35,14 @@ export interface ReportData {
     admin_status?: string;
     admin_approval_status?: string;
     partner_status?: string;
+    faculty_status?: string;
     /** Admin/partner notes when the report was returned for revision. */
     admin_feedback?: string | null;
     feedback?: string | null;
     is_editable?: boolean;
     evidence_urls?: string[];
+    private_candidate?: boolean | null;
+    review_route?: "ciel_pk" | "faculty" | string | null;
     /** When backend sends project/report payment state separately from `status`. */
     report_status?: string;
     payment_status?: string;
@@ -1027,6 +1030,25 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             if (!projectId) {
                 if (!silent) toast.error('Project ID missing — cannot save. Please reload the page.');
                 return false;
+            }
+            const st = String(data.status || '').toLowerCase();
+            const rs = String(data.report_status || '').toLowerCase();
+            if (
+                [
+                    'submitted',
+                    'pending_payment',
+                    'payment_pending',
+                    'payment_under_review',
+                    'paid',
+                    'partner_verified',
+                    'verified',
+                    'approved',
+                    'finalized',
+                    'under_review',
+                ].includes(st) ||
+                ['pending_payment', 'payment_under_review', 'paid'].includes(rs)
+            ) {
+                return true;
             }
 
             const dataForSave = await prepareReportEvidenceForSave(

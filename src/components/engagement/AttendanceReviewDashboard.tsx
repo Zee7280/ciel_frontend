@@ -20,7 +20,7 @@ import {
     PARTNER_ATTENDANCE_AWAIT_TEAM,
     type PartnerTeamBucket,
 } from "@/utils/engagementPartnerTeamScope";
-import AttendancePendingQueuePanel, { type PartnerParticipantChip } from "@/components/engagement/AttendancePendingQueuePanel";
+import { type PartnerParticipantChip } from "@/components/engagement/AttendancePendingQueuePanel";
 
 /** Primary accent aligned with Attendance Verification reference */
 const accent = "text-[#0056B3]";
@@ -115,7 +115,7 @@ export default function AttendanceReviewDashboard({
     const isPartner = variant === "partner";
     const stretchViewport = wideQueueLayout;
     const facultyWide = stretchViewport && !isPartner;
-    const [listTab, setListTab] = useState<ListTab>(isPartner ? "all" : "pending");
+    const [listTab, setListTab] = useState<ListTab>("all");
     const [query, setQuery] = useState("");
     const [refreshingCounts, setRefreshingCounts] = useState(false);
     const [partnerRoster, setPartnerRoster] = useState<PartnerParticipantChip[]>([]);
@@ -1045,20 +1045,13 @@ export default function AttendanceReviewDashboard({
                                         stretchViewport && !isPartner && "flex min-h-0 w-full flex-1 flex-col",
                                     )}
                                 >
-                                    <AttendancePendingQueuePanel
-                                        projectId={projectId}
-                                        title={queueTitle}
-                                        description={queueDescription}
-                                        autoLoadOnProjectIdChange
-                                        onPendingCountChanged={onQueuePendingCountChanged}
-                                        presentation={isPartner ? "partner" : "default"}
-                                        onPartnerQueueSnapshot={isPartner ? handlePartnerQueueSnapshot : undefined}
-                                        partnerSelectedMemberKey={isPartner ? selectedParticipantKey : undefined}
-                                        partnerScopedTeamFilter={isPartner ? selectedTeamKey : undefined}
-                                        partnerTeamRosterRows={isPartner ? partnerTeamRows : undefined}
-                                        scrollTableInPanel={stretchViewport}
-                                        projectTitle={selected?.title}
-                                    />
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm leading-relaxed text-slate-700">
+                                        <p className="font-semibold text-slate-900">Attendance is confirmed on the flash card.</p>
+                                        <p className="mt-2">
+                                            There is no separate faculty or partner attendance queue. Students log hours and evidence here.
+                                            Faculty (or CIEL PK for private candidates) approves those hours when they lock the flash-card score.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -1071,8 +1064,8 @@ export default function AttendanceReviewDashboard({
                                 )}
                             >
                                 {isPartner
-                                    ? "Select an opportunity from the list to load pending attendance."
-                                    : "Select an opportunity to load pending attendance."}
+                                    ? "Select an opportunity from the list to view logged hours."
+                                    : "Select an opportunity to view logged hours."}
                             </div>
                         )}
                     </div>

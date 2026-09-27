@@ -144,7 +144,7 @@ function approvalLabel(norm: Record<string, unknown>): string {
     const raw = norm.approval_status ?? norm.entryStatus ?? norm.entry_status;
     if (raw == null || String(raw).trim() === "") return "Legacy / verified";
     const s = String(raw).trim().toLowerCase();
-    if (s === "pending") return "Pending review";
+    if (s === "pending") return "Logged · confirmed on flash card";
     if (s === "approved") return "Approved";
     if (s === "rejected") return "Rejected";
     if (s === "flagged") return "Flagged";

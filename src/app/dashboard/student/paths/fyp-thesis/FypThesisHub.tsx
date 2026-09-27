@@ -883,7 +883,7 @@ export default function FypThesisHub({
                 <MockupHero
                     title="Final Year Project (FYP)"
                     subtitle="Build your Final Year Project record from first draft to faculty / supervisor verification."
-                    stats={[
+                stats={[
                         { value: String(dashHero?.active ?? entries.length), label: "Active Records" },
                         { value: dashHero?.hours ?? "0h", label: "Verified Service" },
                         { value: String(dashHero?.portfolio ?? approved.length), label: "Impact Portfolio" },
@@ -1025,7 +1025,7 @@ export default function FypThesisHub({
                                         onOpenFlashcard={() => setOpenFlashcardId(entry.id || null)}
                                         onOpenForm={() => openRecord(entry.id)}
                                     />
-                                ))
+                                        ))
                                     )}
                                 </div>
                     </MockupPanel>
@@ -1050,32 +1050,32 @@ export default function FypThesisHub({
                         />
                         <MockupActionCard
                             href={IN_PROGRESS_HREF}
-                            emoji="🔬"
+                        emoji="🔬"
                             ghost="🔬"
-                            title="FYP in Progress"
-                            subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
+                        title="FYP in Progress"
+                        subtitle="Records you're still writing — completion bar, and Email / WhatsApp lines to your team or supervisor."
                             badge={`${drafts.length} IN PROGRESS`}
                             background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
                             href={UNDER_REVIEW_HREF}
-                            emoji="📤"
+                        emoji="📤"
                             ghost="📤"
-                            title="FYP Under Review"
+                        title="FYP Under Review"
                             subtitle="Submitted flashcards with your supervisor. Your CIEL PK Detailed Review and score are released to you on approval."
                             badge={`${underReviewBadge} UNDER REVIEW`}
                             background={MOCKUP_GRADIENTS.blue}
                         />
                         <MockupActionCard
                             href={WALL_HREF}
-                            emoji="🏅"
+                        emoji="🏅"
                             ghost="🏅"
-                            title="My Final Year Project Impact"
+                        title="My Final Year Project Impact"
                             subtitle="Your approved Final Year Projects — each with its flashcard, its CIEL PK Detailed Review (score allotted by your supervisor, section-by-section strengths, limitations and how to improve) and every ranking badge: faculty (locked), university (locked) and the CIEL PK live rank that moves like a stock ▲▼."
                             badge={`${approved.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
-                        />
-                    </div>
+                    />
+                </div>
                     <p className="mt-4 text-center text-[11px] text-[#7a919a]">
                         Need a walkthrough?{" "}
                         <Link href={GUIDE_HREF} className="font-extrabold text-[#0e7d74] hover:underline">

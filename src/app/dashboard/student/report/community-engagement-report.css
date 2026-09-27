@@ -3907,6 +3907,7 @@
     body.cer-print-flash #cer-flash-print-root .c22-actions,
     body.cer-print-flash #cer-flash-print-root .c22-file-actions,
     body.cer-print-flash #cer-flash-print-root .c22-missing,
+    body.cer-print-flash #cer-flash-print-root .c22-next,
     body.cer-print-flash #cer-flash-print-root .c22-vault,
     body.cer-print-flash #cer-flash-print-root .c22-btn { display: none !important; }
 }
@@ -4411,6 +4412,34 @@
 :is(.cer, .cer-scope) .c22-btn.gold { background: #b57b16; }
 :is(.cer, .cer-scope) .c22-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 :is(.cer, .cer-scope) .c22-missing { padding: 0 8px 12px; font-size: 11px; color: #7a919a; }
+:is(.cer, .cer-scope) a.c22-btn {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+:is(.cer, .cer-scope) .c22-next {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #f3d9a0;
+    background: #fbf0d7;
+    color: #6b4e12;
+}
+:is(.cer, .cer-scope) .c22-next.ok {
+    border-color: #bfe6e2;
+    background: #e6f6f4;
+    color: #0f5e57;
+}
+:is(.cer, .cer-scope) .c22-next p {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: inherit;
+}
+:is(.cer, .cer-scope) .cer-c22-flash > .c22-next:last-of-type {
+    margin: 12px 0 0;
+}
 :is(.cer, .cer-scope) .c22-vault {
     display: none;
     position: fixed;

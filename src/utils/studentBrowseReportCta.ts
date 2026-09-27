@@ -57,11 +57,11 @@ export function resolveStudentBrowseReportCta(projectId: string, reportStatus: s
     if (st === "payment_under_review") {
         return { label: "Payment pending", href: paymentHref };
     }
-    if (st === "pending_payment" || st === "payment_pending" || st === "submitted") {
+    if (st === "pending_payment" || st === "payment_pending") {
         return { label: "Payment due", href: paymentHref };
     }
-    if (st === "partner_verified") {
-        return { label: "Submitted", href: reportHref };
+    if (st === "submitted" || st === "under_review" || st === "partner_verified") {
+        return { label: "View submitted report", href: reportHref };
     }
     if (st === "rejected" || st === "revision") {
         return { label: "Revise report", href: reportHref };

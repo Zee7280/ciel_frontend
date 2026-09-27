@@ -11,6 +11,11 @@ import {
     printExhibitionFlashcard,
     shareExhibitionFlashcard,
 } from "../utils/flashcardExport";
+import {
+    communityReportReviewerName,
+    communityReportSendCta,
+    reportRequiresReportingFee,
+} from "@/utils/reviewQueue";
 
 type Agg = {
     title: string;
@@ -131,15 +136,88 @@ function outputLines(acts: Agg["acts"]): string[] {
     return rows;
 }
 
+const IMAGE_EXTS = new Set(["PNG", "JPG", "JPEG", "WEBP", "GIF", "AVIF", "BMP", "SVG"]);
+
+function fileExtFrom(text: string): string {
+    const clean = String(text || "")
+        .split("?")[0]
+        .split("#")[0];
+    let decoded = clean;
+    try {
+        decoded = decodeURIComponent(clean);
+    } catch {
+        decoded = clean;
+    }
+    const match = decoded.match(/\.([a-z0-9]{2,5})$/i);
+    return match?.[1] ? match[1].toUpperCase() : "";
+}
+
+function nameFromUrl(url: string): string {
+    const path = url.split("?")[0].split("#")[0];
+    try {
+        return decodeURIComponent(path).split("/").filter(Boolean).pop() || "File";
+    } catch {
+        return path.split("/").filter(Boolean).pop() || "File";
+    }
+}
+
+function mimeToExt(mime: string): string {
+    const m = mime.toLowerCase();
+    if (m.startsWith("image/")) {
+        const sub = m.slice(6).split("+")[0].replace("jpeg", "jpg");
+        return sub.toUpperCase().slice(0, 4) || "IMG";
+    }
+    if (m.includes("pdf")) return "PDF";
+    if (m.includes("wordprocessingml") || m.includes("msword")) return "DOC";
+    if (m.includes("spreadsheet") || m.includes("excel")) return "XLS";
+    if (m.includes("presentation") || m.includes("powerpoint")) return "PPT";
+    return "";
+}
+
+function extOf(url?: string, name?: string, mime?: string): string {
+    return fileExtFrom(name || "") || fileExtFrom(url || "") || mimeToExt(mime || "") || "FILE";
+}
+
 function isImageItem(item: EvItem) {
-    return Boolean(item.url && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(item.url));
+    if (item.url?.startsWith("data:image/")) return true;
+    const ext = String(item.ext || "").toUpperCase();
+    if (IMAGE_EXTS.has(ext)) return true;
+    return Boolean(item.url && /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|#|$)/i.test(item.url));
 }
 
 function fileKind(item: EvItem) {
     if (isImageItem(item)) return "IMG";
-    if (/pdf/i.test(item.ext) || /\.pdf(\?|$)/i.test(item.url || "") || /\.pdf(\?|$)/i.test(item.cap)) return "PDF";
-    if (/doc/i.test(item.ext) || /\.docx?(\?|$)/i.test(item.cap)) return "DOC";
-    return item.ext || "FILE";
+    const ext = String(item.ext || "").toUpperCase();
+    if (ext === "PDF" || /\.pdf(\?|#|$)/i.test(item.url || "") || /\.pdf(\?|#|$)/i.test(item.cap)) return "PDF";
+    if (["DOC", "DOCX"].includes(ext) || /\.docx?(\?|#|$)/i.test(item.cap)) return "DOC";
+    if (ext && ext !== "FILE" && ext !== "IMG") return ext;
+    return "FILE";
+}
+
+function pickEvidenceRef(value: unknown): { url?: string; name: string; mime?: string } | null {
+    if (value == null || value === false) return null;
+    if (value === true) return { name: "" };
+    if (typeof value === "string") {
+        const text = value.trim();
+        if (!text) return null;
+        if (/^https?:\/\//i.test(text) || text.startsWith("data:") || text.startsWith("blob:")) {
+            return { url: text, name: nameFromUrl(text) };
+        }
+        return { name: text.split("/").pop() || text };
+    }
+    if (typeof value !== "object") return null;
+    if (typeof File !== "undefined" && value instanceof File) {
+        return { name: value.name, mime: value.type };
+    }
+    const rec = value as Record<string, unknown>;
+    const urlFields = [rec.url, rec.evidence_url, rec.file_url, rec.location, rec.path, rec.href, rec.src];
+    const url = urlFields.find((item): item is string => typeof item === "string" && Boolean(item.trim()))?.trim();
+    const nameFields = [rec.name, rec.fileName, rec.filename, rec.originalName, rec.label];
+    const name = nameFields.find((item): item is string => typeof item === "string" && Boolean(item.trim()))?.trim();
+    const mimeRaw = rec.type ?? rec.mimeType ?? rec.mimetype;
+    const mime = typeof mimeRaw === "string" ? mimeRaw : undefined;
+    if (!url && !name) return null;
+    return { url, name: name || (url ? nameFromUrl(url) : ""), mime };
 }
 
 function collectEvidence(data: ReportData, logs: Agg["logs"]): EvItem[] {
@@ -149,13 +227,19 @@ function collectEvidence(data: ReportData, logs: Agg["logs"]): EvItem[] {
         const key = `${url || ""}|${cap}|${section}`;
         if (seen.has(key)) return;
         seen.add(key);
-        items.push({ url: url || undefined, cap, section, ext });
+        items.push({ url: url || undefined, cap, section, ext: ext || "FILE" });
+    };
+    const pushRef = (value: unknown, fallbackCap: string, section: string) => {
+        const ref = pickEvidenceRef(value);
+        if (!ref) return;
+        const cap = ref.name || fallbackCap;
+        push(ref.url, cap, section, extOf(ref.url, cap, ref.mime));
     };
 
     (Array.isArray(data.evidence_urls) ? data.evidence_urls : []).forEach((url, i) => {
         if (typeof url === "string" && url.trim()) {
             const clean = url.trim();
-            push(clean, `Evidence ${i + 1}`, "Report", (clean.split(".").pop() || "FILE").slice(0, 4).toUpperCase());
+            push(clean, `Evidence ${i + 1}`, "Report", extOf(clean, nameFromUrl(clean)));
         }
     });
 
@@ -172,38 +256,25 @@ function collectEvidence(data: ReportData, logs: Agg["logs"]): EvItem[] {
                       ? String((item as { url?: unknown }).url || "").trim()
                       : "";
             if (!url) return;
-            push(url, `${key} media ${i + 1}`, "Gallery", (url.split(".").pop() || "FILE").slice(0, 4).toUpperCase());
+            push(url, `${key} media ${i + 1}`, "Gallery", extOf(url, nameFromUrl(url)));
         });
     });
 
     const files = Array.isArray(data.section8?.evidence_files) ? data.section8.evidence_files : [];
-    files.forEach((file, i) => {
-        const raw: unknown = file;
-        if (typeof raw === "string") {
-            push(/^https?:\/\//i.test(raw) ? raw : undefined, raw.split("/").pop() || `Evidence ${i + 1}`, "Evidence");
-            return;
-        }
-        if (raw && typeof raw === "object") {
-            const rec = raw as { url?: string; path?: string; name?: string; fileName?: string; filename?: string; type?: string };
-            const url = rec.url || rec.path;
-            const cap = rec.name || rec.fileName || rec.filename || `Evidence ${i + 1}`;
-            const ext = (rec.type || cap.split(".").pop() || "FILE").toString().replace(/^image\//, "").slice(0, 4).toUpperCase();
-            push(typeof url === "string" ? url : undefined, cap, "Evidence", ext);
-        }
-    });
+    files.forEach((file, i) => pushRef(file, `Evidence ${i + 1}`, "Evidence"));
 
     logs.forEach((log, i) => {
+        const fallback = `Session file ${i + 1}`;
         if (typeof log.evidence_url === "string" && log.evidence_url.trim()) {
-            push(log.evidence_url.trim(), `Session photo ${i + 1}`, "Session", "IMG");
+            pushRef(log.evidence_url, fallback, "Session");
         }
         (Array.isArray(log.evidence_urls) ? log.evidence_urls : []).forEach((url, j) => {
-            if (typeof url === "string" && url.trim()) push(url.trim(), `Session photo ${i + 1}.${j + 1}`, "Session", "IMG");
+            pushRef(url, `${fallback}.${j + 1}`, "Session");
         });
-        if (log.evidence_file && typeof log.evidence_file === "object") {
-            const rec = log.evidence_file as { url?: string; name?: string };
-            push(typeof rec.url === "string" ? rec.url : undefined, rec.name || `Session photo ${i + 1}`, "Session", "IMG");
+        if (log.evidence_file === true) {
+            push(undefined, fallback, "Session", "FILE");
         } else if (log.evidence_file) {
-            push(undefined, `Session photo ${i + 1}`, "Session", "IMG");
+            pushRef(log.evidence_file, fallback, "Session");
         }
     });
 
@@ -238,6 +309,68 @@ function SecHead({ n, kicker, title, source }: { n: string; kicker: string; titl
     );
 }
 
+function studentNextStepCopy({
+    status,
+    canSend,
+    missingLabels,
+    reviewer,
+    sendCta,
+    requiresFee,
+}: {
+    status: "draft" | "fee" | "pending" | "live";
+    canSend?: boolean;
+    missingLabels: string[];
+    reviewer: "Faculty" | "CIEL PK";
+    sendCta: string;
+    requiresFee: boolean;
+}): { text: string; tone: "ok" | "wait" } {
+    if (status === "live") {
+        return { text: `${reviewer}-verified. This flash card is locked.`, tone: "ok" };
+    }
+    if (status === "fee") {
+        return {
+            text: `This report is submitted. Pay the reporting fee next so ${reviewer} can review it.`,
+            tone: "wait",
+        };
+    }
+    if (status === "pending") {
+        return {
+            text: `Submitted. Waiting on ${reviewer} review.`,
+            tone: "wait",
+        };
+    }
+    if (canSend) {
+        return {
+            text: requiresFee
+                ? `All required fields are complete. Send this report — next you pay the reporting fee, then ${reviewer} reviews it.`
+                : `All required fields are complete. Send this report — ${reviewer} reviews it next.`,
+            tone: "ok",
+        };
+    }
+    if (missingLabels.length) {
+        if (missingLabels.length === 1 && missingLabels[0] === "final declaration") {
+            return {
+                text: `Tick the final declaration below this card, then ${sendCta} unlocks.`,
+                tone: "wait",
+            };
+        }
+        if (missingLabels.length === 1 && missingLabels[0] === "minimum hours (every teammate)") {
+            return {
+                text: "Every teammate must meet the hour minimum in Section 1 before this report can be sent.",
+                tone: "wait",
+            };
+        }
+        return {
+            text: `Complete ${missingLabels.join(", ")} before the report can be sent.`,
+            tone: "wait",
+        };
+    }
+    return {
+        text: `Hours, the final declaration, or team-lead permission still block send. Finish those below, then ${sendCta} unlocks.`,
+        tone: "wait",
+    };
+}
+
 export function V17ImpactFlashcard({
     data,
     agg,
@@ -250,6 +383,7 @@ export function V17ImpactFlashcard({
     status,
     audience = "student",
     onOpenDetailed,
+    paymentHref,
 }: {
     data: ReportData;
     agg: Agg;
@@ -259,9 +393,10 @@ export function V17ImpactFlashcard({
     canSend?: boolean;
     onSend?: () => void;
     sending?: boolean;
-    status: "draft" | "pending" | "live";
+    status: "draft" | "fee" | "pending" | "live";
     audience?: "student" | "faculty";
     onOpenDetailed?: () => void;
+    paymentHref?: string;
 }) {
     const [preview, setPreview] = useState<EvItem | null>(null);
     const cii = resolveReportCii(data);
@@ -306,10 +441,29 @@ export function V17ImpactFlashcard({
     const outs = outputLines(acts);
     const evidenceCount = Math.max(agg.evidence, evAll.length);
     const coverage = Math.round((Math.min(sectionsComplete, sectionTotal) / Math.max(sectionTotal, 1)) * 100);
+    const reviewer = communityReportReviewerName(data);
+    const sendCta = communityReportSendCta(data);
+    const requiresFee = reportRequiresReportingFee(data);
     const statusLabel =
-        status === "live" ? "FACULTY VERIFIED" : status === "pending" ? "AWAITING FACULTY REVIEW" : "DRAFT · STUDENT REVIEW";
+        status === "live"
+            ? `${reviewer.toUpperCase()} VERIFIED`
+            : status === "fee"
+              ? "SUBMITTED · REPORTING FEE DUE"
+              : status === "pending"
+                ? audience === "faculty"
+                    ? "AWAITING FACULTY REVIEW"
+                    : `SUBMITTED · AWAITING ${reviewer.toUpperCase()}`
+                : "DRAFT · STUDENT REVIEW";
     const evidenceState =
-        status === "live" ? "Included in faculty-verified report" : status === "pending" ? "Submitted for faculty review" : "Attached · verification pending";
+        status === "live"
+            ? `Included in ${reviewer.toLowerCase()}-verified report`
+            : status === "fee"
+              ? "Submitted · reporting fee pending"
+              : status === "pending"
+                ? audience === "faculty"
+                    ? "Submitted for faculty review"
+                    : `Submitted · waiting on ${reviewer} review`
+                : "Attached · verification pending";
 
     const team = [
         data.section1?.team_lead
@@ -420,9 +574,15 @@ export function V17ImpactFlashcard({
     const measuredBoth = agg.measured.filter((o) => String(o.baseline ?? "").trim() && String(o.endline ?? "").trim());
     const verifyUrl = data.impact_verify_url || data.impactVerifyUrl;
     const isFaculty = audience === "faculty";
+    const nextStep = studentNextStepCopy({ status, canSend, missingLabels, reviewer, sendCta, requiresFee });
 
     return (
         <div className="cer-c22-flash" id="cer-v17-flash">
+            {!isFaculty ? (
+                <div className={`c22-next ${nextStep.tone}`}>
+                    <p>{nextStep.text}</p>
+                </div>
+            ) : null}
             <article className="c22-card">
                 <header className="c22-hero">
                     <div className="c22-hero-grid">
@@ -940,20 +1100,26 @@ export function V17ImpactFlashcard({
                                 <div className="c22-evgrid">
                                     {evAll.map((item, i) => {
                                         const kind = fileKind(item);
+                                        const image = isImageItem(item);
+                                        const openItem = () => {
+                                            if (!item.url) return;
+                                            if (image || kind === "PDF") setPreview(item);
+                                            else window.open(item.url, "_blank", "noopener,noreferrer");
+                                        };
                                         return (
                                             <article key={`${item.cap}-${i}`} className="c22-file">
                                                 <div
                                                     className="pv"
                                                     role="button"
                                                     tabIndex={0}
-                                                    title="Magnify / preview evidence"
-                                                    onClick={() => (item.url ? setPreview(item) : undefined)}
+                                                    title={image ? "Magnify / preview evidence" : item.url ? "Open file" : "File attached on record"}
+                                                    onClick={openItem}
                                                     onKeyDown={(e) => {
-                                                        if (e.key === "Enter" && item.url) setPreview(item);
+                                                        if (e.key === "Enter") openItem();
                                                     }}
                                                 >
-                                                    {isImageItem(item) && item.url ? <img src={item.url} alt={item.cap} /> : <div className="doc">{kind}</div>}
-                                                    <span className="mag">VIEW / MAGNIFY</span>
+                                                    {image && item.url ? <img src={item.url} alt={item.cap} /> : <div className="doc">{kind}</div>}
+                                                    <span className="mag">{image ? "VIEW / MAGNIFY" : item.url ? "OPEN FILE" : "ON RECORD"}</span>
                                                 </div>
                                                 <div className="info">
                                                     <b>{item.cap}</b>
@@ -965,9 +1131,11 @@ export function V17ImpactFlashcard({
                                                     <div className="c22-file-actions">
                                                         {item.url ? (
                                                             <>
-                                                                <button type="button" onClick={() => setPreview(item)}>
-                                                                    Preview / magnify
-                                                                </button>
+                                                                {image || kind === "PDF" ? (
+                                                                    <button type="button" onClick={() => setPreview(item)}>
+                                                                        {image ? "Preview / magnify" : "Preview file"}
+                                                                    </button>
+                                                                ) : null}
                                                                 <a href={item.url} target="_blank" rel="noopener noreferrer">
                                                                     Open original
                                                                 </a>
@@ -993,7 +1161,13 @@ export function V17ImpactFlashcard({
                         <div className="c22-review">
                             <b>Draft / review note:</b>{" "}
                             {miss ? `${miss} required source-field gap${miss === 1 ? "" : "s"} remain. ` : "No required source-field gaps detected. "}
-                            {status === "pending" ? "The report is awaiting faculty review." : "This record has not yet been faculty verified."}
+                            {status === "fee"
+                                ? `The report is submitted. ${reviewer} review starts after the reporting fee is approved.`
+                                : status === "pending"
+                                  ? audience === "faculty"
+                                      ? "The report is awaiting faculty review."
+                                      : `The report is submitted and waiting on ${reviewer} review.`
+                                  : "This record has not yet been verified."}
                         </div>
                     ) : null}
 
@@ -1050,8 +1224,13 @@ export function V17ImpactFlashcard({
                     <div className="c22-actions">
                         {!isFaculty && status === "draft" && onSend ? (
                             <button type="button" className="c22-btn gold" disabled={!canSend || sending} onClick={onSend}>
-                                {sending ? "Working…" : "Send to Faculty"}
+                                {sending ? "Working…" : sendCta}
                             </button>
+                        ) : null}
+                        {!isFaculty && status === "fee" && paymentHref ? (
+                            <a href={paymentHref} className="c22-btn gold">
+                                Pay reporting fee
+                            </a>
                         ) : null}
                         <button type="button" className="c22-btn" onClick={() => void printExhibitionFlashcard(agg.title)}>
                             Print / Save Flash Card
@@ -1080,8 +1259,10 @@ export function V17ImpactFlashcard({
                 </footer>
             </article>
 
-            {!isFaculty && status === "draft" && !canSend && missingLabels.length ? (
-                <p className="c22-missing">Complete {missingLabels.join(", ")} before the report can be sent.</p>
+            {!isFaculty ? (
+                <div className={`c22-next ${nextStep.tone}`}>
+                    <p>{nextStep.text}</p>
+                </div>
             ) : null}
 
             {preview ? (
@@ -1095,8 +1276,15 @@ export function V17ImpactFlashcard({
                         </div>
                         {isImageItem(preview) && preview.url ? (
                             <img src={preview.url} alt={preview.cap} />
-                        ) : preview.url ? (
+                        ) : fileKind(preview) === "PDF" && preview.url ? (
                             <iframe title={preview.cap} src={preview.url} />
+                        ) : preview.url ? (
+                            <p>
+                                This attachment is a file, not an image.{" "}
+                                <a href={preview.url} target="_blank" rel="noopener noreferrer">
+                                    Open original file
+                                </a>
+                            </p>
                         ) : (
                             <p>No preview URL on this attachment.</p>
                         )}

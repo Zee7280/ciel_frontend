@@ -705,7 +705,7 @@ export default function StartupBusinessWorkspace() {
                     <div className="min-w-0 flex-1">
                         <h3 className="m-0 text-[22px] font-bold text-[#14212b]">{createTitle}</h3>
                         <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">{createSub}</p>
-                    </div>
+                </div>
                     <span className="inline-flex items-center rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
                         {pct}% · {formCategory(pct)}
                     </span>
@@ -1362,7 +1362,7 @@ export default function StartupBusinessWorkspace() {
                                 <VsField label="How sustainable is the current pace for the next 6 months? (1 = we will burn out, 5 = very sustainable)">
                                     <div className="flex gap-1.5">{["1","2","3","4","5"].map((n) => <button key={n} type="button" onClick={() => patchGroup("evidenceInfo", { paceScore: n })} className={clsx("flex-1 rounded-full border px-2 py-2 text-xs font-bold", ev.paceScore === n ? "border-[#a63d65] bg-[#f8e8ef] text-[#087657]" : "border-[#e5e7eb] bg-white text-[#5e6473]")}>{n}</button>)}</div>
                                 </VsField>
-                            </div>
+                                    </div>
                             <VsField label="Any of these warning signs present today?" optional><VsChips options={BURNOUT_SIGNS} selected={ev.burnoutSigns || []} warn={BURNOUT_SIGNS.filter((s) => s !== "None of these" && s !== "Other")} onToggle={(v) => patchGroup("evidenceInfo", { burnoutSigns: toggleChip(ev.burnoutSigns, v) })} otherKey="Other" /></VsField>
                             <VsField label="What will you do to keep the team and business healthy?" optional hint="Simple rules beat good intentions." example={FIELD_EXAMPLES.burnoutPlan} onUseExample={() => patchGroup("evidenceInfo", { burnoutPlan: FIELD_EXAMPLES.burnoutPlan })} count={ev.burnoutPlan || ""} max={400}><textarea className={clsx(vsField, "min-h-[72px]")} maxLength={400} value={ev.burnoutPlan || ""} onChange={(e) => patchGroup("evidenceInfo", { burnoutPlan: e.target.value })} placeholder="e.g. written roles, weekly check-in, exam-period pause" /></VsField>
                             <h3 className="sec mb-2.5 mt-4 text-sm font-black text-[#32133a]">🤝 Support & next step</h3>

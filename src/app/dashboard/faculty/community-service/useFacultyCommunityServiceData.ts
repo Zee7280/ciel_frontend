@@ -10,7 +10,6 @@ import {
     normalizeOpportunityApplicationsListResponse,
     type OpportunityApplicationListRow,
 } from "@/utils/opportunityApplicationsAdmin";
-import { extractPendingAttendanceRows } from "@/utils/engagementPendingAttendanceResponse";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
@@ -73,16 +72,6 @@ function pickStr(item: Record<string, unknown>, ...keys: string[]): string | und
     return undefined;
 }
 
-function attendanceProjectId(row: Record<string, unknown>): string {
-    const nested = row.project && typeof row.project === "object" ? (row.project as Record<string, unknown>) : null;
-    for (const value of [row.projectId, row.project_id, row.opportunityId, row.opportunity_id, nested?.id, nested?._id]) {
-        if (value == null) continue;
-        const text = String(value).trim();
-        if (text) return text;
-    }
-    return "";
-}
-
 export function isFacultyCsReportRevision(row: FacultyCsReportRow): boolean {
     const key = normalizeReviewStatus(row.faculty_status);
     return key === "revision_requested" || key === "revisions_requested" || key === "changes_requested" || key === "returned";
@@ -132,11 +121,8 @@ export function useFacultyCommunityServiceData() {
                 r?.ok ? r.json() : null,
             ),
             fetchJoinApplicationsHistoryRows("/api/v1/faculty/applications"),
-            authenticatedFetch("/api/v1/engagement/attendance/pending", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
         ])
-            .then(([list, award, mine, approvals, history, apps, appHistory, attendance]) => {
+            .then(([list, award, mine, approvals, history, apps, appHistory]) => {
                 if (cancelled) return;
                 const mappedMine = extractFacultyMineOpportunityRows(mine)
                     .map((raw) => {
@@ -156,11 +142,7 @@ export function useFacultyCommunityServiceData() {
                 setHistoryOppRows(normalizeFacultyApprovalsResponse(history));
                 setPendingAppRows(normalizeOpportunityApplicationsListResponse(apps));
                 setHistoryAppRows(appHistory.rows);
-                setHoursProjectCount(
-                    new Set(extractPendingAttendanceRows(attendance).map(attendanceProjectId).filter(Boolean)).size,
-                );
-                setRows(
-                    (Array.isArray(list?.data) ? list.data : [])
+                const mappedRows: FacultyCsReportRow[] = (Array.isArray(list?.data) ? list.data : [])
                         .filter((item: unknown) => item && typeof item === "object")
                         .map((item: Record<string, unknown>) => {
                             const metrics =
@@ -235,8 +217,19 @@ export function useFacultyCommunityServiceData() {
                                 updated_at: pickStr(item, "updated_at", "updatedAt"),
                             };
                         })
-                        .filter((r: FacultyCsReportRow) => r.id),
+                        .filter((r: FacultyCsReportRow) => r.id);
+                setHoursProjectCount(
+                    new Set(
+                        mappedRows
+                            .filter(
+                                (r) =>
+                                    Boolean(r.project_id) &&
+                                    (r.hours || 0) + 1e-9 < (r.required_hours || 16),
+                            )
+                            .map((r) => r.project_id as string),
+                    ).size,
                 );
+                setRows(mappedRows);
                 setCards(Array.isArray(award?.data) ? award.data : []);
                 setLoading(false);
             })

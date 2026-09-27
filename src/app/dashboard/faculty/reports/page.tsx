@@ -17,6 +17,8 @@ interface FacultyReportRow {
     organization_name?: string;
     status: string;
     faculty_status?: string;
+    private_candidate?: boolean | null;
+    review_route?: string | null;
     project_id?: string;
     hours?: number;
     submission_date?: string;
@@ -176,8 +178,8 @@ export default function FacultyStudentReportsPage() {
                         Student impact reports
                     </h1>
                     <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
-                        Submitted reports from students you supervise. Review the report here; attendance for the
-                        same project opens on Attendance review. CIEL Admin signs off after your decision.
+                        Submitted reports from students you supervise. Review the report and lock the flash-card
+                        score here — that confirms attendance hours. CIEL Admin signs off after your decision.
                     </p>
                 </div>
 

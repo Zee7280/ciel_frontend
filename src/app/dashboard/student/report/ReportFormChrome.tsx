@@ -10,6 +10,7 @@ import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journe
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
+import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta } from "@/utils/reviewQueue";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -28,7 +29,7 @@ const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: st
     1: {
         kicker: "START HERE · APPROVAL COMES ONCE, AT THE END",
         title: "Your crew, your hours, your proof",
-        note: "No separate attendance sign-off any more — you log, you declare, and the whole report is verified once at the end by faculty, from your flash card.",
+        note: "No separate attendance sign-off any more — you log, you declare, and the whole report is verified once at the end from your flash card.",
     },
     2: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
@@ -1663,6 +1664,9 @@ export function ReportLifecycleBanner({
     const reportRs = String(data.report_status || "").toLowerCase();
     const paymentSt = String(data.payment_status || "").toLowerCase();
     const adminSt = String(data.admin_status || data.admin_approval_status || "").toLowerCase();
+    const requiresFee = reportRequiresReportingFee(data);
+    const reviewer = communityReportReviewerName(data);
+    const sendCta = communityReportSendCta(data);
     const submitted = [
         "submitted",
         "under_review",
@@ -1676,16 +1680,25 @@ export function ReportLifecycleBanner({
         "finalized",
     ].includes(reportSt) || ["pending_payment", "payment_under_review", "paid"].includes(reportRs);
     const feeDone =
+        !requiresFee ||
         reportSt === "paid" ||
-        reportSt === "payment_under_review" ||
         reportSt === "verified" ||
         reportSt === "approved" ||
         reportRs === "paid" ||
-        reportRs === "payment_under_review" ||
         paymentSt === "paid" ||
         paymentSt === "approved" ||
-        data.payment_verified === true;
-    const feeWaiting = submitted && !feeDone;
+        (data.payment_verified === true &&
+            paymentSt !== "pending" &&
+            paymentSt !== "awaiting_payment" &&
+            reportSt !== "payment_pending" &&
+            reportSt !== "pending_payment" &&
+            reportSt !== "payment_under_review");
+    const proofWaiting =
+        requiresFee &&
+        submitted &&
+        !feeDone &&
+        (reportSt === "payment_under_review" || reportRs === "payment_under_review");
+    const feeWaiting = requiresFee && submitted && !feeDone && !proofWaiting;
     const approved =
         reportSt === "verified" ||
         reportSt === "approved" ||
@@ -1695,28 +1708,36 @@ export function ReportLifecycleBanner({
     const steps: Array<{ label: string; state: "done" | "current" | "pending" }> = [
         { label: `${sectionsComplete}/${REPORT_UI_SECTION_TOTAL} sections`, state: allDone ? "done" : "current" },
         { label: "Submitted", state: flagsSubmitted(submitted, approved) },
-        { label: "Reporting fee", state: flagsFee(feeDone, approved, feeWaiting, submitted) },
-        { label: "Admin approval", state: approved ? "done" : feeDone ? "current" : "pending" },
+        ...(requiresFee
+            ? [{ label: "Reporting fee", state: flagsFee(feeDone, approved, feeWaiting, submitted) }]
+            : []),
+        { label: "Review", state: approved ? "done" : submitted ? "current" : "pending" },
         { label: "Scores & certificate", state: approved ? "done" : "pending" },
     ];
 
-    const tone = approved ? "ok" : feeWaiting ? "fee" : submitted ? "wait" : "draft";
+    const tone = approved ? "ok" : feeWaiting || proofWaiting ? "fee" : submitted ? "wait" : "draft";
     const heading = approved
         ? "Approved"
-        : feeWaiting
-          ? "Sent — waiting on your reporting fee"
-          : submitted
-            ? "Sent — waiting on review"
-            : allDone
-              ? "Ready to send"
-              : "Draft — finish the remaining sections";
+        : proofWaiting
+          ? "Sent — payment proof under review"
+          : feeWaiting
+            ? "Sent — waiting on your reporting fee"
+            : submitted
+              ? "Sent — waiting on review"
+              : allDone
+                ? "Ready to send"
+                : "Draft — finish the remaining sections";
     const copy = approved
         ? "Scores, certificate and the public card are unlocked."
-        : feeWaiting
-          ? "Pay the reporting fee so admin can verify hours, CII and your certificate."
-          : submitted
-            ? "CIEL admin reviews after the fee is on file."
-            : "Complete all 9 sections, then send from the summary card.";
+        : proofWaiting
+          ? "CIEL PK is checking the reporting-fee proof. Review starts after the fee is approved."
+          : feeWaiting
+            ? "Pay the reporting fee so CIEL PK can review your report."
+            : submitted
+              ? `${reviewer} reviews the report next. Hours are confirmed when the flash-card score is locked.`
+              : allDone
+                ? `Use ${sendCta} on the flash card, or Submit report at the bottom of this page.`
+                : "Finish the remaining sections, then send from this flash card.";
 
     return (
         <div className={`cer-life cer-life-${tone}`}>
@@ -1728,6 +1749,10 @@ export function ReportLifecycleBanner({
                 {feeWaiting && paymentHref ? (
                     <a href={paymentHref} className="cer-pay">
                         Pay the fee
+                    </a>
+                ) : proofWaiting && paymentHref ? (
+                    <a href={paymentHref} className="cer-pay">
+                        View payment
                     </a>
                 ) : null}
             </div>
@@ -1759,10 +1784,19 @@ function flagsFee(
     return "pending";
 }
 
-function flashStatus(data: ReportData): "draft" | "pending" | "live" {
-    const status = `${data.status || ""} ${data.admin_status || ""} ${data.report_status || ""}`.toLowerCase();
-    if (/(verified|approved|live)/.test(status)) return "live";
-    if (/(submitted|pending|payment)/.test(status)) return "pending";
+function flashStatus(data: ReportData): "draft" | "fee" | "pending" | "live" {
+    const st = String(data.status || "").toLowerCase();
+    const rs = String(data.report_status || "").toLowerCase();
+    const admin = String(data.admin_status || "").toLowerCase();
+    if (["verified", "approved"].includes(st) || ["verified", "approved"].includes(admin)) return "live";
+    // Only the report lifecycle counts as fee-hold. A stray payment_status=pending on a
+    // draft must not hide Send to Faculty / the next-step message.
+    const reportFeeHold =
+        reportRequiresReportingFee(data) &&
+        (["pending_payment", "payment_pending", "payment_under_review"].includes(st) ||
+            ["pending_payment", "payment_under_review"].includes(rs));
+    if (reportFeeHold && data.payment_verified !== true) return "fee";
+    if (["paid", "partner_verified", "under_review", "finalized"].includes(st) || st.includes("submitted")) return "pending";
     return "draft";
 }
 
@@ -1774,6 +1808,7 @@ export function ReportFlashCard({
     canSend,
     onSend,
     sending,
+    paymentHref,
 }: {
     data: ReportData;
     projectData?: unknown;
@@ -1782,6 +1817,7 @@ export function ReportFlashCard({
     canSend?: boolean;
     onSend?: () => void;
     sending?: boolean;
+    paymentHref?: string;
 }) {
     return (
         <V17ImpactFlashcard
@@ -1793,6 +1829,7 @@ export function ReportFlashCard({
             canSend={canSend}
             onSend={onSend}
             sending={sending}
+            paymentHref={paymentHref}
             status={flashStatus(data)}
         />
     );

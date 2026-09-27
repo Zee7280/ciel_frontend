@@ -1,11 +1,9 @@
 import React, { useMemo, useEffect } from "react";
-import { Lock } from "lucide-react";
 import { Label } from "./ui/label";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { countWords } from "../utils/validation";
-import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
 import { resolveReportCii } from "../utils/resolveReportCii";
 
 const NO_MECHANISM = "No continuation mechanism";
@@ -59,7 +57,7 @@ const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
 export default function Section10Sustainability() {
-    const { data, updateSection, getFieldError, isEligibleForSubmission, incompleteSectionsSummary } = useReportForm();
+    const { data, updateSection, getFieldError, incompleteSectionsSummary } = useReportForm();
     const { section10 } = data;
     const {
         continuation_status,
@@ -116,42 +114,6 @@ export default function Section10Sustainability() {
             updateSection("section10", { summary_text: autoNarrative });
         }
     }, [autoNarrative, section10.summary_text, updateSection]);
-
-    const loggedHours = sumNonRejectedLoggedHours(data.section1.attendance_logs || []);
-    const requiredHours = data.required_hours || 16;
-
-    if (!isEligibleForSubmission) {
-        return (
-            <div className="mx-auto max-w-6xl pb-10">
-                <div className="mx-auto max-w-md space-y-5 rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[var(--gold)]">
-                        <Lock className="h-8 w-8" />
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-slate-900">Section locked</h3>
-                        <p className="text-sm leading-relaxed text-slate-500">
-                            Sustainability analysis activates once the{" "}
-                            <span className="font-semibold text-[var(--teal)]">{requiredHours}-hour minimum</span>{" "}
-                            is logged. Complete your attendance logs in Section 1 to unlock this step. Faculty reviews the flash card after you submit.
-                        </p>
-                    </div>
-                    <div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div
-                                className="h-full bg-[var(--gold)]"
-                                style={{
-                                    width: `${Math.min((loggedHours / Math.max(requiredHours, 1)) * 100, 100)}%`,
-                                }}
-                            />
-                        </div>
-                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                            Current progress: {loggedHours} / {requiredHours} hours
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     const legacyMechanisms = (mechanisms || []).filter(
         (value) => !mechanismOptions.some((opt) => choiceOn([value], opt.id, opt.label, opt.aliases)),

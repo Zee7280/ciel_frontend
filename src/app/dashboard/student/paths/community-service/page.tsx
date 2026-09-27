@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Clock, FileText, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
+import { Clock, FileText, ListChecks, UploadCloud, Award, Pencil, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
@@ -914,19 +914,8 @@ function LogHoursTab({ projects }: { projects: ActiveProject[] }) {
                             )}
                             {status === "pending" && (
                                 <p className="mt-3 text-xs leading-relaxed text-ciel-text-soft">
-                                    Waiting on your reviewer — approved sessions are the only ones that count toward your
-                                    verified hours.
+                                    Hours are logged. Faculty (or CIEL PK) will confirm them when they lock your flash-card score.
                                 </p>
-                            )}
-                            {/* Requesting verification runs the oath + approver choice in the report's
-                                Section 1; posting the bare legacy request from here would skip both gates. */}
-                            {status === "logged" && (
-                                <Link
-                                    href={`/dashboard/student/report?projectId=${encodeURIComponent(log.projectId)}`}
-                                    className="ciel-transition mt-3 inline-flex items-center gap-1.5 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green hover:text-ciel-green-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
-                                >
-                                    <Send className="h-3 w-3" /> Request verification in your report
-                                </Link>
                             )}
                         </div>
                         );

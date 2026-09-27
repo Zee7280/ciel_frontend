@@ -445,7 +445,6 @@ export default function Sidebar() {
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus }]
                     : []),
-                { label: "Attendance review", href: "/dashboard/partner/attendance-review", icon: CalendarClock },
                 { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
                 ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart }] : []),
@@ -483,7 +482,6 @@ export default function Sidebar() {
                 // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
                 // { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
-                { label: "Attendance review", href: "/dashboard/faculty/attendance-review", icon: CalendarClock },
                 // { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             ]),
         [withCounts],

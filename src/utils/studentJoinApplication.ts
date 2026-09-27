@@ -132,15 +132,13 @@ export function canStudentShowStartReportCta(
         return opportunityStatusAllowsStudentReportFlow(raw);
     }
     const app = pickJoinApplicationStatus(raw);
-    if (!app) {
-        return opportunityStatusAllowsStudentReportFlow(raw);
-    }
+    if (!app) return false;
     if (isJoinApplicationRejectedStatus(app)) return false;
     if (isJoinApplicationPendingStatus(app)) return false;
     if (isJoinApplicationApprovedStatus(app)) {
         return opportunityStatusAllowsStudentReportFlow(raw);
     }
-    return opportunityStatusAllowsStudentReportFlow(raw);
+    return false;
 }
 
 /** Short badge line for pending join (faculty / partner / admin queue). */
@@ -167,6 +165,8 @@ export function canStudentAccessReportForProjectPayload(
         isOpportunityPubliclyLive(raw) ||
         allowedLegacy.includes(status);
     if (!eligible) return false;
+
+    if (opts?.isStudentOwner) return true;
 
     const app = pickJoinApplicationStatus(raw);
     if (!app) return true;

@@ -24,7 +24,7 @@ import { sumNonRejectedLoggedHours, type AttendanceLog } from "@/app/dashboard/s
 export const CONDITIONAL_REMARK_PREFIX = "[Conditional badge]";
 export const ADMIN_REVIEW_REMARK_PREFIX = "[Admin review requested]";
 
-export type FacultyDecisionKind = "ap" | "cn" | "ar" | "";
+export type FacultyDecisionKind = "ap" | "cn" | "ar" | "rv" | "";
 
 export type FacultyEvidenceItem = {
     url: string;
@@ -245,6 +245,7 @@ export function decisionFromFacultyRecord(status: unknown, remarks: unknown): Fa
     // when it's set, so that extra check had no independent purpose — it only ever fired on
     // stale data, keeping a resubmitted (now-pending) report reading as still rejected here
     // because the reset-to-pending on resubmit didn't used to clear the old remark text.
+    if (key === "revision_requested" || key === "revisions_requested") return "rv";
     if (key === "rejected") return "ar";
     if (key === "approved" && note.startsWith(CONDITIONAL_REMARK_PREFIX)) return "cn";
     if (key === "approved") return "ap";
@@ -260,6 +261,12 @@ export function buildFacultyActionBody(kind: Exclude<FacultyDecisionKind, "">, n
         return {
             status: "approved" as const,
             remarks: trimmed ? `${CONDITIONAL_REMARK_PREFIX} ${trimmed}` : CONDITIONAL_REMARK_PREFIX,
+        };
+    }
+    if (kind === "rv") {
+        return {
+            status: "revision_requested" as const,
+            remarks: trimmed,
         };
     }
     return {

@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 import AttendanceReviewDashboard from "@/components/engagement/AttendanceReviewDashboard";
-import { fetchPendingAttendanceCountForProject } from "@/utils/engagementPendingAttendanceResponse";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
 
 function pickOpportunityListId(o: Record<string, unknown>): string {
@@ -61,33 +60,8 @@ export default function FacultyAttendanceReviewPage() {
     const [projects, setProjects] = useState<{ id: string; title: string; subtitle?: string }[]>([]);
     const [projectId, setProjectId] = useState("");
     const requestedProjectId = useRef("");
-    const [pendingById, setPendingById] = useState<Record<string, number>>({});
-    const [countsLoading, setCountsLoading] = useState(false);
+    const [pendingById] = useState<Record<string, number>>({});
     const didInitProjectChoice = useRef(false);
-
-    const refreshAllPendingCounts = useCallback(async () => {
-        if (projects.length === 0) {
-            setPendingById({});
-            return;
-        }
-        setCountsLoading(true);
-        try {
-            const entries = await Promise.all(
-                projects.map(async (p) => {
-                    const n = await fetchPendingAttendanceCountForProject(p.id);
-                    return [p.id, n] as const;
-                }),
-            );
-            setPendingById(Object.fromEntries(entries));
-        } finally {
-            setCountsLoading(false);
-        }
-    }, [projects]);
-
-    useEffect(() => {
-        if (loading || projects.length === 0) return;
-        void refreshAllPendingCounts();
-    }, [loading, projects, refreshAllPendingCounts]);
 
     useEffect(() => {
         requestedProjectId.current =
@@ -115,17 +89,9 @@ export default function FacultyAttendanceReviewPage() {
         }
         if (projects.length === 0) return;
         if (projectId) return;
-        if (countsLoading) return;
-        if (Object.keys(pendingById).length === 0) return;
         didInitProjectChoice.current = true;
-        const first = projects.find((p) => (pendingById[p.id] ?? 0) > 0);
-        if (first) setProjectId(first.id);
-    }, [loading, countsLoading, projects, pendingById, projectId]);
-
-    const handlePanelPendingCount = useCallback((n: number) => {
-        if (!projectId) return;
-        setPendingById((prev) => ({ ...prev, [projectId]: n }));
-    }, [projectId]);
+        setProjectId(projects[0].id);
+    }, [loading, projects, projectId]);
 
     useEffect(() => {
         let cancelled = false;
@@ -173,10 +139,8 @@ export default function FacultyAttendanceReviewPage() {
             didInitProjectChoiceRef={didInitProjectChoice}
             pendingById={pendingById}
             loading={loading}
-            countsLoading={countsLoading}
-            onRefreshCounts={refreshAllPendingCounts}
-            onQueuePendingCountChanged={handlePanelPendingCount}
-            queueTitle="Pending attendance"
+            countsLoading={false}
+            queueTitle="Logged hours"
             queueDescription=""
             wideQueueLayout
         />

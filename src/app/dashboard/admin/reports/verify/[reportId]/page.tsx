@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import {
@@ -75,6 +75,7 @@ import {
 import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
+import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -182,6 +183,10 @@ interface ReportDetail {
     requires_partner_approval?: boolean;
     partner_required?: boolean;
     admin_status: string;
+    faculty_status?: string;
+    private_candidate?: boolean;
+    review_route?: string;
+    ciiV2Lock?: { locked?: boolean } | null;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
     section3: ReportData["section3"];
@@ -624,9 +629,11 @@ function SectionCollapseTrigger({
     );
 }
 
-export default function AdminReportDetailPage() {
+function AdminReportDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const ciiView = (searchParams.get("view") || "").trim().toLowerCase() === "cii-v2";
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
@@ -999,6 +1006,30 @@ export default function AdminReportDetailPage() {
         );
     }
 
+    if (ciiView) {
+        const cielPkRoute =
+            report.private_candidate === true || report.review_route === "ciel_pk";
+        if (!cielPkRoute) {
+            return (
+                <div className={clsx(adminDossier.shell, "flex items-center justify-center p-8")}>
+                    <div className="max-w-md text-center">
+                        <h2 className="mb-2 text-2xl font-bold text-slate-900">Faculty reviews this report</h2>
+                        <p className="mb-4 text-sm text-slate-600">
+                            CIEL PK CII analysis is only for the private-candidate route. Open the faculty console for university-supervised reports.
+                        </p>
+                        <Link
+                            href={`/dashboard/admin/reports/verify/${params.reportId}`}
+                            className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
+                        >
+                            Back to dossier
+                        </Link>
+                    </div>
+                </div>
+            );
+        }
+        return <CommunityCiiAnalyser publisher="ciel_pk" />;
+    }
+
     return (
         <div className={clsx(adminDossier.shell, "p-0 sm:p-6 lg:p-8")}>
             <div className="max-w-7xl mx-auto space-y-6">
@@ -1034,6 +1065,20 @@ export default function AdminReportDetailPage() {
                         </span>
                     </div>
                 </div>
+                {(report.private_candidate || report.review_route === "ciel_pk") ? (
+                    <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
+                        <p className="font-semibold">Private candidate route — CIEL PK reviews this report.</p>
+                        <p className="mt-1 text-violet-800">
+                            Run the AI analyzer, confirm the final score, then publish. Faculty does not review this listing.
+                        </p>
+                        <Link
+                            href={`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v2`}
+                            className="mt-2 inline-flex font-semibold text-[#0e7d74] underline"
+                        >
+                            Open CIEL PK AI analyzer
+                        </Link>
+                    </div>
+                ) : null}
 
                 {/* Quality Insight Banner */}
                 {qualityAlerts.length > 0 && (
@@ -2265,7 +2310,12 @@ export default function AdminReportDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("approve")}
-                                    disabled={isVerifying || report.admin_status === "approved"}
+                                    disabled={
+                                        isVerifying ||
+                                        report.admin_status === "approved" ||
+                                        ((report.private_candidate || report.review_route === "ciel_pk") &&
+                                            report.ciiV2Lock?.locked !== true)
+                                    }
                                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
                                 >
                                     <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
@@ -2304,7 +2354,11 @@ export default function AdminReportDetailPage() {
                             <button
                                 type="button"
                                 onClick={() => handleVerify("approve")}
-                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
+                                disabled={
+                                    (report.private_candidate || report.review_route === "ciel_pk") &&
+                                    report.ciiV2Lock?.locked !== true
+                                }
+                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                             >
                                 <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> Approve
                             </button>
@@ -2340,5 +2394,19 @@ export default function AdminReportDetailPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AdminReportVerifyPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex min-h-screen items-center justify-center bg-slate-50">
+                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                </div>
+            }
+        >
+            <AdminReportDetailPage />
+        </Suspense>
     );
 }

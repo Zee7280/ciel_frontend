@@ -11,7 +11,7 @@ export function extractPendingAttendanceRows(json: unknown): Record<string, unkn
         if (!Array.isArray(v)) return null;
         return v.filter((item): item is Record<string, unknown> => item != null && typeof item === "object");
     };
-    for (const key of ["data", "items", "rows", "records", "logs"] as const) {
+    for (const key of ["pending", "data", "items", "rows", "records", "logs"] as const) {
         const top = asRows(root[key]);
         if (top) return top;
     }
@@ -35,6 +35,12 @@ export async function fetchPendingAttendanceCountForProject(projectId: string): 
         );
         if (!res?.ok) return 0;
         const json = await res.json();
+        if (json && typeof json === "object") {
+            const root = json as { count?: unknown; pending?: unknown };
+            if (typeof root.count === "number" && Number.isFinite(root.count)) {
+                return Math.max(0, Math.floor(root.count));
+            }
+        }
         return extractPendingAttendanceRows(json).length;
     } catch {
         return 0;

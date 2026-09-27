@@ -230,6 +230,14 @@ export default function FacultyAiEvaluationConsole() {
             toast.error("Please provide a reason for the score adjustment");
             return;
         }
+        if ((kind === "rv" || kind === "ar") && !notes.trim()) {
+            toast.error(
+                kind === "rv"
+                    ? "State exactly what the student should fix."
+                    : "A reason is required when rejecting a report.",
+            );
+            return;
+        }
 
         try {
             setSaving(true);
@@ -293,7 +301,9 @@ export default function FacultyAiEvaluationConsole() {
                     ? "Approved — faculty decision saved"
                     : kind === "cn"
                       ? "Conditional badge recorded"
-                      : "Admin review requested",
+                      : kind === "rv"
+                        ? "Returned to student for revision"
+                        : "Report rejected — process ended",
             );
             await loadReport();
         } catch {
@@ -392,17 +402,6 @@ export default function FacultyAiEvaluationConsole() {
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v2`}>
                         Open CII v2 Analyser
                     </Link>
-                    {(() => {
-                        const projectId = String(
-                            rawReport?.projectId || rawReport?.project_id || rawReport?.opportunityId || "",
-                        ).trim();
-                        if (!projectId) return null;
-                        return (
-                            <Link href={`/dashboard/faculty/attendance-review?projectId=${encodeURIComponent(projectId)}`}>
-                                Review attendance
-                            </Link>
-                        );
-                    })()}
                 </div>
 
                 <div className="fae-pipe">
@@ -803,14 +802,26 @@ export default function FacultyAiEvaluationConsole() {
                                 </button>
                                 <button
                                     type="button"
+                                    className={`fae-db rv${model.decision === "rv" ? " sel" : ""}`}
+                                    disabled={saving || decided}
+                                    onClick={() => void submitDecision("rv")}
+                                >
+                                    Send for revision
+                                    <br />
+                                    <span style={{ fontWeight: 600, fontSize: 9 }}>
+                                        Student edits and resubmits
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
                                     className={`fae-db ar${model.decision === "ar" ? " sel" : ""}`}
                                     disabled={saving || decided}
                                     onClick={() => void submitDecision("ar")}
                                 >
-                                    Admin review
+                                    Reject
                                     <br />
                                     <span style={{ fontWeight: 600, fontSize: 9 }}>
-                                        Existing faculty reject action
+                                        Process ends — student notified
                                     </span>
                                 </button>
                             </div>

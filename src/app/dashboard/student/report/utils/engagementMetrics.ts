@@ -69,6 +69,44 @@ export function buildIndividualRosterFromSection1(section1: {
     return ids;
 }
 
+/** CIEL attendance cap: one student, one calendar day. Team totals on that day do not count. */
+export const MAX_PERSON_HOURS_PER_DAY = 9;
+
+function personDayBucketKey(log: AttendanceLog, teamRoster: boolean): string {
+    const date = String(log.date || "").trim().slice(0, 10);
+    if (!date) return "";
+    const person = log.participantId
+        ? engagementParticipantCompareKey(log.participantId)
+        : teamRoster
+          ? `row:${String(log.id || "")}`
+          : "solo";
+    return `${person}|${date}`;
+}
+
+/**
+ * Days where any single person logged more than 9 hours.
+ * Multiple members logging on the same date are counted separately.
+ */
+export function personDailyHoursOverCap(
+    logs: AttendanceLog[],
+    rosterIds?: readonly string[] | null,
+): Array<{ date: string; hrs: number }> {
+    const teamRoster = Boolean(rosterIds && rosterIds.length > 0);
+    const hoursByPersonDay = new Map<string, number>();
+    for (const log of logs || []) {
+        const key = personDayBucketKey(log, teamRoster);
+        if (!key) continue;
+        hoursByPersonDay.set(key, (hoursByPersonDay.get(key) || 0) + effectiveHoursFromLog(log));
+    }
+    const maxHrsByDate = new Map<string, number>();
+    for (const [key, hrs] of hoursByPersonDay) {
+        if (hrs <= MAX_PERSON_HOURS_PER_DAY) continue;
+        const date = key.slice(key.lastIndexOf("|") + 1);
+        maxHrsByDate.set(date, Math.max(maxHrsByDate.get(date) || 0, hrs));
+    }
+    return [...maxHrsByDate.entries()].map(([date, hrs]) => ({ date, hrs }));
+}
+
 /** Prefer stored `hours`; otherwise derive from start/end clock times on the same day. */
 export function effectiveHoursFromLog(log: AttendanceLog): number {
     const direct = Number(log.hours);
@@ -261,21 +299,17 @@ export function calculateEngagementMetrics(
     const uniqueDays = new Set(aggregateLogs.map(log => log.date)).size;
 
     // --- AUDIT: Red Flag Detection ---
-    const hoursPerDay: Record<string, number> = {};
     const patterns: Record<string, number> = {};
-    
-    aggregateLogs.forEach(log => {
-        const h = effectiveHoursFromLog(log);
-        hoursPerDay[log.date] = (hoursPerDay[log.date] || 0) + h;
 
-        // Pattern detection (e.g., exact same hours or times)
+    aggregateLogs.forEach((log) => {
         const p = `${effectiveHoursFromLog(log)}`;
         patterns[p] = (patterns[p] || 0) + 1;
     });
 
-    Object.entries(hoursPerDay).forEach(([date, hrs]) => {
-        if (hrs > 9) redFlags.push(`Inflation: Unrealistic daily output on ${date} (${hrs} hrs)`);
-    });
+    // 9h cap is per person per day. Several teammates on the same field day is valid.
+    for (const { date, hrs } of personDailyHoursOverCap(aggregateLogs, rosterIds)) {
+        redFlags.push(`Inflation: Unrealistic daily output on ${date} (${hrs} hrs)`);
+    }
 
     if (Object.values(patterns).some(v => v > 10)) {
         redFlags.push("Suspicious Pattern: Multiple identical duration logs detected");

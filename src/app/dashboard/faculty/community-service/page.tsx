@@ -289,7 +289,7 @@ function FacultyAttendanceLink({ projectId }: { projectId?: string }) {
             href={`${HOURS}?projectId=${encodeURIComponent(projectId)}`}
             className="mt-1.5 inline-block text-[11px] font-extrabold text-[#0e7d74] hover:underline"
         >
-            Review attendance →
+            View hours log →
         </Link>
     );
 }

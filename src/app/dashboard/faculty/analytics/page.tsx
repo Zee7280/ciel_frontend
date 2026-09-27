@@ -764,12 +764,12 @@ export default function FacultyAnalyticsPage() {
                                 <div className="mt-10 px-4 py-8 text-center">
                                     <p className="text-sm font-medium text-slate-700">Nothing to plot yet</p>
                                     <p className="mt-1 text-xs text-slate-500">
-                                        Verified hours appear after attendance is approved. Check{" "}
+                                        Verified hours appear after Faculty locks the flash-card score. Open{" "}
                                         <Link
-                                            href="/dashboard/faculty/attendance-review"
+                                            href="/dashboard/faculty/reports"
                                             className="font-semibold text-teal-800 hover:underline"
                                         >
-                                            Attendance review
+                                            student reports
                                         </Link>
                                         .
                                     </p>

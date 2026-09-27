@@ -325,9 +325,9 @@ function TrackerReadingGuide() {
                     Join applications
                 </Link>
                 . Per-member detail, edit roster, and team report rollups: use{" "}
-                <strong className="text-slate-700">Teams &amp; enrollments</strong> below. Partners review attendance in{" "}
-                <strong className="text-slate-700">Partner Hub → Attendance review</strong>; faculty in{" "}
-                <strong className="text-slate-700">Faculty Hub → Attendance review</strong>.
+                <strong className="text-slate-700">Teams &amp; enrollments</strong> below. Attendance hours are
+                confirmed when Faculty (or CIEL PK) locks the flash-card score — there is no separate
+                partner or faculty attendance queue.
             </p>
         </div>
     );
