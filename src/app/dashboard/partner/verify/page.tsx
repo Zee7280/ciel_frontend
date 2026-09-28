@@ -31,6 +31,7 @@ import {
 import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 import { History } from "lucide-react";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 
 /** Partner/NGO's own line has already been reached here — their pending decision IS the "Partner /
  * NGO" stage, so (unlike the Create Opportunity tab's "my own opportunity" pipeline) it's shown as
@@ -104,7 +105,25 @@ function hasPartnerSignal(record: Record<string, unknown>) {
     );
 }
 
+function isLinkedDraftRow(row: PartnerApprovalRow) {
+    return row.linkedDraft === true || lower(row.opportunityStatus) === "draft";
+}
+
+function isRevisionRequestedRow(row: PartnerApprovalRow) {
+    if (isLinkedDraftRow(row)) return false;
+    const status = lower(row.opportunityStatus);
+    const stage = String(row.workflowStageKey || "").toLowerCase();
+    return (
+        row.partnerDecision === "revision_requested" ||
+        lower(row.facultyApprovalStatus) === "revision_requested" ||
+        stage === "revision" ||
+        status === "revision"
+    );
+}
+
 function isPendingPartnerDecision(row: PartnerApprovalRow) {
+    if (row.linkedDraft || lower(row.opportunityStatus) === "draft") return false;
+    if (isRevisionRequestedRow(row)) return false;
     return row.workflowStageKey === "pending_partner" || ["pending", "awaiting", "required"].includes(row.partnerDecision);
 }
 
@@ -221,7 +240,7 @@ function needsExecutingOrgPortalConfirm(opp: Record<string, unknown> | null): bo
 }
 
 export default function VerifyWorkPage() {
-    const [tab, setTab] = useState<"pending" | "history">("pending");
+    const [tab, setTab] = useState<"pending" | "history" | "linked" | "revision">("pending");
     const [rows, setRows] = useState<PartnerApprovalRow[]>([]);
     const [search, setSearch] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -459,7 +478,19 @@ export default function VerifyWorkPage() {
     };
 
     const filtered = useMemo(() => {
-        const visible = tab === "pending" ? rows.filter(isPendingPartnerDecision) : rows.filter((row) => !isPendingPartnerDecision(row));
+        const visible =
+            tab === "pending"
+                ? rows.filter(isPendingPartnerDecision)
+                : tab === "linked"
+                  ? rows.filter(isLinkedDraftRow)
+                  : tab === "revision"
+                    ? rows.filter(isRevisionRequestedRow)
+                    : rows.filter(
+                          (row) =>
+                              !isPendingPartnerDecision(row) &&
+                              !isLinkedDraftRow(row) &&
+                              !isRevisionRequestedRow(row),
+                      );
         const q = search.trim().toLowerCase();
         if (!q) return visible;
 
@@ -469,6 +500,8 @@ export default function VerifyWorkPage() {
                 row.studentName,
                 row.studentId,
                 row.studentEmail || "",
+                row.publicCode || "",
+                row.currentlyWith || "",
                 row.workflowLabel,
                 row.queueMessage,
             ]
@@ -496,7 +529,7 @@ export default function VerifyWorkPage() {
         if (typeof window === "undefined") return;
         const currentSearch = new URLSearchParams(window.location.search);
         const nextTab = currentSearch.get("tab");
-        if (nextTab === "pending" || nextTab === "history") {
+        if (nextTab === "pending" || nextTab === "history" || nextTab === "linked" || nextTab === "revision") {
             setTab(nextTab);
         }
     }, []);
@@ -508,8 +541,28 @@ export default function VerifyWorkPage() {
         const opportunityId = currentSearch.get("opportunity") || currentSearch.get("id");
         if (!opportunityId || autoOpenedIdRef.current === opportunityId) return;
 
-        const targetTab = currentSearch.get("tab") === "history" ? "history" : "pending";
-        const sourceRows = targetTab === "history" ? rows.filter((row) => !isPendingPartnerDecision(row)) : rows.filter(isPendingPartnerDecision);
+        const requestedTab = currentSearch.get("tab");
+        const targetTab =
+            requestedTab === "history"
+                ? "history"
+                : requestedTab === "linked"
+                  ? "linked"
+                  : requestedTab === "revision"
+                    ? "revision"
+                    : "pending";
+        const sourceRows =
+            targetTab === "history"
+                ? rows.filter(
+                      (row) =>
+                          !isPendingPartnerDecision(row) &&
+                          !isLinkedDraftRow(row) &&
+                          !isRevisionRequestedRow(row),
+                  )
+                : targetTab === "linked"
+                  ? rows.filter(isLinkedDraftRow)
+                  : targetTab === "revision"
+                    ? rows.filter(isRevisionRequestedRow)
+                    : rows.filter(isPendingPartnerDecision);
         if (!sourceRows.some((row) => row.id === opportunityId)) return;
 
         autoOpenedIdRef.current = opportunityId;
@@ -531,6 +584,12 @@ export default function VerifyWorkPage() {
             <div className="flex flex-wrap gap-2">
                 <Button variant={tab === "pending" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("pending")}>
                     Pending Requests
+                </Button>
+                <Button variant={tab === "revision" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("revision")}>
+                    Revision Requested
+                </Button>
+                <Button variant={tab === "linked" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("linked")}>
+                    Linked Drafts
                 </Button>
                 <Button variant={tab === "history" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("history")}>
                     Approval History
@@ -561,12 +620,22 @@ export default function VerifyWorkPage() {
                             <CheckCircle className="w-6 h-6 text-green-500" />
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">
-                            {tab === "pending" ? "No pending partner approvals" : "No partner approval history yet"}
+                            {tab === "pending"
+                                ? "No pending partner approvals"
+                                : tab === "linked"
+                                  ? "No linked drafts"
+                                  : tab === "revision"
+                                    ? "No revision requests"
+                                    : "No partner approval history yet"}
                         </h3>
                         <p className="text-slate-500">
                             {tab === "pending"
                                 ? "When an opportunity lists your organisation as partner and your review step is due, it will appear here."
-                                : "Past partner-linked workflow items will appear here."}
+                                : tab === "linked"
+                                  ? "When a student names your organisation on a draft, it appears here. You can view it, but you cannot approve until they submit and faculty has cleared."
+                                  : tab === "revision"
+                                    ? "Opportunities sent back to the student stay here until they resubmit."
+                                    : "Past partner-linked workflow items will appear here."}
                         </p>
                     </div>
                 ) : (
@@ -589,10 +658,22 @@ export default function VerifyWorkPage() {
                                         sdg: row.sdg,
                                         summary: row.queueMessage,
                                         submitted_at: row.submittedDate,
+                                        public_code: row.publicCode,
+                                        currently_with: row.currentlyWith,
+                                        currently_with_role: row.currentlyWithRole,
+                                        next_step: row.nextStep,
+                                        waiting_since: row.waitingSince,
                                         isStudentCreated: true,
                                     },
                                     "partner",
-                                    { mode: tab === "pending" ? "pending" : "decided" },
+                                    {
+                                        mode:
+                                            tab === "history"
+                                                ? "decided"
+                                                : tab === "revision"
+                                                  ? "revision"
+                                                  : "pending",
+                                    },
                                 )}
                                 actions={
                                     <div className="grid w-full gap-2">
@@ -643,6 +724,24 @@ export default function VerifyWorkPage() {
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> Review details
                                     </Button>
+                                    {tab === "linked" || tab === "revision" ? (
+                                        <ContactStudentActions
+                                            studentEmail={row.studentEmail}
+                                            title={row.projectTitle}
+                                            publicCode={row.publicCode}
+                                        />
+                                    ) : null}
+                                    {tab !== "pending" && tab !== "revision" && !isLinkedDraftRow(row) ? (
+                                        <ApprovalFollowUpActions
+                                            opportunityId={row.id}
+                                            currentlyWithRole={row.currentlyWithRole}
+                                            currentlyWith={row.currentlyWith}
+                                            title={row.projectTitle}
+                                            publicCode={row.publicCode}
+                                            nextStep={row.nextStep}
+                                            openPath={`/dashboard/admin/approvals?opportunity=${encodeURIComponent(row.id)}&tab=pending`}
+                                        />
+                                    ) : null}
                                     {row.approvalHistory && row.approvalHistory.length > 0 ? (
                                         <Button variant="outline" className="w-full" onClick={() => setHistoryRow(row)}>
                                             <History className="w-4 h-4 mr-2" /> History

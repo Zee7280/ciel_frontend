@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     CheckCircle,
     XCircle,
@@ -31,6 +31,7 @@ import {
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 
 type AdminApprovalHistoryEntry = {
     line: "faculty" | "partner" | "admin";
@@ -108,7 +109,47 @@ function readFlowStatus(row: Record<string, unknown> | null | undefined): string
     return t.replace(/_/g, " ");
 }
 
-type OpportunityQueueFilter = "pending" | "approved" | "rejected" | "revision" | "all";
+type OpportunityQueueFilter = "pending" | "approved" | "rejected" | "revision" | "draft" | "all";
+type PendingWaiterFilter = "all" | "faculty" | "partner" | "admin";
+type OpportunityControlTab =
+    | "drafts"
+    | "pending_faculty"
+    | "pending_partner"
+    | "pending_admin"
+    | "pending"
+    | "revision"
+    | "approved"
+    | "closed"
+    | "all";
+function deriveOpportunityControlTab(
+    queue: OpportunityQueueFilter,
+    waiter: PendingWaiterFilter,
+): OpportunityControlTab {
+    if (queue === "draft") return "drafts";
+    if (queue === "revision") return "revision";
+    if (queue === "approved") return "approved";
+    if (queue === "rejected") return "closed";
+    if (queue === "all") return "all";
+    if (waiter === "faculty") return "pending_faculty";
+    if (waiter === "partner") return "pending_partner";
+    if (waiter === "admin") return "pending_admin";
+    return "pending";
+}
+
+function controlTabToQueue(tab: OpportunityControlTab): {
+    queue: OpportunityQueueFilter;
+    waiter: PendingWaiterFilter;
+} {
+    if (tab === "drafts") return { queue: "draft", waiter: "all" };
+    if (tab === "pending_faculty") return { queue: "pending", waiter: "faculty" };
+    if (tab === "pending_partner") return { queue: "pending", waiter: "partner" };
+    if (tab === "pending_admin") return { queue: "pending", waiter: "admin" };
+    if (tab === "revision") return { queue: "revision", waiter: "all" };
+    if (tab === "approved") return { queue: "approved", waiter: "all" };
+    if (tab === "closed") return { queue: "rejected", waiter: "all" };
+    if (tab === "all") return { queue: "all", waiter: "all" };
+    return { queue: "pending", waiter: "all" };
+}
 type OpportunitySortOption = "submitted_newest" | "submitted_oldest" | "title_az";
 type OpportunityCreatorFilter = "all" | "student" | "faculty";
 
@@ -446,6 +487,7 @@ export default function AdminApprovalsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [opportunityQueue, setOpportunityQueue] = useState<OpportunityQueueFilter>("pending");
+    const [pendingWaiter, setPendingWaiter] = useState<PendingWaiterFilter>("all");
     const [opportunitySort, setOpportunitySort] = useState<OpportunitySortOption>("submitted_newest");
     const [opportunityCreatorFilter, setOpportunityCreatorFilter] = useState<OpportunityCreatorFilter>("all");
     const [opportunityDateFrom, setOpportunityDateFrom] = useState("");
@@ -464,6 +506,7 @@ export default function AdminApprovalsPage() {
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [opportunityReviewMode, setOpportunityReviewMode] = useState<"revise" | "reject_permanent">("revise");
     const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
+    const autoOpenedIdRef = useRef<string | null>(null);
 
     const fetchPendingOpportunities = useCallback(async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
@@ -545,6 +588,50 @@ export default function AdminApprovalsPage() {
             void fetchPendingUsers();
         }
     }, [activeTab, didBootstrapCounts, opportunityQueue, fetchPendingOpportunities]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const currentSearch = new URLSearchParams(window.location.search);
+        if (currentSearch.get("opportunity") || currentSearch.get("id") || currentSearch.get("tab") === "pending") {
+            setActiveTab("projects");
+        }
+        const requestedTab = currentSearch.get("tab") || currentSearch.get("queue");
+        const mapped: Record<string, OpportunityControlTab> = {
+            drafts: "drafts",
+            draft: "drafts",
+            pending_faculty: "pending_faculty",
+            faculty: "pending_faculty",
+            pending_partner: "pending_partner",
+            partner: "pending_partner",
+            pending_admin: "pending_admin",
+            ciel: "pending_admin",
+            pending: "pending",
+            revision: "revision",
+            approved: "approved",
+            closed: "closed",
+            rejected: "closed",
+            all: "all",
+        };
+        const next = requestedTab ? mapped[requestedTab] : undefined;
+        if (next) {
+            const mappedQueue = controlTabToQueue(next);
+            setOpportunityQueue(mappedQueue.queue);
+            setPendingWaiter(mappedQueue.waiter);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || isLoading) return;
+        const currentSearch = new URLSearchParams(window.location.search);
+        const opportunityId = currentSearch.get("opportunity") || currentSearch.get("id");
+        if (!opportunityId || autoOpenedIdRef.current === opportunityId) return;
+        const match = opportunities.find((row) => String(row?.id) === opportunityId);
+        if (!match) return;
+        autoOpenedIdRef.current = opportunityId;
+        setActiveTab("projects");
+        setSelectedOpportunity(match);
+        setIsDetailModalOpen(true);
+    }, [isLoading, opportunities]);
 
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
         const submittingKey = `${type}:${id}`;
@@ -678,6 +765,18 @@ export default function AdminApprovalsPage() {
     };
 
     // Filter & Pagination Logic
+    const waiterCounts = useMemo(() => {
+        const counts = { faculty: 0, partner: 0, admin: 0 };
+        for (const item of opportunities) {
+            const row = item as Record<string, unknown>;
+            const role = String(row.currently_with_role ?? row.currentlyWithRole ?? "")
+                .trim()
+                .toLowerCase();
+            if (role === "faculty" || role === "partner" || role === "admin") counts[role] += 1;
+        }
+        return counts;
+    }, [opportunities]);
+
     const filteredItems = useMemo(() => {
         const items = activeTab === "projects" ? opportunities : pendingUsers;
         if (activeTab !== "projects") {
@@ -733,6 +832,16 @@ export default function AdminApprovalsPage() {
             return matchesSearch && matchesFrom && matchesTo && matchesCreator;
         });
 
+        if (opportunityQueue === "pending" && pendingWaiter !== "all") {
+            list = list.filter((item) => {
+                const row = item as Record<string, unknown>;
+                const role = String(row.currently_with_role ?? row.currentlyWithRole ?? "")
+                    .trim()
+                    .toLowerCase();
+                return role === pendingWaiter;
+            });
+        }
+
         list = [...list].sort((a, b) => {
             const rowA = a as Record<string, unknown>;
             const rowB = b as Record<string, unknown>;
@@ -758,6 +867,8 @@ export default function AdminApprovalsPage() {
         opportunityDateTo,
         opportunityCreatorFilter,
         opportunitySort,
+        opportunityQueue,
+        pendingWaiter,
     ]);
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
     const paginatedItems = filteredItems.slice(
@@ -768,15 +879,27 @@ export default function AdminApprovalsPage() {
     // Reset page when tab or search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, searchQuery, opportunityQueue, opportunitySort, opportunityCreatorFilter, opportunityDateFrom, opportunityDateTo]);
+    }, [activeTab, searchQuery, opportunityQueue, pendingWaiter, opportunitySort, opportunityCreatorFilter, opportunityDateFrom, opportunityDateTo]);
 
     const resetOpportunityFilters = () => {
         setSearchQuery("");
         setOpportunityQueue("pending");
+        setPendingWaiter("all");
         setOpportunitySort("submitted_newest");
         setOpportunityCreatorFilter("all");
         setOpportunityDateFrom("");
         setOpportunityDateTo("");
+    };
+    const controlTab = deriveOpportunityControlTab(opportunityQueue, pendingWaiter);
+    const applyControlTab = (tab: OpportunityControlTab) => {
+        const mapped = controlTabToQueue(tab);
+        setOpportunityQueue(mapped.queue);
+        setPendingWaiter(mapped.waiter);
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            params.set("tab", tab);
+            window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+        }
     };
 
     useEffect(() => {
@@ -872,27 +995,40 @@ export default function AdminApprovalsPage() {
             {activeTab === "projects" && (
                 <div className="mb-4 space-y-3">
                     <div className="rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">CIEL final approval only.</span> Use{" "}
-                        <strong>Pending queue</strong> for new reviews. Switch to <strong>Approved by CIEL</strong> to
-                        find projects already published — you can still <strong>Request revision</strong> or{" "}
-                        <strong>Reject permanently</strong> if approval was a mistake.
+                        <span className="font-semibold text-slate-900">CIEL Opportunity Control.</span> Drafts are
+                        oversight-only. Faculty / Partner tabs are waiters still upstream.{" "}
+                        <strong>Pending CIEL</strong> is the final-approve queue. Approve/Reject APIs are unchanged.
                     </div>
                     <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-                            <div className="relative w-full xl:w-52 shrink-0">
-                                <select
-                                    value={opportunityQueue}
-                                    onChange={(e) => setOpportunityQueue(e.target.value as OpportunityQueueFilter)}
-                                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                        <div className="flex flex-wrap gap-2">
+                            {(
+                                [
+                                    ["drafts", "Drafts"],
+                                    ["pending_faculty", `Pending Faculty${opportunityQueue === "pending" ? ` (${waiterCounts.faculty})` : ""}`],
+                                    ["pending_partner", `Pending Partner${opportunityQueue === "pending" ? ` (${waiterCounts.partner})` : ""}`],
+                                    ["pending_admin", `Pending CIEL${opportunityQueue === "pending" ? ` (${waiterCounts.admin})` : ""}`],
+                                    ["pending", "All pending"],
+                                    ["revision", "Action required"],
+                                    ["approved", "Published"],
+                                    ["closed", "Closed"],
+                                    ["all", "All in workflow"],
+                                ] as const
+                            ).map(([id, label]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => applyControlTab(id)}
+                                    className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                                        controlTab === id
+                                            ? "bg-blue-600 text-white"
+                                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                    }`}
                                 >
-                                    <option value="pending">Pending queue</option>
-                                    <option value="approved">Approved by CIEL</option>
-                                    <option value="revision">Revision requested</option>
-                                    <option value="rejected">Rejected</option>
-                                    <option value="all">All in workflow</option>
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
                             <div className="relative w-full xl:w-44 shrink-0">
                                 <select
                                     value={opportunityCreatorFilter}
@@ -1041,13 +1177,22 @@ export default function AdminApprovalsPage() {
                         const canAdminApprove = readAdminCanApprove(projRow);
                         const isLiveApproved =
                             readAdminApproved(projRow) || readWorkflowStage(projRow) === "live";
-                        const showApproveButton = opportunityQueue === "pending" && !isLiveApproved;
+                        const showApproveButton =
+                            opportunityQueue === "pending" && !isLiveApproved;
+                        const isDraftRow =
+                            opportunityQueue === "draft" ||
+                            String(projRow.status ?? "").toLowerCase() === "draft" ||
+                            projRow.linked_draft === true ||
+                            projRow.linkedDraft === true;
                         const showPostApprovalActions =
                             isLiveApproved ||
                             opportunityQueue === "approved" ||
                             opportunityQueue === "all";
                         const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow);
                         const canRequestRevision = canRequestOpportunityRevision(projRow);
+                        const waiterRole = String(projRow.currently_with_role ?? projRow.currentlyWithRole ?? "")
+                            .trim()
+                            .toLowerCase();
                         return (
                         <OpportunityApprovalCard
                             key={proj.id}
@@ -1110,6 +1255,42 @@ export default function AdminApprovalsPage() {
                                         <MessageSquare className="w-4 h-4" /> WhatsApp
                                     </button>
                                 )}
+                                {showApproveButton && (waiterRole === "faculty" || waiterRole === "partner") ? (
+                                    <ApprovalFollowUpActions
+                                        opportunityId={String(proj.id)}
+                                        currentlyWithRole={
+                                            typeof projRow.currently_with_role === "string"
+                                                ? projRow.currently_with_role
+                                                : typeof projRow.currentlyWithRole === "string"
+                                                  ? projRow.currentlyWithRole
+                                                  : ""
+                                        }
+                                        currentlyWith={
+                                            typeof projRow.currently_with === "string"
+                                                ? projRow.currently_with
+                                                : typeof projRow.currentlyWith === "string"
+                                                  ? projRow.currentlyWith
+                                                  : ""
+                                        }
+                                        title={typeof projRow.title === "string" ? projRow.title : "Opportunity"}
+                                        publicCode={
+                                            typeof projRow.public_code === "string"
+                                                ? projRow.public_code
+                                                : typeof projRow.publicCode === "string"
+                                                  ? projRow.publicCode
+                                                  : ""
+                                        }
+                                        nextStep={
+                                            typeof projRow.next_step === "string"
+                                                ? projRow.next_step
+                                                : typeof projRow.nextStep === "string"
+                                                  ? projRow.nextStep
+                                                  : ""
+                                        }
+                                        className="flex flex-wrap items-center gap-2"
+                                    />
+                                ) : null}
+                                {!isDraftRow ? (
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
                                     disabled={!canRequestRevision}
@@ -1139,6 +1320,7 @@ export default function AdminApprovalsPage() {
                                 >
                                     <XCircle className="w-4 h-4" /> Reject permanently
                                 </button>
+                                ) : null}
                                 {showApproveButton ? (
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}

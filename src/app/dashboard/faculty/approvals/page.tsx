@@ -28,6 +28,7 @@ import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import { History } from "lucide-react";
 
 /** Faculty is reviewing a student-created opportunity here, so — unlike the Create Opportunity
@@ -63,10 +64,60 @@ function ApprovalVisibilityBadges({ visibility }: { visibility?: FacultyApproval
     return uni;
 }
 
+function overlayAfterFacultyApprove(
+    row: FacultyApprovalRow,
+    data: Record<string, unknown> | undefined,
+    action: FacultyApprovalAction,
+): FacultyApprovalRow {
+    const roleRaw = String(data?.currently_with_role ?? "").toLowerCase();
+    const currentlyWithRole =
+        roleRaw === "partner" || roleRaw === "admin" || roleRaw === "faculty"
+            ? roleRaw
+            : action === "partner_ack" || row.requiresPartnerApproval !== true
+              ? "admin"
+              : "partner";
+    const currentlyWith =
+        typeof data?.currently_with === "string" && data.currently_with.trim()
+            ? data.currently_with
+            : currentlyWithRole === "partner"
+              ? "Partner / NGO"
+              : currentlyWithRole === "faculty"
+                ? "Faculty"
+                : "CIEL PK";
+    const nextStep =
+        typeof data?.next_step === "string" && data.next_step.trim()
+            ? data.next_step
+            : currentlyWithRole === "partner"
+              ? "Partner / NGO acknowledgement"
+              : "CIEL PK final approval";
+    const publicCode =
+        typeof data?.public_code === "string" && data.public_code.trim()
+            ? data.public_code
+            : row.publicCode;
+    const workflowStage =
+        typeof data?.workflow_stage === "string" && data.workflow_stage.trim()
+            ? data.workflow_stage
+            : currentlyWithRole === "partner"
+              ? "pending_partner"
+              : "pending_admin";
+    return {
+        ...row,
+        currentlyWithRole,
+        currentlyWith,
+        nextStep,
+        publicCode,
+        workflowStage,
+        linkedDraft: false,
+    };
+}
+
 export default function FacultyApprovalsPage() {
-    const [tab, setTab] = useState<"pending" | "history">("pending");
+    const [tab, setTab] = useState<"pending" | "history" | "linked" | "revision">("pending");
     const [pendingProjects, setPendingProjects] = useState<FacultyApprovalRow[]>([]);
     const [historyProjects, setHistoryProjects] = useState<FacultyApprovalRow[]>([]);
+    const [linkedDrafts, setLinkedDrafts] = useState<FacultyApprovalRow[]>([]);
+    const [revisionProjects, setRevisionProjects] = useState<FacultyApprovalRow[]>([]);
+    const [justApproved, setJustApproved] = useState<FacultyApprovalRow[]>([]);
     const [search, setSearch] = useState("");
     const [isLoading, setIsLoading] = useState(true);
 
@@ -97,14 +148,20 @@ export default function FacultyApprovalsPage() {
             const facultyEmail = getStoredCurrentUserEmail();
             const pendingParams = new URLSearchParams({ status: "pending" });
             const historyParams = new URLSearchParams({ status: "history" });
+            const draftParams = new URLSearchParams({ status: "linked_drafts" });
+            const revisionParams = new URLSearchParams({ status: "revision" });
             if (facultyEmail) {
                 pendingParams.set("faculty_email", facultyEmail);
                 historyParams.set("faculty_email", facultyEmail);
+                draftParams.set("faculty_email", facultyEmail);
+                revisionParams.set("faculty_email", facultyEmail);
             }
 
-            const [pendingRes, historyRes] = await Promise.all([
+            const [pendingRes, historyRes, draftRes, revisionRes] = await Promise.all([
                 authenticatedFetch(`/api/v1/faculty/approvals?${pendingParams.toString()}`),
                 authenticatedFetch(`/api/v1/faculty/approvals?${historyParams.toString()}`),
+                authenticatedFetch(`/api/v1/faculty/approvals?${draftParams.toString()}`),
+                authenticatedFetch(`/api/v1/faculty/approvals?${revisionParams.toString()}`),
             ]);
 
             if (pendingRes?.ok) {
@@ -119,6 +176,14 @@ export default function FacultyApprovalsPage() {
                 setHistoryProjects(normalizeFacultyApprovalsResponse(j));
             } else {
                 toast.error("Could not load approval history");
+            }
+            if (draftRes?.ok) {
+                const j = await draftRes.json();
+                setLinkedDrafts(normalizeFacultyApprovalsResponse(j));
+            }
+            if (revisionRes?.ok) {
+                const j = await revisionRes.json();
+                setRevisionProjects(normalizeFacultyApprovalsResponse(j));
             }
         } catch (error) {
             console.error("Failed to fetch approvals", error);
@@ -175,7 +240,14 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const visibleList = tab === "pending" ? pendingProjects : historyProjects;
+    const visibleList =
+        tab === "pending"
+            ? pendingProjects
+            : tab === "linked"
+              ? linkedDrafts
+              : tab === "revision"
+                ? revisionProjects
+                : historyProjects;
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -186,6 +258,8 @@ export default function FacultyApprovalsPage() {
                 p.studentName,
                 p.studentId,
                 p.studentEmail || "",
+                p.publicCode || "",
+                p.currentlyWith || "",
                 p.opportunityStatus || "",
             ]
                 .join(" ")
@@ -198,7 +272,7 @@ export default function FacultyApprovalsPage() {
         if (typeof window === "undefined") return;
         const currentSearch = new URLSearchParams(window.location.search);
         const nextTab = currentSearch.get("tab");
-        if (nextTab === "pending" || nextTab === "history") {
+        if (nextTab === "pending" || nextTab === "history" || nextTab === "linked" || nextTab === "revision") {
             setTab(nextTab);
         }
     }, []);
@@ -210,8 +284,23 @@ export default function FacultyApprovalsPage() {
         const opportunityId = currentSearch.get("opportunity") || currentSearch.get("id");
         if (!opportunityId || autoOpenedIdRef.current === opportunityId) return;
 
-        const targetTab = currentSearch.get("tab") === "history" ? "history" : "pending";
-        const sourceRows = targetTab === "history" ? historyProjects : pendingProjects;
+        const requestedTab = currentSearch.get("tab");
+        const targetTab =
+            requestedTab === "history"
+                ? "history"
+                : requestedTab === "linked"
+                  ? "linked"
+                  : requestedTab === "revision"
+                    ? "revision"
+                    : "pending";
+        const sourceRows =
+            targetTab === "history"
+                ? historyProjects
+                : targetTab === "linked"
+                  ? linkedDrafts
+                  : targetTab === "revision"
+                    ? revisionProjects
+                    : pendingProjects;
         if (!sourceRows.some((row) => row.id === opportunityId)) return;
 
         autoOpenedIdRef.current = opportunityId;
@@ -219,7 +308,7 @@ export default function FacultyApprovalsPage() {
             showActions: targetTab === "pending",
             approvalAction: resolveApprovalActionForId(opportunityId),
         });
-    }, [historyProjects, isLoading, pendingProjects]);
+    }, [historyProjects, isLoading, linkedDrafts, pendingProjects, revisionProjects]);
 
     const handleApprove = async (id: string, action: FacultyApprovalAction = "faculty_review") => {
         if (approveSubmittingId === id) return;
@@ -233,6 +322,15 @@ export default function FacultyApprovalsPage() {
                 method: "POST",
             });
             if (res && res.ok) {
+                const body = (await res.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
+                const source =
+                    pendingProjects.find((p) => p.id === id) ||
+                    revisionProjects.find((p) => p.id === id) ||
+                    historyProjects.find((p) => p.id === id);
+                if (source) {
+                    const overlay = overlayAfterFacultyApprove(source, body?.data, action);
+                    setJustApproved((prev) => [overlay, ...prev.filter((row) => row.id !== id)]);
+                }
                 toast.success(action === "partner_ack" ? "Partner acknowledgement submitted" : "Project approved successfully");
                 setPendingProjects((prev) => prev.filter((p) => p.id !== id));
                 setDetailOpen(false);
@@ -351,7 +449,23 @@ export default function FacultyApprovalsPage() {
                     className="h-9"
                     onClick={() => setTab("pending")}
                 >
-                    Pending
+                    Pending My Approval
+                </Button>
+                <Button
+                    variant={tab === "revision" ? "default" : "outline"}
+                    size="sm"
+                    className="h-9"
+                    onClick={() => setTab("revision")}
+                >
+                    Revision with Student
+                </Button>
+                <Button
+                    variant={tab === "linked" ? "default" : "outline"}
+                    size="sm"
+                    className="h-9"
+                    onClick={() => setTab("linked")}
+                >
+                    Linked Drafts
                 </Button>
                 <Button
                     variant={tab === "history" ? "default" : "outline"}
@@ -377,20 +491,93 @@ export default function FacultyApprovalsPage() {
             </div>
 
             <div className="grid gap-6">
+                {tab === "pending" && justApproved.length > 0
+                    ? justApproved.map((project) => (
+                          <Card key={`just-${project.id}`} className="overflow-hidden border-0 bg-transparent shadow-none">
+                              <OpportunityApprovalCard
+                                  {...buildOpportunityApprovalModel(
+                                      {
+                                          id: project.id,
+                                          title: project.projectTitle,
+                                          student_name: project.studentName,
+                                          version: project.version,
+                                          faculty_approval_status: project.facultyApprovalStatus,
+                                          partner_approval_status: project.partnerApprovalStatus,
+                                          admin_approval_status: project.adminApprovalStatus,
+                                          requires_partner_approval: project.requiresPartnerApproval,
+                                          created_by_role: project.createdByRole,
+                                          status: project.opportunityStatus,
+                                          workflow_stage: project.workflowStage,
+                                          total_hours: project.totalHours,
+                                          submitted_at: project.submittedDate,
+                                          sdg: project.sdg,
+                                          public_code: project.publicCode,
+                                          currently_with: project.currentlyWith,
+                                          currently_with_role: project.currentlyWithRole,
+                                          next_step: project.nextStep,
+                                          waiting_since: project.waitingSince,
+                                          isStudentCreated: true,
+                                      },
+                                      project.approvalAction === "partner_ack" ? "partner" : "faculty",
+                                      { mode: "decided" },
+                                  )}
+                                  facts={[
+                                      project.sdg ? `SDG ${project.sdg}` : "",
+                                      project.totalHours != null ? `${project.totalHours}h` : "",
+                                      project.eisScore != null ? `EIS ${project.eisScore}` : "",
+                                  ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  actions={
+                                      <div className="grid w-full gap-2">
+                                          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
+                                              Approved. Next waiter is still on this screen — Email or WhatsApp them if needed.
+                                          </p>
+                                          <ApprovalFollowUpActions
+                                              opportunityId={project.id}
+                                              currentlyWithRole={project.currentlyWithRole}
+                                              currentlyWith={project.currentlyWith}
+                                              title={project.projectTitle}
+                                              publicCode={project.publicCode}
+                                              nextStep={project.nextStep}
+                                              openPath={
+                                                  project.currentlyWithRole === "partner"
+                                                      ? `/dashboard/partner/verify?opportunity=${encodeURIComponent(project.id)}&tab=pending`
+                                                      : project.currentlyWithRole === "admin"
+                                                        ? `/dashboard/admin/approvals?opportunity=${encodeURIComponent(project.id)}&tab=pending`
+                                                        : undefined
+                                              }
+                                          />
+                                      </div>
+                                  }
+                              />
+                          </Card>
+                      ))
+                    : null}
                 {isLoading ? (
                     <div className="text-center py-12 text-slate-500 text-sm">Loading…</div>
-                ) : filtered.length === 0 ? (
+                ) : filtered.length === 0 && !(tab === "pending" && justApproved.length > 0) ? (
                     <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
                         <div className="mx-auto w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-4">
                             <CheckCircle className="w-6 h-6 text-green-500" />
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">
-                            {tab === "pending" ? "All Caught Up!" : "No history yet"}
+                            {tab === "pending"
+                                ? "All Caught Up!"
+                                : tab === "linked"
+                                  ? "No linked drafts"
+                                  : tab === "revision"
+                                    ? "No revisions with students"
+                                    : "No history yet"}
                         </h3>
                         <p className="text-slate-500">
                             {tab === "pending"
                                 ? "No pending approvals at the moment."
-                                : "Approved or progressed projects will appear here after you act or verify by email."}
+                                : tab === "linked"
+                                  ? "When a student names you on a draft, it appears here. You can view it, but you cannot approve until they submit."
+                                  : tab === "revision"
+                                    ? "When you or a partner send an opportunity back, it stays here until the student resubmits."
+                                    : "Approved or progressed projects will appear here after you act or verify by email."}
                         </p>
                     </div>
                 ) : (
@@ -413,10 +600,22 @@ export default function FacultyApprovalsPage() {
                                         total_hours: project.totalHours,
                                         submitted_at: project.submittedDate,
                                         sdg: project.sdg,
+                                        public_code: project.publicCode,
+                                        currently_with: project.currentlyWith,
+                                        currently_with_role: project.currentlyWithRole,
+                                        next_step: project.nextStep,
+                                        waiting_since: project.waitingSince,
                                         isStudentCreated: true,
                                     },
                                     project.approvalAction === "partner_ack" ? "partner" : "faculty",
-                                    { mode: tab === "pending" ? "pending" : "decided" },
+                                    {
+                                        mode:
+                                            tab === "history"
+                                                ? "decided"
+                                                : tab === "revision"
+                                                  ? "revision"
+                                                  : "pending",
+                                    },
                                 )}
                                 facts={[
                                     project.sdg ? `SDG ${project.sdg}` : "",
@@ -487,6 +686,30 @@ export default function FacultyApprovalsPage() {
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> {tab === "pending" ? "Review full details" : "Opportunity details"}
                                     </Button>
+                                    {tab === "linked" || tab === "revision" ? (
+                                        <ContactStudentActions
+                                            studentEmail={project.studentEmail}
+                                            title={project.projectTitle}
+                                            publicCode={project.publicCode}
+                                        />
+                                    ) : null}
+                                    {tab !== "pending" && tab !== "revision" && !project.linkedDraft ? (
+                                        <ApprovalFollowUpActions
+                                            opportunityId={project.id}
+                                            currentlyWithRole={project.currentlyWithRole}
+                                            currentlyWith={project.currentlyWith}
+                                            title={project.projectTitle}
+                                            publicCode={project.publicCode}
+                                            nextStep={project.nextStep}
+                                            openPath={
+                                                project.currentlyWithRole === "partner"
+                                                    ? `/dashboard/partner/verify?opportunity=${encodeURIComponent(project.id)}&tab=pending`
+                                                    : project.currentlyWithRole === "admin"
+                                                      ? `/dashboard/admin/approvals?opportunity=${encodeURIComponent(project.id)}&tab=pending`
+                                                      : undefined
+                                            }
+                                        />
+                                    ) : null}
                                     {project.approvalHistory && project.approvalHistory.length > 0 ? (
                                         <Button variant="ghost" className="w-full" onClick={() => setHistoryRow(project)}>
                                             <History className="w-4 h-4 mr-2" /> History

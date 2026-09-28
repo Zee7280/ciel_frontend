@@ -9,6 +9,22 @@ export function whatsappShareHref(text: string): string {
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
+export function formatSentWaiting(iso?: string | null): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const sent = date.toLocaleString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+    const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+    const waiting = days < 1 ? "today" : days === 1 ? "1 day" : `${days} days`;
+    return `Sent: ${sent} · Waiting ${waiting}`;
+}
+
 /** Same sanitizers as the FYP/Coursework team-member WhatsApp fields — kept in sync by hand. */
 function normalizeCountryCode(v?: string) {
     const d = String(v || "").replace(/\D/g, "").slice(0, 4);

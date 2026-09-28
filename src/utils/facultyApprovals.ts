@@ -37,6 +37,12 @@ export type FacultyApprovalRow = {
     createdByRole?: string | null;
     version?: number;
     approvalHistory?: ApprovalHistoryEntry[];
+    publicCode?: string | null;
+    currentlyWith?: string | null;
+    currentlyWithRole?: string | null;
+    nextStep?: string | null;
+    waitingSince?: string | null;
+    linkedDraft?: boolean;
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -136,6 +142,12 @@ export function mapFacultyApprovalBackendRow(raw: unknown): FacultyApprovalRow |
         createdByRole: pickStr(r, "createdByRole", "created_by_role", "creator_role", "creatorRole") || null,
         version: pickNum(r, "version"),
         approvalHistory: pickApprovalHistory(r),
+        publicCode: pickStr(r, "publicCode", "public_code") || null,
+        currentlyWith: pickStr(r, "currentlyWith", "currently_with") || null,
+        currentlyWithRole: pickStr(r, "currentlyWithRole", "currently_with_role") || null,
+        nextStep: pickStr(r, "nextStep", "next_step") || null,
+        waitingSince: pickStr(r, "waitingSince", "waiting_since") || null,
+        linkedDraft: pickBool(r, "linkedDraft", "linked_draft"),
     };
 }
 

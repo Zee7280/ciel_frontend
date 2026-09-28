@@ -206,6 +206,10 @@ export function useUniversityCommunityServiceData() {
             ),
         [oppRows],
     );
+    const draftOpps = useMemo(
+        () => oppRows.filter((row) => normalizeReviewStatus(row.status) === "draft"),
+        [oppRows],
+    );
     const createCounts = useMemo(() => {
         const counts = { drafts: 0, review: 0, action: 0, published: 0, closed: 0 };
         for (const row of mine) counts[uniMineBucket(row)] += 1;
@@ -251,6 +255,7 @@ export function useUniversityCommunityServiceData() {
         oppRows,
         mine,
         approvalOpps,
+        draftOpps,
         createCounts,
         publishedMine,
         pipeline,

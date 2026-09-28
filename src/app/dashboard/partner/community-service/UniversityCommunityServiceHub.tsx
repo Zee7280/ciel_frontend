@@ -15,6 +15,7 @@ import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { formatDisplayId } from "@/utils/displayIds";
@@ -83,10 +84,10 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
     projects: {
         desc: "Institution-wide monitoring of Community Service work.",
         items: [
-            ["Projects", "View opportunity/report stage, student/team, faculty and partner."],
-            ["Progress", "Report completion %, last activity and member hours where authorised."],
-            ["Reminders", "System follow-up to the responsible stakeholder."],
-            ["Filters", "Review by department, faculty, partner, semester or status."],
+            ["Projects", "All named opportunities, university-created listings, approval monitor, and join applications."],
+            ["All / University", "Read-only lists. University does not approve or reject the opportunity chain."],
+            ["Approval + Monitor", "Drafts, in-approval, active reports, verified and closed."],
+            ["Applications", "Join applications on this institution’s listings. Monitor only."],
         ],
         rule: "University oversight is institutional; academic report approval remains with Faculty.",
     },
@@ -196,14 +197,45 @@ function EmptyPanel({ title, text }: { title: string; text: string }) {
     );
 }
 
-function UniRemindButtons({ email, title }: { email?: string | null; title: string }) {
+function UniRemindButtons({
+    email,
+    title,
+    opportunityId,
+    currentlyWith,
+    currentlyWithRole,
+    nextStep,
+    publicCode,
+}: {
+    email?: string | null;
+    title: string;
+    opportunityId?: string;
+    currentlyWith?: string | null;
+    currentlyWithRole?: string | null;
+    nextStep?: string | null;
+    publicCode?: string | null;
+}) {
+    const role = String(currentlyWithRole || "").toLowerCase();
+    if (opportunityId && ["faculty", "partner", "admin"].includes(role)) {
+        return (
+            <div className="mt-1.5">
+                <ApprovalFollowUpActions
+                    opportunityId={opportunityId}
+                    currentlyWithRole={currentlyWithRole}
+                    currentlyWith={currentlyWith}
+                    title={title}
+                    publicCode={publicCode}
+                    nextStep={nextStep}
+                />
+            </div>
+        );
+    }
     const to = email && email.includes("@") ? email : "";
     const subject = `Community Service reminder — ${title}`;
     const body = `A reminder from your university about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
     return (
         <div className="mt-1.5 flex flex-wrap gap-2">
             <a href={mailtoHref(to, subject, body)} className="rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]">
-                ✉ Remind
+                ✉ Send Reminder
             </a>
             <a href={whatsappShareHref(body)} className="rounded-full bg-[#e8f8ee] px-3 py-1.5 text-[11px] font-extrabold text-[#1f7a46]">
                 WhatsApp
@@ -234,11 +266,14 @@ export default function UniversityCommunityServiceHub() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const tabParam = searchParams.get("tab") || "";
+    const monitorParam = searchParams.get("monitor") || "";
     const {
         loading,
         orgName,
         mine,
         approvalOpps,
+        draftOpps,
+        oppRows,
         createCounts,
         pipeline,
         waiting,
@@ -259,6 +294,8 @@ export default function UniversityCommunityServiceHub() {
     const [allocEmail, setAllocEmail] = useState("");
     const [allocOpen, setAllocOpen] = useState(false);
     const [allocBusy, setAllocBusy] = useState(false);
+    const [joinApps, setJoinApps] = useState<Array<Record<string, unknown>>>([]);
+    const [joinAppsLoading, setJoinAppsLoading] = useState(false);
 
     useEffect(() => {
         setInnerTab(tabParam);
@@ -269,6 +306,15 @@ export default function UniversityCommunityServiceHub() {
         const params = new URLSearchParams(searchParams.toString());
         params.set("view", view === "reps" ? "allocation" : view);
         params.set("tab", id);
+        params.set("monitor", "monitor");
+        router.replace(`${CS_BASE}?${params.toString()}`, { scroll: false });
+    };
+
+    const setMonitorTab = (id: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("view", "projects");
+        params.set("monitor", id);
+        if (id !== "monitor") params.delete("tab");
         router.replace(`${CS_BASE}?${params.toString()}`, { scroll: false });
     };
 
@@ -281,7 +327,12 @@ export default function UniversityCommunityServiceHub() {
         | "published"
         | "closed";
     const allocTab = ["requested", "authorized", "history"].includes(innerTab) ? innerTab : "authorized";
-    const projectTab = ["approval", "active", "verified", "closed"].includes(innerTab) ? innerTab : "active";
+    const monitorTab = ["all", "university", "monitor", "applications"].includes(monitorParam)
+        ? monitorParam
+        : tabParam === "all" || tabParam === "university" || tabParam === "applications"
+          ? tabParam
+          : "monitor";
+    const projectTab = ["drafts", "approval", "active", "verified", "closed"].includes(innerTab) ? innerTab : "active";
     const filesTab = innerTab === "ai" ? "ai" : "faculty";
     const effectiveView: CsView = view === "reps" ? "allocation" : view;
     const guide = GUIDES[effectiveView] || GUIDES.home;
@@ -313,6 +364,32 @@ export default function UniversityCommunityServiceHub() {
         if (query && !`${row.title}`.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
     };
+
+    useEffect(() => {
+        if (effectiveView !== "projects" || monitorTab !== "applications") return;
+        let cancelled = false;
+        setJoinAppsLoading(true);
+        Promise.all([
+            authenticatedFetch("/api/v1/partner/opportunity-applications?status=pending", {}, { redirectToLogin: false }),
+            authenticatedFetch("/api/v1/partner/opportunity-applications?status=history", {}, { redirectToLogin: false }),
+        ])
+            .then(async ([pendingRes, historyRes]) => {
+                const pendingJson = pendingRes?.ok ? await pendingRes.json() : null;
+                const historyJson = historyRes?.ok ? await historyRes.json() : null;
+                const pending = Array.isArray(pendingJson?.data) ? pendingJson.data : [];
+                const history = Array.isArray(historyJson?.data) ? historyJson.data : [];
+                if (!cancelled) setJoinApps([...pending, ...history]);
+            })
+            .catch(() => {
+                if (!cancelled) setJoinApps([]);
+            })
+            .finally(() => {
+                if (!cancelled) setJoinAppsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [effectiveView, monitorTab]);
 
     const attention = [
         {
@@ -663,6 +740,78 @@ export default function UniversityCommunityServiceHub() {
                     </div>
                     <HubTabs
                         tabs={[
+                            { id: "all", label: "All opportunities", count: oppRows.filter(filterOpp).length },
+                            { id: "university", label: "University opportunities", count: mine.filter(filterOpp).length },
+                            { id: "monitor", label: "Approval + Monitor", count: approvalOpps.filter(filterOpp).length + draftOpps.filter(filterOpp).length },
+                            { id: "applications", label: "Applications", count: joinApps.length },
+                        ]}
+                        active={monitorTab}
+                        onChange={setMonitorTab}
+                    />
+                    {monitorTab === "all" || monitorTab === "university" ? (
+                        loading ? (
+                            <p className="text-sm text-slate-500">Loading…</p>
+                        ) : (monitorTab === "university" ? mine : oppRows).filter(filterOpp).length === 0 ? (
+                            <EmptyPanel
+                                title="Nothing here"
+                                text={
+                                    monitorTab === "university"
+                                        ? "Opportunities created by this university appear here. Read-only — no Approve/Reject."
+                                        : "Named opportunities for this institution appear here. Read-only — no Approve/Reject."
+                                }
+                            />
+                        ) : (
+                            <div className="grid gap-3">
+                                {(monitorTab === "university" ? mine : oppRows).filter(filterOpp).map((row) => {
+                                    const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: "decided" });
+                                    return (
+                                        <div key={row.id}>
+                                            <OpportunityApprovalCard
+                                                {...model}
+                                                actions={
+                                                    <Link href={`${MY_OPPS}/${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                                        Open Flashcard
+                                                    </Link>
+                                                }
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
+                    ) : monitorTab === "applications" ? (
+                        joinAppsLoading ? (
+                            <p className="text-sm text-slate-500">Loading…</p>
+                        ) : joinApps.length === 0 ? (
+                            <EmptyPanel title="No join applications" text="Applications to this university’s listings appear here. University does not approve the opportunity chain from this tab." />
+                        ) : (
+                            <div className="grid gap-3">
+                                {joinApps.map((row) => {
+                                    const id = String(row.id || "");
+                                    const oppId = String(row.opportunity_id || "");
+                                    const title = String(row.opportunity_title || "Opportunity");
+                                    const student = String(row.student_name || "Student");
+                                    const stage = String(row.application_stage || row.internal_status || "—");
+                                    return (
+                                        <article key={id} className="rounded-2xl border border-[#dde5ea] bg-white p-4">
+                                            <p className="text-[10px] font-black uppercase tracking-wide text-[#70808a]">{stage.replace(/_/g, " ")}</p>
+                                            <b className="mt-1 block text-[13px] text-[#16313d]">{title}</b>
+                                            <p className="mt-0.5 text-[12px] text-[#4f6068]">{student}{row.student_email ? ` · ${String(row.student_email)}` : ""}</p>
+                                            {oppId ? (
+                                                <Link href={`${MY_OPPS}/${encodeURIComponent(oppId)}`} className={`${approvalActionClass.soft} mt-3 inline-flex`}>
+                                                    Open opportunity
+                                                </Link>
+                                            ) : null}
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        )
+                    ) : (
+                    <>
+                    <HubTabs
+                        tabs={[
+                            { id: "drafts", label: "Drafts", count: draftOpps.filter(filterOpp).length },
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
                             { id: "active", label: "Active reports", count: waiting.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
@@ -673,6 +822,33 @@ export default function UniversityCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
+                    ) : projectTab === "drafts" ? (
+                        draftOpps.filter(filterOpp).length === 0 ? (
+                            <EmptyPanel title="Nothing here" text="Student and institution drafts named to this university appear here. They cannot be approved until submitted." />
+                        ) : (
+                            <div className="grid gap-3">
+                                {draftOpps.filter(filterOpp).map((row) => {
+                                    const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: "decided" });
+                                    return (
+                                        <div key={row.id}>
+                                            <OpportunityApprovalCard
+                                                {...model}
+                                                actions={
+                                                    <Link href={`${MY_OPPS}/${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                                        Open Flashcard
+                                                    </Link>
+                                                }
+                                            />
+                                            <ContactStudentActions
+                                                studentEmail={pickStr(row, "creator_email", "student_email", "email")}
+                                                title={row.title}
+                                                publicCode={pickStr(row, "public_code", "publicCode")}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
                     ) : projectTab === "approval" ? (
                         approvalOpps.filter(filterOpp).length === 0 ? (
                             <EmptyPanel title="Nothing here" text="Opportunities still moving through Faculty → Partner → CIEL PK appear here." />
@@ -690,7 +866,15 @@ export default function UniversityCommunityServiceHub() {
                                                     </Link>
                                                 }
                                             />
-                                            <UniRemindButtons email={pickStr(row, "creator_email", "faculty_email")} title={row.title} />
+                                            <UniRemindButtons
+                                                email={pickStr(row, "creator_email", "faculty_email")}
+                                                title={row.title}
+                                                opportunityId={row.id}
+                                                currentlyWith={pickStr(row, "currently_with", "currentlyWith")}
+                                                currentlyWithRole={pickStr(row, "currently_with_role", "currentlyWithRole")}
+                                                nextStep={pickStr(row, "next_step", "nextStep")}
+                                                publicCode={pickStr(row, "public_code", "publicCode")}
+                                            />
                                         </div>
                                     );
                                 })}
@@ -711,6 +895,8 @@ export default function UniversityCommunityServiceHub() {
                                 </div>
                             );
                         })()
+                    )}
+                    </>
                     )}
                 </div>
             )}

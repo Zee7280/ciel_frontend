@@ -15,7 +15,7 @@ import {
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
 import { ApprovalChain, buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
-import { whatsappShareHref } from "@/utils/reminderLinks";
+import { formatSentWaiting, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     canEditReturnedOpportunity,
     isOpportunityPermanentlyRejected,
@@ -63,6 +63,17 @@ type MineRow = {
     partner_contact_name?: string | null;
     partner_contact_email?: string | null;
     rejection_reason?: string | null;
+    public_code?: string | null;
+    currently_with?: string | null;
+    currently_with_role?: string | null;
+    next_step?: string | null;
+    waiting_since?: string | null;
+    approval_route?: {
+        faculty?: string;
+        partner?: string;
+        admin?: string;
+        student?: string;
+    };
 };
 
 function isCreateTab(value: string | null): value is CreateTab {
@@ -146,6 +157,7 @@ export default function CommunityServiceCreate() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const filterParam = searchParams.get("filter");
+    const focusId = searchParams.get("opportunity");
     const [rows, setRows] = useState<MineRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [showDraftExistsModal, setShowDraftExistsModal] = useState(false);
@@ -175,6 +187,15 @@ export default function CommunityServiceCreate() {
                         partner_contact_name: (r.partner_contact_name as string | null) ?? null,
                         partner_contact_email: (r.partner_contact_email as string | null) ?? null,
                         rejection_reason: (r.rejection_reason as string | null) ?? null,
+                        public_code: typeof r.public_code === "string" ? r.public_code : null,
+                        currently_with: typeof r.currently_with === "string" ? r.currently_with : null,
+                        currently_with_role: typeof r.currently_with_role === "string" ? r.currently_with_role : null,
+                        next_step: typeof r.next_step === "string" ? r.next_step : null,
+                        waiting_since: typeof r.waiting_since === "string" ? r.waiting_since : null,
+                        approval_route:
+                            r.approval_route && typeof r.approval_route === "object" && !Array.isArray(r.approval_route)
+                                ? (r.approval_route as MineRow["approval_route"])
+                                : undefined,
                     })),
                 );
                 setLoading(false);
@@ -213,6 +234,12 @@ export default function CommunityServiceCreate() {
 
     const list = submitted.filter((row) => createTabOf(row) === tab);
     const activeN = counts.drafts + counts.review + counts.action;
+
+    useEffect(() => {
+        if (!focusId || loading) return;
+        const el = document.getElementById(`cs-opp-${focusId}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [focusId, loading, tab]);
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
@@ -376,7 +403,7 @@ export default function CommunityServiceCreate() {
             ) : (
                 <div className="grid gap-3.5">
                     {list.map((op) => (
-                        <ProposalCard key={op.id} op={op} tab={tab} onOpenHistory={() => setHistoryOpenId(op.id)} />
+                        <ProposalCard key={op.id} op={op} tab={tab} highlighted={focusId === op.id} onOpenHistory={() => setHistoryOpenId(op.id)} />
                     ))}
                 </div>
             )}
@@ -467,14 +494,37 @@ export default function CommunityServiceCreate() {
     );
 }
 
-function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab; onOpenHistory: () => void }) {
+function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; tab: CreateTab; highlighted?: boolean; onOpenHistory: () => void }) {
     const who = currentReviewer(op);
     const [sendingEmail, setSendingEmail] = useState(false);
     const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`;
     const viewHref = `/dashboard/student/browse/${encodeURIComponent(op.id)}`;
-    const remindSubject = `CIEL PK reminder — ${op.title}`;
-    const remindBody = `Hi ${who},\n\nA polite reminder that "${op.title}" is waiting for review on CIEL PK.\n`;
-    const canSendReviewerEmail = tab === "review" && who !== "CIEL PK";
+    const publicCode = op.public_code || "";
+    const remindSubject = publicCode
+        ? `CIEL PK Community Service Approval · ${publicCode}`
+        : `CIEL PK reminder — ${op.title}`;
+    const remindBody = [
+        "CIEL PK · Approval Reminder",
+        `Opportunity: ${op.title}`,
+        publicCode ? `ID: ${publicCode}` : "",
+        `Current Status: ${op.currently_with || who}`,
+        op.next_step ? `Next: ${op.next_step}` : "",
+        "",
+        "Please review the opportunity when convenient.",
+        op.approval_route?.faculty || op.approval_route?.admin
+            ? `Open Approval: ${
+                  op.currently_with_role === "partner"
+                      ? op.approval_route?.partner
+                      : op.currently_with_role === "admin"
+                        ? op.approval_route?.admin
+                        : op.approval_route?.faculty
+              }`
+            : "",
+    ]
+        .filter((line) => line !== "")
+        .join("\n");
+    const canSendReviewerEmail = tab === "review";
+    const sentWaiting = formatSentWaiting(op.waiting_since);
 
     const sendReviewerEmail = async () => {
         if (sendingEmail) return;
@@ -532,10 +582,19 @@ function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab;
     }
 
     return (
-        <article className="grid grid-cols-1 gap-4 rounded-[17px] border border-[#dde5ea] bg-white p-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <article
+            id={`cs-opp-${op.id}`}
+            className={
+                "grid grid-cols-1 gap-4 rounded-[17px] border bg-white p-4 lg:grid-cols-[minmax(0,1fr)_280px] " +
+                (highlighted ? "border-[#0e7d74] shadow-[0_0_0_3px_rgba(14,125,116,0.15)]" : "border-[#dde5ea]")
+            }
+        >
             <div>
                 <div className="flex flex-wrap items-center gap-2">
                     <h4 className="m-0 text-[15px] font-semibold text-[#16313d]">{op.title}</h4>
+                    {op.public_code ? (
+                        <span className="rounded-lg bg-[#eef3f5] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#3f5661]">{op.public_code}</span>
+                    ) : null}
                     <span className="rounded-[18px] bg-[#edf4fb] px-2 py-0.5 text-[9.5px] font-black text-[#376d9f]">Created by You</span>
                     <span
                         className={
@@ -580,12 +639,15 @@ function ProposalCard({ op, tab, onOpenHistory }: { op: MineRow; tab: CreateTab;
             <div className="space-y-2">
                 <div className="rounded-[13px] border border-[#dde5ea] bg-[#fbfcfd] px-3 py-2.5">
                     <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#70808a]">Status · Opportunity</p>
-                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{statusTitle}</b>
-                    <small className="mt-0.5 block text-[10.5px] text-[#6b7c86]">{statusText}</small>
+                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{op.currently_with ? `Currently with: ${op.currently_with}` : statusTitle}</b>
+                    <small className="mt-0.5 block text-[10.5px] text-[#6b7c86]">
+                        {statusText}
+                        {sentWaiting ? ` · ${sentWaiting}` : ""}
+                    </small>
                 </div>
                 <div className="rounded-[13px] border border-[#efddb7] bg-[#fff8e9] px-3 py-2.5">
                     <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#9d6810]">Next action</p>
-                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{nextTitle}</b>
+                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{op.next_step || nextTitle}</b>
                     <small className="mt-0.5 block text-[10.5px] text-[#6b7c86]">{nextText}</small>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

@@ -16,6 +16,7 @@ import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import {
     mapCommunityPipelineRow,
     mergeCommunityLiveDeck,
@@ -806,9 +807,19 @@ export default function PartnerCommunityServiceHub() {
                                                             </Link>
                                                         </>
                                                     ) : (
-                                                        <Link href={href} className={approvalActionClass.soft}>
-                                                            {mode === "decided" ? "Open record" : "View Flashcard"}
-                                                        </Link>
+                                                        <>
+                                                            <Link href={href} className={approvalActionClass.soft}>
+                                                                {mode === "decided" ? "Open record" : "View Flashcard"}
+                                                            </Link>
+                                                            <ApprovalFollowUpActions
+                                                                opportunityId={row.id}
+                                                                currentlyWithRole={pickStr(row, "currently_with_role", "currentlyWithRole")}
+                                                                currentlyWith={pickStr(row, "currently_with", "currentlyWith")}
+                                                                title={pickStr(row, "title", "projectTitle") || "Opportunity"}
+                                                                publicCode={pickStr(row, "public_code", "publicCode")}
+                                                                nextStep={pickStr(row, "next_step", "nextStep")}
+                                                            />
+                                                        </>
                                                     )
                                                 }
                                             />

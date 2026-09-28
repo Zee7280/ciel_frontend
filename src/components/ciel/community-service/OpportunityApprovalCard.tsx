@@ -4,6 +4,7 @@ import {
     isFacultyApprovalCompleteForPartnerGate,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
+import { formatSentWaiting } from "@/utils/reminderLinks";
 
 export type ApprovalCardStepState = "done" | "cur" | "bad" | "locked";
 
@@ -237,6 +238,15 @@ export function buildOpportunityApprovalModel(
 
     const version = typeof row.version === "number" && Number.isFinite(row.version) ? row.version : 1;
     const activity = ago(row.updated_at ?? row.updatedAt ?? row.submitted_at ?? row.submittedAt ?? row.created_at ?? row.createdAt);
+    const currentlyWith = pickStr(row, "currently_with", "currentlyWith");
+    const nextStep = pickStr(row, "next_step", "nextStep");
+    const waitingStamp = formatSentWaiting(
+        typeof row.waiting_since === "string"
+            ? row.waiting_since
+            : typeof row.waitingSince === "string"
+              ? row.waitingSince
+              : null,
+    );
     const summary =
         pickStr(row, "summary", "description", "short_description") ||
         pickStr(asObj(row.activity_details), "summary", "description");
@@ -277,6 +287,11 @@ export function buildOpportunityApprovalModel(
         statusText = `Faculty approved · Opp v${version}${activity ? ` · ${activity}` : ""}`;
     }
 
+    if (currentlyWith && mode === "pending") {
+        statusTitle = `Currently with: ${currentlyWith}`;
+        if (nextStep) nextText = `Next: ${nextStep}`;
+    }
+
     if (mode === "revision") {
         statusTitle = "Revision requested";
         statusText = "Waiting for the creator to resubmit this version.";
@@ -294,10 +309,14 @@ export function buildOpportunityApprovalModel(
 
     return {
         title: pickStr(row, "title", "project_title", "projectTitle", "name") || "Opportunity",
-        idLabel: formatDisplayId(row.id, "OPP"),
+        idLabel: pickStr(row, "public_code", "publicCode") || formatDisplayId(row.id, "OPP"),
         versionLabel: `Opp v${version}`,
         statusPill: statusTitle,
-        lastActivity: activity ? `Last activity ${activity}` : "",
+        lastActivity: waitingStamp
+            ? waitingStamp
+            : activity
+              ? `Last activity ${activity}`
+              : "",
         people,
         steps,
         summary,
