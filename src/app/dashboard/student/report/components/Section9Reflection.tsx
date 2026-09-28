@@ -3,6 +3,7 @@ import { Label } from "./ui/label";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
+import { normalizeAcademicIntegration } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const integrationOptions = [
@@ -197,6 +198,12 @@ export default function Section9Reflection() {
     } = section9;
 
     const update = (field: string, val: unknown) => updateSection("section9", { [field]: val });
+    const carriedIntegration = normalizeAcademicIntegration(
+        academic_integration
+        || (data.section1?.team_lead as { academicIntegrationType?: string } | undefined)?.academicIntegrationType,
+    );
+    const selectedIntegration = normalizeAcademicIntegration(academic_integration);
+
     const updateScore = (key: string, val: number) =>
         update("competency_scores", { ...competency_scores, [key]: val });
 
@@ -296,7 +303,9 @@ export default function Section9Reflection() {
                 <div className="cer-secl">
                     <span className="cer-secn">8.1</span>
                     <h3>Academic integration</h3>
-                    <span className="cer-tag auto">Carried from your program — tap to change</span>
+                    <span className={clsx("cer-tag", carriedIntegration && "auto")}>
+                        {carriedIntegration ? "Carried from your program — tap to change" : "Required"}
+                    </span>
                 </div>
                 <div className="cer-chips">
                     {integrationOptions.map((opt) => (
@@ -304,12 +313,12 @@ export default function Section9Reflection() {
                             key={opt.id}
                             type="button"
                             onClick={() => update("academic_integration", opt.id)}
-                            className={clsx("cer-chip", academic_integration === opt.id && "on")}
+                            className={clsx("cer-chip", selectedIntegration === opt.id && "on")}
                         >
                             {opt.label}
                         </button>
                     ))}
-                    {academic_integration && !integrationOptions.some((opt) => opt.id === academic_integration) ? (
+                    {academic_integration && !integrationOptions.some((opt) => opt.id === selectedIntegration) ? (
                         <button type="button" className="cer-chip on" onClick={() => update("academic_integration", academic_integration)}>
                             {academic_integration}
                         </button>

@@ -35,7 +35,7 @@ import OpportunityApprovalCard, {
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
-import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { isCommunityReportRejected, isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
@@ -437,7 +437,9 @@ function FacultyCommunityServiceHub() {
         | "closed";
     const reviewTab = ["opps", "revision", "apps", "done"].includes(innerTab) ? innerTab : "opps";
     const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
-    const reportTab = ["pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
+    const reportTab = ["pending", "rev", "done", "rejected"].includes(innerTab) ? innerTab : "pending";
+    const approvedReports = decidedReports.filter((row) => !isCommunityReportRejected(row));
+    const rejectedReports = decidedReports.filter((row) => isCommunityReportRejected(row));
     const filesTab = innerTab === "ai" ? "ai" : "faculty";
 
     const crumb = VIEW_CRUMB[view];
@@ -933,7 +935,8 @@ function FacultyCommunityServiceHub() {
                         tabs={[
                             { id: "pending", label: "Pending review", count: pendingReports.length },
                             { id: "rev", label: "Revision with student", count: revisionReports.length },
-                            { id: "done", label: "Decided", count: decidedReports.length },
+                            { id: "done", label: "Approved", count: approvedReports.length },
+                            { id: "rejected", label: "Rejected", count: rejectedReports.length },
                         ]}
                         active={view === "pending" ? "pending" : reportTab}
                         onChange={setHubTab}
@@ -942,7 +945,14 @@ function FacultyCommunityServiceHub() {
                         <p className="text-sm text-slate-500">Loading reports…</p>
                     ) : (
                         (() => {
-                            const list = reportTab === "rev" ? revisionReports : reportTab === "done" ? decidedReports : pendingReports;
+                            const list =
+                                reportTab === "rev"
+                                    ? revisionReports
+                                    : reportTab === "rejected"
+                                      ? rejectedReports
+                                      : reportTab === "done"
+                                        ? approvedReports
+                                        : pendingReports;
                             if (!list.length) {
                                 return (
                                     <EmptyPanel
@@ -952,7 +962,9 @@ function FacultyCommunityServiceHub() {
                                                 ? "Submitted reports arrive here as a locked Flashcard + Detailed Report. The Analyzer runs only when you choose to run it."
                                                 : reportTab === "rev"
                                                   ? "Reports you return for correction stay here until the student resubmits."
-                                                  : "Decided reports stay here for history."
+                                                  : reportTab === "rejected"
+                                                    ? "Permanently rejected reports stay here. They are not verified impact."
+                                                    : "Approved reports stay here for history."
                                         }
                                     />
                                 );
@@ -963,7 +975,13 @@ function FacultyCommunityServiceHub() {
                                         <div key={row.id}>
                                             <FacultyReportReviewCard
                                                 row={row}
-                                                mode={reportTab === "rev" ? "revision" : reportTab === "done" ? "decided" : "pending"}
+                                                mode={
+                                                    reportTab === "rev"
+                                                        ? "revision"
+                                                        : reportTab === "done" || reportTab === "rejected"
+                                                          ? "decided"
+                                                          : "pending"
+                                                }
                                             />
                                             {reportTab === "rev" ? (
                                                 <FacultyRemindButtons email={row.student_email} title={row.project_title} />

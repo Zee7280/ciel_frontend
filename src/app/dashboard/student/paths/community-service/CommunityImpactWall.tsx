@@ -46,7 +46,7 @@ type WallRow = {
     hours?: number;
     created_at?: string;
     impact_verify_url?: string | null;
-    actions?: { certificate_url?: string | null; pdf_url?: string | null; evidence_url?: string | null };
+    actions?: { certificate_url?: string | null; pdf_url?: string | null; v17_url?: string | null; evidence_url?: string | null };
     // Phase 3: CII v2 AI Analysis data for two-column display
     ciiV2?: {
         final?: number;
@@ -99,6 +99,12 @@ type WallRow = {
         note?: string;
     }> | null;
 };
+
+function studentV17Href(r: Pick<WallRow, "project_id" | "opportunity_id" | "actions">): string | null {
+    if (r.actions?.v17_url) return r.actions.v17_url;
+    const id = r.project_id || r.opportunity_id;
+    return id ? `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}&view=v17` : null;
+}
 
 type FlashState = {
     title: string;
@@ -962,6 +968,9 @@ export default function CommunityImpactWall(_props: {
                                     <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-2.5">
                                         <button type="button" onClick={() => openFlash(r)} className="rounded-[9px] bg-[#174b43] px-2.5 py-1.5 text-[9px] font-black text-white">
                                             Open Flashcard
+                                        </button>
+                                        <button type="button" onClick={() => openOrToast(studentV17Href(r), "V17 detailed report is not available yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
+                                            V17 Detailed Report
                                         </button>
                                         <button type="button" onClick={() => openOrToast(r.actions?.pdf_url, "PDF is not attached yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
                                             PDF Report

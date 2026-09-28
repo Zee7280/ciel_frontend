@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
-import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
+import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
@@ -37,6 +37,16 @@ export interface ReportData {
     admin_approval_status?: string;
     partner_status?: string;
     faculty_status?: string;
+    faculty_remarks?: string | null;
+    last_edited_by?: string | null;
+    last_edited_at?: string | null;
+    last_saved?: string | null;
+    report_access?: {
+        participation_mode?: string;
+        is_team_lead?: boolean;
+        can_edit_report_body?: boolean;
+        can_submit_report?: boolean;
+    };
     /** Admin/partner notes when the report was returned for revision. */
     admin_feedback?: string | null;
     feedback?: string | null;
@@ -695,7 +705,10 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [isReadOnly, setReadOnly] = useState(false);
     const [myParticipationIsTeamLead, setMyParticipationIsTeamLead] = useState<boolean | null>(null);
     const [isParticipationUnlocked, setParticipationUnlocked] = useState(false);
-    
+
+    const participationIntegration = (data.section1?.team_lead as { academicIntegrationType?: string } | undefined)
+        ?.academicIntegrationType;
+
     // Hour bar for submission uses logged sessions, including ones faculty has not reviewed yet.
     // Each member must log their own hours. Faculty approves the flash card after submit.
     const isEligibleForSubmission = useMemo(() => {
@@ -771,6 +784,17 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         () => isReadOnly || isTeamMemberAttendanceOnly,
         [isReadOnly, isTeamMemberAttendanceOnly],
     );
+
+    useEffect(() => {
+        if (isReportSectionsReadOnly) return;
+        if (String(data.section9.academic_integration || "").trim()) return;
+        const mapped = normalizeAcademicIntegration(participationIntegration);
+        if (!mapped) return;
+        setData((prev) => {
+            if (String(prev.section9.academic_integration || "").trim()) return prev;
+            return { ...prev, section9: { ...prev.section9, academic_integration: mapped } };
+        });
+    }, [isReportSectionsReadOnly, data.section9.academic_integration, participationIntegration]);
 
     const canFinalizeSubmit = useMemo(
         () => canSubmitReport && isTeamLeadForSubmit,
@@ -997,7 +1021,11 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         const keys = wizardStepToDataSections(activeStep).map((n) => `section${n}`);
         for (const sectionKey of keys) {
             const errors = validationErrors[sectionKey] || [];
-            const error = errors.find((e) => e.field === fieldPath || e.field.endsWith(`.${fieldPath}`));
+            const error = errors.find((e) =>
+                e.field === fieldPath
+                || e.field.endsWith(`.${fieldPath}`)
+                || fieldPath.endsWith(`.${e.field}`)
+            );
             if (error) return error.message;
         }
         return undefined;

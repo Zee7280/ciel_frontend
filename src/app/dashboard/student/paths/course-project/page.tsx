@@ -8,17 +8,29 @@ import { authenticatedFetch } from "@/utils/api";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import EmptyState from "@/components/ciel/EmptyState";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import Tabs from "@/components/ciel/Tabs";
+import Tabs, { type CielTab } from "@/components/ciel/Tabs";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
-import { isFacultyApproved } from "@/utils/courseworkSectionReview";
-import { isPathEntryWaiting } from "@/utils/reviewQueue";
-import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { isFacultyApproved, pendingFacultyReview } from "@/utils/courseworkSectionReview";
+import { normalizeReviewStatus } from "@/utils/reviewQueue";
+import { CourseworkCrumb, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import CourseworkSectionGuide from "@/components/ciel/coursework/CourseworkSectionGuide";
+import CourseworkGuidanceOverview from "@/components/ciel/coursework/CourseworkGuidanceOverview";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
 import CourseworkImpactListCard from "@/components/ciel/coursework/CourseworkImpactListCard";
+
+const STUDENT_HUB_VIEWS = ["home", "create", "workspace", "wall", "guide"] as const;
+type StudentHubView = (typeof STUDENT_HUB_VIEWS)[number];
+type WorkspaceTab = "all" | "active" | "submitted" | "decided";
+
+const VIEW_CRUMB: Record<Exclude<StudentHubView, "home">, string> = {
+    create: "Create",
+    workspace: "My Workspace",
+    wall: "Impact",
+    guide: "Guidance",
+};
 
 function firstName() {
     const user = readStoredCurrentUser();
@@ -29,16 +41,8 @@ function firstName() {
 function CourseProjectHub() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const rawView = searchParams.get("view");
-    const view =
-        rawView === "guide" ||
-        rawView === "wall" ||
-        rawView === "in-progress" ||
-        rawView === "under-review" ||
-        rawView === "create"
-            ? rawView
-            : "home";
-    const hubHref = "/dashboard/student/paths/course-project";
+    const { view, homeHref } = useFacultyHubView(STUDENT_HUB_VIEWS, "home");
+    const hubHref = homeHref;
     const createHref = `${hubHref}?view=create`;
     const goCreate = () => router.push(createHref);
     const openParam = searchParams.get("open");
@@ -47,7 +51,7 @@ function CourseProjectHub() {
     const [creating, setCreating] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [name, setName] = useState("there");
-    const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
+    const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("all");
     const [flashId, setFlashId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -96,47 +100,44 @@ function CourseProjectHub() {
 
     if (loading) return <WorkspaceSkeleton />;
 
+    // Everything a student owns, split the way the module actually behaves: `status` only ever
+    // flips draft -> submitted (it never reverts), so a record faculty sent back for revision or
+    // rejected is still `status === "submitted"` — only `facultyApprovalStatus` moves. Reading both
+    // fields directly here (rather than reusing the faculty-inbox "waiting" helper for everything)
+    // keeps revision/rejected records visible in "My Workspace" instead of falling into neither the
+    // drafts bucket nor the pending-with-faculty bucket.
     const drafts = entries.filter((e) => e.status !== "submitted");
+    const revision = entries.filter((e) => e.status === "submitted" && normalizeReviewStatus(e.facultyApprovalStatus) === "revision_requested");
+    const rejected = entries.filter((e) => e.status === "submitted" && normalizeReviewStatus(e.facultyApprovalStatus) === "rejected");
+    const pendingWithFaculty = entries.filter(pendingFacultyReview);
     const approved = entries.filter(isFacultyApproved);
-    const inProgress = drafts.length;
-    const underReview = entries.filter(isPathEntryWaiting);
+    const active = [...drafts, ...revision];
+    const decided = [...approved, ...rejected];
     const flashEntry = flashId ? approved.find((e) => e.id === flashId) ?? null : null;
+
+    const workspaceTabs: CielTab[] = [
+        { key: "all", label: `All · ${entries.length}` },
+        { key: "active", label: `In progress · ${active.length}` },
+        { key: "submitted", label: `With faculty · ${pendingWithFaculty.length}` },
+        { key: "decided", label: `Decided · ${decided.length}` },
+    ];
+    const workspaceRows =
+        workspaceTab === "all" ? entries : workspaceTab === "active" ? active : workspaceTab === "submitted" ? pendingWithFaculty : decided;
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CourseworkCrumb
-                role="Student"
-                view={
-                    view === "home"
-                        ? undefined
-                        : view === "create"
-                          ? "Create"
-                          : view === "wall"
-                            ? "Impact"
-                            : view === "in-progress"
-                              ? "In progress"
-                              : view === "under-review"
-                                ? "Under review"
-                                : view === "guide"
-                                  ? "Guide"
-                                  : view
-                }
-            />
+            <CourseworkCrumb role="Student" view={view === "home" ? undefined : VIEW_CRUMB[view]} />
             {view === "home" ? (
                 <MockupHero
                     kicker="MY PATHS · COURSEWORK"
                     title={namedTimeGreeting(name === "there" ? "" : name, "📘")}
-                    subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
+                    subtitle="Fill the coursework form chapter by chapter, submit your flashcard to faculty, and collect your approved coursework here."
                     stats={[
                         { value: String(approved.length), label: "APPROVED" },
-                        { value: String(underReview.length), label: "UNDER REVIEW" },
-                        { value: String(inProgress), label: "IN PROGRESS" },
+                        { value: String(pendingWithFaculty.length), label: "UNDER REVIEW" },
+                        { value: String(active.length), label: "IN PROGRESS" },
                     ]}
                 />
-            ) : view !== "create" && view !== "wall" ? (
-                <div className="mt-4">
-                    <HubBackButton href={hubHref} />
-                </div>
             ) : null}
 
             {view === "create" && (
@@ -158,7 +159,7 @@ function CourseProjectHub() {
                     <section className="overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
                         <div className="p-5">
                             <div className="mb-3.5 rounded-xl border border-[#ead8b8] bg-[#fff8ec] p-3 text-[11.5px] leading-[1.5] text-[#715a2d]">
-                                No pre-approval is required. The form has <b>seven short sections</b> (Course → Format → Aims → Process → Results → SDG map → Reflection) and an <b>AI summary writes itself under each one</b>, in your voice. When you submit, the summaries become your faculty flashcard. Your instructor decides; you receive the approved file.
+                                No pre-approval is required. The form has <b>six short chapters</b> (Course & Faculty → Brief & Problem → Aim & Method → Results → SDG Mapping → Reflection & Evidence) and an <b>AI summary writes itself under each one</b>, in your voice. When you submit, the summaries become your faculty flashcard. Your instructor decides; you receive the approved file.
                             </div>
                             <div className="flex flex-wrap items-center gap-2.5">
                                 <button
@@ -171,7 +172,7 @@ function CourseProjectHub() {
                                 </button>
                             </div>
                             <div className="mt-4 rounded-xl border border-[#d5eee8] bg-[#eef8f6] px-3.5 py-2.5 text-[11px] leading-[1.5] text-[#4b6f68]">
-                                Once you start, the record appears under <b>Coursework → Coursework in Progress</b> with a completion bar. Your faculty, university and CIEL PK can see progress and send reminders — never your unfinished text.
+                                Once you start, the record appears under <b>My Workspace</b> with a completion bar. Your faculty, university and CIEL PK can see progress and send reminders — never your unfinished text.
                             </div>
                         </div>
                     </section>
@@ -179,8 +180,26 @@ function CourseProjectHub() {
             )}
 
             {view === "guide" && (
-                <div className="mt-4">
-                    <CourseworkSectionGuide />
+                <div className="mt-[23px] space-y-5">
+                    <div className="mb-1 flex flex-wrap items-end justify-between gap-5">
+                        <div>
+                            <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Coursework Guidance</h2>
+                            <p className="mt-1 text-[12.5px] text-[#70808a]">
+                                What to submit, how you are scored, and what happens after submission.
+                            </p>
+                        </div>
+                        <Link
+                            href={hubHref}
+                            className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline"
+                        >
+                            ← Back to module buttons
+                        </Link>
+                    </div>
+                    <CourseworkGuidanceOverview />
+                    <div>
+                        <h3 className="mb-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#70808a]">Section-by-section guide</h3>
+                        <CourseworkSectionGuide />
+                    </div>
                 </div>
             )}
 
@@ -241,9 +260,23 @@ function CourseProjectHub() {
                 </div>
             )}
 
-            {view === "in-progress" && (
-                <div className="mt-4">
-                    {drafts.length === 0 ? (
+            {view === "workspace" && (
+                <div className="mt-[23px]">
+                    <div className="mb-3.5 flex flex-wrap items-end justify-between gap-5">
+                        <div>
+                            <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">My Workspace</h2>
+                            <p className="mt-1 text-[12.5px] text-[#70808a]">
+                                Everything you own, where it is in the loop, and what to do next.
+                            </p>
+                        </div>
+                        <Link
+                            href={hubHref}
+                            className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline"
+                        >
+                            ← Back to module buttons
+                        </Link>
+                    </div>
+                    {entries.length === 0 ? (
                         <EmptyState
                             emoji="🧩"
                             heading="Nothing in progress"
@@ -252,78 +285,43 @@ function CourseProjectHub() {
                             onAction={goCreate}
                         />
                     ) : (
-                        <div className="space-y-3">
-                            {drafts.map((entry) => (
-                                <div key={entry.id} className="relative">
-                                    <CardOpenTarget entryId={entry.id!} router={router}>
-                                        <CourseworkCard entry={entry} studentReminder="team" hideScore />
-                                    </CardOpenTarget>
-                                    {entry.isOwner !== false && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteDraft(entry.id!);
-                                            }}
-                                            disabled={deletingId === entry.id}
-                                            aria-label="Delete draft"
-                                            className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                        <>
+                            <Tabs tabs={workspaceTabs} active={workspaceTab} onChange={(key) => setWorkspaceTab(key as WorkspaceTab)} />
+                            <div className="mt-3 space-y-3">
+                                {workspaceRows.length === 0 ? (
+                                    <p className="px-1 text-sm text-ciel-text-mid">Nothing in this tab right now.</p>
+                                ) : (
+                                    workspaceRows.map((entry) => (
+                                        <div key={entry.id} className="relative">
+                                            <CardOpenTarget entryId={entry.id!} router={router}>
+                                                <CourseworkCard
+                                                    entry={entry}
+                                                    studentReminder={entry.status !== "submitted" ? "team" : "faculty"}
+                                                    hideScore
+                                                />
+                                            </CardOpenTarget>
+                                            {entry.status !== "submitted" && entry.isOwner !== false && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteDraft(entry.id!);
+                                                    }}
+                                                    disabled={deletingId === entry.id}
+                                                    aria-label="Delete draft"
+                                                    className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             )}
-
-            {view === "under-review" && (() => {
-                const byTab = {
-                    pending: underReview.filter((e) => e.facultyApprovalStatus === "pending"),
-                    revision: underReview.filter((e) => e.facultyApprovalStatus === "revision_requested"),
-                    rejected: underReview.filter((e) => e.facultyApprovalStatus === "rejected"),
-                };
-                const visible = reviewTab === "all" ? underReview : byTab[reviewTab];
-                return (
-                    <div className="mt-4">
-                        {underReview.length === 0 ? (
-                            <EmptyState
-                                emoji="📤"
-                                heading="Nothing under review"
-                                line="Submit a completed coursework record and it lands here while faculty reviews it."
-                                actionLabel="+ New coursework report"
-                                onAction={goCreate}
-                            />
-                        ) : (
-                            <>
-                                <Tabs
-                                    tabs={[
-                                        { key: "all", label: `All · ${underReview.length}` },
-                                        { key: "pending", label: `Pending faculty · ${byTab.pending.length}` },
-                                        { key: "revision", label: `Revision required · ${byTab.revision.length}` },
-                                        { key: "rejected", label: `Not accepted · ${byTab.rejected.length}` },
-                                    ]}
-                                    active={reviewTab}
-                                    onChange={(key) => setReviewTab(key as typeof reviewTab)}
-                                />
-                                <div className="mt-3 space-y-3">
-                                    {visible.length === 0 ? (
-                                        <p className="px-1 text-sm text-ciel-text-mid">Nothing in this tab right now.</p>
-                                    ) : (
-                                        visible.map((entry) => (
-                                            <CardOpenTarget key={entry.id} entryId={entry.id!} router={router}>
-                                                <CourseworkCard entry={entry} studentReminder="faculty" hideScore />
-                                            </CardOpenTarget>
-                                        ))
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                );
-            })()}
 
             {view === "home" && (
                 <>
@@ -332,47 +330,37 @@ function CourseProjectHub() {
                             href={createHref}
                             emoji="📚"
                             ghost="📚"
-                            title="Create Coursework Record"
-                            subtitle="Open the Coursework Sustainability & SDG form. Seven short sections — each writes its own AI summary; no pre-approval needed."
+                            title="Create Coursework"
+                            subtitle="Open the Coursework Sustainability & SDG form. Six short chapters — each writes its own AI summary; no pre-approval needed."
                             badge={creating ? "OPENING" : "START"}
                             background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
-                            href="/dashboard/student/paths/course-project?view=in-progress"
+                            href={`${hubHref}?view=workspace`}
                             emoji="🧩"
                             ghost="🧩"
-                            title="Coursework in Progress"
-                            subtitle="Records you're still filling in — completion bar, and Email / WhatsApp reminders for your team or your faculty."
-                            badge={`${inProgress} IN PROGRESS`}
+                            title="My Workspace"
+                            subtitle="Every record you own: drafts, revisions, records with faculty, and decisions — plus a direct line to your faculty."
+                            badge={`${active.length} ACTIVE`}
                             background={MOCKUP_GRADIENTS.orange}
                         />
                         <MockupActionCard
-                            href="/dashboard/student/paths/course-project?view=under-review"
-                            emoji="📤"
-                            ghost="📤"
-                            title="Coursework Under Review"
-                            subtitle="Submitted flashcards waiting for faculty approval — with Email / WhatsApp buttons to remind your faculty."
-                            badge={`${underReview.length} UNDER REVIEW`}
-                            background={MOCKUP_GRADIENTS.blue}
-                        />
-                        <MockupActionCard
-                            href="/dashboard/student/impact?area=Coursework"
+                            href={`${hubHref}?view=wall`}
                             emoji="🏅"
                             ghost="🏅"
-                            title="My Coursework Impact"
-                            subtitle="Approved flashcards with ranking live under My Impact Portfolio → Coursework. University and CIEL PK see the same cards."
+                            title="My Impact Wall"
+                            subtitle="Approved coursework with final score, flashcard and any ranking badges. Shared with your faculty, university and CIEL PK."
                             badge={`${approved.length} APPROVED`}
                             background={MOCKUP_GRADIENTS.green}
                         />
                         <MockupActionCard
-                            href="/dashboard/student/paths/course-project?view=guide"
+                            href={`${hubHref}?view=guide`}
                             emoji="📘"
                             ghost="📘"
-                            title="Coursework Guidance"
-                            subtitle="What to fill in, what evidence helps, and what happens after you submit."
+                            title="Guidance"
+                            subtitle="What to submit, how you are scored and what happens after submission."
                             badge="GUIDE INSIDE"
                             background={MOCKUP_GRADIENTS.purple}
-                            full
                         />
                     </div>
 

@@ -484,6 +484,7 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                             </p>
                         </button>
                     </div>
+                    <FieldError message={getFieldError("use_resources")} />
 
                     {use_resources === "no" ? (
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

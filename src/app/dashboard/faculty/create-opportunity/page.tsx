@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Info, MapPin, AlertCircle, ChevronDown, Loader2, Plus } from "lucide-react";
 import { X } from "lucide-react";
@@ -117,6 +117,12 @@ function pickProfileContact(u: unknown): string {
 
 export default function FacultyOpportunityCreationPage() {
     const router = useRouter();
+    const pathname = usePathname();
+    const isCielAdminForm = pathname?.startsWith("/dashboard/admin/create-opportunity") ?? false;
+    const hubHref = isCielAdminForm
+        ? "/dashboard/admin/community-service?view=create"
+        : "/dashboard/faculty/community-service?view=create";
+    const formPath = isCielAdminForm ? "/dashboard/admin/create-opportunity" : "/dashboard/faculty/create-opportunity";
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
@@ -412,11 +418,19 @@ export default function FacultyOpportunityCreationPage() {
 
         // Section F1 — Academic lead / faculty verification
         if (!facultyDetails.name.trim()) {
-            toast.error("Faculty name is missing from your profile (Section A / F1)");
+            toast.error(
+                isCielAdminForm
+                    ? "Creator name is missing from your profile (Section A)"
+                    : "Faculty name is missing from your profile (Section A / F1)",
+            );
             return false;
         }
         if (!facultyDetails.institution.trim()) {
-            toast.error("University / institution is missing from your profile (Section A / F1)");
+            toast.error(
+                isCielAdminForm
+                    ? "Institution is missing from your profile (Section A)"
+                    : "University / institution is missing from your profile (Section A / F1)",
+            );
             return false;
         }
         if (!formData.academicLead.designation.trim() || !formData.academicLead.department.trim()) {
@@ -714,7 +728,14 @@ export default function FacultyOpportunityCreationPage() {
                     toast.success(
                         isEdit
                             ? "Opportunity updated successfully."
-                            : "Opportunity submitted. Track partner (if any) and admin approval under My Opportunities.",
+                            : isCielAdminForm
+                              ? formData.partnerCollaboration.hasPartner ||
+                                (formData.academicLead.officialEmail.trim().toLowerCase() !==
+                                    facultyDetails.email.trim().toLowerCase() &&
+                                    isValidEmail(formData.academicLead.officialEmail))
+                                  ? "Submitted. Waiting on partner or faculty acknowledgement — CIEL PK does not need a second admin approval."
+                                  : "Opportunity published. Partner or faculty acknowledgement is required only if those stakeholders are named."
+                              : "Opportunity submitted. Track partner (if any) and admin approval under My Opportunities.",
                     );
                     deviceDraftClosed.current = true;
                     try {
@@ -731,7 +752,7 @@ export default function FacultyOpportunityCreationPage() {
                             /* the submitted listing already exists */
                         });
                     }
-                    router.push("/dashboard/faculty/community-service?view=create");
+                    router.push(hubHref);
                 } else {
                     toast.error(data.message || (isEdit ? "Failed to update opportunity" : "Failed to create opportunity"));
                 }
@@ -796,7 +817,7 @@ export default function FacultyOpportunityCreationPage() {
                 setEditingOpportunityId(newId);
                 setIsDraftMode(true);
                 router.replace(
-                    `/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(newId)}&draft=1`,
+                    `${formPath}?edit=${encodeURIComponent(newId)}&draft=1`,
                     { scroll: false },
                 );
             }
@@ -831,6 +852,10 @@ export default function FacultyOpportunityCreationPage() {
                 } catch {
                     /* ignore */
                 }
+                const path =
+                    typeof window !== "undefined" ? window.location.pathname : pathname || "";
+                const adminCreator =
+                    isCielAdminForm || path.startsWith("/dashboard/admin/create-opportunity");
 
                 let name = typeof base.name === "string" ? base.name : "";
                 let email = pickProfileEmail(base);
@@ -901,14 +926,14 @@ export default function FacultyOpportunityCreationPage() {
                     city,
                 };
 
-                if (!isFacultyProfileComplete(mergedForGate)) {
+                if (!adminCreator && !isFacultyProfileComplete(mergedForGate)) {
                     router.replace("/dashboard/faculty/profile");
                     return;
                 }
 
                 setFacultyDetails({
                     name,
-                    institution,
+                    institution: institution || (adminCreator ? "CIEL PK" : ""),
                     city,
                     contact,
                     email,
@@ -918,8 +943,9 @@ export default function FacultyOpportunityCreationPage() {
                     academicLead: {
                         ...p.academicLead,
                         officialEmail: email || p.academicLead.officialEmail,
-                        department: department || p.academicLead.department,
-                        designation: designation || p.academicLead.designation,
+                        department: department || p.academicLead.department || (adminCreator ? "CIEL PK" : ""),
+                        designation:
+                            designation || p.academicLead.designation || (adminCreator ? "CIEL PK Super Admin" : ""),
                     },
                 }));
             } catch (error) {
@@ -929,8 +955,8 @@ export default function FacultyOpportunityCreationPage() {
             }
         };
 
-        fetchProfile();
-    }, [router]);
+                        fetchProfile();
+    }, [router, isCielAdminForm]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -1150,7 +1176,7 @@ export default function FacultyOpportunityCreationPage() {
             creatorName: facultyDetails.name,
             orgLabel: facultyDetails.institution || "—",
             unitLabel: formData.academicLead.department || "—",
-            badgeLabel: "FACULTY CREATOR",
+            badgeLabel: isCielAdminForm ? "CIEL PK CREATOR" : "FACULTY CREATOR",
             privateCandidate: false,
             facultyName: facultyDetails.name,
             facultyEmail: formData.academicLead.officialEmail || facultyDetails.email,
@@ -1159,13 +1185,17 @@ export default function FacultyOpportunityCreationPage() {
             verification: formData.verification.join(", "),
             scopeLabel: scopeMap[formData.applyScope] || formData.applyScope,
             scopeDetail,
-            approvalText: partnerOn
-                ? "Pending partner acknowledgement → CIEL PK final review"
-                : "Pending CIEL PK final review",
+            approvalText: isCielAdminForm
+                ? partnerOn
+                    ? "Pending partner acknowledgement — no second CIEL admin approval"
+                    : "Published by CIEL PK unless a partner or faculty is named"
+                : partnerOn
+                  ? "Pending partner acknowledgement → CIEL PK final review"
+                  : "Pending CIEL PK final review",
             eligible: elig.eligible,
             eligibilityWhy: elig.why,
         };
-    }, [formData, facultyDetails, flashViewer]);
+    }, [formData, facultyDetails, flashViewer, isCielAdminForm]);
 
     return (
         <div className="co-form">
@@ -1176,7 +1206,7 @@ export default function FacultyOpportunityCreationPage() {
                     </p>
                 </div>
                 <Link
-                    href="/dashboard/faculty/community-service"
+                    href={hubHref}
                     className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
                 >
                     ← Back
@@ -1186,15 +1216,27 @@ export default function FacultyOpportunityCreationPage() {
             <div className="co-hero">
                 <div className="co-hero-copy">
                     <p className="co-hero-eyebrow">
-                        {editingOpportunityId ? "EDIT FACULTY OPPORTUNITY · SDG-ALIGNED" : "CIEL PK · FACULTY COMMUNITY SERVICE"}
+                        {editingOpportunityId
+                            ? isCielAdminForm
+                                ? "EDIT CIEL PK OPPORTUNITY · SDG-ALIGNED"
+                                : "EDIT FACULTY OPPORTUNITY · SDG-ALIGNED"
+                            : isCielAdminForm
+                              ? "CIEL PK · SUPER ADMIN COMMUNITY SERVICE"
+                              : "CIEL PK · FACULTY COMMUNITY SERVICE"}
                     </p>
                     <h1>
-                        {editingOpportunityId ? "Update your listing" : "Create an opportunity — you are the academic owner."}
+                        {editingOpportunityId
+                            ? "Update your listing"
+                            : isCielAdminForm
+                              ? "Create an opportunity — CIEL PK is the publisher."
+                              : "Create an opportunity — you are the academic owner."}
                     </h1>
                     <p>
                         {editingOpportunityId
                             ? "Update your posting. Some fields may be restricted after approval."
-                            : "You are auto-linked as the faculty owner. Partner acknowledgement is optional. CIEL PK completes final review before the opportunity is published."}
+                            : isCielAdminForm
+                              ? "CIEL PK does not need a second admin approval. Partner or faculty acknowledgement is required only if those stakeholders are named."
+                              : "You are auto-linked as the faculty owner. Partner acknowledgement is optional. CIEL PK completes final review before the opportunity is published."}
                     </p>
                     <div className="co-hero-chips">
                         <span className="co-hero-chip">🧭 Guided 9-step form</span>
@@ -1233,8 +1275,8 @@ export default function FacultyOpportunityCreationPage() {
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
-                                        <b>{step.label}</b>
-                                        <span>{step.sub}</span>
+                                        <b>{step.key === "A" && isCielAdminForm ? "Creator" : step.label}</b>
+                                        <span>{step.key === "A" && isCielAdminForm ? "CIEL PK profile" : step.sub}</span>
                                     </span>
                                     <span className="co-step-num">{idx < activeStepIndex ? "✓" : idx + 1}</span>
                                 </button>
@@ -1248,7 +1290,9 @@ export default function FacultyOpportunityCreationPage() {
                     <div className="co-side-card">
                         <h3>Approval path</h3>
                         <p>
-                            Faculty (auto-linked academic owner) → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity
+                            {isCielAdminForm
+                                ? "CIEL PK publishes directly. Partner or faculty acknowledgement only if named → Published opportunity"
+                                : "Faculty (auto-linked academic owner) → Partner/host acknowledgement if named → CIEL PK final review → Published opportunity"}
                         </p>
                     </div>
                 </aside>
@@ -1258,7 +1302,7 @@ export default function FacultyOpportunityCreationPage() {
             {/* SECTION A: FACULTY DETAILS */}
             {activeStep === "A" && (
             <div className="co-card">
-                <CoSectionHead letter="A" title="Faculty details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
+                <CoSectionHead letter="A" title={isCielAdminForm ? "CIEL PK creator details" : "Faculty details"} tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
                 {isLoadingProfile ? (
                     <div className="py-4 text-center text-[#7a919a]">
                         <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading details...
@@ -2360,9 +2404,13 @@ export default function FacultyOpportunityCreationPage() {
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-2">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">CIEL PK final review</h3>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                            {isCielAdminForm ? "Stakeholder acknowledgement (only if named)" : "CIEL PK final review"}
+                        </h3>
                         <p className="text-sm text-slate-600">
-                            After you submit, a named partner (if any) acknowledges first. CIEL PK then completes final review before the opportunity is published.
+                            {isCielAdminForm
+                                ? "CIEL Admin does not need a second platform approval. If you name a partner or a faculty academic owner, that person acknowledges first — then the opportunity is published."
+                                : "After you submit, a named partner (if any) acknowledges first. CIEL PK then completes final review before the opportunity is published."}
                         </p>
                     </div>
 

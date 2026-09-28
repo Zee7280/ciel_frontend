@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-    MapPin,
     Loader2,
     CheckCircle2,
     Upload,
@@ -158,7 +157,6 @@ export default function AttendanceForm({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
-    const [showMap, setShowMap] = useState(false);
     const [pinnedAddress, setPinnedAddress] = useState("");
     const [mounted, setMounted] = React.useState(false);
     const [formData, setFormData] = useState({
@@ -491,34 +489,30 @@ export default function AttendanceForm({
                 />
             </div>
 
-            {/* Pin exact location */}
+            {/* Pin exact location — search is always visible so students don't skip the pin */}
             <div className="space-y-1.5">
                 <Label className={labelClass}>Pin Exact Location</Label>
-                {!showMap ? (
-                    <button
-                        type="button"
-                        onClick={() => setShowMap(true)}
-                        className="flex min-h-[120px] w-full min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 px-4 py-5 text-center transition-colors hover:border-[#0e7d74]/50 hover:bg-[#e6f6f4]"
-                    >
-                        <MapPin className="h-5 w-5 shrink-0 text-rose-500" />
-                        <span className="max-w-full text-xs font-medium leading-snug break-words text-slate-500">
-                            Map preview — tap to search or drop a pin
-                        </span>
-                    </button>
-                ) : (
-                    <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200">
-                        <LocationPicker
-                            onLocationSelect={(loc) => {
-                                setPinnedAddress(loc.address || "");
-                                setFormData((prev) => ({
-                                    ...prev,
-                                    organizationName: loc.address || prev.organizationName,
-                                    locationPin: `${loc.lat},${loc.lng}`,
-                                }));
-                            }}
-                        />
-                    </div>
-                )}
+                <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
+                    <LocationPicker
+                        initialLocation={(() => {
+                            const pin = formData.locationPin;
+                            if (!pin.includes(",")) return undefined;
+                            const [lat, lng] = pin.split(",").map((s) => parseFloat(s.trim()));
+                            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+                            return { lat, lng };
+                        })()}
+                        onLocationSelect={(loc) => {
+                            setPinnedAddress(loc.address || "");
+                            setFormData((prev) => ({
+                                ...prev,
+                                organizationName: prev.organizationName.trim()
+                                    ? prev.organizationName
+                                    : loc.address || prev.organizationName,
+                                locationPin: `${loc.lat},${loc.lng}`,
+                            }));
+                        }}
+                    />
+                </div>
                 <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
                     {formData.locationPin ? (
                         <>
@@ -531,7 +525,7 @@ export default function AttendanceForm({
                     ) : (
                         <>
                             <Info className="mt-0.5 h-3 w-3 shrink-0" />
-                            <span>Optional — pin helps verify your engagement site</span>
+                            <span>Search the site by name, or drop a pin on the map. Optional — pin helps verify your engagement site.</span>
                         </>
                     )}
                 </p>

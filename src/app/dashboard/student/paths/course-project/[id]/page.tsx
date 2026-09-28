@@ -54,6 +54,25 @@ const STEPS = [
     { key: "reflection", emoji: "💡", label: "Reflection" },
     { key: "submit", emoji: "📩", label: "Submit" },
 ];
+
+/** Presentation-only regrouping of the 8 stored STEPS above into the mockup's 6 visual "chapters"
+ * (STEPS itself — and everything it drives: entity fields, autosave, computeCourseworkReadiness —
+ * stays untouched). Two chapters bundle two adjacent raw steps: "Aim & Method" (aims + process) and
+ * "Reflection & Evidence" (reflection + the review/declare/submit step, folded in as an action
+ * rather than a separate 7th tab). Each raw step's own content block is unchanged; only the outer
+ * chapter/progress nav and the chip strip below it are new. */
+const CHAPTERS: { title: string; emoji: string; steps: number[] }[] = [
+    { title: "Course & Faculty", emoji: "📌", steps: [0] },
+    { title: "Brief & Problem", emoji: "📝", steps: [1] },
+    { title: "Aim & Method", emoji: "🎯", steps: [2, 3] },
+    { title: "Results", emoji: "📦", steps: [4] },
+    { title: "SDG Mapping", emoji: "🌍", steps: [5] },
+    { title: "Reflection & Evidence", emoji: "💡", steps: [6, 7] },
+];
+function chapterIndexForStep(step: number): number {
+    const idx = CHAPTERS.findIndex((c) => c.steps.includes(step));
+    return idx === -1 ? 0 : idx;
+}
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 /** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
 function semesterSelectValue(raw?: string): string {
@@ -809,6 +828,7 @@ export default function CourseProjectWizardPage() {
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
     const blended = routesIn.length > 1;
     const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
+    const chaptersComplete = CHAPTERS.filter((c) => c.steps.every((s) => s < entry.stepCompleted)).length;
 
     const primarySdg = entry.sdgMapping?.entries?.[0];
     const supportingSdgs = entry.sdgMapping?.entries?.slice(1) ?? [];
@@ -853,11 +873,11 @@ export default function CourseProjectWizardPage() {
             <CourseworkHero
                 kicker="MY PATHS · COURSEWORK"
                 title="Build project"
-                subtitle="Fill each section. Your draft saves as you go — faculty only sees this after you submit."
+                subtitle="Fill each chapter. Your draft saves as you go — faculty only sees this after you submit."
                 gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
                 stats={[
                     { value: statusChip.label, label: "STATUS" },
-                    { value: `${entry.stepCompleted}/8`, label: "STEPS COMPLETE" },
+                    { value: `${chaptersComplete}/6`, label: "CHAPTERS COMPLETE" },
                 ]}
             />
             <div className="mt-5">
@@ -919,41 +939,65 @@ export default function CourseProjectWizardPage() {
                         />
                     </div>
                     <div className="flex gap-1.5 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
-                        {STEPS.map((s, i) => {
-                            const isCurrent = i === step;
-                            const isDone = i < entry.stepCompleted && !isCurrent;
-                            const isSubmit = i === STEPS.length - 1;
+                        {CHAPTERS.map((chapter, ci) => {
+                            const isCurrent = chapter.steps.includes(step);
+                            const isDone = !isCurrent && chapter.steps.every((s) => s < entry.stepCompleted);
                             return (
                                 <button
-                                    key={s.key}
+                                    key={chapter.title}
                                     type="button"
-                                    onClick={() => setStep(i)}
-                                    title={stepLabels[i]}
+                                    onClick={() => setStep(isCurrent ? step : chapter.steps[0])}
+                                    title={chapter.title}
                                     className={clsx(
                                         "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 pb-[7px] pt-2.5 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
                                         isCurrent
                                             ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep shadow-[0_2px_8px_rgba(213,170,70,.25)]"
-                                            : isSubmit
-                                              ? "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-gold/40"
-                                              : "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep hover:border-ciel-green",
+                                            : isDone
+                                              ? "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep hover:border-ciel-green"
+                                              : "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-gold/40",
                                     )}
                                 >
                                     <span
                                         className={clsx(
                                             "absolute -top-2 left-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] font-black text-white ring-2 ring-white",
-                                            isCurrent ? "bg-ciel-gold-deep" : isSubmit ? "bg-ciel-text-mid" : "bg-ciel-green-deep",
+                                            isCurrent ? "bg-ciel-gold-deep" : isDone ? "bg-ciel-green-deep" : "bg-ciel-text-mid",
                                         )}
                                     >
-                                        {isDone ? "✓" : i + 1}
+                                        {isDone ? "✓" : ci + 1}
                                     </span>
-                                    <div className="text-sm leading-none">{s.emoji}</div>
+                                    <div className="text-sm leading-none">{chapter.emoji}</div>
                                     <div className="mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide">
-                                        {stepLabels[i]}
+                                        {chapter.title}
                                     </div>
                                 </button>
                             );
                         })}
                     </div>
+                    {CHAPTERS[chapterIndexForStep(step)].steps.length > 1 && (
+                        <div className="mt-1.5 flex gap-1.5 pl-1">
+                            {CHAPTERS[chapterIndexForStep(step)].steps.map((s) => {
+                                const isCurrent = s === step;
+                                const isDone = s < entry.stepCompleted && !isCurrent;
+                                return (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => setStep(s)}
+                                        className={clsx(
+                                            "ciel-transition rounded-full border-2 px-3 py-1 text-[10.5px] font-bold",
+                                            isCurrent
+                                                ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep"
+                                                : isDone
+                                                  ? "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep"
+                                                  : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
+                                        )}
+                                    >
+                                        {STEPS[s].emoji} {stepLabels[s]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">

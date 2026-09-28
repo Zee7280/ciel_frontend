@@ -1,6 +1,18 @@
 // Shared types + summary composition for the Course Project coursework wizard, flash card, and decks.
 // Mirrors ciel_backend/src/paths/entities/course-project-entry.entity.ts
 
+/** One published ranking badge at a single level — see CourseProjectEntry.meritRibbon. */
+export interface CourseworkRibbonEntry {
+    rank: number;
+    of: number;
+    scope: string;
+    total?: number;
+    badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
+    previousRank?: number | null;
+    at: string;
+}
+export type CourseworkRibbonLevel = "faculty" | "university" | "cielpk";
+
 export interface CourseProjectGroupMember {
     name: string;
     email?: string;
@@ -213,16 +225,14 @@ export interface CourseProjectEntry {
     facultyApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     facultyApprovalNote?: string | null;
     facultyApprovalAt?: string | null;
-    /** Pinned by the analyzer after a ranked run — shown on My Impact Wall. badgeLevel is a rank-percentile
-     * tier; previousRank is this card's rank the last time it was ranked (null/undefined = first run). */
+    /** Up to three independent, simultaneous ranking badges — one per publishing level (Faculty,
+     * University, CIEL PK). Each is only ever written by that level's own role and publishing one
+     * never touches the others. badgeLevel is a rank-percentile tier; previousRank is that level's
+     * rank the last time it was ranked at that same level (null/undefined = first run at that level). */
     meritRibbon?: {
-        rank: number;
-        of: number;
-        scope: string;
-        total?: number;
-        badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
-        previousRank?: number | null;
-        at: string;
+        faculty?: CourseworkRibbonEntry;
+        university?: CourseworkRibbonEntry;
+        cielpk?: CourseworkRibbonEntry;
     } | null;
     /** Faculty's own per-criterion override of the AI-proposed rubric levels, frozen at approval —
      * faculty-only, never present on a student-facing response (see backend redactMeritScoreForStudent). */
@@ -327,6 +337,27 @@ export function rankMovement(
     if (ribbon.previousRank < ribbon.rank) return { symbol: "↓", label: `Down from #${ribbon.previousRank}` };
     return { symbol: "—", label: "Unchanged" };
 }
+
+const RIBBON_LEVEL_ORDER: CourseworkRibbonLevel[] = ["cielpk", "university", "faculty"];
+
+/** Fans a record's meritRibbon map out into a list of whichever levels are actually published,
+ * most-prestigious first (CIEL PK > University > Faculty) — the single source every card/flashcard
+ * should render badges from instead of guessing a "kind" from a scope string. */
+export function courseworkRibbons(
+    entry: Pick<CourseProjectEntry, "meritRibbon">,
+): { level: CourseworkRibbonLevel; ribbon: CourseworkRibbonEntry }[] {
+    if (!entry.meritRibbon) return [];
+    return RIBBON_LEVEL_ORDER.filter((level) => entry.meritRibbon?.[level]).map((level) => ({
+        level,
+        ribbon: entry.meritRibbon![level]!,
+    }));
+}
+
+export const COURSEWORK_RIBBON_LEVEL_LABEL: Record<CourseworkRibbonLevel, string> = {
+    faculty: "Faculty ranking",
+    university: "University ranking",
+    cielpk: "CIEL PK ranking",
+};
 
 /** Section summaries embed literal `<b>...</b>` markers for emphasis (rendered via RichSummaryText
  * in read-only views) — but a plain HTML `<textarea>` can't render partial bold, so the review

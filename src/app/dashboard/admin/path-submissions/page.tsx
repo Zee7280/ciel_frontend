@@ -21,11 +21,13 @@ import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import Tabs from "@/components/ciel/Tabs";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
-import { CourseworkCrumb, HubBackButton, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkMonitorRow, isCourseworkMonitorStalled } from "@/components/ciel/coursework/CourseworkMonitorRow";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
+import { courseworkRibbons, COURSEWORK_RIBBON_LEVEL_LABEL, type CourseworkRibbonEntry } from "@/utils/courseProjectTypes";
 
 type PathTab = "course-project" | "fyp-thesis" | "startup-business";
 
@@ -58,7 +60,22 @@ interface AdminCourseProjectRow {
     facultyApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     updatedAt: string;
     student: AdminStudent | null;
-    studentInfo?: { groupMembers?: (string | AdminGroupMember)[] } | null;
+    studentInfo?: {
+        groupMembers?: (string | AdminGroupMember)[];
+        studentName?: string;
+        studentEmail?: string;
+        teacherName?: string;
+        teacherEmail?: string;
+        universityName?: string;
+    } | null;
+    /** Up to three independent ranking badges (faculty / university / cielpk) — see
+     * CourseProjectEntry.meritRibbon on the backend. Used only for the Governance & Activity
+     * "recent rankings" list, derived client-side from these `.at` timestamps. */
+    meritRibbon?: {
+        faculty?: CourseworkRibbonEntry;
+        university?: CourseworkRibbonEntry;
+        cielpk?: CourseworkRibbonEntry;
+    } | null;
 }
 
 interface FypMilestone {
@@ -183,18 +200,20 @@ function memberStatusLabel(member: { email?: string; inviteStatus?: "pending" | 
 }
 
 const ADMIN_PATH = "/dashboard/admin/path-submissions";
-const COURSE_VIEWS = ["home", "progress", "review", "approved", "rank", "stats", "submissions", "hec"] as const;
+const COURSE_VIEWS = ["home", "progress", "review", "approved", "rank", "stats", "submissions", "hec", "command", "governance"] as const;
 const FYP_HUB_VIEWS = ["home", "progress", "review", "approved", "rank", "faculty-work"] as const;
 type CourseView = (typeof COURSE_VIEWS)[number];
 type FypHubView = (typeof FYP_HUB_VIEWS)[number];
 const COURSE_VIEW_CRUMB: Record<Exclude<CourseView, "home">, string> = {
     progress: "Coursework in Progress",
     review: "Coursework Under Review",
-    approved: "Approved Coursework Impact",
-    rank: "Coursework AI Rankings",
+    approved: "CIEL PK Impact Wall",
+    rank: "Run AI Ranker",
     stats: "Analytics",
     submissions: "All submissions",
     hec: "HEC / Government lens",
+    command: "Command Monitor",
+    governance: "Governance & Activity",
 };
 const FYP_VIEW_CRUMB: Record<Exclude<FypHubView, "home">, string> = {
     progress: "FYP in Progress",
@@ -255,10 +274,11 @@ function AdminPathSubmissionsHub() {
     const [approvedMeritEntries, setApprovedMeritEntries] = useState<MeritEntry[]>([]);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
     const [fypMeritLoading, setFypMeritLoading] = useState(false);
+    const [commandTab, setCommandTab] = useState<"stalled" | "all" | "live" | "review" | "done">("stalled");
 
     useEffect(() => {
         if (pathTab !== "course-project") return;
-        if (courseView !== "approved" && courseView !== "rank" && courseView !== "stats" && courseView !== "hec") return;
+        if (courseView !== "approved" && courseView !== "rank" && courseView !== "stats" && courseView !== "hec" && courseView !== "governance") return;
         let cancelled = false;
         setMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/course-projects")
@@ -417,6 +437,62 @@ function AdminPathSubmissionsHub() {
         () => courseRowsAsMerit.filter((r) => r.status === "draft"),
         [courseRowsAsMerit],
     );
+    // Command Monitor — every coursework record CIEL PK can see (listCourseProjectsForAdmin with
+    // no filters already returns drafts + every submitted approval status), with a client-side
+    // "stalled" rule layered on top (see CourseworkMonitorRow.isCourseworkMonitorStalled).
+    const commandPool = courseRows;
+    const commandStalled = useMemo(() => commandPool.filter(isCourseworkMonitorStalled), [commandPool]);
+    const commandLive = useMemo(
+        () => commandPool.filter((r) => r.status === "draft" || r.facultyApprovalStatus === "revision_requested"),
+        [commandPool],
+    );
+    const commandReview = useMemo(() => commandPool.filter(isPathEntryWaiting), [commandPool]);
+    const commandDone = useMemo(
+        () => commandPool.filter((r) => r.facultyApprovalStatus === "approved" || r.facultyApprovalStatus === "rejected"),
+        [commandPool],
+    );
+    const commandRows =
+        commandTab === "stalled" ? commandStalled
+            : commandTab === "live" ? commandLive
+              : commandTab === "review" ? commandReview
+                : commandTab === "done" ? commandDone
+                  : commandPool;
+    const commandContactFor = (row: AdminCourseProjectRow): { name: string; to: string; subject: string; body: string } | null => {
+        const si = row.studentInfo || {};
+        if (row.status === "draft" || row.facultyApprovalStatus === "revision_requested") {
+            const to = row.student?.email || si.studentEmail;
+            if (!to) return null;
+            const name = (row.student?.name || si.studentName || "there").split(" ")[0];
+            return {
+                name,
+                to,
+                subject: `Reminder: continue "${row.projectTitle || "your coursework"}" on CIEL PK`,
+                body: `Hi ${name},\n\nYour coursework record "${row.projectTitle || "coursework"}" (${row.course || "coursework"}) is still with you on CIEL PK. Please continue and submit it for faculty review when it's ready.\n\nThanks,\nCIEL PK`,
+            };
+        }
+        if (isPathEntryWaiting(row)) {
+            const to = si.teacherEmail;
+            if (!to) return null;
+            const name = (si.teacherName || "there").split(" ")[0];
+            return {
+                name,
+                to,
+                subject: `Reminder: "${row.projectTitle || "a coursework record"}" is awaiting your review on CIEL PK`,
+                body: `Hi ${name},\n\nA coursework record — "${row.projectTitle || "coursework"}" (${row.course || "coursework"}) — has been waiting on your review on CIEL PK. Please take a look when you can.\n\nThanks,\nCIEL PK`,
+            };
+        }
+        return null;
+    };
+    // Governance & Activity — "recent rankings": there is no dedicated publications log table on
+    // the backend, so this is derived client-side from every present ribbon's own `.at` timestamp
+    // across the already-fetched rows (no new endpoint).
+    const recentRankings = useMemo(() => {
+        return courseRows
+            .flatMap((row) => courseworkRibbons(row).map(({ level, ribbon }) => ({ row, level, ribbon })))
+            .filter((r) => !!r.ribbon.at)
+            .sort((a, b) => (b.ribbon.at || "").localeCompare(a.ribbon.at || ""))
+            .slice(0, 12);
+    }, [courseRows]);
 
     const fypRowsAsMerit = useMemo(() => fypRows as unknown as FypMeritEntry[], [fypRows]);
     const approvedFyp = useMemo(
@@ -470,62 +546,51 @@ function AdminPathSubmissionsHub() {
                     />
                     {courseView === "home" ? (
                     <>
-                    <MockupHero
+                    <CourseworkHero
                         kicker="CIEL PK · COURSEWORK"
                         title={namedTimeGreeting("CIEL PK", "📘")}
-                        subtitle="Track coursework records from first draft to faculty verification across every university."
+                        subtitle="Command view of coursework records from first draft to faculty verification across every university. Stalled records surface first."
                         stats={[
                             { value: String(approvedCourse.length), label: "APPROVED" },
                             { value: String(waitingCourse.length), label: "UNDER REVIEW" },
-                            { value: String(draftCourse.length), label: "IN PROGRESS" },
+                            { value: String(draftCourse.length), label: "DRAFTS LIVE" },
                         ]}
                     />
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <MockupActionCard
-                            href={tabHref("course-project", "progress")}
-                            emoji="🧩"
-                            ghost="🧩"
-                            title="Coursework in Progress"
-                            subtitle="Live completion percentage, sections completed and student delays — with Email / WhatsApp reminders on each record."
-                            badge={`${draftCourse.length} IN PROGRESS`}
-                            background={MOCKUP_GRADIENTS.teal}
-                        />
-                        <MockupActionCard
-                            href={tabHref("course-project", "review")}
-                            emoji="📤"
-                            ghost="📤"
-                            title="Coursework Under Review"
-                            subtitle="Submitted flashcards waiting for faculty approval or returned for student revision. Remind whoever holds the workflow."
-                            badge={`${waitingCourse.length} UNDER REVIEW`}
-                            background={MOCKUP_GRADIENTS.blue}
-                        />
-                        <MockupActionCard
-                            href={tabHref("course-project", "approved")}
-                            emoji="🏅"
-                            ghost="🏅"
-                            title="Approved Coursework Impact"
-                            subtitle="Every faculty-approved flashcard across universities — the same record the student, faculty and university see."
-                            badge={`${approvedCourse.length} APPROVED`}
-                            background={MOCKUP_GRADIENTS.green}
-                        />
-                        <MockupActionCard
-                            href={tabHref("course-project", "rank")}
-                            emoji="🧮"
-                            ghost="🧮"
-                            title="Coursework AI Rankings"
-                            subtitle="Rank approved coursework nationwide. Waiting submissions stay out of the live picks."
-                            badge="RANKINGS"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                        <MockupActionCard
-                            href={tabHref("course-project", "stats")}
-                            emoji="📊"
-                            ghost="📊"
-                            title="Analytics"
-                            subtitle="Universities, criteria and formats — the intelligence layer only CIEL PK sees."
-                            badge="MASTER ONLY"
+                        <HubTile
+                            href={tabHref("course-project", "command")}
+                            emoji="🛰"
+                            title="Command Monitor"
+                            subtitle="Every record at every university. Stalled items first. Reach the student or the faculty in one tap."
+                            badge={`${commandStalled.length} STALLED`}
                             background={MOCKUP_GRADIENTS.navy}
                         />
+                        <HubTile
+                            href={tabHref("course-project", "approved")}
+                            emoji="🏅"
+                            title="CIEL PK Impact Wall"
+                            subtitle="Every faculty-approved flashcard across universities — the same record the student, faculty and university see."
+                            badge={`${approvedCourse.length} APPROVED`}
+                            background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <HubTile
+                            href={tabHref("course-project", "rank")}
+                            emoji="📊"
+                            title="Run AI Ranker"
+                            subtitle="Rank approved coursework nationwide. Waiting submissions stay out of the live picks."
+                            badge="RANK"
+                            background={MOCKUP_GRADIENTS.purple}
+                        />
+                        <HubTile
+                            href={tabHref("course-project", "governance")}
+                            emoji="⚙️"
+                            title="Governance & Activity"
+                            subtitle="Rubric and engine versions, recent published rankings, and institutional analytics."
+                            badge="GOVERNANCE"
+                            background={MOCKUP_GRADIENTS.gold}
+                        />
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
                             href={tabHref("course-project", "submissions")}
                             emoji="🗂️"
@@ -533,7 +598,7 @@ function AdminPathSubmissionsHub() {
                             title="All submissions"
                             subtitle="Drafts, waiting, and approved — search across every status in one list."
                             badge={`${courseRows.length} ENTRIES`}
-                            background={MOCKUP_GRADIENTS.gold}
+                            background={MOCKUP_GRADIENTS.slate}
                         />
                         <MockupActionCard
                             href={tabHref("course-project", "hec")}
@@ -543,7 +608,6 @@ function AdminPathSubmissionsHub() {
                             subtitle="Flash cards and analytics only — no review actions, no edits."
                             badge="READ-ONLY"
                             background={MOCKUP_GRADIENTS.navy}
-                            full
                         />
                     </div>
                     </>
@@ -640,7 +704,51 @@ function AdminPathSubmissionsHub() {
             </div>
             ) : null}
 
-            {pathTab === "course-project" && courseView === "home" ? null : pathTab === "course-project" && courseView === "hec" ? (
+            {pathTab === "course-project" && courseView === "home" ? null : pathTab === "course-project" && courseView === "command" ? (
+                <>
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
+                    <PathSectionHead
+                        title="Command Monitor"
+                        subtitle="Stalled first: drafts idle ≥ 3 days, submissions waiting on faculty ≥ 5 days. Reach the student or the faculty in one tap."
+                        pill="ALL UNIVERSITIES"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        {([
+                            ["stalled", "Stalled", commandStalled.length],
+                            ["all", "All", commandPool.length],
+                            ["live", "Drafts live", commandLive.length],
+                            ["review", "In faculty review", commandReview.length],
+                            ["done", "Decided", commandDone.length],
+                        ] as const).map(([key, label, n]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setCommandTab(key)}
+                                className={`rounded-[18px] border px-2.5 py-[7px] text-[11px] font-extrabold ${
+                                    commandTab === key ? "border-[#153f47] bg-[#153f47] text-white" : "border-[#dde5ea] bg-white text-[#5c6d76]"
+                                }`}
+                            >
+                                {label} <span className="ml-1 opacity-80">{n}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {loading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : commandRows.length === 0 ? (
+                        <Card className="border-dashed p-10 text-center text-slate-500">
+                            {commandTab === "stalled" ? "Nothing stalled right now." : "No records in this view."}
+                        </Card>
+                    ) : (
+                        <div className="space-y-2">
+                            {commandRows.map((row) => (
+                                <CourseworkMonitorRow key={row.id} entry={row} showStalled contact={commandContactFor(row)} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            ) : pathTab === "course-project" && courseView === "hec" ? (
                 <>
                     <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
                     {meritLoading ? (
@@ -765,6 +873,56 @@ function AdminPathSubmissionsHub() {
                     ) : (
                         <MeritModelPanel entries={approvedMeritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
                     )}
+                </>
+            ) : pathTab === "course-project" && courseView === "governance" ? (
+                <>
+                    <HubBackButton href={tabHref("course-project")} label="← Back to Coursework" />
+                    <PathSectionHead
+                        title="Governance & Activity"
+                        subtitle="Rubric and engine versions, recent published rankings, and the institutional analytics behind them."
+                        pill="GOVERNANCE"
+                    />
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <GovernanceKpi label="Rubric" value="7-criterion · 100pt" />
+                        <GovernanceKpi label="Record states" value="5" hint="draft, submitted, approved, rejected, revision requested" />
+                        <GovernanceKpi label="Ranking levels" value="3" hint="Faculty, University, CIEL PK — independent & simultaneous" />
+                        <GovernanceKpi label="Published rankings" value={String(recentRankings.length)} hint="most recent shown below" />
+                    </div>
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <CourseworkAnalyticsPanel entries={meritEntries} />
+                    )}
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde5ea] bg-white">
+                        <div className="border-b border-[#dde5ea] px-5 py-4">
+                            <h3 className="m-0 text-base font-semibold text-[#183140]">Recent rankings</h3>
+                            <p className="mt-1 text-xs text-[#71828e]">
+                                Every ranking level currently published on a record, most recent first — derived from each record&apos;s own
+                                badge timestamps (no separate publications log exists on the backend).
+                            </p>
+                        </div>
+                        {recentRankings.length === 0 ? (
+                            <p className="px-5 py-8 text-center text-sm text-slate-500">No ranking has been published yet.</p>
+                        ) : (
+                            <ul className="divide-y divide-[#eef1f2]">
+                                {recentRankings.map(({ row, level, ribbon }, i) => (
+                                    <li key={`${row.id}-${level}-${i}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-[12.5px]">
+                                        <span className="min-w-0 truncate text-[#183140]">
+                                            <b className="font-bold">{COURSEWORK_RIBBON_LEVEL_LABEL[level]}</b> — {row.projectTitle || "Untitled coursework"}
+                                            {row.student?.name ? ` · ${row.student.name}` : ""}
+                                        </span>
+                                        <span className="shrink-0 text-[#70808a]">
+                                            #{ribbon.rank}/{ribbon.of}
+                                            {ribbon.badgeLevel ? ` · ${ribbon.badgeLevel}` : ""}
+                                            {ribbon.at ? ` · ${new Date(ribbon.at).toLocaleDateString()}` : ""}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </>
             ) : pathTab === "fyp-thesis" && fypView === "progress" ? (
                 <>
@@ -1254,6 +1412,18 @@ function AdminPathSubmissionsHub() {
                     }}
                 />
             ) : null}
+        </div>
+    );
+}
+
+/** Static rubric/engine info card for the Governance & Activity view — no live query, the numbers
+ * are the platform's fixed governance facts (rubric shape, lifecycle states, ranking levels). */
+function GovernanceKpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+    return (
+        <div className="rounded-[15px] border border-[#dde5ea] bg-white p-3.5">
+            <span className="text-[9px] font-black uppercase tracking-[0.06em] text-[#71828e]">{label}</span>
+            <strong className="mt-1.5 block text-lg font-semibold text-[#183140]">{value}</strong>
+            {hint ? <span className="mt-1 block text-[10px] leading-snug text-[#71828e]">{hint}</span> : null}
         </div>
     );
 }

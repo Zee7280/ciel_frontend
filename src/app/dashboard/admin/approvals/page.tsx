@@ -1291,6 +1291,7 @@ export default function AdminApprovalsPage() {
                                     />
                                 ) : null}
                                 {!isDraftRow ? (
+                                <>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
                                     disabled={!canRequestRevision}
@@ -1320,6 +1321,7 @@ export default function AdminApprovalsPage() {
                                 >
                                     <XCircle className="w-4 h-4" /> Reject permanently
                                 </button>
+                                </>
                                 ) : null}
                                 {showApproveButton ? (
                                 <button

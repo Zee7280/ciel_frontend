@@ -17,21 +17,32 @@ import FacultyFypFlashcardModal, {
     UniversityFypReviewCard,
 } from "@/components/ciel/FacultyFypFlashcard";
 import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
-import { CourseworkCrumb, HubBackButton, PathFilterBar, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathFilterBar, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
+import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
+import { CourseworkMonitorRow } from "@/components/ciel/coursework/CourseworkMonitorRow";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { isPathEntryApproved, isPathEntryWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 
 type DeckMode = "course-project" | "fyp-thesis";
-type UniView = "home" | "progress" | "pending" | "deck" | "rank" | "analytics";
-const UNI_VIEWS: readonly UniView[] = ["home", "progress", "pending", "deck", "rank", "analytics"];
+type UniView = "home" | "progress" | "pending" | "deck" | "rank" | "analytics" | "monitor";
+const UNI_VIEWS: readonly UniView[] = ["home", "progress", "pending", "deck", "rank", "analytics", "monitor"];
 const FYP_VIEW_CRUMB: Record<Exclude<UniView, "home">, string> = {
     progress: "FYP in Progress",
     pending: "FYP Under Review",
     deck: "FYP Impact Wall",
     rank: "FYP AI Rankings — Ranking Studio",
     analytics: "FYP Analytics",
+    monitor: "FYP in Progress",
+};
+const COURSE_VIEW_CRUMB: Record<Exclude<UniView, "home">, string> = {
+    progress: "Coursework in Progress",
+    pending: "Coursework Under Review",
+    deck: "University Impact Wall",
+    rank: "Run AI Ranker",
+    analytics: "Institutional Analytics",
+    monitor: "Live Monitor",
 };
 
 function fypGate(entry: FypMeritEntry) {
@@ -101,6 +112,7 @@ function UniversityShowcaseHub() {
     const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
     const [openReviewId, setOpenReviewId] = useState<string | null>(null);
     const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
+    const [monitorTab, setMonitorTab] = useState<"all" | "live" | "review" | "done">("all");
 
     useEffect(() => {
         void fetchEntries();
@@ -212,6 +224,25 @@ function UniversityShowcaseHub() {
 
     const approved = approvedEntries;
     const waiting = useMemo(() => entries.filter(isPathEntryWaiting), [entries]);
+    // Live Monitor — every record the university can see (drafts + every submitted approval
+    // status), deduped by id. Both source lists are already role-scoped by the backend
+    // (listCourseProjectsForUniversity), so no new endpoint is needed for this merged view.
+    const monitorPool = useMemo(() => {
+        const map = new Map<string, MeritEntry>();
+        for (const e of [...inProgress, ...entries]) if (e.id) map.set(e.id, e);
+        return [...map.values()].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    }, [inProgress, entries]);
+    const monitorLive = useMemo(
+        () => monitorPool.filter((e) => e.status === "draft" || e.facultyApprovalStatus === "revision_requested"),
+        [monitorPool],
+    );
+    const monitorReview = useMemo(() => monitorPool.filter(isPathEntryWaiting), [monitorPool]);
+    const monitorDone = useMemo(
+        () => monitorPool.filter((e) => e.facultyApprovalStatus === "approved" || e.facultyApprovalStatus === "rejected"),
+        [monitorPool],
+    );
+    const monitorRows =
+        monitorTab === "live" ? monitorLive : monitorTab === "review" ? monitorReview : monitorTab === "done" ? monitorDone : monitorPool;
     const approvedFyp = approvedFypEntries;
     const waitingFyp = useMemo(() => fypEntries.filter(isPathEntryWaiting), [fypEntries]);
     const revisionFyp = useMemo(() => fypEntries.filter(isUniFypRevision), [fypEntries]);
@@ -338,7 +369,7 @@ function UniversityShowcaseHub() {
                 : FYP_VIEW_CRUMB[view]
             : view === "home"
               ? undefined
-              : view;
+              : COURSE_VIEW_CRUMB[view];
     const activeLoading = mode === "course-project" ? loading : fypLoading;
 
     if (forbidden) {
@@ -364,14 +395,14 @@ function UniversityShowcaseHub() {
                 <CourseworkCrumb role="University" view={crumbView} pathLabel={mode === "fyp-thesis" ? "Final Year Project (FYP)" : "Coursework"} />
                 {view === "home" ? (
                     mode === "course-project" ? (
-                    <MockupHero
+                    <CourseworkHero
                         kicker="UNIVERSITY · COURSEWORK"
                         title={namedTimeGreeting(firstName, "📘")}
-                        subtitle="See approved sustainability-linked coursework from all departments and run AI Rankings."
+                        subtitle="Read-only oversight of every coursework record at your university. Institutional intelligence after faculty approval — the university never changes a score."
                         stats={[
                             { value: String(approved.length), label: "APPROVED" },
                             { value: String(waiting.length), label: "UNDER REVIEW" },
-                            { value: String(inProgress.length), label: "IN PROGRESS" },
+                            { value: String(inProgress.length), label: "DRAFTS LIVE" },
                         ]}
                     />
                 ) : (
@@ -411,7 +442,7 @@ function UniversityShowcaseHub() {
                 </div>
                 ) : null}
 
-                {mode === "course-project" && view !== "home" && view !== "rank" && (
+                {mode === "course-project" && view !== "home" && view !== "rank" && view !== "analytics" && view !== "monitor" && (
                     <div className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-black uppercase tracking-wide text-slate-500">Coursework Filters</p>
@@ -597,41 +628,37 @@ function UniversityShowcaseHub() {
 
                 {view === "home" && mode === "course-project" && (
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <MockupActionCard
-                            href={hrefFor("course-project", "progress")}
-                            emoji="🧩"
-                            ghost="🧩"
-                            title="Coursework in Progress"
-                            subtitle="Students still filling the form across departments — completion bar, last activity, Email / WhatsApp reminders."
-                            badge={`${inProgress.length} IN PROGRESS`}
-                            background={MOCKUP_GRADIENTS.teal}
+                        <HubTile
+                            href={hrefFor("course-project", "monitor")}
+                            emoji="👁"
+                            title="Live Monitor"
+                            subtitle="Every record, its stage, faculty and waiting time — with live draft progress. Read only."
+                            badge="READ ONLY"
+                            background={MOCKUP_GRADIENTS.navy}
                         />
-                        <MockupActionCard
-                            href={hrefFor("course-project", "pending")}
-                            emoji="📤"
-                            ghost="📤"
-                            title="Coursework Under Review"
-                            subtitle="Submitted flashcards waiting for faculty approval, or returned for revision — remind the faculty member or the student."
-                            badge={`${waiting.length} UNDER REVIEW`}
-                            background={MOCKUP_GRADIENTS.blue}
-                        />
-                        <MockupActionCard
+                        <HubTile
                             href={hrefFor("course-project", "deck")}
                             emoji="🏅"
-                            ghost="🏅"
-                            title="Approved Coursework Impact"
-                            subtitle="Faculty-approved coursework flashcards from every department — the same record the student, faculty and CIEL PK see."
+                            title="University Impact Wall"
+                            subtitle="The institution's approved coursework with final scores and badges."
                             badge={`${approved.length} APPROVED`}
-                            background={MOCKUP_GRADIENTS.green}
+                            background={MOCKUP_GRADIENTS.teal}
                         />
-                        <MockupActionCard
+                        <HubTile
                             href={hrefFor("course-project", "rank")}
-                            emoji="🧮"
-                            ghost="🧮"
-                            title="Coursework AI Rankings"
-                            subtitle="Rank approved coursework. Waiting submissions stay out of the live picks."
-                            badge="RANKINGS"
+                            emoji="📊"
+                            title="Run AI Ranker"
+                            subtitle="Rank approved coursework across departments and publish University badges."
+                            badge="RANK"
                             background={MOCKUP_GRADIENTS.purple}
+                        />
+                        <HubTile
+                            href={hrefFor("course-project", "analytics")}
+                            emoji="📈"
+                            title="Institutional Analytics"
+                            subtitle="Pipeline funnel, score distribution, SDG coverage and faculty turnaround."
+                            badge="INSIGHTS"
+                            background={MOCKUP_GRADIENTS.blue}
                         />
                     </div>
                 )}
@@ -679,6 +706,13 @@ function UniversityShowcaseHub() {
                         pill="SYNCED TO ALL DASHBOARDS"
                     />
                 )}
+                {mode === "course-project" && view === "deck" && (
+                    <PathSectionHead
+                        title="University Impact Wall"
+                        subtitle={`${approved.length} faculty-approved coursework flashcard${approved.length === 1 ? "" : "s"} — the same record the student, faculty and CIEL PK see.`}
+                        pill="IMPACT"
+                    />
+                )}
 
                 {(view === "progress" || view === "pending" || view === "deck") && (
                     <div className="relative max-w-sm">
@@ -693,14 +727,74 @@ function UniversityShowcaseHub() {
                     </div>
                 )}
 
-                {mode === "course-project" && view === "rank" &&
-                    (loading ? (
-                        <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
-                    ) : approved.length === 0 ? (
-                        <EmptyUni />
-                    ) : (
-                        <MeritModelPanel entries={approved} showDepartmentFilter showFacultyFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="This university" />
-                    ))}
+                {mode === "course-project" && view === "monitor" && (
+                    <>
+                        <PathSectionHead
+                            title="Live Monitor"
+                            subtitle="No academic text, no action buttons — just where every record is, its faculty and its waiting time."
+                            pill="READ ONLY"
+                        />
+                        <PathFilterBar
+                            filters={[
+                                `All · ${monitorPool.length}`,
+                                `Drafts live · ${monitorLive.length}`,
+                                `In faculty review · ${monitorReview.length}`,
+                                `Decided · ${monitorDone.length}`,
+                            ]}
+                            active={
+                                monitorTab === "live" ? `Drafts live · ${monitorLive.length}`
+                                    : monitorTab === "review" ? `In faculty review · ${monitorReview.length}`
+                                      : monitorTab === "done" ? `Decided · ${monitorDone.length}`
+                                        : `All · ${monitorPool.length}`
+                            }
+                            onChange={(label) => {
+                                if (label.startsWith("Drafts")) setMonitorTab("live");
+                                else if (label.startsWith("In faculty")) setMonitorTab("review");
+                                else if (label.startsWith("Decided")) setMonitorTab("done");
+                                else setMonitorTab("all");
+                            }}
+                        />
+                        {loading ? (
+                            <SkeletonList />
+                        ) : monitorRows.length === 0 ? (
+                            <EmptyUni message="No records in this view yet." />
+                        ) : (
+                            <div className="space-y-2">
+                                {monitorRows.map((entry) => (
+                                    <CourseworkMonitorRow key={entry.id} entry={entry} />
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {mode === "course-project" && view === "analytics" && (
+                    <>
+                        <PathSectionHead
+                            title="Institutional Analytics"
+                            subtitle="Derived only from approved and in-flight records."
+                            pill="INSIGHTS"
+                        />
+                        {loading ? (
+                            <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+                        ) : (
+                            <CourseworkAnalyticsPanel entries={entries} />
+                        )}
+                    </>
+                )}
+
+                {mode === "course-project" && view === "rank" && (
+                    <>
+                        <PathSectionHead title="Run AI Ranker" subtitle="Institutional cohorts — waiting submissions stay out of the live picks." pill="RANK" />
+                        {loading ? (
+                            <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+                        ) : approved.length === 0 ? (
+                            <EmptyUni />
+                        ) : (
+                            <MeritModelPanel entries={approved} showDepartmentFilter showFacultyFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="This university" />
+                        )}
+                    </>
+                )}
 
                 {mode === "fyp-thesis" && view === "rank" && (
                     <>

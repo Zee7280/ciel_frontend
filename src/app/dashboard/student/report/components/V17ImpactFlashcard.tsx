@@ -509,7 +509,9 @@ export function V17ImpactFlashcard({
         return parts.length ? parts.join(" ") : "Complete the source report to generate the exhibition project summary.";
     })();
 
-    const meta = [partnerLine, locationLine, dateSpan, facultyLine ? `Faculty: ${facultyLine}` : "", recordId].filter(Boolean);
+    // recordId already has its own labeled spot in the record/verify footer below — including it a
+    // second time here rendered as a bare, unlabeled UUID pill next to human-readable tags.
+    const meta = [partnerLine, locationLine, dateSpan, facultyLine ? `Faculty: ${facultyLine}` : ""].filter(Boolean);
     const gaps = [
         ...asList(data.section2?.system_gaps).map(stripChoice).filter((s) => s && !/^other(?:…|\.\.\.)?$/i.test(s)),
         ...asList(data.section2?.system_gaps_other_entries),

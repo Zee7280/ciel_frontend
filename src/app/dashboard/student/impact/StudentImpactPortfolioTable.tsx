@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected, isPathEntryApproved } from "@/utils/reviewQueue";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
-import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
+import { type CourseProjectEntry, courseworkRibbons } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
@@ -294,7 +294,10 @@ export default function StudentImpactPortfolioTable() {
             for (const r of courseworkRows) {
                 if (!isFacultyApproved(r)) continue;
                 const entry = r as CourseProjectEntry;
-                const ribbon = entry.meritRibbon;
+                // A record can carry up to three simultaneous badges now — this single-line
+                // portfolio row shows the single most prestigious one published (CIEL PK >
+                // University > Faculty), same precedence as the public verification card.
+                const ribbon = courseworkRibbons(entry)[0]?.ribbon;
                 const rankLabel = ribbon
                     ? `${ribbon.badgeLevel || "Ranked"} #${ribbon.rank} of ${ribbon.of}`
                     : "Faculty Approved";

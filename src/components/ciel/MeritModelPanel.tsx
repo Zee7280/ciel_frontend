@@ -4,7 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import { type CourseProjectEntry, stripEmoji, courseProjectStory } from "@/utils/courseProjectTypes";
+import {
+    type CourseProjectEntry,
+    type CourseworkRibbonLevel,
+    COURSEWORK_RIBBON_LEVEL_LABEL,
+    courseworkRibbons,
+    stripEmoji,
+    courseProjectStory,
+} from "@/utils/courseProjectTypes";
+import { formatFlashDate } from "@/utils/courseworkFlashCard";
 import {
     MERIT_RUBRIC,
     MERIT_NEUTRALITY_NOTE,
@@ -92,6 +100,7 @@ const BAND_CHIP: Record<RubricBand, string> = {
     DEVELOPING: "bg-[#fdf1f4] text-[#e11d48]",
 };
 const MEDALS = ["🥇", "🥈", "🥉"];
+const RIBBON_SHORT_LABEL: Record<CourseworkRibbonLevel, string> = { faculty: "Faculty", university: "University", cielpk: "CIEL PK" };
 
 /**
  * The AI Analyzer — one rubric, three scopes. Faculty / university / CIEL Master all render this
@@ -235,6 +244,19 @@ export default function MeritModelPanel({
 
     const avg = scored.length ? Math.round(scored.reduce((s, x) => s + x.scorecard.total, 0) / scored.length) : 0;
     const top3 = ranked ? scored.slice(0, 3) : [];
+
+    /** Mockup's "Published rankings" history — the backend keeps no separate publications log, so
+     * this is derived client-side from each in-scope record's own per-level ribbon (rank/of/scope/at),
+     * newest first. Naturally scoped to whatever level(s) this pool's caller can see. */
+    const publishHistory = useMemo(() => {
+        const rows: { key: string; title: string; level: CourseworkRibbonLevel; rank: number; of: number; scope: string; at: string }[] = [];
+        for (const e of pool) {
+            for (const { level, ribbon } of courseworkRibbons(e)) {
+                rows.push({ key: `${e.id}-${level}`, title: e.projectTitle || "Untitled coursework", level, rank: ribbon.rank, of: ribbon.of, scope: ribbon.scope, at: ribbon.at });
+            }
+        }
+        return rows.sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 6);
+    }, [pool]);
 
     const notifyTop = (ids: string[], picks: { entryId: string; rank: number; of: number; total: number }[]) => {
         if (!meritEndpoint || !ids.length) return;
@@ -425,9 +447,53 @@ export default function MeritModelPanel({
                         TO <input type="month" value={dto} onChange={(e) => setDto(e.target.value)} className={selectClass} />
                     </label>
                 </div>
-                <p className="mt-2 text-[10px] text-[#7a919a]">
-                    <b className="text-[#6d28d9]">{pool.length}</b> approved flash card{pool.length === 1 ? "" : "s"} in scope — these are what the model will rank.
-                </p>
+                {/* Single actions row — scope is set above, run/publish/state sit together here,
+                    matching the mockup's one-line "select → ▶ run → publish → state" chrome. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2.5 border-t border-dashed border-[#e2d9f7] pt-3">
+                    <button
+                        type="button"
+                        onClick={runMeritModel}
+                        disabled={!pool.length}
+                        className="rounded-[12px] bg-[#6d28d9] px-5 py-2.5 text-[11.5px] font-extrabold text-white transition hover:-translate-y-0.5 disabled:opacity-50"
+                    >
+                        ▶ Run AI Ranker
+                    </button>
+                    {ranked && top3.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => notifyTop(topIds, topPicks)}
+                            disabled={notifyState === "sending" || notifyState === "sent" || runsExhausted}
+                            className="rounded-[12px] bg-[#16865a] px-5 py-2.5 text-[11.5px] font-extrabold text-white disabled:opacity-50"
+                        >
+                            {notifyState === "sent"
+                                ? "✓ Published"
+                                : notifyState === "sending"
+                                  ? "Publishing…"
+                                  : notifyState === "failed"
+                                    ? "Retry publish"
+                                    : runsExhausted
+                                      ? "No publishes left this year"
+                                      : "Publish ranking → badges"}
+                        </button>
+                    )}
+                    {graderRuns && (
+                        <span
+                            className={clsx(
+                                "rounded-full px-3 py-1.5 text-[9.5px] font-extrabold",
+                                graderRuns.unlimited
+                                    ? "bg-[#e6f6f4] text-[#0e7d74]"
+                                    : runsExhausted
+                                      ? "bg-[#fdf1f4] text-[#e11d48]"
+                                      : "bg-[#f1ebfd] text-[#6d28d9]",
+                            )}
+                        >
+                            {graderRuns.unlimited ? "♾️ Unlimited publishes" : `Publishes used this year: ${graderRuns.used} of ${graderRuns.limit}`}
+                        </span>
+                    )}
+                    <span className="ml-auto text-[10px] font-extrabold text-[#7a919a]">
+                        <b className="text-[#6d28d9]">{pool.length}</b> approved record{pool.length === 1 ? "" : "s"} eligible in scope
+                    </span>
+                </div>
             </div>
 
             <p className="text-[8.5px] font-extrabold tracking-[0.1em] text-[#6d28d9]">⭐ THE FLASH CARDS IN SCOPE — WHAT THE MODEL WILL RANK</p>
@@ -442,31 +508,6 @@ export default function MeritModelPanel({
                     ))}
                 </div>
             )}
-
-            <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                    type="button"
-                    onClick={runMeritModel}
-                    disabled={!pool.length}
-                    className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white transition hover:-translate-y-0.5 disabled:opacity-50"
-                >
-                    ▶ Run the AI model — best → least, reasoned, cards attached
-                </button>
-                {graderRuns && (
-                    <span
-                        className={clsx(
-                            "rounded-full px-3 py-1.5 text-[9.5px] font-extrabold",
-                            graderRuns.unlimited
-                                ? "bg-[#e6f6f4] text-[#0e7d74]"
-                                : runsExhausted
-                                  ? "bg-[#fdf1f4] text-[#e11d48]"
-                                  : "bg-[#f1ebfd] text-[#6d28d9]",
-                        )}
-                    >
-                        {graderRuns.unlimited ? "♾️ Unlimited publishes" : `Publishes used this year: ${graderRuns.used} of ${graderRuns.limit}`}
-                    </span>
-                )}
-            </div>
 
             {ranked && (
                 <div className="rounded-[13px] border border-[#e2d9f7] bg-[#f1ebfd] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#4c3a78]">
@@ -499,22 +540,7 @@ export default function MeritModelPanel({
                         <p className="text-[10px] font-extrabold tracking-[0.12em] text-[#b45309]">
                             🔔 TOP 3 — PREVIEW ONLY, NOT SENT UNTIL PUBLISHED
                         </p>
-                        <button
-                            type="button"
-                            onClick={() => notifyTop(topIds, topPicks)}
-                            disabled={notifyState === "sending" || notifyState === "sent" || runsExhausted}
-                            className="rounded-full bg-[#b45309] px-3.5 py-1.5 text-[9.5px] font-extrabold text-white disabled:opacity-50"
-                        >
-                            {notifyState === "sent"
-                                ? "✓ Published"
-                                : notifyState === "sending"
-                                  ? "Publishing…"
-                                  : notifyState === "failed"
-                                    ? "Retry publish"
-                                    : runsExhausted
-                                      ? "No publishes left this year"
-                                      : "🔔 Publish & notify top students"}
-                        </button>
+                        <span className="text-[9.5px] font-bold text-[#7a6a45]">Use &ldquo;Publish ranking → badges&rdquo; above to notify and pin badges</span>
                     </div>
                     {top3.map((x, i) => (
                         <div key={x.entry.id} className="flex gap-2.5 border-b border-dashed border-[#dcebee] py-2.5 last:border-0">
@@ -565,6 +591,43 @@ export default function MeritModelPanel({
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {ranked && scored.length > 0 && (
+                <div className="overflow-hidden rounded-[16px] border border-[#dcebee] bg-white">
+                    <div className="grid grid-cols-[44px_1fr_70px_140px] gap-2 border-b border-[#dcebee] bg-[#f7fafb] px-3 py-2 text-[8.5px] font-black uppercase tracking-wide text-[#7a919a]">
+                        <span>Rank</span>
+                        <span>Coursework</span>
+                        <span>Score</span>
+                        <span>Current badges</span>
+                    </div>
+                    {scored.map((x, i) => {
+                        const ribbons = courseworkRibbons(x.entry);
+                        return (
+                            <div key={x.entry.id} className="grid grid-cols-[44px_1fr_70px_140px] items-center gap-2 border-b border-[#eef2f4] px-3 py-2 text-[11px] last:border-0">
+                                <span className="text-center text-[14px]">{MEDALS[i] || `#${i + 1}`}</span>
+                                <div className="min-w-0">
+                                    <b className="block truncate text-[#0d2b33]">{x.entry.projectTitle || "Untitled coursework"}</b>
+                                    <span className="block truncate text-[9px] text-[#7a919a]">
+                                        {displayName(x.entry)} · {entryUniversity(x.entry)} · {entryCourse(x.entry)}
+                                    </span>
+                                </div>
+                                <span className="font-black text-[#6d28d9]">{x.scorecard.total}/100</span>
+                                <span className="flex flex-wrap gap-1">
+                                    {ribbons.length ? (
+                                        ribbons.map(({ level, ribbon }) => (
+                                            <span key={level} className="rounded-full bg-[#eef2f4] px-1.5 py-0.5 text-[8.5px] font-bold text-[#4c5d65]">
+                                                {RIBBON_SHORT_LABEL[level]} #{ribbon.rank}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-[9px] text-[#a5b1b8]">—</span>
+                                    )}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -620,6 +683,27 @@ export default function MeritModelPanel({
                         </div>
                     );
                 })}
+
+            <div className="rounded-[16px] border border-[#dcebee] bg-white px-4 py-3.5">
+                <p className="text-[9px] font-black uppercase tracking-wide text-[#7a919a]">📜 Published rankings in this scope</p>
+                {publishHistory.length === 0 ? (
+                    <p className="mt-1.5 text-[10.5px] text-[#a5b1b8]">None yet — publish a ranking above to write badges here.</p>
+                ) : (
+                    <div className="mt-1.5 space-y-1.5">
+                        {publishHistory.map((row) => (
+                            <div key={row.key} className="flex flex-wrap items-center gap-2 border-t border-dashed border-[#eef2f4] pt-1.5 text-[10.5px] text-[#4c5d65] first:border-0 first:pt-0">
+                                <span className="w-24 shrink-0 text-[9px] font-bold text-[#7a919a]">{formatFlashDate(row.at) || "—"}</span>
+                                <span className="shrink-0 rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[8.5px] font-extrabold text-[#6d28d9]">
+                                    {COURSEWORK_RIBBON_LEVEL_LABEL[row.level]}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    #{row.rank} of {row.of} · {row.scope} · <b className="text-[#0d2b33]">{row.title}</b>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

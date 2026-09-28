@@ -6,7 +6,7 @@ import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, tabIsComplete, wizardStepToDataSections } from "./utils/reportWizardNav";
-import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, computeJourneyXP, journeyLevel, sectionStrength } from "./utils/impactJourney";
+import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, sectionStrength } from "./utils/impactJourney";
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
@@ -267,7 +267,7 @@ export function ReportMissionHero({ data, projectData }: { data: ReportData; pro
     );
 }
 
-/** Top-of-wizard "Impact Journey" HUD — completion + 9-stop map + fun-meter XP/level. Purely
+/** Top-of-wizard "Impact Journey" HUD — completion + 9-stop map. Purely
  * derived from data the real form already collects; never affects CII, validation or submit. */
 export function ReportImpactJourney({
     data,
@@ -282,8 +282,6 @@ export function ReportImpactJourney({
     sectionsCompleteCount: number;
     onGo: (step: number) => void;
 }) {
-    const xp = computeJourneyXP(data);
-    const level = journeyLevel(xp);
     return (
         <div className="cer-journey">
             <div className="cer-journey-map">
@@ -313,24 +311,6 @@ export function ReportImpactJourney({
                             </button>
                         );
                     })}
-                </div>
-                <div className="cer-journey-xp">
-                    <div className="lvl">{level.icon}</div>
-                    <div className="cer-journey-xp-copy">
-                        <b>Level {level.index + 1} · {level.name}</b>
-                        <small>
-                            {level.next
-                                ? `${Math.max(level.next[0] - xp, 0)} XP to ${level.next[2]} — earn XP by logging sessions, attaching evidence, and finishing sections strongly.`
-                                : "Top level reached — your report reads like a pro's."}
-                        </small>
-                        <div className="bar">
-                            <i style={{ width: `${level.pct}%` }} />
-                        </div>
-                    </div>
-                    <div className="pts">
-                        <b>{xp} XP</b>
-                        <small>FUN METER · NOT CII</small>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1694,6 +1674,10 @@ export function ReportLifecycleBanner({
         adminSt === "verified" ||
         adminSt === "approved";
     const allDone = sectionsComplete >= REPORT_UI_SECTION_TOTAL;
+    const isTeam = data.section1?.participation_type === "team";
+    const lastEdited = data.last_edited_by ? `Last edited by ${data.last_edited_by}` : "";
+    const teamReadyCopy =
+        "Great work, team! Your project is ready for final reporting. Only the Team Lead can submit the Final Report.";
     const steps: Array<{ label: string; state: "done" | "current" | "pending" }> = [
         { label: `${sectionsComplete}/${REPORT_UI_SECTION_TOTAL} sections`, state: allDone ? "done" : "current" },
         { label: "Submitted", state: flagsSubmitted(submitted, approved) },
@@ -1714,7 +1698,9 @@ export function ReportLifecycleBanner({
             : submitted
               ? "Sent — waiting on review"
               : allDone
-                ? "Ready to send"
+                ? isTeam
+                  ? "Ready for the Team Lead"
+                  : "Ready to send"
                 : "Draft — finish the remaining sections";
     const copy = approved
         ? "Scores, certificate and the public card are unlocked."
@@ -1725,8 +1711,16 @@ export function ReportLifecycleBanner({
             : submitted
               ? `${reviewer} reviews the report next. Hours are confirmed when the flash-card score is locked.`
               : allDone
-                ? `Use ${sendCta} on the flash card, or Submit report at the bottom of this page.`
-                : "Finish the remaining sections, then send from this flash card.";
+                ? isTeam
+                  ? teamReadyCopy
+                  : `Use ${sendCta} on the flash card, or Submit report at the bottom of this page.`
+                : isTeam
+                  ? "All members can read this shared report. Only the Team Lead can edit the report body and submit."
+                  : "Finish the remaining sections, then send from this flash card.";
+    const revisionNote = String(data.faculty_remarks || data.feedback || "").trim();
+    const isRevision =
+        String(data.faculty_status || "").toLowerCase().includes("revision") ||
+        String(data.status || "").toLowerCase().includes("revision");
 
     return (
         <div className={`cer-life cer-life-${tone}`}>
@@ -1734,6 +1728,12 @@ export function ReportLifecycleBanner({
                 <div>
                     <p className="cer-life-k">{heading}</p>
                     <p className="cer-life-t">{copy}</p>
+                    {isRevision && revisionNote ? (
+                        <p className="cer-life-t" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+                            {revisionNote}
+                        </p>
+                    ) : null}
+                    {lastEdited ? <p className="cer-life-t" style={{ marginTop: 6, opacity: 0.85 }}>{lastEdited}</p> : null}
                 </div>
                 {feeWaiting && paymentHref ? (
                     <a href={paymentHref} className="cer-pay">

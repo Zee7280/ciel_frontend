@@ -33,8 +33,35 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
     description: { min: 15, max: 200 },
-    evidence_caption: { min: 10, max: 200 },
+    /** Step 7 extra-evidence caption — UI meter is 10–45 words. */
+    evidence_caption: { min: 10, max: 45 },
 };
+
+/** Step 8 chip ids, plus participation-enum aliases carried from program setup. */
+export const ACADEMIC_INTEGRATION_OPTIONS: Array<{ id: string; aliases: string[] }> = [
+    { id: "Voluntary extracurricular activity", aliases: ["Voluntary", "Voluntary Extracurricular"] },
+    { id: "Course-linked assignment", aliases: ["Course-Linked", "Course-linked", "Directly related to coursework"] },
+    { id: "Credit-bearing component", aliases: ["Credit-Bearing"] },
+    { id: "Capstone / Thesis-linked project", aliases: ["Capstone / Thesis"] },
+    { id: "Research-integrated project", aliases: ["Research-Integrated"] },
+];
+
+/** Map a participation enum or chip id onto the Step 8 Academic integration chip id. */
+export function normalizeAcademicIntegration(value: unknown): string {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const lower = text.toLowerCase();
+    for (const opt of ACADEMIC_INTEGRATION_OPTIONS) {
+        if (text === opt.id || opt.aliases.some((alias) => alias.toLowerCase() === lower)) {
+            return opt.id;
+        }
+    }
+    return text;
+}
+
+export function hasAcademicIntegration(value: unknown): boolean {
+    return Boolean(String(value || "").trim());
+}
 
 export function wordRangeLabel(min: number, max: number): string {
     return `${min}–${max} words`;
@@ -318,6 +345,10 @@ export function validateSection5(data: any): ValidationResult {
  */
 export function validateSection6(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+
+    if (data.use_resources !== 'yes' && data.use_resources !== 'no') {
+        errors.push({ field: 'use_resources', message: 'Tell us whether the project used extra resources' });
+    }
     
     if (data.use_resources === 'yes') {
         if (!data.resources?.length) {
@@ -417,7 +448,7 @@ export function validateSection8(data: any): ValidationResult {
         if (types.some((type) => /other supporting document/i.test(String(type))) && !String(data.evidence_type_other || '').trim()) {
             errors.push({ field: 'evidence_type_other', message: 'Say what kind of document this is' });
         }
-        pushWordRange(errors, 'description', data.description, 'Evidence explanation', true, 'evidence_caption');
+        pushWordRange(errors, 'description', data.description, 'What does your evidence show?', true, 'evidence_caption');
     }
 
     if (!data.media_visible) {
@@ -436,8 +467,11 @@ export function validateSection8(data: any): ValidationResult {
 export function validateSection9(data: any): ValidationResult {
     const errors: ValidationError[] = [];
 
-    if (!data.academic_integration) {
-        errors.push({ field: 'academic_integration', message: 'Please select an academic integration level' });
+    if (!hasAcademicIntegration(data.academic_integration)) {
+        errors.push({
+            field: 'academic_integration',
+            message: 'Tap an Academic integration option (Voluntary, course, credit, capstone, or research)',
+        });
     }
     if (!Array.isArray(data.skills_grown) || data.skills_grown.length === 0) {
         errors.push({ field: 'skills_grown', message: 'Tap at least one skill you grew' });
@@ -478,21 +512,21 @@ export function validateSection9(data: any): ValidationResult {
 export function validateSection10(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     if (!data.continuation_status) {
-        errors.push({ field: 'continuation_status', message: 'Sustainability continuation status is required' });
+        errors.push({ field: 'continuation_status', message: 'Choose whether the impact will continue after you (Yes / Partial / No)' });
     }
-    pushWordRange(errors, 'continuation_details', data.continuation_details, 'Continuation explanation');
+    pushWordRange(errors, 'continuation_details', data.continuation_details, 'What continues, what stops?');
 
     if (!data.mechanisms?.length) {
-        errors.push({ field: 'mechanisms', message: 'Identify at least one sustainability mechanism' });
+        errors.push({ field: 'mechanisms', message: 'Tap at least one option under What keeps it alive?' });
     }
     if ((data.mechanisms || []).some((item: string) => String(item).replace(/^✏️\s*/, '').trim().toLowerCase() === 'other') && !String(data.mechanism_other || '').trim()) {
         errors.push({ field: 'mechanism_other', message: 'Say what else keeps it going' });
     }
     if (!data.scaling_potential) {
-        errors.push({ field: 'scaling_potential', message: 'Scaling potential is required' });
+        errors.push({ field: 'scaling_potential', message: 'Select a Scaling potential option' });
     }
     if (!data.policy_influence) {
-        errors.push({ field: 'policy_influence', message: 'Say whether this project influenced a long-term system' });
+        errors.push({ field: 'policy_influence', message: 'Select whether this project influenced a long-term system' });
     }
     return { isValid: errors.length === 0, errors };
 }

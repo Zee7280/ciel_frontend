@@ -145,6 +145,8 @@ export default function CommunityCiiAnalyser({
     const [approving, setApproving] = useState(false);
     const [deciding, setDeciding] = useState(false);
     const [facultyNote, setFacultyNote] = useState("");
+    const [revisionSection, setRevisionSection] = useState("");
+    const [requiredCorrection, setRequiredCorrection] = useState("");
     const [facultySectionScores, setFacultySectionScores] = useState<Record<number, number>>({});
 
     const ciiV2 = (report?.ciiV2 as CiiV2Result | undefined) || null;
@@ -264,7 +266,12 @@ export default function CommunityCiiAnalyser({
                     body: JSON.stringify(
                         isCielPk
                             ? { action: "reject", feedback: facultyNote.trim() }
-                            : { status: "revision_requested", remarks: facultyNote.trim() },
+                            : {
+                                  status: "revision_requested",
+                                  remarks: facultyNote.trim(),
+                                  revision_section: revisionSection.trim() || undefined,
+                                  required_correction: requiredCorrection.trim() || undefined,
+                              },
                     ),
                 },
             );
@@ -608,6 +615,25 @@ export default function CommunityCiiAnalyser({
                                 onChange={(e) => setFacultyNote(e.target.value)}
                                 disabled={locked}
                                 placeholder="Record why the system assessment is accepted or adjusted. This becomes the Faculty Analysis note."
+                            />
+                            <label>
+                                Section(s) for revision <span>optional · additive</span>
+                            </label>
+                            <input
+                                value={revisionSection}
+                                onChange={(e) => setRevisionSection(e.target.value)}
+                                disabled={locked}
+                                placeholder="e.g. Section 4 Activities, Section 8 Evidence"
+                                style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
+                            />
+                            <label>
+                                Required correction <span>optional · shown to the team</span>
+                            </label>
+                            <textarea
+                                value={requiredCorrection}
+                                onChange={(e) => setRequiredCorrection(e.target.value)}
+                                disabled={locked}
+                                placeholder="What the Team Lead must fix before resubmit"
                             />
                             <small>
                                 Approve locks the Faculty-Verified CII and badge. Revision / reject keep the record unlocked and send the same note to the student.

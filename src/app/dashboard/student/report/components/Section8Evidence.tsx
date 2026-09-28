@@ -357,7 +357,7 @@ export default function Section8Evidence() {
                         <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Upload &amp; classify below.</p>
                     </button>
                 </div>
-                <FieldError message={getFieldError("section8.has_evidence")} />
+                <FieldError message={getFieldError("has_evidence")} />
 
                 {section8.has_evidence === "yes" ? (
                     <div className="space-y-4">
@@ -388,7 +388,7 @@ export default function Section8Evidence() {
                                     </button>
                                 ))}
                             </div>
-                            <FieldError message={getFieldError("section8.evidence_types")} />
+                            <FieldError message={getFieldError("evidence_types")} />
                         </div>
 
                         {otherTypeOn ? (
@@ -399,7 +399,7 @@ export default function Section8Evidence() {
                                 onChange={(e) => update("evidence_type_other", e.target.value)}
                             />
                         ) : null}
-                        <FieldError message={getFieldError("section8.evidence_type_other")} />
+                        <FieldError message={getFieldError("evidence_type_other")} />
 
                         <label className="cer-aibtn inline-flex cursor-pointer">
                             ⬆️ Add files (JPG, PNG, PDF, Word)
@@ -420,7 +420,7 @@ export default function Section8Evidence() {
                             />
                         </label>
                         <p className="text-[11px] text-slate-500">Max {MAX_REPORT_UPLOAD_LABEL} per file.</p>
-                        <FieldError message={getFieldError("section8.evidence_files")} />
+                        <FieldError message={getFieldError("evidence_files")} />
 
                         {evidence_files && evidence_files.length > 0 ? (
                             <div className="cer-gal">
@@ -454,7 +454,10 @@ export default function Section8Evidence() {
                         ) : null}
 
                         <div>
-                            <Label className={fieldLabel}>What does your evidence show?</Label>
+                            <div className="flex items-end justify-between gap-3">
+                                <Label className={fieldLabel}>What does your evidence show?</Label>
+                                <span className="cer-tag">Required · 10–45 words</span>
+                            </div>
                             <input
                                 className="cer-input mt-2"
                                 value={description}
@@ -464,7 +467,7 @@ export default function Section8Evidence() {
                             <p className={clsx("cer-wc", captionInRange && "ok")}>
                                 {descriptionWords} WORDS · TARGET 10–45
                             </p>
-                            <FieldError message={getFieldError("section8.description")} />
+                            <FieldError message={getFieldError("description")} />
                         </div>
                     </div>
                 ) : null}
@@ -486,7 +489,7 @@ export default function Section8Evidence() {
                         <span className="text-[var(--gold)]">False submissions may result in rejection and institutional action.</span>
                     </span>
                 </label>
-                <FieldError message={getFieldError("section8.ethical_compliance")} />
+                <FieldError message={getFieldError("ethical_compliance")} />
 
                 <div>
                     <Label className={fieldLabel}>Default media visibility</Label>
@@ -515,7 +518,7 @@ export default function Section8Evidence() {
                     <p className="cer-hint mt-2">
                         Privacy does not reduce verification quality. Choose Public only when consent and institutional policy permit it. Institutional or Private evidence can still be fully verified. Blur or redact identifying details whenever needed.
                     </p>
-                    <FieldError message={getFieldError("section8.media_visible")} />
+                    <FieldError message={getFieldError("media_visible")} />
                 </div>
             </section>
 

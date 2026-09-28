@@ -150,7 +150,7 @@ export default function TeamMemberParticipationPage() {
                         Team report
                     </div>
                     <p className="mt-3 text-sm text-slate-600">
-                        Your team lead files the impact report. You only maintain your attendance record.
+                        Your team lead files the impact report. You can read the full shared report at any time. Attendance is the only part you edit.
                     </p>
                     {data.team_report_status ? (
                         <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -161,11 +161,18 @@ export default function TeamMemberParticipationPage() {
             </div>
 
             {complete ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
-                    <p className="font-semibold">Your part is complete</p>
-                    <p className="mt-1 text-sm">
-                        Attendance requirements are met. Your team lead will submit the final report when ready.
-                    </p>
+                <div className="space-y-3">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
+                        <p className="font-semibold">Your part is complete</p>
+                        <p className="mt-1 text-sm">
+                            Attendance requirements are met. Your team lead will submit the final report when ready.
+                        </p>
+                    </div>
+                    <Link
+                        href={`/dashboard/student/report?projectId=${encodeURIComponent(projectId)}`}
+                    >
+                        <Button>View full report</Button>
+                    </Link>
                 </div>
             ) : (
                 <div className="flex flex-wrap gap-3">
@@ -180,6 +187,11 @@ export default function TeamMemberParticipationPage() {
                             <Button>{data.attendance_locked ? "View attendance" : "Log attendance"}</Button>
                         </Link>
                     )}
+                    <Link
+                        href={`/dashboard/student/report?projectId=${encodeURIComponent(projectId)}`}
+                    >
+                        <Button variant="outline">View full report</Button>
+                    </Link>
                 </div>
             )}
         </div>

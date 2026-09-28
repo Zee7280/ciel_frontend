@@ -2,6 +2,8 @@ import { findSdgById, findSdgTarget } from "@/utils/sdgData";
 import {
     type CourseProjectEntry,
     type CourseProjectSectionSummaries,
+    type CourseworkRibbonEntry,
+    type CourseworkRibbonLevel,
     courseProjectMetricLine,
     normalizeGroupMembers,
     normalizeUrlList,
@@ -217,10 +219,11 @@ export function courseworkApprovedMetaLine(entry: CourseProjectEntry): string {
         .join(" · ");
 }
 
-export function courseworkRibbonBadgeClass(scope?: string): "fac" | "uni" | "live" {
-    const s = (scope || "").toLowerCase();
-    if (s.includes("faculty")) return "fac";
-    if (s.includes("university")) return "uni";
+/** Level is a first-class key on meritRibbon now (see courseworkRibbons()) — no more guessing a
+ * "kind" from the scope string. */
+export function courseworkRibbonBadgeClass(level: CourseworkRibbonLevel): "fac" | "uni" | "live" {
+    if (level === "faculty") return "fac";
+    if (level === "university") return "uni";
     return "live";
 }
 
@@ -236,8 +239,10 @@ export function courseworkHistoryLines(entry: CourseProjectEntry): string[] {
     return lines;
 }
 
-export function courseworkRankTrend(entry: CourseProjectEntry): { symbol: string; kind: "UP" | "DOWN" | "SAME" | "NEW" } | null {
-    const move = rankMovement(entry.meritRibbon);
+/** Trend arrow for one specific level's ribbon — pass entry.meritRibbon?.faculty (etc), not the
+ * whole map, since each level's rank/previousRank moves independently of the other two. */
+export function courseworkRankTrend(ribbon?: CourseworkRibbonEntry | null): { symbol: string; kind: "UP" | "DOWN" | "SAME" | "NEW" } | null {
+    const move = rankMovement(ribbon);
     if (!move) return null;
     if (move.symbol === "↑") return { symbol: "▲", kind: "UP" };
     if (move.symbol === "↓") return { symbol: "▼", kind: "DOWN" };

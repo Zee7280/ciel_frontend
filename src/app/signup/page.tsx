@@ -39,6 +39,29 @@ const ORG_KIND_OPTIONS = [
     { kind: "international", label: "UN / International Organization", role: "ngo", category: "Development Organization", legal: "International Organization" },
 ] as const;
 
+const ORG_FIELD_HINTS: Record<string, { orgName: string; designation: string; email: string }> = {
+    university: {
+        orgName: "e.g. Beaconhouse National University",
+        designation: "e.g. Coordinator Community Engagement",
+        email: "official@university.edu.pk",
+    },
+    ngo: {
+        orgName: "e.g. Edhi Foundation",
+        designation: "e.g. Programme Manager",
+        email: "contact@ngo.org",
+    },
+    corporate: {
+        orgName: "e.g. Packages Limited",
+        designation: "e.g. CSR Lead",
+        email: "csr@company.com",
+    },
+    government: {
+        orgName: "e.g. Higher Education Commission",
+        designation: "e.g. Director Quality Assurance",
+        email: "official@hec.gov.pk",
+    },
+};
+
 const PROOF_LINK_TYPES = [
     "Official Website Profile",
     "University / Organization Staff Directory",
@@ -150,6 +173,7 @@ function SignUpContent() {
 
     const isOrgRole = ["university", "ngo", "corporate", "government"].includes(role);
     const isInvestor = role === "investor";
+    const orgHints = ORG_FIELD_HINTS[orgKind] ?? ORG_FIELD_HINTS[role] ?? ORG_FIELD_HINTS.ngo;
     const apiRole = signupApiRole(role);
     const isPersonalEmail = useMemo(() => isPersonalEmailDomain(formData.email), [formData.email]);
 
@@ -643,14 +667,14 @@ function SignUpContent() {
                                                         <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
                                                     </div>
                                                 ) : (
-                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. Beaconhouse National University" aria-label="Organization name" />
+                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder={orgHints.orgName} aria-label="Organization name" />
                                                 )}
                                                 {errors.orgName && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.orgName}</p>}
                                             </div>
 
                                             <div>
                                                 <label className={labelClass}>Your designation</label>
-                                                <input type="text" value={formData.contactPerson} onChange={(e) => handleGenericChange("contactPerson", e.target.value)} className={fieldClass(!!errors.contactPerson)} placeholder="e.g. Coordinator Community Engagement" />
+                                                <input type="text" value={formData.contactPerson} onChange={(e) => handleGenericChange("contactPerson", e.target.value)} className={fieldClass(!!errors.contactPerson)} placeholder={orgHints.designation} />
                                                 {errors.contactPerson && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.contactPerson}</p>}
                                             </div>
                                         </div>
@@ -712,7 +736,7 @@ function SignUpContent() {
                                                 value={formData.email}
                                                 onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
                                                 className={fieldClass(!!errors.email, "pl-11")}
-                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : isInvestor ? "name@fund.com" : "official@organization.org"}
+                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : isInvestor ? "name@fund.com" : orgHints.email}
                                             />
                                         </div>
                                         {errors.email && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.email}</p>}

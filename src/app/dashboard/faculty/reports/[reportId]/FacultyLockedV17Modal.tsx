@@ -15,7 +15,7 @@ import { V19_ASSESSMENT_RULE } from "./buildLockedV17Assessment";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
 import "./faculty-locked-v17.css";
 
-type TabId = "flashView" | "reportView" | "evidenceView" | "attendanceView" | "analyzerView" | "assessedView" | "badgeView";
+type TabId = "flashView" | "reportView" | "evidenceView" | "attendanceView" | "analyzerView" | "decisionView" | "assessedView" | "badgeView";
 
 const TABS: Array<{ id: TabId; label: string }> = [
     { id: "flashView", label: "01 · Flashcard" },
@@ -23,6 +23,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
     { id: "evidenceView", label: "03 · Evidence" },
     { id: "attendanceView", label: "04 · Attendance & Hours" },
     { id: "analyzerView", label: "05 · CII Analyzer" },
+    { id: "decisionView", label: "06 · Faculty Decision" },
     { id: "assessedView", label: "Detailed Report + CII Assessment" },
     { id: "badgeView", label: "Flashcard + CII Badge" },
 ];
@@ -904,6 +905,27 @@ export default function FacultyLockedV17Modal({
                                     </section>
                                     <section className={`view ${tab === "analyzerView" ? "on" : ""}`}>
                                         <AnalyzerPane model={model} analyzerHref={analyzerHref} />
+                                    </section>
+                                    <section className={`view ${tab === "decisionView" ? "on" : ""}`}>
+                                        <div className="flv17-analyzer">
+                                            <div className="flv17-analyzerTop">
+                                                <div className="flv17-analyzerTitle">
+                                                    <span className="flv17-analyzerIcon">✓</span>
+                                                    <div>
+                                                        <small>CIEL PK · FACULTY DECISION</small>
+                                                        <h2>Approve, return, or reject this locked package</h2>
+                                                        <p>
+                                                            Regular reports stay on the Faculty path. Approve &amp; lock still runs from the CII Analyzer so the current CII tests stay intact. Revision can name the section and required correction.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {analyzerHref ? (
+                                                    <Link className="flv17-run" href={analyzerHref}>
+                                                        Open Faculty Decision
+                                                    </Link>
+                                                ) : null}
+                                            </div>
+                                        </div>
                                     </section>
                                     <section className={`view ${tab === "assessedView" ? "on" : ""}`}>
                                         <AssessmentLayer model={model} />

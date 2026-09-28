@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
+import { toast } from "sonner";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import {
@@ -66,6 +67,9 @@ type ReportRow = {
     organization_name?: string;
     status?: string;
     faculty_status?: string;
+    faculty_remarks?: string | null;
+    last_edited_by?: string | null;
+    last_edited_at?: string | null;
     admin_status?: string;
     faculty_name?: string | null;
     faculty_email?: string | null;
@@ -90,7 +94,7 @@ type WorkCard = {
     pills?: { label: string; kind: "ok" | "wait" | "rev" }[];
     sideTitle: string;
     sideDetail: string;
-    actions: { label: string; href: string; style: "primary" | "soft" | "blue" | "purple" | "red" }[];
+    actions: { label: string; href: string; style: "primary" | "soft" | "blue" | "purple" | "red"; remindReportId?: string }[];
 };
 
 const FILTERS: { key: WsFilter; label: string }[] = [
@@ -109,6 +113,44 @@ const LEGACY_FILTER: Record<string, WsFilter> = {
     closed: "completed",
     all: "ready",
 };
+
+function WorkspaceRemindButton({
+    reportId,
+    label,
+    className,
+}: {
+    reportId: string;
+    label: string;
+    className: string;
+}) {
+    const [sending, setSending] = useState(false);
+    const send = async () => {
+        if (sending) return;
+        setSending(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/student/reports/${encodeURIComponent(reportId)}/remind-reviewer`, {
+                method: "POST",
+            });
+            const body = await res?.json().catch(() => null);
+            const raw = body?.message;
+            const message = Array.isArray(raw) ? raw.filter(Boolean).join(" ") : raw;
+            if (!res?.ok || body?.success === false) {
+                toast.error(typeof message === "string" && message ? message : "Could not send the reminder.");
+                return;
+            }
+            toast.success(typeof message === "string" && message ? message : "Reminder sent.");
+        } catch {
+            toast.error("Could not send the reminder.");
+        } finally {
+            setSending(false);
+        }
+    };
+    return (
+        <button type="button" className={className} disabled={sending} onClick={() => void send()}>
+            {sending ? "Sending…" : label}
+        </button>
+    );
+}
 
 function opportunityFullyApproved(op: OpportunityRow): boolean {
     return op.status === "live" || op.admin_approval_status === "approved";
@@ -388,13 +430,17 @@ export default function CommunityServiceWorkspace({
                     actions: [
                         { label: "View Submitted Report", href, style: "soft" },
                         ...(reviewer === "Faculty"
-                            ? buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email)
+                            ? [
+                                  ...buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email),
+                                  { label: "Email Faculty (platform)", href: "#remind", style: "blue" as const, remindReportId: report.id },
+                              ]
                             : []),
                     ],
                 });
                 continue;
             }
             if (bucket === "action") {
+                const remarks = String(report.faculty_remarks || "").trim();
                 out.push({
                     id: `rep-${report.id}`,
                     filter: "action",
@@ -402,14 +448,15 @@ export default function CommunityServiceWorkspace({
                     title,
                     meta: "Faculty decision received",
                     journeyHead: "REVISION REQUIRED",
-                    journeySub: "Edit the marked sections and resubmit",
+                    journeySub: "All members can read this shared report. Only the Team Lead can edit and resubmit.",
                     pills: [{ label: "Revision Required", kind: "rev" }],
                     note: {
                         kind: "comment",
-                        body: "Faculty asked for changes. Open the report to see the comments and resubmit.",
+                        title: "Faculty comments",
+                        body: remarks || "Faculty asked for changes. Open the report to see the comments and resubmit.",
                     },
                     sideTitle: "Your Next Action",
-                    sideDetail: "Edit the requested sections and resubmit",
+                    sideDetail: "Team Lead resubmits after the marked sections are updated",
                     actions: [
                         { label: "View All Comments", href, style: "red" },
                         { label: "Revise Report", href, style: "primary" },
@@ -430,7 +477,10 @@ export default function CommunityServiceWorkspace({
                 note: rejected
                     ? {
                           kind: "comment",
-                          body: "This record will not enter the verified impact portfolio.",
+                          title: "Faculty comments",
+                          body:
+                              String(report.faculty_remarks || "").trim() ||
+                              "This record will not enter the verified impact portfolio.",
                       }
                     : {
                           kind: "success",
@@ -654,7 +704,14 @@ export default function CommunityServiceWorkspace({
                                 </div>
                                 <div className="mt-2.5 flex flex-wrap gap-1.5">
                                     {card.actions.map((action) =>
-                                        action.href.startsWith("mailto:") ? (
+                                        action.remindReportId ? (
+                                            <WorkspaceRemindButton
+                                                key={action.label}
+                                                reportId={action.remindReportId}
+                                                label={action.label}
+                                                className={actionClass(action.style)}
+                                            />
+                                        ) : action.href.startsWith("mailto:") ? (
                                             <a key={action.label} href={action.href} className={actionClass(action.style)}>
                                                 {action.label}
                                             </a>

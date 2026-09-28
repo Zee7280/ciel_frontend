@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { sdgData } from "@/utils/sdgData";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
-import { type CourseProjectEntry, resolveSectionSummaries } from "@/utils/courseProjectTypes";
+import { type CourseProjectEntry, COURSEWORK_RIBBON_LEVEL_LABEL, courseworkRibbons, resolveSectionSummaries } from "@/utils/courseProjectTypes";
 import {
     FLASH_SECTIONS,
     courseworkApprovedFiles,
@@ -43,11 +43,9 @@ export default function CourseworkFlashCardModal({
     const summaries = resolveSectionSummaries(entry);
     const highlights = courseworkFlashHighlights(entry);
     const files = courseworkApprovedFiles(entry);
-    const ribbon = entry.meritRibbon;
-    const trend = courseworkRankTrend(entry);
+    const ribbons = courseworkRibbons(entry);
     const targetLabel = courseworkPrimaryTargetLabel(entry);
     const history = courseworkHistoryLines(entry);
-    const badgeKind = courseworkRibbonBadgeClass(ribbon?.scope);
     const approvedOn = formatFlashDate(entry.facultyApprovalAt);
     const status = "APPROVED — ON IMPACT WALLS";
 
@@ -151,40 +149,48 @@ export default function CourseworkFlashCardModal({
                             <span className="text-[10.5px]">
                                 Published to: 🧑‍🎓 Student → My Coursework Impact · 🧑‍🏫 Faculty → Approved Coursework · 🏫 University → Coursework Impact Wall · 🌐 CIEL PK → Approved Coursework
                             </span>
-                            {ribbon ? (
+                            {ribbons.length ? (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
-                                    <span
-                                        className={
-                                            badgeKind === "fac"
-                                                ? "inline-flex flex-col rounded-xl border border-[#f1d68a] bg-[#fff6df] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#7a5a08]"
-                                                : badgeKind === "uni"
-                                                  ? "inline-flex flex-col rounded-xl border border-[#c9d6ff] bg-[#eef3ff] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#2b3f8f]"
-                                                  : "inline-flex flex-col rounded-xl border border-[#dccfff] bg-[#f3edff] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#5a2fd1]"
-                                        }
-                                    >
-                                        <span>
-                                            {badgeKind === "uni" ? "🏛️" : badgeKind === "live" ? "🌐" : "🏅"} {ribbon.badgeLevel || "Ranked"} #{ribbon.rank} of {ribbon.of}
-                                            {trend ? (
-                                                <b
-                                                    className={
-                                                        trend.kind === "UP"
-                                                            ? "ml-1 text-[#15966d]"
-                                                            : trend.kind === "DOWN"
-                                                              ? "ml-1 text-[#cc5260]"
-                                                              : trend.kind === "NEW"
-                                                                ? "ml-1 text-[#6d3df5]"
-                                                                : "ml-1 text-[#85939b]"
-                                                    }
-                                                >
-                                                    {trend.symbol}
-                                                </b>
-                                            ) : null}
-                                        </span>
-                                        <small className="text-[8.5px] font-bold opacity-80">
-                                            {ribbon.scope}
-                                            {ribbon.at ? ` · ${formatFlashDate(ribbon.at)}` : ""}
-                                        </small>
-                                    </span>
+                                    {ribbons.map(({ level, ribbon }) => {
+                                        const badgeKind = courseworkRibbonBadgeClass(level);
+                                        const trend = courseworkRankTrend(ribbon);
+                                        return (
+                                            <span
+                                                key={level}
+                                                title={COURSEWORK_RIBBON_LEVEL_LABEL[level]}
+                                                className={
+                                                    badgeKind === "fac"
+                                                        ? "inline-flex flex-col rounded-xl border border-[#f1d68a] bg-[#fff6df] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#7a5a08]"
+                                                        : badgeKind === "uni"
+                                                          ? "inline-flex flex-col rounded-xl border border-[#c9d6ff] bg-[#eef3ff] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#2b3f8f]"
+                                                          : "inline-flex flex-col rounded-xl border border-[#dccfff] bg-[#f3edff] px-2.5 py-1.5 text-[10.5px] font-black leading-tight text-[#5a2fd1]"
+                                                }
+                                            >
+                                                <span>
+                                                    {badgeKind === "uni" ? "🏛️" : badgeKind === "live" ? "🌐" : "🧑‍🏫"} {ribbon.badgeLevel || "Ranked"} #{ribbon.rank} of {ribbon.of}
+                                                    {trend ? (
+                                                        <b
+                                                            className={
+                                                                trend.kind === "UP"
+                                                                    ? "ml-1 text-[#15966d]"
+                                                                    : trend.kind === "DOWN"
+                                                                      ? "ml-1 text-[#cc5260]"
+                                                                      : trend.kind === "NEW"
+                                                                        ? "ml-1 text-[#6d3df5]"
+                                                                        : "ml-1 text-[#85939b]"
+                                                            }
+                                                        >
+                                                            {trend.symbol}
+                                                        </b>
+                                                    ) : null}
+                                                </span>
+                                                <small className="text-[8.5px] font-bold opacity-80">
+                                                    {ribbon.scope}
+                                                    {ribbon.at ? ` · ${formatFlashDate(ribbon.at)}` : ""}
+                                                </small>
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="mt-2">

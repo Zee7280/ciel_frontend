@@ -16,6 +16,7 @@ import {
     stripEmoji,
     normalizeGroupMembers,
     rankMovement,
+    courseworkRibbons,
 } from "@/utils/courseProjectTypes";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import { mailtoHref, whatsappShareHref, whatsappTargetedHref } from "@/utils/reminderLinks";
@@ -81,9 +82,8 @@ export default function CourseworkCard({
     const proof = re.findings?.[0] || re.metrics?.[0]?.meaning || re.measurableImpact;
     const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
     const approval = entry.facultyApprovalStatus;
-    const ribbon = entry.meritRibbon;
+    const ribbons = courseworkRibbons(entry);
     const statusLabel = courseworkStatusLabel(entry, hideScore ? "student" : "other");
-    const movement = rankMovement(ribbon);
     const verifyPath = entry.verificationPublicSlug ? `/coursework/verify/${entry.verificationPublicSlug}` : null;
     const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;
 
@@ -149,14 +149,21 @@ export default function CourseworkCard({
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
-            {ribbon && entry.status === "submitted" && approval === "approved" ? (
-                <div className="bg-[linear-gradient(90deg,#f59e0b,#fbbf24)] px-4 py-2 text-[10px] font-black uppercase tracking-wide text-[#3b2202]">
-                    {ribbon.rank === 1 ? "🥇" : ribbon.rank === 2 ? "🥈" : ribbon.rank === 3 ? "🥉" : "🏅"}{" "}
-                    Ranked #{ribbon.rank} of {ribbon.of}
-                    {ribbon.scope ? ` · ${ribbon.scope}` : ""}
-                    {!hideScore && ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
-                    {ribbon.badgeLevel ? ` · ${BADGE_EMOJI[ribbon.badgeLevel]} ${ribbon.badgeLevel}` : ""}
-                    {movement ? ` · ${movement.symbol} ${movement.label}` : ""}
+            {ribbons.length > 0 && entry.status === "submitted" && approval === "approved" ? (
+                <div className="divide-y divide-black/10">
+                    {ribbons.map(({ level, ribbon }) => {
+                        const movement = rankMovement(ribbon);
+                        return (
+                            <div key={level} className="bg-[linear-gradient(90deg,#f59e0b,#fbbf24)] px-4 py-2 text-[10px] font-black uppercase tracking-wide text-[#3b2202]">
+                                {ribbon.rank === 1 ? "🥇" : ribbon.rank === 2 ? "🥈" : ribbon.rank === 3 ? "🥉" : "🏅"}{" "}
+                                Ranked #{ribbon.rank} of {ribbon.of}
+                                {ribbon.scope ? ` · ${ribbon.scope}` : ""}
+                                {!hideScore && ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
+                                {ribbon.badgeLevel ? ` · ${BADGE_EMOJI[ribbon.badgeLevel]} ${ribbon.badgeLevel}` : ""}
+                                {movement ? ` · ${movement.symbol} ${movement.label}` : ""}
+                            </div>
+                        );
+                    })}
                 </div>
             ) : null}
             {/* Ribbon */}
