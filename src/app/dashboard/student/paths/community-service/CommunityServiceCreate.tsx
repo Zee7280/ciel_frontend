@@ -517,16 +517,32 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                 `/api/v1/student/opportunity/${encodeURIComponent(op.id)}/remind-reviewer`,
                 { method: "POST" },
             );
-            const body = await res?.json().catch(() => null);
-            const raw = body?.message;
-            const message = Array.isArray(raw) ? raw.filter(Boolean).join(" ") : raw;
+            const body = (await res?.json().catch(() => null)) as Record<string, unknown> | null;
+            const raw = body?.message ?? body?.error;
+            const message = Array.isArray(raw)
+                ? raw.filter(Boolean).join(" ")
+                : typeof raw === "string"
+                  ? raw
+                  : "";
             if (!res?.ok || body?.success === false) {
-                toast.error(typeof message === "string" && message ? message : "Could not send the email.");
+                toast.error(
+                    message ||
+                        "Email nahi gayi — mail server ne reject kiya. Thori dair baad dubara try karein.",
+                );
                 return;
             }
-            toast.success(typeof message === "string" && message ? message : `Email sent to ${who}.`);
+            const sentTo =
+                (typeof body?.sent_to === "string" && body.sent_to) ||
+                (typeof body?.partner_email === "string" && body.partner_email) ||
+                "";
+            toast.success(
+                message ||
+                    (sentTo
+                        ? `Verification email sent to ${sentTo}. Inbox + Spam check karein.`
+                        : `Verification email sent to ${who}. Inbox + Spam check karein.`),
+            );
         } catch {
-            toast.error("Could not send the email.");
+            toast.error("Could not send the email. Network/API check karein.");
         } finally {
             setSendingEmail(false);
         }
@@ -540,8 +556,19 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
 
     let statusTitle = pendingStageLabel(op);
     let statusText = who === "CIEL PK" ? "Waiting for final platform approval" : `Waiting for ${who}`;
-    let nextTitle = "No action required from you";
-    let nextText = "This opportunity stays here until the current reviewer decides. You will be notified.";
+    // Student-facing "next action" must describe who is blocking NOW — not the step after them.
+    // Backend `next_step` for pending_partner is "CIEL PK Final Approval" (downstream), which
+    // confused the Email button area into looking like CIEL should be emailed.
+    let nextTitle =
+        tab === "review"
+            ? who === "CIEL PK"
+                ? "Waiting for CIEL PK"
+                : `Waiting for ${who} to approve`
+            : "No action required from you";
+    let nextText =
+        tab === "review"
+            ? `Use Email ${who} to resend the CIEL verification link. Also check their Spam/Junk folder.`
+            : "This opportunity stays here until the current reviewer decides. You will be notified.";
     let tone: "ok" | "wait" | "rev" = "wait";
 
     if (tab === "action") {
@@ -630,7 +657,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                 </div>
                 <div className="rounded-[13px] border border-[#efddb7] bg-[#fff8e9] px-3 py-2.5">
                     <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#9d6810]">Next action</p>
-                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{op.next_step || nextTitle}</b>
+                    <b className="mt-0.5 block text-[12.5px] text-[#16313d]">{nextTitle}</b>
                     <small className="mt-0.5 block text-[10.5px] text-[#6b7c86]">{nextText}</small>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
