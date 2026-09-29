@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatOpportunityCode } from "@/utils/displayIds";
+import { partnerQueueBucket } from "@/utils/partnerOpportunityQueue";
 import {
     mapCommunityPipelineRow,
     mergeCommunityLiveDeck,
@@ -94,18 +95,6 @@ export function ngoMineBucket(row: OppRow): "drafts" | "review" | "action" | "pu
     if (isOpportunityPermanentlyRejected(row) || normalizeReviewStatus(row.status) === "rejected") return "closed";
     if (isOpportunityPubliclyLive(row) || normalizeReviewStatus(row.status) === "live") return "published";
     return "review";
-}
-
-function isPartnerRevision(row: OppRow): boolean {
-    const partnerStatus = normalizeReviewStatus(
-        String(row.partner_approval_status ?? row.partner_status ?? row.workflow_stage ?? ""),
-    );
-    return (
-        partnerStatus === "revision_requested" ||
-        partnerStatus === "revisions_requested" ||
-        partnerStatus === "returned" ||
-        partnerStatus.includes("revision")
-    );
 }
 
 export function readNgoOrgName(): string {
@@ -200,34 +189,30 @@ export function useNgoCommunityServiceData() {
 
     const currentUserId = getStoredCurrentUserId();
     const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
-    const pendingApprovals = useMemo(
+    const namedToUs = useMemo(
         () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                if (isPartnerRevision(row)) return false;
-                return resolveStudentOpportunityWorkflow(row).stage === "pending_partner";
-            }),
+            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId) && hasPartnerSignal(row)),
         [oppRows, currentUserId],
+    );
+    const linkedDrafts = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "linked"),
+        [namedToUs],
+    );
+    const waitingFacultyApprovals = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "waiting_faculty"),
+        [namedToUs],
+    );
+    const pendingApprovals = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "pending"),
+        [namedToUs],
     );
     const revisionApprovals = useMemo(
-        () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                return isPartnerRevision(row);
-            }),
-        [oppRows, currentUserId],
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "revision"),
+        [namedToUs],
     );
     const decidedApprovals = useMemo(
-        () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                if (isPartnerRevision(row)) return false;
-                return resolveStudentOpportunityWorkflow(row).stage !== "pending_partner";
-            }),
-        [oppRows, currentUserId],
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "decided"),
+        [namedToUs],
     );
     const publishedMine = useMemo(() => mine.filter((row) => ngoMineBucket(row) === "published"), [mine]);
     const createCounts = useMemo(() => {
@@ -260,7 +245,7 @@ export function useNgoCommunityServiceData() {
                     key: `opp-${row.id}`,
                     kind: "opp" as const,
                     title: row.title,
-                    meta: `${formatDisplayId(row.id, "OPP")} · ${creator} · ${resolveStudentOpportunityWorkflow(row).badgeLabel}`,
+                    meta: `${formatOpportunityCode(row)} · ${creator} · ${resolveStudentOpportunityWorkflow(row).badgeLabel}`,
                     href: `${NGO_CS_APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
                     cta: facultyCreated ? "View Flashcard & Acknowledge" : "View Flashcard & Approve",
                     studentEmail: emailOrUndef(pickStr(row, "creator_email", "student_email", "submitted_by_email", "email")),
@@ -275,6 +260,8 @@ export function useNgoCommunityServiceData() {
         oppRows,
         mine,
         pendingApprovals,
+        linkedDrafts,
+        waitingFacultyApprovals,
         revisionApprovals,
         decidedApprovals,
         publishedMine,

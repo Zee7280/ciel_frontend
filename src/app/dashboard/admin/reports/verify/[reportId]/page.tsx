@@ -919,10 +919,13 @@ function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject', intent: 'decision' | 'editable' = 'decision') => {
-        if (action === 'reject' && !feedback.trim()) {
+    const handleVerify = async (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
+        const apiAction: 'approve' | 'reject' | 'unlock' =
+            intent === 'editable' ? 'unlock' : action;
+
+        if ((apiAction === 'reject' || apiAction === 'unlock') && !feedback.trim()) {
             toast.error(
-                intent === 'editable'
+                apiAction === 'unlock'
                     ? 'Please provide notes so the student knows what to edit'
                     : 'Please provide notes/feedback for rejection',
             );
@@ -938,8 +941,9 @@ function AdminReportDetailPage() {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action,
+                        action: apiAction,
                         feedback: feedback.trim() || undefined,
+                        reason: feedback.trim() || undefined,
                         verified_by: userData.id
                     })
                 }
@@ -947,13 +951,17 @@ function AdminReportDetailPage() {
 
             if (response?.ok) {
                 toast.success(
-                    intent === 'editable'
+                    apiAction === 'unlock'
                         ? 'Report returned to student for edits.'
-                        : `Report ${action === 'approve' ? 'approved' : 'rejected'} successfully!`,
+                        : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
                 );
                 setTimeout(() => router.push('/dashboard/admin/reports/verify'), 1500);
             } else {
-                toast.error(intent === 'editable' ? 'Failed to make report editable' : 'Failed to verify report');
+                const payload = response ? await response.json().catch(() => ({})) : {};
+                const msg =
+                    (payload as { message?: string }).message ||
+                    (apiAction === 'unlock' ? 'Failed to make report editable' : 'Failed to verify report');
+                toast.error(msg);
             }
         } catch (error) {
             console.error('Verification error:', error);

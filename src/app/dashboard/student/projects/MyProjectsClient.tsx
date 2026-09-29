@@ -1487,7 +1487,7 @@ export default function MyProjectsPage() {
                                                         className="w-full"
                                                     >
                                                         <Button className="h-10 w-full rounded-xl bg-slate-900 font-medium text-white hover:bg-slate-800">
-                                                            Apply again
+                                                            {projectActions.joinCtaLabel}
                                                         </Button>
                                                     </Link>
                                                 </>
@@ -1497,7 +1497,7 @@ export default function MyProjectsPage() {
                                                     className="w-full"
                                                 >
                                                     <Button className="h-10 w-full rounded-xl bg-slate-900 font-medium text-white hover:bg-slate-800">
-                                                        Apply Now
+                                                        {projectActions.joinCtaLabel}
                                                     </Button>
                                                 </Link>
                                             ) : reportCta ? (

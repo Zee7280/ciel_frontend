@@ -11,7 +11,7 @@ import {
     type OpportunityApplicationListRow,
 } from "@/utils/opportunityApplicationsAdmin";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
 
@@ -87,6 +87,7 @@ export function useFacultyCommunityServiceData() {
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [mineRows, setMineRows] = useState<FacultyCsMineRow[]>([]);
     const [pendingOppRows, setPendingOppRows] = useState<FacultyApprovalRow[]>([]);
+    const [linkedDraftRows, setLinkedDraftRows] = useState<FacultyApprovalRow[]>([]);
     const [historyOppRows, setHistoryOppRows] = useState<FacultyApprovalRow[]>([]);
     const [pendingAppRows, setPendingAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [historyAppRows, setHistoryAppRows] = useState<OpportunityApplicationListRow[]>([]);
@@ -98,9 +99,11 @@ export function useFacultyCommunityServiceData() {
         const facultyEmail = getStoredCurrentUserEmail();
         const approvalQs = new URLSearchParams({ status: "pending" });
         const historyQs = new URLSearchParams({ status: "history" });
+        const draftQs = new URLSearchParams({ status: "linked_drafts" });
         if (facultyEmail) {
             approvalQs.set("faculty_email", facultyEmail);
             historyQs.set("faculty_email", facultyEmail);
+            draftQs.set("faculty_email", facultyEmail);
         }
 
         Promise.all([
@@ -117,12 +120,15 @@ export function useFacultyCommunityServiceData() {
             authenticatedFetch(`/api/v1/faculty/approvals?${historyQs.toString()}`, {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
+            authenticatedFetch(`/api/v1/faculty/approvals?${draftQs.toString()}`, {}, { redirectToLogin: false }).then((r) =>
+                r?.ok ? r.json() : null,
+            ),
             authenticatedFetch("/api/v1/faculty/applications?status=pending", {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
             fetchJoinApplicationsHistoryRows("/api/v1/faculty/applications"),
         ])
-            .then(([list, award, mine, approvals, history, apps, appHistory]) => {
+            .then(([list, award, mine, approvals, history, drafts, apps, appHistory]) => {
                 if (cancelled) return;
                 const mappedMine = extractFacultyMineOpportunityRows(mine)
                     .map((raw) => {
@@ -140,6 +146,7 @@ export function useFacultyCommunityServiceData() {
                 setMineRows(mappedMine);
                 setPendingOppRows(normalizeFacultyApprovalsResponse(approvals));
                 setHistoryOppRows(normalizeFacultyApprovalsResponse(history));
+                setLinkedDraftRows(normalizeFacultyApprovalsResponse(drafts));
                 setPendingAppRows(normalizeOpportunityApplicationsListResponse(apps));
                 setHistoryAppRows(appHistory.rows);
                 const mappedRows: FacultyCsReportRow[] = (Array.isArray(list?.data) ? list.data : [])
@@ -239,6 +246,7 @@ export function useFacultyCommunityServiceData() {
                 setCards([]);
                 setMineRows([]);
                 setPendingOppRows([]);
+                setLinkedDraftRows([]);
                 setHistoryOppRows([]);
                 setPendingAppRows([]);
                 setHistoryAppRows([]);
@@ -283,7 +291,7 @@ export function useFacultyCommunityServiceData() {
                 key: `opp-${row.id}`,
                 kind: "opp" as const,
                 title: row.projectTitle,
-                meta: `${formatDisplayId(row.id, "OPP")} · ${row.studentName} · submitted ${row.submittedDate}`,
+                meta: `${formatOpportunityCode(row)} · ${row.studentName} · submitted ${row.submittedDate}`,
                 href: `${FACULTY_CS_APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
                 cta: "View Flashcard & Approve",
                 studentEmail: row.studentEmail,
@@ -310,6 +318,7 @@ export function useFacultyCommunityServiceData() {
         rows,
         mineRows,
         pendingOppRows,
+        linkedDraftRows,
         historyOppRows,
         pendingAppRows,
         historyAppRows,

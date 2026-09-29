@@ -121,8 +121,11 @@ function splitLines(text: string | undefined): string[] {
 
 export default function CommunityCiiAnalyser({
     publisher = "faculty",
+    readOnly = false,
 }: {
     publisher?: "faculty" | "ciel_pk";
+    /** Faculty view: inspect only — no Run / Approve / Reject. */
+    readOnly?: boolean;
 } = {}) {
     const params = useParams();
     const reportId = String(params.reportId ?? "");
@@ -186,7 +189,7 @@ export default function CommunityCiiAnalyser({
     }, [reportId]);
 
     const runAnalysis = async () => {
-        if (!reportId || analysing || locked) return;
+        if (readOnly || !reportId || analysing || locked) return;
         try {
             setAnalysing(true);
             const res = await authenticatedFetch(analysePath, {
@@ -216,7 +219,7 @@ export default function CommunityCiiAnalyser({
     }, [ciiV2, facultySectionScores]);
 
     const approveAndLock = async () => {
-        if (!reportId || approving || locked || !ciiV2 || facultyFinal == null) return;
+        if (readOnly || !reportId || approving || locked || !ciiV2 || facultyFinal == null) return;
         const adjusted = Math.round(facultyFinal) !== Math.round(ciiV2.final);
         if (adjusted && !facultyNote.trim()) {
             toast.error("A moderation reason is required when the Faculty-Verified CII differs from the system score.");
@@ -249,6 +252,7 @@ export default function CommunityCiiAnalyser({
     };
 
     const returnForRevision = async () => {
+        if (readOnly) return;
         if (!reportId || deciding || locked) return;
         if (!facultyNote.trim()) {
             toast.error("State exactly what needs clarification or review.");
@@ -256,25 +260,20 @@ export default function CommunityCiiAnalyser({
         }
         try {
             setDeciding(true);
-            const res = await authenticatedFetch(
-                isCielPk
-                    ? `/api/v1/admin/reports/${reportId}/verify`
-                    : `/api/v1/faculty/reports/${reportId}/action`,
-                {
-                    method: isCielPk ? "PATCH" : "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(
-                        isCielPk
-                            ? { action: "reject", feedback: facultyNote.trim() }
-                            : {
-                                  status: "revision_requested",
-                                  remarks: facultyNote.trim(),
-                                  revision_section: revisionSection.trim() || undefined,
-                                  required_correction: requiredCorrection.trim() || undefined,
-                              },
-                    ),
-                },
-            );
+            // Faculty writes are blocked on BE; Admin unlock returns the package for edits.
+            if (!isCielPk) {
+                toast.error("Faculty report review is read-only. CIEL PK Admin handles returns.");
+                return;
+            }
+            const res = await authenticatedFetch(`/api/v1/admin/reports/${reportId}/verify`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "unlock",
+                    feedback: facultyNote.trim(),
+                    reason: facultyNote.trim(),
+                }),
+            });
             if (!res?.ok) {
                 const payload = res ? await res.json().catch(() => ({})) : {};
                 toast.error((payload as { message?: string }).message || "Could not save decision");
@@ -290,6 +289,7 @@ export default function CommunityCiiAnalyser({
     };
 
     const rejectReport = async () => {
+        if (readOnly) return;
         if (!reportId || deciding || locked) return;
         if (!facultyNote.trim()) {
             toast.error("A reason is required when rejecting a report.");
@@ -297,10 +297,18 @@ export default function CommunityCiiAnalyser({
         }
         try {
             setDeciding(true);
-            const res = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/action`, {
-                method: "POST",
+            if (!isCielPk) {
+                toast.error("Faculty report review is read-only. CIEL PK Admin handles rejections.");
+                return;
+            }
+            const res = await authenticatedFetch(`/api/v1/admin/reports/${reportId}/verify`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "rejected", remarks: facultyNote.trim() }),
+                body: JSON.stringify({
+                    action: "reject",
+                    feedback: facultyNote.trim(),
+                    reason: facultyNote.trim(),
+                }),
             });
             if (!res?.ok) {
                 const payload = res ? await res.json().catch(() => ({})) : {};
@@ -384,6 +392,10 @@ export default function CommunityCiiAnalyser({
                 <div className="fx23-lock">
                     CII + badge are locked. The Faculty-Verified score cannot be silently rewritten. Any later correction should create a new version.
                 </div>
+            ) : readOnly ? (
+                <div className="fx23-lock">
+                    Faculty access is read-only. You can view the locked package and any System / Verified CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
+                </div>
             ) : (
                 <div className="fx23-lock">
                     Locked flow: review the submitted record first. Running the Analyzer generates a provisional System CII. Student-source text is not rewritten.
@@ -395,12 +407,18 @@ export default function CommunityCiiAnalyser({
                     <small>SYSTEM ASSESSMENT · FACULTY-TRIGGERED</small>
                     <h2>CIEL PK CII Analyzer</h2>
                     <p>
-                        Composite Impact Index v2 reads the locked 9-section report and evidence package. Faculty then moderates the score before a badge is issued.
+                        Composite Impact Index v2 reads the locked 9-section report and evidence package. Faculty can view results; CIEL PK Admin moderates and decides.
                     </p>
                 </div>
-                <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || locked}>
-                    {analysing ? "Analysing…" : locked ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
-                </button>
+                {readOnly ? (
+                    <span className="fx23-run" style={{ opacity: 0.75, cursor: "default" }}>
+                        {locked ? "Locked · read only" : ciiV2 ? "System CII (view only)" : "Analyzer not run · read only"}
+                    </span>
+                ) : (
+                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || locked}>
+                        {analysing ? "Analysing…" : locked ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
+                    </button>
+                )}
             </div>
 
             <div className="fx23-ready">
@@ -583,7 +601,7 @@ export default function CommunityCiiAnalyser({
                                                         min={0}
                                                         max={section.weight}
                                                         step={0.1}
-                                                        disabled={locked}
+                                                        disabled={locked || readOnly}
                                                         value={facultyScore}
                                                         onChange={(e) => {
                                                             const next = Number(e.target.value);
@@ -613,7 +631,7 @@ export default function CommunityCiiAnalyser({
                             <textarea
                                 value={facultyNote}
                                 onChange={(e) => setFacultyNote(e.target.value)}
-                                disabled={locked}
+                                disabled={locked || readOnly}
                                 placeholder="Record why the system assessment is accepted or adjusted. This becomes the Faculty Analysis note."
                             />
                             <label>
@@ -622,7 +640,7 @@ export default function CommunityCiiAnalyser({
                             <input
                                 value={revisionSection}
                                 onChange={(e) => setRevisionSection(e.target.value)}
-                                disabled={locked}
+                                disabled={locked || readOnly}
                                 placeholder="e.g. Section 4 Activities, Section 8 Evidence"
                                 style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
                             />
@@ -632,7 +650,7 @@ export default function CommunityCiiAnalyser({
                             <textarea
                                 value={requiredCorrection}
                                 onChange={(e) => setRequiredCorrection(e.target.value)}
-                                disabled={locked}
+                                disabled={locked || readOnly}
                                 placeholder="What the Team Lead must fix before resubmit"
                             />
                             <small>
@@ -640,24 +658,32 @@ export default function CommunityCiiAnalyser({
                             </small>
                         </div>
                         <div className="fx23-decision">
-                            <button type="button" className="rev" disabled={locked || deciding} onClick={returnForRevision}>
-                                Request revision
-                            </button>
-                            {!isCielPk ? (
-                            <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
-                                Reject
-                            </button>
-                            ) : null}
-                            <button type="button" className="approve" disabled={locked || approving || !ciiV2} onClick={approveAndLock}>
-                                {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
-                            </button>
+                            {readOnly ? (
+                                <p style={{ margin: 0, fontSize: 11, color: "#617579", fontWeight: 700 }}>
+                                    Read-only — Approve, Request revision and Reject are not available on Faculty login.
+                                </p>
+                            ) : (
+                                <>
+                                    <button type="button" className="rev" disabled={locked || deciding} onClick={returnForRevision}>
+                                        Request revision
+                                    </button>
+                                    {!isCielPk ? (
+                                    <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
+                                        Reject
+                                    </button>
+                                    ) : null}
+                                    <button type="button" className="approve" disabled={locked || approving || !ciiV2} onClick={approveAndLock}>
+                                        {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </>
             ) : (
                 <div className="fx23-moderation" style={{ padding: 22 }}>
                     <p style={{ fontSize: 10, color: "#617579", margin: 0 }}>
-                        Analyzer not run. No CII or badge has been assigned yet. Click Run AI Analyzer when you are ready to assess this locked report.
+                        Analyzer not run yet. Faculty view is read-only — CIEL PK Admin runs analysis and final decisions.
                     </p>
                 </div>
             )}

@@ -25,3 +25,16 @@ export function formatDisplayId(rawId: unknown, prefix = "ID"): string {
 
     return `${prefix}-${compact.slice(-6)}`;
 }
+
+/** Prefer backend `public_code` (CS-YEAR-XXXX). Fallback stays CS-prefixed, never a second record. */
+export function formatOpportunityCode(row: {
+    id?: unknown;
+    public_code?: unknown;
+    publicCode?: unknown;
+}): string {
+    const code = [row.public_code, row.publicCode]
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .find(Boolean);
+    if (code) return code;
+    return formatDisplayId(row.id, "CS");
+}

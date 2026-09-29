@@ -103,7 +103,7 @@ const FILTERS: { key: WsFilter; label: string }[] = [
     { key: "review", label: "Reports Under Review" },
     { key: "action", label: "Action Required" },
     { key: "completed", label: "Completed" },
-    { key: "archived", label: "Archived" },
+    { key: "archived", label: "Rejected / Closed" },
 ];
 
 const LEGACY_FILTER: Record<string, WsFilter> = {
@@ -153,7 +153,15 @@ function WorkspaceRemindButton({
 }
 
 function opportunityFullyApproved(op: OpportunityRow): boolean {
-    return op.status === "live" || op.admin_approval_status === "approved";
+    if (op.status !== "live") return false;
+    if (op.admin_approval_status && op.admin_approval_status !== "approved") return false;
+    const faculty = String(op.faculty_approval_status || "").toLowerCase();
+    if (faculty && faculty !== "approved" && faculty !== "not_applicable") return false;
+    if (op.requires_partner_approval) {
+        const partner = String(op.partner_approval_status || "").toLowerCase();
+        return partner === "approved" || partner === "not_applicable";
+    }
+    return true;
 }
 
 /** One Email + one WhatsApp action, each addressed to the actual contact when we have one on file
@@ -500,6 +508,9 @@ export default function CommunityServiceWorkspace({
         for (const project of projects) {
             if (reportByKey.has(project.id)) continue;
             if (opportunities.some((op) => op.id === project.id)) continue;
+            // Joined/owned listings only unlock report CTAs once the opportunity is LIVE.
+            const st = String(project.status || "").toLowerCase();
+            if (st !== "live" && st !== "completed" && st !== "finalized") continue;
             out.push({
                 id: `proj-${project.id}`,
                 filter: project.report_status ? "reports" : "ready",
@@ -529,10 +540,10 @@ export default function CommunityServiceWorkspace({
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="Workspace" />
+            <CommunityCrumb role="Student" view="My Reports" />
             <MockupSectionHead
-                title="Community Service Workspace"
-                subtitle="This workspace begins only after an opportunity or participation request is approved. It manages service delivery and the report — never proposal approval."
+                title="My Reports"
+                subtitle="Report operational home after an opportunity or participation request is approved. Same Report ID moves across folders by status — never proposal approval."
                 action={
                     <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
                         ← Back to module buttons
@@ -547,15 +558,15 @@ export default function CommunityServiceWorkspace({
                     ["Reports Under Review", "Submitted reports waiting for AI/faculty review."],
                     ["Action Required", "Report revisions requested after submission."],
                     ["Completed", "Verified Community Service Impact after approval."],
-                    ["Archived", "Closed report records retained for history."],
+                    ["Rejected / Closed", "Rejected or closed report records retained for history."],
                 ]}
-                rule="Opportunity drafts and opportunity approvals never belong here."
+                rule="Opportunity drafts and opportunity approvals never belong here — use My Opportunities."
             />
 
             <div className="flex flex-col justify-between gap-3 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-5 sm:flex-row sm:items-center">
                 <div>
                     <p className="text-[9.5px] font-black uppercase tracking-[0.08em] text-[#c76000]">Approved work only</p>
-                    <h3 className="mt-1 text-[20px] font-semibold text-[#16313d]">Your Community Service Workspace</h3>
+                    <h3 className="mt-1 text-[20px] font-semibold text-[#16313d]">My Reports</h3>
                     <p className="mt-1 max-w-[800px] text-[12px] leading-relaxed text-[#70808a]">
                         Everything here has already cleared the opportunity/participation gate. From this point onward, the student is doing the work, recording evidence and completing the report.
                     </p>
@@ -590,7 +601,7 @@ export default function CommunityServiceWorkspace({
 
             <div className="mt-3.5">
                 <ZoneRule title="Nothing before approval belongs here." tone="warn">
-                    If you need to check a student-created proposal, go to <strong>Create Opportunity</strong>. If you are waiting on an application to a published opportunity, go to{" "}
+                    If you need to check a student-created proposal, go to <strong>My Opportunities</strong>. If you are waiting on an application to a published opportunity, go to{" "}
                     <strong>Browse Opportunities → My Applications</strong>.
                 </ZoneRule>
             </div>

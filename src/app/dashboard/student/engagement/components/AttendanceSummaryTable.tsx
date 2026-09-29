@@ -7,6 +7,9 @@ import {
     Trash2,
     MessageSquareText,
     ExternalLink,
+    FileImage,
+    FileText,
+    File,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -158,6 +161,36 @@ function evidenceLinkLabel(href: string): string {
     }
 }
 
+/** UUID-style upload keys are not useful as UI labels — keep a short human label. */
+function isOpaqueUploadName(name: string): boolean {
+    const base = name.replace(/\.[^.]+$/, "").trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(base);
+}
+
+function evidenceFileKind(nameOrHref: string): "image" | "pdf" | "file" {
+    const lower = nameOrHref.toLowerCase().split("?")[0];
+    if (/\.(png|jpe?g|gif|webp|bmp|heic|svg)$/.test(lower)) return "image";
+    if (/\.pdf$/.test(lower)) return "pdf";
+    return "file";
+}
+
+function evidenceDisplayLabel(nameOrHref: string): string {
+    const raw = evidenceLinkLabel(nameOrHref);
+    if (!raw || isOpaqueUploadName(raw)) {
+        const kind = evidenceFileKind(nameOrHref);
+        if (kind === "image") return "Photo";
+        if (kind === "pdf") return "PDF";
+        return "File";
+    }
+    return raw.length > 28 ? `${raw.slice(0, 24)}…` : raw;
+}
+
+function EvidenceFileIcon({ kind, className }: { kind: "image" | "pdf" | "file"; className?: string }) {
+    if (kind === "image") return <FileImage className={className} />;
+    if (kind === "pdf") return <FileText className={className} />;
+    return <File className={className} />;
+}
+
 function SessionCard({
     entry,
     participantNames,
@@ -281,15 +314,26 @@ function SessionCard({
                             href={evidenceHref}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
+                            title="Open file"
+                            className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50 hover:text-indigo-900"
                         >
-                            <ExternalLink className="h-2.5 w-2.5" />
-                            {evidenceLinkLabel(evidenceHref)}
+                            <EvidenceFileIcon
+                                kind={evidenceFileKind(evidenceHref)}
+                                className="h-3.5 w-3.5 shrink-0"
+                            />
+                            <span>{evidenceDisplayLabel(evidenceHref)}</span>
+                            <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-70" />
                         </a>
                     ) : localFile ? (
-                        <p className="mt-1.5 text-[11px] text-slate-500">
-                            {(entry.evidence_file as File).name || "File attached"}
-                        </p>
+                        <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">
+                            <EvidenceFileIcon
+                                kind={evidenceFileKind((entry.evidence_file as File).name || "")}
+                                className="h-3.5 w-3.5 shrink-0"
+                            />
+                            <span>
+                                {evidenceDisplayLabel((entry.evidence_file as File).name || "File attached")}
+                            </span>
+                        </span>
                     ) : null}
 
                     {remarkOpen && rejected ? (

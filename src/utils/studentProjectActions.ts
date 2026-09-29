@@ -18,6 +18,12 @@ import {
     mergeHasAppliedFields,
     pickJoinApplicationStatus,
 } from "@/utils/studentJoinApplication";
+import {
+    REPORTING_WINDOW_CLOSED_MESSAGE,
+    canJoinOrApply,
+    canRecordCompletedService,
+    lifecycleStatusLabel,
+} from "@/utils/opportunityTimelineLifecycle";
 
 export type StudentProjectActionsInput = {
     raw: Record<string, unknown>;
@@ -40,11 +46,54 @@ export type StudentProjectActions = {
     showListingClosed: boolean;
     /** Short helper under buttons (listing queue or join). */
     helperMessage: string | null;
+    /** Primary join CTA copy. */
+    joinCtaLabel: string;
+    /** Date-driven lifecycle badge, if any. */
+    lifecycleLabel: string | null;
 };
 
-function lower(v: unknown): string {
-    if (v == null) return "";
-    return String(v).trim().toLowerCase();
+function timelineFromRaw(raw: Record<string, unknown>): unknown {
+    return raw.timeline ?? (raw.detail_view as { timeline?: unknown } | undefined)?.timeline;
+}
+
+function joinCtaForTimeline(raw: Record<string, unknown>): {
+    allowJoin: boolean;
+    label: string;
+    helper: string | null;
+    lifecycleLabel: string | null;
+} {
+    const timeline = timelineFromRaw(raw);
+    const lifecycleLabel = lifecycleStatusLabel(timeline);
+    if (canJoinOrApply(timeline)) {
+        return { allowJoin: true, label: "Join Opportunity", helper: null, lifecycleLabel };
+    }
+    if (canRecordCompletedService(timeline)) {
+        return {
+            allowJoin: true,
+            label: "Record Completed Service",
+            helper:
+                "Project service period ended. You can still record completed service during the reporting window.",
+            lifecycleLabel,
+        };
+    }
+    if (lifecycleLabel === "Applications Closed") {
+        return {
+            allowJoin: false,
+            label: "Applications Closed",
+            helper:
+                "Applications have closed. Enrolled students can continue service until the project end date.",
+            lifecycleLabel,
+        };
+    }
+    if (lifecycleLabel === "Reporting Window Closed") {
+        return {
+            allowJoin: false,
+            label: "Reporting Window Closed",
+            helper: REPORTING_WINDOW_CLOSED_MESSAGE,
+            lifecycleLabel,
+        };
+    }
+    return { allowJoin: true, label: "Join Opportunity", helper: null, lifecycleLabel };
 }
 
 /**
@@ -69,6 +118,19 @@ export function resolveStudentProjectActions(input: StudentProjectActionsInput):
     const canEditListing = isStudentOwner && canEditReturnedOpportunity(raw);
     const listingClosed = isStudentOwner && isOpportunityPermanentlyRejected(raw);
     const joinUi = shouldShowJoinApplicationApplyUi(raw, { isStudentOwner });
+    const joinTiming = joinCtaForTimeline(raw);
+
+    const empty = (extra: Partial<StudentProjectActions>): StudentProjectActions => ({
+        showEditResubmit: false,
+        showJoinApplyNow: false,
+        showJoinApplyAgain: false,
+        showJoinAppliedLocked: false,
+        showListingClosed: false,
+        helperMessage: null,
+        joinCtaLabel: joinTiming.label,
+        lifecycleLabel: joinTiming.lifecycleLabel,
+        ...extra,
+    });
 
     const joinRejected =
         Boolean(applicationStatus) && isJoinApplicationRejectedStatus(applicationStatus);
@@ -76,79 +138,56 @@ export function resolveStudentProjectActions(input: StudentProjectActionsInput):
         Boolean(applicationStatus) && isJoinApplicationPendingStatus(applicationStatus);
 
     if (isStudentOwner && canEditListing) {
-        return {
+        return empty({
             showEditResubmit: true,
-            showJoinApplyNow: false,
-            showJoinApplyAgain: false,
-            showJoinAppliedLocked: false,
-            showListingClosed: false,
             helperMessage: workflow.queueMessage,
-        };
+        });
     }
 
     if (listingClosed) {
-        return {
-            showEditResubmit: false,
-            showJoinApplyNow: false,
-            showJoinApplyAgain: false,
-            showJoinAppliedLocked: false,
+        return empty({
             showListingClosed: true,
             helperMessage: workflow.queueMessage,
-        };
+        });
     }
 
     if (joinUi) {
+        if (!joinTiming.allowJoin) {
+            return empty({
+                helperMessage: joinTiming.helper,
+            });
+        }
         if (applyLocked || (hasApplied && !joinRejected)) {
-            return {
-                showEditResubmit: false,
-                showJoinApplyNow: false,
-                showJoinApplyAgain: false,
+            return empty({
                 showJoinAppliedLocked: true,
-                showListingClosed: false,
                 helperMessage: joinPending ? workflow.queueMessage : null,
-            };
+            });
         }
         if (hasApplied && joinRejected) {
-            return {
-                showEditResubmit: false,
-                showJoinApplyNow: false,
+            return empty({
                 showJoinApplyAgain: true,
-                showJoinAppliedLocked: false,
-                showListingClosed: false,
+                joinCtaLabel:
+                    joinTiming.label === "Record Completed Service"
+                        ? "Record Completed Service"
+                        : "Apply again",
                 helperMessage: isStudentOwner
                     ? "Your participation signup was not approved. Re-apply to unlock reporting on your project."
                     : "Application not approved. You can submit a new request.",
-            };
+            });
         }
-        return {
-            showEditResubmit: false,
+        return empty({
             showJoinApplyNow: true,
-            showJoinApplyAgain: false,
-            showJoinAppliedLocked: false,
-            showListingClosed: false,
-            helperMessage: null,
-        };
+            helperMessage: joinTiming.helper,
+        });
     }
 
     if (isStudentOwner && !live) {
-        return {
-            showEditResubmit: false,
-            showJoinApplyNow: false,
-            showJoinApplyAgain: false,
-            showJoinAppliedLocked: false,
-            showListingClosed: false,
+        return empty({
             helperMessage: workflow.queueMessage,
-        };
+        });
     }
 
-    return {
-        showEditResubmit: false,
-        showJoinApplyNow: false,
-        showJoinApplyAgain: false,
-        showJoinAppliedLocked: false,
-        showListingClosed: false,
-        helperMessage: null,
-    };
+    return empty({});
 }
 
 /** Build apply-lock fields from API payload (browse + my projects). */

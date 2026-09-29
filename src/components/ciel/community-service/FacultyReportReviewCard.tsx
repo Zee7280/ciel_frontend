@@ -9,8 +9,12 @@ import type { FacultyCsReportRow } from "@/app/dashboard/faculty/community-servi
 import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
 
 export type FacultyReportReviewMode = "pending" | "revision" | "decided";
+export type FacultyReportReviewViewer = "faculty" | "admin";
 
-const REPORT_BASE = "/dashboard/faculty/reports";
+const DEFAULT_REPORT_BASE: Record<FacultyReportReviewViewer, string> = {
+    faculty: "/dashboard/faculty/reports",
+    admin: "/dashboard/admin/reports/verify",
+};
 
 function ago(value?: string): string {
     if (!value) return "";
@@ -57,9 +61,14 @@ const AVATAR: Record<string, string> = {
 export default function FacultyReportReviewCard({
     row,
     mode,
+    viewer = "faculty",
+    reportBase,
 }: {
     row: FacultyCsReportRow;
     mode: FacultyReportReviewMode;
+    viewer?: FacultyReportReviewViewer;
+    /** Override report detail base path (no trailing slash). */
+    reportBase?: string;
 }) {
     const [lockedOpen, setLockedOpen] = useState(false);
     const has = analyserHasRun(row);
@@ -68,9 +77,9 @@ export default function FacultyReportReviewCard({
     const dividend = hours * DIVIDEND_HOURLY_RATE_PKR;
     const submitted = ago(row.report_submitted_at || row.submission_date);
     const lastActivity = ago(row.updated_at || row.report_submitted_at || row.submission_date);
-    const reportHref = `${REPORT_BASE}/${row.id}`;
+    const base = (reportBase || DEFAULT_REPORT_BASE[viewer]).replace(/\/$/, "");
+    const reportHref = `${base}/${row.id}`;
     const analyserHref = `${reportHref}?view=cii-v2`;
-    const decideHref = `${reportHref}?intent=decide`;
     const idLabel = formatDisplayId(row.id, "RPT");
     const score = typeof row.cii_provisional === "number" ? Math.round(row.cii_provisional * 10) / 10 : null;
     const levelLabel = row.cii_level_name
@@ -87,20 +96,32 @@ export default function FacultyReportReviewCard({
         .toLowerCase()
         .includes("reject");
 
-    let statusTitle = "Pending Faculty Review";
+    let statusTitle = "Pending CIEL PK Review";
     let statusText = [
         submitted ? `Submitted ${submitted}` : "Report v1",
         has
-            ? `System CII ${score ?? "—"} (Provisional)${levelLabel ? ` · ${levelLabel}` : ""}`
-            : "Analyzer not run",
+            ? viewer === "admin"
+                ? `System CII ${score ?? "—"} (Provisional)${levelLabel ? ` · ${levelLabel}` : ""}`
+                : `Provisional CII ${score ?? "—"} (view only)${levelLabel ? ` · ${levelLabel}` : ""}`
+            : viewer === "admin"
+              ? "Analyzer not run"
+              : "Analysis pending · CIEL PK Admin",
     ]
         .filter(Boolean)
         .join(" · ");
     let statusTone: "warn" | "ok" | "bad" = "warn";
-    let nextTitle = has ? "Review CII · Moderate · Approve / Revise / Reject" : "Open locked package · Run Analyzer";
-    let nextText = has
-        ? "Approval locks the Faculty-Verified CII and releases badge, certificate and QR"
-        : "The student submission stays locked; analysis starts only when Faculty triggers the Analyzer.";
+    let nextTitle =
+        viewer === "admin"
+            ? has
+                ? "Review CII · Finalise CIEL PK verification"
+                : "Open locked package · Review evidence"
+            : "View locked package · Read only";
+    let nextText =
+        viewer === "admin"
+            ? has
+                ? "CIEL PK can request revision or reject. Faculty CII stays locked after academic sign-off."
+                : "Faculty-approved submissions open here for national verification and independent analysis."
+            : "Faculty access is read-only. View the locked Flashcard + Detailed Report. Analysis, Approve, Revision and Reject stay with CIEL PK Admin.";
     let accent: "act" | "ok" | "rev" = "act";
 
     if (mode === "revision") {
@@ -108,7 +129,10 @@ export default function FacultyReportReviewCard({
         statusText = "Returned for correction. The locked package stays visible until the student resubmits.";
         statusTone = "bad";
         nextTitle = "Waiting for resubmission";
-        nextText = "Report returns as a new locked version; Faculty reruns the Analyzer.";
+        nextText =
+            viewer === "admin"
+                ? "Report returns after the student resubmits; Faculty and CIEL PK review again."
+                : "Report returns as a new locked version for review after the student resubmits.";
         accent = "rev";
     } else if (mode === "decided") {
         statusTitle = rejected ? "Rejected — Closed" : locked ? `Verified · CII ${score ?? "—"}` : "Approved";
@@ -120,7 +144,7 @@ export default function FacultyReportReviewCard({
     }
 
     const analyserStep: "done" | "cur" | "" = has ? "done" : mode === "pending" ? "cur" : "";
-    const facultyStep: "done" | "cur" | "" = mode === "decided" ? "done" : has && mode === "pending" ? "cur" : "";
+    const finalStep: "done" | "cur" | "" = mode === "decided" ? "done" : has && mode === "pending" ? "cur" : "";
 
     const stages: { label: string; sub: string; state: "done" | "cur" | "" }[] = [
         { label: "Flashcard", sub: "Locked V17 template", state: "done" },
@@ -128,14 +152,29 @@ export default function FacultyReportReviewCard({
         { label: "Evidence", sub: `${evidenceCount} items · full access`, state: "done" },
         { label: "Full PDF", sub: `${idLabel}-R01.pdf`, state: "done" },
         {
-            label: "AI Analyzer",
-            sub: has ? "Run complete · System CII ready" : "Faculty action required · not yet run",
+            label: viewer === "admin" ? "AI Analyzer" : "Analysis status",
+            sub: has
+                ? viewer === "admin"
+                    ? "Run complete · System CII ready"
+                    : "Provisional CII available · view only"
+                : viewer === "admin"
+                  ? "Optional independent analysis"
+                  : "Not run yet · CIEL PK Admin",
             state: analyserStep,
         },
         {
-            label: "Faculty Final",
-            sub: mode === "decided" ? "Decision recorded" : has ? "Review / moderate / approve" : "Available after Analyzer",
-            state: facultyStep,
+            label: "CIEL PK Final",
+            sub:
+                mode === "decided"
+                    ? "Decision recorded"
+                    : has
+                      ? viewer === "admin"
+                          ? "National verification"
+                          : "View only · Admin decides"
+                      : viewer === "admin"
+                        ? "Open verify dossier"
+                        : "CIEL PK Admin decides",
+            state: finalStep,
         },
     ];
 
@@ -185,7 +224,7 @@ export default function FacultyReportReviewCard({
                         {lastActivity ? <span>Last activity {lastActivity}</span> : null}
                         {!has ? (
                             <span className="rounded-[18px] border border-dashed border-[#d3e3e0] bg-[#f4f7f8] px-2 py-0.5 text-[10.5px] font-bold text-[#6c7f86]">
-                                Not analysed yet
+                                {viewer === "admin" ? "Not analysed yet" : "Awaiting CIEL PK analysis"}
                             </span>
                         ) : null}
                     </div>
@@ -223,11 +262,16 @@ export default function FacultyReportReviewCard({
                             <p className="mt-2 text-[12px] leading-relaxed text-[#4f6068]">
                                 {row.story
                                     ? `${row.story.slice(0, 320)}${row.story.length > 320 ? "…" : ""}`
-                                    : "System CII is provisional until you approve. Overrides need a recorded reason. Student-source text is not rewritten."}
+                                    : viewer === "admin"
+                                      ? "System CII is provisional until final acceptance. Overrides need a recorded reason. Student-source text is not rewritten."
+                                      : "Provisional CII is view-only for Faculty. Final acceptance and decisions stay with CIEL PK Admin."}
                             </p>
                         ) : (
                             <div className="mt-2 rounded-[11px] border border-[#cfe6ef] bg-[#f3f9fb] px-3 py-2 text-[12px] leading-relaxed text-[#3e515b]">
-                                <b>Locked flow:</b> Faculty first reviews the submitted Flashcard + Detailed Report. The Analyzer runs only when you choose to run it.
+                                <b>Locked flow:</b>{" "}
+                                {viewer === "admin"
+                                    ? "Review the submitted Flashcard + Detailed Report on the verify dossier. Independent Analyzer is optional and never overwrites Faculty CII."
+                                    : "Faculty can open the submitted Flashcard + Detailed Report. Analyzer and decisions stay with CIEL PK Admin."}
                             </div>
                         )}
                         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -280,21 +324,34 @@ export default function FacultyReportReviewCard({
                         <small className="mt-0.5 block text-[11.5px] leading-snug text-[#6b7c86]">{nextText}</small>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                        <button type="button" className={approvalActionClass.green} onClick={() => setLockedOpen(true)}>
-                            Open Locked V17 Package
-                        </button>
-                        <Link href={analyserHref} className={approvalActionClass.blue}>
-                            {has ? "System CII · Review & Finalise" : "Run AI Analyzer"}
-                        </Link>
+                        {viewer === "admin" ? (
+                            <Link href={reportHref} className={approvalActionClass.green}>
+                                Open Locked V17 Package
+                            </Link>
+                        ) : (
+                            <button type="button" className={approvalActionClass.green} onClick={() => setLockedOpen(true)}>
+                                Open Locked V17 Package
+                            </button>
+                        )}
+                        {viewer === "admin" ? (
+                            <Link href={analyserHref} className={approvalActionClass.blue}>
+                                {has ? "System CII · Review" : "Open AI Analyzer"}
+                            </Link>
+                        ) : has ? (
+                            <Link href={analyserHref} className={approvalActionClass.soft}>
+                                View System CII
+                            </Link>
+                        ) : null}
                         {mode === "pending" ? (
-                            <>
-                                <Link href={decideHref} className={approvalActionClass.gold}>
-                                    ✏ Request Revision
+                            viewer === "admin" ? (
+                                <Link href={reportHref} className={approvalActionClass.gold}>
+                                    Open verify · Decide
                                 </Link>
-                                <Link href={decideHref} className={approvalActionClass.red}>
-                                    ✕ Reject
+                            ) : (
+                                <Link href={reportHref} className={approvalActionClass.soft}>
+                                    Open record
                                 </Link>
-                            </>
+                            )
                         ) : (
                             <Link href={reportHref} className={approvalActionClass.soft}>
                                 Open record
@@ -303,7 +360,7 @@ export default function FacultyReportReviewCard({
                     </div>
                 </div>
             </article>
-            {lockedOpen ? <FacultyLockedV17Modal reportId={row.id} onClose={() => setLockedOpen(false)} /> : null}
+            {lockedOpen && viewer === "faculty" ? <FacultyLockedV17Modal reportId={row.id} onClose={() => setLockedOpen(false)} /> : null}
         </>
     );
 }

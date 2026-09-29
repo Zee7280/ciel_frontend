@@ -15,7 +15,6 @@ import {
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
@@ -23,9 +22,8 @@ import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
-import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatOpportunityCode } from "@/utils/displayIds";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
@@ -45,7 +43,7 @@ import {
     type OppRow,
 } from "./useNgoCommunityServiceData";
 
-const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "files", "run", "analytics", "pending", "approved"] as const;
+const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "analytics", "pending", "approved"] as const;
 type CsView = (typeof CS_VIEWS)[number];
 
 const VIEW_CRUMB: Partial<Record<CsView, string>> = {
@@ -53,8 +51,6 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     approvals: "Approvals",
     projects: "Community Service Projects",
     impact: "My Impact",
-    files: "Shared Analysis Files",
-    run: "AI Analyzer & Rankings",
     analytics: "Analytics",
     pending: "Approvals",
     approved: "My Impact",
@@ -83,6 +79,8 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
         title: "Approvals",
         desc: "Review opportunities created by others that name your NGO as a linked organization.",
         items: [
+            ["Linked Drafts", "Named to you but not submitted yet — view the same master record."],
+            ["Waiting for Faculty", "Submitted and linked; Faculty has not approved yet. View only."],
             ["Pending Approval / Acknowledgement", "Records waiting for your organization’s consent or decision."],
             ["Open Flashcard", "Review the opportunity students will eventually see."],
             ["Approve / Acknowledge", "Confirm organizational participation and route the record onward."],
@@ -111,26 +109,6 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
             ["Flashcard & Credentials", "Open the verified project summary, CII, badge, certificate and QR."],
         ],
         rule: "Rejected work never appears as verified impact.",
-    },
-    files: {
-        title: "Shared Analysis Files",
-        desc: "One place for every analysis file shared across stakeholders.",
-        items: [
-            ["Faculty Analysis", "The faculty decision file for each submitted report: decision, CII accepted or moderated, reason, comments."],
-            ["AI Analyzer reports", "The latest dated AI Analyzer badge and run history for each project."],
-            ["Open / Download", "View inside the dashboard, print, or download the file."],
-        ],
-        rule: "Files are shared automatically — nobody has to send them.",
-    },
-    run: {
-        title: "AI Analyzer & Rankings",
-        desc: "Analyse/rank verified projects linked to your NGO within permitted cohorts.",
-        items: [
-            ["Ranking Preview", "Run dynamic analysis without creating a permanent award."],
-            ["Official Run", "Create a dated official cohort ranking, subject to role limits."],
-            ["Why It Ranks", "Evidence-backed explanation for each position."],
-        ],
-        rule: "Faculty remains the academic report approver; rankings use verified records only.",
     },
     analytics: {
         title: "Analytics",
@@ -286,6 +264,8 @@ export default function NgoCommunityServiceHub() {
         orgName,
         mine,
         pendingApprovals,
+        linkedDrafts,
+        waitingFacultyApprovals,
         revisionApprovals,
         decidedApprovals,
         publishedMine,
@@ -294,13 +274,11 @@ export default function NgoCommunityServiceHub() {
         pipeline,
         waiting,
         liveRows,
-        decidedReports,
         deckCards,
         inboxItems,
     } = useNgoCommunityServiceData();
     const [innerTab, setInnerTab] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
-    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
 
     useEffect(() => {
         setInnerTab(tabParam);
@@ -322,9 +300,8 @@ export default function NgoCommunityServiceHub() {
         | "action"
         | "published"
         | "closed";
-    const approvalTab = ["pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
+    const approvalTab = ["linked", "waiting", "pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
     const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
-    const filesTab = innerTab === "ai" ? "ai" : "faculty";
     const crumb = VIEW_CRUMB[view];
     const guideKey = view === "pending" ? "approvals" : view === "approved" ? "impact" : view;
     const guide = GUIDES[guideKey] || GUIDES.home;
@@ -457,24 +434,6 @@ export default function NgoCommunityServiceHub() {
                             background={MOCKUP_GRADIENTS.green}
                         />
                         <MockupActionCard
-                            href={`${CS_BASE}?view=files`}
-                            emoji="📁"
-                            ghost="📁"
-                            title="Shared Analysis Files"
-                            subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard."
-                            badge="SHARED"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=run`}
-                            emoji="🧠"
-                            ghost="🧠"
-                            title="AI Analyzer & Rankings"
-                            subtitle="Analyse/rank verified projects linked to your NGO within permitted cohorts."
-                            badge="ANALYZE"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                        <MockupActionCard
                             href={`${CS_BASE}?view=analytics`}
                             emoji="📊"
                             ghost="📊"
@@ -554,7 +513,7 @@ export default function NgoCommunityServiceHub() {
                                         <OpportunityListFlashHead title={row.title} />
                                         <div className="px-4 py-3">
                                             <small className="block text-[11.5px] text-[#6b7c86]">
-                                                {formatDisplayId(row.id, "OPP")} ·{" "}
+                                                {formatOpportunityCode(row)} ·{" "}
                                                 {createTab === "review" ? ngoPendingStageLabel(row) : String(row.status || "in review")}
                                                 {pickNum(row, "applicants_count", "applicantsCount") > 0
                                                     ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
@@ -587,7 +546,9 @@ export default function NgoCommunityServiceHub() {
                     </p>
                     <HubTabs
                         tabs={[
-                            { id: "pending", label: "Pending", count: pendingApprovals.length },
+                            { id: "linked", label: "Linked Drafts", count: linkedDrafts.length },
+                            { id: "waiting", label: "Waiting for Faculty", count: waitingFacultyApprovals.length },
+                            { id: "pending", label: "Pending Approval", count: pendingApprovals.length },
                             { id: "rev", label: "Revision requested", count: revisionApprovals.length },
                             { id: "done", label: "Decided", count: decidedApprovals.length },
                         ]}
@@ -599,15 +560,38 @@ export default function NgoCommunityServiceHub() {
                     ) : (
                         (() => {
                             const tab = view === "pending" ? "pending" : approvalTab;
-                            const list = tab === "done" ? decidedApprovals : tab === "rev" ? revisionApprovals : pendingApprovals;
+                            const list =
+                                tab === "done"
+                                    ? decidedApprovals
+                                    : tab === "rev"
+                                      ? revisionApprovals
+                                      : tab === "linked"
+                                        ? linkedDrafts
+                                        : tab === "waiting"
+                                          ? waitingFacultyApprovals
+                                          : pendingApprovals;
                             if (!list.length) {
                                 return (
                                     <EmptyPanel
-                                        title={tab === "done" ? "No decided records yet" : tab === "rev" ? "None" : "No approvals waiting"}
+                                        title={
+                                            tab === "done"
+                                                ? "No decided records yet"
+                                                : tab === "rev"
+                                                  ? "None"
+                                                  : tab === "linked"
+                                                    ? "No linked drafts"
+                                                    : tab === "waiting"
+                                                      ? "None waiting on Faculty"
+                                                      : "No approvals waiting"
+                                        }
                                         text={
-                                            tab === "pending"
-                                                ? "Opportunities naming your organization appear here once Faculty has approved them."
-                                                : "When an opportunity lists your organisation as partner, it will appear here."
+                                            tab === "waiting"
+                                                ? "When you are named on a submitted opportunity, it appears here until Faculty approves. Same Opportunity ID — view only."
+                                                : tab === "linked"
+                                                  ? "Drafts that already name your organization appear here. You cannot approve until the creator submits."
+                                                  : tab === "pending"
+                                                    ? "Opportunities naming your organization appear here once Faculty has approved them."
+                                                    : "When an opportunity lists your organisation as partner, it will appear here."
                                         }
                                     />
                                 );
@@ -615,9 +599,26 @@ export default function NgoCommunityServiceHub() {
                             return (
                                 <div className="grid gap-3">
                                     {list.map((row) => {
-                                        const mode = tab === "done" ? "decided" : tab === "rev" ? "revision" : "pending";
+                                        const mode =
+                                            tab === "done"
+                                                ? "decided"
+                                                : tab === "rev"
+                                                  ? "revision"
+                                                  : tab === "waiting" || tab === "linked"
+                                                    ? "waiting"
+                                                    : "pending";
                                         const model = buildOpportunityApprovalModel(row, "ngo", { orgName, mode });
-                                        const href = `${APPROVALS}?tab=${tab === "pending" ? "pending" : "history"}&opportunity=${encodeURIComponent(row.id)}`;
+                                        const verifyTab =
+                                            tab === "pending"
+                                                ? "pending"
+                                                : tab === "linked"
+                                                  ? "linked"
+                                                  : tab === "waiting"
+                                                    ? "waiting"
+                                                    : tab === "rev"
+                                                      ? "revision"
+                                                      : "history";
+                                        const href = `${APPROVALS}?tab=${verifyTab}&opportunity=${encodeURIComponent(row.id)}`;
                                         return (
                                             <OpportunityApprovalCard
                                                 key={row.id}
@@ -637,7 +638,7 @@ export default function NgoCommunityServiceHub() {
                                                         </>
                                                     ) : (
                                                         <Link href={href} className={approvalActionClass.soft}>
-                                                            {mode === "decided" ? "Open record" : "View Flashcard"}
+                                                            {mode === "decided" ? "Open record" : "View same record"}
                                                         </Link>
                                                     )
                                                 }
@@ -737,101 +738,6 @@ export default function NgoCommunityServiceHub() {
                 </div>
             )}
 
-            {view === "files" && (
-                <div className="mt-4">
-                    <MockupSectionHead
-                        title={`Shared files · ${orgName}`}
-                        subtitle="Faculty Analysis files and AI Analyzer reports are shared automatically with every stakeholder linked to a record."
-                    />
-                    <HubTabs
-                        tabs={[
-                            { id: "faculty", label: "Faculty Analysis files", count: decidedReports.length },
-                            { id: "ai", label: "AI Analyzer reports", count: deckCards.filter((c) => c.cii != null).length },
-                        ]}
-                        active={filesTab}
-                        onChange={setHubTab}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading files…</p>
-                    ) : filesTab === "ai" ? (
-                        deckCards.filter((c) => c.cii != null).length === 0 ? (
-                            <EmptyPanel title="No AI Analyzer runs yet" text="The dated CII badge is the shared file every stakeholder sees once Faculty runs analysis." />
-                        ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {deckCards
-                                    .filter((c) => c.cii != null)
-                                    .map((card) => (
-                                        <div
-                                            key={card.id}
-                                            className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                        >
-                                            <div className="text-[22px]">🧠</div>
-                                            <b className="mt-1 block text-[14px] text-[#16313d]">{card.project_title}</b>
-                                            <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                                {card.level || "CII"} · {card.cii}/100 · {card.student_name}
-                                            </small>
-                                            <div className="mt-2 flex flex-wrap gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setBreakdownFor({ id: card.id, title: card.project_title })}
-                                                    className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
-                                                >
-                                                    View CII breakdown →
-                                                </button>
-                                                <Link href={reportHref(card.id)} className="text-[10.5px] font-black text-[#6b7c86] hover:underline">
-                                                    Open report →
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    ))}
-                            </div>
-                        )
-                    ) : decidedReports.length === 0 ? (
-                        <EmptyPanel title="No Faculty Analysis yet" text="A file is created the moment faculty decides on a submitted report." />
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {decidedReports.map((row) => (
-                                <Link
-                                    key={row.id}
-                                    href={reportHref(row.id)}
-                                    className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                >
-                                    <div className="text-[22px]">📄</div>
-                                    <b className="mt-1 block text-[14px] text-[#16313d]">{row.project_title}</b>
-                                    <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                        {formatDisplayId(row.id, "RPT")} · {row.faculty_status || row.status} · {row.student_name}
-                                    </small>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {view === "run" && (
-                <div className="mt-4">
-                    <MockupSectionHead
-                        title="AI Analyzer & Rankings"
-                        subtitle={`${orgName}-linked projects. Preview freely; an official run creates a dated cohort ranking.`}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading…</p>
-                    ) : deckCards.length === 0 ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-                            No live cards to rank yet. Faculty-approved Community Service fills this run.
-                        </p>
-                    ) : (
-                        <CommunityAwardPanel
-                            cards={deckCards}
-                            kind="par"
-                            scopeName={`${orgName} NGO cohort`}
-                            notifyEndpoint="/api/v1/partners/community-service/award-notify"
-                            filters={{ university: true }}
-                        />
-                    )}
-                </div>
-            )}
-
             {view === "analytics" && (
                 <div className="mt-4 space-y-3">
                     <MockupSectionHead
@@ -893,14 +799,6 @@ export default function NgoCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
-
-            {breakdownFor && (
-                <CommunityCiiBreakdownModal
-                    fetchUrl={`/api/v1/partners/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
-                    title={breakdownFor.title}
-                    onClose={() => setBreakdownFor(null)}
-                />
-            )}
         </div>
     );
 }

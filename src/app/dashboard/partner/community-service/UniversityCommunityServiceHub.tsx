@@ -16,9 +16,9 @@ import OpportunityApprovalCard, {
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
-import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { resolveStudentOpportunityWorkflow } from "@/utils/opportunityWorkflow";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { authenticatedFetch } from "@/utils/api";
@@ -49,7 +49,6 @@ const CS_VIEWS = [
     "wall",
     "run",
     "analytics",
-    "files",
     "exports",
 ] as const;
 type CsView = (typeof CS_VIEWS)[number];
@@ -84,9 +83,9 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
     projects: {
         desc: "Institution-wide monitoring of Community Service work.",
         items: [
-            ["Projects", "All named opportunities, university-created listings, approval monitor, and join applications."],
+            ["Projects", "All named opportunities, university-created listings, Opportunity Monitor, and join applications."],
             ["All / University", "Read-only lists. University does not approve or reject the opportunity chain."],
-            ["Approval + Monitor", "Drafts, in-approval, active reports, verified and closed."],
+            ["Opportunity Monitor", "Drafts, Pending Faculty, in-approval, active reports, verified and closed."],
             ["Applications", "Join applications on this institution’s listings. Monitor only."],
         ],
         rule: "University oversight is institutional; academic report approval remains with Faculty.",
@@ -110,14 +109,14 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
         rule: "Rejected and confidential records are never shown publicly.",
     },
     run: {
-        desc: "Analyse and rank verified University projects in meaningful cohorts.",
+        desc: "Run University Ruberix Ranking on eligible accepted projects from this institution only.",
         items: [
-            ["Preview", "Dynamic ranking analysis."],
-            ["Official Run", "Dated permanent University cohort snapshot, subject to role limits."],
-            ["Cohort Filters", "Define semester, department, SDG or other meaningful comparison group."],
-            ["Explanation", "Shows why each project ranks where it does."],
+            ["Select Filters", "Academic year, department, faculty, SDG and other cohort filters within your university."],
+            ["Run AI Ranking Analyzer", "Loads eligible projects and generates a Ranking Preview (not published)."],
+            ["Publish Ranking", "Creates the official University ranking run, history, ranks, trends and badges."],
+            ["CII locked", "Ranking never changes Verified CII."],
         ],
-        rule: "Avoid misleading micro-cohorts such as “#1 of 1”.",
+        rule: "Only this University’s eligible accepted projects enter the University ranking pool.",
     },
     analytics: {
         desc: "Institution-wide Community Service performance dashboard.",
@@ -129,15 +128,6 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
             ["SDGs / Departments / Partners", "Distribution across the University."],
         ],
         rule: "Use aggregate analytics for institutional planning and reporting.",
-    },
-    files: {
-        desc: "One place for every analysis file shared across stakeholders.",
-        items: [
-            ["Faculty Analysis", "The faculty decision file for each submitted report: decision, CII accepted or moderated, reason, comments."],
-            ["AI Analyzer reports", "The latest dated AI Analyzer badge and run history for each project."],
-            ["Open / Download", "View inside the dashboard, print, or download the file."],
-        ],
-        rule: "Files are shared automatically — nobody has to send them.",
     },
     exports: {
         desc: "Generate institutional outputs from verified/authorised Community Service data.",
@@ -261,6 +251,18 @@ function csvEscape(value: string) {
     return `"${value.replace(/"/g, '""')}"`;
 }
 
+function universityMonitorMode(row: UniOppRow): "pending" | "revision" | "decided" | "waiting" {
+    const stage = resolveStudentOpportunityWorkflow(row).stage;
+    if (stage === "revision") return "revision";
+    if (String(row.status || "").toLowerCase() === "draft") return "waiting";
+    if (stage === "live" || stage === "rejected") return "decided";
+    return "pending";
+}
+
+function isPendingFacultyRow(row: UniOppRow): boolean {
+    return resolveStudentOpportunityWorkflow(row).stage === "pending_faculty";
+}
+
 export default function UniversityCommunityServiceHub() {
     const { view, homeHref } = useFacultyHubView(CS_VIEWS, "home");
     const searchParams = useSearchParams();
@@ -279,15 +281,12 @@ export default function UniversityCommunityServiceHub() {
         waiting,
         liveRows,
         closedReports,
-        decidedReports,
         deckCards,
         reps,
         reloadReps,
         approvedProjects,
     } = useUniversityCommunityServiceData();
     const [innerTab, setInnerTab] = useState("");
-    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
-    const [rerunningId, setRerunningId] = useState<string | null>(null);
     const [deptFilter, setDeptFilter] = useState("");
     const [facFilter, setFacFilter] = useState("");
     const [query, setQuery] = useState("");
@@ -332,8 +331,9 @@ export default function UniversityCommunityServiceHub() {
         : tabParam === "all" || tabParam === "university" || tabParam === "applications"
           ? tabParam
           : "monitor";
-    const projectTab = ["drafts", "approval", "active", "verified", "closed"].includes(innerTab) ? innerTab : "active";
-    const filesTab = innerTab === "ai" ? "ai" : "faculty";
+    const projectTab = ["drafts", "approval", "faculty", "active", "verified", "closed"].includes(innerTab)
+        ? innerTab
+        : "active";
     const effectiveView: CsView = view === "reps" ? "allocation" : view;
     const guide = GUIDES[effectiveView] || GUIDES.home;
     const hours = deckCards.reduce((s, c) => s + (c.hours || 0), 0);
@@ -465,32 +465,6 @@ export default function UniversityCommunityServiceHub() {
         await reloadReps();
     };
 
-    /** Backend already permits universities to run an extra AI pass on an already faculty-approved
-     * report (never overwrites the faculty-approved score/level) — this just wires a button to it. */
-    const runIndependentAnalysis = async (reportId: string) => {
-        setRerunningId(reportId);
-        try {
-            const res = await authenticatedFetch(
-                `/api/v1/partners/community-service/reports/${encodeURIComponent(reportId)}/independent-analysis`,
-                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
-            );
-            const json = await res?.json().catch(() => null);
-            if (!res?.ok) {
-                toast.error(json?.message || "Independent AI analysis failed.");
-                return;
-            }
-            const score = json?.data?.score ?? json?.score;
-            const levelName = json?.data?.level?.name ?? json?.level?.name;
-            toast.success(
-                score != null
-                    ? `Independent analysis complete — ${Math.round(score)}/100${levelName ? ` (${levelName})` : ""}. The faculty-approved score is unchanged.`
-                    : "Independent analysis complete. The faculty-approved score is unchanged.",
-            );
-        } finally {
-            setRerunningId(null);
-        }
-    };
-
     const exportVerified = (kind: string) => {
         const rows = deckCards.map((c) =>
             [
@@ -535,12 +509,10 @@ export default function UniversityCommunityServiceHub() {
                                 : effectiveView === "wall"
                                   ? "Impact Wall"
                                   : effectiveView === "run"
-                                    ? "AI Analyzer & Rankings"
+                                    ? "AI Ranking Analyzer"
                                     : effectiveView === "analytics"
                                       ? "Analytics"
-                                      : effectiveView === "files"
-                                        ? "Shared Analysis Files"
-                                        : "Reports / Exports"
+                                      : "Reports / Exports"
                 }
             />
             {effectiveView === "home" ? (
@@ -595,9 +567,8 @@ export default function UniversityCommunityServiceHub() {
                         <MockupActionCard href={`${CS_BASE}?view=projects`} emoji="📈" ghost="📈" title="Community Service Projects" subtitle="Monitor every University Community Service project, progress, faculty, partners and student participation." badge="TRACK" background={MOCKUP_GRADIENTS.blue} />
                         <MockupActionCard href={`${CS_BASE}?view=approved`} emoji="✅" ghost="✅" title="Approved Impact" subtitle="Verified reports with CII, badges, certificates and QR verification." badge="VERIFIED" background={MOCKUP_GRADIENTS.green} />
                         <MockupActionCard href={`${CS_BASE}?view=wall`} emoji="🏆" ghost="🏆" title="Impact Wall" subtitle="Permission-aware University showcase of verified Community Service work." badge="SHOWCASE" background={MOCKUP_GRADIENTS.orange} />
-                        <MockupActionCard href={`${CS_BASE}?view=run`} emoji="🧠" ghost="🧠" title="AI Analyzer & Rankings" subtitle="Run permitted institutional ranking previews and official cohort snapshots." badge="ANALYZE" background={MOCKUP_GRADIENTS.purple} />
+                        <MockupActionCard href={`${CS_BASE}?view=run`} emoji="🧠" ghost="🧠" title="AI Ranking Analyzer" subtitle="Run University Ruberix Ranking on your institution’s eligible accepted projects only. Preview first; Publish Ranking creates the official run." badge="ANALYZE" background={MOCKUP_GRADIENTS.purple} />
                         <MockupActionCard href={`${CS_BASE}?view=analytics`} emoji="📊" ghost="📊" title="Analytics" subtitle="Institution-wide hours, dividend, reach, SDGs, departments, partners and CII distribution." badge="INSIGHTS" background={MOCKUP_GRADIENTS.gold} />
-                        <MockupActionCard href={`${CS_BASE}?view=files`} emoji="📁" ghost="📁" title="Shared Analysis Files" subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard." badge="SHARED" background={MOCKUP_GRADIENTS.purple} />
                         <MockupActionCard href={`${CS_BASE}?view=exports`} emoji="📤" ghost="📤" title="Reports / Exports" subtitle="HEC-ready summaries, department reports, certificate registers and authorised exports." badge="EXPORT" background="linear-gradient(135deg,#455a78,#7088ad)" />
                     </div>
                     <Link href={HOME} className="mt-4 inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
@@ -656,7 +627,7 @@ export default function UniversityCommunityServiceHub() {
                                         <OpportunityListFlashHead title={row.title} />
                                         <div className="px-4 py-3">
                                             <small className="block text-[11.5px] text-[#6b7c86]">
-                                                {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
+                                                {formatOpportunityCode(row)} · {String(row.status || "in review")}
                                             </small>
                                         </div>
                                     </Link>
@@ -722,7 +693,7 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "projects" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="Community Service Projects" subtitle="Institution-wide view. Draft answers remain private; you see stage, completion, last activity and member hours." />
+                    <MockupSectionHead title="Opportunity Monitor" subtitle="Read-only institutional view of the same master opportunity. Live status and approval journey — no Approve/Reject on this chain." />
                     <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="rounded-[10px] border border-[#dde5ea] bg-white px-2.5 py-2 text-[11px]">
                             <option value="">All departments</option>
@@ -742,7 +713,7 @@ export default function UniversityCommunityServiceHub() {
                         tabs={[
                             { id: "all", label: "All opportunities", count: oppRows.filter(filterOpp).length },
                             { id: "university", label: "University opportunities", count: mine.filter(filterOpp).length },
-                            { id: "monitor", label: "Approval + Monitor", count: approvalOpps.filter(filterOpp).length + draftOpps.filter(filterOpp).length },
+                            { id: "monitor", label: "Opportunity Monitor", count: approvalOpps.filter(filterOpp).length + draftOpps.filter(filterOpp).length },
                             { id: "applications", label: "Applications", count: joinApps.length },
                         ]}
                         active={monitorTab}
@@ -763,7 +734,7 @@ export default function UniversityCommunityServiceHub() {
                         ) : (
                             <div className="grid gap-3">
                                 {(monitorTab === "university" ? mine : oppRows).filter(filterOpp).map((row) => {
-                                    const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: "decided" });
+                                    const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: universityMonitorMode(row) });
                                     return (
                                         <div key={row.id}>
                                             <OpportunityApprovalCard
@@ -812,6 +783,7 @@ export default function UniversityCommunityServiceHub() {
                     <HubTabs
                         tabs={[
                             { id: "drafts", label: "Drafts", count: draftOpps.filter(filterOpp).length },
+                            { id: "faculty", label: "Pending Faculty", count: approvalOpps.filter(isPendingFacultyRow).filter(filterOpp).length },
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
                             { id: "active", label: "Active reports", count: waiting.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
@@ -847,6 +819,40 @@ export default function UniversityCommunityServiceHub() {
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )
+                    ) : projectTab === "faculty" ? (
+                        approvalOpps.filter(isPendingFacultyRow).filter(filterOpp).length === 0 ? (
+                            <EmptyPanel title="Nothing pending Faculty" text="When a student from this institution is waiting on Faculty, the same Opportunity ID appears here. Read-only." />
+                        ) : (
+                            <div className="grid gap-3">
+                                {approvalOpps
+                                    .filter(isPendingFacultyRow)
+                                    .filter(filterOpp)
+                                    .map((row) => {
+                                        const model = buildOpportunityApprovalModel(row, "university", { orgName, mode: "pending" });
+                                        return (
+                                            <div key={row.id}>
+                                                <OpportunityApprovalCard
+                                                    {...model}
+                                                    actions={
+                                                        <Link href={`${MY_OPPS}/${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                                            Open Flashcard
+                                                        </Link>
+                                                    }
+                                                />
+                                                <UniRemindButtons
+                                                    email={pickStr(row, "creator_email", "faculty_email")}
+                                                    title={row.title}
+                                                    opportunityId={row.id}
+                                                    currentlyWith={pickStr(row, "currently_with", "currentlyWith")}
+                                                    currentlyWithRole={pickStr(row, "currently_with_role", "currentlyWithRole")}
+                                                    nextStep={pickStr(row, "next_step", "nextStep")}
+                                                    publicCode={pickStr(row, "public_code", "publicCode")}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                             </div>
                         )
                     ) : projectTab === "approval" ? (
@@ -977,7 +983,7 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "run" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="AI Analyzer & Rankings" subtitle={`${orgName} University Cohort. Preview freely; an official run creates a dated snapshot. Avoid #1 of 1.`} />
+                    <MockupSectionHead title="AI Ranking Analyzer" subtitle={`${orgName} University Cohort only — other universities never enter this pool. Preview freely; Publish Ranking creates a dated official run. Avoid #1 of 1.`} />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
@@ -993,67 +999,6 @@ export default function UniversityCommunityServiceHub() {
                     <MockupSectionHead title={`Analytics · ${orgName}`} subtitle="Semester-level view. Community Dividend = verified volunteer contribution value + verified student out-of-pocket investment (not wages paid)." />
                     {loading ? <p className="text-sm text-slate-500">Loading…</p> : <CommunityAwardAnalytics cards={deckCards} groupBy="department" />}
                     <a href={ANALYTICS} className="inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">Open full university analytics →</a>
-                </div>
-            )}
-
-            {effectiveView === "files" && (
-                <div className="mt-4">
-                    <MockupSectionHead title={`Shared files · ${orgName}`} subtitle="Faculty Analysis files and AI Analyzer reports are shared automatically." />
-                    <HubTabs
-                        tabs={[
-                            { id: "faculty", label: "Faculty Analysis files", count: decidedReports.length },
-                            { id: "ai", label: "AI Analyzer reports", count: deckCards.filter((c) => c.cii != null).length },
-                        ]}
-                        active={filesTab}
-                        onChange={setHubTab}
-                    />
-                    {filesTab === "ai" ? (
-                        deckCards.filter((c) => c.cii != null).length === 0 ? (
-                            <EmptyPanel title="No AI Analyzer runs yet" text="The dated CII badge is the shared file every stakeholder sees." />
-                        ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {deckCards.filter((c) => c.cii != null).map((card) => (
-                                    <div key={card.id} className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5">
-                                        <div className="text-[22px]">🧠</div>
-                                        <b className="mt-1 block text-[14px] text-[#16313d]">{card.project_title}</b>
-                                        <small className="mt-1 block text-[11.5px] text-[#6b7c86]">{card.level || "CII"} · {card.cii}/100 · {card.student_name}</small>
-                                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => setBreakdownFor({ id: card.id, title: card.project_title })}
-                                                className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
-                                            >
-                                                View CII breakdown →
-                                            </button>
-                                            <button
-                                                type="button"
-                                                disabled={rerunningId === card.id}
-                                                onClick={() => void runIndependentAnalysis(card.id)}
-                                                className="text-[10.5px] font-black text-[#6d28d9] hover:underline disabled:opacity-50"
-                                            >
-                                                {rerunningId === card.id ? "Running…" : "Run AI Analyzer →"}
-                                            </button>
-                                            <Link href={IMPACT} className="text-[10.5px] font-black text-[#6b7c86] hover:underline">
-                                                Open report →
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )
-                    ) : decidedReports.length === 0 ? (
-                        <EmptyPanel title="No Faculty Analysis yet" text="A file is created the moment faculty decides on a submitted report." />
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {decidedReports.map((row) => (
-                                <Link key={row.id} href={REPORTS} className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5">
-                                    <div className="text-[22px]">📄</div>
-                                    <b className="mt-1 block text-[14px] text-[#16313d]">{row.project_title}</b>
-                                    <small className="mt-1 block text-[11.5px] text-[#6b7c86]">{formatDisplayId(row.id, "RPT")} · {row.faculty_status || row.status} · {row.student_name}</small>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -1100,14 +1045,6 @@ export default function UniversityCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
-
-            {breakdownFor && (
-                <CommunityCiiBreakdownModal
-                    fetchUrl={`/api/v1/partners/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
-                    title={breakdownFor.title}
-                    onClose={() => setBreakdownFor(null)}
-                />
-            )}
         </div>
     );
 }

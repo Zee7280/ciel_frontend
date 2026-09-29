@@ -841,7 +841,7 @@ function OpportunityDetailsContent() {
                                 {["Fixed dates", "Flexible", "Ongoing"].includes(formData.timelineType) && (
                                     <div className="space-y-2 animate-in fade-in zoom-in-95">
                                         <p className="text-xs text-slate-500">
-                                            Start and end dates are optional for all timeline types.
+                                            Project start and end dates are optional for all timeline types.
                                         </p>
                                         <div className="flex gap-2">
                                             <input

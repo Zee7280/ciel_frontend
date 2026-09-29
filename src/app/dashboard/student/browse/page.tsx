@@ -23,6 +23,11 @@ import {
     resolveStudentUniversityApplyEligibility,
 } from "@/utils/studentOpportunityApplyEligibility";
 import {
+    canJoinOrApply,
+    canRecordCompletedService,
+    lifecycleStatusLabel,
+} from "@/utils/opportunityTimelineLifecycle";
+import {
     isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
     isJoinApplicationApprovedStatus,
@@ -46,7 +51,6 @@ import { ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
 import { fetchImpactSummary, readImpactSummaryCache } from "@/utils/cielImpactSummary";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import ProgressBar from "@/components/ciel/ProgressBar";
-import { UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { findSdgById } from "@/utils/sdgData";
 
 type BrowseCreatorLabel = "Faculty" | "NGO" | "Partner" | "CIEL PK";
@@ -313,10 +317,10 @@ function scheduleLabel(op: BrowseOpportunity): string {
     if (op.start_date) {
         const d = new Date(op.start_date);
         if (!Number.isNaN(d.getTime())) {
-            return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            return `Project date · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
         }
     }
-    return "Flexible";
+    return "Project dates · Flexible";
 }
 
 function hoursCreditLabel(op: BrowseOpportunity): string {
@@ -593,7 +597,7 @@ export default function StudentBrowseOpportunitiesPage() {
                 <div>
                     <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
                     <p className="mt-1 text-sm text-ciel-text-mid">
-                        Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to Workspace.
+                        Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to My Reports.
                     </p>
                     <Link href="/dashboard/student/paths/community-service" className="mt-2 inline-block text-xs font-extrabold text-[#0e7d74] hover:underline">
                         ← Community Service hub
@@ -608,17 +612,6 @@ export default function StudentBrowseOpportunitiesPage() {
                 </button>
             </header>
 
-            <UserGuideBanner
-                desc="Find approved opportunities published by Faculty, NGOs, Partners and CIEL PK."
-                items={[
-                    ["Published Opportunities", "Explore live opportunity flashcards and eligibility before applying."],
-                    ["My Applications", "Track Pending, Approved or Declined participation requests."],
-                    ["Apply Now", "Submit a participation request when you are eligible."],
-                    ["Go to Workspace", "Appears after participation approval; opens the assigned project."],
-                ]}
-                rule="A pending application stays in Browse. Only an approved assignment moves to Workspace."
-            />
-
             <div className="flex flex-col gap-3 rounded-xl border border-ciel-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-5">
                 <p className="shrink-0 text-sm font-bold text-ciel-text">
                     {hoursLogged} of {hoursTarget} hours logged
@@ -632,7 +625,7 @@ export default function StudentBrowseOpportunitiesPage() {
             <section className="rounded-xl border border-ciel-border bg-white p-4">
                 <h2 className="text-[17px] font-semibold text-[#16313d]">My applications</h2>
                 <p className="mt-1 text-[12.5px] text-[#70808a]">
-                    Apply here → participation approval stays here → once approved, the assigned project moves to Workspace → Ready to Start.
+                    Apply here → participation approval stays here → once approved, the assigned project moves to My Reports → Ready to Start.
                 </p>
                 {myApplications.length === 0 ? (
                     <p className="mt-3 text-sm text-[#7a919a]">No applications yet.</p>
@@ -646,7 +639,7 @@ export default function StudentBrowseOpportunitiesPage() {
                             const next = pending
                                 ? "No action required — waiting on participation approval"
                                 : approved
-                                  ? "Moved to Workspace · Ready to Start"
+                                  ? "Moved to My Reports · Ready to Start"
                                   : declined
                                     ? "Application closed — review other opportunities"
                                     : "—";
@@ -671,7 +664,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 href="/dashboard/student/paths/community-service?view=workspace&filter=ready"
                                                 className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white"
                                             >
-                                                Go to workspace
+                                                Go to My Reports
                                             </Link>
                                         ) : (
                                             <Link
@@ -873,6 +866,21 @@ export default function StudentBrowseOpportunitiesPage() {
                             op as unknown as Record<string, unknown>,
                             studentInstitution,
                         );
+                        const timeline = (op as { timeline?: unknown }).timeline;
+                        const joinOpen = canJoinOrApply(timeline);
+                        const lateRecord = canRecordCompletedService(timeline);
+                        const lifeLabel = lifecycleStatusLabel(timeline);
+                        const dateAllowsJoin = joinOpen || lateRecord;
+                        const canApplyNow = applyEligibility.canApply && dateAllowsJoin;
+                        const joinButtonLabel = !applyEligibility.canApply
+                            ? "Not eligible"
+                            : !dateAllowsJoin
+                              ? lifeLabel || "Closed"
+                              : lateRecord && !joinOpen
+                                ? "Record Completed Service"
+                                : op.hasApplied
+                                  ? "Apply again"
+                                  : "Join Opportunity";
                         const reportCta =
                             op.application_status != null && ["approved", "verified"].includes(op.application_status)
                                 ? resolveStudentBrowseReportCta(op.id, op.report_status)
@@ -1016,16 +1024,20 @@ export default function StudentBrowseOpportunitiesPage() {
                                     ) : (
                                         <button
                                             type="button"
-                                            onClick={() => applyEligibility.canApply && openApplicationDialog(op)}
-                                            disabled={!applyEligibility.canApply}
-                                            title={applyEligibility.blockedReason || undefined}
+                                            onClick={() => canApplyNow && openApplicationDialog(op)}
+                                            disabled={!canApplyNow}
+                                            title={
+                                                !dateAllowsJoin
+                                                    ? lifeLabel || "Applications closed"
+                                                    : applyEligibility.blockedReason || undefined
+                                            }
                                             className={
-                                                applyEligibility.canApply
+                                                canApplyNow
                                                     ? "rounded-md bg-[#0e7d74] px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-[#0c6b64]"
                                                     : "cursor-not-allowed rounded-md bg-slate-200 px-3.5 py-1.5 text-sm font-semibold text-slate-500"
                                             }
                                         >
-                                            {applyEligibility.canApply ? (op.hasApplied ? "Apply again" : "Apply") : "Not eligible"}
+                                            {joinButtonLabel}
                                         </button>
                                     )}
                                 </div>

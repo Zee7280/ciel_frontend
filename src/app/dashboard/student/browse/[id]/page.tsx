@@ -405,7 +405,7 @@ export default function OpportunityDetailsPage() {
                                                 : "cursor-not-allowed gap-2 rounded-lg bg-slate-300 px-5 text-slate-600 shadow-sm hover:bg-slate-300"
                                         }
                                     >
-                                        {projectActions.showJoinApplyAgain ? "Apply again" : "Apply Now"}
+                                        {projectActions.joinCtaLabel}
                                     </Button>
                                 ) : null}
                             </>
@@ -458,7 +458,18 @@ export default function OpportunityDetailsPage() {
                             ) : null}
                             <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
                                 <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {opportunity.location?.city || opportunity.city || "Remote"}</span>
-                                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Start: {opportunity.timeline?.start_date ? new Date(opportunity.timeline.start_date).toLocaleDateString() : (opportunity.start_date ? new Date(opportunity.start_date).toLocaleDateString() : "Flexible")}</span>
+                                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Project dates: {(() => {
+                                    const startRaw = opportunity.timeline?.start_date || opportunity.start_date;
+                                    const endRaw = opportunity.timeline?.end_date || opportunity.end_date;
+                                    const start = startRaw ? new Date(startRaw) : null;
+                                    const end = endRaw ? new Date(endRaw) : null;
+                                    const startOk = start && !Number.isNaN(start.getTime());
+                                    const endOk = end && !Number.isNaN(end.getTime());
+                                    if (startOk && endOk) return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
+                                    if (startOk) return start.toLocaleDateString();
+                                    if (endOk) return end.toLocaleDateString();
+                                    return "Flexible";
+                                })()}</span>
                                 <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{opportunity.mode || "On Site"}</span>
                                 {applyEligibility.listingRestrictionLabel ? (
                                     <span className="bg-amber-50 text-amber-900 px-2.5 py-0.5 rounded-full text-xs font-bold border border-amber-200">

@@ -260,7 +260,7 @@ function CommunityServiceContent() {
                 key: "readyToStart",
                 n: readyProjects.length,
                 title: "Ready to start",
-                sub: "Approved projects waiting in Workspace",
+                sub: "Approved projects waiting in My Reports",
                 href: `${HUB}?view=workspace&filter=ready`,
                 urgent: false,
                 tone: readyProjects.length > 0 ? ("warn" as const) : ("default" as const),
@@ -559,7 +559,7 @@ function EngagementsTab({
         createdOpportunities.length > 0 ? (
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">Community Service Workspace · Opportunity approval</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">My Opportunities · Opportunity approval</h3>
                     <Link href="/dashboard/student/projects" className="text-xs font-semibold text-ciel-green-deep hover:underline">
                         Manage all →
                     </Link>

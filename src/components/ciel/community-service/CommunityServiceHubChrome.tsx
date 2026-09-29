@@ -178,44 +178,11 @@ export function ZoneRule({
     );
 }
 
-export function UserGuideBanner({
-    desc,
-    items,
-    rule,
-}: {
+/** Removed from CS hubs — keep export so call sites compile without UI. */
+export function UserGuideBanner(_props: {
     desc: string;
     items?: [string, string][];
     rule?: string;
 }) {
-    return (
-        <div className="mb-3.5 overflow-hidden rounded-[18px] border border-[#ead9ad] bg-[linear-gradient(135deg,#fffdf6,#fff8e8)] shadow-[0_8px_22px_rgba(24,52,64,.045)]">
-            <div className="flex items-start gap-2.5 px-4 py-3.5">
-                <span
-                    className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[11px] bg-[#f3e4b8] text-[17px]"
-                    aria-hidden
-                >
-                    🧭
-                </span>
-                <div>
-                    <b className="block text-[12.5px] font-extrabold text-[#16313d]">What is inside this button?</b>
-                    <p className="mt-1 text-[11.5px] leading-relaxed text-[#6b5a2a]">{desc}</p>
-                </div>
-            </div>
-            {items?.length ? (
-                <div className="grid grid-cols-1 gap-1.5 border-t border-[#ead9ad]/70 px-3.5 py-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {items.map(([title, text]) => (
-                        <div key={title} className="rounded-xl border border-[#e0e8ea] bg-white px-2.5 py-2">
-                            <b className="block text-[10px] text-[#173e47]">{title}</b>
-                            <span className="mt-1 block text-[10px] leading-relaxed text-[#6d7e85]">{text}</span>
-                        </div>
-                    ))}
-                </div>
-            ) : null}
-            {rule ? (
-                <div className="mx-3.5 mb-3 rounded-[11px] border border-[#ead9ad] bg-[#fff8e8] px-2.5 py-2 text-[10.5px] leading-relaxed text-[#725e2a]">
-                    <b>Simple rule:</b> {rule}
-                </div>
-            ) : null}
-        </div>
-    );
+    return null;
 }

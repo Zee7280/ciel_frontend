@@ -80,6 +80,26 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
         studentRow.department ||
         studentRow.phone;
 
+    let flashcard: ReturnType<typeof buildOpportunityRecordFlashcard> | null = null;
+    let flashError: string | null = null;
+    try {
+        flashcard = buildOpportunityRecordFlashcard(d, {
+            studentName: studentRow.name,
+            facultyName:
+                typeof (d.supervision as { supervisor_name?: string } | undefined)?.supervisor_name === "string"
+                    ? (d.supervision as { supervisor_name?: string }).supervisor_name
+                    : undefined,
+            facultyEmail:
+                typeof (d.supervision as { contact?: string } | undefined)?.contact === "string"
+                    ? (d.supervision as { contact?: string }).contact
+                    : undefined,
+            university: studentRow.university,
+        });
+    } catch (err) {
+        console.error("FacultyOpportunityDetailBody flashcard failed", err);
+        flashError = "Could not render this opportunity flashcard. Try Edit, or contact CIEL PK support.";
+    }
+
     return (
         <div className="space-y-4">
             {hasStudentInfo ? (
@@ -119,18 +139,13 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
                     </ul>
                 </div>
             ) : null}
-            <StudentOpportunityFlashcard
-                model={buildOpportunityRecordFlashcard(d, {
-                    studentName: studentRow.name,
-                    facultyName: typeof (d.supervision as { supervisor_name?: string } | undefined)?.supervisor_name === "string"
-                        ? (d.supervision as { supervisor_name?: string }).supervisor_name
-                        : undefined,
-                    facultyEmail: typeof (d.supervision as { contact?: string } | undefined)?.contact === "string"
-                        ? (d.supervision as { contact?: string }).contact
-                        : undefined,
-                    university: studentRow.university,
-                })}
-            />
+            {flashcard ? (
+                <StudentOpportunityFlashcard model={flashcard} />
+            ) : (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    {flashError || "Opportunity detail unavailable."}
+                </div>
+            )}
         </div>
     );
 }

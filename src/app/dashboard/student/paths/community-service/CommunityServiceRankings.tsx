@@ -38,15 +38,6 @@ type RankingRow = {
     awardBadgeHistory: CommunityAwardBadge[];
 };
 
-type ReportRow = {
-    id: string;
-    project_id?: string | null;
-    opportunity_id?: string | null;
-    project_title?: string;
-    cii_score?: number | null;
-    level?: string | null;
-};
-
 function reportHref(row: { id: string; project_id?: string | null; opportunity_id?: string | null; opportunityId?: string | null }): string {
     const id = row.project_id || row.opportunity_id || row.opportunityId || row.id;
     return `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}`;
@@ -229,27 +220,21 @@ function RankCard({ label, band }: { label: string; band: RankBand }) {
 
 export default function CommunityServiceRankings() {
     const [rows, setRows] = useState<RankingRow[]>([]);
-    const [reports, setReports] = useState<ReportRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
     const [historyFor, setHistoryFor] = useState<RankingRow | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false }),
-            authenticatedFetch("/api/v1/student/reports?limit=100", {}, { redirectToLogin: false }),
-        ])
-            .then(async ([rankRes, reportRes]) => {
+        authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
+            .then(async (rankRes) => {
                 if (cancelled) return;
                 const rankJson = rankRes?.ok ? await rankRes.json() : null;
-                const reportJson = reportRes?.ok ? await reportRes.json() : null;
                 if (!rankJson?.success) {
                     setFailed(true);
                     return;
                 }
                 setRows(Array.isArray(rankJson.data) ? rankJson.data : []);
-                setReports(Array.isArray(reportJson?.data) ? reportJson.data : []);
             })
             .catch(() => {
                 if (!cancelled) setFailed(true);
@@ -262,15 +247,12 @@ export default function CommunityServiceRankings() {
         };
     }, []);
 
-    const analysed = reports.filter((row) => row.cii_score != null);
-    const officialRows = rows.filter((r) => (r.awardBadges || []).length > 0);
-
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="AI Analyzer & Rankings" />
+            <CommunityCrumb role="Student" view="My Rankings" />
             <MockupSectionHead
-                title="My National Ranking Badges & History"
-                subtitle="You cannot run or publish the AI ranking analyzer. Every published National Ranking by Faculty, NGO/Partner, University or CIEL PK appears here and on your verified flashcard, with history preserved."
+                title="My Rankings"
+                subtitle="Published achievement view only. University and CIEL PK Super Admin run Ruberix ranking — you see Current, Previous, Best-Ever, Trend and Badge."
                 action={
                     <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
                         ← Back to module buttons
@@ -285,55 +267,15 @@ export default function CommunityServiceRankings() {
                 ))}
             </div>
             <UserGuideBanner
-                desc="View official ranking snapshots attached to your verified projects."
+                desc="View published University and CIEL PK National ranking snapshots on your verified projects."
                 items={[
-                    ["Official Ranking", "A dated permanent cohort result."],
-                    ["Cohort", "Shows who/what your project was compared against."],
-                    ["Why It Ranked", "Explains the evidence and verified factors behind the position."],
-                    ["Current Position", "May change on institutional dashboards; it does not overwrite official awards."],
+                    ["University Ranking", "Current · Previous · Best-Ever · Trend · Badge"],
+                    ["CIEL PK National Ranking", "Current · Previous · Best-Ever · Trend · Badge"],
+                    ["Ranking History", "Every published run is kept; old runs are never overwritten."],
+                    ["CII stays locked", "Ranking never changes your Verified CII."],
                 ]}
-                rule="Students view rankings; they do not run them."
+                rule="Students cannot Run Ranking, Publish Ranking, or open detailed Ruberix Analysis."
             />
-
-            <div className="mb-5 rounded-[18px] border border-[#dde5ea] bg-white p-4">
-                <h3 className="m-0 text-[16px] font-semibold text-[#16313d]">🧠 AI Analyzer</h3>
-                <p className="mt-1 text-[12px] leading-relaxed text-[#70808a]">
-                    Any stakeholder can run the AI Analyzer on a project once its report has started. The result becomes a dated badge on every stakeholder dashboard. Students view the shared badge here; faculty, university and CIEL PK run official cohort rankings.
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-[#dde5ea] bg-[#fbfcfd] px-4 py-3">
-                        <p className="text-[9.5px] font-black uppercase tracking-[0.06em] text-[#70808a]">Analysed</p>
-                        <strong className="mt-1 block text-lg text-[#16313d]">{analysed.length}</strong>
-                        <small className="text-[10.5px] text-[#6b7c86]">of {reports.length} report records</small>
-                    </div>
-                    <div className="rounded-2xl border border-[#dde5ea] bg-[#fbfcfd] px-4 py-3">
-                        <p className="text-[9.5px] font-black uppercase tracking-[0.06em] text-[#70808a]">Official snapshots</p>
-                        <strong className="mt-1 block text-lg text-[#16313d]">{officialRows.reduce((n, r) => n + r.awardBadges.length, 0)}</strong>
-                        <small className="text-[10.5px] text-[#6b7c86]">dated awards that never overwrite</small>
-                    </div>
-                    <div className="rounded-2xl border border-[#dde5ea] bg-[#fbfcfd] px-4 py-3">
-                        <p className="text-[9.5px] font-black uppercase tracking-[0.06em] text-[#70808a]">Live ranks</p>
-                        <strong className="mt-1 block text-lg text-[#16313d]">{rows.length}</strong>
-                        <small className="text-[10.5px] text-[#6b7c86]">faculty · university · network</small>
-                    </div>
-                </div>
-                {analysed.length ? (
-                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                        {analysed.map((row) => (
-                            <Link
-                                key={row.id}
-                                href={reportHref(row)}
-                                className="rounded-2xl border border-[#dde5ea] px-4 py-3 transition hover:border-[#bcd4d8]"
-                            >
-                                <b className="block text-[13px] text-[#16313d]">{row.project_title || "Community Service report"}</b>
-                                <small className="mt-1 block text-[11px] text-[#6b7c86]">
-                                    {formatDisplayId(row.id, "RPT")} · {row.level || "CII"} · {row.cii_score}/100
-                                </small>
-                            </Link>
-                        ))}
-                    </div>
-                ) : null}
-            </div>
 
             {loading ? (
                 <div className="py-14 text-center text-[#7a919a]">
@@ -348,7 +290,7 @@ export default function CommunityServiceRankings() {
             ) : rows.length === 0 ? (
                 <EmptyPanel
                     title="No rankings yet"
-                    text="Only approved reports become eligible; Faculty, NGOs, Partners, Universities and CIEL PK run rankings."
+                    text="Only accepted/published Community Service projects enter the ranking pool. University and CIEL PK Super Admin publish rankings."
                 />
             ) : (
                 <div className="space-y-4">
@@ -383,7 +325,7 @@ export default function CommunityServiceRankings() {
                                 </div>
                             ) : (
                                 <p className="mt-3 text-[11.5px] text-[#8ba29d]">
-                                    No published National Ranking badge yet — it will appear automatically once an authorised stakeholder runs one for this project.
+                                    No published University or National ranking badge yet — it appears after University or CIEL PK Super Admin publishes a ranking for this project.
                                 </p>
                             )}
 

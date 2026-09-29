@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatOpportunityCode } from "@/utils/displayIds";
 import {
     isFacultyApprovalCompleteForPartnerGate,
     resolveStudentOpportunityWorkflow,
@@ -12,6 +12,8 @@ export type ApprovalCardStep = {
     role: string;
     who?: string;
     state: ApprovalCardStepState;
+    /** Optional pill override (e.g. live handoff “Not live yet” instead of generic Locked). */
+    pill?: string;
 };
 
 export type ApprovalCardPerson = {
@@ -21,7 +23,7 @@ export type ApprovalCardPerson = {
 };
 
 export type ApprovalViewer = "ngo" | "partner" | "faculty" | "university" | "admin" | "student";
-export type ApprovalCardMode = "pending" | "revision" | "decided";
+export type ApprovalCardMode = "pending" | "revision" | "decided" | "waiting";
 
 function lower(value: unknown): string {
     return String(value ?? "")
@@ -115,7 +117,7 @@ export function ApprovalChain({ steps, badWord = "Revision" }: { steps: Approval
                                     : "bg-[#eef1f2] text-[#6d7a80]")
                         }
                     >
-                        {pillLabel(step.state, badWord)}
+                        {step.pill || pillLabel(step.state, badWord)}
                     </span>
                 </div>
             ))}
@@ -220,10 +222,14 @@ export function buildOpportunityApprovalModel(
         state: lineState(adminLine, cursor, blocked),
     });
 
+    // Post-approval handoff marker only — not a reviewer. Unlocks when opportunity is truly live.
     if (studentCreated) {
+        const live = workflow.stage === "live";
         steps.push({
-            role: "Team Project",
-            state: workflow.stage === "live" ? "done" : "locked",
+            role: "Live · My Reports",
+            who: live ? "Ready to start report" : "After opportunity goes live",
+            state: live ? "done" : "locked",
+            pill: live ? "Approved" : "Not live yet",
         });
     }
 
@@ -254,7 +260,11 @@ export function buildOpportunityApprovalModel(
     const end = pickStr(timeline, "end_date", "end");
     const place = pickStr(row, "location_name", "location_text") || pickStr(location, "address", "name", "city") || pickStr(timeline, "location");
     const hours = timeline?.hours_per_student ?? timeline?.required_hours ?? row.totalHours ?? row.total_hours;
-    const facts = [start && end ? `${start}–${end}` : start || end, place, hours ? `${hours}h/student` : ""]
+    const facts = [
+        start && end ? `Project dates · ${start}–${end}` : start ? `Project start · ${start}` : end ? `Project end · ${end}` : "",
+        place,
+        hours ? `${hours}h/student` : "",
+    ]
         .filter(Boolean)
         .join(" · ");
 
@@ -292,6 +302,18 @@ export function buildOpportunityApprovalModel(
         if (nextStep) nextText = `Next: ${nextStep}`;
     }
 
+    if (mode === "waiting") {
+        const draft = row.linked_draft === true || row.linkedDraft === true || lower(row.status) === "draft";
+        statusTitle = draft ? "Linked Draft" : "Linked — Waiting for Faculty Approval";
+        statusText = currentlyWith ? `Currently with: ${currentlyWith}` : statusText;
+        nextTitle = "View only";
+        nextText = draft
+            ? "This is the same master record. Approve unlocks after the creator submits and Faculty decides."
+            : "Same Opportunity ID. Approve / Revise / Reject unlock after Faculty approval.";
+        accent = "act";
+        statusTone = "warn";
+    }
+
     if (mode === "revision") {
         statusTitle = "Revision requested";
         statusText = "Waiting for the creator to resubmit this version.";
@@ -309,7 +331,7 @@ export function buildOpportunityApprovalModel(
 
     return {
         title: pickStr(row, "title", "project_title", "projectTitle", "name") || "Opportunity",
-        idLabel: pickStr(row, "public_code", "publicCode") || formatDisplayId(row.id, "OPP"),
+        idLabel: formatOpportunityCode(row),
         versionLabel: `Opp v${version}`,
         statusPill: statusTitle,
         lastActivity: waitingStamp

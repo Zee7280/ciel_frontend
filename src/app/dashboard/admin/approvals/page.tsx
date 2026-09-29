@@ -1731,9 +1731,24 @@ export default function AdminApprovalsPage() {
                                     );
                                 })()}
 
-                                <StudentOpportunityFlashcard
-                                    model={buildOpportunityRecordFlashcard(adminDetailView as Record<string, unknown>)}
-                                />
+                                {(() => {
+                                    try {
+                                        return (
+                                            <StudentOpportunityFlashcard
+                                                model={buildOpportunityRecordFlashcard(
+                                                    adminDetailView as Record<string, unknown>,
+                                                )}
+                                            />
+                                        );
+                                    } catch (err) {
+                                        console.error("Admin opportunity detail flashcard failed", err);
+                                        return (
+                                            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                                                Could not render this opportunity flashcard. Try again or contact CIEL PK support.
+                                            </div>
+                                        );
+                                    }
+                                })()}
                             </div>
 
                             <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap justify-end gap-3">

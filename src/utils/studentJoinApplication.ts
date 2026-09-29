@@ -150,7 +150,7 @@ export function joinApplicationPendingLabel(raw: Record<string, unknown>): strin
     return "Pending approval";
 }
 
-/** Report page / project fetch: allow access only when project status allowlisted and join not blocking. */
+/** Report page / project fetch: allow access only when listing is publicly live (or completed). */
 export function canStudentAccessReportForProjectPayload(
     raw: Record<string, unknown>,
     opts?: { isStudentOwner?: boolean },
@@ -158,12 +158,10 @@ export function canStudentAccessReportForProjectPayload(
     if (studentOwnerMustCompleteJoinBeforeReport(raw, opts)) return false;
 
     const status = lower(raw.status);
-    const allowedLegacy = ["active", "approved", "verified"];
     const eligible =
         status === "completed" ||
         status === "finalized" ||
-        isOpportunityPubliclyLive(raw) ||
-        allowedLegacy.includes(status);
+        isOpportunityPubliclyLive(raw);
     if (!eligible) return false;
 
     if (opts?.isStudentOwner) return true;

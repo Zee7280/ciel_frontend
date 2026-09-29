@@ -148,48 +148,10 @@ export default function FacultyAiEvaluationConsole() {
         }
     }, [reportId]);
 
-    // Faculty-triggered Analyzer (inbox: run only when chosen)
+    // Faculty CS report review is read-only — CIEL PK Admin owns Analyzer / decisions.
     const runAutoAiAnalysis = useCallback(async () => {
-        if (!reportId || aiAnalysisStatus === "running") return;
-        
-        setAiAnalysisStatus("running");
-        setAiAnalysisProgress(0);
-        
-        // Simulate progress while AI runs (actual API call takes time)
-        const progressInterval = setInterval(() => {
-            setAiAnalysisProgress((prev) => {
-                if (prev >= 90) return prev;
-                return prev + Math.random() * 15;
-            });
-        }, 800);
-
-        try {
-            const response = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/cii-v2/analyse`, {
-                method: "POST",
-            });
-            
-            clearInterval(progressInterval);
-            
-            if (!response?.ok) {
-                const errData = await response?.json().catch(() => ({}));
-                const msg = (errData as { message?: string })?.message || "AI analysis failed";
-                toast.error(msg);
-                setAiAnalysisStatus("error");
-                return;
-            }
-
-            setAiAnalysisProgress(100);
-            setAiAnalysisStatus("complete");
-            toast.success("AI Analysis complete");
-            
-            // Reload report to get the new analysis
-            await loadReport();
-        } catch {
-            clearInterval(progressInterval);
-            toast.error("AI analysis failed — please try again");
-            setAiAnalysisStatus("error");
-        }
-    }, [reportId, aiAnalysisStatus, loadReport]);
+        toast.error("Faculty report review is read-only. CIEL PK Admin runs the Analyzer.");
+    }, []);
 
     useEffect(() => {
         void loadReport();
@@ -207,132 +169,13 @@ export default function FacultyAiEvaluationConsole() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model?.facultyRemarks]);
 
-    const submitDecision = async (kind: Exclude<FacultyDecisionKind, "">) => {
-        if (!reportId || saving) return;
-
-        // Phase 2: Validate score adjustment reason
-        if (kind === "ap" && missingAdjustmentReason) {
-            toast.error("Please provide a reason for the score adjustment");
-            return;
-        }
-        if ((kind === "rv" || kind === "ar") && !notes.trim()) {
-            toast.error(
-                kind === "rv"
-                    ? "State exactly what the student should fix."
-                    : "A reason is required when rejecting a report.",
-            );
-            return;
-        }
-
-        try {
-            setSaving(true);
-
-            // Phase 2: For approval with CII v2 analysis, use the dedicated approve endpoint
-            if (kind === "ap" && hasCiiV2Analysis) {
-                const approveBody: Record<string, unknown> = {
-                    note: notes.trim() || undefined,
-                };
-
-                // Include faculty adjustment if score was changed
-                if (scoreWasAdjusted && facultyAdjustedScore !== null) {
-                    approveBody.facultyAdjustedScore = facultyAdjustedScore;
-                    approveBody.scoreAdjustmentReason = scoreAdjustmentReason.trim();
-                }
-
-                const approveResponse = await authenticatedFetch(
-                    `/api/v1/faculty/reports/${reportId}/cii-v2/approve`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(approveBody),
-                    },
-                );
-
-                if (!approveResponse?.ok) {
-                    const errPayload = await approveResponse?.json().catch(() => ({}));
-                    toast.error(
-                        (errPayload as { message?: string }).message || "Could not approve CII score",
-                    );
-                    return;
-                }
-
-                toast.success(
-                    scoreWasAdjusted
-                        ? "Approved with faculty-adjusted score — audit trail saved"
-                        : "Approved — AI analysis & score locked",
-                );
-                await loadReport();
-                return;
-            }
-
-            // Fallback: Use the legacy action endpoint for non-CII reports or reject/conditional
-            const body = buildFacultyActionBody(kind, notes);
-            const response = await authenticatedFetch(`/api/v1/faculty/reports/${reportId}/action`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!response?.ok) {
-                const payload = response
-                    ? await response.json().catch(() => ({}))
-                    : {};
-                toast.error(
-                    (payload as { message?: string }).message || "Could not save faculty decision",
-                );
-                return;
-            }
-            toast.success(
-                kind === "ap"
-                    ? "Approved — faculty decision saved"
-                    : kind === "cn"
-                      ? "Conditional badge recorded"
-                      : kind === "rv"
-                        ? "Returned to student for revision"
-                        : "Report rejected — process ended",
-            );
-            await loadReport();
-        } catch {
-            toast.error("Could not save faculty decision");
-        } finally {
-            setSaving(false);
-        }
+    const submitDecision = async (_kind: Exclude<FacultyDecisionKind, "">) => {
+        toast.error("Faculty report review is read-only. CIEL PK Admin owns Approve / Revision / Reject.");
     };
 
-    /**
-     * Phase 4: Run Independent AI Analysis on an approved report.
-     * 
-     * This does NOT overwrite the faculty-approved score.
-     * Results are stored separately for audit purposes.
-     */
+    /** Faculty cannot run independent analysis — University / CIEL PK Admin only. */
     const runIndependentAnalysis = async () => {
-        if (!reportId || independentAnalysisRunning || !isReportLocked) return;
-
-        try {
-            setIndependentAnalysisRunning(true);
-            const response = await authenticatedFetch(
-                `/api/v1/impact-wall/reports/${reportId}/independent-analysis`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ note: "Additional analysis run from Faculty Dashboard" }),
-                },
-            );
-
-            if (!response?.ok) {
-                const err = await response?.json().catch(() => ({}));
-                toast.error((err as { message?: string }).message || "Failed to run independent analysis");
-                return;
-            }
-
-            const result = await response.json();
-            toast.success(`Independent analysis complete — Score: ${Math.round(result.data?.analysis?.score ?? 0)}`);
-            await loadReport();
-            setShowIndependentAnalyses(true);
-        } catch {
-            toast.error("Failed to run independent analysis");
-        } finally {
-            setIndependentAnalysisRunning(false);
-        }
+        toast.error("Faculty report review is read-only. Independent analysis is available to University / CIEL PK Admin.");
     };
 
     if (loading) {
@@ -373,8 +216,7 @@ export default function FacultyAiEvaluationConsole() {
                     </span>
                 </div>
                 <div className="fae-sub">
-                    Section banners → flash card → faculty review → stored AI score (CII + badge) →
-                    approval → PDF. Scoring is not recalculated here.
+                    Faculty read-only view. Open the locked package and scores. Analysis, Approve, Request revision and Reject stay with CIEL PK Admin.
                 </div>
                 <div className="fae-nav">
                     <Link href="/dashboard/faculty/reports">Back to student reports</Link>
@@ -385,8 +227,11 @@ export default function FacultyAiEvaluationConsole() {
                         Open full dossier
                     </Link>
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v2`}>
-                        Open CII v2 Analyser
+                        View CII record
                     </Link>
+                </div>
+                <div className="fae-lock" style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, border: "1px solid #cfe6ef", background: "#f3f9fb", fontSize: 12, color: "#3e515b", fontWeight: 700 }}>
+                    Read-only rights — no Approve / Reject / Run AI Analyzer on Faculty login.
                 </div>
 
                 <div className="fae-pipe">
@@ -478,22 +323,12 @@ export default function FacultyAiEvaluationConsole() {
                                 </div>
                             )}
 
-                            {/* AI Analysis Error State - show retry option */}
+                            {/* AI Analysis Error State — faculty cannot re-run Analyzer */}
                             {aiAnalysisStatus === "error" && !model.hasAiEvaluation && (
                                 <div className="fae-ai-error">
                                     <p className="fae-ai-error-text">
-                                        AI Analysis encountered an issue. You can retry or proceed with manual review.
+                                        AI Analysis is unavailable on Faculty login. Open the locked package to review; CIEL PK Admin runs the Analyzer.
                                     </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setAiAnalysisStatus("idle");
-                                            void runAutoAiAnalysis();
-                                        }}
-                                        className="fae-retry-btn"
-                                    >
-                                        ↻ Retry AI Analysis
-                                    </button>
                                 </div>
                             )}
 
@@ -736,80 +571,16 @@ export default function FacultyAiEvaluationConsole() {
                             ) : aiAnalysisStatus === "idle" ? (
                                 <div className="fae-no-eval">
                                     <p className="fae-sub" style={{ marginTop: 12 }}>
-                                        This report does not yet have a stored AI evaluation.
-                                        Review the locked Flashcard + Detailed Report first, then run the Analyzer when you choose.
+                                        No stored AI evaluation yet. Faculty can view the locked Flashcard + Detailed Report.
+                                        CIEL PK Admin runs the Analyzer and records the decision.
                                     </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => void runAutoAiAnalysis()}
-                                        className="fae-manual-run-btn"
-                                    >
-                                        <Sparkles className="h-4 w-4" />
-                                        Run AI Analysis Now
-                                    </button>
                                 </div>
                             ) : null}
 
-                            <div className="fae-bsec">FACULTY DECISION — THE AI RECOMMENDS, THE FACULTY DECIDES</div>
-                            <textarea
-                                className="fae-notes"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Optional remarks (required context for conditional badge or admin review)"
-                                disabled={saving}
-                            />
-                            <div className="fae-dec">
-                                <button
-                                    type="button"
-                                    className={`fae-db ap${model.decision === "ap" ? " sel" : ""}`}
-                                    disabled={saving || decided || aiAnalysisStatus === "running" || missingAdjustmentReason}
-                                    onClick={() => void submitDecision("ap")}
-                                >
-                                    ✓ Approve AI Analysis &amp; Score
-                                    <br />
-                                    <span style={{ fontWeight: 600, fontSize: 9 }}>
-                                        {scoreWasAdjusted
-                                            ? `AI ${Math.round(aiRecommendedScore ?? 0)} → Faculty ${Math.round(facultyAdjustedScore ?? 0)}`
-                                            : "One-click approval — locks the record"}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`fae-db cn${model.decision === "cn" ? " sel" : ""}`}
-                                    disabled={saving || decided}
-                                    onClick={() => void submitDecision("cn")}
-                                >
-                                    Conditional badge
-                                    <br />
-                                    <span style={{ fontWeight: 600, fontSize: 9 }}>
-                                        Approve with remarks
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`fae-db rv${model.decision === "rv" ? " sel" : ""}`}
-                                    disabled={saving || decided}
-                                    onClick={() => void submitDecision("rv")}
-                                >
-                                    Send for revision
-                                    <br />
-                                    <span style={{ fontWeight: 600, fontSize: 9 }}>
-                                        Student edits and resubmits
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`fae-db ar${model.decision === "ar" ? " sel" : ""}`}
-                                    disabled={saving || decided}
-                                    onClick={() => void submitDecision("ar")}
-                                >
-                                    Reject
-                                    <br />
-                                    <span style={{ fontWeight: 600, fontSize: 9 }}>
-                                        Process ends — student notified
-                                    </span>
-                                </button>
-                            </div>
+                            <div className="fae-bsec">FACULTY VIEW — READ ONLY</div>
+                            <p className="mt-2 text-[11px] leading-relaxed text-[#6b7c86]">
+                                Approve, Conditional badge, Request revision, Reject and Run AI Analyzer are not available on Faculty login. CIEL PK Admin owns those actions.
+                            </p>
 
                             {model.decision === "ap" ? (
                                 <div className="fae-livebar">
@@ -837,38 +608,8 @@ export default function FacultyAiEvaluationConsole() {
                                             marginTop: 12,
                                         }}>
                                             <span style={{ fontSize: 10, fontWeight: 900, color: "#8b7355", textTransform: "uppercase" }}>
-                                                Additional AI Analyses (Do Not Override Approved Score)
+                                                Additional AI Analyses (view only)
                                             </span>
-                                            <button
-                                                type="button"
-                                                onClick={runIndependentAnalysis}
-                                                disabled={independentAnalysisRunning}
-                                                style={{
-                                                    background: independentAnalysisRunning ? "#ccc" : "#f5eee0",
-                                                    border: "1px solid #e8dcc8",
-                                                    borderRadius: 8,
-                                                    padding: "6px 12px",
-                                                    fontSize: 10,
-                                                    fontWeight: 700,
-                                                    color: "#5a4832",
-                                                    cursor: independentAnalysisRunning ? "not-allowed" : "pointer",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: 6,
-                                                }}
-                                            >
-                                                {independentAnalysisRunning ? (
-                                                    <>
-                                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                                        Running…
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Sparkles className="h-3 w-3" />
-                                                        Run AI Analysis
-                                                    </>
-                                                )}
-                                            </button>
                                         </div>
 
                                         {independentAnalyses.length > 0 && (

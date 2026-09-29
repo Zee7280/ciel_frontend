@@ -886,10 +886,10 @@ export default function CommunityImpactWall(_props: {
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="Impact Wall" />
+            <CommunityCrumb role="Student" view="My Impact" />
             <HubBackButton href={HUB} label="← Back to Community Service" />
             <MockupSectionHead
-                title="My Impact Wall"
+                title="My Impact"
                 subtitle="After faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, combined package, certificate and QR."
                 action={
                     <Link href="/dashboard/student/impact?area=Community%20Service" className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">

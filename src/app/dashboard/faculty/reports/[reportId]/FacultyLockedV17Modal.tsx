@@ -484,7 +484,7 @@ function AnalyzerPane({
                     </div>
                     {analyzerHref ? (
                         <Link className="flv17-run" href={analyzerHref}>
-                            Run AI Analyzer
+                            View CII record
                         </Link>
                     ) : null}
                 </div>
@@ -555,7 +555,7 @@ function AnalyzerPane({
             {analyzerHref ? (
                 <div className="flv17-analyzerFoot">
                     <Link className="flv17-run" href={analyzerHref}>
-                        {model.ciiLocked ? "Open Faculty CII record" : "Open Analyzer to moderate / finalise"}
+                        {model.ciiLocked ? "Open Faculty CII record" : "View System CII (read only)"}
                     </Link>
                 </div>
             ) : null}
@@ -913,9 +913,9 @@ export default function FacultyLockedV17Modal({
                                                     <span className="flv17-analyzerIcon">✓</span>
                                                     <div>
                                                         <small>CIEL PK · FACULTY DECISION</small>
-                                                        <h2>Approve, return, or reject this locked package</h2>
+                                                        <h2>Review and approve this locked package</h2>
                                                         <p>
-                                                            Regular reports stay on the Faculty path. Approve &amp; lock still runs from the CII Analyzer so the current CII tests stay intact. Revision can name the section and required correction.
+                                                            Faculty can view the Flashcard, Detailed Report and CII record. Analysis, Approve, Request revision and Reject stay with CIEL PK Admin.
                                                         </p>
                                                     </div>
                                                 </div>

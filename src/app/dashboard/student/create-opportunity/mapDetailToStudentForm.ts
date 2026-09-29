@@ -89,13 +89,15 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
     else if (typeof extC.official_email === "string" && extC.official_email.trim()) executingContext = "partner";
     else executingContext = "independent";
 
-    const typesRaw = Array.isArray(d.types) ? (d.types as string[]) : [];
+    const typesRaw = Array.isArray(d.types) ? d.types : [];
     const opportunityType: string[] = [];
     const otherSpecs: string[] = [];
-    for (const t of typesRaw) {
+    for (const rawType of typesRaw) {
+        const t = typeof rawType === "string" ? rawType : rawType == null ? "" : String(rawType);
+        if (!t) continue;
         if (t.startsWith("Other: ")) {
             otherSpecs.push(t.slice(7).trim());
-        } else if (t) {
+        } else {
             opportunityType.push(t);
         }
     }
@@ -109,7 +111,9 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         : [];
     const beneficiariesPredefined: string[] = [];
     const beneficiariesOther: string[] = [];
-    for (const b of beneficiariesTypeRaw) {
+    for (const rawB of beneficiariesTypeRaw) {
+        const b = typeof rawB === "string" ? rawB : rawB == null ? "" : String(rawB);
+        if (!b) continue;
         if (BENEFICIARY_PREDEFINED.has(b)) beneficiariesPredefined.push(b);
         else beneficiariesOther.push(b);
     }
@@ -174,7 +178,7 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         mode: typeof d.mode === "string" ? d.mode : "",
         location: (() => {
             const loc =
-                d.location && typeof d.location === "object"
+                d.location && typeof d.location === "object" && !Array.isArray(d.location)
                     ? (d.location as Record<string, unknown>)
                     : {};
             return {
@@ -193,6 +197,12 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
         applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
+        closeApplicationsEarly:
+            timeline.close_applications_early === true ||
+            (typeof timeline.application_deadline === "string" &&
+                typeof timeline.end_date === "string" &&
+                timeline.application_deadline < timeline.end_date &&
+                timeline.close_applications_early !== false),
         scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
             hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",

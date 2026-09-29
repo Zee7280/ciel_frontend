@@ -11,13 +11,13 @@ import {
     Grid2X2,
     Info,
     Megaphone,
-    Send,
     ShieldCheck,
     UserCheck,
     Users,
     X,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/app/dashboard/student/report/components/ui/dialog";
+import { isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { mergeHasAppliedFields } from "@/utils/studentJoinApplication";
 
 export type OpportunityPromptProject = {
@@ -42,9 +42,7 @@ function isStudentCreatedProject(project: Record<string, unknown>): boolean {
 }
 
 function isApprovedAndLive(project: Record<string, unknown>): boolean {
-    const status = lower(project.status);
-    const workflow = lower(project.workflow_stage ?? project.workflowStage ?? project.approval_stage);
-    return status === "live" || workflow === "live";
+    return isOpportunityPubliclyLive(project);
 }
 
 function pickProjectOwnerId(project: Record<string, unknown>): string {
@@ -215,14 +213,16 @@ export function OpportunitySubmittedReviewModal({
                             Your opportunity has been submitted successfully and is now <strong className="text-blue-700">under review</strong>.
                         </PromptRow>
                         <PromptRow icon={<Clock3 className="h-4 w-4" />} iconClass="bg-amber-50 text-amber-600">
-                            Once it is approved and live, you will receive a dashboard reminder. Approval only makes the opportunity available; it does{" "}
-                            <strong className="text-rose-700">not automatically confirm your participation</strong>.
+                            Once faculty (and partner if required) and CIEL PK admin approve it, the opportunity goes{" "}
+                            <strong className="text-amber-800">live</strong>. You will get a dashboard reminder.
                         </PromptRow>
                         <PromptRow icon={<Users className="h-4 w-4" />} iconClass="bg-emerald-50 text-emerald-600">
-                            After it goes live, go to <strong className="text-emerald-700">My Projects</strong>, click <strong>Apply Now</strong>, and add yourself or your team members.
+                            After it goes live, open <strong className="text-emerald-700">My Projects</strong> and click{" "}
+                            <strong>Start Report</strong> to begin your community service record. Teammates (if any) still use{" "}
+                            <strong>Join Opportunity / Apply</strong> on the public listing.
                         </PromptRow>
                         <PromptRow icon={<FileText className="h-4 w-4" />} iconClass="bg-violet-50 text-violet-600">
-                            You will only be able to start the report after this application step is completed.
+                            Reporting unlocks only after the opportunity is fully approved and live — not right after you submit.
                         </PromptRow>
                     </div>
 
@@ -269,7 +269,7 @@ export function OpportunityLiveApplyModal({
                         </div>
                         <div className="min-w-0 pt-2">
                             <p className="text-xs font-black uppercase tracking-widest text-emerald-600">Opportunity Approved</p>
-                            <h2 className="mt-1 text-2xl font-black leading-tight text-emerald-800">Your Opportunity Is Live - Apply Now to Begin</h2>
+                            <h2 className="mt-1 text-2xl font-black leading-tight text-emerald-800">Your Opportunity Is Live — Start Your Report</h2>
                             <p className="mt-2 text-sm font-semibold text-slate-500">{project.title}</p>
                         </div>
                     </div>
@@ -281,25 +281,25 @@ export function OpportunityLiveApplyModal({
                             Your opportunity has been <strong className="text-emerald-700">approved and is now live</strong> on the dashboard.
                         </PromptRow>
                         <PromptRow icon={<UserCheck className="h-4 w-4" />} iconClass="bg-blue-50 text-blue-600">
-                            To officially participate and start working on the report, go to My Projects, click <strong>Apply Now</strong>, complete your information, and add yourself or your team members.
+                            As the creator, go to <strong>My Projects</strong> and click <strong>Start Report</strong> to record service hours, evidence, and submit your report.
                         </PromptRow>
                         <PromptRow icon={<Users className="h-4 w-4" />} iconClass="bg-orange-50 text-orange-600">
-                            Your report will <strong className="text-orange-700">only be accessible</strong> after you apply and register your team.
+                            Other students still join via <strong className="text-orange-700">Join Opportunity / Apply</strong> on the listing. Your report unlocks on live approval — you do not need a separate Apply step.
                         </PromptRow>
                         <div className="flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
                             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
                             <p className="text-sm font-semibold leading-relaxed text-emerald-900">
-                                Approval does not mean you are registered. Please apply now to confirm your participation and secure your team&apos;s seats.
+                                Faculty → partner (if any) → CIEL PK admin approval is complete. You can start reporting now.
                             </p>
                         </div>
                     </div>
 
                     <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row">
-                        <ActionLink href="/dashboard/student/projects" variant="outline" onClick={onClose}>
-                            <FolderOpen className="h-4 w-4" /> Go to My Projects
+                        <ActionLink href={applyHref} variant="outline" onClick={onClose}>
+                            <FolderOpen className="h-4 w-4" /> Open listing
                         </ActionLink>
-                        <ActionLink href={applyHref} variant="success" onClick={onClose}>
-                            <Send className="h-4 w-4" /> Apply Now
+                        <ActionLink href="/dashboard/student/projects" variant="success" onClick={onClose}>
+                            <FileText className="h-4 w-4" /> Start Report
                         </ActionLink>
                     </div>
                 </div>
@@ -336,16 +336,17 @@ export function OpportunityLiveApplyBanner({
                     <div className="min-w-0">
                         <h3 className="text-base font-black text-violet-900">Your Opportunity is Now Live!</h3>
                         <p className="mt-1 max-w-2xl text-sm font-medium leading-relaxed text-slate-700">
-                            <span className="font-bold text-slate-900">{project.title}</span> has been approved and is live on the dashboard. Go to My Projects and click <strong>Apply Now</strong> to book your seat and register your team members. You won&apos;t be able to start your report until you complete this step.
+                            <span className="font-bold text-slate-900">{project.title}</span> has been approved and is live. Open{" "}
+                            <strong>My Projects</strong> and click <strong>Start Report</strong> to begin. Other students can still Join / Apply on the listing.
                         </p>
                     </div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                    <Link href={applyHref} className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-700 px-8 text-sm font-black text-white shadow-sm transition hover:bg-violet-800">
-                        Apply Now
+                    <Link href="/dashboard/student/projects" className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-700 px-8 text-sm font-black text-white shadow-sm transition hover:bg-violet-800">
+                        Start Report
                     </Link>
-                    <Link href="/dashboard/student/projects" className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-300 bg-white px-6 text-sm font-bold text-violet-800 transition hover:bg-violet-50">
-                        Go to My Projects
+                    <Link href={applyHref} className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-300 bg-white px-6 text-sm font-bold text-violet-800 transition hover:bg-violet-50">
+                        Open listing
                     </Link>
                 </div>
             </div>

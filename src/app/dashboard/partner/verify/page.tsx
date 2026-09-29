@@ -121,9 +121,14 @@ function isRevisionRequestedRow(row: PartnerApprovalRow) {
     );
 }
 
+function isWaitingFacultyRow(row: PartnerApprovalRow) {
+    if (isLinkedDraftRow(row) || isRevisionRequestedRow(row)) return false;
+    return row.workflowStageKey === "pending_faculty";
+}
+
 function isPendingPartnerDecision(row: PartnerApprovalRow) {
     if (row.linkedDraft || lower(row.opportunityStatus) === "draft") return false;
-    if (isRevisionRequestedRow(row)) return false;
+    if (isRevisionRequestedRow(row) || isWaitingFacultyRow(row)) return false;
     return row.workflowStageKey === "pending_partner" || ["pending", "awaiting", "required"].includes(row.partnerDecision);
 }
 
@@ -240,7 +245,7 @@ function needsExecutingOrgPortalConfirm(opp: Record<string, unknown> | null): bo
 }
 
 export default function VerifyWorkPage() {
-    const [tab, setTab] = useState<"pending" | "history" | "linked" | "revision">("pending");
+    const [tab, setTab] = useState<"pending" | "history" | "linked" | "revision" | "waiting">("pending");
     const [rows, setRows] = useState<PartnerApprovalRow[]>([]);
     const [search, setSearch] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -483,12 +488,15 @@ export default function VerifyWorkPage() {
                 ? rows.filter(isPendingPartnerDecision)
                 : tab === "linked"
                   ? rows.filter(isLinkedDraftRow)
+                  : tab === "waiting"
+                    ? rows.filter(isWaitingFacultyRow)
                   : tab === "revision"
                     ? rows.filter(isRevisionRequestedRow)
                     : rows.filter(
                           (row) =>
                               !isPendingPartnerDecision(row) &&
                               !isLinkedDraftRow(row) &&
+                              !isWaitingFacultyRow(row) &&
                               !isRevisionRequestedRow(row),
                       );
         const q = search.trim().toLowerCase();
@@ -529,7 +537,7 @@ export default function VerifyWorkPage() {
         if (typeof window === "undefined") return;
         const currentSearch = new URLSearchParams(window.location.search);
         const nextTab = currentSearch.get("tab");
-        if (nextTab === "pending" || nextTab === "history" || nextTab === "linked" || nextTab === "revision") {
+        if (nextTab === "pending" || nextTab === "history" || nextTab === "linked" || nextTab === "revision" || nextTab === "waiting") {
             setTab(nextTab);
         }
     }, []);
@@ -547,6 +555,8 @@ export default function VerifyWorkPage() {
                 ? "history"
                 : requestedTab === "linked"
                   ? "linked"
+                  : requestedTab === "waiting"
+                    ? "waiting"
                   : requestedTab === "revision"
                     ? "revision"
                     : "pending";
@@ -556,10 +566,13 @@ export default function VerifyWorkPage() {
                       (row) =>
                           !isPendingPartnerDecision(row) &&
                           !isLinkedDraftRow(row) &&
+                          !isWaitingFacultyRow(row) &&
                           !isRevisionRequestedRow(row),
                   )
                 : targetTab === "linked"
                   ? rows.filter(isLinkedDraftRow)
+                  : targetTab === "waiting"
+                    ? rows.filter(isWaitingFacultyRow)
                   : targetTab === "revision"
                     ? rows.filter(isRevisionRequestedRow)
                     : rows.filter(isPendingPartnerDecision);
@@ -584,6 +597,9 @@ export default function VerifyWorkPage() {
             <div className="flex flex-wrap gap-2">
                 <Button variant={tab === "pending" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("pending")}>
                     Pending Requests
+                </Button>
+                <Button variant={tab === "waiting" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("waiting")}>
+                    Waiting for Faculty
                 </Button>
                 <Button variant={tab === "revision" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("revision")}>
                     Revision Requested
@@ -624,6 +640,8 @@ export default function VerifyWorkPage() {
                                 ? "No pending partner approvals"
                                 : tab === "linked"
                                   ? "No linked drafts"
+                                  : tab === "waiting"
+                                    ? "Nothing waiting on Faculty"
                                   : tab === "revision"
                                     ? "No revision requests"
                                     : "No partner approval history yet"}
@@ -633,6 +651,8 @@ export default function VerifyWorkPage() {
                                 ? "When an opportunity lists your organisation as partner and your review step is due, it will appear here."
                                 : tab === "linked"
                                   ? "When a student names your organisation on a draft, it appears here. You can view it, but you cannot approve until they submit and faculty has cleared."
+                                  : tab === "waiting"
+                                    ? "Linked opportunities stay here until Faculty approves. Same Opportunity ID — view only."
                                   : tab === "revision"
                                     ? "Opportunities sent back to the student stay here until they resubmit."
                                     : "Past partner-linked workflow items will appear here."}
@@ -672,6 +692,8 @@ export default function VerifyWorkPage() {
                                                 ? "decided"
                                                 : tab === "revision"
                                                   ? "revision"
+                                                  : tab === "waiting" || tab === "linked"
+                                                    ? "waiting"
                                                   : "pending",
                                     },
                                 )}
@@ -724,7 +746,7 @@ export default function VerifyWorkPage() {
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> Review details
                                     </Button>
-                                    {tab === "linked" || tab === "revision" ? (
+                                    {tab === "linked" || tab === "waiting" || tab === "revision" ? (
                                         <ContactStudentActions
                                             studentEmail={row.studentEmail}
                                             title={row.projectTitle}

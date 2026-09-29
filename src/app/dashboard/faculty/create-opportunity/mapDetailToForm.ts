@@ -98,11 +98,13 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             (typeof extEmail === "string" && extEmail.trim()),
     );
 
-    const typesRaw = Array.isArray(d.types) ? (d.types as string[]) : [];
+    const typesRaw = Array.isArray(d.types) ? d.types : [];
     const opportunityType: string[] = [];
     const otherSpecs: string[] = [];
     let isOtherTypeChecked = false;
-    for (const t of typesRaw) {
+    for (const rawType of typesRaw) {
+        const t = typeof rawType === "string" ? rawType : rawType == null ? "" : String(rawType);
+        if (!t) continue;
         if (t.startsWith("Other: ")) {
             isOtherTypeChecked = true;
             otherSpecs.push(t.slice(7).trim());
@@ -110,6 +112,16 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             opportunityType.push(t);
         }
     }
+
+    const locationRaw =
+        d.location && typeof d.location === "object" && !Array.isArray(d.location)
+            ? (d.location as Record<string, unknown>)
+            : null;
+    const location = {
+        city: typeof locationRaw?.city === "string" ? locationRaw.city : "",
+        venue: typeof locationRaw?.venue === "string" ? locationRaw.venue : "",
+        pin: typeof locationRaw?.pin === "string" ? locationRaw.pin : "",
+    };
 
     const rule = (scope.rule as ParticipationRule) || "open_all_universities";
     const uniNames = Array.isArray(scope.university_names) ? (scope.university_names as string[]) : [];
@@ -157,10 +169,7 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         isOtherTypeChecked,
         otherTypeSpecs: otherSpecs.length ? otherSpecs : [""],
         mode: typeof d.mode === "string" ? d.mode : "",
-        location:
-            d.location && typeof d.location === "object"
-                ? d.location
-                : { city: "", venue: "", pin: "" },
+        location,
         timelineType: typeof timeline.type === "string" ? timeline.type : "",
         dates: {
             start: typeof timeline.start_date === "string" ? timeline.start_date : "",
@@ -169,6 +178,12 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
         applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
+        closeApplicationsEarly:
+            timeline.close_applications_early === true ||
+            (typeof timeline.application_deadline === "string" &&
+                typeof timeline.end_date === "string" &&
+                timeline.application_deadline < timeline.end_date &&
+                timeline.close_applications_early !== false),
         scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
             hours:

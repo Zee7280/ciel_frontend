@@ -360,11 +360,40 @@ export function isOpportunityPermanentlyRejected(project: Record<string, unknown
     return stage === "rejected" || status === "rejected";
 }
 
-/** True when the listing is publicly live: API-aligned `status` plus final admin approval (do not infer from `workflow_stage`). */
+/** True when the listing is publicly live: API `status === live` plus final admin approval. */
 export function isOpportunityPubliclyLive(project: Record<string, unknown>): boolean {
     if (lower(project.status) !== "live") return false;
     const adminFlag = project.admin_approved ?? project.adminApproved;
-    return truthyApproved(adminFlag) || adminFlag === true;
+    if (!(truthyApproved(adminFlag) || adminFlag === true)) return false;
+
+    // Student-created: also require faculty (+ partner when required) so a partial approve never shows LIVE/report.
+    const isStudentCreated =
+        project.is_student_created === true ||
+        project.isStudentCreated === true ||
+        lower(project.source) === "student_created";
+    if (!isStudentCreated) return true;
+
+    const faculty = lower(
+        project.faculty_approval_status ?? project.facultyApprovalStatus ?? project.faculty_verification_status,
+    );
+    const facultyOk =
+        truthyApproved(project.faculty_verified) ||
+        faculty === "approved" ||
+        faculty === "not_applicable" ||
+        faculty === "not_required" ||
+        faculty === "faculty_verified";
+    if (!facultyOk) return false;
+
+    const needsPartner =
+        project.requires_partner_approval === true ||
+        project.requiresPartnerApproval === true;
+    if (!needsPartner) return true;
+    const partner = lower(project.partner_approval_status ?? project.partnerApprovalStatus);
+    return (
+        truthyApproved(project.partner_verified ?? project.partnerVerified) ||
+        partner === "approved" ||
+        partner === "not_applicable"
+    );
 }
 
 /**

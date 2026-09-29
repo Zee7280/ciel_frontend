@@ -25,7 +25,6 @@ import {
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
@@ -39,7 +38,7 @@ import { isCommunityReportRejected, isFacultyCommunityLiveCard, normalizeReviewS
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { CII_V2_LEVELS } from "@/utils/communityCiiAnalyser";
 
@@ -50,8 +49,6 @@ const CS_VIEWS = [
     "projects",
     "reports",
     "impact",
-    "files",
-    "run",
     "analytics",
     "guide",
     "pending",
@@ -84,6 +81,7 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
     review: {
         desc: "Academic approval area for student-created opportunities and participation requests.",
         items: [
+            ["Linked Drafts", "Named to you but not submitted yet. View the same Opportunity ID."],
             ["Pending My Approval", "Student-created proposals waiting for your decision."],
             ["Revision with Student", "Proposals you returned for correction; status remains visible."],
             ["Participation Requests", "Students asking to join published opportunities under your supervision."],
@@ -103,15 +101,15 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
         rule: "Monitoring does not expose raw private student phone numbers.",
     },
     reports: {
-        desc: "Final academic review of submitted Community Service Reports.",
+        desc: "Read-only faculty review and analysis of submitted Community Service Reports.",
         items: [
-            ["Pending Review", "Submitted reports waiting for your review; run the Analyzer when you are ready to assess the locked report."],
+            ["Pending Review", "Reports awaiting CIEL PK Admin analysis / decision. Open the locked package to view."],
             ["Revision with Student", "Reports returned for correction."],
             ["Decided", "Approved or rejected report decisions retained for history."],
-            ["CII Breakdown", "Review the provisional System CII, evidence logic and section reasoning."],
-            ["Approve / Review / Reject", "Your final academic report decision; moderation requires a recorded reason."],
+            ["CII Breakdown", "Review any provisional AI assessment and evidence logic when available."],
+            ["Approve / Revise / Reject", "Final report decision is CIEL PK-only in this build; faculty analysis remains available as view-only."],
         ],
-        rule: "System CII is provisional until Faculty approval.",
+        rule: "AI CII is provisional until CIEL PK final acceptance.",
     },
     impact: {
         desc: "Verified impact from projects you supervised.",
@@ -120,25 +118,6 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
             ["Flashcard & package", "Open the verified flashcard, CII, badge, ranking + trend, detailed report and PDF. QR stays on the flashcard."],
         ],
         rule: "Rejected work never appears as verified impact.",
-    },
-    run: {
-        desc: "Analyse and rank verified projects in your permitted faculty cohort.",
-        items: [
-            ["Ranking Preview", "Run dynamic analysis without creating a permanent award."],
-            ["Official Run", "Create a dated official cohort ranking, subject to role limits."],
-            ["Why It Ranks", "Evidence-backed explanation for each position."],
-            ["Ranking History", "Preserves previous official runs."],
-        ],
-        rule: "Faculty scope is limited to projects connected to the faculty member.",
-    },
-    files: {
-        desc: "One place for every analysis file shared across stakeholders.",
-        items: [
-            ["Faculty Analysis", "The faculty decision file for each submitted report: decision, CII accepted or moderated, reason, comments."],
-            ["AI Analyzer reports", "The latest dated AI Analyzer badge and run history for each project."],
-            ["Open / Download", "View inside the dashboard, print, or download the file."],
-        ],
-        rule: "Files are shared automatically — nobody has to send them.",
     },
     analytics: {
         desc: "See performance patterns across your supervised Community Service projects.",
@@ -159,8 +138,6 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     projects: "Community Service Projects",
     reports: "Reports for Review",
     impact: "Community Service Impact",
-    files: "Shared Analysis Files",
-    run: "AI Analyzer & Rankings",
     analytics: "Analytics",
     guide: "Guide",
     pending: "Reports for Review",
@@ -342,6 +319,7 @@ function FacultyCommunityServiceHub() {
         rows,
         mineRows,
         pendingOppRows,
+        linkedDraftRows,
         historyOppRows,
         pendingAppRows,
         historyAppRows,
@@ -407,7 +385,7 @@ function FacultyCommunityServiceHub() {
             key: "reports",
             n: pendingReports.length,
             title: "Reports for review",
-            sub: "Locked report received · Analyzer may be pending",
+            sub: "Locked report received · waiting on CIEL PK Admin",
             href: `${CS_BASE}?view=reports&tab=pending`,
             tone: pendingReports.length ? "bad" : "default",
         },
@@ -435,12 +413,11 @@ function FacultyCommunityServiceHub() {
         | "action"
         | "published"
         | "closed";
-    const reviewTab = ["opps", "revision", "apps", "done"].includes(innerTab) ? innerTab : "opps";
+    const reviewTab = ["linked", "opps", "revision", "apps", "done"].includes(innerTab) ? innerTab : "opps";
     const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
     const reportTab = ["pending", "rev", "done", "rejected"].includes(innerTab) ? innerTab : "pending";
     const approvedReports = decidedReports.filter((row) => !isCommunityReportRejected(row));
     const rejectedReports = decidedReports.filter((row) => isCommunityReportRejected(row));
-    const filesTab = innerTab === "ai" ? "ai" : "faculty";
 
     const crumb = VIEW_CRUMB[view];
     const showHomeHero = view === "home";
@@ -518,8 +495,8 @@ function FacultyCommunityServiceHub() {
                             emoji="📝"
                             ghost="📝"
                             title="Reports for Review"
-                            subtitle="Review submitted reports, evidence and provisional CII; approve, revise or reject."
-                            badge="ACADEMIC REVIEW"
+                            subtitle="Read-only faculty review of submitted report packages. Final Approve / Revise / Reject live only on CIEL PK Admin."
+                            badge="READ ONLY"
                             background={MOCKUP_GRADIENTS.red}
                             hot={pendingReports.length > 0}
                         />
@@ -531,24 +508,6 @@ function FacultyCommunityServiceHub() {
                             subtitle="Verified impact from projects you supervised: Flashcards, CII, badges and credentials."
                             badge="VERIFIED"
                             background={MOCKUP_GRADIENTS.green}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=run`}
-                            emoji="🧠"
-                            ghost="🧠"
-                            title="AI Analyzer & Rankings"
-                            subtitle="Run the AI Analyzer on any supervised project (dated badge + trend shared with every stakeholder) and run permitted ranking cohorts."
-                            badge="ANALYZE"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=files`}
-                            emoji="📁"
-                            ghost="📁"
-                            title="Shared Analysis Files"
-                            subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard."
-                            badge="SHARED"
-                            background={MOCKUP_GRADIENTS.purple}
                         />
                         <MockupActionCard
                             href={`${CS_BASE}?view=analytics`}
@@ -631,7 +590,7 @@ function FacultyCommunityServiceHub() {
                                             <OpportunityListFlashHead title={row.title} />
                                             <div className="px-4 py-3">
                                                 <small className="block text-[11.5px] text-[#6b7c86]">
-                                                    {formatDisplayId(row.id, "OPP")} ·{" "}
+                                                    {formatOpportunityCode(row)} ·{" "}
                                                     {createTab === "review" ? facultyPendingStageLabel(row) : row.status || "in review"}
                                                     {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
                                                 </small>
@@ -660,6 +619,7 @@ function FacultyCommunityServiceHub() {
                     <UserGuideBanner {...FACULTY_CS_GUIDES.review} />
                     <HubTabs
                         tabs={[
+                            { id: "linked", label: "Linked Drafts", count: linkedDraftRows.length },
                             { id: "opps", label: "Pending my approval", count: pendingOppReviews },
                             { id: "revision", label: "Revision with student", count: revisionOpps.length },
                             { id: "apps", label: "Participation requests", count: pendingApps },
@@ -670,6 +630,51 @@ function FacultyCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading reviews…</p>
+                    ) : reviewTab === "linked" ? (
+                        linkedDraftRows.length === 0 ? (
+                            <EmptyPanel title="No linked drafts" text="When a student names you on an unsaved draft, the same Opportunity ID appears here. Approve is locked until they submit." />
+                        ) : (
+                            <div className="grid gap-3">
+                                {linkedDraftRows.map((row) => {
+                                    const href = `${APPROVALS}?tab=linked&opportunity=${encodeURIComponent(row.id)}`;
+                                    const model = buildOpportunityApprovalModel(
+                                        {
+                                            id: row.id,
+                                            title: row.projectTitle,
+                                            student_name: row.studentName,
+                                            version: row.version,
+                                            faculty_approval_status: row.facultyApprovalStatus,
+                                            partner_approval_status: row.partnerApprovalStatus,
+                                            admin_approval_status: row.adminApprovalStatus,
+                                            requires_partner_approval: row.requiresPartnerApproval,
+                                            created_by_role: row.createdByRole,
+                                            status: row.opportunityStatus,
+                                            workflow_stage: row.workflowStage,
+                                            public_code: row.publicCode,
+                                            currently_with: row.currentlyWith,
+                                            currently_with_role: row.currentlyWithRole,
+                                            next_step: row.nextStep,
+                                            waiting_since: row.waitingSince,
+                                            linked_draft: true,
+                                            isStudentCreated: true,
+                                        },
+                                        "faculty",
+                                        { mode: "waiting" },
+                                    );
+                                    return (
+                                        <OpportunityApprovalCard
+                                            key={row.id}
+                                            {...model}
+                                            actions={
+                                                <Link href={href} className={approvalActionClass.soft}>
+                                                    View same record
+                                                </Link>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )
                     ) : reviewTab === "opps" ? (
                         pendingOppRows.length === 0 ? (
                             <EmptyPanel title="No opportunities pending" text="New student submissions appear here with their Flashcard." />
@@ -692,6 +697,11 @@ function FacultyCommunityServiceHub() {
                                             workflow_stage: row.workflowStage,
                                             total_hours: row.totalHours,
                                             submitted_at: row.submittedDate,
+                                            public_code: row.publicCode,
+                                            currently_with: row.currentlyWith,
+                                            currently_with_role: row.currentlyWithRole,
+                                            next_step: row.nextStep,
+                                            waiting_since: row.waitingSince,
                                             isStudentCreated: true,
                                         },
                                         "faculty",
@@ -899,22 +909,12 @@ function FacultyCommunityServiceHub() {
                 <div>
                     <MockupSectionHead
                         title="Reports for Review"
-                        subtitle="Faculty-only academic approval. Review the locked Flashcard + Detailed Report first. System CII is provisional until you approve; overrides need a recorded reason."
+                        subtitle="Read-only faculty review. Open the locked Flashcard + Detailed Report. Final decision controls stay with CIEL PK Admin."
                     />
-                    <div className="mb-3.5 overflow-hidden rounded-[18px] border border-[#d8e5e8] bg-[linear-gradient(135deg,#ffffff,#f5fbfa)] shadow-[0_8px_22px_rgba(24,52,64,.045)]">
-                        <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2 xl:grid-cols-5">
-                            {(FACULTY_CS_GUIDES.reports.items || []).map(([title, text]) => (
-                                <div key={title} className="rounded-xl border border-[#e0e8ea] bg-white px-2.5 py-2">
-                                    <b className="block text-[10px] text-[#173e47]">{title}</b>
-                                    <span className="mt-1 block text-[10px] leading-relaxed text-[#6d7e85]">{text}</span>
-                                </div>
-                            ))}
-                        </div>
-                        {FACULTY_CS_GUIDES.reports.rule ? (
-                            <div className="mx-3 mb-3 rounded-[11px] border border-[#ead9ad] bg-[#fff8e8] px-2.5 py-2 text-[10.5px] leading-relaxed text-[#725e2a]">
-                                <b>Simple rule:</b> {FACULTY_CS_GUIDES.reports.rule}
-                            </div>
-                        ) : null}
+                    <UserGuideBanner {...FACULTY_CS_GUIDES.reports} />
+                    <div className="mb-3 rounded-[14px] border border-[#b7d3e8] bg-[#eef6fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#2f5b86]">
+                        <b>Architecture retained:</b> Pending Review → Revision with Student → Decided remain in their original location.{" "}
+                        Final decision controls are disabled here and live only on CIEL PK / Super Admin.
                     </div>
                     <div className="mb-3 rounded-[14px] border border-[#cfe6ef] bg-[#f3f9fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#3e515b]">
                         <b>CII recognition scale — locked to the live analyser:</b>{" "}
@@ -928,7 +928,7 @@ function FacultyCommunityServiceHub() {
                             </span>
                         ))}
                         <span className="mt-1 block text-[11px] text-[#6b7c86]">
-                            Highest levels require quality gates; the numerical total alone is not enough. The Analyzer is not run until you trigger it.
+                            Highest levels require quality gates; the numerical total alone is not enough. Faculty views the package; CIEL PK Admin runs analysis and decides.
                         </span>
                     </div>
                     <HubTabs
@@ -959,7 +959,7 @@ function FacultyCommunityServiceHub() {
                                         title={reportTab === "pending" ? "No reports waiting" : "None"}
                                         text={
                                             reportTab === "pending"
-                                                ? "Submitted reports arrive here as a locked Flashcard + Detailed Report. The Analyzer runs only when you choose to run it."
+                                                ? "Submitted reports arrive here as a locked Flashcard + Detailed Report. Faculty can open and view; CIEL PK Admin runs analysis and decides."
                                                 : reportTab === "rev"
                                                   ? "Reports you return for correction stay here until the student resubmits."
                                                   : reportTab === "rejected"
@@ -1031,97 +1031,6 @@ function FacultyCommunityServiceHub() {
                                             />
                             ))}
                         </div>
-                    )}
-                </div>
-            )}
-
-            {view === "files" && (
-                <div>
-                    <MockupSectionHead
-                        title="Shared Analysis Files"
-                        subtitle="Faculty Analysis files and AI Analyzer reports are shared automatically with every stakeholder linked to a record — the same file, the same version, on every dashboard."
-                    />
-                    <UserGuideBanner {...FACULTY_CS_GUIDES.files} />
-                    <HubTabs
-                        tabs={[
-                            { id: "faculty", label: "Faculty Analysis files", count: decidedReports.length },
-                            { id: "ai", label: "AI Analyzer reports", count: deckCards.filter((c) => c.cii != null).length },
-                        ]}
-                        active={filesTab}
-                        onChange={setHubTab}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading files…</p>
-                    ) : filesTab === "ai" ? (
-                        deckCards.filter((c) => c.cii != null).length === 0 ? (
-                            <EmptyPanel
-                                title="No AI Analyzer runs yet"
-                                text="Run it from any report record. The dated CII badge is the shared file every stakeholder sees."
-                            />
-                        ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {deckCards
-                                    .filter((c) => c.cii != null)
-                                    .map((card) => (
-                                        <Link
-                                            key={card.id}
-                                            href={`${REPORTS}/${card.id}`}
-                                            className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                        >
-                                            <div className="text-[22px]">🧠</div>
-                                            <b className="mt-1 block text-[14px] text-[#16313d]">{card.project_title}</b>
-                                            <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                                {card.level || "CII"} · {card.cii}/100 · {card.student_name}
-                                            </small>
-                                        </Link>
-                                    ))}
-                            </div>
-                        )
-                    ) : decidedReports.length === 0 ? (
-                        <EmptyPanel
-                            title="No Faculty Analysis yet"
-                            text="A file is created the moment faculty decides on a submitted report."
-                        />
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {decidedReports.map((row) => (
-                                <Link
-                                    key={row.id}
-                                    href={`${REPORTS}/${row.id}`}
-                                    className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                >
-                                    <div className="text-[22px]">📄</div>
-                                    <b className="mt-1 block text-[14px] text-[#16313d]">{row.project_title}</b>
-                                    <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                        {formatDisplayId(row.id, "RPT")} · {row.faculty_status || row.status} · {row.student_name}
-                                    </small>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {view === "run" && (
-                <div>
-                    <MockupSectionHead
-                        title="AI Analyzer & Rankings"
-                        subtitle="Faculty scope is limited to projects you supervised. Preview freely; an official run creates a dated cohort ranking."
-                    />
-                    <UserGuideBanner {...FACULTY_CS_GUIDES.run} />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading…</p>
-                    ) : deckCards.length === 0 ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-                            No live cards to rank yet. Approved Community Service fills this run.
-                        </p>
-                    ) : (
-                        <CommunityAwardPanel
-                            cards={deckCards}
-                            kind="fac"
-                            scopeName="Faculty Community Service Cohort"
-                            notifyEndpoint="/api/v1/faculty/community-service/award-notify"
-                        />
                     )}
                 </div>
             )}

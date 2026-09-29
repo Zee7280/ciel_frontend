@@ -186,7 +186,10 @@ export function buildOpportunityRecordFlashcard(
         seats: pickStr(timeline.volunteers_required) || "0",
         start: pickStr(timeline.start_date),
         end: pickStr(timeline.end_date),
-        deadline: pickStr(timeline.application_deadline),
+        // Applications close on early deadline if set, otherwise project end (lifecycle rule).
+        deadline:
+            pickStr(timeline.application_deadline) ||
+            pickStr(timeline.end_date),
         beneficiariesCount: pickStr(objectives.beneficiaries_count) || "0",
         beneficiaryType: listText(objectives.beneficiaries_type) || pickStr(objectives.beneficiary_group) || "Community members",
         responsibilities: pickStr(activity.student_responsibilities),
@@ -303,7 +306,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const secondarySdgName = secondarySdg?.title || "SDG";
     const secondarySdgNum = secondarySdg?.number != null ? String(secondarySdg.number) : model.secondarySdg || "—";
 
-    const days = daysUntil(model.deadline);
+    const days = daysUntil(String(model.deadline || ""));
     const closed = days !== null && days < 0;
     const hot = days !== null && days >= 0 && days <= 3;
     const soon = days !== null && days > 3 && days <= 10;
@@ -323,21 +326,21 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                     : "APPLICATIONS OPEN";
     const ribbonSub =
         days === null
-            ? "Application deadline will appear here once it is set."
+            ? "Join / apply stays open through the project end date (or early close date if set)."
             : closed
-              ? "The application deadline has passed. The card stays visible for reference."
+              ? "Applications have closed for this opportunity."
               : days === 0
-                ? "Applications close today. Apply before the day ends."
+                ? "Applications close today. Join / apply before the day ends."
                 : hot
-                  ? `Only ${days} day${days === 1 ? "" : "s"} left to apply.`
+                  ? `Only ${days} day${days === 1 ? "" : "s"} left to join / apply.`
                   : soon
                     ? `${days} days left before applications close.`
                     : `${days} days left. Applications are open.`;
-    const span = daySpan(model.start, model.end);
-    const steps = flowSteps(model.responsibilities);
-    const skillChips = splitBits(model.skills);
-    const title = model.title.trim() || "Untitled Community Service Opportunity";
-    const hook = model.hook.trim() || "A practical opportunity to contribute, learn and build verified community impact.";
+    const span = daySpan(String(model.start || ""), String(model.end || ""));
+    const steps = flowSteps(String(model.responsibilities || ""));
+    const skillChips = splitBits(String(model.skills || ""));
+    const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
+    const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
     const canApply = model.eligible && !closed;
     const ctaTitle = closed
         ? "Applications are closed."
@@ -349,19 +352,19 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const ctaBody = closed
         ? "This deadline has passed. You can still read the card."
         : model.eligibilityWhy;
-    const sdgWhy = model.objective.trim() || model.outputs.trim() || model.summary.trim();
+    const sdgWhy = String(model.objective || "").trim() || String(model.outputs || "").trim() || String(model.summary || "").trim();
     const reachBits = [
-        model.beneficiariesCount.trim() ? { k: model.beneficiariesCount.trim(), l: model.beneficiaryType || "people reached" } : null,
-        model.hours.trim() && model.hours.trim() !== "0" ? { k: `${model.hours.trim()} hrs`, l: "expected per student" } : null,
+        String(model.beneficiariesCount || "").trim() ? { k: String(model.beneficiariesCount).trim(), l: model.beneficiaryType || "people reached" } : null,
+        String(model.hours || "").trim() && String(model.hours).trim() !== "0" ? { k: `${String(model.hours).trim()} hrs`, l: "expected per student" } : null,
     ].filter((x): x is { k: string; l: string } => !!x);
 
     const remind = () => {
-        if (!model.deadline.trim() || closed) return;
+        if (!String(model.deadline || "").trim() || closed) return;
         downloadIcs("ciel-application-deadline.ics", `Apply: ${title}`, model.deadline);
         setNote("Deadline reminder downloaded.");
     };
     const addDates = () => {
-        if (!model.start.trim()) return;
+        if (!String(model.start || "").trim()) return;
         downloadIcs("ciel-project-dates.ics", title, model.start, model.end || model.start);
         setNote("Project dates downloaded.");
     };
@@ -390,7 +393,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                 <div className="co-flash-meta">
                     <span>{esc(model.activityType || "Community Service")}</span>
                     <span>{esc(model.mode || "On-site")}</span>
-                    {model.city.trim() ? <span>{esc(model.city)}</span> : null}
+                    {String(model.city || "").trim() ? <span>{esc(model.city)}</span> : null}
                     <span>{esc(model.orgLabel)}</span>
                 </div>
             </section>
@@ -453,7 +456,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                 <section className="co-flash-need">
                     <span className="co-flash-tag">The need & the plan</span>
                     <h2>{esc(model.summary || hook)}</h2>
-                    {model.objective.trim() && model.objective.trim() !== model.summary.trim() ? (
+                    {String(model.objective || "").trim() && String(model.objective).trim() !== String(model.summary || "").trim() ? (
                         <p>{model.objective}</p>
                     ) : null}
                 </section>
@@ -468,7 +471,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                         <b>Scope</b>
                         <span>{esc(model.scopeDetail)}</span>
                     </div>
-                    {model.prerequisites.trim() ? (
+                    {String(model.prerequisites || "").trim() ? (
                         <div className="co-flash-row">
                             <b>Before you apply</b>
                             <span>{model.prerequisites}</span>
@@ -543,13 +546,13 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                             <span key={skill}>{skill}</span>
                         ))}
                     </div>
-                    {model.resources.trim() ? (
+                    {String(model.resources || "").trim() ? (
                         <p>
                             <strong>Support: </strong>
                             {model.resources}
                         </p>
                     ) : null}
-                    {model.verification.trim() ? (
+                    {String(model.verification || "").trim() ? (
                         <p>
                             <strong>Verification: </strong>
                             {model.verification}

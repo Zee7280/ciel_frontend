@@ -10,7 +10,6 @@ import {
     CommunityCrumb,
     EmptyPanel,
     HubTabs,
-    UserGuideBanner,
     ZoneRule,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
@@ -31,7 +30,7 @@ export const CREATE_TABS = [
     { id: "review", label: "Under Approval" },
     { id: "action", label: "Action Required" },
     { id: "closed", label: "Closed" },
-    { id: "history", label: "Approved History" },
+    { id: "history", label: "Approved / Live" },
 ] as const;
 
 export type CreateTab = (typeof CREATE_TABS)[number]["id"];
@@ -80,12 +79,9 @@ function isCreateTab(value: string | null): value is CreateTab {
     return CREATE_TABS.some((tab) => tab.id === value);
 }
 
+/** Approved / Live tab = truly live for reporting only (same gate as Team/Live node unlock). */
 function opportunityFullyApproved(op: MineRow): boolean {
-    return (
-        isStudentOpportunityLiveForReporting(op as unknown as Record<string, unknown>) ||
-        op.status === "live" ||
-        op.admin_approval_status === "approved"
-    );
+    return isStudentOpportunityLiveForReporting(op as unknown as Record<string, unknown>);
 }
 
 export function createTabOf(op: MineRow): CreateTab {
@@ -150,7 +146,7 @@ const EMPTY: Record<CreateTab, string> = {
     review: "No opportunity is waiting for approval right now.",
     action: "No reviewer has requested changes.",
     closed: "No rejected opportunities.",
-    history: "Approved proposals appear here as history; active work is in Workspace.",
+    history: "Approved / Live proposals appear here; active work is also in My Reports.",
 };
 
 export default function CommunityServiceCreate() {
@@ -246,32 +242,19 @@ export default function CommunityServiceCreate() {
             <CommunityCrumb role="Student" view="Create Opportunity" />
             <MockupSectionHead
                 title="Create Opportunity"
-                subtitle="Everything about a student-created opportunity stays here until CIEL PK gives the final decision. Approval completes the proposal journey; approved work then moves to Workspace."
+                subtitle="Everything about a student-created opportunity stays here until CIEL PK gives the final decision. Approval completes the proposal journey; approved work then moves to My Reports."
                 action={
                     <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
                         ← Back to module buttons
                     </Link>
                 }
             />
-            <UserGuideBanner
-                desc="Create and manage your own student-proposed opportunity until the final opportunity decision."
-                items={[
-                    ["Create New Opportunity", "Open the Community Service Opportunity Form and begin a new proposal."],
-                    ["Drafts", "Saved proposals you have not submitted yet; continue editing from here."],
-                    ["Under Approval", "Submitted proposals moving through Faculty → Partner/NGO if linked → CIEL PK."],
-                    ["Action Required", "Revision requests returned to you with reviewer comments and the next edit required."],
-                    ["Closed", "Rejected or archived proposals kept for transparency and audit history."],
-                    ["Approved History", "Final-approved proposals. The active project has moved to Workspace → Ready to Start."],
-                ]}
-                rule="Proposal status stays here; report status never replaces it."
-            />
-
             <div className="flex flex-col items-start justify-between gap-4 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-5 sm:flex-row sm:items-center">
                 <div>
                     <p className="text-[9.5px] font-black uppercase tracking-[0.08em] text-[#0e7d74]">Your proposal journey</p>
                     <h3 className="mt-1 text-[20px] font-semibold text-[#16313d]">Create it here. Track it here. Fix it here.</h3>
                     <p className="mt-1 max-w-[800px] text-[12px] leading-relaxed text-[#70808a]">
-                        The proposal does not enter Community Service Workspace until final approval. Every reviewer, decision, version and next action remains visible here.
+                        The proposal does not enter My Reports until final approval. Every reviewer, decision, version and next action remains visible here.
                     </p>
                 </div>
                 <button
@@ -367,8 +350,8 @@ export default function CommunityServiceCreate() {
 
             <div className="mt-3.5">
                 <ZoneRule title="Simple rule:">
-                    Draft, approval, revision and rejection stay under <strong>Create Opportunity</strong>. When final approval is achieved, the operational project appears in{" "}
-                    <strong>Community Service Workspace → Ready to Start</strong>. Approved History remains here only as a transparent audit trail.
+                    Draft, approval, revision and rejection stay under <strong>Create Opportunity / My Opportunities</strong>. When final approval is achieved, the operational project appears in{" "}
+                    <strong>My Reports → Ready to Start</strong>. Approved / Live remains here as the same master record.
                 </ZoneRule>
             </div>
 
@@ -377,7 +360,7 @@ export default function CommunityServiceCreate() {
                     [String(activeN), "Active proposal records"],
                     [String(counts.review), "Waiting on reviewer"],
                     [String(counts.action), "Need your action"],
-                    [String(counts.history), "Approved → Workspace"],
+                    [String(counts.history), "Approved / Live"],
                 ].map(([value, label]) => (
                     <div key={label} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
                         <strong className="block text-lg text-[#16313d]">{value}</strong>
@@ -576,7 +559,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
     } else if (tab === "history") {
         statusTitle = "Approved ✓";
         statusText = "Opportunity approval is complete.";
-        nextTitle = "Moved to Community Service Workspace";
+        nextTitle = "Moved to My Reports";
         nextText = "Start Report is waiting there. This card stays here as history only.";
         tone = "ok";
     }
@@ -631,7 +614,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#1c765d] text-[12px] font-black text-white">✓</span>
                         <div>
                             <b className="block">Approved and handed off</b>
-                            <span>This record is no longer an active opportunity proposal. It now lives in Community Service Workspace for service + reporting.</span>
+                            <span>This record is no longer an active opportunity proposal. It now lives in My Reports for service + reporting.</span>
                         </div>
                     </div>
                 ) : null}
@@ -658,7 +641,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                     ) : null}
                     {tab === "history" ? (
                         <Link href={WORKSPACE_READY} className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white">
-                            Open Workspace
+                            Open My Reports
                         </Link>
                     ) : null}
                     <Link href={viewHref} className="rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">

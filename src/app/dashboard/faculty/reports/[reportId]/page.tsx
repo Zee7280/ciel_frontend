@@ -29,7 +29,7 @@ function FacultyReportView() {
     }
 
     if (view === "cii-v2") {
-        return <CommunityCiiAnalyser />;
+        return <CommunityCiiAnalyser readOnly />;
     }
 
     return <FacultyAiEvaluationConsole />;

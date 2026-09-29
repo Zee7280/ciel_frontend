@@ -1,3 +1,4 @@
+/** @deprecated Shared Analysis Files removed from student hub. `?view=files` redirects to hub home. */
 "use client";
 
 import { useEffect, useState } from "react";

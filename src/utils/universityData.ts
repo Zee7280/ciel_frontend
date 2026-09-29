@@ -175,3 +175,51 @@ export const BNU_DEGREE_PROGRAMS: { school: string; programs: string[] }[] = [
         programs: ["BS Applied Psychology", "MS Clinical & Counseling Psychology"],
     },
 ];
+
+/** Faculty department / school options for opportunity Verification (BNU + common PK names). */
+export const BNU_FACULTY_DEPARTMENTS: string[] = [
+    ...BNU_DEGREE_PROGRAMS.map((s) => s.school),
+    "School of Management Sciences (SMS)",
+    "SMS",
+];
+
+export const COMMON_FACULTY_DEPARTMENTS: string[] = [
+    "Computer Science",
+    "Software Engineering",
+    "Information Technology",
+    "Artificial Intelligence",
+    "Data Science",
+    "Cyber Security",
+    "Electrical Engineering",
+    "Mechanical Engineering",
+    "Civil Engineering",
+    "Business Administration",
+    "Management Sciences",
+    "School of Management Sciences",
+    "Accounting & Finance",
+    "Economics",
+    "Psychology",
+    "Education",
+    "Media & Mass Communication",
+    "Architecture",
+    "Design",
+    "Law",
+    "Pharmacy",
+    "Medicine",
+    "Public Health",
+    "Social Sciences",
+    "English",
+    "Mathematics",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Other",
+];
+
+/** Searchable department list; BNU institutions get school names first. */
+export function facultyDepartmentOptionsForInstitution(institution?: string | null): string[] {
+    const base = isBnuUniversity(institution)
+        ? [...BNU_FACULTY_DEPARTMENTS, ...COMMON_FACULTY_DEPARTMENTS]
+        : [...COMMON_FACULTY_DEPARTMENTS, ...BNU_FACULTY_DEPARTMENTS];
+    return Array.from(new Set(base.map((s) => s.trim()).filter(Boolean)));
+}

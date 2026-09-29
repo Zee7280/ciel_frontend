@@ -7,10 +7,8 @@ import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
-import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
@@ -24,17 +22,18 @@ import {
     type CommunityPipelineRow,
 } from "@/utils/communityAwardModel";
 import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
-import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import {
     canEditReturnedOpportunity,
     isOpportunityPermanentlyRejected,
     isOpportunityPubliclyLive,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
-import { formatDisplayId } from "@/utils/displayIds";
+import { formatOpportunityCode } from "@/utils/displayIds";
+import { partnerQueueBucket } from "@/utils/partnerOpportunityQueue";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 
-const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "files", "run", "analytics", "pending", "approved"] as const;
+const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "analytics", "pending", "approved"] as const;
 type CsView = (typeof CS_VIEWS)[number];
 
 const CS_BASE = "/dashboard/partner/community-service";
@@ -52,8 +51,6 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     approvals: "Approvals",
     projects: "Community Service Projects",
     impact: "My Impact",
-    files: "Shared Analysis Files",
-    run: "AI Analyzer & Rankings",
     analytics: "Analytics",
     pending: "Approvals",
     approved: "My Impact",
@@ -82,6 +79,8 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
         title: "Approvals",
         desc: "Review opportunities created by others that name Partner Organization as a linked organization.",
         items: [
+            ["Linked Drafts", "Named to you but not submitted yet — view the same master record."],
+            ["Waiting for Faculty", "Submitted and linked; Faculty has not approved yet. View only."],
             ["Pending Approval / Acknowledgement", "Records waiting for your organization’s consent or decision."],
             ["Open Flashcard", "Review the opportunity students will eventually see."],
             ["Approve / Acknowledge", "Confirm organizational participation and route the record onward."],
@@ -112,27 +111,6 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
             ["CII / Badges / Certificates", "Verified impact credentials from linked projects."],
         ],
         rule: "Only verified linked impact appears here.",
-    },
-    files: {
-        title: "Shared Analysis Files",
-        desc: "One place for every analysis file shared across stakeholders.",
-        items: [
-            ["Faculty Analysis", "The faculty decision file for each submitted report: decision, CII accepted or moderated, reason, comments."],
-            ["AI Analyzer reports", "The latest dated AI Analyzer badge and run history for each project."],
-            ["Open / Download", "View inside the dashboard, print, or download the file."],
-        ],
-        rule: "Files are shared automatically — nobody has to send them.",
-    },
-    run: {
-        title: "AI Analyzer & Rankings",
-        desc: "Analyse/rank verified projects linked to your organization.",
-        items: [
-            ["Preview", "Dynamic ranking analysis."],
-            ["Official Run", "Dated official organization-linked cohort ranking, subject to role limits."],
-            ["Why It Ranks", "Evidence-backed explanation."],
-            ["History", "Previous official ranking snapshots."],
-        ],
-        rule: "Organization ranking scope is limited to linked projects.",
     },
     analytics: {
         title: "Analytics",
@@ -281,32 +259,9 @@ function EmptyPanel({ title, text }: { title: string; text: string }) {
     );
 }
 
-function UserGuide({ view }: { view: string }) {
-    const guide = GUIDES[view] || GUIDES.home;
-    return (
-        <div className="mt-4 rounded-[18px] border border-[#cfe8e4] bg-[linear-gradient(135deg,#f3fbf8,#fff)] p-4">
-            <div className="flex items-start gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#e8f7f3] text-lg">🧭</div>
-                <div>
-                    <b className="block text-[13.5px] text-[#16313d]">What is inside this button?</b>
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-[#4f6068]">{guide.desc}</p>
-                </div>
-            </div>
-            {guide.items?.length ? (
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {guide.items.map(([title, text]) => (
-                        <div key={title} className="rounded-[12px] border border-[#dde8e6] bg-white px-3 py-2.5">
-                            <b className="block text-[12px] text-[#126b60]">{title}</b>
-                            <span className="mt-0.5 block text-[11.5px] leading-relaxed text-[#52636e]">{text}</span>
-                        </div>
-                    ))}
-                </div>
-            ) : null}
-            <p className="mt-3 rounded-[12px] bg-[#eef9f6] px-3 py-2 text-[11.5px] text-[#4d6d6b]">
-                <b className="text-[#126b60]">Simple rule:</b> {guide.rule}
-            </p>
-        </div>
-    );
+/** Removed — "What is inside this button?" guide cards no longer shown. */
+function UserGuide(_props: { view: string }) {
+    return null;
 }
 
 export default function PartnerCommunityServiceHub() {
@@ -324,7 +279,6 @@ export default function PartnerCommunityServiceHub() {
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [innerTab, setInnerTab] = useState("");
-    const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
 
     useEffect(() => {
@@ -385,36 +339,30 @@ export default function PartnerCommunityServiceHub() {
 
     const currentUserId = getStoredCurrentUserId();
     const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
-    const pendingApprovals = useMemo(
+    const namedToUs = useMemo(
         () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                return resolveStudentOpportunityWorkflow(row).stage === "pending_partner";
-            }),
+            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId) && hasPartnerSignal(row)),
         [oppRows, currentUserId],
+    );
+    const linkedDrafts = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "linked"),
+        [namedToUs],
+    );
+    const waitingFacultyApprovals = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "waiting_faculty"),
+        [namedToUs],
+    );
+    const pendingApprovals = useMemo(
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "pending"),
+        [namedToUs],
     );
     const revisionApprovals = useMemo(
-        () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                if (resolveStudentOpportunityWorkflow(row).stage === "pending_partner") return false;
-                const key = `${normalizeReviewStatus(row.status)} ${lower(row.workflow_stage)} ${lower(row.revision_with ?? row.revisionWith)}`;
-                return key.includes("revision") || key.includes("returned") || canEditReturnedOpportunity(row);
-            }),
-        [oppRows, currentUserId],
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "revision"),
+        [namedToUs],
     );
     const decidedApprovals = useMemo(
-        () =>
-            oppRows.filter((row) => {
-                if (isOwnedByCurrentPartner(row, currentUserId)) return false;
-                if (!hasPartnerSignal(row)) return false;
-                if (resolveStudentOpportunityWorkflow(row).stage === "pending_partner") return false;
-                const key = `${normalizeReviewStatus(row.status)} ${lower(row.workflow_stage)} ${lower(row.revision_with ?? row.revisionWith)}`;
-                return !(key.includes("revision") || key.includes("returned") || canEditReturnedOpportunity(row));
-            }),
-        [oppRows, currentUserId],
+        () => namedToUs.filter((row) => partnerQueueBucket(row) === "decided"),
+        [namedToUs],
     );
     const publishedMine = useMemo(() => mine.filter((row) => mineBucket(row) === "published"), [mine]);
     const createCounts = useMemo(() => {
@@ -429,10 +377,6 @@ export default function PartnerCommunityServiceHub() {
 
     const liveRows = useMemo(() => pipeline.filter((r) => isFacultyCommunityLiveCard(r)), [pipeline]);
     const waiting = useMemo(() => pipeline.filter((r) => isFacultyCommunityWaiting(r)), [pipeline]);
-    const decidedReports = useMemo(
-        () => pipeline.filter((r) => isFacultyCommunityLiveCard(r) || isCommunityReportRejected(r)),
-        [pipeline],
-    );
     const deckCards = useMemo(
         () => mergeCommunityLiveDeck(cards, liveRows, isFacultyCommunityLiveCard),
         [cards, liveRows],
@@ -446,9 +390,8 @@ export default function PartnerCommunityServiceHub() {
         | "action"
         | "published"
         | "closed";
-    const approvalTab = ["pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
+    const approvalTab = ["linked", "waiting", "pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
     const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
-    const filesTab = innerTab === "ai" ? "ai" : "faculty";
     const crumb = VIEW_CRUMB[view];
     const guideKey = view === "pending" ? "approvals" : view === "approved" ? "impact" : view;
 
@@ -565,7 +508,7 @@ export default function PartnerCommunityServiceHub() {
                                         <div className="min-w-[240px] flex-1">
                                             <b className="block text-[13.5px] text-[#16313d]">{row.title}</b>
                                             <small className="mt-0.5 block text-[11px] text-[#4f6068]">
-                                                {formatDisplayId(row.id, "OPP")} · {resolveStudentOpportunityWorkflow(row).badgeLabel}
+                                                {formatOpportunityCode(row)} · {resolveStudentOpportunityWorkflow(row).badgeLabel}
                                             </small>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
@@ -633,24 +576,6 @@ export default function PartnerCommunityServiceHub() {
                             subtitle="Verified Community Service impact linked to your organization."
                             badge="VERIFIED"
                             background={MOCKUP_GRADIENTS.green}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=files`}
-                            emoji="📁"
-                            ghost="📁"
-                            title="Shared Analysis Files"
-                            subtitle="Faculty Analysis files and AI Analyzer reports shared with every stakeholder on the record — same file, same version, every dashboard."
-                            badge="SHARED"
-                            background={MOCKUP_GRADIENTS.purple}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=run`}
-                            emoji="🧠"
-                            ghost="🧠"
-                            title="AI Analyzer & Rankings"
-                            subtitle="Analyse/rank verified projects linked to your organization within permitted cohorts."
-                            badge="ANALYZE"
-                            background={MOCKUP_GRADIENTS.purple}
                         />
                         <MockupActionCard
                             href={`${CS_BASE}?view=analytics`}
@@ -722,7 +647,7 @@ export default function PartnerCommunityServiceHub() {
                                         <OpportunityListFlashHead title={row.title} />
                                         <div className="px-4 py-3">
                                             <small className="block text-[11.5px] text-[#6b7c86]">
-                                                {formatDisplayId(row.id, "OPP")} · {String(row.status || "in review")}
+                                                {formatOpportunityCode(row)} · {String(row.status || "in review")}
                                                 {pickNum(row, "applicants_count", "applicantsCount") > 0
                                                     ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
                                                     : ""}
@@ -751,7 +676,9 @@ export default function PartnerCommunityServiceHub() {
                     </p>
                     <HubTabs
                         tabs={[
-                            { id: "pending", label: "Pending", count: pendingApprovals.length },
+                            { id: "linked", label: "Linked Drafts", count: linkedDrafts.length },
+                            { id: "waiting", label: "Waiting for Faculty", count: waitingFacultyApprovals.length },
+                            { id: "pending", label: "Pending Approval", count: pendingApprovals.length },
                             { id: "rev", label: "Revision requested", count: revisionApprovals.length },
                             { id: "done", label: "Decided", count: decidedApprovals.length },
                         ]}
@@ -763,7 +690,16 @@ export default function PartnerCommunityServiceHub() {
                     ) : (
                         (() => {
                             const tab = view === "pending" ? "pending" : approvalTab;
-                            const list = tab === "done" ? decidedApprovals : tab === "rev" ? revisionApprovals : pendingApprovals;
+                            const list =
+                                tab === "done"
+                                    ? decidedApprovals
+                                    : tab === "rev"
+                                      ? revisionApprovals
+                                      : tab === "linked"
+                                        ? linkedDrafts
+                                        : tab === "waiting"
+                                          ? waitingFacultyApprovals
+                                          : pendingApprovals;
                             if (!list.length) {
                                 return (
                                     <EmptyPanel
@@ -772,12 +708,20 @@ export default function PartnerCommunityServiceHub() {
                                                 ? "No decided records yet"
                                                 : tab === "rev"
                                                   ? "None"
-                                                  : "Nothing pending"
+                                                  : tab === "linked"
+                                                    ? "No linked drafts"
+                                                    : tab === "waiting"
+                                                      ? "None waiting on Faculty"
+                                                      : "Nothing pending"
                                         }
                                         text={
-                                            tab === "pending"
-                                                ? "Opportunities naming your organization appear here once Faculty has approved them."
-                                                : "When an opportunity lists your organisation as partner, it will appear here."
+                                            tab === "waiting"
+                                                ? "When you are named on a submitted opportunity, it appears here until Faculty approves. Same Opportunity ID — view only."
+                                                : tab === "linked"
+                                                  ? "Drafts that already name your organization appear here. You cannot approve until the creator submits."
+                                                  : tab === "pending"
+                                                    ? "Opportunities naming your organization appear here once Faculty has approved them."
+                                                    : "When an opportunity lists your organisation as partner, it will appear here."
                                         }
                                     />
                                 );
@@ -785,9 +729,26 @@ export default function PartnerCommunityServiceHub() {
                             return (
                                 <div className="grid gap-3">
                                     {list.map((row) => {
-                                        const mode = tab === "done" ? "decided" : tab === "rev" ? "revision" : "pending";
+                                        const mode =
+                                            tab === "done"
+                                                ? "decided"
+                                                : tab === "rev"
+                                                  ? "revision"
+                                                  : tab === "waiting" || tab === "linked"
+                                                    ? "waiting"
+                                                    : "pending";
                                         const model = buildOpportunityApprovalModel(row, "partner", { orgName, mode });
-                                        const href = `${APPROVALS}?tab=${mode === "pending" ? "pending" : "history"}&opportunity=${encodeURIComponent(row.id)}`;
+                                        const verifyTab =
+                                            tab === "pending"
+                                                ? "pending"
+                                                : tab === "linked"
+                                                  ? "linked"
+                                                  : tab === "waiting"
+                                                    ? "waiting"
+                                                    : tab === "rev"
+                                                      ? "revision"
+                                                      : "history";
+                                        const href = `${APPROVALS}?tab=${verifyTab}&opportunity=${encodeURIComponent(row.id)}`;
                                         const acknowledge = lower(row.created_by_role ?? row.creator_role) === "faculty";
                                         return (
                                             <OpportunityApprovalCard
@@ -809,7 +770,7 @@ export default function PartnerCommunityServiceHub() {
                                                     ) : (
                                                         <>
                                                             <Link href={href} className={approvalActionClass.soft}>
-                                                                {mode === "decided" ? "Open record" : "View Flashcard"}
+                                                                {mode === "decided" ? "Open record" : "View same record"}
                                                             </Link>
                                                             <ApprovalFollowUpActions
                                                                 opportunityId={row.id}
@@ -919,101 +880,6 @@ export default function PartnerCommunityServiceHub() {
                 </div>
             )}
 
-            {view === "files" && (
-                <div className="mt-4">
-                    <MockupSectionHead
-                        title={`Shared files · ${orgName}`}
-                        subtitle="Faculty Analysis files and AI Analyzer reports are shared automatically with every stakeholder linked to a record."
-                    />
-                    <HubTabs
-                        tabs={[
-                            { id: "faculty", label: "Faculty Analysis files", count: decidedReports.length },
-                            { id: "ai", label: "AI Analyzer reports", count: deckCards.filter((c) => c.cii != null).length },
-                        ]}
-                        active={filesTab}
-                        onChange={setInnerTab}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading files…</p>
-                    ) : filesTab === "ai" ? (
-                        deckCards.filter((c) => c.cii != null).length === 0 ? (
-                            <EmptyPanel title="No AI Analyzer runs yet" text="The dated CII badge is the shared file every stakeholder sees once Faculty runs analysis." />
-                        ) : (
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                {deckCards
-                                    .filter((c) => c.cii != null)
-                                    .map((card) => (
-                                        <div
-                                            key={card.id}
-                                            className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                        >
-                                            <div className="text-[22px]">🧠</div>
-                                            <b className="mt-1 block text-[14px] text-[#16313d]">{card.project_title}</b>
-                                            <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                                {card.level || "CII"} · {card.cii}/100 · {card.student_name}
-                                            </small>
-                                            <div className="mt-2 flex flex-wrap gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setBreakdownFor({ id: card.id, title: card.project_title })}
-                                                    className="text-[10.5px] font-black text-[#0e7d74] hover:underline"
-                                                >
-                                                    View CII breakdown →
-                                                </button>
-                                                <Link href={reportHref(card.id)} className="text-[10.5px] font-black text-[#6b7c86] hover:underline">
-                                                    Open report →
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    ))}
-                            </div>
-                        )
-                    ) : decidedReports.length === 0 ? (
-                        <EmptyPanel title="No Faculty Analysis yet" text="A file is created the moment faculty decides on a submitted report." />
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {decidedReports.map((row) => (
-                                <Link
-                                    key={row.id}
-                                    href={reportHref(row.id)}
-                                    className="rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 transition hover:border-[#bcd4d8]"
-                                >
-                                    <div className="text-[22px]">📄</div>
-                                    <b className="mt-1 block text-[14px] text-[#16313d]">{row.project_title}</b>
-                                    <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
-                                        {formatDisplayId(row.id, "RPT")} · {row.faculty_status || row.status} · {row.student_name}
-                                    </small>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {view === "run" && (
-                <div className="mt-4">
-                    <MockupSectionHead
-                        title="AI Analyzer & Rankings"
-                        subtitle={`${orgName}-linked projects. Preview freely; an official run creates a dated cohort ranking.`}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading…</p>
-                    ) : deckCards.length === 0 ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-                            No live cards to rank yet. Faculty-approved Community Service fills this run.
-                        </p>
-                    ) : (
-                        <CommunityAwardPanel
-                            cards={deckCards}
-                            kind="par"
-                            scopeName={`${orgName}-linked projects`}
-                            notifyEndpoint="/api/v1/partners/community-service/award-notify"
-                            filters={{ university: true }}
-                        />
-                    )}
-                </div>
-            )}
-
             {view === "analytics" && (
                 <div className="mt-4 space-y-3">
                     <MockupSectionHead
@@ -1075,14 +941,6 @@ export default function PartnerCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
-
-            {breakdownFor && (
-                <CommunityCiiBreakdownModal
-                    fetchUrl={`/api/v1/partners/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
-                    title={breakdownFor.title}
-                    onClose={() => setBreakdownFor(null)}
-                />
-            )}
         </div>
     );
 }

@@ -17,6 +17,7 @@ import {
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
+import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -198,6 +199,7 @@ export default function OpportunityPostingPage() {
         timelineType: "Fixed dates",
         dates: { start: "", end: "", fromTime: "", endTime: "" },
         applicationDeadline: "",
+        closeApplicationsEarly: false,
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
@@ -366,20 +368,14 @@ export default function OpportunityPostingPage() {
             toast.error("Please select a Timeline Type");
             return false;
         }
-        if (!formData.applicationDeadline.trim()) {
-            toast.error("Please set an application deadline.");
-            return false;
-        }
-        if (!formData.dates.start.trim() || !formData.dates.end.trim()) {
-            toast.error("Please set both a start date and an end date.");
-            return false;
-        }
-        if (formData.dates.start > formData.dates.end) {
-            toast.error("End date must be on or after the start date.");
-            return false;
-        }
-        if (formData.applicationDeadline > formData.dates.start) {
-            toast.error("Application deadline cannot be after the start date.");
+        const timelineErr = validateTimelineForPersist({
+            start_date: formData.dates.start,
+            end_date: formData.dates.end,
+            close_applications_early: formData.closeApplicationsEarly,
+            application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+        });
+        if (timelineErr) {
+            toast.error(timelineErr);
             return false;
         }
         const hoursNum = parseInt(formData.capacity.hours, 10);
@@ -543,7 +539,10 @@ export default function OpportunityPostingPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
-                    application_deadline: formData.applicationDeadline || undefined,
+                    close_applications_early: !!formData.closeApplicationsEarly,
+                    application_deadline: formData.closeApplicationsEarly
+                        ? formData.applicationDeadline || undefined
+                        : null,
                     schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
@@ -994,6 +993,12 @@ export default function OpportunityPostingPage() {
                         endTime: str(timeline.to_time),
                     },
                     applicationDeadline: str(timeline.application_deadline),
+                    closeApplicationsEarly:
+                        timeline.close_applications_early === true ||
+                        (!!str(timeline.application_deadline) &&
+                            !!str(timeline.end_date) &&
+                            str(timeline.application_deadline) < str(timeline.end_date) &&
+                            timeline.close_applications_early !== false),
                     scheduleNotes: str(timeline.schedule_notes),
                     capacity: {
                         hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",
@@ -1584,21 +1589,13 @@ export default function OpportunityPostingPage() {
                     expanded
                 />
                 <div>
-                    <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-slate-700">
-                        <span className="font-semibold text-slate-900">Application Deadline: </span>
-                        This is the final date to apply for the opportunity. Community engagement activities may continue beyond this date, but applications must be submitted before the deadline. After the deadline, the opportunity will be marked as Expired and will no longer accept applications.
+                                        <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                        <span className="font-semibold text-slate-900">Project dates: </span>
+                        Only Project Start and Project End are required. Students can join until the project end date. After the project ends, a 60-day reporting window stays open so completed service can still be recorded. Use the optional setting below only if you need applications to close earlier than the project end date.
                     </p>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div>
-                            <label className="co-label" style={{ marginTop: 0 }}>Application deadline *</label>
-                            <input
-                                type="date"
-                                value={formData.applicationDeadline}
-                                onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="co-label" style={{ marginTop: 0 }}>Start date *</label>
+                            <label className="co-label" style={{ marginTop: 0 }}>Project start date *</label>
                             <input
                                 type="date"
                                 value={formData.dates.start}
@@ -1607,7 +1604,7 @@ export default function OpportunityPostingPage() {
                             {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
                         </div>
                         <div>
-                            <label className="co-label" style={{ marginTop: 0 }}>End date *</label>
+                            <label className="co-label" style={{ marginTop: 0 }}>Project end date *</label>
                             <input
                                 type="date"
                                 value={formData.dates.end}
@@ -1616,7 +1613,39 @@ export default function OpportunityPostingPage() {
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
                         </div>
                     </div>
-                    <div className="pt-2">
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <label className="flex items-start gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="mt-1"
+                                checked={formData.closeApplicationsEarly}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        closeApplicationsEarly: e.target.checked,
+                                        applicationDeadline: e.target.checked ? formData.applicationDeadline : "",
+                                    })
+                                }
+                            />
+                            <span className="text-sm text-slate-800">
+                                <span className="font-semibold">Close applications before project end date</span>
+                                <span className="block text-xs text-slate-500 mt-0.5">
+                                    Optional. When off, students can join until the project end date.
+                                </span>
+                            </span>
+                        </label>
+                        {formData.closeApplicationsEarly ? (
+                            <div className="mt-3 max-w-sm">
+                                <label className="co-label" style={{ marginTop: 0 }}>Application closing date *</label>
+                                <input
+                                    type="date"
+                                    value={formData.applicationDeadline}
+                                    onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
+                                />
+                            </div>
+                        ) : null}
+                    </div>
+<div className="pt-2">
                         <label className="co-label">Duration type</label>
                         <div className="co-chips mb-3">
                             {(["Fixed dates", "Flexible", "Ongoing"] as const).map((t) => (
@@ -1681,7 +1710,7 @@ export default function OpportunityPostingPage() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> deadline must be on/before start date; end date cannot be before start date; hours 1–500; seats 1–5000.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be before project end; hours 1–500; seats 1–5000.</span>
                         </div>
                     </div>
                 </div>

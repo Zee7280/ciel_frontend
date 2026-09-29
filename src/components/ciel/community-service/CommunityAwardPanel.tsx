@@ -117,9 +117,9 @@ export default function CommunityAwardPanel({
     return (
         <div className="space-y-3">
             <div className="rounded-[16px] border-2 border-[#e2d9f7] bg-white px-4 py-3.5">
-                <p className="text-[9px] font-extrabold tracking-[0.12em] text-[#6d28d9]">📐 THE AWARD CRITERIA — IDENTICAL FOR EVERY STAKEHOLDER</p>
+                <p className="text-[9px] font-extrabold tracking-[0.12em] text-[#6d28d9]">📐 RUBERIX SCORING — SAME METHODOLOGY · POOL DIFFERS BY ROLE</p>
                 <p className="mt-1 text-[9.5px] leading-relaxed text-[#7a919a]">
-                    Weighted, normalized, interdisciplinary. Total <b className="text-[#0d2b33]">/100</b>. Ties break on evidence integrity.
+                    Preview is temporary. Publish Ranking creates the official run. CII stays locked. Total <b className="text-[#0d2b33]">/100</b>.
                 </p>
                 <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
                     {COMMUNITY_AWARD_CRITERIA.map((c) => (
@@ -229,23 +229,23 @@ export default function CommunityAwardPanel({
                     }}
                     className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white disabled:opacity-50"
                 >
-                    ▶ Run the award model on {pool.length} card{pool.length === 1 ? "" : "s"} — best → least, free preview
+                    ▶ Run AI Ranking Analyzer — preview on {pool.length} eligible project{pool.length === 1 ? "" : "s"}
                 </button>
             </div>
 
             {ranked && (
                 <div className="rounded-[13px] border border-[#e2d9f7] bg-[#f1ebfd] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#4c3a78]">
-                    🧮 <b>Run complete</b> — {scored.length} cards · cohort average <b>{avg}/100</b> · evidence re-checked before any rank.{" "}
+                    🧮 <b>Ranking Preview</b> — {scored.length} eligible project{scored.length === 1 ? "" : "s"} · cohort average <b>{avg}/100</b>. Preview does not update Impact Walls or badges.{" "}
                     {notifyState === "sent" ? (
-                        <b>Top {topN} badges are pinned to the students&apos; Impact Walls.</b>
+                        <b>Ranking published — badges and history updated for linked stakeholders.</b>
                     ) : notifyState === "sending" ? (
-                        <b>Publishing to top-ranked students…</b>
+                        <b>Publishing Ranking…</b>
                     ) : notifyState === "failed" ? (
-                        <b>Ranking is saved on this screen — student notifications did not send. Retry below.</b>
+                        <b>Preview is still on this screen — publish did not complete. Retry below.</b>
                     ) : runsExhausted ? (
-                        <b>{notifyErrorMessage || "No publishes left this year."} This run is a free preview only — nothing is pinned or sent to students.</b>
+                        <b>{notifyErrorMessage || "No publishes left this year."} This run stays a free preview only.</b>
                     ) : (
-                        <b>This is a free preview — running the model again won&apos;t cost a run. Nothing is sent to students until you publish.</b>
+                        <b>Nothing is official until you Publish Ranking.</b>
                     )}
                     {top.length > 0 && (
                         <div className="mt-2">
@@ -256,14 +256,14 @@ export default function CommunityAwardPanel({
                                 className="rounded-full bg-[#6d28d9] px-3.5 py-1.5 text-[9.5px] font-extrabold text-white disabled:opacity-50"
                             >
                                 {notifyState === "sent"
-                                    ? "✓ Published"
+                                    ? "✓ Ranking Published"
                                     : notifyState === "sending"
-                                      ? "Publishing…"
+                                      ? "Publishing Ranking…"
                                       : notifyState === "failed"
-                                        ? "Retry publish"
+                                        ? "Retry Publish Ranking"
                                         : runsExhausted
                                           ? "No publishes left this year"
-                                          : `🔔 Publish & notify top ${topN}`}
+                                          : "Publish Ranking"}
                             </button>
                         </div>
                     )}

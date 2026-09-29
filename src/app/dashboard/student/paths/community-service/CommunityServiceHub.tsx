@@ -119,13 +119,13 @@ export default function CommunityServiceHub({
             <div className="mb-1 mt-6">
                 <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Community Service</h2>
                 <p className="mt-1 text-[12.5px] text-[#70808a]">
-                    One contained area. Proposal approval stays in Create Opportunity; applications stay in Browse; only approved work moves into Workspace.
+                    One contained area. Proposal approval stays in Create / My Opportunities; applications stay in Browse; only approved work moves into My Reports.
                 </p>
             </div>
 
             <UserGuideBanner
                 desc="Everything for Community Service is grouped here. Choose the stage of your journey; Home stays an overview."
-                rule="Create/Apply happens before Workspace; Workspace starts after approval."
+                rule="Create / My Opportunities happen before My Reports; My Reports starts after approval."
             />
 
             <ZoneRule title="Where am I?">
@@ -142,7 +142,7 @@ export default function CommunityServiceHub({
                     emoji="🚀"
                     ghost="🚀"
                     title="Create Opportunity"
-                    subtitle="Create your own proposal, save drafts, submit it, and track Faculty → Partner/NGO (if linked) → CIEL PK approval here until the final decision."
+                    subtitle="Open the Community Service Opportunity Form and start a new student-created proposal."
                     badge="PROPOSAL LOOP"
                     background={MOCKUP_GRADIENTS.teal}
                     hot={createHot}
@@ -152,20 +152,48 @@ export default function CommunityServiceHub({
                     emoji="🔎"
                     ghost="🔎"
                     title="Browse Opportunities"
-                    subtitle="Discover published opportunities created by Faculty, NGOs, Partners and CIEL PK. Apply here; once participation is approved, the project moves to Workspace."
+                    subtitle="Discover published opportunities created by Faculty, NGOs, Partners and CIEL PK. Apply here; once participation is approved, the project moves to My Reports."
                     badge="DISCOVER + APPLY"
                     background={MOCKUP_GRADIENTS.blue}
                     hot={browseHot}
                 />
                 <MockupActionCard
+                    href={CREATE_VIEW}
+                    emoji="📁"
+                    ghost="📁"
+                    title="My Opportunities"
+                    subtitle="Same Opportunity IDs across Drafts, Under Approval, Action Required and Approved / Live — no duplicate records."
+                    badge="TRACK PROPOSALS"
+                    background={MOCKUP_GRADIENTS.teal}
+                    hot={createHot}
+                />
+                <MockupActionCard
                     href={WORKSPACE_HREF}
                     emoji="🛠️"
                     ghost="🛠️"
-                    title="Community Service Workspace"
-                    subtitle="Only approved engagements live here: Ready to Start → Report in Progress → Review → Revision → Completed."
-                    badge="APPROVED WORK"
+                    title="My Reports"
+                    subtitle="Report operational home: Ready to Start → In Progress → Under Review → Action Required → Completed → Rejected / Closed."
+                    badge="REPORT HOME"
                     background={MOCKUP_GRADIENTS.orange}
                     hot={workspaceHot}
+                />
+                <MockupActionCard
+                    href={CS_IMPACT_HREF}
+                    emoji="🏅"
+                    ghost="🏅"
+                    title="My Impact"
+                    subtitle="Verified records after faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, certificate and QR."
+                    badge="MY IMPACT"
+                    background={MOCKUP_GRADIENTS.green}
+                />
+                <MockupActionCard
+                    href={RANKINGS_HREF}
+                    emoji="🧠"
+                    ghost="🧠"
+                    title="My Rankings"
+                    subtitle="Official ranking snapshots and badge history for your verified Community Service records."
+                    badge="RANKINGS"
+                    background={MOCKUP_GRADIENTS.navy}
                 />
                 <MockupActionCard
                     href={GUIDE_HREF}
@@ -175,24 +203,6 @@ export default function CommunityServiceHub({
                     subtitle="A coach for the 9-section report — one section at a time, with strong examples, what to avoid and what helps your CII."
                     badge="GUIDE INSIDE"
                     background={MOCKUP_GRADIENTS.purple}
-                />
-                <MockupActionCard
-                    href={CS_IMPACT_HREF}
-                    emoji="🏅"
-                    ghost="🏅"
-                    title="My Impact Wall"
-                    subtitle="Verified records after faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, certificate and QR."
-                    badge="MY IMPACT"
-                    background={MOCKUP_GRADIENTS.green}
-                />
-                <MockupActionCard
-                    href={RANKINGS_HREF}
-                    emoji="🧠"
-                    ghost="🧠"
-                    title="AI Analyzer & My Rankings"
-                    subtitle="Run the AI Analyzer on your projects (dated badge + trend shared with faculty, partners, university and CIEL PK) and see official ranking snapshots."
-                    badge="ANALYZE"
-                    background={MOCKUP_GRADIENTS.navy}
                 />
             </div>
 
@@ -242,16 +252,16 @@ export default function CommunityServiceHub({
                         </div>
                         <div className="space-y-3 px-5 py-4 text-[12.5px] leading-relaxed text-[#3f5661]">
                             <p className="rounded-[11px] bg-[#e3f4fa] px-3.5 py-2.5 text-[11.5px] text-[#0f5e57]">
-                                Everything for Community Service is grouped here. Create or apply first; Workspace starts only after approval. Home stays an overview.
+                                Everything for Community Service is grouped here. Create or apply first; My Reports starts only after approval. Home stays an overview.
                             </p>
                             <p>
-                                <b>Create Opportunity</b> — your own proposal until Faculty → Partner/NGO (if linked) → CIEL PK decides.
+                                <b>Create Opportunity / My Opportunities</b> — your own proposal until Faculty → Partner/NGO (if linked) → CIEL PK decides.
                             </p>
                             <p>
                                 <b>Browse</b> — published opportunities. A pending application stays here until participation is approved.
                             </p>
                             <p>
-                                <b>Workspace</b> — approved work only: start the report, log hours, submit, revise, complete.
+                                <b>My Reports</b> — approved work only: start the report, log hours, submit, revise, complete.
                             </p>
                             <div className="flex flex-wrap gap-2 pt-1">
                                 <Link href={CREATE_VIEW} className="rounded-full bg-[#0e7d74] px-4 py-2 text-[11px] font-extrabold text-white">
@@ -261,7 +271,7 @@ export default function CommunityServiceHub({
                                     Browse opportunities
                                 </Link>
                                 <Link href={WORKSPACE_HREF} className="rounded-full bg-[#e6f6f4] px-4 py-2 text-[11px] font-extrabold text-[#0e7d74]">
-                                    Open workspace
+                                    Open My Reports
                                 </Link>
                             </div>
                             {firstName ? <p className="text-[10px] text-[#7a919a]">Hi {firstName} — drafts save automatically.</p> : null}
