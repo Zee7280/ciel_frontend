@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle, Eye, Filter, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
@@ -26,6 +27,7 @@ import {
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
+import { readDashboardNavRoleFromStorage } from "@/utils/dashboardNavRole";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
@@ -138,8 +140,18 @@ export default function FacultyApprovalsPage() {
     const autoOpenedIdRef = useRef<string | null>(null);
     const [historyRow, setHistoryRow] = useState<FacultyApprovalRow | null>(null);
 
+    const router = useRouter();
+
     useEffect(() => {
+        // Email verification links and old bookmarks land here for everyone. The faculty API is
+        // faculty-only (403 for CIEL PK admins), so hand admins to their own approvals queue —
+        // keeping ?opportunity= / ?tab= — instead of a page of failed requests.
+        if (readDashboardNavRoleFromStorage() === "admin") {
+            router.replace(`/dashboard/admin/approvals${window.location.search}`);
+            return;
+        }
         void loadLists();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadLists = async () => {
