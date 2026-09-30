@@ -476,16 +476,23 @@ function SignUpContent() {
         if (resendCooldown > 0) return;
         setOtpError(null);
         try {
-            await fetch("/api/v1/auth/send-otp", {
+            const res = await fetch("/api/v1/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: formData.email.trim().toLowerCase() }),
             });
+            // A failed send must not look like success — otherwise the user waits for an email that never left.
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setOtpError(authApiErrorMessage(data, "Could not resend the code. Try again."));
+                if (res.status === 429) setResendCooldown(10);
+                return;
+            }
             setOtpDigits(["", "", "", "", "", ""]);
             setResendCooldown(30);
             otpRefs.current[0]?.focus();
         } catch {
-            setOtpError("Could not resend the code. Try again.");
+            setOtpError("Could not resend the code. Check your connection and try again.");
         }
     };
 
