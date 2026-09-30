@@ -158,6 +158,11 @@ function mapPartnerApprovalRows(payload: unknown, currentUserId: string): Partne
         })
         .filter((row) => {
             const raw = rawMap.get(row.id) || {};
+            // `viewer_access.can_partner_review` is the backend's own answer to "would approve/reject
+            // be honoured for this login?" — rows it refuses (e.g. an org colleague of the creator)
+            // do not belong in the partner approval queue.
+            const access = raw.viewer_access as { can_partner_review?: boolean } | undefined;
+            if (access?.can_partner_review === false) return false;
             return !isOwnedByCurrentPartner(raw, currentUserId) && hasPartnerSignal(raw);
         });
 }

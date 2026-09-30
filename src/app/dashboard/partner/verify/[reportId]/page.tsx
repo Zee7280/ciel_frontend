@@ -64,6 +64,9 @@ function facultyHasApprovedReport(report: ReportDetail): boolean {
 
 /** When to show NGO verify / reject controls. Backend status names vary, so only final decisions should hide the CTA. */
 function partnerCanSubmitDecision(report: ReportDetail): boolean {
+    // Read-only access (e.g. a university dashboard viewing a report on an opportunity owned by
+    // another organisation): the backend refuses the decision, so never offer it.
+    if (report.viewer_can_review === false) return false;
     const st = normalizeKey(report.status);
     if (st === "draft") return false;
     if (isReportDecisionFinal(report.status)) return false;
@@ -79,6 +82,8 @@ function partnerCanSubmitDecision(report: ReportDetail): boolean {
 
 interface ReportDetail {
     id: string;
+    /** False when the API opened this report read-only for the viewer. */
+    viewer_can_review?: boolean;
     student: {
         id?: string;
         name: string;
