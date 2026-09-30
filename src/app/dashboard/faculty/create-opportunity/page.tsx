@@ -126,6 +126,8 @@ export default function FacultyOpportunityCreationPage() {
     const formPath = isCielAdminForm ? "/dashboard/admin/create-opportunity" : "/dashboard/faculty/create-opportunity";
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    /** Synchronous lock: state updates are async, so a fast double-click could otherwise fire two creates. */
+    const submitLock = useRef(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     const [isDraftMode, setIsDraftMode] = useState(false);
     /** Set once this visit has been submitted, so the autosave timer cannot write that form back. */
@@ -313,6 +315,10 @@ export default function FacultyOpportunityCreationPage() {
         }
         if (!formData.title.trim()) {
             toast.error("Please enter an Opportunity Title");
+            return false;
+        }
+        if (formData.title.trim().length > 200) {
+            toast.error("Opportunity Title must be 200 characters or fewer.");
             return false;
         }
         if (!formData.hook.trim()) {
@@ -704,9 +710,10 @@ export default function FacultyOpportunityCreationPage() {
     };
 
     const handleSubmit = async () => {
-        if (isLoadingEdit) return;
+        if (isLoadingEdit || submitLock.current) return;
         if (!validateForm()) return;
 
+        submitLock.current = true;
         setIsSubmitting(true);
         try {
             const payload = buildOpportunityPayload();
@@ -777,6 +784,7 @@ export default function FacultyOpportunityCreationPage() {
             console.error("Error submitting form", error);
             toast.error("An error occurred. Please try again.");
         } finally {
+            submitLock.current = false;
             setIsSubmitting(false);
         }
     };

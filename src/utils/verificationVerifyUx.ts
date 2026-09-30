@@ -1,9 +1,6 @@
-import { verificationUsePost } from "@/config/verification";
-
 /**
- * Backend: GET `/verifications/verify?token=…` or POST body `{ token }` (see env below).
- * Verify pages only call after login — send `Authorization: Bearer …` (proxy forwards it).
- * Optional POST when `NEXT_PUBLIC_VERIFICATION_VERIFY_USE_POST=true`.
+ * Backend: POST body `{ token }` only — GET must never change state (mail scanners and link
+ * prefetchers open GET links). Verify pages only call after login — send `Authorization: Bearer …`.
  *
  * Partner verify may return 400 until faculty has approved (sequential gate).
  */
@@ -12,18 +9,11 @@ export function fetchVerificationVerify(token: string, bearerToken: string | nul
     const headers: Record<string, string> = { Accept: "application/json" };
     if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
 
-    if (verificationUsePost()) {
-        headers["Content-Type"] = "application/json";
-        return fetch("/api/v1/verifications/verify", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ token }),
-        });
-    }
-
-    return fetch(`/api/v1/verifications/verify?token=${encodeURIComponent(token)}`, {
-        method: "GET",
+    headers["Content-Type"] = "application/json";
+    return fetch("/api/v1/verifications/verify", {
+        method: "POST",
         headers,
+        body: JSON.stringify({ token }),
     });
 }
 

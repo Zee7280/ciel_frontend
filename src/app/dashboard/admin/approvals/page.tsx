@@ -661,8 +661,10 @@ export default function AdminApprovalsPage() {
             } else if (res) {
                 let msg = "Approval request failed.";
                 try {
-                    const err = (await res.json()) as { message?: unknown };
-                    if (typeof err?.message === "string" && err.message.trim()) msg = err.message.trim();
+                    // The Next proxy routes return `{ error }`; the backend itself returns `{ message }`.
+                    const err = (await res.json()) as { message?: unknown; error?: unknown };
+                    const raw = Array.isArray(err?.message) ? err.message.join(", ") : (err?.message ?? err?.error);
+                    if (typeof raw === "string" && raw.trim()) msg = raw.trim();
                 } catch {
                     /* ignore */
                 }
@@ -722,6 +724,10 @@ export default function AdminApprovalsPage() {
 
     const confirmReject = async () => {
         if (!rejectId) return;
+        if (!rejectReason.trim()) {
+            toast.error("A reason is required.");
+            return;
+        }
 
         try {
             const endpoint =
@@ -733,7 +739,7 @@ export default function AdminApprovalsPage() {
 
             const res = await authenticatedFetch(endpoint, {
                 method: "POST",
-                body: JSON.stringify({ reason: rejectReason }),
+                body: JSON.stringify({ reason: rejectReason.trim() }),
             });
 
             if (res && res.ok) {
@@ -761,6 +767,7 @@ export default function AdminApprovalsPage() {
             }
         } catch (error) {
             console.error("Failed to submit review action", error);
+            toast.error("Could not reach the server. Please try again.");
         }
     };
 
@@ -1859,6 +1866,7 @@ export default function AdminApprovalsPage() {
                                             : "e.g. Add partner organization email and resubmit…"
                                     }
                                     value={rejectReason}
+                                    maxLength={2000}
                                     onChange={(e) => setRejectReason(e.target.value)}
                                 ></textarea>
                             </div>
