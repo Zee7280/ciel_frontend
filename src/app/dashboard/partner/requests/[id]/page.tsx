@@ -292,8 +292,9 @@ function OpportunityDetailsContent() {
     }, [id]);
 
     useEffect(() => {
-        setIsEditing(searchParams.get('edit') === 'true');
-    }, [searchParams]);
+        const va = opportunityApiRecord?.viewer_access as { can_edit?: boolean } | undefined;
+        setIsEditing(searchParams.get('edit') === 'true' && va?.can_edit !== false);
+    }, [searchParams, opportunityApiRecord]);
 
     const validateForm = () => {
         if (!formData.title.trim()) {
@@ -498,6 +499,10 @@ function OpportunityDetailsContent() {
         const execOfficial = getExecutingOrgOfficialEmail(opportunityApiRecord);
         const needsExecConfirm = needsExecutingOrgPortalConfirm(opportunityApiRecord);
         const canExecConfirm = needsExecConfirm && !!userEmail && !!execOfficial && userEmail === execOfficial;
+        // The API tells us what this login may do; an executing-org contact, named partner or
+        // university observer can open the record but the backend refuses their edits.
+        const viewerAccess = opportunityApiRecord?.viewer_access as { can_edit?: boolean } | undefined;
+        const viewerCanEdit = viewerAccess?.can_edit !== false;
         return (
             <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
                 {/* Header Actions */}
@@ -509,9 +514,11 @@ function OpportunityDetailsContent() {
                         <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
                             <Printer className="w-4 h-4" /> Print PDF
                         </button>
-                        <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
-                            <Edit className="w-4 h-4" /> Edit Opportunity
-                        </button>
+                        {viewerCanEdit ? (
+                            <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
+                                <Edit className="w-4 h-4" /> Edit Opportunity
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 

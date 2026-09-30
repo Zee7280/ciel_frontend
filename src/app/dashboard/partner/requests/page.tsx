@@ -96,7 +96,11 @@ export default function PartnerRequestsPage() {
                         ? rows.filter((item: unknown) => item && typeof item === "object")
                         : rows.filter((item: unknown) =>
                               item && typeof item === "object"
-                                  ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId)
+                                  ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId) ||
+                                    // The executing-organization contact is told to open the opportunity here
+                                    // to confirm execution details, so their row must not be filtered out.
+                                    (item as { viewer_access?: { is_executing_contact?: boolean } }).viewer_access
+                                        ?.is_executing_contact === true
                                   : false,
                           );
                     setRequests(scoped);
@@ -294,12 +298,14 @@ export default function PartnerRequestsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">
-                                                <Link
-                                                    href={`/dashboard/partner/requests/${req.id}/applicants`}
-                                                    className="h-10 px-3 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 whitespace-nowrap transition-all shadow-sm"
-                                                >
-                                                    <Users className="w-3 h-3" /> Applicants
-                                                </Link>
+                                                {req.viewer_access?.is_org_owner === false ? null : (
+                                                    <Link
+                                                        href={`/dashboard/partner/requests/${req.id}/applicants`}
+                                                        className="h-10 px-3 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 whitespace-nowrap transition-all shadow-sm"
+                                                    >
+                                                        <Users className="w-3 h-3" /> Applicants
+                                                    </Link>
+                                                )}
 
                                                 <button
                                                     onClick={(e) => {
@@ -343,12 +349,14 @@ export default function PartnerRequestsPage() {
                         >
                             <ExternalLink className="w-3.5 h-3.5 text-slate-400" /> View Details
                         </button>
-                        <button
-                            onClick={() => router.push(`/dashboard/partner/requests/${activeRequest.id}?edit=true`)}
-                            className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-medium transition-colors"
-                        >
-                            <Edit className="w-3.5 h-3.5 text-slate-400" /> Edit Opportunity
-                        </button>
+                        {activeRequest.viewer_access?.is_org_owner === false ? null : (
+                            <button
+                                onClick={() => router.push(`/dashboard/partner/requests/${activeRequest.id}?edit=true`)}
+                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-medium transition-colors"
+                            >
+                                <Edit className="w-3.5 h-3.5 text-slate-400" /> Edit Opportunity
+                            </button>
+                        )}
                         {hasPendingVerificationLink ? (
                             <button
                                 onClick={() => handleVerifyFromOpportunity(activeRequest.id)}
