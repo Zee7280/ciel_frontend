@@ -1398,7 +1398,7 @@ export default function FacultyOpportunityCreationPage() {
                                 nationalDigits={displayFacultyContact.national}
                                 readOnly
                                 placeholderNational="—"
-                                selectClassName="rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
+                                selectClassName="w-auto max-w-none rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
                                 inputClassName="rounded-lg border-transparent bg-transparent py-0 text-sm font-medium text-[#0d2b33]"
                             />
                         </span>

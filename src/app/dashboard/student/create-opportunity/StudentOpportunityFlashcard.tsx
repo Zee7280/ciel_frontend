@@ -307,7 +307,13 @@ export function resolveFacultyFlashEligibility(input: {
     return { eligible: true, why: "You match the selected application scope." };
 }
 
-export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcardModel }) {
+export function StudentOpportunityFlashcard({
+    model,
+    className = "",
+}: {
+    model: StudentFlashcardModel;
+    className?: string;
+}) {
     const [note, setNote] = useState("");
     const sdg = findSdgById(model.sdg);
     const sdgName = sdg?.title || "SDG";
@@ -395,7 +401,7 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const scheduleShort = scheduleText.length > 72 ? `${scheduleText.slice(0, 69).trimEnd()}…` : scheduleText;
 
     return (
-        <article className="co-flash">
+        <article className={`co-flash${className ? ` ${className}` : ""}`}>
             <section className="co-flash-hero">
                 <div className="co-flash-top">
                     <div className="co-flash-kicker">CIEL PK · Community Service Opportunity</div>

@@ -273,7 +273,7 @@ export default function PhoneConnectivityRow({
         <div className="min-w-0 max-w-full space-y-1.5">
             <div
                 className={cn(
-                    "flex min-w-0 w-full max-w-full items-stretch gap-2",
+                    "flex min-w-0 w-full max-w-full flex-wrap items-stretch gap-2",
                     usePortalCountryPicker && "gap-2.5",
                     rowClassName,
                 )}
@@ -318,8 +318,8 @@ export default function PhoneConnectivityRow({
                     aria-invalid={errorText ? true : undefined}
                     className={cn(
                         usePortalCountryPicker
-                            ? "h-10 min-w-0 w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4"
-                            : "min-w-0 w-0 flex-1 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-3 py-4 font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-emerald-600 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70 sm:px-5",
+                            ? "h-10 min-w-[8.5rem] basis-[8.5rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4"
+                            : "min-w-[8.5rem] basis-[8.5rem] flex-1 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-3 py-4 font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-emerald-600 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70 sm:px-5",
                         errorText && "border-red-500 focus:border-red-500",
                         inputClassName,
                     )}
