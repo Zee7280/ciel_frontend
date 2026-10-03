@@ -235,8 +235,16 @@ export default function StudentPaymentsHistoryPage() {
 
     if (loading) {
         return (
-            <div className="flex min-h-[40vh] items-center justify-center gap-2 text-ciel-text-mid">
-                <Loader2 className="h-8 w-8 animate-spin text-[#0e7d74]" />
+            <div className="mx-auto max-w-5xl space-y-6 pb-16">
+                <header>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Payments</h1>
+                    <p className="mt-1 text-sm text-ciel-text-mid">
+                        Reporting fees for your projects, and the slips you&apos;ve uploaded.
+                    </p>
+                </header>
+                <div className="flex min-h-[40vh] items-center justify-center gap-2 text-ciel-text-mid">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#0e7d74]" />
+                </div>
             </div>
         );
     }

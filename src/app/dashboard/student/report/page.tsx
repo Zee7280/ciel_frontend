@@ -444,11 +444,16 @@ function ReportFormContent() {
                     }
 
                     const reportAccess = reportForState.report_access as
-                        | { is_team_lead?: boolean; can_submit_report?: boolean }
+                        | {
+                              is_team_lead?: boolean;
+                              can_submit_report?: boolean;
+                              can_edit_report_body?: boolean;
+                          }
                         | undefined;
                     if (reportAccess) {
                         if (
                             reportAccess.can_submit_report === false ||
+                            reportAccess.can_edit_report_body === false ||
                             reportAccess.is_team_lead === false
                         ) {
                             setMyParticipationIsTeamLead(false);
@@ -617,7 +622,7 @@ function ReportFormContent() {
                     toast.error('Only your team lead can submit this team report.');
                 } else if (!isEligibleForSubmission) {
                     toast.error(
-                        `Minimum logged hours not met (${sumNonRejectedLoggedHours(data.section1.attendance_logs || [])}/${data.required_hours || 16}). Complete Section 1 first.`,
+                        `Minimum logged hours not met (${sumNonRejectedLoggedHours(data.section1?.attendance_logs || [])}/${data.required_hours || 16}). Complete Section 1 first.`,
                     );
                 } else {
                     toast.error('Complete all required fields in every section before submitting.');
@@ -710,11 +715,11 @@ function ReportFormContent() {
     const confirmSubmit = async () => {
         if (submitSucceeded) return;
         const hoursOk = loggedHoursClearSubmitBar({
-            logs: data.section1.attendance_logs || [],
+            logs: data.section1?.attendance_logs || [],
             requiredHours: data.required_hours || 16,
             rosterIds: buildIndividualRosterFromSection1(
                 data.section1,
-                data.section1.team_lead?.id,
+                data.section1?.team_lead?.id,
             ),
         });
         const stillIncomplete = getIncompleteSectionsSummary(data);
@@ -1271,10 +1276,10 @@ function ReportFormContent() {
                             <p>
                                 Logged hours:{" "}
                                 <span className="font-semibold text-slate-900">
-                                    {sumNonRejectedLoggedHours(data.section1.attendance_logs || [])} / {data.required_hours || 16}
+                                    {sumNonRejectedLoggedHours(data.section1?.attendance_logs || [])} / {data.required_hours || 16}
                                 </span>
                                 . Log attendance in Section 1 until the minimum is met. Faculty reviews the flash card after you submit.
-                                {sumNonRejectedLoggedHours(data.section1.attendance_logs || []) >= (data.required_hours || 16) ? (
+                                {sumNonRejectedLoggedHours(data.section1?.attendance_logs || []) >= (data.required_hours || 16) ? (
                                     <>
                                         {" "}
                                         The team total meets the goal, but every teammate needs their own hours logged — hours can&apos;t be pooled from one member to cover another.

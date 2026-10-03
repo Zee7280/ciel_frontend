@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authenticatedFetch } from "@/utils/api";
+import { fetchCommunityServiceRankings, peekCommunityServiceRankings } from "@/utils/student-community-cache";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import {
     CommunityCrumb,
@@ -219,22 +219,18 @@ function RankCard({ label, band }: { label: string; band: RankBand }) {
 }
 
 export default function CommunityServiceRankings() {
-    const [rows, setRows] = useState<RankingRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const cached = peekCommunityServiceRankings();
+    const [rows, setRows] = useState<RankingRow[]>(() => (cached ?? []) as RankingRow[]);
+    const [loading, setLoading] = useState(!cached);
     const [failed, setFailed] = useState(false);
     const [historyFor, setHistoryFor] = useState<RankingRow | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
-            .then(async (rankRes) => {
+        fetchCommunityServiceRankings()
+            .then((data) => {
                 if (cancelled) return;
-                const rankJson = rankRes?.ok ? await rankRes.json() : null;
-                if (!rankJson?.success) {
-                    setFailed(true);
-                    return;
-                }
-                setRows(Array.isArray(rankJson.data) ? rankJson.data : []);
+                setRows((data ?? []) as RankingRow[]);
             })
             .catch(() => {
                 if (!cancelled) setFailed(true);

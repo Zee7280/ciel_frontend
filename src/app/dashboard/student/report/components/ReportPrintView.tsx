@@ -461,11 +461,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
               ? Math.round(engagementRecalc.total_verified_hours)
               : Math.round(
                     (parseFloat(String(data.section1?.team_lead?.hours ?? "")) || 0) +
-                        (data.section1?.team_members?.reduce(
-                            (sum: number, m: ReportData["section1"]["team_members"][number]) =>
-                                sum + (parseFloat(String(m.hours ?? "")) || 0),
-                            0,
-                        ) || 0),
+                        (Array.isArray(data.section1?.team_members)
+                            ? data.section1.team_members.reduce(
+                                  (sum: number, m: ReportData["section1"]["team_members"][number]) =>
+                                      sum + (parseFloat(String(m.hours ?? "")) || 0),
+                                  0,
+                              )
+                            : 0),
                 );
 
     const mBase = data.section1?.metrics;
@@ -480,7 +482,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         .filter(Boolean)
         .join(" · ");
 
-    const tm = data.section1?.team_members ?? [];
+    const tm = Array.isArray(data.section1?.team_members) ? data.section1.team_members : [];
     const memberAuthor = !authorParticipation.isTeamLeadAuthor && authorParticipation.memberIndex >= 0;
     const authorMemberRow = memberAuthor ? tm[authorParticipation.memberIndex] : undefined;
     const dossierAuthorRoleHoursLine = memberAuthor

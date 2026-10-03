@@ -9,6 +9,7 @@ import {
     composeInternationalPhone,
     DEFAULT_PHONE_COUNTRY_KEY,
     parsePhoneForDisplay,
+    validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_PROVINCE_OPTIONS, PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 
@@ -260,9 +261,9 @@ export default function OrganizationProfilePage() {
         for (const field of requiredFields) {
             if (field.key === "contactPhone") {
                 const e164 = composeInternationalPhone(phoneCountryKey, phoneNational);
-                const nationalDigits = phoneNational.replace(/\D/g, "");
-                if (!e164.trim() || nationalDigits.length < 10) {
-                    toast.error("Enter a valid phone number with country code (at least 10 digits after code)");
+                const phoneErr = validateNationalPhone(phoneCountryKey, phoneNational);
+                if (!e164.trim() || phoneErr) {
+                    toast.error(phoneErr || "Enter a valid phone number with country code");
                     setIsSaving(false);
                     return;
                 }
@@ -589,7 +590,7 @@ export default function OrganizationProfilePage() {
                                                 }));
                                             }}
                                             maxNationalDigits={15}
-                                            placeholderNational="3001234567"
+                                            placeholderNational="300 1234567"
                                             selectClassName="rounded-lg border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                                             inputClassName="rounded-lg border border-slate-200 bg-white py-2 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                                         />

@@ -17,7 +17,8 @@ import {
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
-import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { lastAllowedApplicationCloseDate, validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -25,7 +26,7 @@ import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY } from "@/utils/countryCallingCodes";
+import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, validateOptionalNationalPhone } from "@/utils/countryCallingCodes";
 import {
     resolveFacultyFlashEligibility,
     StudentOpportunityFlashcard,
@@ -299,13 +300,39 @@ export default function OpportunityPostingPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+        if (i >= schedIdx) {
+            const timelineErr = validateTimelineForPersist({
+                start_date: formData.dates.start,
+                end_date: formData.dates.end,
+                close_applications_early: formData.closeApplicationsEarly,
+                application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+            });
+            if (timelineErr) {
+                toast.error(timelineErr);
+                goToStep("SCHED");
+                return;
+            }
+            const hoursNum = parseInt(formData.capacity.hours, 10);
+            const volNum = parseInt(formData.capacity.volunteers, 10);
+            if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
+                toast.error("Required hours per student must be between 1 and 500.");
+                goToStep("SCHED");
+                return;
+            }
+            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
+                toast.error("Available seats must be between 1 and 5000.");
+                goToStep("SCHED");
+                return;
+            }
+        }
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -376,16 +403,29 @@ export default function OpportunityPostingPage() {
         });
         if (timelineErr) {
             toast.error(timelineErr);
+            goToStep("SCHED");
             return false;
         }
         const hoursNum = parseInt(formData.capacity.hours, 10);
         if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
             toast.error("Required hours per student must be between 1 and 500.");
+            goToStep("SCHED");
             return false;
         }
         const volNum = parseInt(formData.capacity.volunteers, 10);
         if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
             toast.error("Available seats must be between 1 and 5000.");
+            goToStep("SCHED");
+            return false;
+        }
+        if (
+            (TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) &&
+            formData.dates.fromTime.trim() &&
+            formData.dates.endTime.trim() &&
+            formData.dates.fromTime >= formData.dates.endTime
+        ) {
+            toast.error("End time must be after start time.");
+            goToStep("SCHED");
             return false;
         }
         if (!formData.sdg) {
@@ -424,6 +464,14 @@ export default function OpportunityPostingPage() {
         }
         if (!vs.executingOrg.officialEmail.trim() || !isValidEmail(vs.executingOrg.officialEmail)) {
             toast.error("Please enter a valid official email for the executing organization (Section F1)");
+            return false;
+        }
+        const whatsappErr = validateOptionalNationalPhone(
+            vs.executingOrg.whatsappCountryKey,
+            vs.executingOrg.whatsappNational,
+        );
+        if (whatsappErr) {
+            toast.error(whatsappErr);
             return false;
         }
         if (vs.partnerOrg.hasPartner) {
@@ -1087,6 +1135,12 @@ export default function OpportunityPostingPage() {
     const previewSecondarySdg = formData.secondarySdgs[0] ? findSdgById(formData.secondarySdgs[0].sdgId) : null;
     const timelineStartWeekdayLabel = weekdayLabelFromDateInput(formData.dates.start);
     const timelineEndWeekdayLabel = weekdayLabelFromDateInput(formData.dates.end);
+    const scheduleTimelineError = validateTimelineForPersist({
+        start_date: formData.dates.start,
+        end_date: formData.dates.end,
+        close_applications_early: formData.closeApplicationsEarly,
+        application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+    });
 
     const isNgoCreator = isNgoCreatorAccount(orgDetails.organizationType || storedOrgTypeHint());
     const creatorTypes = isNgoCreator ? NGO_CREATOR_TYPES : PARTNER_CREATOR_TYPES;
@@ -1248,7 +1302,26 @@ export default function OpportunityPostingPage() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => goToStep(step.key)}
+                                    onClick={() => {
+                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
+                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+                                        if (to > schedIdx) {
+                                            const timelineErr = validateTimelineForPersist({
+                                                start_date: formData.dates.start,
+                                                end_date: formData.dates.end,
+                                                close_applications_early: formData.closeApplicationsEarly,
+                                                application_deadline: formData.closeApplicationsEarly
+                                                    ? formData.applicationDeadline
+                                                    : formData.dates.end,
+                                            });
+                                            if (timelineErr) {
+                                                toast.error(timelineErr);
+                                                goToStep("SCHED");
+                                                return;
+                                            }
+                                        }
+                                        goToStep(step.key);
+                                    }}
                                 >
                                     <span className="co-step-ico">{idx === 0 ? creatorCopy.icon : step.icon}</span>
                                     <span className="co-step-copy">
@@ -1545,7 +1618,7 @@ export default function OpportunityPostingPage() {
 
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Pin Exact Location</label>
-                                        <div className="rounded-xl overflow-hidden border border-slate-200">
+                                        <div className="rounded-xl border border-slate-200">
                                             <LocationPicker
                                                 onLocationSelect={(loc) => {
                                                     setFormData(prev => ({
@@ -1599,6 +1672,7 @@ export default function OpportunityPostingPage() {
                             <input
                                 type="date"
                                 value={formData.dates.start}
+                                max={formData.dates.end || undefined}
                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
                             />
                             {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
@@ -1608,11 +1682,18 @@ export default function OpportunityPostingPage() {
                             <input
                                 type="date"
                                 value={formData.dates.end}
+                                min={formData.dates.start || undefined}
                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
                             />
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
                         </div>
                     </div>
+                    {scheduleTimelineError &&
+                    formData.dates.start &&
+                    formData.dates.end &&
+                    !/application closing/i.test(scheduleTimelineError) ? (
+                        <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
+                    ) : null}
                     <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
                         <label className="flex items-start gap-2 cursor-pointer">
                             <input
@@ -1640,8 +1721,13 @@ export default function OpportunityPostingPage() {
                                 <input
                                     type="date"
                                     value={formData.applicationDeadline}
+                                    min={formData.dates.start || undefined}
+                                    max={lastAllowedApplicationCloseDate(formData.dates.end)}
                                     onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
                                 />
+                                {scheduleTimelineError && /application closing/i.test(scheduleTimelineError) ? (
+                                    <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
+                                ) : null}
                             </div>
                         ) : null}
                     </div>
@@ -1662,6 +1748,7 @@ export default function OpportunityPostingPage() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.fromTime}
+                                        max={formData.dates.endTime || undefined}
                                         onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
                                     />
                                 </div>
@@ -1671,6 +1758,7 @@ export default function OpportunityPostingPage() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.endTime}
+                                        min={formData.dates.fromTime || undefined}
                                         onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
                                     />
                                 </div>
@@ -1680,23 +1768,37 @@ export default function OpportunityPostingPage() {
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={500}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={3}
                                     placeholder="e.g. 16"
                                     value={formData.capacity.hours}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            capacity: { ...formData.capacity, hours: integerFieldInput(e.target.value, 3) },
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={5000}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={4}
                                     placeholder="e.g. 20"
                                     value={formData.capacity.volunteers}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            capacity: { ...formData.capacity, volunteers: integerFieldInput(e.target.value, 4) },
+                                        })
+                                    }
                                 />
                             </div>
                         </div>
@@ -1710,7 +1812,7 @@ export default function OpportunityPostingPage() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be before project end; hours 1–500; seats 1–5000.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be on or after start and before project end; hours, seats, and beneficiaries accept digits only.</span>
                         </div>
                     </div>
                 </div>
@@ -1980,11 +2082,23 @@ export default function OpportunityPostingPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Number of Beneficiaries</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={7}
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none"
                                     placeholder="e.g. 50"
                                     value={formData.objectives.beneficiariesCount}
-                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            objectives: {
+                                                ...formData.objectives,
+                                                beneficiariesCount: integerFieldInput(e.target.value, 7),
+                                            },
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
@@ -2313,7 +2427,7 @@ export default function OpportunityPostingPage() {
                                 <PhoneConnectivityRow
                                     phoneCountryKey={formData.verificationSafety.executingOrg.whatsappCountryKey}
                                     nationalDigits={formData.verificationSafety.executingOrg.whatsappNational}
-                                    placeholderNational="3001234567"
+                                    placeholderNational="300 1234567"
                                     selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
                                     inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
                                     onPhoneCountryKeyChange={(key) =>
@@ -2967,7 +3081,7 @@ export default function OpportunityPostingPage() {
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
                         <div className="flex gap-2">
-                            {!editingOpportunityId || isDraftMode ? (
+                            {(!editingOpportunityId || isDraftMode) && activeStep !== "SUBMIT" ? (
                                 <button type="button" className="co-nav-btn back" onClick={() => void handleSaveDraft(false)} disabled={isLoadingEdit}>
                                     Save draft
                                 </button>

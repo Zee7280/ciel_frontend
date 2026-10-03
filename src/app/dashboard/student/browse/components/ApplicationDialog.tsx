@@ -17,6 +17,8 @@ import {
     DEFAULT_PHONE_COUNTRY_KEY,
     composeInternationalPhone,
     parsePhoneForDisplay,
+    validateNationalPhone,
+    validateOptionalNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
 import {
@@ -83,6 +85,19 @@ function teamMemberRowForApplyApi(m: TeamMember) {
         program: m.program,
         role: m.role,
     };
+}
+
+function emailKey(value: unknown): string {
+    return String(value || "").trim().toLowerCase();
+}
+
+const DUPLICATE_TEAM_EMAIL_MESSAGE =
+    "This email is already on this team (team lead or another member). Each student must use their own registered email.";
+
+function isDuplicateTeamMemberEmail(email: string, members: TeamMember[], selfIndex: number): boolean {
+    const next = emailKey(email);
+    if (!next) return false;
+    return members.some((member, idx) => idx !== selfIndex && emailKey(member.email) === next);
 }
 
 export default function ApplicationDialog({
@@ -256,6 +271,10 @@ export default function ApplicationDialog({
             toast.error("Please enter an email address first.");
             return;
         }
+        if (isDuplicateTeamMemberEmail(member.email, teamMembers, index)) {
+            toast.error(DUPLICATE_TEAM_EMAIL_MESSAGE);
+            return;
+        }
 
         // 1. Immediately show loader and disable button
         setTeamMembers(prev => {
@@ -267,7 +286,11 @@ export default function ApplicationDialog({
         try {
             const res = await authenticatedFetch(`/api/v1/student/verify-team-member/send`, {
                 method: 'POST',
-                body: JSON.stringify({ email: member.email })
+                body: JSON.stringify({
+                    email: member.email,
+                    projectId: opportunityId,
+                    blockIfOnRoster: member.role !== "Lead",
+                })
             });
 
             if (res && res.ok) {
@@ -284,7 +307,7 @@ export default function ApplicationDialog({
                     updated[index] = { ...updated[index], verificationStatus: 'unverified' };
                     return updated;
                 });
-                toast.error(errorData.message || "Failed to send OTP");
+                toast.error(normalizeNestHttpMessage(errorData.message) || "Failed to send OTP");
             }
         } catch (error) {
             console.error("Verification error", error);
@@ -355,9 +378,15 @@ export default function ApplicationDialog({
 
         const applicantPhoneE164 = composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
         if (participationType === "individual") {
-            const n = applicantPhoneNational.replace(/\D/g, "");
-            if (!applicantPhoneE164 || n.length < 8) {
-                toast.error("Please enter a valid mobile number with country code.");
+            const phoneErr = validateNationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
+            if (phoneErr) {
+                toast.error(phoneErr);
+                return;
+            }
+        } else {
+            const optionalErr = validateOptionalNationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
+            if (optionalErr) {
+                toast.error(optionalErr);
                 return;
             }
         }
@@ -370,10 +399,9 @@ export default function ApplicationDialog({
         if (participationType === "team") {
             for (let i = 0; i < teamMembers.length; i++) {
                 const member = teamMembers[i];
-                const memberPhoneE164 = composeInternationalPhone(member.phoneCountryKey, member.phoneNational);
-                const nationalDigits = member.phoneNational.replace(/\D/g, "");
-                if (!member.name || !member.cnic || !memberPhoneE164 || nationalDigits.length < 8) {
-                    toast.error(`Please fill in all required fields for Member ${i + 1}.`);
+                const memberPhoneErr = validateNationalPhone(member.phoneCountryKey, member.phoneNational);
+                if (!member.name || !member.cnic || memberPhoneErr) {
+                    toast.error(memberPhoneErr || `Please fill in all required fields for Member ${i + 1}.`);
                     return;
                 }
                 if (member.cnic.length !== 13) {
@@ -382,6 +410,10 @@ export default function ApplicationDialog({
                 }
                 if (member.verificationStatus !== 'verified') {
                     toast.error(`Please verify the email for Member ${i + 1} before submitting.`);
+                    return;
+                }
+                if (isDuplicateTeamMemberEmail(member.email, teamMembers, i)) {
+                    toast.error(DUPLICATE_TEAM_EMAIL_MESSAGE);
                     return;
                 }
             }
@@ -787,7 +819,7 @@ export default function ApplicationDialog({
                                                         size="default"
                                                         className={`h-10 min-h-10 shrink-0 px-4 sm:min-w-[100px] ${member.verificationStatus === 'verified' ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-900'}`}
                                                         onClick={() => handleVerifyEmail(index)}
-                                                        disabled={member.verificationStatus === 'verified' || member.verificationStatus === 'sending' || !member.email}
+                                                        disabled={member.verificationStatus === 'verified' || member.verificationStatus === 'sending' || !member.email || isDuplicateTeamMemberEmail(member.email, teamMembers, index)}
                                                     >
                                                         {member.verificationStatus === 'sending' ? (
                                                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -801,10 +833,13 @@ export default function ApplicationDialog({
                                                     </Button>
                                                 </div>
                                                 <div className="min-h-[1.125rem] space-y-0.5">
+                                                    {isDuplicateTeamMemberEmail(member.email, teamMembers, index) && (
+                                                        <p className="text-[10px] text-red-600 font-medium">{DUPLICATE_TEAM_EMAIL_MESSAGE}</p>
+                                                    )}
                                                     {member.verificationStatus === 'verified' && (
                                                         <p className="text-[10px] text-green-600 font-medium">Email verified successfully.</p>
                                                     )}
-                                                    {member.verificationStatus === 'unverified' && member.email && (
+                                                    {member.verificationStatus === 'unverified' && member.email && !isDuplicateTeamMemberEmail(member.email, teamMembers, index) && (
                                                         <p className="text-[10px] text-slate-400">Click Send OTP — they must confirm the code before they are added.</p>
                                                     )}
                                                     {member.verificationStatus === 'otp_sent' && (

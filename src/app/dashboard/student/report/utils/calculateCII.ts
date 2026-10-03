@@ -41,8 +41,16 @@ export function calculateCII(data: ReportData): CIIResult {
         requiredHours: (data as any).requiredHoursPerStudent || data.required_hours || 16,
         studentActiveDays: data.section1?.metrics?.total_active_days || 0,
         studentEngagementSpan: data.section1?.metrics?.engagement_span || 0,
-        teamSize: data.section1?.team_members?.length ? data.section1.team_members.length + 1 : 1,
-        totalVerifiedTeamHours: (data.section1?.team_members?.reduce((sum, member) => sum + (parseFloat(member.hours) || 0), 0) || 0) + (parseFloat(data.section1?.team_lead?.hours) || 0),
+        teamSize: Array.isArray(data.section1?.team_members) && data.section1.team_members.length
+            ? data.section1.team_members.length + 1
+            : 1,
+        totalVerifiedTeamHours:
+            (Array.isArray(data.section1?.team_members)
+                ? data.section1.team_members.reduce(
+                      (sum, member) => sum + (parseFloat(member.hours) || 0),
+                      0,
+                  )
+                : 0) + (parseFloat(data.section1?.team_lead?.hours) || 0),
     });
 
     const participation = section1Result.finalScore;

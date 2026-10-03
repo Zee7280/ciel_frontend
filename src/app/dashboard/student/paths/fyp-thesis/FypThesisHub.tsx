@@ -12,9 +12,9 @@ import FacultyFypFlashcardModal from "@/components/ciel/FacultyFypFlashcard";
 import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
 import type { FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { fypRankContext, fypRankRibbons, type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
 import { createStudentFyp, listStudentFyps } from "@/utils/fypStudentApi";
+import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
 import { isPathEntryApproved } from "@/utils/reviewQueue";
 import { fypStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
@@ -762,8 +762,9 @@ export default function FypThesisHub({
     view: HubView;
 }) {
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
-    const [entries, setEntries] = useState<FypEntry[]>([]);
+    const cachedEntries = usePathSessionCache<FypEntry[]>("fyp-entries");
+    const [loading, setLoading] = useState(!cachedEntries);
+    const [entries, setEntries] = useState<FypEntry[]>(cachedEntries ?? []);
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -774,9 +775,10 @@ export default function FypThesisHub({
     const autoOpenRef = useRef(false);
 
     const load = useCallback(async () => {
-        setLoading(true);
         try {
-            setEntries(await listStudentFyps());
+            const next = await listStudentFyps();
+            setEntries(next);
+            setPathSessionCache("fyp-entries", next);
         } finally {
             setLoading(false);
         }
@@ -858,8 +860,6 @@ export default function FypThesisHub({
     const updateEntry = (id: string, patch: Partial<FypMeritEntry>) => {
         setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
     };
-
-    if (loading) return <WorkspaceSkeleton />;
 
     const drafts = entries.filter((e) => e.status !== "submitted");
     const approved = entries.filter(isPathEntryApproved);

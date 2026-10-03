@@ -8,7 +8,7 @@ import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, S
 import Image from "next/image";
 import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey } from "@/utils/countryCallingCodes";
+import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey, validateNationalPhone } from "@/utils/countryCallingCodes";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
@@ -226,8 +226,9 @@ function SignUpContent() {
 
         if (!formData.phone.trim()) {
             newErrors.phone = "Phone number is required";
-        } else if (formData.phone.length < 10) {
-            newErrors.phone = "Phone number must be at least 10 digits";
+        } else {
+            const phoneErr = validateNationalPhone(formData.phoneCountryKey, formData.phone);
+            if (phoneErr) newErrors.phone = phoneErr;
         }
 
         if (!formData.city.trim() && !isInvestor) {
@@ -268,7 +269,7 @@ function SignUpContent() {
         if (!isInvestor && !consent) return false;
         if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return false;
         if (!formData.password || formData.password.length < (isInvestor ? 10 : 8)) return false;
-        if (!formData.phone.trim() || formData.phone.length < 10) return false;
+        if (!formData.phone.trim() || validateNationalPhone(formData.phoneCountryKey, formData.phone)) return false;
         if (!isInvestor && !formData.city.trim()) return false;
         if (isInvestor) {
             if (!formData.name.trim() || !formData.contactPerson.trim() || !formData.orgName.trim()) return false;
@@ -298,7 +299,7 @@ function SignUpContent() {
             if (!formData.contactPerson.trim()) return "Enter your designation to continue";
             if (!formData.orgName.trim()) return "Enter the organisation name to continue";
             if (!formData.email.trim()) return "Enter your official email to continue";
-            if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+            if (!formData.phone.trim() || validateNationalPhone(formData.phoneCountryKey, formData.phone)) return "Enter your mobile number to continue";
             if (!formData.city.trim()) return "Select your city to continue";
             if (!formData.password || formData.password.length < 8) return "Create a password to continue";
             if (proofMethod === "link" && !proofUrl.trim()) return "Add a verification link to continue";
@@ -311,7 +312,7 @@ function SignUpContent() {
             return role === "student" ? "Select your programme to continue" : "Enter your department to continue";
         }
         if (!formData.email.trim()) return "Enter your email to continue";
-        if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+        if (!formData.phone.trim() || validateNationalPhone(formData.phoneCountryKey, formData.phone)) return "Enter your mobile number to continue";
         if (!formData.city.trim()) return "Select your city to continue";
         if (role === "student" && !formData.enrollmentYear.trim()) return "Select your enrolment year to continue";
         if (!formData.password || formData.password.length < 8) return "Create a password to continue";
@@ -710,7 +711,7 @@ function SignUpContent() {
                                     )}
 
                                     {(role === "student" || role === "faculty") && (
-                                        <div key={`${role}-inst`} className="ciel-crossfade-enter grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div key={`${role}-inst`} className="ciel-crossfade-enter relative z-30 grid grid-cols-1 items-start gap-4 overflow-visible sm:grid-cols-2">
                                             <div>
                                                 <label className={labelClass}>University</label>
                                                 <div className="relative">
@@ -722,7 +723,7 @@ function SignUpContent() {
                                                 </div>
                                                 {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
                                             </div>
-                                            <div>
+                                            <div className="relative z-20 min-w-0">
                                                 <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>
                                                 {role === "student" ? (
                                                     <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} />

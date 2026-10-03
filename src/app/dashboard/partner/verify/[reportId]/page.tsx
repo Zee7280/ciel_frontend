@@ -38,6 +38,10 @@ import {
 import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
 import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { mailtoHref, whatsappShareHref } from '@/utils/reminderLinks';
+import AdminReviewPackageStrip from "@/app/dashboard/admin/reports/verify/AdminReviewPackageStrip";
+import ReportEvidenceGallery, {
+    classifyEvidenceGalleryKind,
+} from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -112,6 +116,11 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    review_package?: {
+        documents?: {
+            evidence?: { files?: Array<{ url?: string; name?: string; kind?: string }> };
+        };
+    } | null;
 }
 
 type PartnerBlueprintRow = {
@@ -468,6 +477,16 @@ export default function ReportDetailPage() {
                         </span>
                     </div>
                 </div>
+                <AdminReviewPackageStrip
+                    reportId={String(params.reportId)}
+                    report={report as unknown as Record<string, unknown>}
+                    fallbackFiles={(report.evidence_urls || []).map((url) => ({
+                        url,
+                        name: url.split("?")[0].split("/").pop() || "Evidence file",
+                        kind: classifyEvidenceGalleryKind(url, url),
+                    }))}
+                    variant="published"
+                />
 
                 {/* Quality Insight Banner */}
                 {qualityAlerts.length > 0 && (
@@ -1223,24 +1242,21 @@ export default function ReportDetailPage() {
 
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-3">Evidence Files</h3>
-                                    {report.evidence_urls && report.evidence_urls.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {report.evidence_urls.map((url, index) => (
-                                                <a
-                                                    key={index}
-                                                    href={url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-4 bg-slate-50 rounded-2xl hover:bg-indigo-50 transition-all flex items-center justify-between group border border-slate-100"
-                                                >
-                                                    <span className="font-bold text-slate-900 group-hover:text-indigo-600">Evidence {index + 1}</span>
-                                                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-slate-500 italic text-sm">No evidence files uploaded</p>
-                                    )}
+                                    <ReportEvidenceGallery
+                                        files={(
+                                            report.review_package?.documents?.evidence?.files ||
+                                            (report.evidence_urls || []).map((url) => ({
+                                                url,
+                                                name: url.split("?")[0].split("/").pop() || "Evidence file",
+                                                kind: classifyEvidenceGalleryKind(url, url),
+                                            }))
+                                        ).map((file) => ({
+                                            url: String(file.url || ""),
+                                            name: String(file.name || "Evidence file"),
+                                            kind: file.kind || classifyEvidenceGalleryKind(String(file.url || ""), String(file.name || "")),
+                                        }))}
+                                        emptyLabel="No evidence files uploaded"
+                                    />
                                 </div>
                             </div>
                         </div>

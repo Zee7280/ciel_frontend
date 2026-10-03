@@ -24,6 +24,11 @@ import {
     canRecordCompletedService,
     lifecycleStatusLabel,
 } from "@/utils/opportunityTimelineLifecycle";
+import {
+    applicationsOpenFromPayload,
+    applyBlockedMessageFromPayload,
+    applyClosedCtaLabel,
+} from "@/utils/studentApplyMaintenance";
 
 export type StudentProjectActionsInput = {
     raw: Record<string, unknown>;
@@ -64,6 +69,23 @@ function joinCtaForTimeline(raw: Record<string, unknown>): {
 } {
     const timeline = timelineFromRaw(raw);
     const lifecycleLabel = lifecycleStatusLabel(timeline);
+    if (!applicationsOpenFromPayload(raw)) {
+        const helper = applyBlockedMessageFromPayload(raw);
+        const reason = String(raw.apply_blocked_reason || "");
+        const label = applyClosedCtaLabel(reason);
+        return {
+            allowJoin: false,
+            label,
+            helper:
+                helper ||
+                (reason === "maintenance"
+                    ? "Student applications are temporarily paused for maintenance."
+                    : reason === "catalog_closed"
+                      ? "This opportunity has expired."
+                      : "Applications for this opportunity have closed."),
+            lifecycleLabel: label,
+        };
+    }
     if (canJoinOrApply(timeline)) {
         return { allowJoin: true, label: "Join Opportunity", helper: null, lifecycleLabel };
     }

@@ -376,7 +376,7 @@ export default function CommunityCiiAnalyser({
         <div className="fx23-analyzer">
             <div className="fx23-workhead">
                 <div>
-                    <span>{isCielPk ? "CIEL PK private-candidate review · A Analyzer" : "Faculty review workspace · A Analyzer"}</span>
+                    <span>{isCielPk ? "CIEL PK Super Admin review · A Analyzer" : "Faculty review workspace · A Analyzer"}</span>
                     <h2>{projectTitle}</h2>
                     <p>
                         {studentName} · submitted Flashcard + Detailed Report stay locked. The Analyzer runs only when you choose to run it.

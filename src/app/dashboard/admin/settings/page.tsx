@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, Loader2, Shield, Globe, Mail, FileCheck, CreditCard } from "lucide-react";
+import { Save, Loader2, Shield, Globe, Mail, FileCheck, CreditCard, PauseCircle, TimerOff } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import {
@@ -14,6 +14,15 @@ import {
     parsePartnerMembershipRequiredSettingValue,
     PARTNER_MEMBERSHIP_REQUIRED_KEY,
 } from "@/utils/partnerMembershipDisplay";
+import {
+    DEFAULT_STUDENT_APPLY_EXPIRED_MESSAGE,
+    DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
+    parseStudentApplyMaintenanceEnabled,
+    STUDENT_APPLY_CLOSED_BEFORE_KEY,
+    STUDENT_APPLY_EXPIRED_MESSAGE_KEY,
+    STUDENT_APPLY_MAINTENANCE_ENABLED_KEY,
+    STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY,
+} from "@/utils/studentApplyMaintenance";
 
 type SettingRow = { key?: string; value?: string };
 
@@ -42,9 +51,20 @@ export default function AdminSettingsPage() {
     const [isSavingReportPartnerGate, setIsSavingReportPartnerGate] = useState(false);
     const [isSavingPartnerMembershipGate, setIsSavingPartnerMembershipGate] = useState(false);
     const [isSavingPartnerMembershipFee, setIsSavingPartnerMembershipFee] = useState(false);
+    const [isSavingApplyMaintenance, setIsSavingApplyMaintenance] = useState(false);
+    const [isSavingApplyMessage, setIsSavingApplyMessage] = useState(false);
+    const [isExpiringExistingApplies, setIsExpiringExistingApplies] = useState(false);
+    const [isSavingExpireToggle, setIsSavingExpireToggle] = useState(false);
+    const [isSavingExpireMessage, setIsSavingExpireMessage] = useState(false);
     const [reportPartnerApprovalEnabled, setReportPartnerApprovalEnabled] = useState(true);
     const [partnerMembershipRequired, setPartnerMembershipRequired] = useState(false);
     const [partnerMembershipFeePkr, setPartnerMembershipFeePkr] = useState("1000");
+    const [applyMaintenanceEnabled, setApplyMaintenanceEnabled] = useState(false);
+    const [applyMaintenanceMessage, setApplyMaintenanceMessage] = useState(
+        DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
+    );
+    const [applyClosedBefore, setApplyClosedBefore] = useState("");
+    const [applyExpiredMessage, setApplyExpiredMessage] = useState(DEFAULT_STUDENT_APPLY_EXPIRED_MESSAGE);
     const [settings, setSettings] = useState({
         site_name: "",
         contact_email: "",
@@ -69,6 +89,20 @@ export default function AdminSettingsPage() {
                     );
                     setPartnerMembershipFeePkr(
                         String(parseMembershipFeePkrSettingValue(map[MEMBERSHIP_FEE_PARTNER_PKR_KEY], 1000)),
+                    );
+                    setApplyMaintenanceEnabled(
+                        parseStudentApplyMaintenanceEnabled(
+                            map[STUDENT_APPLY_MAINTENANCE_ENABLED_KEY],
+                            false,
+                        ),
+                    );
+                    setApplyMaintenanceMessage(
+                        map[STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY]?.trim() ||
+                            DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
+                    );
+                    setApplyClosedBefore(map[STUDENT_APPLY_CLOSED_BEFORE_KEY] || "");
+                    setApplyExpiredMessage(
+                        map[STUDENT_APPLY_EXPIRED_MESSAGE_KEY]?.trim() || DEFAULT_STUDENT_APPLY_EXPIRED_MESSAGE,
                     );
                     // The general settings live in the same flat key/value array.
                     setSettings((prev) => ({
@@ -204,6 +238,182 @@ export default function AdminSettingsPage() {
         }
     };
 
+    const persistApplyMaintenanceEnabled = async (enabled: boolean) => {
+        setIsSavingApplyMaintenance(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: STUDENT_APPLY_MAINTENANCE_ENABLED_KEY,
+                    value: enabled ? "true" : "false",
+                }),
+            });
+            if (res?.ok) {
+                setApplyMaintenanceEnabled(enabled);
+                toast.success(
+                    enabled
+                        ? "Student apply is paused. Reports, attendance, and reviews still work."
+                        : "Student apply is open again (except listings closed by the catalog cutoff).",
+                );
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to update apply maintenance");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to update apply maintenance", error);
+            toast.error("Failed to update apply maintenance");
+            await fetchSettings();
+        } finally {
+            setIsSavingApplyMaintenance(false);
+        }
+    };
+
+    const persistApplyMaintenanceMessage = async () => {
+        const message = applyMaintenanceMessage.trim() || DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE;
+        setIsSavingApplyMessage(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY,
+                    value: message,
+                }),
+            });
+            if (res?.ok) {
+                setApplyMaintenanceMessage(message);
+                toast.success("Apply pause message saved");
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to save apply message");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to save apply message", error);
+            toast.error("Failed to save apply message");
+            await fetchSettings();
+        } finally {
+            setIsSavingApplyMessage(false);
+        }
+    };
+
+    const persistExpireExisting = async (enabled: boolean) => {
+        if (isSavingExpireToggle) return;
+        if (
+            enabled &&
+            !window.confirm(
+                "Expire Join / Apply on every opportunity created so far? Enrolled students keep reports and attendance. New listings created after this can still accept applies unless Pause is on.",
+            )
+        ) {
+            return;
+        }
+        if (
+            !enabled &&
+            !window.confirm(
+                "Turn off Expire? Existing listings will accept Join / Apply again (unless Pause is on, or their own deadline has passed).",
+            )
+        ) {
+            return;
+        }
+        setIsSavingExpireToggle(true);
+        try {
+            const stamped = enabled ? new Date().toISOString() : "";
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: STUDENT_APPLY_CLOSED_BEFORE_KEY,
+                    value: stamped,
+                }),
+            });
+            if (res?.ok) {
+                setApplyClosedBefore(stamped);
+                toast.success(
+                    enabled
+                        ? "Existing opportunities are now expired. Students cannot join or apply."
+                        : "Expire is off. Existing listings can accept applications again.",
+                );
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to update expire setting");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to update expire setting", error);
+            toast.error("Failed to update expire setting");
+            await fetchSettings();
+        } finally {
+            setIsSavingExpireToggle(false);
+        }
+    };
+
+    const persistExpireMessage = async () => {
+        const message = applyExpiredMessage.trim() || DEFAULT_STUDENT_APPLY_EXPIRED_MESSAGE;
+        setIsSavingExpireMessage(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: STUDENT_APPLY_EXPIRED_MESSAGE_KEY,
+                    value: message,
+                }),
+            });
+            if (res?.ok) {
+                setApplyExpiredMessage(message);
+                toast.success("Expired opportunity message saved");
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to save expired message");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to save expired message", error);
+            toast.error("Failed to save expired message");
+            await fetchSettings();
+        } finally {
+            setIsSavingExpireMessage(false);
+        }
+    };
+
+    const expireExistingApplications = async () => {
+        if (
+            !window.confirm(
+                "Close Join / Apply on every opportunity created so far? Enrolled students keep reports and attendance. New listings created after this can still accept applies unless maintenance is on.",
+            )
+        ) {
+            return;
+        }
+        setIsExpiringExistingApplies(true);
+        try {
+            const stamped = new Date().toISOString();
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: STUDENT_APPLY_CLOSED_BEFORE_KEY,
+                    value: stamped,
+                }),
+            });
+            if (res?.ok) {
+                setApplyClosedBefore(stamped);
+                toast.success("Existing opportunities can no longer accept new applications.");
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to close existing applications");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to close existing applications", error);
+            toast.error("Failed to close existing applications");
+            await fetchSettings();
+        } finally {
+            setIsExpiringExistingApplies(false);
+        }
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         // POST /admin/settings upserts a single { key, value } row, so send one request per key.
@@ -263,6 +473,138 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="space-y-6">
+                <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm sm:p-6">
+                    <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-900">
+                        <PauseCircle className="h-5 w-5 text-amber-600" /> Student applications
+                    </h3>
+                    <div className="flex items-start justify-between gap-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+                        <div className="min-w-0">
+                            <div className="font-bold text-slate-900">Pause Join / Apply (temporary maintenance)</div>
+                            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                                When <strong>on</strong>, students cannot join or apply to any listing. The message below
+                                is shown on Browse. Reports, attendance, faculty review, and admin tools keep working.
+                            </p>
+                        </div>
+                        <label
+                            className={`relative inline-flex shrink-0 cursor-pointer items-center ${
+                                isSavingApplyMaintenance ? "pointer-events-none opacity-60" : ""
+                            }`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={applyMaintenanceEnabled}
+                                disabled={isSavingApplyMaintenance}
+                                onChange={(e) => void persistApplyMaintenanceEnabled(e.target.checked)}
+                                className="peer sr-only"
+                            />
+                            <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-amber-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-100"></div>
+                        </label>
+                    </div>
+                    {isSavingApplyMaintenance ? (
+                        <p className="mt-3 flex items-center gap-2 text-xs font-medium text-amber-800">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Saving…
+                        </p>
+                    ) : (
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Current: {applyMaintenanceEnabled ? "Apply paused" : "Apply not paused"}
+                        </p>
+                    )}
+
+                    <div className="mt-5 space-y-3 rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                        <label className="block text-sm font-bold text-slate-700">Message students see</label>
+                        <textarea
+                            rows={3}
+                            value={applyMaintenanceMessage}
+                            onChange={(e) => setApplyMaintenanceMessage(e.target.value)}
+                            disabled={isSavingApplyMessage}
+                            className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none transition-colors focus:border-amber-500"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void persistApplyMaintenanceMessage()}
+                            disabled={isSavingApplyMessage}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-amber-700 disabled:opacity-70"
+                        >
+                            {isSavingApplyMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save message
+                        </button>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 font-bold text-slate-900">
+                                    <TimerOff className="h-4 w-4 text-slate-600" />
+                                    Expire existing opportunities
+                                </div>
+                                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                                    When <strong>on</strong>, listings already created show as <strong>Expired</strong> and
+                                    students cannot Join / Apply. Reports, attendance, and reviews keep working. Listings
+                                    created after you turn this on can still accept applies unless Pause is also on.
+                                </p>
+                            </div>
+                            <label
+                                className={`relative inline-flex shrink-0 cursor-pointer items-center ${
+                                    isSavingExpireToggle ? "pointer-events-none opacity-60" : ""
+                                }`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(applyClosedBefore)}
+                                    disabled={isSavingExpireToggle}
+                                    onChange={(e) => void persistExpireExisting(e.target.checked)}
+                                    className="peer sr-only"
+                                />
+                                <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-slate-200"></div>
+                            </label>
+                        </div>
+                        {isSavingExpireToggle ? (
+                            <p className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-700">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Saving…
+                            </p>
+                        ) : (
+                            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Current: {applyClosedBefore ? "Expired" : "Not expired"}
+                                {applyClosedBefore
+                                    ? ` · cutoff ${new Date(applyClosedBefore).toLocaleString()}`
+                                    : ""}
+                            </p>
+                        )}
+
+                        <div className="mt-4 space-y-3">
+                            <label className="block text-sm font-bold text-slate-700">Expired message students see</label>
+                            <textarea
+                                rows={3}
+                                value={applyExpiredMessage}
+                                onChange={(e) => setApplyExpiredMessage(e.target.value)}
+                                disabled={isSavingExpireMessage}
+                                className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none transition-colors focus:border-slate-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => void persistExpireMessage()}
+                                disabled={isSavingExpireMessage}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-slate-900 disabled:opacity-70"
+                            >
+                                {isSavingExpireMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                Save expired message
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => void expireExistingApplications()}
+                            disabled={isExpiringExistingApplies}
+                            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 transition-all hover:bg-slate-50 disabled:opacity-70"
+                        >
+                            {isExpiringExistingApplies ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Expire all opportunities created so far
+                        </button>
+                    </div>
+                </div>
+
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-900">
                         <FileCheck className="h-5 w-5 text-indigo-600" /> Impact report workflow

@@ -468,9 +468,9 @@ export function V17ImpactFlashcard({
     const team = [
         data.section1?.team_lead
             ? {
-                  name: data.section1.team_lead.fullName || data.section1.team_lead.name || "Team lead",
-                  acad: [data.section1.team_lead.degree, data.section1.team_lead.university].filter(Boolean).join(" · "),
-                  hrs: data.section1.team_lead.hours,
+                  name: data.section1?.team_lead?.fullName || data.section1?.team_lead?.name || "Team lead",
+                  acad: [data.section1?.team_lead?.degree, data.section1?.team_lead?.university].filter(Boolean).join(" · "),
+                  hrs: data.section1?.team_lead?.hours,
               }
             : null,
         ...(Array.isArray(data.section1?.team_members)

@@ -218,9 +218,15 @@ export function resolvePhoneCountryDialEntry(phoneCountryKey: string): CountryDi
 /** E.164 from a dial string like `+92` and national digits (no leading `+`). */
 export function composeE164FromDialCode(countryDial: string, nationalDigits: string): string {
   const d = digitsOnly(countryDial);
-  const n = digitsOnly(nationalDigits);
+  let n = digitsOnly(nationalDigits);
   if (!n) return "";
   if (!d) return n;
+  if (d === "92") {
+    if (n.startsWith("0")) n = n.replace(/^0+/, "");
+    if (n.startsWith("92") && n.length > 10) n = n.slice(2);
+    n = n.slice(0, 10);
+    return n ? `+92${n}` : "";
+  }
   if (n.startsWith(d)) return `+${n}`;
   return `+${d}${n}`;
 }
@@ -269,17 +275,89 @@ export function parsePhoneForDisplay(stored: string): { phoneCountryKey: string;
     const d = dial.slice(1);
     if (rest.startsWith(d)) {
       const national = rest.slice(d.length);
-      return normalizePhonePartsToPicker(`${iso2}|${dial}`, national);
+      const parts = normalizePhonePartsToPicker(`${iso2}|${dial}`, national);
+      return {
+        phoneCountryKey: parts.phoneCountryKey,
+        national: normalizeNationalPhoneInput(parts.phoneCountryKey, parts.national),
+      };
     }
   }
-  return normalizePhonePartsToPicker(DEFAULT_PHONE_COUNTRY_KEY, rest);
+  const parts = normalizePhonePartsToPicker(DEFAULT_PHONE_COUNTRY_KEY, rest);
+  return {
+    phoneCountryKey: parts.phoneCountryKey,
+    national: normalizeNationalPhoneInput(parts.phoneCountryKey, parts.national),
+  };
 }
 
 /** E.164-style full number from select key + national digits. */
 export function composeInternationalPhone(phoneCountryKey: string, nationalDigits: string): string {
   const dial = dialFromPhoneCountryKey(phoneCountryKey);
-  const n = digitsOnly(nationalDigits);
+  const n = normalizeNationalPhoneInput(phoneCountryKey, nationalDigits);
   return n ? `${dial}${n}` : "";
+}
+
+function isoFromPhoneCountryKey(phoneCountryKey: string): string {
+  return resolvePhoneCountryDialEntry(phoneCountryKey).iso2.toUpperCase();
+}
+
+/**
+ * Digits-only national number, with PK trunk/`+92` prefixes stripped so the field
+ * stores `3001234567` rather than `03001234567` or `923001234567`.
+ */
+export function normalizeNationalPhoneInput(
+  phoneCountryKey: string,
+  raw: string,
+  maxDigits = 15,
+): string {
+  let n = digitsOnly(raw);
+  if (isoFromPhoneCountryKey(phoneCountryKey) === "PK") {
+    if (n.startsWith("0")) n = n.replace(/^0+/, "");
+    if (n.startsWith("92") && n.length > 10) n = n.slice(2);
+    return n.slice(0, 10);
+  }
+  // E.164 allows 15 digits in total, country code included (backend validatePhoneE164).
+  const dialDigits = digitsOnly(resolvePhoneCountryDialEntry(phoneCountryKey).dial).length;
+  const cap = maxDigits > 0 ? Math.min(maxDigits, 15 - dialDigits) : 15 - dialDigits;
+  if (cap > 0 && n.length > cap) return n.slice(0, cap);
+  return n;
+}
+
+/** Grouped national display (PK: `300 1234567`); other countries stay digit-only. */
+export function formatNationalPhoneInput(phoneCountryKey: string, national: string): string {
+  const n = normalizeNationalPhoneInput(phoneCountryKey, national, 15);
+  if (isoFromPhoneCountryKey(phoneCountryKey) === "PK") {
+    if (n.length <= 3) return n;
+    return `${n.slice(0, 3)} ${n.slice(3)}`;
+  }
+  return n;
+}
+
+/** Inline / submit error for the national mobile field, or `null` when valid. */
+export function validateNationalPhone(phoneCountryKey: string, national: string): string | null {
+  const iso = isoFromPhoneCountryKey(phoneCountryKey);
+  const rawDigits = digitsOnly(national);
+  if (!rawDigits) return "Enter a mobile / WhatsApp number.";
+  const n = normalizeNationalPhoneInput(phoneCountryKey, national, 15);
+  if (iso === "PK") {
+    if (rawDigits.startsWith("0") && !n.startsWith("3")) {
+      return "Drop the leading 0. Use 10 digits starting with 3 after +92.";
+    }
+    if (n.length !== 10 || !n.startsWith("3")) {
+      return "Pakistan mobile must be 10 digits starting with 3 (e.g. 300 1234567).";
+    }
+    return null;
+  }
+  if (n.length < 8) return "Enter a valid mobile number (at least 8 digits after the country code).";
+  if (n.length + digitsOnly(resolvePhoneCountryDialEntry(phoneCountryKey).dial).length > 15) {
+    return "Mobile number is too long.";
+  }
+  return null;
+}
+
+/** Same as {@link validateNationalPhone}, but empty is allowed (optional WhatsApp / contact). */
+export function validateOptionalNationalPhone(phoneCountryKey: string, national: string): string | null {
+  if (!digitsOnly(national)) return null;
+  return validateNationalPhone(phoneCountryKey, national);
 }
 
 /** Display as country code + national number, e.g. `+92 3001234567`. */

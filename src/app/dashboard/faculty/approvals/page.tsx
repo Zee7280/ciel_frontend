@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { CheckCircle, XCircle, Eye, Filter, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Filter, History, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
@@ -29,7 +29,8 @@ import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
-import { History } from "lucide-react";
+import { CommunityCrumb, HubBackButton, HubTabs } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 
 /** Faculty is reviewing a student-created opportunity here, so — unlike the Create Opportunity
  * tab's "my own opportunity" pipeline — the Faculty line itself is shown as a real, live stage. */
@@ -419,63 +420,25 @@ export default function FacultyApprovalsPage() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Student Project Approvals</h1>
-                <p className="text-slate-500">
-                    When a student requests approval (you may get an email), open the opportunity and review{" "}
-                    <strong className="text-slate-600 font-semibold">academic relevance</strong>,{" "}
-                    <strong className="text-slate-600 font-semibold">feasibility</strong>, and{" "}
-                    <strong className="text-slate-600 font-semibold">student readiness</strong>. Approve to move the
-                    request forward, request revision, or reject permanently when the proposal cannot proceed.
-                </p>
-                <p className="mt-2 text-sm text-slate-600">
-                    <strong className="font-semibold text-slate-800">Why do I see a request?</strong>{" "}
-                    <span className="text-slate-600">
-                        <em>Listed on submission</em> means you match the supervising faculty fields or the partner
-                        organization&rsquo;s official contact on the record. Some rows ask for <strong>partner</strong>{" "}
-                        acknowledgement rather than faculty gate review — Approve/Reject calls the partner workflow (same login).
-                        {" "}
-                        <em>University scope</em> means your account is assigned that university&rsquo;s liaison queue, so you
-                        may see other supervisors&rsquo; students from the same institution alongside your own listings.
-                    </span>
-                </p>
+        <div className="mx-auto max-w-[1240px] pb-20">
+            <CommunityCrumb role="Faculty" view="Review Opportunities" />
+            <div className="mt-4">
+                <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
             </div>
-
-            <div className="flex flex-wrap gap-2">
-                <Button
-                    variant={tab === "pending" ? "default" : "outline"}
-                    size="sm"
-                    className="h-9"
-                    onClick={() => setTab("pending")}
-                >
-                    Pending My Approval
-                </Button>
-                <Button
-                    variant={tab === "revision" ? "default" : "outline"}
-                    size="sm"
-                    className="h-9"
-                    onClick={() => setTab("revision")}
-                >
-                    Revision with Student
-                </Button>
-                <Button
-                    variant={tab === "linked" ? "default" : "outline"}
-                    size="sm"
-                    className="h-9"
-                    onClick={() => setTab("linked")}
-                >
-                    Linked Drafts
-                </Button>
-                <Button
-                    variant={tab === "history" ? "default" : "outline"}
-                    size="sm"
-                    className="h-9"
-                    onClick={() => setTab("history")}
-                >
-                    Approval history
-                </Button>
-            </div>
+            <MockupSectionHead
+                title="Review Opportunities"
+                subtitle="Student → Faculty → Partner/NGO (if named) → CIEL PK. Every decision is versioned and audited."
+            />
+            <HubTabs
+                tabs={[
+                    { id: "pending", label: "Pending my approval", count: pendingProjects.length },
+                    { id: "revision", label: "Revision with student", count: revisionProjects.length },
+                    { id: "linked", label: "Linked Drafts", count: linkedDrafts.length },
+                    { id: "history", label: "Decided", count: historyProjects.length },
+                ]}
+                active={tab}
+                onChange={(id) => setTab(id as typeof tab)}
+            />
 
             <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="relative flex-1">

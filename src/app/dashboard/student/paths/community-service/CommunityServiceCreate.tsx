@@ -4,36 +4,44 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentOpportunityMine, peekStudentOpportunityMine } from "@/utils/student-community-cache";
 import { toast } from "sonner";
-import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import {
     CommunityCrumb,
     EmptyPanel,
     HubTabs,
-    ZoneRule,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
 import { ApprovalChain, buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
-import { formatSentWaiting, whatsappShareHref } from "@/utils/reminderLinks";
+import { formatSentWaiting, whatsappHrefFromE164 } from "@/utils/reminderLinks";
 import {
     canEditReturnedOpportunity,
     isOpportunityPermanentlyRejected,
     isStudentOpportunityLiveForReporting,
 } from "@/utils/opportunityWorkflow";
+import { canStudentShowStartReportCta } from "@/utils/studentJoinApplication";
+import {
+    buildStudentReportsCheckMap,
+    pickReportStatusFromCheckRow,
+    resolveStudentBrowseReportCta,
+} from "@/utils/studentBrowseReportCta";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 const HUB = "/dashboard/student/paths/community-service";
 const CREATE_FORM = "/dashboard/student/create-opportunity?new=1";
 const WORKSPACE_READY = `${HUB}?view=workspace&filter=ready`;
 
 export const CREATE_TABS = [
+    { id: "all", label: "All" },
     { id: "drafts", label: "Drafts" },
-    { id: "review", label: "Under Approval" },
+    { id: "review", label: "Under Review" },
     { id: "action", label: "Action Required" },
-    { id: "closed", label: "Closed" },
-    { id: "history", label: "Approved / Live" },
+    { id: "closed", label: "Rejected / Closed" },
+    { id: "history", label: "Published / Live" },
 ] as const;
 
 export type CreateTab = (typeof CREATE_TABS)[number]["id"];
+type StatusTab = Exclude<CreateTab, "all">;
 
 type ApprovalLineStatus =
     | "pending"
@@ -59,8 +67,12 @@ type MineRow = {
     updated_at?: string;
     faculty_contact_name?: string | null;
     faculty_contact_email?: string | null;
+    faculty_contact_phone?: string | null;
     partner_contact_name?: string | null;
     partner_contact_email?: string | null;
+    partner_contact_phone?: string | null;
+    admin_approved?: boolean;
+    report_status?: string | null;
     rejection_reason?: string | null;
     public_code?: string | null;
     currently_with?: string | null;
@@ -84,14 +96,6 @@ function opportunityFullyApproved(op: MineRow): boolean {
     return isStudentOpportunityLiveForReporting(op as unknown as Record<string, unknown>);
 }
 
-export function createTabOf(op: MineRow): CreateTab {
-    if (op.status === "draft") return "drafts";
-    if (canEditReturnedOpportunity(op as unknown as Record<string, unknown>)) return "action";
-    if (isOpportunityPermanentlyRejected(op as unknown as Record<string, unknown>)) return "closed";
-    if (opportunityFullyApproved(op)) return "history";
-    return "review";
-}
-
 function lineDone(status: ApprovalLineStatus): boolean {
     return (
         status === "approved" ||
@@ -105,25 +109,85 @@ function lineBlocked(status: ApprovalLineStatus): boolean {
     return status === "rejected" || status === "revision_requested";
 }
 
-function currentReviewer(op: MineRow): string {
-    if (!lineDone(op.faculty_approval_status) && op.faculty_approval_status !== "rejected") {
-        return op.faculty_contact_name?.trim() || "Faculty";
-    }
-    if (op.requires_partner_approval && !lineDone(op.partner_approval_status) && op.partner_approval_status !== "rejected") {
-        return op.partner_contact_name?.trim() || "Partner / NGO";
-    }
-    return "CIEL PK";
+function mapMineRow(r: Record<string, unknown>): MineRow {
+    return {
+        id: String(r.id),
+        title: String(r.title ?? "Untitled opportunity"),
+        status: typeof r.status === "string" ? r.status : undefined,
+        workflow_stage: (r.workflow_stage as string | null) ?? null,
+        faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
+        partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
+        admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
+        requires_partner_approval: Boolean(r.requires_partner_approval),
+        created_at: typeof r.created_at === "string" ? r.created_at : undefined,
+        updated_at: typeof r.updated_at === "string" ? r.updated_at : undefined,
+        faculty_contact_name: (r.faculty_contact_name as string | null) ?? null,
+        faculty_contact_email: (r.faculty_contact_email as string | null) ?? null,
+        faculty_contact_phone: (r.faculty_contact_phone as string | null) ?? null,
+        partner_contact_name: (r.partner_contact_name as string | null) ?? null,
+        partner_contact_email: (r.partner_contact_email as string | null) ?? null,
+        partner_contact_phone: (r.partner_contact_phone as string | null) ?? null,
+        admin_approved: r.admin_approved === true,
+        rejection_reason: (r.rejection_reason as string | null) ?? null,
+        public_code: typeof r.public_code === "string" ? r.public_code : null,
+        currently_with: typeof r.currently_with === "string" ? r.currently_with : null,
+        currently_with_role: typeof r.currently_with_role === "string" ? r.currently_with_role : null,
+        next_step: typeof r.next_step === "string" ? r.next_step : null,
+        waiting_since: typeof r.waiting_since === "string" ? r.waiting_since : null,
+        approval_route:
+            r.approval_route && typeof r.approval_route === "object" && !Array.isArray(r.approval_route)
+                ? (r.approval_route as MineRow["approval_route"])
+                : undefined,
+        report_status: typeof r.report_status === "string" ? r.report_status : null,
+    };
 }
 
-/** Which stage is currently pending, for the "Pending X" badge/status title on Under Approval cards. */
-function pendingStageLabel(op: MineRow): string {
-    if (!lineDone(op.faculty_approval_status) && !lineBlocked(op.faculty_approval_status)) {
-        return "Pending Faculty";
+export function createTabOf(op: MineRow): StatusTab {
+    if (op.status === "draft") return "drafts";
+    if (canEditReturnedOpportunity(op as unknown as Record<string, unknown>)) return "action";
+    if (isOpportunityPermanentlyRejected(op as unknown as Record<string, unknown>)) return "closed";
+    if (opportunityFullyApproved(op)) return "history";
+    const role = String(op.currently_with_role || "").toLowerCase();
+    if (
+        (role === "none" || role === "") &&
+        (op.admin_approved || lineDone(op.admin_approval_status)) &&
+        lineDone(op.faculty_approval_status) &&
+        (!op.requires_partner_approval || lineDone(op.partner_approval_status))
+    ) {
+        return "history";
     }
+    return "review";
+}
+
+function pendingReviewerRole(op: MineRow): "faculty" | "partner" | "admin" | "none" {
+    const role = String(op.currently_with_role || "").toLowerCase();
+    if (role === "faculty" || role === "partner" || role === "admin") return role;
+    if (role === "none" || role === "student") return "none";
+    if (!lineDone(op.faculty_approval_status) && !lineBlocked(op.faculty_approval_status)) return "faculty";
     if (op.requires_partner_approval && !lineDone(op.partner_approval_status) && !lineBlocked(op.partner_approval_status)) {
-        return "Pending Partner";
+        return "partner";
     }
-    return "Pending CIEL PK";
+    if (!lineDone(op.admin_approval_status) && !lineBlocked(op.admin_approval_status) && !op.admin_approved) {
+        return "admin";
+    }
+    return "none";
+}
+
+function currentReviewer(op: MineRow): string {
+    const role = pendingReviewerRole(op);
+    if (role === "faculty") return op.faculty_contact_name?.trim() || "Faculty";
+    if (role === "partner") return op.partner_contact_name?.trim() || "Partner / NGO";
+    if (role === "admin") return "CIEL PK";
+    return op.currently_with?.trim() || "CIEL PK";
+}
+
+/** Which stage is currently pending, for the "Pending X" badge on Under Review cards. */
+function pendingStageLabel(op: MineRow): string {
+    const role = pendingReviewerRole(op);
+    if (role === "faculty") return "Pending Faculty";
+    if (role === "partner") return "Pending Partner";
+    if (role === "admin") return "Pending CIEL PK";
+    return "Approved";
 }
 
 function formatWhen(iso?: string): string {
@@ -134,19 +198,38 @@ function formatWhen(iso?: string): string {
 }
 
 const ROAD: { n: string; title: string; sub: string; optional?: boolean; finish?: boolean }[] = [
-    { n: "1", title: "Draft", sub: "You build + save" },
-    { n: "2", title: "Faculty", sub: "Mandatory review" },
-    { n: "3", title: "Partner / NGO", sub: "Only if linked", optional: true },
+    { n: "1", title: "Draft", sub: "Save before submitting" },
+    { n: "2", title: "Faculty", sub: "if required" },
+    { n: "3", title: "Partner / NGO", sub: "if selected", optional: true },
     { n: "4", title: "CIEL PK", sub: "Final review" },
-    { n: "5", title: "Decision", sub: "Approved / Revise / Reject", finish: true },
+    { n: "5", title: "Published / Live", sub: "Based on visibility", finish: true },
 ];
 
-const EMPTY: Record<CreateTab, string> = {
-    drafts: "Create a new opportunity or save a form to see it here.",
-    review: "No opportunity is waiting for approval right now.",
-    action: "No reviewer has requested changes.",
-    closed: "No rejected opportunities.",
-    history: "Approved / Live proposals appear here; active work is also in My Reports.",
+const EMPTY: Record<CreateTab, { title: string; text: string }> = {
+    all: {
+        title: "No opportunities yet",
+        text: "Use the button above to start tracking a proposal from draft to publication.",
+    },
+    drafts: {
+        title: "No drafts",
+        text: "Saved drafts will appear here before you submit for review.",
+    },
+    review: {
+        title: "Nothing under review",
+        text: "No opportunity is waiting for Faculty, Partner, or CIEL PK right now.",
+    },
+    action: {
+        title: "No changes requested",
+        text: "You have no revision requests at the moment.",
+    },
+    closed: {
+        title: "No rejected or closed opportunities",
+        text: "Rejected or closed proposals will appear here.",
+    },
+    history: {
+        title: "Nothing published yet",
+        text: "Approved opportunities appear here after CIEL PK publishes them.",
+    },
 };
 
 export default function CommunityServiceCreate() {
@@ -154,51 +237,42 @@ export default function CommunityServiceCreate() {
     const searchParams = useSearchParams();
     const filterParam = searchParams.get("filter");
     const focusId = searchParams.get("opportunity");
-    const [rows, setRows] = useState<MineRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const cachedMine = peekStudentOpportunityMine();
+    const [rows, setRows] = useState<MineRow[]>(() => (cachedMine ?? []).map(mapMineRow));
+    const [loading, setLoading] = useState(!cachedMine);
     const [showDraftExistsModal, setShowDraftExistsModal] = useState(false);
-    const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((json) => {
+        const load = async () => {
+            try {
+                const list = await fetchStudentOpportunityMine();
                 if (cancelled) return;
-                const list = Array.isArray(json?.data) ? (json.data as Record<string, unknown>[]) : [];
-                setRows(
-                    list.map((r) => ({
-                        id: String(r.id),
-                        title: String(r.title ?? "Untitled opportunity"),
-                        status: typeof r.status === "string" ? r.status : undefined,
-                        workflow_stage: (r.workflow_stage as string | null) ?? null,
-                        faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
-                        partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
-                        admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
-                        requires_partner_approval: Boolean(r.requires_partner_approval),
-                        created_at: typeof r.created_at === "string" ? r.created_at : undefined,
-                        updated_at: typeof r.updated_at === "string" ? r.updated_at : undefined,
-                        faculty_contact_name: (r.faculty_contact_name as string | null) ?? null,
-                        faculty_contact_email: (r.faculty_contact_email as string | null) ?? null,
-                        partner_contact_name: (r.partner_contact_name as string | null) ?? null,
-                        partner_contact_email: (r.partner_contact_email as string | null) ?? null,
-                        rejection_reason: (r.rejection_reason as string | null) ?? null,
-                        public_code: typeof r.public_code === "string" ? r.public_code : null,
-                        currently_with: typeof r.currently_with === "string" ? r.currently_with : null,
-                        currently_with_role: typeof r.currently_with_role === "string" ? r.currently_with_role : null,
-                        next_step: typeof r.next_step === "string" ? r.next_step : null,
-                        waiting_since: typeof r.waiting_since === "string" ? r.waiting_since : null,
-                        approval_route:
-                            r.approval_route && typeof r.approval_route === "object" && !Array.isArray(r.approval_route)
-                                ? (r.approval_route as MineRow["approval_route"])
-                                : undefined,
+                setRows(list.map(mapMineRow));
+                setLoading(false);
+
+                const studentId = String(readStoredCurrentUser()?.id || "").trim();
+                if (!studentId) return;
+                const reportsRes = await authenticatedFetch(
+                    `/api/v1/students/reports/check?studentId=${encodeURIComponent(studentId)}`,
+                    {},
+                    { redirectToLogin: false },
+                );
+                if (cancelled || !reportsRes?.ok) return;
+                const reportsJson = (await reportsRes.json()) as { success?: boolean; data?: unknown };
+                if (!reportsJson.success || !Array.isArray(reportsJson.data)) return;
+                const reportMap = buildStudentReportsCheckMap(reportsJson.data);
+                setRows((prev) =>
+                    prev.map((row) => ({
+                        ...row,
+                        report_status: pickReportStatusFromCheckRow(reportMap.get(row.id)) || row.report_status || null,
                     })),
                 );
-                setLoading(false);
-            })
-            .catch(() => {
+            } catch {
                 if (!cancelled) setLoading(false);
-            });
+            }
+        };
+        void load();
         return () => {
             cancelled = true;
         };
@@ -206,7 +280,14 @@ export default function CommunityServiceCreate() {
 
     const submitted = useMemo(() => rows.filter((row) => row.status !== "draft"), [rows]);
     const counts = useMemo(() => {
-        const next: Record<CreateTab, number> = { drafts: 0, review: 0, action: 0, closed: 0, history: 0 };
+        const next: Record<CreateTab, number> = {
+            all: rows.length,
+            drafts: 0,
+            review: 0,
+            action: 0,
+            closed: 0,
+            history: 0,
+        };
         for (const row of rows) next[createTabOf(row)] += 1;
         return next;
     }, [rows]);
@@ -217,19 +298,17 @@ export default function CommunityServiceCreate() {
           ? "action"
           : counts.review
             ? "review"
-            : counts.drafts
-              ? "drafts"
-              : "history";
+            : "all";
 
     const setTab = (next: string) => {
-        const qs = new URLSearchParams(searchParams.toString());
+        const qs = new URLSearchParams();
         qs.set("view", "create");
         qs.set("filter", next);
+        // Drop focused opportunity when switching tabs so the list for the new tab is clear.
         router.replace(`${HUB}?${qs.toString()}`, { scroll: false });
     };
 
-    const list = submitted.filter((row) => createTabOf(row) === tab);
-    const activeN = counts.drafts + counts.review + counts.action;
+    const list = tab === "all" ? submitted : submitted.filter((row) => createTabOf(row) === tab);
 
     useEffect(() => {
         if (!focusId || loading) return;
@@ -239,22 +318,19 @@ export default function CommunityServiceCreate() {
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
-            <CommunityCrumb role="Student" view="Create Opportunity" />
-            <MockupSectionHead
-                title="Create Opportunity"
-                subtitle="Everything about a student-created opportunity stays here until CIEL PK gives the final decision. Approval completes the proposal journey; approved work then moves to My Reports."
-                action={
-                    <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
-                        ← Back to module buttons
-                    </Link>
-                }
-            />
-            <div className="flex flex-col items-start justify-between gap-4 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-5 sm:flex-row sm:items-center">
-                <div>
-                    <p className="text-[9.5px] font-black uppercase tracking-[0.08em] text-[#0e7d74]">Your proposal journey</p>
-                    <h3 className="mt-1 text-[20px] font-semibold text-[#16313d]">Create it here. Track it here. Fix it here.</h3>
-                    <p className="mt-1 max-w-[800px] text-[12px] leading-relaxed text-[#70808a]">
-                        The proposal does not enter My Reports until final approval. Every reviewer, decision, version and next action remains visible here.
+            <CommunityCrumb role="Student" view="My Opportunities" />
+            <div className="mb-2 mt-4 sm:mt-[23px]">
+                <Link href={HUB} className="inline-flex border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
+                    ← Back to Community Service
+                </Link>
+            </div>
+            <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-start">
+                <div className="min-w-0">
+                    <h1 className="m-0 text-[26px] font-bold tracking-tight text-[#16313d] sm:text-[32px]">My Opportunities</h1>
+                    <p className="mt-1.5 max-w-[640px] text-[13px] leading-relaxed text-[#70808a]">
+                        Track your opportunities from draft to publication.
+                        <br className="hidden sm:block" />
+                        View approval progress and respond to reviewer feedback.
                     </p>
                 </div>
                 <button
@@ -264,9 +340,9 @@ export default function CommunityServiceCreate() {
                         if (hasDraft) setShowDraftExistsModal(true);
                         else router.push(CREATE_FORM);
                     }}
-                    className="shrink-0 rounded-xl bg-[#174b43] px-[15px] py-[11px] text-[11px] font-[950] text-white"
+                    className="w-full shrink-0 rounded-xl bg-[#174b43] px-[15px] py-[11px] text-center text-[11px] font-[950] text-white sm:w-auto"
                 >
-                    + Create New Opportunity
+                    + Create Opportunity
                 </button>
             </div>
 
@@ -322,45 +398,44 @@ export default function CommunityServiceCreate() {
                 );
             })() : null}
 
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
-                {ROAD.map((step, i) => (
-                    <span key={step.n} className="flex items-center gap-2">
-                        <span
-                            className={
-                                "rounded-xl border px-3 py-2 " +
-                                (i === 0
-                                    ? "border-[#cfeadf] bg-[#eff9f5]"
-                                    : step.finish
-                                      ? "border-[#dce6ea] bg-[#f7fafb]"
-                                      : step.optional
-                                        ? "border-dashed border-[#dce6ea] bg-white"
-                                        : "border-[#dde5ea] bg-white")
-                            }
-                        >
-                            <span className="mr-1.5 inline-grid h-5 w-5 place-items-center rounded-full bg-[#16313d] text-[9px] font-black text-white">
-                                {step.n}
+            <div className="mt-1 rounded-[16px] border border-[#dce6ea] bg-white p-4">
+                <p className="mb-3 text-[13px] font-semibold text-[#16313d]">Approval flow</p>
+                <div className="-mx-1 flex flex-nowrap items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                    {ROAD.map((step, i) => (
+                        <span key={step.n} className="flex shrink-0 items-center gap-2">
+                            <span
+                                className={
+                                    "whitespace-nowrap rounded-xl border px-3 py-2 " +
+                                    (i === 0
+                                        ? "border-[#cfeadf] bg-[#eff9f5]"
+                                        : step.finish
+                                          ? "border-[#dce6ea] bg-[#f7fafb]"
+                                          : step.optional
+                                            ? "border-dashed border-[#dce6ea] bg-white"
+                                            : "border-[#dde5ea] bg-white")
+                                }
+                            >
+                                <span className="mr-1.5 inline-grid h-5 w-5 place-items-center rounded-full bg-[#16313d] text-[9px] font-black text-white">
+                                    {step.n}
+                                </span>
+                                <b className="text-[11px] text-[#16313d]">{step.title}</b>
+                                <small className="ml-1.5 hidden text-[10px] text-[#70808a] sm:inline">{step.sub}</small>
                             </span>
-                            <b className="text-[11px] text-[#16313d]">{step.title}</b>
-                            <small className="ml-1.5 text-[10px] text-[#70808a]">{step.sub}</small>
+                            {i < ROAD.length - 1 ? <span className="font-black text-[#a8b6bb]">→</span> : null}
                         </span>
-                        {i < ROAD.length - 1 ? <span className="font-black text-[#a8b6bb]">→</span> : null}
-                    </span>
-                ))}
-            </div>
-
-            <div className="mt-3.5">
-                <ZoneRule title="Simple rule:">
-                    Draft, approval, revision and rejection stay under <strong>Create Opportunity / My Opportunities</strong>. When final approval is achieved, the operational project appears in{" "}
-                    <strong>My Reports → Ready to Start</strong>. Approved / Live remains here as the same master record.
-                </ZoneRule>
+                    ))}
+                </div>
+                <p className="mt-3 text-[11px] italic text-[#70808a]">
+                    Any reviewer may request changes or reject an opportunity during review.
+                </p>
             </div>
 
             <div className="mt-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
                 {[
-                    [String(activeN), "Active proposal records"],
-                    [String(counts.review), "Waiting on reviewer"],
-                    [String(counts.action), "Need your action"],
-                    [String(counts.history), "Approved / Live"],
+                    [String(counts.all), "Total Opportunities"],
+                    [String(counts.review), "Under Review"],
+                    [String(counts.action), "Action Required"],
+                    [String(counts.history), "Published / Live"],
                 ].map(([value, label]) => (
                     <div key={label} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
                         <strong className="block text-lg text-[#16313d]">{value}</strong>
@@ -381,108 +456,47 @@ export default function CommunityServiceCreate() {
                 <DraftsLandingView embedded hideIntro />
             ) : loading ? (
                 <p className="mt-6 text-center text-sm text-[#7a919a]">Loading proposals…</p>
+            ) : tab === "all" && rows.length === 0 ? (
+                <EmptyPanel title={EMPTY.all.title} text={EMPTY.all.text} />
+            ) : tab === "all" ? (
+                <div className="grid gap-3.5">
+                    {counts.drafts > 0 ? <DraftsLandingView embedded hideIntro /> : null}
+                    {list.map((op) => (
+                        <ProposalCard key={op.id} op={op} tab={createTabOf(op)} highlighted={focusId === op.id} />
+                    ))}
+                </div>
             ) : list.length === 0 ? (
-                <EmptyPanel title="Nothing here" text={EMPTY[tab]} />
+                <EmptyPanel
+                    title={EMPTY[tab].title}
+                    text={EMPTY[tab].text}
+                    mark={tab === "action" ? "ok" : undefined}
+                />
             ) : (
                 <div className="grid gap-3.5">
                     {list.map((op) => (
-                        <ProposalCard key={op.id} op={op} tab={tab} highlighted={focusId === op.id} onOpenHistory={() => setHistoryOpenId(op.id)} />
+                        <ProposalCard key={op.id} op={op} tab={tab} highlighted={focusId === op.id} />
                     ))}
                 </div>
             )}
-
-            {historyOpenId
-                ? (() => {
-                      const op = rows.find((r) => r.id === historyOpenId);
-                      if (!op) return null;
-                      const lines: { label: string; status: ApprovalLineStatus; contact?: string | null }[] = [
-                          { label: "Faculty", status: op.faculty_approval_status, contact: op.faculty_contact_name },
-                          ...(op.requires_partner_approval
-                              ? [{ label: "Partner / NGO", status: op.partner_approval_status, contact: op.partner_contact_name }]
-                              : []),
-                          { label: "CIEL PK", status: op.admin_approval_status, contact: null },
-                      ];
-                      const lineStatusLabel = (status: ApprovalLineStatus): string => {
-                          if (status === "approved") return "Approved";
-                          if (status === "rejected") return "Rejected";
-                          if (status === "revision_requested") return "Revision requested";
-                          if (status === "not_applicable" || status === "not_required" || status === "skipped") return "Not required";
-                          return "Pending";
-                      };
-                      return (
-                          <div
-                              className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-                              onClick={(e) => e.target === e.currentTarget && setHistoryOpenId(null)}
-                          >
-                              <div className="w-full max-w-[480px] rounded-2xl bg-white p-6 shadow-2xl">
-                                  <div className="flex items-start justify-between gap-3">
-                                      <h3 className="m-0 text-[16px] font-bold text-[#16313d]">Approval history</h3>
-                                      <button
-                                          type="button"
-                                          onClick={() => setHistoryOpenId(null)}
-                                          className="shrink-0 rounded-full border border-[#dde5ea] px-2.5 py-1 text-[11px] font-bold text-[#3c5968]"
-                                      >
-                                          ✕
-                                      </button>
-                                  </div>
-                                  <p className="mt-1 text-[11px] text-[#70808a]">{op.title}</p>
-                                  <div className="mt-4 space-y-2">
-                                      {lines.map((line) => (
-                                          <div
-                                              key={line.label}
-                                              className="flex items-center justify-between gap-3 rounded-[12px] border border-[#dde5ea] bg-[#fbfcfd] px-3 py-2.5"
-                                          >
-                                              <div>
-                                                  <b className="block text-[11.5px] text-[#16313d]">{line.label}</b>
-                                                  {line.contact ? <span className="text-[10px] text-[#70808a]">{line.contact}</span> : null}
-                                              </div>
-                                              <span
-                                                  className={
-                                                      "rounded-[18px] px-2 py-0.5 text-[9.5px] font-black " +
-                                                      (line.status === "approved"
-                                                          ? "bg-[#e8f5ef] text-[#1d765d]"
-                                                          : line.status === "rejected" || line.status === "revision_requested"
-                                                            ? "bg-[#fdeeee] text-[#b34c4c]"
-                                                            : lineDone(line.status)
-                                                              ? "bg-[#edf2f3] text-[#5a6b73]"
-                                                              : "bg-[#fff3dc] text-[#a66d11]")
-                                                  }
-                                              >
-                                                  {lineStatusLabel(line.status)}
-                                              </span>
-                                          </div>
-                                      ))}
-                                  </div>
-                                  {op.rejection_reason ? (
-                                      <div className="mt-3 rounded-[12px] border border-[#f3d4d4] bg-[#fdeeee] p-3">
-                                          <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#b34c4c]">Latest reviewer comment</p>
-                                          <p className="mt-1 text-[11px] leading-relaxed text-[#7d3838]">{op.rejection_reason}</p>
-                                      </div>
-                                  ) : null}
-                                  <div className="mt-5 flex justify-end">
-                                      <button
-                                          type="button"
-                                          onClick={() => setHistoryOpenId(null)}
-                                          className="rounded-[10px] border border-[#dde5ea] px-3 py-2 text-[10px] font-black text-[#3c5968]"
-                                      >
-                                          Close
-                                      </button>
-                                  </div>
-                              </div>
-                          </div>
-                      );
-                  })()
-                : null}
         </div>
     );
 }
 
-function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; tab: CreateTab; highlighted?: boolean; onOpenHistory: () => void }) {
+function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; highlighted?: boolean }) {
+    const reviewerRole = pendingReviewerRole(op);
     const who = currentReviewer(op);
     const [sendingEmail, setSendingEmail] = useState(false);
     const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`;
     const viewHref = `/dashboard/student/browse/${encodeURIComponent(op.id)}`;
     const publicCode = op.public_code || "";
+    const openPath =
+        reviewerRole === "partner"
+            ? op.approval_route?.partner
+            : reviewerRole === "admin"
+              ? op.approval_route?.admin
+              : op.approval_route?.faculty;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const openUrl = openPath ? `${origin}${openPath}` : "";
     const remindSubject = publicCode
         ? `CIEL PK Community Service Approval · ${publicCode}`
         : `CIEL PK reminder — ${op.title}`;
@@ -494,23 +508,40 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
         op.next_step ? `Next: ${op.next_step}` : "",
         "",
         "Please review the opportunity when convenient.",
-        op.approval_route?.faculty || op.approval_route?.admin
-            ? `Open Approval: ${
-                  op.currently_with_role === "partner"
-                      ? op.approval_route?.partner
-                      : op.currently_with_role === "admin"
-                        ? op.approval_route?.admin
-                        : op.approval_route?.faculty
-              }`
-            : "",
+        openUrl ? `Open Approval: ${openUrl}` : "",
     ]
         .filter((line) => line !== "")
         .join("\n");
-    const canSendReviewerEmail = tab === "review";
+    const canRemindReviewer =
+        tab === "review" && (reviewerRole === "faculty" || reviewerRole === "partner" || reviewerRole === "admin");
+    const reviewerPhone =
+        reviewerRole === "faculty"
+            ? op.faculty_contact_phone
+            : reviewerRole === "partner"
+              ? op.partner_contact_phone
+              : null;
+    const whatsappHref = canRemindReviewer ? whatsappHrefFromE164(reviewerPhone, remindBody) : null;
     const sentWaiting = formatSentWaiting(op.waiting_since);
+    const oppRecord: Record<string, unknown> = {
+        ...op,
+        is_student_created: true,
+        isStudentCreated: true,
+        is_student_owner: true,
+        isStudentOwner: true,
+        admin_approved: op.admin_approved === true,
+        status: op.status,
+        faculty_approval_status: op.faculty_approval_status,
+        partner_approval_status: op.partner_approval_status,
+        admin_approval_status: op.admin_approval_status,
+        requires_partner_approval: op.requires_partner_approval,
+        workflow_stage: op.workflow_stage,
+    };
+    const reportCta = canStudentShowStartReportCta(oppRecord, { isStudentOwner: true })
+        ? resolveStudentBrowseReportCta(op.id, op.report_status || undefined)
+        : null;
 
     const sendReviewerEmail = async () => {
-        if (sendingEmail) return;
+        if (sendingEmail || !canRemindReviewer) return;
         setSendingEmail(true);
         try {
             const res = await authenticatedFetch(
@@ -555,21 +586,30 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
     );
 
     let statusTitle = pendingStageLabel(op);
-    let statusText = who === "CIEL PK" ? "Waiting for final platform approval" : `Waiting for ${who}`;
+    let statusText =
+        reviewerRole === "admin"
+            ? "Waiting for final platform approval"
+            : reviewerRole === "none"
+              ? "No reviewer is waiting on a decision right now."
+              : `Waiting for ${who}`;
     // Student-facing "next action" must describe who is blocking NOW — not the step after them.
-    // Backend `next_step` for pending_partner is "CIEL PK Final Approval" (downstream), which
-    // confused the Email button area into looking like CIEL should be emailed.
     let nextTitle =
         tab === "review"
-            ? who === "CIEL PK"
+            ? reviewerRole === "admin"
                 ? "Waiting for CIEL PK"
-                : `Waiting for ${who} to approve`
+                : reviewerRole === "none"
+                  ? "No action required from you"
+                  : `Waiting for ${who} to approve`
             : "No action required from you";
     let nextText =
         tab === "review"
-            ? `Use Email ${who} to resend the CIEL verification link. Also check their Spam/Junk folder.`
+            ? reviewerRole === "admin"
+                ? `Use Email CIEL PK to resend the final verification reminder. Also check Spam/Junk on the CIEL inbox.`
+                : reviewerRole === "none"
+                  ? "This proposal is no longer waiting on a reviewer reminder."
+                  : `Use Email ${who} to resend their verification link. Also ask them to check Spam/Junk.`
             : "This opportunity stays here until the current reviewer decides. You will be notified.";
-    let tone: "ok" | "wait" | "rev" = "wait";
+    let tone: "ok" | "wait" | "rev" = reviewerRole === "none" && tab === "review" ? "ok" : "wait";
 
     if (tab === "action") {
         statusTitle = "Revision Required";
@@ -666,7 +706,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                             Review Comments & Edit
                         </Link>
                     ) : null}
-                    {tab === "history" ? (
+                    {tab === "history" && !reportCta ? (
                         <Link href={WORKSPACE_READY} className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white">
                             Open My Reports
                         </Link>
@@ -674,14 +714,7 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                     <Link href={viewHref} className="rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
                         {tab === "review" ? "View Submitted Flashcard" : "View Flashcard"}
                     </Link>
-                    <button
-                        type="button"
-                        onClick={onOpenHistory}
-                        className="rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
-                    >
-                        {tab === "action" ? "History" : tab === "closed" ? "View History" : "Approval History"}
-                    </button>
-                    {canSendReviewerEmail ? (
+                    {canRemindReviewer ? (
                         <button
                             type="button"
                             disabled={sendingEmail}
@@ -691,10 +724,34 @@ function ProposalCard({ op, tab, highlighted, onOpenHistory }: { op: MineRow; ta
                             {sendingEmail ? "Sending…" : `Email ${who}`}
                         </button>
                     ) : null}
-                    {tab === "review" ? (
-                        <a href={whatsappShareHref(`${remindSubject}\n\n${remindBody}`)} className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f]">
-                            WhatsApp {who}
-                        </a>
+                    {canRemindReviewer ? (
+                        whatsappHref ? (
+                            <a
+                                href={whatsappHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-[9px] bg-[#e8f8ee] px-2.5 py-2 text-[10px] font-black text-[#1f7a46]"
+                            >
+                                WhatsApp {who}
+                            </a>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled
+                                title="No WhatsApp number saved for this reviewer"
+                                className="cursor-not-allowed rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#8a9aa3] opacity-70"
+                            >
+                                WhatsApp {who}
+                            </button>
+                        )
+                    ) : null}
+                    {reportCta ? (
+                        <Link
+                            href={reportCta.href}
+                            className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white"
+                        >
+                            {reportCta.label}
+                        </Link>
                     ) : null}
                 </div>
             </div>

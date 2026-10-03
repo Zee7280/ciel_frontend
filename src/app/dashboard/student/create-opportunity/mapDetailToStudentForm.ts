@@ -225,8 +225,12 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         privateCountry: typeof privateBlock.country === "string" ? privateBlock.country : "",
         privateContactPref: typeof privateBlock.contact_pref === "string" ? privateBlock.contact_pref : "",
         ...(() => {
-            const raw = typeof privateBlock.phone === "string" ? privateBlock.phone : "";
-            const parsed = parsePhoneForDisplay(raw);
+            const rawPhone =
+                (typeof privateBlock.phone === "string" && privateBlock.phone.trim()) ||
+                (typeof d.student_contact === "string" && d.student_contact.trim()) ||
+                (typeof indBlock.contact_number === "string" && indBlock.contact_number.trim()) ||
+                "";
+            const parsed = parsePhoneForDisplay(rawPhone);
             return {
                 privatePhoneKey: parsed.phoneCountryKey,
                 privatePhone: parsed.national,

@@ -9,7 +9,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { CourseworkCrumb } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
+import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
@@ -1113,8 +1113,9 @@ export default function StartupBusinessHub({
     view: HubView;
 }) {
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
-    const [entry, setEntry] = useState<HubVenture | null>(null);
+    const cachedEntry = usePathSessionCache<HubVenture>("startup-venture");
+    const [, setLoading] = useState(!cachedEntry);
+    const [entry, setEntry] = useState<HubVenture | null>(cachedEntry);
     const [name, setName] = useState("there");
     const [filters, setFilters] = useState({ status: "", stage: "", sector: "", sdg: "", sort: "updated", q: "" });
     const [consentBusy, setConsentBusy] = useState(false);
@@ -1125,7 +1126,11 @@ export default function StartupBusinessHub({
         authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
-                if (result?.data) setEntry(result.data as HubVenture);
+                if (result?.data) {
+                    const next = result.data as HubVenture;
+                    setEntry(next);
+                    setPathSessionCache("startup-venture", next);
+                }
             })
             .finally(() => setLoading(false));
     }, []);
@@ -1143,8 +1148,6 @@ export default function StartupBusinessHub({
     const investorOpen = approved.some(isInvestorOpen);
     const workspaceList = applyFilters(inProgress, filters, "workspace");
     const wallList = applyFilters(approved, filters, "wall");
-
-    if (loading) return <WorkspaceSkeleton />;
 
     const openForm = () => router.push(WORKSPACE_HREF);
     const openRecord = () => router.push(RECORD_HREF);

@@ -75,6 +75,11 @@ export function isTeamMemberAttendanceOnlyMode(
     userEmail?: string | null,
     myParticipationIsTeamLead?: boolean | null,
 ): boolean {
+    // Individual seats must never enter attendance-only mode — even if a stale
+    // participation flag says isTeamLead=false from a prior team project.
+    if (data.section1?.participation_type !== "team") {
+        return false;
+    }
     if (myParticipationIsTeamLead === false) {
         return true;
     }

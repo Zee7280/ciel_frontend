@@ -152,7 +152,7 @@ export default function SearchableSelect({
                         )}
                     />
 
-                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border-2 border-slate-100 bg-white shadow-2xl shadow-slate-200/60 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="relative z-10 mt-2 max-h-64 overflow-y-auto rounded-2xl border-2 border-slate-100 bg-white shadow-lg">
                         {filteredOptions.length > 0 ? (
                             filteredOptions.map((option, index) => (
                                 <button

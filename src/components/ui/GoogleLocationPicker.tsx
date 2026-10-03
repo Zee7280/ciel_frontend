@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MapPin, Search } from "lucide-react";
+import { Loader2, LocateFixed, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
     GOOGLE_MAPS_API_KEY,
@@ -52,6 +52,7 @@ type LatLngLike = LatLngLiteral | {
 
 type MapLike = {
     panTo: (position: LatLngLiteral) => void;
+    setZoom?: (zoom: number) => void;
     addListener: (eventName: string, handler: (event: { latLng?: LatLngLike }) => void) => void;
 };
 
@@ -115,6 +116,7 @@ type GoogleMapsApi = {
         Map: new (node: HTMLElement, options: Record<string, unknown>) => MapLike;
         Marker: new (options: Record<string, unknown>) => MarkerLike;
         Geocoder: new () => GeocoderLike;
+        ControlPosition?: { LEFT_BOTTOM?: number };
         places: {
             Autocomplete: new (input: HTMLInputElement, options: Record<string, unknown>) => NativeAutocompleteLike;
             AutocompleteService: new () => AutocompleteServiceLike;
@@ -281,7 +283,10 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
     const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
     const [position, setPosition] = useState(initialLocation || GOOGLE_MAPS_DEFAULT_CENTER);
+    const didAutoLocateRef = useRef(false);
+    const skipAutoLocate = Boolean(initialLocation);
 
     useEffect(() => {
         let cancelled = false;
@@ -301,6 +306,10 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                     streetViewControl: false,
                     fullscreenControl: false,
                     clickableIcons: true,
+                    zoomControl: true,
+                    zoomControlOptions: {
+                        position: google.maps.ControlPosition?.LEFT_BOTTOM ?? 6,
+                    },
                 });
 
                 placesRef.current = new google.maps.places.PlacesService(mapRef.current);
@@ -533,6 +542,60 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
         );
     };
 
+    const pinCurrentLocation = (opts?: { fromUser?: boolean }) => {
+        const fromUser = opts?.fromUser !== false;
+        if (isLocating) return;
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+            if (fromUser) {
+                toast.error("This browser can't read your current location. Search or click the map instead.");
+            }
+            return;
+        }
+
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (geo) => {
+                setIsLocating(false);
+                const nextPosition = {
+                    lat: geo.coords.latitude,
+                    lng: geo.coords.longitude,
+                };
+                if (!fromUser) {
+                    // Auto-locate only recentres the map — the creator must pin the spot themselves.
+                    mapRef.current?.panTo(nextPosition);
+                    mapRef.current?.setZoom?.(14);
+                    return;
+                }
+                setPinnedLocation(nextPosition);
+                mapRef.current?.setZoom?.(16);
+                reverseGeocode(nextPosition);
+                if (fromUser) toast.success("Pinned your current location.");
+            },
+            (error) => {
+                setIsLocating(false);
+                if (!fromUser) return;
+                if (error.code === error.PERMISSION_DENIED) {
+                    toast.error("Location permission denied. Allow location access, or search / click the map.");
+                    return;
+                }
+                if (error.code === error.TIMEOUT) {
+                    toast.error("Timed out reading your location. Try again, or pin the map.");
+                    return;
+                }
+                toast.error("Couldn't get your current location. Try again, or pin the map.");
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 },
+        );
+    };
+
+    useEffect(() => {
+        if (!isReady || skipAutoLocate || didAutoLocateRef.current) return;
+        didAutoLocateRef.current = true;
+        pinCurrentLocation({ fromUser: false });
+        // Recentre once on the user's area when the map first loads and the form has no saved pin.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isReady]);
+
     const handleSearch = () => {
         const q = searchQuery.trim();
         if (!q || !geocoderRef.current) return;
@@ -616,6 +679,16 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                 </div>
                 <button
                     type="button"
+                    onClick={() => pinCurrentLocation({ fromUser: true })}
+                    disabled={!isReady || isLocating}
+                    title="Use current location"
+                    aria-label="Use current location"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.25rem] border-2 border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition-all hover:border-emerald-400 hover:bg-emerald-100 active:scale-95 disabled:opacity-70 sm:h-14 sm:w-14"
+                >
+                    {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
+                </button>
+                <button
+                    type="button"
                     onClick={handleSearch}
                     disabled={!isReady || isSearching}
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.25rem] bg-slate-900 text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-70 sm:h-14 sm:w-14"
@@ -625,9 +698,18 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
             </div>
 
             <p className="text-xs leading-relaxed text-slate-500 -mt-1">
-                <span className="font-semibold text-slate-600">Google Maps:</span> Search or click the map to pin
-                the exact location.
+                <span className="font-semibold text-slate-600">Google Maps:</span> Tap the locate icon to pin your current GPS position, search, or click the map.
             </p>
+
+            <button
+                type="button"
+                onClick={() => pinCurrentLocation({ fromUser: true })}
+                disabled={!isReady || isLocating}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-100 disabled:opacity-70 sm:w-auto"
+            >
+                {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+                {isLocating ? "Finding your location…" : "Use my current location"}
+            </button>
 
             <div className="relative z-0 h-[220px] w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner sm:h-[280px]">
                 {!isReady && !loadError && (
@@ -642,6 +724,16 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
                     </div>
                 )}
                 <div ref={mapNodeRef} className="h-[220px] w-full sm:h-[280px]" />
+                <button
+                    type="button"
+                    onClick={() => pinCurrentLocation({ fromUser: true })}
+                    disabled={!isReady || isLocating}
+                    title="Pin current location"
+                    aria-label="Pin current location"
+                    className="absolute top-3 left-3 z-30 flex h-11 w-11 items-center justify-center rounded-full border-2 border-emerald-200 bg-white text-emerald-700 shadow-lg transition-all hover:border-emerald-400 hover:bg-emerald-50 active:scale-95 disabled:opacity-70"
+                >
+                    {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
+                </button>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50/50 px-3 py-3 sm:px-5">

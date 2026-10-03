@@ -3,11 +3,18 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, Mail, Phone, MapPin, Building2, User, Save, Camera, GraduationCap, ChevronDown } from "lucide-react";
+import { Loader2, Mail, MapPin, Building2, User, Save, Camera, GraduationCap, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
-import { rawPhoneForProfileDisplay } from "@/utils/countryCallingCodes";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    composeInternationalPhone,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    parsePhoneForDisplay,
+    rawPhoneForProfileDisplay,
+    validateNationalPhone,
+} from "@/utils/countryCallingCodes";
 
 const backendAssetBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
 
@@ -53,6 +60,13 @@ export default function FacultyProfilePage() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [phoneCountryKey, setPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
+    const [phoneNational, setPhoneNational] = useState("");
+    const phoneCountryKeyRef = useRef(phoneCountryKey);
+    const phoneNationalRef = useRef(phoneNational);
+    phoneCountryKeyRef.current = phoneCountryKey;
+    phoneNationalRef.current = phoneNational;
+
     useEffect(() => {
         isMounted.current = true;
         fetchProfile();
@@ -69,14 +83,22 @@ export default function FacultyProfilePage() {
                 try {
                     const parsedUser = JSON.parse(storedUserStr) as Record<string, unknown>;
                     setUser(parsedUser);
+                    const rawPhone = rawPhoneForProfileDisplay(
+                        parsedUser.contact,
+                        parsedUser.phone,
+                        parsedUser.countryCode,
+                    );
+                    const phoneParts = parsePhoneForDisplay(rawPhone);
+                    setPhoneCountryKey(phoneParts.phoneCountryKey);
+                    setPhoneNational(phoneParts.national);
+                    const contactE164 = composeInternationalPhone(
+                        phoneParts.phoneCountryKey,
+                        phoneParts.national,
+                    );
                     setFormData({
                         name: typeof parsedUser.name === "string" ? parsedUser.name : "",
                         email: typeof parsedUser.email === "string" ? parsedUser.email : "",
-                        contact: rawPhoneForProfileDisplay(
-                            parsedUser.contact,
-                            parsedUser.phone,
-                            parsedUser.countryCode,
-                        ),
+                        contact: contactE164,
                         institution:
                             (typeof parsedUser.institution === "string" && parsedUser.institution) ||
                             (typeof parsedUser.university === "string" && parsedUser.university) ||
@@ -124,8 +146,14 @@ export default function FacultyProfilePage() {
             toast.error("Department is required before you can create opportunities");
             return;
         }
-        if (!formData.institution.trim() || !formData.city.trim() || !formData.contact.trim()) {
+        if (!formData.institution.trim() || !formData.city.trim()) {
             toast.error("Institution, city, and phone are required");
+            return;
+        }
+        const contactE164 = composeInternationalPhone(phoneCountryKey, phoneNational);
+        const phoneErr = validateNationalPhone(phoneCountryKey, phoneNational);
+        if (!contactE164.trim() || phoneErr) {
+            toast.error(phoneErr || "Institution, city, and phone are required");
             return;
         }
 
@@ -152,8 +180,8 @@ export default function FacultyProfilePage() {
             payload.append("institution", formData.institution);
             payload.append("university", formData.institution);
             payload.append("city", formData.city);
-            payload.append("contact", formData.contact);
-            payload.append("phone", formData.contact);
+            payload.append("contact", contactE164);
+            payload.append("phone", contactE164);
             payload.append("department", formData.department);
             payload.append("faculty_department", formData.department);
             payload.append("bio", formData.bio);
@@ -408,16 +436,27 @@ export default function FacultyProfilePage() {
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Phone</label>
-                                <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
-                                    <input
-                                        type="tel"
-                                        value={formData.contact}
-                                        onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="+92 300 1234567"
-                                    />
-                                </div>
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={phoneCountryKey}
+                                    nationalDigits={phoneNational}
+                                    onPhoneCountryKeyChange={(key) => {
+                                        setPhoneCountryKey(key);
+                                        setFormData((f) => ({
+                                            ...f,
+                                            contact: composeInternationalPhone(key, phoneNationalRef.current),
+                                        }));
+                                    }}
+                                    onNationalDigitsChange={(national) => {
+                                        setPhoneNational(national);
+                                        setFormData((f) => ({
+                                            ...f,
+                                            contact: composeInternationalPhone(phoneCountryKeyRef.current, national),
+                                        }));
+                                    }}
+                                    placeholderNational="300 1234567"
+                                    selectClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-sm font-semibold text-slate-800 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                                    inputClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 font-medium text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                                />
                             </div>
 
                             <div className="md:col-span-2">

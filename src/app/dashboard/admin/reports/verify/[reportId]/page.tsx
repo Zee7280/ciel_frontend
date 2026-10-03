@@ -76,6 +76,11 @@ import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
+import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import ReportEvidenceGallery, {
+    classifyEvidenceGalleryKind,
+    type ReportEvidenceGalleryItem,
+} from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -199,6 +204,15 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    review_package?: {
+        documents?: {
+            flashcard?: { title?: string; href?: string };
+            detailed_report?: { title?: string; href?: string };
+            evidence?: { title?: string; count?: number; files?: ReportEvidenceGalleryItem[] };
+        };
+        admin_review_href?: string;
+        ai_analyser_href?: string;
+    } | null;
     /** Hours target for CII / engagement; falls back to opportunity hours or 16. */
     required_hours?: number;
 }
@@ -207,6 +221,7 @@ type AdminEvidenceFile = {
     url: string;
     name: string;
     isImage: boolean;
+    kind: ReturnType<typeof classifyEvidenceGalleryKind>;
 };
 
 const ADMIN_IMAGE_FILE_EXTENSION_RE = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif)(\?|#|$)/i;
@@ -447,9 +462,37 @@ function pickEvidenceName(value: unknown, fallback: string): string {
 function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFile[] {
     if (!report) return [];
 
+    const packaged = report.review_package?.documents?.evidence?.files;
+    if (Array.isArray(packaged) && packaged.length) {
+        const seen = new Set<string>();
+        return packaged.reduce<AdminEvidenceFile[]>((files, item) => {
+            const url = String(item?.url || "").trim();
+            if (!url || seen.has(url)) return files;
+            seen.add(url);
+            const name = item?.name || pickEvidenceName(item, `Evidence ${files.length + 1}`);
+            files.push({
+                url,
+                name,
+                isImage: (item?.kind || classifyEvidenceGalleryKind(url, name)) === "image",
+                kind: (item?.kind as AdminEvidenceFile["kind"]) || classifyEvidenceGalleryKind(url, name),
+            });
+            return files;
+        }, []);
+    }
+
+    const section6 = report.section6 as { evidence_files?: unknown } | undefined;
+    const section7 = report.section7 as {
+        formalization_files?: unknown;
+        partner_verification_files?: unknown;
+    } | undefined;
+    const logs = Array.isArray(report.section1?.attendance_logs) ? report.section1.attendance_logs : [];
     const candidates: unknown[] = [
         ...(Array.isArray(report.evidence_urls) ? report.evidence_urls : []),
         ...(Array.isArray(report.section8?.evidence_files) ? report.section8.evidence_files : []),
+        ...(Array.isArray(section6?.evidence_files) ? section6.evidence_files : []),
+        ...(Array.isArray(section7?.formalization_files) ? section7.formalization_files : []),
+        ...(Array.isArray(section7?.partner_verification_files) ? section7.partner_verification_files : []),
+        ...logs.map((log) => (log as { evidence_url?: unknown })?.evidence_url),
     ];
 
     const seen = new Set<string>();
@@ -461,6 +504,7 @@ function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFi
             url,
             name: pickEvidenceName(item, `Evidence ${files.length + 1}`),
             isImage: isAdminImageEvidence(url, item),
+            kind: classifyEvidenceGalleryKind(url, pickEvidenceName(item, "")),
         });
         return files;
     }, []);
@@ -634,6 +678,8 @@ function AdminReportDetailPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const ciiView = (searchParams.get("view") || "").trim().toLowerCase() === "cii-v2";
+    const packageView = (searchParams.get("package") || "").trim() === "1";
+    const packageDoc = (searchParams.get("doc") || "").trim().toLowerCase();
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
@@ -1015,26 +1061,6 @@ function AdminReportDetailPage() {
     }
 
     if (ciiView) {
-        const cielPkRoute =
-            report.private_candidate === true || report.review_route === "ciel_pk";
-        if (!cielPkRoute) {
-            return (
-                <div className={clsx(adminDossier.shell, "flex items-center justify-center p-8")}>
-                    <div className="max-w-md text-center">
-                        <h2 className="mb-2 text-2xl font-bold text-slate-900">Faculty reviews this report</h2>
-                        <p className="mb-4 text-sm text-slate-600">
-                            CIEL PK CII analysis is only for the private-candidate route. Open the faculty console for university-supervised reports.
-                        </p>
-                        <Link
-                            href={`/dashboard/admin/reports/verify/${params.reportId}`}
-                            className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
-                        >
-                            Back to dossier
-                        </Link>
-                    </div>
-                </div>
-            );
-        }
         return <CommunityCiiAnalyser publisher="ciel_pk" />;
     }
 
@@ -1073,6 +1099,17 @@ function AdminReportDetailPage() {
                         </span>
                     </div>
                 </div>
+                <AdminReviewPackageStrip
+                    reportId={String(params.reportId)}
+                    report={report as unknown as Record<string, unknown>}
+                    fallbackFiles={evidenceFiles}
+                    highlight={packageView}
+                    initialDoc={
+                        packageDoc === "flashcard" || packageDoc === "report" || packageDoc === "evidence"
+                            ? packageDoc
+                            : null
+                    }
+                />
                 {(report.private_candidate || report.review_route === "ciel_pk") ? (
                     <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
                         <p className="font-semibold">Private candidate route — CIEL PK reviews this report.</p>
@@ -2026,51 +2063,7 @@ function AdminReportDetailPage() {
 
                                 <div>
                                     <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
-                                    {evidenceFiles.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-                                            {evidenceFiles.map((file, index) =>
-                                                file.isImage ? (
-                                                    <a
-                                                        key={file.url}
-                                                        href={file.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/90 transition-colors hover:border-indigo-200"
-                                                    >
-                                                        <img
-                                                            src={file.url}
-                                                            alt={file.name || `Evidence ${index + 1}`}
-                                                            className="aspect-square w-full object-cover"
-                                                        />
-                                                        <span className="block truncate px-3 py-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-800">
-                                                            {file.name || `Evidence ${index + 1}`}
-                                                        </span>
-                                                    </a>
-                                                ) : (
-                                                    <a
-                                                        key={file.url}
-                                                        href={file.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group col-span-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 sm:col-span-3"
-                                                    >
-                                                        <span className="min-w-0 pr-3 font-semibold text-slate-900 group-hover:text-indigo-800">
-                                                            <span className="block truncate">{file.name || `Evidence ${index + 1}`}</span>
-                                                            <span className="mt-1 block text-xs font-medium text-slate-500">
-                                                                Evidence {index + 1}
-                                                            </span>
-                                                        </span>
-                                                        <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
-                                                    </a>
-                                                ),
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className={adminDossier.inset}>
-                                            <AdminFieldBody value={null} />
-                                            <p className="mt-2 text-xs text-slate-500">No files attached to this submission.</p>
-                                        </div>
-                                    )}
+                                    <ReportEvidenceGallery files={evidenceFiles} emptyLabel="No files attached to this submission." />
                                 </div>
                             </div>
                             ) : null}

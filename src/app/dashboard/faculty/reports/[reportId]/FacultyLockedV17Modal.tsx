@@ -14,6 +14,7 @@ import { emptyLockedV17SourceTabs } from "./buildLockedV17SourceTabs";
 import { V19_ASSESSMENT_RULE } from "./buildLockedV17Assessment";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
 import "./faculty-locked-v17.css";
+import ReportEvidenceGallery from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 type TabId = "flashView" | "reportView" | "evidenceView" | "attendanceView" | "analyzerView" | "decisionView" | "assessedView" | "badgeView";
 
@@ -244,17 +245,27 @@ function EvidencePane({ tabs }: { tabs: LockedV17SourceTabs }) {
                 <div>
                     <small>CIEL PK · CLAIM-AWARE EVIDENCE RECORD</small>
                     <h2>Evidence manifest · {tabs.evidenceItems.length} records</h2>
-                    <p>Evidence is not proof merely because it was uploaded. Actual content should be inspected and mapped to the claim it is intended to substantiate.</p>
+                    <p>Click a thumbnail to view the file. Evidence is not proof merely because it was uploaded — inspect the actual content against the claim it is intended to substantiate.</p>
                 </div>
                 <div>
                     <b>{tabs.claimCoverage}/6</b>
                     <span>material claim areas covered</span>
                 </div>
             </div>
+            <div className="flv17-evgallery">
+                <ReportEvidenceGallery
+                    files={tabs.evidenceItems.map((item) => ({
+                        url: item.url,
+                        name: item.name,
+                        kind: item.kind,
+                    }))}
+                    emptyLabel="No evidence attached to this locked report."
+                />
+            </div>
             <div className="flv17-evcards">
                 {tabs.evidenceItems.length ? (
                     tabs.evidenceItems.map((item) => (
-                        <article key={item.url}>
+                        <article key={item.url || item.name}>
                             <div className="ico">{evIcon(item.kind, item.name)}</div>
                             <div>
                                 <h3>{item.name}</h3>
@@ -272,17 +283,10 @@ function EvidencePane({ tabs }: { tabs: LockedV17SourceTabs }) {
                                 <small>
                                     {item.kind} · {item.verified ? "On record" : "Pending verification"}
                                 </small>
-                                {item.url ? (
-                                    <a href={item.url} target="_blank" rel="noopener noreferrer">
-                                        Open original ↗
-                                    </a>
-                                ) : null}
                             </div>
                         </article>
                     ))
-                ) : (
-                    <div className="flv17-empty">No evidence attached to this locked report.</div>
-                )}
+                ) : null}
             </div>
         </div>
     );
@@ -713,6 +717,7 @@ export default function FacultyLockedV17Modal({
     report,
     projectData,
     initialTab = "flashView",
+    analyzerHref: analyzerHrefProp,
     onClose,
 }: {
     reportId?: string;
@@ -720,6 +725,7 @@ export default function FacultyLockedV17Modal({
     report?: Record<string, unknown>;
     projectData?: unknown;
     initialTab?: TabId;
+    analyzerHref?: string;
     onClose: () => void;
 }) {
     const [tab, setTab] = useState<TabId>(initialTab);
@@ -789,7 +795,8 @@ export default function FacultyLockedV17Modal({
         }
     }, [flash, raw, projectData]);
     const cii = flash ? resolveReportCii(flash) : null;
-    const analyzerHref = reportId ? `/dashboard/faculty/reports/${reportId}?view=cii-v2` : undefined;
+    const analyzerHref =
+        analyzerHrefProp || (reportId ? `/dashboard/faculty/reports/${reportId}?view=cii-v2` : undefined);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {

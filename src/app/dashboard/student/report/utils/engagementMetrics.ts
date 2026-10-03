@@ -50,8 +50,8 @@ export function buildIndividualRosterFromSection1(section1: {
     participation_type?: string;
     team_lead?: { id?: string | null };
     team_members?: Array<{ id?: string; participantId?: string; cnic?: string; email?: string }>;
-}, leadParticipantId?: string | null): string[] | undefined {
-    if (section1.participation_type !== "team") return undefined;
+} | null | undefined, leadParticipantId?: string | null): string[] | undefined {
+    if (!section1 || section1.participation_type !== "team") return undefined;
     const leadId = leadParticipantId ?? section1.team_lead?.id ?? null;
     if (!leadId) return undefined;
     const leadEmail =
@@ -59,7 +59,10 @@ export function buildIndividualRosterFromSection1(section1: {
             ? (section1.team_lead as { email: string }).email.trim().toLowerCase()
             : "";
     const ids: string[] = [`lead:${leadId}`];
-    (section1.team_members ?? []).forEach((m, idx) => {
+    // API payloads sometimes store team_members as a non-array object; `?? []` does not catch that
+    // and `.forEach` then throws "… is not a function" (minified as "q is not a function").
+    const members = Array.isArray(section1.team_members) ? section1.team_members : [];
+    members.forEach((m, idx) => {
         const memberId = m?.id ?? m?.participantId;
         const memberEmail = typeof m?.email === "string" ? m.email.trim().toLowerCase() : "";
         if (memberId && String(memberId) === String(leadId)) return;

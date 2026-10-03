@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentReportsList, peekStudentReportsList } from "@/utils/student-community-cache";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
@@ -782,26 +782,24 @@ export default function CommunityImpactWall(_props: {
     wallCount?: number;
     completion?: number;
 }) {
-    const [rows, setRows] = useState<WallRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const cachedReports = peekStudentReportsList();
+    const [rows, setRows] = useState<WallRow[]>(() =>
+        ((cachedReports ?? []) as WallRow[]).filter((r) => isCommunityReportOnLiveDeck(r) && !isCommunityReportRejected(r)),
+    );
+    const [loading, setLoading] = useState(!cachedReports);
     const [flash, setFlash] = useState<FlashState | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        authenticatedFetch("/api/v1/student/reports?limit=100", {}, { redirectToLogin: false })
-            .then((r) => (r?.ok ? r.json() : null))
-            .then((reports) => {
+        fetchStudentReportsList()
+            .then((list) => {
                 if (cancelled) return;
-                const list = Array.isArray(reports?.data) ? reports.data : [];
-                // Mirrors the backend live-deck gate (isCommunityAwardLiveReport): a late
-                // Faculty/Admin rejection blocks the record even when an earlier stage had
-                // approved it — without the rejected check such a row still rendered here as
-                // "✓ VERIFIED".
-                setRows(list.filter((r: WallRow) => isCommunityReportOnLiveDeck(r) && !isCommunityReportRejected(r)));
+                setRows(
+                    (list as WallRow[]).filter((r) => isCommunityReportOnLiveDeck(r) && !isCommunityReportRejected(r)),
+                );
                 setLoading(false);
             })
             .catch(() => {
-                // Never leave the wall stuck on "Loading verified records…" after a network error.
                 if (!cancelled) setLoading(false);
             });
         return () => {

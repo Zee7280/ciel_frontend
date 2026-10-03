@@ -435,7 +435,7 @@ export function ReportSectionBridge({
 
     const a = chromeAgg(data, projectData);
     const { context, title, sdgs, members, acts, reach, evidence, competency, bestPct, pkr } = a;
-    const loggedHours = sumNonRejectedLoggedHours(data.section1.attendance_logs || []);
+    const loggedHours = sumNonRejectedLoggedHours(data.section1?.attendance_logs || []);
 
     const pills: Array<[string, string]> = [];
     if (uiStep > 1 && loggedHours) pills.push([`${Math.round(loggedHours * 10) / 10}h`, "TEAM-HOURS LOGGED"]);

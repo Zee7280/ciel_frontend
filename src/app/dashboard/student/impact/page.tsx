@@ -1,37 +1,36 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
-import { fetchImpactSummary, type CielImpactSummary } from "@/utils/cielImpactSummary";
+import { fetchStudentDashboardData, useStudentDashboardCache } from "@/utils/student-dashboard-fetch";
+import { fetchImpactSummary, useImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
 import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
-import { DashboardSkeleton } from "@/components/ciel/Skeleton";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import StudentImpactPortfolioTable from "./StudentImpactPortfolioTable";
 
 export default function ImpactHistoryPage() {
-    const [loading, setLoading] = useState(true);
-    const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-    const [summary, setSummary] = useState<CielImpactSummary | null>(null);
+    const cachedDashboard = useStudentDashboardCache();
+    const cachedSummary = useImpactSummaryCache();
+    const [dashboard, setDashboard] = useState<DashboardData | null>(cachedDashboard);
+    const [summary, setSummary] = useState<CielImpactSummary | null>(cachedSummary);
 
     useEffect(() => {
         Promise.all([
             fetchStudentDashboardData({ redirectToLogin: false }),
             fetchImpactSummary({ redirectToLogin: false }),
         ]).then(([dashboardData, summaryData]) => {
-            setDashboard(dashboardData);
+            if (dashboardData) setDashboard(dashboardData);
             if (summaryData) setSummary(summaryData);
-            setLoading(false);
         });
     }, []);
 
-    if (loading) return <DashboardSkeleton />;
-
-    const activeRecords = dashboard?.overview?.activeProjectsCount ?? dashboard?.activeProjects?.length ?? 0;
-    const verifiedHours = Math.round(summary?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0);
-    const portfolioCount = dashboard?.overview?.impactHistoryBadgeCount ?? dashboard?.overview?.completedCount ?? 0;
+    const viewDashboard = dashboard ?? cachedDashboard;
+    const viewSummary = summary ?? cachedSummary;
+    const activeRecords = viewDashboard?.overview?.activeProjectsCount ?? viewDashboard?.activeProjects?.length ?? 0;
+    const verifiedHours = Math.round(viewSummary?.verifiedHours ?? viewDashboard?.overview?.totalVerifiedHours ?? 0);
+    const portfolioCount = viewDashboard?.overview?.impactHistoryBadgeCount ?? viewDashboard?.overview?.completedCount ?? 0;
     const completion = Math.round(
-        (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
+        (CIEL_PATHS.reduce((sum, path) => sum + (viewSummary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
     );
 
     return (

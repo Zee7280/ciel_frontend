@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
-import { fetchImpactSummary, readImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
+import { fetchStudentDashboardData, useStudentDashboardCache } from "@/utils/student-dashboard-fetch";
+import { fetchImpactSummary, useImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
 import { authenticatedFetch } from "@/utils/api";
 import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
+import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
+import { prefetchCommunityServiceData } from "@/utils/student-community-cache";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { DashboardSkeleton } from "@/components/ciel/Skeleton";
 import {
     MOCKUP_GRADIENTS,
     MockupActionCard,
@@ -69,59 +70,55 @@ const PATH_CARDS = [
 ];
 
 export default function StudentDashboardPage() {
-    const [loading, setLoading] = useState(true);
+    const cachedDashboard = useStudentDashboardCache();
+    const cachedSummary = useImpactSummaryCache();
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-    // Starts null/"" (matching the server render) rather than reading localStorage synchronously —
-    // that caused a hydration mismatch (and the thrown error killed interactivity for the whole
-    // page) for any returning visitor who already had cached data. Both are set client-side in the
-    // effect below, which only runs after hydration completes.
     const [summary, setSummary] = useState<CielImpactSummary | null>(null);
     const [opportunities, setOpportunities] = useState<RecommendedOpportunity[]>([]);
     const [firstName, setFirstName] = useState("");
+    const viewDashboard = dashboard ?? cachedDashboard;
+    const viewSummary = summary ?? cachedSummary;
 
     useEffect(() => {
-        setSummary(readImpactSummaryCache());
         const name = readStoredCurrentUser()?.name;
         setFirstName(typeof name === "string" ? name.trim().split(/\s+/)[0] : "");
-        Promise.all([
-            fetchStudentDashboardData({ redirectToLogin: false }),
-            fetchImpactSummary({ redirectToLogin: false }),
-            authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
-                .then((res) => (res?.ok ? res.json() : null))
-                .then((result) => (Array.isArray(result?.data) ? result.data.slice(0, 3) : [])),
-        ]).then(([dashboardData, summaryData, opps]) => {
-            setDashboard(dashboardData);
-            if (summaryData) setSummary(summaryData);
-            setOpportunities(opps);
-            setLoading(false);
+        void fetchStudentDashboardData({ redirectToLogin: false }).then((dashboardData) => {
+            if (dashboardData) setDashboard(dashboardData);
         });
+        void fetchImpactSummary({ redirectToLogin: false }).then((summaryData) => {
+            if (summaryData) setSummary(summaryData);
+        });
+        void authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                setOpportunities(Array.isArray(result?.data) ? result.data.slice(0, 3) : []);
+            });
+        prefetchCommunityServiceData();
     }, []);
 
     const needsYouNow = useMemo(() => {
-        if (!dashboard) return [];
+        if (!viewDashboard) return [];
         const items: Array<{ id: string; title: string; detail: string; href: string }> = [];
-        dashboard.notificationsPreview?.active.slice(0, 2).forEach((n) =>
+        viewDashboard.notificationsPreview?.active.slice(0, 2).forEach((n) =>
             items.push({ id: n.id, title: n.title, detail: n.detail, href: "/dashboard/student/paths/community-service?tab=log-hours" }),
         );
-        dashboard.pendingSummary?.items.slice(0, 2).forEach((n) =>
+        viewDashboard.pendingSummary?.items.slice(0, 2).forEach((n) =>
             items.push({ id: n.key, title: n.title, detail: n.description ?? `${n.count} pending`, href: n.href }),
         );
-        if (summary?.pathsStatus.communityService.needsAction) {
+        if (viewSummary?.pathsStatus.communityService.needsAction) {
             items.push({ id: "cs-verify", title: "Send logged hours for verification", detail: "You have hours waiting to be sent to a supervisor.", href: "/dashboard/student/paths/community-service?tab=log-hours" });
         }
-        if (summary?.pathsStatus.startupBusiness.needsAction) {
+        if (viewSummary?.pathsStatus.startupBusiness.needsAction) {
             items.push({ id: "sb-visible", title: "Your venture is ready to publish", detail: "You've reached the completeness threshold — make it visible.", href: "/dashboard/student/paths/startup-business?view=workspace" });
         }
         return items.slice(0, 4);
-    }, [dashboard, summary]);
+    }, [viewDashboard, viewSummary]);
 
-    if (loading) return <DashboardSkeleton />;
-
-    const activeRecords = dashboard?.overview?.activeProjectsCount ?? dashboard?.activeProjects?.length ?? 0;
-    const verifiedHours = Math.round(summary?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0);
-    const portfolioCount = dashboard?.overview?.impactHistoryBadgeCount ?? dashboard?.overview?.completedCount ?? 0;
+    const activeRecords = viewDashboard?.overview?.activeProjectsCount ?? viewDashboard?.activeProjects?.length ?? 0;
+    const verifiedHours = Math.round(viewSummary?.verifiedHours ?? viewDashboard?.overview?.totalVerifiedHours ?? 0);
+    const portfolioCount = viewDashboard?.overview?.impactHistoryBadgeCount ?? viewDashboard?.overview?.completedCount ?? 0;
     const completion = Math.round(
-        (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
+        (CIEL_PATHS.reduce((sum, path) => sum + (viewSummary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
     );
 
     return (
@@ -149,9 +146,10 @@ export default function StudentDashboardPage() {
                         emoji={card.emoji}
                         ghost={card.ghost}
                         title={card.title}
-                        subtitle={summary?.pathsStatus[card.key]?.detail || card.subtitle}
+                        subtitle={viewSummary?.pathsStatus[card.key]?.detail || card.subtitle}
                         badge={card.badge}
                         background={card.background}
+                        onPrefetch={() => prefetchStudentPathData(card.key)}
                     />
                 ))}
                 <MockupActionCard
@@ -163,6 +161,7 @@ export default function StudentDashboardPage() {
                     badge="VIEW PORTFOLIO"
                     background={MOCKUP_GRADIENTS.green}
                     full
+                    onPrefetch={() => prefetchStudentImpactPortfolio()}
                 />
             </div>
 

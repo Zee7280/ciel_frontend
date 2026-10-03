@@ -12,6 +12,7 @@ import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { formatOpportunityDetailStatusBadge } from "@/utils/opportunityWorkflow";
+import { integerFieldInput } from "@/utils/integerFieldInput";
 import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
@@ -848,6 +849,7 @@ function OpportunityDetailsContent() {
                                                 type="date"
                                                 className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
                                                 value={formData.dates.start}
+                                                max={formData.dates.end || undefined}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
                                             />
                                             <span className="self-center text-slate-400">-</span>
@@ -855,6 +857,7 @@ function OpportunityDetailsContent() {
                                                 type="date"
                                                 className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
                                                 value={formData.dates.end}
+                                                min={formData.dates.start || undefined}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
                                             />
                                         </div>
@@ -868,11 +871,19 @@ function OpportunityDetailsContent() {
                                     <div className="relative">
                                         <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                         <input
-                                            type="number"
-
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            autoComplete="off"
+                                            maxLength={3}
                                             className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
                                             value={formData.capacity.hours}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    capacity: { ...formData.capacity, hours: integerFieldInput(e.target.value, 3) },
+                                                })
+                                            }
                                         />
                                     </div>
                                 </div>
@@ -881,11 +892,19 @@ function OpportunityDetailsContent() {
                                     <div className="relative">
                                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                         <input
-                                            type="number"
-
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            autoComplete="off"
+                                            maxLength={4}
                                             className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
                                             value={formData.capacity.volunteers}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    capacity: { ...formData.capacity, volunteers: integerFieldInput(e.target.value, 4) },
+                                                })
+                                            }
                                         />
                                     </div>
                                 </div>
@@ -1116,11 +1135,22 @@ function OpportunityDetailsContent() {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Number of Beneficiaries</label>
                                 <input
-                                    type="number"
-
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={7}
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none disabled:bg-slate-100"
                                     value={formData.objectives.beneficiariesCount}
-                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            objectives: {
+                                                ...formData.objectives,
+                                                beneficiariesCount: integerFieldInput(e.target.value, 7),
+                                            },
+                                        })
+                                    }
                                 />
                             </div>
                             <div>

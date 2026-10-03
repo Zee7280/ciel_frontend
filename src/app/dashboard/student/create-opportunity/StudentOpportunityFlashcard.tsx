@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { findSdgById } from "@/utils/sdgData";
+import {
+    applicationsOpenFromPayload,
+    applyBlockedMessageFromPayload,
+} from "@/utils/studentApplyMaintenance";
 import "@/components/opportunities/create-opportunity.css";
 
 export type FlashViewer = "eligible" | "wrongdept" | "otheruni";
@@ -46,6 +50,9 @@ export type StudentFlashcardModel = {
     approvalText: string;
     eligible: boolean;
     eligibilityWhy: string;
+    applyForcedClosed?: boolean;
+    applyClosedReason?: string;
+    applyClosedMessage?: string;
 };
 
 function esc(s: string): string {
@@ -218,6 +225,9 @@ export function buildOpportunityRecordFlashcard(
         approvalText: "Approval flow: Student → Faculty → Partner → CIEL PK",
         eligible: true,
         eligibilityWhy: "Students who match the application scope can apply once this opportunity is live.",
+        applyForcedClosed: !applicationsOpenFromPayload(raw),
+        applyClosedReason: typeof raw.apply_blocked_reason === "string" ? raw.apply_blocked_reason : "",
+        applyClosedMessage: applyBlockedMessageFromPayload(raw) || "",
     };
 }
 
@@ -307,35 +317,42 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const secondarySdgNum = secondarySdg?.number != null ? String(secondarySdg.number) : model.secondarySdg || "—";
 
     const days = daysUntil(String(model.deadline || ""));
-    const closed = days !== null && days < 0;
-    const hot = days !== null && days >= 0 && days <= 3;
-    const soon = days !== null && days > 3 && days <= 10;
-    const ribbon =
-        days === null ? "open" : closed ? "closed" : hot ? "hot" : soon ? "soon" : "open";
-    const ribbonTitle =
-        days === null
-            ? "APPLICATIONS OPEN"
-            : closed
-              ? "APPLICATIONS CLOSED"
-              : days === 0
-                ? "CLOSES TODAY"
-                : hot
-                  ? "CLOSING SOON"
-                  : soon
-                    ? "APPLY SOON"
-                    : "APPLICATIONS OPEN";
-    const ribbonSub =
-        days === null
-            ? "Join / apply stays open through the project end date (or early close date if set)."
-            : closed
-              ? "Applications have closed for this opportunity."
-              : days === 0
-                ? "Applications close today. Join / apply before the day ends."
-                : hot
-                  ? `Only ${days} day${days === 1 ? "" : "s"} left to join / apply.`
-                  : soon
-                    ? `${days} days left before applications close.`
-                    : `${days} days left. Applications are open.`;
+    const catalogClosed = Boolean(model.applyForcedClosed);
+    const dateClosed = days !== null && days < 0;
+    const closed = catalogClosed || dateClosed;
+    const hot = !catalogClosed && days !== null && days >= 0 && days <= 3;
+    const soon = !catalogClosed && days !== null && days > 3 && days <= 10;
+    const ribbon = closed ? "closed" : days === null ? "open" : hot ? "hot" : soon ? "soon" : "open";
+    const ribbonTitle = catalogClosed
+        ? model.applyClosedReason === "maintenance"
+            ? "TEMPORARILY PAUSED"
+            : model.applyClosedReason === "catalog_closed"
+              ? "EXPIRED"
+              : "APPLICATIONS CLOSED"
+        : days === null
+          ? "APPLICATIONS OPEN"
+          : dateClosed
+            ? "APPLICATIONS CLOSED"
+            : days === 0
+              ? "CLOSES TODAY"
+              : hot
+                ? "CLOSING SOON"
+                : soon
+                  ? "APPLY SOON"
+                  : "APPLICATIONS OPEN";
+    const ribbonSub = catalogClosed
+        ? model.applyClosedMessage || "Applications for this opportunity have closed."
+        : days === null
+          ? "Join / apply stays open through the project end date (or early close date if set)."
+          : dateClosed
+            ? "Applications have closed for this opportunity."
+            : days === 0
+              ? "Applications close today. Join / apply before the day ends."
+              : hot
+                ? `Only ${days} day${days === 1 ? "" : "s"} left to join / apply.`
+                : soon
+                  ? `${days} days left before applications close.`
+                  : `${days} days left. Applications are open.`;
     const span = daySpan(String(model.start || ""), String(model.end || ""));
     const steps = flowSteps(String(model.responsibilities || ""));
     const skillChips = splitBits(String(model.skills || ""));
@@ -343,14 +360,20 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
     const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
     const canApply = model.eligible && !closed;
     const ctaTitle = closed
-        ? "Applications are closed."
+        ? catalogClosed && model.applyClosedReason === "maintenance"
+            ? "Applications are temporarily paused."
+            : catalogClosed && model.applyClosedReason === "catalog_closed"
+              ? "This opportunity has expired."
+              : "Applications are closed."
         : !model.eligible
           ? "You can view this opportunity."
           : hot
             ? "Closing soon."
             : "Ready to contribute?";
     const ctaBody = closed
-        ? "This deadline has passed. You can still read the card."
+        ? catalogClosed
+            ? model.applyClosedMessage || "This listing is not accepting new student applications."
+            : "This deadline has passed. You can still read the card."
         : model.eligibilityWhy;
     const sdgWhy = String(model.objective || "").trim() || String(model.outputs || "").trim() || String(model.summary || "").trim();
     const reachBits = [
@@ -368,15 +391,8 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
         downloadIcs("ciel-project-dates.ics", title, model.start, model.end || model.start);
         setNote("Project dates downloaded.");
     };
-    const share = async () => {
-        const text = `${title}\n${hook}`;
-        try {
-            await navigator.clipboard.writeText(text);
-            setNote("Card text copied.");
-        } catch {
-            setNote("");
-        }
-    };
+    const scheduleText = String(model.scheduleNotes || "").trim() || "Agreed with selected students";
+    const scheduleShort = scheduleText.length > 72 ? `${scheduleText.slice(0, 69).trimEnd()}…` : scheduleText;
 
     return (
         <article className="co-flash">
@@ -421,32 +437,35 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
             </div>
             <div className="co-flash-facts">
                 <div className="co-flash-fact">
-                    <div className="ico">⏱</div>
+                    <div className="ico" aria-hidden>⏱</div>
                     <small>Commitment</small>
-                    <b>{esc(model.hours)} hours</b>
+                    <b>{esc(model.hours)} hrs</b>
                     <em>per student</em>
                 </div>
                 <div className="co-flash-fact">
-                    <div className="ico">👥</div>
+                    <div className="ico" aria-hidden>👥</div>
                     <small>Seats</small>
                     <b>{esc(model.seats)}</b>
                     <em>students</em>
                 </div>
-                <div className="co-flash-fact">
-                    <div className="ico">📅</div>
+                <div className="co-flash-fact co-flash-fact--dates">
+                    <div className="ico" aria-hidden>📅</div>
                     <small>Project dates</small>
                     <b>
-                        {prettyDate(model.start)} – {prettyDate(model.end)}
+                        <span>{prettyDate(model.start)}</span>
+                        <span className="co-flash-date-sep">to</span>
+                        <span>{prettyDate(model.end)}</span>
                     </b>
                     <em>{span || "dates confirmed with the team"}</em>
                 </div>
                 <div className="co-flash-fact">
-                    <div className="ico">🗓</div>
+                    <div className="ico" aria-hidden>🗓</div>
                     <small>Schedule</small>
-                    <b>{esc(model.scheduleNotes || "Agreed with selected students")}</b>
+                    <b title={scheduleText}>{esc(scheduleShort)}</b>
+                    <em>with selected students</em>
                 </div>
                 <div className="co-flash-fact">
-                    <div className="ico">🎯</div>
+                    <div className="ico" aria-hidden>🎯</div>
                     <small>Expected reach</small>
                     <b>{esc(model.beneficiariesCount)}</b>
                     <em>{esc(model.beneficiaryType)}</em>
@@ -462,10 +481,26 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                 </section>
                 <section className="co-flash-who">
                     <span className="co-flash-tag">Who can apply</span>
-                    <div className={`co-flash-row ${model.eligible ? "yes" : "no"}`}>
-                        <b>{model.eligible ? "Eligible" : "View only"}</b>
+                    <div className={`co-flash-row ${canApply ? "yes" : "no"}`}>
+                        <b>
+                            {canApply
+                                ? "Eligible"
+                                : catalogClosed && model.applyClosedReason === "catalog_closed"
+                                  ? "Expired"
+                                  : closed
+                                    ? "Applications closed"
+                                    : "View only"}
+                        </b>
                         <span>{esc(model.scopeLabel)}</span>
-                        <small>{esc(model.eligibilityWhy)}</small>
+                        <small>
+                            {esc(
+                                closed
+                                    ? catalogClosed
+                                        ? model.applyClosedMessage || "This listing is not accepting new applications."
+                                        : "Applications have closed for this opportunity."
+                                    : model.eligibilityWhy,
+                            )}
+                        </small>
                     </div>
                     <div className="co-flash-row no">
                         <b>Scope</b>
@@ -540,44 +575,48 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
             </section>
             <div className="co-flash-half">
                 <section className="co-flash-skills">
-                    <b>Skills & support</b>
+                    <div className="co-flash-sec-head">
+                        <b>Skills & support</b>
+                    </div>
                     <div className="co-flash-skill-row">
                         {(skillChips.length ? skillChips : ["Community engagement"]).map((skill) => (
                             <span key={skill}>{skill}</span>
                         ))}
                     </div>
                     {String(model.resources || "").trim() ? (
-                        <p>
-                            <strong>Support: </strong>
-                            {model.resources}
-                        </p>
+                        <div className="co-flash-detail">
+                            <strong>Support</strong>
+                            <p>{model.resources}</p>
+                        </div>
                     ) : null}
                     {String(model.verification || "").trim() ? (
-                        <p>
-                            <strong>Verification: </strong>
-                            {model.verification}
-                        </p>
+                        <div className="co-flash-detail">
+                            <strong>Verification</strong>
+                            <p>{model.verification}</p>
+                        </div>
                     ) : null}
                 </section>
                 <section className="co-flash-account">
-                    <b>Accountability</b>
+                    <div className="co-flash-sec-head">
+                        <b>Accountability</b>
+                    </div>
                     <div className="co-flash-chain">
-                        <div>
+                        <div className="co-flash-chain-item">
                             <small>Created by</small>
                             <b>{esc(model.creatorName)}</b>
                             <em>{esc(model.orgLabel)}</em>
                         </div>
-                        <div>
+                        <div className="co-flash-chain-item">
                             <small>{model.privateCandidate ? "Verification" : "Faculty"}</small>
                             <b>{esc(model.facultyName)}</b>
                             <em>{esc(model.unitLabel || model.facultyEmail)}</em>
                         </div>
-                        <div>
+                        <div className="co-flash-chain-item">
                             <small>Host</small>
                             <b>{esc(model.host)}</b>
                             <em>{model.host !== "No external partner" ? esc(model.partnerEmail) : "No partner on this card"}</em>
                         </div>
-                        <div>
+                        <div className="co-flash-chain-item">
                             <small>CIEL PK</small>
                             <b>Final check</b>
                             <em>{esc(model.approvalText)}</em>
@@ -585,26 +624,23 @@ export function StudentOpportunityFlashcard({ model }: { model: StudentFlashcard
                     </div>
                 </section>
             </div>
-            <section className={`co-flash-cta ${closed || !model.eligible ? "muted" : ""}`}>
-                <div>
+            <section className={`co-flash-cta ${closed || !model.eligible ? "muted" : ""}${canApply ? "" : " co-flash-cta--status"}`}>
+                <div className="co-flash-cta-copy">
                     <h3>{ctaTitle}</h3>
                     <p>{esc(ctaBody)}</p>
                 </div>
-                <div className="co-flash-btns">
-                    {canApply ? (
+                {canApply ? (
+                    <div className="co-flash-btns">
                         <span className="co-flash-btn apply">Apply now</span>
-                    ) : (
-                        <span className="co-flash-btn disabled">{closed ? "Applications closed" : "View only"}</span>
-                    )}
-                    <button type="button" className="co-flash-btn ghost" onClick={() => void share()}>
-                        Share
-                    </button>
-                </div>
+                    </div>
+                ) : (
+                    <span className="co-flash-status-pill">{closed ? "Closed" : "View only"}</span>
+                )}
             </section>
             {note ? <p className="co-flash-note">{note}</p> : null}
             <footer className="co-flash-foot">
                 <span>CIEL PK</span>
-                <span>{esc(model.approvalText)}. Phone numbers stay off this card.</span>
+                <span>Phone numbers stay off this card</span>
             </footer>
         </article>
     );

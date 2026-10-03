@@ -6,7 +6,8 @@ import Link from "next/link";
 import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { lastAllowedApplicationCloseDate, validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from 'next/dynamic';
 import { findSdgById, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, missingProfileFieldsForRole, pickProfileEmail } from "@/utils/profileCompletion";
@@ -16,7 +17,9 @@ import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuid
 import {
     composeInternationalPhone,
     DEFAULT_PHONE_COUNTRY_KEY,
+    normalizeNationalPhoneInput,
     parsePhoneForDisplay,
+    validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { facultyDepartmentOptionsForInstitution } from "@/utils/universityData";
@@ -58,6 +61,67 @@ type ApplyScope =
     | "all"
     | "multi_all"
     | "multi_depts";
+
+const PRIVATE_CONTACT_METHODS = ["Email", "WhatsApp", "Phone Call", "Email + WhatsApp"] as const;
+
+type CreatorFieldKey =
+    | "privateProgramme"
+    | "privateAwardingBody"
+    | "privateCountry"
+    | "privateContactPref"
+    | "privatePhone";
+
+type CreatorFieldErrors = Partial<Record<CreatorFieldKey, string>>;
+
+function fieldErrorClass(hasError: boolean): string {
+    return hasError ? "border-red-500 bg-red-50/50" : "";
+}
+
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return <p className="mt-1 text-[11px] font-semibold text-red-600">{message}</p>;
+}
+
+function firstFieldError(errors: Record<string, string | undefined>): string | undefined {
+    return Object.values(errors).find((value): value is string => Boolean(value));
+}
+
+function isScheduleValidationMessage(message: string): boolean {
+    return /application closing|project start date|project end date|hours per student|available seats|end time must be after|expected beneficiaries/i.test(
+        message,
+    );
+}
+
+function collectPrivateCandidateErrors(form: {
+    privateProgramme: string;
+    privateAwardingBody: string;
+    privateCountry: string;
+    privateContactPref: string;
+    privatePhoneKey: string;
+    privatePhone: string;
+}): CreatorFieldErrors {
+    const errors: CreatorFieldErrors = {};
+    if (!form.privateProgramme.trim()) {
+        errors.privateProgramme = "Enter your undergraduate programme / qualification.";
+    }
+    if (!form.privateAwardingBody.trim()) {
+        errors.privateAwardingBody = "Enter the awarding body / university / provider.";
+    }
+    if (!form.privateCountry.trim()) {
+        errors.privateCountry = "Enter your country / location.";
+    }
+    if (!form.privateContactPref.trim()) {
+        errors.privateContactPref = "Select how CIEL PK should contact you.";
+    } else if (!(PRIVATE_CONTACT_METHODS as readonly string[]).includes(form.privateContactPref.trim())) {
+        errors.privateContactPref = "Select a valid contact method.";
+    }
+    const phoneErr = validateNationalPhone(
+        form.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+        form.privatePhone,
+    );
+    if (phoneErr) errors.privatePhone = phoneErr;
+    return errors;
+}
 
 /** Left-rail wizard steps — 9-step Opportunity Builder (private-candidate pathway included). */
 const WIZARD_STEPS = [
@@ -326,6 +390,257 @@ function StudentOpportunityCreationPageInner() {
         visibility: "restricted" as "restricted" | "public",
     });
     const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
+    const [creatorFieldErrors, setCreatorFieldErrors] = useState<CreatorFieldErrors>({});
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const goToStepRef = useRef<(key: string) => void>(() => {});
+
+    const clearFieldError = (key: string) => {
+        setFieldErrors((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+    };
+
+    const applyLiveTimelineErrors = (
+        start: string,
+        end: string,
+        closeEarly: boolean,
+        deadline: string,
+    ) => {
+        setFieldErrors((prev) => {
+            const next = { ...prev };
+            delete next.dates;
+            delete next.dateStart;
+            delete next.dateEnd;
+            delete next.applicationDeadline;
+            const timelineErr = validateTimelineForPersist({
+                start_date: start,
+                end_date: end,
+                close_applications_early: closeEarly,
+                application_deadline: closeEarly ? deadline : end,
+            });
+            if (timelineErr && start.trim() && end.trim()) {
+                if (/application closing/i.test(timelineErr)) {
+                    next.applicationDeadline = timelineErr;
+                } else {
+                    next.dates = timelineErr;
+                }
+            } else if (closeEarly && start.trim() && end.trim() && !deadline.trim()) {
+                next.applicationDeadline = "Enter the application closing date.";
+            }
+            return next;
+        });
+    };
+
+    const patchCreatorField = (key: CreatorFieldKey, value: string) => {
+        setFormData((prev) => ({ ...prev, [key]: value }));
+        setCreatorFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+    };
+
+    const collectStepErrors = (step: string): Record<string, string> => {
+        const errors: Record<string, string> = {};
+        const privatePath = formData.privateCandidate;
+
+        if (step === "A") {
+            if (!privatePath) return errors;
+            const creator = collectPrivateCandidateErrors(formData);
+            (Object.keys(creator) as CreatorFieldKey[]).forEach((key) => {
+                const message = creator[key];
+                if (message) errors[key] = message;
+            });
+            return errors;
+        }
+
+        if (step === "B") {
+            if (!formData.title.trim()) errors.title = "Enter an opportunity title.";
+            if (!formData.hook.trim()) errors.hook = "Add a one-line student hook.";
+            if (!formData.opportunitySummary.trim()) errors.opportunitySummary = "Add an opportunity summary.";
+            // Older listings only picked predefined chips / "Other" specs, so a group label is optional then.
+            const hasBeneficiaryChoice =
+                formData.objectives.beneficiariesType.length > 0 ||
+                formData.objectives.otherBeneficiarySpecs.some((s) => s.trim());
+            if (!formData.objectives.beneficiaryGroup.trim() && !hasBeneficiaryChoice) {
+                errors.beneficiaryGroup = "Describe the community / beneficiary group.";
+            }
+            if (formData.opportunityType.length === 0) errors.opportunityType = "Select at least one activity type.";
+            if (formData.opportunityType.includes("Other")) {
+                const specs = formData.otherActivitySpecs.map((s) => s.trim()).filter(Boolean);
+                if (specs.length === 0) errors.otherActivitySpecs = "Add at least one Other activity description.";
+            }
+            if (!formData.mode) errors.mode = "Select a mode of engagement.";
+            if (formData.mode && formData.mode !== "Remote") {
+                if (!formData.location.city.trim()) errors.locationCity = "Select a city / area.";
+                if (!formData.location.pin.trim()) errors.locationPin = "Pin the exact location on the map.";
+            }
+            return errors;
+        }
+
+        if (step === "SCHED") {
+            if (!formData.dates.start.trim()) errors.dateStart = "Enter the project start date.";
+            if (!formData.dates.end.trim()) errors.dateEnd = "Enter the project end date.";
+            const timelineErr = validateTimelineForPersist({
+                start_date: formData.dates.start,
+                end_date: formData.dates.end,
+                close_applications_early: formData.closeApplicationsEarly,
+                application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+            });
+            if (timelineErr && formData.dates.start.trim() && formData.dates.end.trim()) {
+                if (/application closing/i.test(timelineErr)) {
+                    errors.applicationDeadline = timelineErr;
+                } else {
+                    errors.dates = timelineErr;
+                }
+            }
+            if (formData.closeApplicationsEarly && !formData.applicationDeadline.trim()) {
+                errors.applicationDeadline = errors.applicationDeadline || "Enter the application closing date.";
+            }
+            const fromTime = formData.dates.fromTime.trim();
+            const endTime = formData.dates.endTime.trim();
+            if (
+                (TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) &&
+                fromTime &&
+                endTime &&
+                fromTime >= endTime
+            ) {
+                errors.datesTime = "End time must be after start time.";
+            }
+            const hoursNum = parseInt(formData.capacity.hours, 10);
+            if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
+                errors.hours = "Required hours per student must be between 1 and 500.";
+            }
+            const volNum = parseInt(formData.capacity.volunteers, 10);
+            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
+                errors.seats = "Available seats must be between 1 and 5000.";
+            }
+            const benStr = formData.objectives.beneficiariesCount.trim();
+            const benNum = parseInt(benStr, 10);
+            if (benStr && (Number.isNaN(benNum) || benNum < 0)) {
+                errors.beneficiariesCount = "Expected beneficiaries must be 0 or more.";
+            }
+            return errors;
+        }
+
+        if (step === "C") {
+            if (!formData.sdg) errors.sdg = "Select a primary SDG.";
+            if (formData.sdg && !formData.sdgWhy.trim()) errors.sdgWhy = "Explain why this SDG is genuinely relevant.";
+            if (formData.secondarySdg) {
+                if (formData.secondarySdg === formData.sdg) {
+                    errors.secondarySdg = "Secondary SDG must be different from the primary SDG.";
+                }
+                if (!formData.secondarySdgWhy.trim()) {
+                    errors.secondarySdgWhy = "Explain why the secondary SDG is genuinely relevant.";
+                }
+            }
+            if (!formData.objectives.description.trim()) errors.objective = "Enter the primary objective.";
+            if (!formData.objectives.outputs.trim()) errors.outputs = "Describe expected outputs.";
+            if (formData.objectives.isOtherBeneficiaryChecked) {
+                const other = formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean);
+                if (other.length === 0) errors.otherBeneficiary = "Add at least one other beneficiary type.";
+            }
+            return errors;
+        }
+
+        if (step === "E") {
+            if (!formData.activity.responsibilities.trim()) {
+                errors.responsibilities = "List what students will actually do (short bullet plan).";
+            } else if (formData.activity.responsibilities.length > 12_000) {
+                errors.responsibilities = "Detailed plan is too long (max 12,000 characters).";
+            }
+            return errors;
+        }
+
+        if (step === "F") {
+            const s = formData.supervision;
+            if (!privatePath) {
+                if (!s.facultyName.trim()) errors.facultyName = "Enter the faculty member's name.";
+                if (!s.facultyDesignation.trim()) errors.facultyDesignation = "Enter the faculty designation.";
+                if (!s.facultyDepartment.trim()) errors.facultyDepartment = "Select the faculty department.";
+                if (!s.facultyOfficialEmail.trim() || !isValidEmail(s.facultyOfficialEmail)) {
+                    errors.facultyEmail = "Enter a valid faculty official email.";
+                }
+            }
+            if (s.executingContext === "partner") {
+                if (!s.partnerOrgName.trim()) errors.partnerOrgName = "Enter the partner organization name.";
+                if (!s.partnerContactPerson.trim()) errors.partnerContactPerson = "Enter the partner contact person.";
+                if (!s.partnerEmail.trim() || !isValidEmail(s.partnerEmail)) {
+                    errors.partnerEmail = "Enter a valid partner email.";
+                }
+            }
+            if (formData.verification.length === 0) {
+                errors.verification = "Select at least one verification method.";
+            }
+            return errors;
+        }
+
+        if (step === "VIS") {
+            if (privatePath) {
+                if (formData.applyScope === "multi_all" || formData.applyScope === "multi_depts") {
+                    const unis = formData.selectedUniversities.map((d) => d.trim()).filter(Boolean);
+                    if (unis.length === 0) errors.universities = "Add at least one university for this Apply Now scope.";
+                }
+                if (formData.applyScope === "multi_depts") {
+                    const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
+                    if (deps.length === 0) errors.departments = "Add at least one department for this Apply Now scope.";
+                }
+            } else if (formData.applyScope === "student_selected_depts") {
+                const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
+                if (deps.length === 0) errors.departments = "Add at least one department or choose all departments.";
+            }
+            return errors;
+        }
+
+        if (step === "SAFE") {
+            const s = formData.supervision;
+            if (!s.declSafeEnvironment || !s.declNoHazardous || !s.declFacultyOversight || !s.declEthicalLawful) {
+                errors.safetyDecls = "Confirm all safety & responsibility items.";
+            }
+            const extra = formData.extraSafety;
+            if (!extra.communicateChanges || !extra.visibilityIntentional || !extra.cielNotGuarantee || !extra.signatureAck) {
+                errors.extraSafety = "Confirm all safety and accountability declarations.";
+            }
+            if (!formData.electronicSignature.trim()) {
+                errors.signature = "Type your full name as electronic signature.";
+            } else if (
+                studentDetails.name.trim() &&
+                formData.electronicSignature.trim().toLowerCase() !== studentDetails.name.trim().toLowerCase()
+            ) {
+                errors.signature = "Electronic signature should match your profile name.";
+            }
+            return errors;
+        }
+
+        if (step === "SUBMIT") {
+            const c = formData.sectionFConfirmations;
+            if (!c.facultyApproval || !c.genuineAccurate || !c.safeAppropriate || !c.truthfulVerifiable) {
+                errors.confirmations = "Accept all required confirmations before submitting.";
+            }
+            if (!formData.flashApprove) errors.flashApprove = "Review and approve the flashcard before submitting.";
+            return errors;
+        }
+
+        return errors;
+    };
+
+    const applyStepErrors = (step: string, errors: Record<string, string>) => {
+        if (step === "A") {
+            setCreatorFieldErrors(errors as CreatorFieldErrors);
+            return;
+        }
+        setFieldErrors(errors);
+    };
+
+    const validateStep = (step: string): boolean => {
+        const errors = collectStepErrors(step);
+        applyStepErrors(step, errors);
+        const first = firstFieldError(errors);
+        if (first) {
+            toast.error(first);
+            return false;
+        }
+        return true;
+    };
 
     const validateForm = () => {
         const privatePath = formData.privateCandidate;
@@ -341,239 +656,20 @@ function StudentOpportunityCreationPageInner() {
             toast.error("Department is missing from your profile. Update your profile, then try again.");
             return false;
         }
-        if (privatePath) {
-            if (!formData.privateProgramme.trim()) {
-                toast.error("Private candidates must state their undergraduate programme / qualification.");
-                return false;
-            }
-            if (!formData.privateAwardingBody.trim()) {
-                toast.error("Private candidates must state the awarding body / university / programme provider.");
-                return false;
-            }
-            if (!formData.privateCountry.trim()) {
-                toast.error("Private candidates must state their country / location.");
-                return false;
-            }
-            if (!formData.privateContactPref.trim()) {
-                toast.error("Private candidates must select how CIEL PK should contact them for verification.");
-                return false;
-            }
-            const privatePhoneFull = composeInternationalPhone(
-                formData.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
-                formData.privatePhone,
-            ).trim();
-            if (!privatePhoneFull) {
-                toast.error("Private candidates must provide a private mobile / WhatsApp number for CIEL PK verification.");
-                return false;
-            }
-        }
-        if (!formData.title.trim()) {
-            toast.error("Please enter an Opportunity Title");
-            return false;
-        }
-        if (!formData.hook.trim()) {
-            toast.error("Please add a one-line student hook.");
-            return false;
-        }
-        if (!formData.opportunitySummary.trim()) {
-            toast.error("Please add an opportunity summary.");
-            return false;
-        }
-        if (formData.opportunityType.length === 0) {
-            toast.error("Please select at least one Opportunity Type");
-            return false;
-        }
-        if (formData.opportunityType.includes("Other")) {
-            const specs = formData.otherActivitySpecs.map((s) => s.trim()).filter(Boolean);
-            if (specs.length === 0) {
-                toast.error("Please add at least one Other activity description");
-                return false;
-            }
-        }
-        if (!formData.mode) {
-            toast.error("Please select a Mode of Engagement");
-            return false;
-        }
-        if (formData.mode !== 'Remote') {
-            if (!formData.location.city.trim()) {
-                toast.error("Please enter a City/Area");
-                return false;
-            }
-            if (!formData.location.pin.trim()) {
-                toast.error("Please pin the exact location on the map so it shows up accurately.");
-                return false;
-            }
-        }
-        if (!formData.timelineType) {
-            toast.error("Please select a Timeline Type");
-            return false;
-        }
-        const timelineErr = validateTimelineForPersist({
-            start_date: formData.dates.start,
-            end_date: formData.dates.end,
-            close_applications_early: formData.closeApplicationsEarly,
-            application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
-        });
-        if (timelineErr) {
-            toast.error(timelineErr);
-            return false;
-        }
-
-        const hoursNum = parseInt(formData.capacity.hours, 10);
-        if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
-            toast.error("Required hours per student must be between 1 and 500.");
-            return false;
-        }
-
-        const volNum = parseInt(formData.capacity.volunteers, 10);
-        if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-            toast.error("Available seats must be between 1 and 5000.");
-            return false;
-        }
-
-        if (!formData.sdg) {
-            toast.error("Please select a Primary SDG");
-            return false;
-        }
-        if (!formData.sdgWhy.trim()) {
-            toast.error("Please explain why this SDG is genuinely relevant.");
-            return false;
-        }
-        if (formData.secondarySdg) {
-            if (formData.secondarySdg === formData.sdg) {
-                toast.error("Secondary SDG must be different from the Primary SDG");
-                return false;
-            }
-            if (!formData.secondarySdgWhy.trim()) {
-                toast.error("Please explain why the secondary SDG is genuinely relevant.");
-                return false;
-            }
-        }
-
-        if (!formData.objectives.description.trim()) {
-            toast.error("Please enter the primary objective");
-            return false;
-        }
-        if (!formData.objectives.outputs.trim()) {
-            toast.error("Please describe expected outputs.");
-            return false;
-        }
-        const benStr = formData.objectives.beneficiariesCount.trim();
-        const benNum = parseInt(benStr, 10);
-        if (benStr && (Number.isNaN(benNum) || benNum < 0)) {
-            toast.error("Expected beneficiaries must be a number of 0 or more.");
-            return false;
-        }
-        if (formData.objectives.isOtherBeneficiaryChecked) {
-            const ob = formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean);
-            if (ob.length === 0) {
-                toast.error("Please add at least one other beneficiary type");
-                return false;
-            }
-        }
-        const predefinedSelected = formData.objectives.beneficiariesType.filter((t) =>
-            (BENEFICIARY_PREDEFINED as readonly string[]).includes(t),
-        );
-        const otherFilled =
-            formData.objectives.isOtherBeneficiaryChecked &&
-            formData.objectives.otherBeneficiarySpecs.some((s) => s.trim().length > 0);
-        if (predefinedSelected.length === 0 && !otherFilled && !formData.objectives.beneficiaryGroup.trim()) {
-            toast.error("Please describe the community / beneficiary group.");
-            return false;
-        }
-
-        if (!formData.activity.responsibilities.trim()) {
-            toast.error("Please list Student Responsibilities");
-            return false;
-        }
-        if (formData.activity.responsibilities.length > 12_000) {
-            toast.error("Detailed plan is too long (max 12,000 characters). Use a concise bullet summary.");
-            return false;
-        }
-
         if (!privatePath && !studentDetails.institution.trim()) {
             toast.error("Your university/institution is missing from your profile. Complete your profile, then try again.");
             return false;
         }
-
-        const s = formData.supervision;
-        if (!privatePath) {
-            if (!s.facultyName.trim() || !s.facultyDesignation.trim() || !s.facultyDepartment.trim()) {
-                toast.error("Please complete Faculty Approval details");
-                return false;
-            }
-            if (!s.facultyOfficialEmail.trim() || !isValidEmail(s.facultyOfficialEmail)) {
-                toast.error("Please enter a valid faculty official email");
-                return false;
-            }
-        }
-
-        if (s.executingContext === "partner") {
-            if (!s.partnerOrgName.trim() || !s.partnerContactPerson.trim() || !s.partnerEmail.trim()) {
-                toast.error("Please provide complete partner organization details");
-                return false;
-            }
-            if (!isValidEmail(s.partnerEmail)) {
-                toast.error("Please enter a valid partner organization email");
+        for (const step of WIZARD_STEPS) {
+            const errors = collectStepErrors(step.key);
+            const first = firstFieldError(errors);
+            if (first) {
+                applyStepErrors(step.key, errors);
+                toast.error(first);
+                goToStepRef.current(step.key);
                 return false;
             }
         }
-
-        if (!s.declSafeEnvironment || !s.declNoHazardous || !s.declFacultyOversight || !s.declEthicalLawful) {
-            toast.error("Please confirm all items in Safety & Responsibility");
-            return false;
-        }
-        if (!formData.extraSafety.communicateChanges || !formData.extraSafety.visibilityIntentional || !formData.extraSafety.cielNotGuarantee || !formData.extraSafety.signatureAck) {
-            toast.error("Please confirm all safety and accountability declarations.");
-            return false;
-        }
-        if (!formData.electronicSignature.trim()) {
-            toast.error("Please type your full name as electronic signature.");
-            return false;
-        }
-        if (studentDetails.name.trim() && formData.electronicSignature.trim().toLowerCase() !== studentDetails.name.trim().toLowerCase()) {
-            toast.error("Electronic signature should match your profile name.");
-            return false;
-        }
-
-        if (privatePath) {
-            if (formData.applyScope === "multi_all" || formData.applyScope === "multi_depts") {
-                const unis = formData.selectedUniversities.map((d) => d.trim()).filter(Boolean);
-                if (unis.length === 0) {
-                    toast.error("Add at least one university for the selected Apply Now scope.");
-                    return false;
-                }
-            }
-            if (formData.applyScope === "multi_depts") {
-                const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
-                if (deps.length === 0) {
-                    toast.error("Add at least one department for the selected Apply Now scope.");
-                    return false;
-                }
-            }
-        } else if (formData.applyScope === "student_selected_depts" || formData.participation.departmentScope === "specific") {
-            const deps = formData.participation.departments.map((d) => d.trim()).filter(Boolean);
-            if (deps.length === 0) {
-                toast.error("Add at least one department or choose all departments");
-                return false;
-            }
-        }
-
-        const c = formData.sectionFConfirmations;
-        if (!c.facultyApproval || !c.genuineAccurate || !c.safeAppropriate || !c.truthfulVerifiable) {
-            toast.error("Please accept all required confirmations before submitting");
-            return false;
-        }
-        if (!formData.flashApprove) {
-            toast.error("Please review and approve the flashcard before submitting.");
-            return false;
-        }
-
-        if (formData.verification.length === 0) {
-            toast.error("Select at least one verification method");
-            return false;
-        }
-
         return true;
     };
 
@@ -654,9 +750,10 @@ function StudentOpportunityCreationPageInner() {
             // branch above so it always reflects the final restricted-universities list.
             const visibility: "restricted" | "public" = restricted.length > 0 ? "restricted" : "public";
 
+            const privatePhoneKey = formData.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY;
             const privatePhoneFull = composeInternationalPhone(
-                formData.privatePhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
-                formData.privatePhone,
+                privatePhoneKey,
+                normalizeNationalPhoneInput(privatePhoneKey, formData.privatePhone),
             ).trim();
 
             // Transform state to match API Spec
@@ -941,6 +1038,9 @@ function StudentOpportunityCreationPageInner() {
                               ? `Could not update opportunity (${res.status}).`
                               : `Could not create opportunity (${res.status}).`);
                 toast.error(msg, { duration: res.status === 409 ? 7000 : 4000 });
+                if (isScheduleValidationMessage(msg)) {
+                    goToStepRef.current("SCHED");
+                }
             }
         } catch (error) {
             console.error("Error submitting form", error);
@@ -972,22 +1072,30 @@ function StudentOpportunityCreationPageInner() {
         setActiveStep(key);
         if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     }, []);
+    goToStepRef.current = goToStep;
     const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+        if (i > schedIdx && !validateStep("SCHED")) {
+            goToStep("SCHED");
+            return;
+        }
+        if (!validateStep(activeStep)) return;
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData, studentDetails]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
     }, [activeStep, goToStep]);
 
     const setPrivateCandidate = (on: boolean) => {
+        if (!on) setCreatorFieldErrors({});
         setFormData((prev) => ({
             ...prev,
             privateCandidate: on,
@@ -1135,8 +1243,11 @@ function StudentOpportunityCreationPageInner() {
                     { redirectToLogin: false },
                 );
                 const data = await res?.json().catch(() => null);
+                if (!res) {
+                    return;
+                }
                 const newId = (data as { data?: { id?: string } } | null)?.data?.id;
-                if (res?.ok && newId && !existingId) {
+                if (res.ok && newId && !existingId) {
                     draftIdRef.current = newId;
                     skipDraftHydrateRef.current = true;
                     setEditingOpportunityId(newId);
@@ -1146,11 +1257,14 @@ function StudentOpportunityCreationPageInner() {
                         { scroll: false },
                     );
                 }
-                if (!res?.ok) {
+                if (!res.ok) {
+                    const raw = (data as { message?: unknown; error?: unknown } | null)?.message;
+                    const err = (data as { error?: unknown } | null)?.error;
                     const msg =
-                        typeof (data as { message?: unknown } | null)?.message === "string"
-                            ? (data as { message: string }).message
-                            : "Could not sync this draft to your account.";
+                        (typeof raw === "string" && raw.trim()) ||
+                        (Array.isArray(raw) && typeof raw[0] === "string" && raw[0].trim()) ||
+                        (typeof err === "string" && err.trim()) ||
+                        "Could not sync this draft to your account.";
                     toast.warning(quiet ? msg : `Saved on this device. ${msg}`);
                     return;
                 }
@@ -1522,15 +1636,15 @@ function StudentOpportunityCreationPageInner() {
                 </div>
             ) : null}
 
-            <div className="mb-3.5 flex items-center gap-3">
-                <div>
+            <div className="mb-3.5 flex min-w-0 flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-[#7a919a]">
                         Community Service → <b className="text-[#0e7d74]">Create an Opportunity</b>
                     </p>
                 </div>
                 <Link
                     href="/dashboard/student/paths/community-service?view=create"
-                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
+                    className="shrink-0 rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
                 >
                     ← Back
                 </Link>
@@ -1585,7 +1699,25 @@ function StudentOpportunityCreationPageInner() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => goToStep(step.key)}
+                                    onClick={() => {
+                                        const from = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
+                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+                                        if (to > schedIdx && !validateStep("SCHED")) {
+                                            goToStep("SCHED");
+                                            return;
+                                        }
+                                        if (to > from) {
+                                            for (let i = from; i < to; i++) {
+                                                if (WIZARD_STEPS[i].key === "SCHED") continue;
+                                                if (!validateStep(WIZARD_STEPS[i].key)) {
+                                                    if (WIZARD_STEPS[i].key !== activeStep) goToStep(WIZARD_STEPS[i].key);
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        goToStep(step.key);
+                                    }}
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
@@ -1677,30 +1809,40 @@ function StudentOpportunityCreationPageInner() {
                             : <span><b>University-linked student:</b> leave this unchecked. You will connect a faculty member in Verification.</span>}
                     </div>
                     {formData.privateCandidate ? (
-                        <div className="mt-3 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="mt-3 min-w-0 space-y-3 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
                             <p className="text-xs leading-relaxed text-amber-950">
                                 <b>CIEL PK direct verification:</b> before this opportunity can be approved, CIEL PK may contact you to confirm your identity, undergraduate programme / registration status and the authenticity of the opportunity.
                             </p>
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <div>
+                            <div className="co-verify-grid grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="min-w-0">
                                     <label className="co-label" style={{ marginTop: 0 }}>Undergraduate programme / qualification *</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. BSc Business Administration, LLB, BBA"
                                         value={formData.privateProgramme}
-                                        onChange={(e) => setFormData({ ...formData, privateProgramme: e.target.value })}
+                                        aria-invalid={creatorFieldErrors.privateProgramme ? true : undefined}
+                                        className={fieldErrorClass(!!creatorFieldErrors.privateProgramme)}
+                                        onChange={(e) => patchCreatorField("privateProgramme", e.target.value)}
                                     />
+                                    {creatorFieldErrors.privateProgramme ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-red-600">{creatorFieldErrors.privateProgramme}</p>
+                                    ) : null}
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label className="co-label" style={{ marginTop: 0 }}>Awarding body / university / provider *</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. University of London, private degree provider"
                                         value={formData.privateAwardingBody}
-                                        onChange={(e) => setFormData({ ...formData, privateAwardingBody: e.target.value })}
+                                        aria-invalid={creatorFieldErrors.privateAwardingBody ? true : undefined}
+                                        className={fieldErrorClass(!!creatorFieldErrors.privateAwardingBody)}
+                                        onChange={(e) => patchCreatorField("privateAwardingBody", e.target.value)}
                                     />
+                                    {creatorFieldErrors.privateAwardingBody ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-red-600">{creatorFieldErrors.privateAwardingBody}</p>
+                                    ) : null}
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label className="co-label" style={{ marginTop: 0 }}>Candidate / registration ID <span className="font-medium normal-case tracking-normal text-[#7a919a]">optional</span></label>
                                     <input
                                         type="text"
@@ -1709,40 +1851,57 @@ function StudentOpportunityCreationPageInner() {
                                         onChange={(e) => setFormData({ ...formData, privateCandidateId: e.target.value })}
                                     />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label className="co-label" style={{ marginTop: 0 }}>Country / location *</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. Pakistan"
                                         value={formData.privateCountry}
-                                        onChange={(e) => setFormData({ ...formData, privateCountry: e.target.value })}
+                                        aria-invalid={creatorFieldErrors.privateCountry ? true : undefined}
+                                        className={fieldErrorClass(!!creatorFieldErrors.privateCountry)}
+                                        onChange={(e) => patchCreatorField("privateCountry", e.target.value)}
                                     />
+                                    {creatorFieldErrors.privateCountry ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-red-600">{creatorFieldErrors.privateCountry}</p>
+                                    ) : null}
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <label className="co-label" style={{ marginTop: 0 }}>Preferred CIEL PK contact method *</label>
                                     <select
-                                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                                        className={`w-full min-w-0 rounded-xl border px-4 py-3 text-sm ${creatorFieldErrors.privateContactPref ? "border-red-500 bg-red-50/50" : "border-slate-200"}`}
                                         value={formData.privateContactPref}
-                                        onChange={(e) => setFormData({ ...formData, privateContactPref: e.target.value })}
+                                        aria-invalid={creatorFieldErrors.privateContactPref ? true : undefined}
+                                        onChange={(e) => patchCreatorField("privateContactPref", e.target.value)}
                                     >
-                                        <option value="">Select</option>
-                                        <option>Email</option>
-                                        <option>WhatsApp</option>
-                                        <option>Phone Call</option>
-                                        <option>Email + WhatsApp</option>
+                                        <option value="">Select method</option>
+                                        {PRIVATE_CONTACT_METHODS.map((method) => (
+                                            <option key={method} value={method}>{method}</option>
+                                        ))}
                                     </select>
+                                    {creatorFieldErrors.privateContactPref ? (
+                                        <p className="mt-1 text-[11px] font-semibold text-red-600">{creatorFieldErrors.privateContactPref}</p>
+                                    ) : null}
                                 </div>
-                                <div>
+                                <div className="min-w-0 md:col-span-2">
                                     <label className="co-label" style={{ marginTop: 0 }}>Mobile / WhatsApp for verification * · private</label>
                                     <PhoneConnectivityRow
                                         phoneCountryKey={formData.privatePhoneKey}
                                         nationalDigits={formData.privatePhone}
-                                        onPhoneCountryKeyChange={(privatePhoneKey) => setFormData({ ...formData, privatePhoneKey })}
-                                        onNationalDigitsChange={(privatePhone) => setFormData({ ...formData, privatePhone })}
-                                        maxNationalDigits={15}
-                                        selectClassName="rounded-xl border border-slate-200 py-3 text-xs font-semibold"
-                                        inputClassName="rounded-xl border border-slate-200 py-3 text-sm font-medium"
+                                        onPhoneCountryKeyChange={(privatePhoneKey) => {
+                                            setFormData((prev) => ({ ...prev, privatePhoneKey }));
+                                            setCreatorFieldErrors((prev) => (prev.privatePhone ? { ...prev, privatePhone: undefined } : prev));
+                                        }}
+                                        onNationalDigitsChange={(privatePhone) => patchCreatorField("privatePhone", privatePhone)}
+                                        usePortalCountryPicker
+                                        maxNationalDigits={formData.privatePhoneKey.startsWith("PK|") ? 10 : 15}
+                                        errorText={creatorFieldErrors.privatePhone}
+                                        rowClassName="co-phone-row"
+                                        selectClassName={`h-[42px] rounded-[10px] border py-0 text-xs font-semibold ${creatorFieldErrors.privatePhone ? "border-red-500" : "border-slate-200"}`}
+                                        inputClassName={`h-[42px] rounded-[10px] border py-0 text-sm font-medium ${creatorFieldErrors.privatePhone ? "border-red-500 focus:border-red-500" : "border-slate-200"}`}
                                     />
+                                    {!creatorFieldErrors.privatePhone ? (
+                                        <p className="mt-1 text-[10px] text-[#7a919a]">Pakistan: 10 digits starting with 3, no leading 0 — e.g. 300 1234567</p>
+                                    ) : null}
                                 </div>
                             </div>
                             <p className="text-[10px] text-[#7a919a]">🔒 These verification contact details stay private. They are not displayed on the public opportunity flashcard.</p>
@@ -1773,8 +1932,14 @@ function StudentOpportunityCreationPageInner() {
                             type="text"
                             placeholder="e.g. Community Clean Up Drive"
                             value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            aria-invalid={fieldErrors.title ? true : undefined}
+                            className={fieldErrorClass(!!fieldErrors.title)}
+                            onChange={(e) => {
+                                clearFieldError("title");
+                                setFormData({ ...formData, title: e.target.value });
+                            }}
                         />
+                        <FieldError message={fieldErrors.title} />
                         {!formData.privateCandidate && !editingOpportunityId && (similarCheckLoading || similarMatches.length > 0) ? (
                             <div
                                 className={`mt-3 rounded-xl border p-4 ${
@@ -1844,8 +2009,14 @@ function StudentOpportunityCreationPageInner() {
                             maxLength={180}
                             placeholder="Why would a student want to join?"
                             value={formData.hook}
-                            onChange={(e) => setFormData({ ...formData, hook: e.target.value })}
+                            aria-invalid={fieldErrors.hook ? true : undefined}
+                            className={fieldErrorClass(!!fieldErrors.hook)}
+                            onChange={(e) => {
+                                clearFieldError("hook");
+                                setFormData({ ...formData, hook: e.target.value });
+                            }}
                         />
+                        <FieldError message={fieldErrors.hook} />
                     </div>
                     <div>
                         <label className="co-label">Opportunity summary *</label>
@@ -1853,8 +2024,14 @@ function StudentOpportunityCreationPageInner() {
                             spellCheck={true}
                             placeholder="Describe the community need, student contribution and why the opportunity matters."
                             value={formData.opportunitySummary}
-                            onChange={(e) => setFormData({ ...formData, opportunitySummary: e.target.value })}
+                            aria-invalid={fieldErrors.opportunitySummary ? true : undefined}
+                            className={fieldErrorClass(!!fieldErrors.opportunitySummary)}
+                            onChange={(e) => {
+                                clearFieldError("opportunitySummary");
+                                setFormData({ ...formData, opportunitySummary: e.target.value });
+                            }}
                         />
+                        <FieldError message={fieldErrors.opportunitySummary} />
                     </div>
                     <div>
                         <label className="co-label">Community / beneficiary group *</label>
@@ -1862,25 +2039,38 @@ function StudentOpportunityCreationPageInner() {
                             type="text"
                             placeholder="e.g. public-school students, local residents"
                             value={formData.objectives.beneficiaryGroup}
-                            onChange={(e) => setFormData({
-                                ...formData,
-                                objectives: { ...formData.objectives, beneficiaryGroup: e.target.value },
-                            })}
+                            aria-invalid={fieldErrors.beneficiaryGroup ? true : undefined}
+                            className={fieldErrorClass(!!fieldErrors.beneficiaryGroup)}
+                            onChange={(e) => {
+                                clearFieldError("beneficiaryGroup");
+                                setFormData({
+                                    ...formData,
+                                    objectives: { ...formData.objectives, beneficiaryGroup: e.target.value },
+                                });
+                            }}
                         />
+                        <FieldError message={fieldErrors.beneficiaryGroup} />
                     </div>
                     {/* B2. Type */}
                     <div>
-                        <label className="co-label">B2 · Activity type · tap one or more</label>
-                        <div className="co-chips">
+                        <label className="co-label">B2 · Activity type · tap one or more *</label>
+                        <div className={`co-chips${fieldErrors.opportunityType ? " rounded-xl ring-2 ring-red-400" : ""}`}>
                             {ACTIVITY_TYPES_MAIN.map((type) => (
-                                <CoChip key={type} selected={formData.opportunityType.includes(type)} onClick={() => toggleType(type)}>
+                                <CoChip key={type} selected={formData.opportunityType.includes(type)} onClick={() => {
+                                    clearFieldError("opportunityType");
+                                    toggleType(type);
+                                }}>
                                     {ACTIVITY_TYPE_EMOJI[type] || ""} {type}
                                 </CoChip>
                             ))}
-                            <CoChip selected={formData.opportunityType.includes("Other")} onClick={() => toggleType("Other")}>
+                            <CoChip selected={formData.opportunityType.includes("Other")} onClick={() => {
+                                clearFieldError("opportunityType");
+                                toggleType("Other");
+                            }}>
                                 ✏️ Other
                             </CoChip>
                         </div>
+                        <FieldError message={fieldErrors.opportunityType} />
                         {formData.opportunityType.includes("Other") && (
                             <div className="mt-4 space-y-3 pl-4 border-l-2 border-blue-100">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Specify each &quot;Other&quot; activity (add as many as needed)</p>
@@ -1895,6 +2085,7 @@ function StudentOpportunityCreationPageInner() {
                                                 onChange={(e) => {
                                                     const next = [...formData.otherActivitySpecs];
                                                     next[idx] = e.target.value;
+                                                    clearFieldError("otherActivitySpecs");
                                                     setFormData({ ...formData, otherActivitySpecs: next });
                                                 }}
                                             />
@@ -1922,13 +2113,14 @@ function StudentOpportunityCreationPageInner() {
                                     <Plus className="w-3.5 h-3.5" />
                                     Add another Other
                                 </button>
+                                <FieldError message={fieldErrors.otherActivitySpecs} />
                             </div>
                         )}
                     </div>
 
                     <div className="pt-1">
                         <label className="co-label">Mode of engagement *</label>
-                        <div className="co-mode-grid">
+                        <div className={`co-mode-grid${fieldErrors.mode ? " rounded-xl ring-2 ring-red-400" : ""}`}>
                             {([
                                 ["On site", "📍", "On-site", "Physical participation"],
                                 ["Remote", "💻", "Remote", "Virtual participation"],
@@ -1938,7 +2130,10 @@ function StudentOpportunityCreationPageInner() {
                                     key={value}
                                     type="button"
                                     className={`co-mode-card${formData.mode === value ? " on" : ""}`}
-                                    onClick={() => setFormData({ ...formData, mode: value })}
+                                    onClick={() => {
+                                        clearFieldError("mode");
+                                        setFormData({ ...formData, mode: value });
+                                    }}
                                 >
                                     <div className="em">{em}</div>
                                     <b>{title}</b>
@@ -1946,6 +2141,7 @@ function StudentOpportunityCreationPageInner() {
                                 </button>
                             ))}
                         </div>
+                        <FieldError message={fieldErrors.mode} />
                     </div>
 
                     {(formData.mode === "On site" || formData.mode === "Hybrid") && (
@@ -1956,13 +2152,14 @@ function StudentOpportunityCreationPageInner() {
                                         <MapPin className="absolute left-3 top-1/2 z-10 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                         <select
                                             value={formData.location.city}
-                                            onChange={(e) =>
+                                            className={`w-full pl-10 pr-10 py-3 rounded-xl border outline-none focus:border-blue-500 text-sm appearance-none cursor-pointer bg-white ${fieldErrors.locationCity ? "border-red-500 bg-red-50/50" : "border-slate-200"}`}
+                                            onChange={(e) => {
+                                                clearFieldError("locationCity");
                                                 setFormData({
                                                     ...formData,
                                                     location: { ...formData.location, city: e.target.value },
-                                                })
-                                            }
-                                            className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 text-sm appearance-none cursor-pointer bg-white"
+                                                });
+                                            }}
                                         >
                                             <option value="">Select city / area</option>
                                             {formData.location.city.trim() &&
@@ -1981,9 +2178,10 @@ function StudentOpportunityCreationPageInner() {
                                         </select>
                                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                     </div>
+                                    <FieldError message={fieldErrors.locationCity} />
 
-                                    <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pin Implementation Location</label>
+                                    <div className={`border rounded-xl p-4 bg-slate-50/50 ${fieldErrors.locationPin ? "border-red-500" : "border-slate-200"}`}>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pin Implementation Location *</label>
                                         {(() => {
                                             let initialLocation: { lat: number; lng: number } | undefined;
                                             if (formData.location.pin && formData.location.pin.includes(',')) {
@@ -1995,6 +2193,7 @@ function StudentOpportunityCreationPageInner() {
                                                 <LocationPicker
                                                     initialLocation={initialLocation}
                                                     onLocationSelect={(loc) => {
+                                                        clearFieldError("locationPin");
                                                         setFormData(prev => ({
                                                             ...prev,
                                                             location: {
@@ -2007,6 +2206,7 @@ function StudentOpportunityCreationPageInner() {
                                                 />
                                             );
                                         })()}
+                                        <FieldError message={fieldErrors.locationPin} />
                                     </div>
 
                                     <div className="relative">
@@ -2070,33 +2270,68 @@ function StudentOpportunityCreationPageInner() {
                             <input
                                 type="date"
                                 value={formData.dates.start}
-                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                                max={formData.dates.end || undefined}
+                                aria-invalid={fieldErrors.dateStart || fieldErrors.dates ? true : undefined}
+                                className={fieldErrorClass(!!(fieldErrors.dateStart || fieldErrors.dates))}
+                                onChange={(e) => {
+                                    const start = e.target.value;
+                                    setFormData({ ...formData, dates: { ...formData.dates, start } });
+                                    applyLiveTimelineErrors(
+                                        start,
+                                        formData.dates.end,
+                                        formData.closeApplicationsEarly,
+                                        formData.applicationDeadline,
+                                    );
+                                }}
                             />
                             {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
+                            <FieldError message={fieldErrors.dateStart} />
                         </div>
                         <div>
                             <label className="co-label" style={{ marginTop: 0 }}>Project end date *</label>
                             <input
                                 type="date"
                                 value={formData.dates.end}
-                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                                min={formData.dates.start || undefined}
+                                aria-invalid={fieldErrors.dateEnd || fieldErrors.dates ? true : undefined}
+                                className={fieldErrorClass(!!(fieldErrors.dateEnd || fieldErrors.dates))}
+                                onChange={(e) => {
+                                    const end = e.target.value;
+                                    setFormData({ ...formData, dates: { ...formData.dates, end } });
+                                    applyLiveTimelineErrors(
+                                        formData.dates.start,
+                                        end,
+                                        formData.closeApplicationsEarly,
+                                        formData.applicationDeadline,
+                                    );
+                                }}
                             />
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
+                            <FieldError message={fieldErrors.dateEnd} />
                         </div>
                     </div>
+                    <FieldError message={fieldErrors.dates} />
                     <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
                         <label className="flex items-start gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
                                 className="mt-1"
                                 checked={formData.closeApplicationsEarly}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    const deadline = checked ? formData.applicationDeadline : "";
                                     setFormData({
                                         ...formData,
-                                        closeApplicationsEarly: e.target.checked,
-                                        applicationDeadline: e.target.checked ? formData.applicationDeadline : "",
-                                    })
-                                }
+                                        closeApplicationsEarly: checked,
+                                        applicationDeadline: deadline,
+                                    });
+                                    applyLiveTimelineErrors(
+                                        formData.dates.start,
+                                        formData.dates.end,
+                                        checked,
+                                        deadline,
+                                    );
+                                }}
                             />
                             <span className="text-sm text-slate-800">
                                 <span className="font-semibold">Close applications before project end date</span>
@@ -2111,8 +2346,22 @@ function StudentOpportunityCreationPageInner() {
                                 <input
                                     type="date"
                                     value={formData.applicationDeadline}
-                                    onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
+                                    min={formData.dates.start || undefined}
+                                    max={lastAllowedApplicationCloseDate(formData.dates.end)}
+                                    aria-invalid={fieldErrors.applicationDeadline ? true : undefined}
+                                    className={fieldErrorClass(!!fieldErrors.applicationDeadline)}
+                                    onChange={(e) => {
+                                        const deadline = e.target.value;
+                                        setFormData({ ...formData, applicationDeadline: deadline });
+                                        applyLiveTimelineErrors(
+                                            formData.dates.start,
+                                            formData.dates.end,
+                                            true,
+                                            deadline,
+                                        );
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.applicationDeadline} />
                             </div>
                         ) : null}
                     </div>
@@ -2134,7 +2383,18 @@ function StudentOpportunityCreationPageInner() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.fromTime}
-                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
+                                        max={formData.dates.endTime || undefined}
+                                        onChange={(e) => {
+                                            const fromTime = e.target.value;
+                                            setFormData({ ...formData, dates: { ...formData.dates, fromTime } });
+                                            clearFieldError("datesTime");
+                                            if (formData.dates.endTime && fromTime && fromTime >= formData.dates.endTime) {
+                                                setFieldErrors((prev) => ({
+                                                    ...prev,
+                                                    datesTime: "End time must be after start time.",
+                                                }));
+                                            }
+                                        }}
                                     />
                                 </div>
                                 <div className="flex-1 min-w-[140px]">
@@ -2143,43 +2403,102 @@ function StudentOpportunityCreationPageInner() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.endTime}
-                                        onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
+                                        min={formData.dates.fromTime || undefined}
+                                        onChange={(e) => {
+                                            const endTime = e.target.value;
+                                            setFormData({ ...formData, dates: { ...formData.dates, endTime } });
+                                            clearFieldError("datesTime");
+                                            if (formData.dates.fromTime && endTime && formData.dates.fromTime >= endTime) {
+                                                setFieldErrors((prev) => ({
+                                                    ...prev,
+                                                    datesTime: "End time must be after start time.",
+                                                }));
+                                            }
+                                        }}
                                     />
                                 </div>
                             </div>
                         )}
+                        <FieldError message={fieldErrors.datesTime} />
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={500}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={3}
                                     placeholder="e.g. 16"
                                     value={formData.capacity.hours}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                    aria-invalid={fieldErrors.hours ? true : undefined}
+                                    className={fieldErrorClass(!!fieldErrors.hours)}
+                                    onChange={(e) => {
+                                        const hours = integerFieldInput(e.target.value, 3);
+                                        setFormData({ ...formData, capacity: { ...formData.capacity, hours } });
+                                        const n = parseInt(hours, 10);
+                                        setFieldErrors((prev) => {
+                                            const next = { ...prev };
+                                            delete next.hours;
+                                            if (hours && (Number.isNaN(n) || n <= 0 || n > 500)) {
+                                                next.hours = "Required hours per student must be between 1 and 500.";
+                                            }
+                                            return next;
+                                        });
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.hours} />
                             </div>
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={5000}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={4}
                                     placeholder="e.g. 20"
                                     value={formData.capacity.volunteers}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                    aria-invalid={fieldErrors.seats ? true : undefined}
+                                    className={fieldErrorClass(!!fieldErrors.seats)}
+                                    onChange={(e) => {
+                                        const volunteers = integerFieldInput(e.target.value, 4);
+                                        setFormData({ ...formData, capacity: { ...formData.capacity, volunteers } });
+                                        const n = parseInt(volunteers, 10);
+                                        setFieldErrors((prev) => {
+                                            const next = { ...prev };
+                                            delete next.seats;
+                                            if (volunteers && (Number.isNaN(n) || n < 1 || n > 5000)) {
+                                                next.seats = "Available seats must be between 1 and 5000.";
+                                            }
+                                            return next;
+                                        });
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.seats} />
                             </div>
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Expected beneficiaries</label>
                                 <input
-                                    type="number"
-                                    min={0}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={7}
                                     placeholder="e.g. 60"
                                     value={formData.objectives.beneficiariesCount}
-                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
+                                    aria-invalid={fieldErrors.beneficiariesCount ? true : undefined}
+                                    className={fieldErrorClass(!!fieldErrors.beneficiariesCount)}
+                                    onChange={(e) => {
+                                        const beneficiariesCount = integerFieldInput(e.target.value, 7);
+                                        setFormData({
+                                            ...formData,
+                                            objectives: { ...formData.objectives, beneficiariesCount },
+                                        });
+                                        clearFieldError("beneficiariesCount");
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.beneficiariesCount} />
                             </div>
                         </div>
                         <div className="mt-3">
@@ -2192,7 +2511,7 @@ function StudentOpportunityCreationPageInner() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be before project end; hours and seats must be positive.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be on or after start and before project end; hours, seats, and beneficiaries accept digits only.</span>
                         </div>
                     </div>
                 </div>
@@ -2246,6 +2565,8 @@ function StudentOpportunityCreationPageInner() {
                                             outlineOffset: isPrimary || isSecondary ? "-3px" : undefined,
                                         }}
                                         onClick={() => {
+                                            clearFieldError("sdg");
+                                            clearFieldError("secondarySdg");
                                             if (isPrimary) {
                                                 // Deselect the primary SDG, promoting the secondary (if any) up to primary.
                                                 setFormData({
@@ -2291,6 +2612,7 @@ function StudentOpportunityCreationPageInner() {
                                 );
                             })}
                         </div>
+                        <FieldError message={fieldErrors.sdg || fieldErrors.secondarySdg} />
                     </div>
 
                     {(
@@ -2402,14 +2724,18 @@ function StudentOpportunityCreationPageInner() {
                                         spellCheck={true}
                                         placeholder={`Explain the direct connection between the opportunity and SDG ${sdg.number}.`}
                                         value={entry.why}
-                                        onChange={(e) =>
+                                        aria-invalid={(entry.isPrimary ? fieldErrors.sdgWhy : fieldErrors.secondarySdgWhy) ? true : undefined}
+                                        className={fieldErrorClass(!!(entry.isPrimary ? fieldErrors.sdgWhy : fieldErrors.secondarySdgWhy))}
+                                        onChange={(e) => {
+                                            clearFieldError(entry.isPrimary ? "sdgWhy" : "secondarySdgWhy");
                                             setFormData(
                                                 entry.isPrimary
                                                     ? { ...formData, sdgWhy: e.target.value }
                                                     : { ...formData, secondarySdgWhy: e.target.value },
-                                            )
-                                        }
+                                            );
+                                        }}
                                     />
+                                    <FieldError message={entry.isPrimary ? fieldErrors.sdgWhy : fieldErrors.secondarySdgWhy} />
                                 </div>
                             </div>
                         );
@@ -2435,11 +2761,15 @@ function StudentOpportunityCreationPageInner() {
                     <div>
                         <label className="co-label" style={{ marginTop: 4 }}>Primary objective *</label>
                         <textarea spellCheck={true}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32"
+                            className={`w-full px-4 py-3 rounded-xl border focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32 ${fieldErrors.objective ? "border-red-500 bg-red-50/50" : "border-slate-200"}`}
                             placeholder="What do you aim to achieve?"
                             value={formData.objectives.description}
-                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, description: e.target.value } })}
+                            onChange={(e) => {
+                                clearFieldError("objective");
+                                setFormData({ ...formData, objectives: { ...formData.objectives, description: e.target.value } });
+                            }}
                         ></textarea>
+                        <FieldError message={fieldErrors.objective} />
                     </div>
                     <div>
                         <label className="co-label">Expected outputs *</label>
@@ -2447,8 +2777,14 @@ function StudentOpportunityCreationPageInner() {
                             spellCheck={true}
                             placeholder="What will be produced or delivered?"
                             value={formData.objectives.outputs}
-                            onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, outputs: e.target.value } })}
+                            aria-invalid={fieldErrors.outputs ? true : undefined}
+                            className={fieldErrorClass(!!fieldErrors.outputs)}
+                            onChange={(e) => {
+                                clearFieldError("outputs");
+                                setFormData({ ...formData, objectives: { ...formData.objectives, outputs: e.target.value } });
+                            }}
                         />
+                        <FieldError message={fieldErrors.outputs} />
                     </div>
                     <div>
                         <label className="co-label">Expected outcome / success measure</label>
@@ -2581,17 +2917,21 @@ function StudentOpportunityCreationPageInner() {
 
                 <div className={`${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
-                        <label className="co-label" style={{ marginTop: 4 }}>E1 · Detailed plan — bullet list</label>
+                        <label className="co-label" style={{ marginTop: 4 }}>E1 · Detailed plan — bullet list *</label>
                         <p className="co-hint" style={{ margin: "0 0 6px" }}>
                             Short bullet points only (max 12,000 characters). Not an essay — you can attach the full roadmap later if needed.
                         </p>
                         <textarea spellCheck={true}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32"
+                            className={`w-full px-4 py-3 rounded-xl border focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32 ${fieldErrors.responsibilities ? "border-red-500 bg-red-50/50" : "border-slate-200"}`}
                             placeholder="• Step 1: ..."
                             maxLength={12000}
                             value={formData.activity.responsibilities}
-                            onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, responsibilities: e.target.value } })}
+                            onChange={(e) => {
+                                clearFieldError("responsibilities");
+                                setFormData({ ...formData, activity: { ...formData.activity, responsibilities: e.target.value } });
+                            }}
                         ></textarea>
+                        <FieldError message={fieldErrors.responsibilities} />
                         <p className="mt-1 text-right text-[8.5px] font-extrabold tracking-[0.08em] text-[#7a919a]">
                             {formData.activity.responsibilities.length.toLocaleString()} / 12,000 CHARACTERS
                         </p>
@@ -2745,8 +3085,13 @@ function StudentOpportunityCreationPageInner() {
                                     type="text"
                                     placeholder="Faculty name…"
                                     value={formData.supervision.facultyName}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyName: e.target.value } })}
+                                    className={fieldErrorClass(!!fieldErrors.facultyName)}
+                                    onChange={(e) => {
+                                        clearFieldError("facultyName");
+                                        setFormData({ ...formData, supervision: { ...formData.supervision, facultyName: e.target.value } });
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.facultyName} />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Designation <span className="text-red-500">*</span></label>
@@ -2754,25 +3099,32 @@ function StudentOpportunityCreationPageInner() {
                                     type="text"
                                     placeholder="Designation…"
                                     value={formData.supervision.facultyDesignation}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyDesignation: e.target.value } })}
+                                    className={fieldErrorClass(!!fieldErrors.facultyDesignation)}
+                                    onChange={(e) => {
+                                        clearFieldError("facultyDesignation");
+                                        setFormData({ ...formData, supervision: { ...formData.supervision, facultyDesignation: e.target.value } });
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.facultyDesignation} />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Department <span className="text-red-500">*</span></label>
                                 <SearchableSelect
                                     value={formData.supervision.facultyDepartment}
-                                    onChange={(v) =>
+                                    onChange={(v) => {
+                                        clearFieldError("facultyDepartment");
                                         setFormData({
                                             ...formData,
                                             supervision: { ...formData.supervision, facultyDepartment: v },
-                                        })
-                                    }
+                                        });
+                                    }}
                                     options={facultyDepartmentOptionsForInstitution(studentDetails.institution)}
                                     placeholder="Select faculty department / school…"
                                     searchPlaceholder="Search departments…"
                                     ariaLabel="Faculty department"
                                     allowCustomValue
                                 />
+                                <FieldError message={fieldErrors.facultyDepartment} />
                             </div>
                             <div>
                                 <span className="co-locked w-full">🏛️ {studentDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
@@ -2783,8 +3135,13 @@ function StudentOpportunityCreationPageInner() {
                                     type="email"
                                     placeholder="Official email address — faculty.name@university.edu…"
                                     value={formData.supervision.facultyOfficialEmail}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyOfficialEmail: e.target.value } })}
+                                    className={fieldErrorClass(!!fieldErrors.facultyEmail)}
+                                    onChange={(e) => {
+                                        clearFieldError("facultyEmail");
+                                        setFormData({ ...formData, supervision: { ...formData.supervision, facultyOfficialEmail: e.target.value } });
+                                    }}
                                 />
+                                <FieldError message={fieldErrors.facultyEmail} />
                             </div>
                         </div>
                         <div className="co-note aqua">
@@ -2862,6 +3219,7 @@ function StudentOpportunityCreationPageInner() {
                                     key={v}
                                     selected={formData.verification.includes(v)}
                                     onClick={() => {
+                                        clearFieldError("verification");
                                         const vers = formData.verification.includes(v)
                                             ? formData.verification.filter(i => i !== v)
                                             : [...formData.verification, v];
@@ -2872,6 +3230,7 @@ function StudentOpportunityCreationPageInner() {
                                 </CoChip>
                             ))}
                         </div>
+                        <FieldError message={fieldErrors.verification} />
                     </div>
                 </div>
             </div>
@@ -3060,6 +3419,7 @@ function StudentOpportunityCreationPageInner() {
                                 <span>Publication or approval on CIEL PK is not by itself a guarantee by CIEL PK regarding a third-party location or activity.</span>
                             </button>
                     </div>
+                    <FieldError message={fieldErrors.safetyDecls || fieldErrors.extraSafety} />
                     <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div>
                             <label className="co-label">Electronic signature — type full name *</label>
@@ -3067,8 +3427,13 @@ function StudentOpportunityCreationPageInner() {
                                 type="text"
                                 placeholder={studentDetails.name || "Your full name"}
                                 value={formData.electronicSignature}
-                                onChange={(e) => setFormData({ ...formData, electronicSignature: e.target.value })}
+                                className={fieldErrorClass(!!fieldErrors.signature)}
+                                onChange={(e) => {
+                                    clearFieldError("signature");
+                                    setFormData({ ...formData, electronicSignature: e.target.value });
+                                }}
                             />
+                            <FieldError message={fieldErrors.signature} />
                         </div>
                         <div>
                             <label className="co-label">Signed date & time</label>
@@ -3114,11 +3479,15 @@ function StudentOpportunityCreationPageInner() {
                 <button
                     type="button"
                     className={`co-safe mt-3 w-full text-left${formData.flashApprove ? " on" : ""}`}
-                    onClick={() => setFormData({ ...formData, flashApprove: !formData.flashApprove })}
+                    onClick={() => {
+                        clearFieldError("flashApprove");
+                        setFormData({ ...formData, flashApprove: !formData.flashApprove });
+                    }}
                 >
                     <span className="co-tick">{formData.flashApprove ? "✓" : ""}</span>
                     <span>I have reviewed this flashcard and confirm it accurately represents the opportunity being submitted.</span>
                 </button>
+                <FieldError message={fieldErrors.flashApprove} />
             </div>
             <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
                 <div className="mb-1 flex items-center gap-2.5">
@@ -3178,6 +3547,7 @@ function StudentOpportunityCreationPageInner() {
                     <span className="co-tick">{formData.sectionFConfirmations.truthfulVerifiable ? "✓" : ""}</span>
                     <span>All provided information is truthful and verifiable.</span>
                 </button>
+                <FieldError message={fieldErrors.confirmations} />
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
                         🧑‍🎓 <b style={{ color: "#fff" }}>{studentDetails.name || "—"}</b><span className="co-lock-badge">🔒</span>
@@ -3186,7 +3556,7 @@ function StudentOpportunityCreationPageInner() {
                         🏛️ {formData.privateCandidate ? (formData.privateAwardingBody || "Private / independent") : (studentDetails.institution || "—")} · {formData.privateCandidate ? "CIEL PK VERIFY" : "UNI APPLY SCOPE"}<span className="co-lock-badge">🔒</span>
                     </span>
                 </div>
-                <div className="mt-3.5 flex gap-2.5">
+                <div className="mt-3.5 flex flex-col gap-2.5 sm:flex-row">
                     <button
                         type="button"
                         onClick={() => void handleSaveDraft(false)}
@@ -3218,7 +3588,7 @@ function StudentOpportunityCreationPageInner() {
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
                         <div className="flex gap-2">
-                            {!editingOpportunityId || isDraftMode ? (
+                            {(!editingOpportunityId || isDraftMode) && activeStep !== "SUBMIT" ? (
                                 <button
                                     type="button"
                                     className="co-nav-btn back"
@@ -3243,15 +3613,15 @@ function StudentOpportunityCreationPageInner() {
             </div>
 
             <div className="sticky bottom-3.5 z-40 mt-4 overflow-hidden rounded-[20px] border border-[#dcebee] bg-white shadow-[0_-8px_30px_rgba(4,37,43,.10)]">
-                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-3 py-3 text-white sm:px-4">
                     <span className="text-[22px]">{previewEmoji}</span>
-                    <div className="min-w-0 flex-1">
-                        <b className="block text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
-                        <span className="text-[9.5px] text-[#cdf5f0]">
+                    <div className="min-w-0 flex-1 basis-[min(100%,12rem)]">
+                        <b className="block truncate text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
+                        <span className="line-clamp-2 text-[9.5px] text-[#cdf5f0]">
                             {previewBits.length ? previewBits.join(" · ") : "fill the form above and watch this card come alive"}
                         </span>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex max-w-full flex-wrap gap-1">
                         {previewPrimarySdg ? (
                             <span className="co-sdg" style={{ background: previewPrimarySdg.color ?? "#0e7d74" }}>
                                 SDG {previewPrimarySdg.number}{formData.target ? ` · ${formData.target}` : ""}
@@ -3280,7 +3650,7 @@ function StudentOpportunityCreationPageInner() {
 
 export default function StudentOpportunityCreationPage() {
     return (
-        <Suspense fallback={<WorkspaceSkeleton />}>
+        <Suspense fallback={null}>
             <StudentOpportunityCreationPageInner />
         </Suspense>
     );

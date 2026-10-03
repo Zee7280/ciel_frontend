@@ -14,7 +14,9 @@ export default function TeamVerification({
     canRemoveMember,
     teamId = "",
     primaryFacultyEmail = "",
-    secondaryFacultyEmail = ""
+    secondaryFacultyEmail = "",
+    teamLeadEmail = "",
+    maxMembers,
 }: {
     projectId: string;
     members: any[];
@@ -24,6 +26,9 @@ export default function TeamVerification({
     teamId?: string;
     primaryFacultyEmail?: string;
     secondaryFacultyEmail?: string;
+    teamLeadEmail?: string;
+    /** Max members besides the lead (opportunity seats − 1). Undefined = no cap known. */
+    maxMembers?: number;
 }) {
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
@@ -66,7 +71,13 @@ export default function TeamVerification({
         onUpdateMembers(newMembers);
     };
 
+    const atCapacity = typeof maxMembers === "number" && members.length >= maxMembers;
+
     const handleAddMember = () => {
+        if (atCapacity) {
+            alert(`This opportunity has ${maxMembers! + 1} seats (team lead + ${maxMembers} member${maxMembers === 1 ? "" : "s"}).`);
+            return;
+        }
         onUpdateMembers([...members, {
             name: '',
             email: '',
@@ -82,6 +93,12 @@ export default function TeamVerification({
     };
 
     const expandedMember = expandedIndex != null ? members[expandedIndex] : null;
+    const reservedEmails = [
+        teamLeadEmail,
+        ...members
+            .map((member, idx) => (idx === expandedIndex ? "" : String(member?.email || "")))
+            .filter(Boolean),
+    ];
 
     return (
         <div className="space-y-2">
@@ -158,7 +175,7 @@ export default function TeamVerification({
                 </div>
             )}
 
-            {!lockAddMembers ? (
+            {!lockAddMembers && !atCapacity ? (
                 <button
                     type="button"
                     onClick={handleAddMember}
@@ -167,6 +184,12 @@ export default function TeamVerification({
                     <UserPlus className="h-3.5 w-3.5" />
                     Add team member — individual + academic configuration
                 </button>
+            ) : null}
+            {!lockAddMembers && atCapacity ? (
+                <div className="cer-hint !mb-0 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 shrink-0" />
+                    Team is full — {maxMembers! + 1} seats = team lead + {maxMembers} member{maxMembers === 1 ? "" : "s"}.
+                </div>
             ) : null}
 
             {/* Expanded configure panel */}
@@ -193,6 +216,8 @@ export default function TeamVerification({
                         teamId={teamId}
                         primaryFacultyEmail={primaryFacultyEmail}
                         secondaryFacultyEmail={secondaryFacultyEmail}
+                        reservedEmails={reservedEmails}
+                        enforceUniqueOnProject
                         showSemester
                         onSuccess={(p) => handleMemberSuccess(expandedIndex as number, p)}
                     />

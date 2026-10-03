@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { reportRowToAwardCard, type CommunityAwardCard } from "@/utils/communityAwardModel";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
@@ -93,6 +93,8 @@ export function useFacultyCommunityServiceData() {
     const [historyAppRows, setHistoryAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [hoursProjectCount, setHoursProjectCount] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [reloadTick, setReloadTick] = useState(0);
+    const reload = useCallback(() => setReloadTick((n) => n + 1), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -144,9 +146,14 @@ export function useFacultyCommunityServiceData() {
                     })
                     .filter((row) => row.id);
                 setMineRows(mappedMine);
-                setPendingOppRows(normalizeFacultyApprovalsResponse(approvals));
-                setHistoryOppRows(normalizeFacultyApprovalsResponse(history));
-                setLinkedDraftRows(normalizeFacultyApprovalsResponse(drafts));
+                // Faculty CS hub = personal / named-supervisor work only.
+                // Pure university_scope rows appear after Faculty↔University assignment and belong
+                // on the university / dashboard university view — not this personal Review queue.
+                const isPersonalApproval = (row: { approvalVisibility?: string }) =>
+                    row.approvalVisibility !== "university_scope";
+                setPendingOppRows(normalizeFacultyApprovalsResponse(approvals).filter(isPersonalApproval));
+                setHistoryOppRows(normalizeFacultyApprovalsResponse(history).filter(isPersonalApproval));
+                setLinkedDraftRows(normalizeFacultyApprovalsResponse(drafts).filter(isPersonalApproval));
                 setPendingAppRows(normalizeOpportunityApplicationsListResponse(apps));
                 setHistoryAppRows(appHistory.rows);
                 const mappedRows: FacultyCsReportRow[] = (Array.isArray(list?.data) ? list.data : [])
@@ -256,7 +263,7 @@ export function useFacultyCommunityServiceData() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadTick]);
 
     const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
     const revisionReports = useMemo(() => rows.filter(isFacultyCsReportRevision), [rows]);
@@ -292,7 +299,7 @@ export function useFacultyCommunityServiceData() {
                 kind: "opp" as const,
                 title: row.projectTitle,
                 meta: `${formatOpportunityCode(row)} · ${row.studentName} · submitted ${row.submittedDate}`,
-                href: `${FACULTY_CS_APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
+                href: `${FACULTY_CS_BASE}?view=review&tab=opps&opportunity=${encodeURIComponent(row.id)}`,
                 cta: "View Flashcard & Approve",
                 studentEmail: row.studentEmail,
             })),
@@ -333,5 +340,6 @@ export function useFacultyCommunityServiceData() {
         inboxItems,
         pendingOppReviews: pendingOppRows.length,
         pendingApps: pendingAppRows.length,
+        reload,
     };
 }

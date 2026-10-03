@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, HubBackButton, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import {
     ApprovalPipelineMini,
     SummaryTiles,
@@ -12,9 +12,7 @@ import {
     type ApprovalLineStatus,
     type ApprovalPipelineStepState,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import {
-    FACULTY_CS_APPROVALS as APPROVALS,
     FACULTY_CS_BASE as CS_BASE,
     FACULTY_CS_HOURS as HOURS,
     FACULTY_CS_JOIN_APPS as JOIN_APPS,
@@ -33,6 +31,10 @@ import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import {
+    FacultyPendingReviewButtons,
+    useFacultyOpportunityReviewActions,
+} from "@/components/faculty/FacultyOpportunityReviewActions";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
@@ -331,10 +333,12 @@ function FacultyCommunityServiceHub() {
         activeProjects,
         revisionOpps,
         deckCards,
-        inboxItems,
         pendingOppReviews,
         pendingApps,
+        reload,
     } = useFacultyCommunityServiceData();
+    const reviewActions = useFacultyOpportunityReviewActions(reload);
+    const autoOpenedIdRef = useRef<string | null>(null);
     const [facultyName, setFacultyName] = useState("Faculty");
     const [department, setDepartment] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
@@ -352,6 +356,20 @@ function FacultyCommunityServiceHub() {
     useEffect(() => {
         setInnerTab(tabParam);
     }, [tabParam, view]);
+
+    const opportunityParam = searchParams.get("opportunity") || searchParams.get("id") || "";
+    const openOpportunityDetail = reviewActions.openOpportunityDetail;
+    useEffect(() => {
+        if (!opportunityParam || loading) return;
+        if (autoOpenedIdRef.current === opportunityParam) return;
+        const inPending = pendingOppRows.some((row) => row.id === opportunityParam);
+        autoOpenedIdRef.current = opportunityParam;
+        const action = pendingOppRows.find((row) => row.id === opportunityParam)?.approvalAction ?? "faculty_review";
+        void openOpportunityDetail(opportunityParam, {
+            showActions: inPending,
+            approvalAction: action,
+        });
+    }, [loading, opportunityParam, pendingOppRows, openOpportunityDetail]);
 
     const setHubTab = (id: string) => {
         setInnerTab(id);
@@ -451,14 +469,6 @@ function FacultyCommunityServiceHub() {
             {view === "home" && (
                 <>
                     <UserGuideBanner {...FACULTY_CS_GUIDES.home} />
-                    <ZoneRule title="Navigation rule">
-                        You entered Community Service from the left. Everything below belongs to this impact area; Home remains a
-                        clean overview. Create and creator-statuses stay in Create Opportunity; student approvals stay in Review;
-                        approved work stays in Projects/Reports.
-                    </ZoneRule>
-                    <div className="mt-4">
-                        <FacultyCsInbox items={inboxItems} loading={loading} />
-                    </div>
                     <AttentionRow items={attention} />
                     <MockupSectionHead title="Community Service tools" subtitle="Choose the responsibility you need to work on." />
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -636,7 +646,6 @@ function FacultyCommunityServiceHub() {
                         ) : (
                             <div className="grid gap-3">
                                 {linkedDraftRows.map((row) => {
-                                    const href = `${APPROVALS}?tab=linked&opportunity=${encodeURIComponent(row.id)}`;
                                     const model = buildOpportunityApprovalModel(
                                         {
                                             id: row.id,
@@ -666,9 +675,15 @@ function FacultyCommunityServiceHub() {
                                             key={row.id}
                                             {...model}
                                             actions={
-                                                <Link href={href} className={approvalActionClass.soft}>
+                                                <button
+                                                    type="button"
+                                                    className={approvalActionClass.soft}
+                                                    onClick={() =>
+                                                        void reviewActions.openOpportunityDetail(row.id, { showActions: false })
+                                                    }
+                                                >
                                                     View same record
-                                                </Link>
+                                                </button>
                                             }
                                         />
                                     );
@@ -681,7 +696,6 @@ function FacultyCommunityServiceHub() {
                         ) : (
                             <div className="grid gap-3">
                                 {pendingOppRows.map((row) => {
-                                    const href = `${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`;
                                     const model = buildOpportunityApprovalModel(
                                         {
                                             id: row.id,
@@ -712,17 +726,23 @@ function FacultyCommunityServiceHub() {
                                             key={row.id}
                                             {...model}
                                             actions={
-                                                <>
-                                                    <Link href={href} className={approvalActionClass.green}>
-                                                        View Flashcard & Approve
-                                                    </Link>
-                                                    <Link href={href} className={approvalActionClass.gold}>
-                                                        Request Revision
-                                                    </Link>
-                                                    <Link href={href} className={approvalActionClass.red}>
-                                                        Reject
-                                                    </Link>
-                                                </>
+                                                <FacultyPendingReviewButtons
+                                                    opportunityId={row.id}
+                                                    approvalAction={row.approvalAction ?? "faculty_review"}
+                                                    approveSubmittingId={reviewActions.approveSubmittingId}
+                                                    onOpenFlashcard={(id, action) =>
+                                                        void reviewActions.openOpportunityDetail(id, {
+                                                            showActions: true,
+                                                            approvalAction: action,
+                                                        })
+                                                    }
+                                                    onRevise={(id, action) =>
+                                                        reviewActions.openRejectDialog(id, action, "revise")
+                                                    }
+                                                    onReject={(id, action) =>
+                                                        reviewActions.openRejectDialog(id, action, "reject_permanent")
+                                                    }
+                                                />
                                             }
                                         />
                                     );
@@ -735,7 +755,6 @@ function FacultyCommunityServiceHub() {
                         ) : (
                             <div className="grid gap-3">
                                 {revisionOpps.map((row) => {
-                                    const href = `${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`;
                                     const model = buildOpportunityApprovalModel(
                                         {
                                             id: row.id,
@@ -758,9 +777,17 @@ function FacultyCommunityServiceHub() {
                                             <OpportunityApprovalCard
                                                 {...model}
                                                 actions={
-                                                    <Link href={href} className={approvalActionClass.soft}>
+                                                    <button
+                                                        type="button"
+                                                        className={approvalActionClass.soft}
+                                                        onClick={() =>
+                                                            void reviewActions.openOpportunityDetail(row.id, {
+                                                                showActions: false,
+                                                            })
+                                                        }
+                                                    >
                                                         View Flashcard
-                                                    </Link>
+                                                    </button>
                                                 }
                                             />
                                             <FacultyRemindButtons email={row.studentEmail} title={row.projectTitle} />
@@ -812,9 +839,15 @@ function FacultyCommunityServiceHub() {
                                         key={`opp-${row.id}`}
                                         {...model}
                                         actions={
-                                            <Link href={`${APPROVALS}?tab=history&opportunity=${encodeURIComponent(row.id)}`} className={approvalActionClass.soft}>
+                                            <button
+                                                type="button"
+                                                className={approvalActionClass.soft}
+                                                onClick={() =>
+                                                    void reviewActions.openOpportunityDetail(row.id, { showActions: false })
+                                                }
+                                            >
                                                 History
-                                            </Link>
+                                            </button>
                                         }
                                     />
                                 );
@@ -833,14 +866,11 @@ function FacultyCommunityServiceHub() {
                     )}
                     <p className="mt-4 text-[11px] text-[#7a919a]">
                         Opportunity review and participation approval are separate decisions.{" "}
-                        <Link href={APPROVALS} className="font-extrabold text-[#0e7d74] hover:underline">
-                            Open full approvals
-                        </Link>
-                        {" · "}
-                        <Link href={JOIN_APPS} className="font-extrabold text-[#0e7d74] hover:underline">
+                        <Link href={`${CS_BASE}?view=review&tab=apps`} className="font-extrabold text-[#0e7d74] hover:underline">
                             Open participation requests
                         </Link>
                     </p>
+                    {reviewActions.dialogs}
                 </div>
             )}
 

@@ -357,9 +357,10 @@ export default function Section6Resources({ projectData: _projectData }: { proje
     };
 
     const verifiedHoursSnapshot = useMemo(() => {
-        const logs = section1.attendance_logs || [];
+        const logs = Array.isArray(section1.attendance_logs) ? section1.attendance_logs : [];
         if (logs.length > 0) {
-            const teamSize = (section1.participation_type === "team" ? section1.team_members.length : 0) + 1;
+            const members = Array.isArray(section1.team_members) ? section1.team_members : [];
+            const teamSize = (section1.participation_type === "team" ? members.length : 0) + 1;
             const req = data.required_hours || 16;
             const rosterIds = buildIndividualRosterFromSection1(section1, section1.team_lead?.id);
             const calc = calculateEngagementMetrics(logs, req, teamSize, undefined, rosterIds);

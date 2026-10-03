@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentOpportunityMine, fetchStudentReportsList, peekStudentOpportunityMine, peekStudentReportsList } from "@/utils/student-community-cache";
 import { toast } from "sonner";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
@@ -255,24 +256,36 @@ export default function CommunityServiceWorkspace({
         qs.set("filter", next);
         router.replace(`${HUB}?${qs.toString()}`, { scroll: false });
     };
-    const [opportunities, setOpportunities] = useState<OpportunityRow[]>([]);
-    const [reports, setReports] = useState<ReportRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const cachedMine = peekStudentOpportunityMine();
+    const cachedReports = peekStudentReportsList();
+    const [opportunities, setOpportunities] = useState<OpportunityRow[]>(() =>
+        (cachedMine ?? [])
+            .filter((r) => r.status !== "draft")
+            .map((r) => ({
+                id: String(r.id),
+                title: String(r.title ?? "Untitled opportunity"),
+                status: typeof r.status === "string" ? r.status : undefined,
+                workflow_stage: (r.workflow_stage as string | null) ?? null,
+                faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
+                partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
+                admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
+                requires_partner_approval: Boolean(r.requires_partner_approval),
+                created_at: typeof r.created_at === "string" ? r.created_at : undefined,
+                faculty_contact_name: (r.faculty_contact_name as string | null) ?? null,
+                faculty_contact_email: (r.faculty_contact_email as string | null) ?? null,
+                partner_contact_name: (r.partner_contact_name as string | null) ?? null,
+                partner_contact_email: (r.partner_contact_email as string | null) ?? null,
+            })),
+    );
+    const [reports, setReports] = useState<ReportRow[]>(() => (cachedReports ?? []) as ReportRow[]);
+    const [loading, setLoading] = useState(!cachedMine && !cachedReports);
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-            authenticatedFetch("/api/v1/student/reports?limit=100", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-        ]).then(([mine, reportJson]) => {
+        Promise.all([fetchStudentOpportunityMine(), fetchStudentReportsList()]).then(([mine, reportJson]) => {
             if (cancelled) return;
-            const rows = Array.isArray(mine?.data) ? (mine.data as Record<string, unknown>[]) : [];
             setOpportunities(
-                rows
+                mine
                     .filter((r) => r.status !== "draft")
                     .map((r) => ({
                         id: String(r.id),
@@ -290,11 +303,9 @@ export default function CommunityServiceWorkspace({
                         partner_contact_email: (r.partner_contact_email as string | null) ?? null,
                     })),
             );
-            setReports(Array.isArray(reportJson?.data) ? reportJson.data : []);
+            setReports(reportJson as ReportRow[]);
             setLoading(false);
         }).catch(() => {
-            // A network failure must still clear the spinner — otherwise the workspace hangs
-            // on "Loading workspace…" forever and reads as a broken page.
             if (!cancelled) setLoading(false);
         });
         return () => {
@@ -508,9 +519,12 @@ export default function CommunityServiceWorkspace({
         for (const project of projects) {
             if (reportByKey.has(project.id)) continue;
             if (opportunities.some((op) => op.id === project.id)) continue;
-            // Joined/owned listings only unlock report CTAs once the opportunity is LIVE.
+            // `projects` come from the student dashboard (participation seats), including
+            // team members OTP-added on a lead's report. Their `status` is a participation
+            // label ("Active — in progress", "Pending approval", …) — NOT opportunity
+            // workflow "live". Only skip rejected seats.
             const st = String(project.status || "").toLowerCase();
-            if (st !== "live" && st !== "completed" && st !== "finalized") continue;
+            if (st.includes("reject")) continue;
             out.push({
                 id: `proj-${project.id}`,
                 filter: project.report_status ? "reports" : "ready",

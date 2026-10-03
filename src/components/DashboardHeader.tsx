@@ -12,6 +12,8 @@ import {
 import { authenticatedFetch } from "@/utils/api";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
+import { clearPathSessionCache } from "@/utils/student-path-session-cache";
+import { clearImpactSummaryCache } from "@/utils/cielImpactSummary";
 import {
     CIEL_FACULTY_SCOPE_EVENT,
     clearFacultyScopeSession,
@@ -143,6 +145,8 @@ export default function DashboardHeader() {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();
+        clearPathSessionCache();
+        clearImpactSummaryCache();
         clearFacultyScopeSession();
         router.push("/login");
     };

@@ -2,7 +2,6 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import FypThesisHub from "./FypThesisHub";
 
 function FypThesisRouter() {
@@ -25,7 +24,7 @@ function FypThesisRouter() {
 
 export default function FypThesisPage() {
     return (
-        <Suspense fallback={<WorkspaceSkeleton />}>
+        <Suspense fallback={null}>
             <FypThesisRouter />
         </Suspense>
     );

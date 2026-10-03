@@ -5,18 +5,46 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { FieldError } from './ui/FieldError';
 import {
-    Plus, Trash2, Target, Info, Layers,
-    ChevronDown, PlusCircle, Lock, Pencil, CheckCircle2, Calendar,
+    Target, ChevronDown, PlusCircle, Lock, Pencil, CheckCircle2, Calendar,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
     OUTPUT_TYPES, UNIVERSAL_UNITS,
-    BENEFICIARY_CATEGORIES, OVERLAP_STATUSES,
+    BENEFICIARY_CATEGORIES,
     GEOGRAPHIC_REACH_OPTIONS,
     COUNTING_METHODS
 } from '../utils/section4Constants';
 import { ACTIVITY_FAMILY_OPTIONS, GLOBAL_ACTIVITY_TAXONOMY, isOtherTaxonomyChoice } from '../utils/globalActivityTaxonomy';
 import { reportTextWordMeter } from '../utils/validation';
+import { integerFieldInput } from '@/utils/integerFieldInput';
+import { findSdgById } from '@/utils/sdgData';
+import {
+    LADDER_STEPS,
+    OVERLAP_CHIPS,
+    SURE_OPTIONS,
+    FAM_OUTPUT_HINTS,
+    FAM_BEN_HINTS,
+    FAM_METRIC_HINTS,
+    unitForOutputType,
+    ladderWordCount,
+    outputRowOk,
+    step1Ok,
+    step2Ok,
+    step3Ok,
+    step4Ok,
+    stepNeedText,
+    readLadderOpen,
+    readLadderAllBen,
+    stripFamilyEmoji,
+    numValue,
+    matchedProjectSdgs,
+    outcomeDisplayName,
+    outcomeLadderOk,
+    metricPickPatch,
+    isBlankUnattachedOutcome,
+    isOtherLike,
+    type LadderOutcome,
+} from '../utils/section4Ladder';
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]";
@@ -30,20 +58,9 @@ const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const badgeMandatory =
     "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
-const badgeRequired =
-    "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 const badgeAuto =
     "shrink-0 rounded-full bg-[var(--aqua-soft)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--aqua)]";
 
-function isOtherChoice(value: unknown): boolean {
-    return /other/i.test(String(value ?? ""));
-}
-
-function wordCount(text: string): number {
-    return (text || "").trim().split(/\s+/).filter(Boolean).length;
-}
-
-/** Parse stored activity_period into calendar From/To (ISO YYYY-MM-DD). */
 function parseActivityPeriod(raw?: string): { from: string; to: string; legacy: string } {
     const text = String(raw || "").trim();
     if (!text) return { from: "", to: "", legacy: "" };
@@ -60,6 +77,73 @@ function formatActivityPeriod(from: string, to: string): string {
     const end = (to || "").trim();
     if (start && end) return start === end ? start : `${start} – ${end}`;
     return start || end || "";
+}
+
+function emptyOutput(type = '') {
+    return {
+        title: type,
+        type,
+        type_other: '',
+        quantity: '',
+        unit: type ? unitForOutputType(type) : '',
+        unit_other: '',
+        verification_note: '',
+        is_shared: false,
+    };
+}
+
+function emptyActivity() {
+    return {
+        id: Math.random().toString(36).substr(2, 9),
+        title: '',
+        primary_category: '',
+        sub_category: '',
+        other_category_text: '',
+        other_sub_category_text: '',
+        activity_period: '',
+        partner_host: '',
+        description: '',
+        status: 'Ongoing',
+        delivery_mode: '',
+        implementation_models: [],
+        sessions_count: '',
+        delivery_explanation: '',
+        outputs: [],
+        serves_beneficiaries: true,
+        beneficiaries_reached: '',
+        unique_beneficiaries: '',
+        beneficiary_categories: [],
+        other_beneficiary_text: '',
+        relevance_types: [],
+        overlap_status: '',
+        overlap_note: '',
+        reach_counting_method: '',
+        reach_counting_method_other: '',
+        beneficiary_description: '',
+        geographic_reach: '',
+        geographic_sub_category: '',
+        site_note: '',
+        sdgs: [] as number[],
+        ladder_ui: { open: 1 },
+    };
+}
+
+function emptyOutcome(activityId: string | null): LadderOutcome {
+    return {
+        id: `oc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        activity_id: activityId,
+        outcome_area: '',
+        outcome_sub_category: '',
+        metric_category: '',
+        metric: '',
+        metric_other: '',
+        baseline: '',
+        endline: '',
+        unit: '',
+        confidence_level: [],
+        measurement_explanation: '',
+        sure: 0,
+    };
 }
 
 function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
@@ -79,127 +163,72 @@ function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
     );
 }
 
-function PillToggle({
-    options,
-    selected,
-    onToggle,
-}: {
-    options: string[];
-    selected: string[];
-    onToggle: (value: string) => void;
-}) {
-    return (
-        <div className="flex flex-wrap gap-2">
-            {options.map((opt) => {
-                const active = selected.includes(opt);
-                return (
-                    <button
-                        key={opt}
-                        type="button"
-                        onClick={() => onToggle(opt)}
-                        className={clsx(
-                            "s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
-                            active
-                                ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
-                                : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
-                        )}
-                    >
-                        {opt}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
-function SingleChip({
-    options,
-    value,
-    onChange,
-}: {
-    options: string[];
-    value: string;
-    onChange: (value: string) => void;
-}) {
-    return (
-        <div className="flex flex-wrap gap-2">
-            {options.map((opt) => {
-                const active = value === opt;
-                return (
-                    <button
-                        key={opt}
-                        type="button"
-                        onClick={() => onChange(opt)}
-                        className={clsx(
-                            "s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold transition-colors",
-                            active
-                                ? "on border-[#0e7d74] bg-[#0e7d74] text-white"
-                                : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
-                        )}
-                    >
-                        {opt}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
 export default function Section4Activities() {
     const { data, updateSection, getFieldError } = useReportForm();
     const section3 = data.section3 || {};
     const section4 = data.section4 || { activity_blocks: [], project_summary: {} };
+    const section5 = data.section5 || { measurable_outcomes: [] };
     const section7 = data.section7 || {};
 
     const update = (field: string, val: any) => updateSection('section4', { [field]: val });
 
+    const projectSdgs = useMemo(() => {
+        const nums: number[] = [];
+        const primary = Number(section3?.primary_sdg?.goal_number);
+        if (primary >= 1 && primary <= 17) nums.push(primary);
+        for (const row of section3?.secondary_sdgs || []) {
+            const n = Number(row?.goal_number);
+            if (n >= 1 && n <= 17) nums.push(n);
+        }
+        return [...new Set(nums)].sort((a, b) => a - b);
+    }, [section3?.primary_sdg?.goal_number, section3?.secondary_sdgs]);
+
+    const outcomes: LadderOutcome[] = Array.isArray(section5.measurable_outcomes)
+        ? section5.measurable_outcomes
+        : [];
+
+    const setOutcomes = (next: LadderOutcome[]) => {
+        updateSection('section5', { measurable_outcomes: next });
+    };
+
+    const syncSummary = (blocks: any[]) => {
+        const uniqueSum = blocks.reduce((sum, a) => {
+            const n = parseInt(String(a.unique_beneficiaries || a.beneficiaries_reached || ''), 10);
+            return sum + (Number.isFinite(n) ? n : 0);
+        }, 0);
+        const method = blocks.map((a) => a.reach_counting_method).find(Boolean) || '';
+        updateSection('section4', {
+            activity_blocks: blocks,
+            project_summary: {
+                ...(section4.project_summary || {}),
+                distinct_total_beneficiaries: uniqueSum ? String(uniqueSum) : (section4.project_summary?.distinct_total_beneficiaries || ''),
+                counting_method: method || section4.project_summary?.counting_method || '',
+            },
+        });
+    };
+
     const addActivity = () => {
-        const newActivity = {
-            id: Math.random().toString(36).substr(2, 9),
-            title: '',
-            primary_category: '',
-            sub_category: '',
-            other_sub_category_text: '',
-            activity_period: '',
-            partner_host: '',
-            description: '',
-            status: 'Ongoing',
-            delivery_mode: '',
-            implementation_models: [],
-            sessions_count: '',
-            delivery_explanation: '',
-            outputs: [{ title: '', type: '', quantity: '', unit: '', verification_note: '', is_shared: false }],
-            serves_beneficiaries: true,
-            beneficiaries_reached: '',
-            unique_beneficiaries: '',
-            beneficiary_categories: [],
-            other_beneficiary_text: '',
-            relevance_types: [],
-            overlap_status: '',
-            overlap_note: '',
-            reach_counting_method: '',
-            reach_counting_method_other: '',
-            beneficiary_description: '',
-            geographic_reach: '',
-            geographic_sub_category: '',
-            site_note: ''
-        };
-        update('activity_blocks', [...(section4.activity_blocks || []), newActivity]);
+        const blocks = (section4.activity_blocks || []).map((block: any) => ({
+            ...block,
+            ladder_ui: { ...(block.ladder_ui || {}), open: 0 },
+        }));
+        syncSummary([...blocks, emptyActivity()]);
     };
 
     const removeActivity = (index: number) => {
-        update('activity_blocks', section4.activity_blocks.filter((_: any, i: number) => i !== index));
+        const target = section4.activity_blocks[index];
+        const nextBlocks = section4.activity_blocks.filter((_: any, i: number) => i !== index);
+        syncSummary(nextBlocks);
+        if (target?.id) {
+            setOutcomes(outcomes.filter((o) => o.activity_id !== target.id));
+        }
     };
 
     const updateActivity = (index: number, updates: Record<string, any>) => {
         const blocks = (section4.activity_blocks || []).map((block: any, i: number) => (
             i === index ? { ...block, ...updates } : block
         ));
-        update('activity_blocks', blocks);
-    };
-
-    const updateProjectSummary = (field: string, val: any) => {
-        update('project_summary', { ...section4.project_summary, [field]: val });
+        syncSummary(blocks);
     };
 
     const categoriesTouched = useMemo(() => {
@@ -220,17 +249,17 @@ export default function Section4Activities() {
     }, [section4.activity_blocks, section4.project_summary]);
 
     const sdgMixLabel = useMemo(() => {
+        if (projectSdgs.length) return projectSdgs.map((n) => `SDG ${n}`).join(', ');
         const goal = section3?.primary_sdg?.goal_number;
         if (goal != null && String(goal).trim()) {
             const n = String(goal).replace(/^SDG\s*/i, '');
             return `SDG ${n}`;
         }
         return '—';
-    }, [section3?.primary_sdg?.goal_number]);
+    }, [section3?.primary_sdg?.goal_number, projectSdgs]);
 
     const partnersCount = Array.isArray(section7?.partners) ? section7.partners.length : 0;
 
-    // ── Finalise Section 4 — "the effort" shortlist card ────────────────────
     const activities: any[] = section4.activity_blocks || [];
     const sessionsTotal = activities.reduce((sum, a) => sum + (parseInt(a.sessions_count) || 0), 0);
     const outputsTotal = activities.reduce((sum, a) => sum + (a.outputs?.length || 0), 0);
@@ -239,7 +268,6 @@ export default function Section4Activities() {
     const primaryCategoryLabel = useMemo(() => {
         const cats = Array.from(new Set(activities.map((a) => a.primary_category).filter(Boolean)));
         return cats.join(' · ');
-        // `activities` is a plain `section4.activity_blocks || []` alias, not independent state.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [section4.activity_blocks]);
     const canFinalizeSection4 = activities.length > 0;
@@ -253,7 +281,6 @@ export default function Section4Activities() {
     const lastFinalizedSection4SnapshotRef = useRef('');
     useEffect(() => {
         if (!isSection4Finalized) return;
-        // First render after a finalized report loads — seed the baseline instead of comparing against an empty ref.
         if (!lastFinalizedSection4SnapshotRef.current) {
             lastFinalizedSection4SnapshotRef.current = section4Snapshot;
             return;
@@ -271,83 +298,63 @@ export default function Section4Activities() {
 
     return (
         <div className="mx-auto max-w-6xl space-y-3 pb-10">
-            {/* Header */}
-            <div className="cer-dup-head space-y-5">
-                <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                        <Layers className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 4 · Part A:</span> Activities, outputs &amp; scale
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-5 sm:p-6">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-white text-indigo-600">
-                            <Info className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-3">
-                            <h3 className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                                Section guidelines
-                            </h3>
-                            <p className="text-sm leading-relaxed text-slate-600">
-                                Complete this section activity by activity. Each block represents a major effort
-                                within your project. This data forms the operational foundation for reporting and
-                                SDG validation.
-                            </p>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                {[
-                                    'Numeric & measurable outputs',
-                                    'Verified beneficiary reach',
-                                ].map((item) => (
-                                    <div key={item} className="flex items-center gap-2 text-sm text-slate-600">
-                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
-                                        {item}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+            <div className="ladderIntro" id="ladderIntro">
+                <b>How this section works:</b> one card per activity, four small steps. Finish a step, press <b>Looks good</b>, the next one opens. You can always tap a finished step to edit it.
+                <div className="steps">
+                    <span>1 · Did — what &amp; who</span>
+                    <span>2 · Delivered — what you can count</span>
+                    <span>3 · Who — how many, counted once</span>
+                    <span>4 · Changed — before → after (optional per activity)</span>
                 </div>
             </div>
 
-            {/* 4.1 Activity Blocks */}
             <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        4.1
-                    </span>
-                    <h3 className="text-base font-semibold text-slate-900">Activity blocks</h3>
+                    <span className="cer-secn">4.1</span>
+                    <h3 className="text-base font-semibold text-slate-900">Activity cards — one per major effort</h3>
                     <span className={badgeMandatory}>Mandatory</span>
                 </div>
-                <p className="text-[12.5px] leading-relaxed text-[#3c5a5c]">
-                    Activity integrity: every activity needs a title, status, category, responsibility statement, a countable output or beneficiary reach, counting method, geographic/site detail and an overlap/unique-reach declaration. This prevents double-counting.
+                <p className="ladWhy">
+                    <b>Why four steps?</b> Reviewers score three different things — what you <b>did</b>, what you can <b>count</b>, and what <b>changed</b>. Keeping them apart is what makes a report believable. Every activity needs steps 1–3; step 4 is optional per activity, but the whole project needs at least one measured change.
                 </p>
 
                 {section4.activity_blocks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-10 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-white shadow-sm">
-                            <Plus className="h-6 w-6 text-slate-300" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-slate-900">No activities added yet</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                                Click the button below to record your first major project activity.
-                            </p>
-                        </div>
+                    <div className="rollEmpty">
+                        No activity yet. Tap <b>＋ Add new activity</b> — one card per major effort.
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {section4.activity_blocks.map((activity: any, index: number) => (
-                            <ActivityBlockComponent
+                            <ActivityLadderCard
                                 key={activity.id}
                                 activity={activity}
                                 index={index}
+                                projectSdgs={projectSdgs}
+                                outcomes={outcomes.filter((o) => o.activity_id === activity.id)}
                                 updateActivity={updateActivity}
                                 removeActivity={removeActivity}
+                                setOutcomes={(nextForAct: LadderOutcome[]) => {
+                                    const result: LadderOutcome[] = [];
+                                    let inserted = false;
+                                    for (const row of outcomes) {
+                                        if (row.activity_id === activity.id) {
+                                            if (!inserted) {
+                                                result.push(...nextForAct);
+                                                inserted = true;
+                                            }
+                                            continue;
+                                        }
+                                        if (!inserted && nextForAct.length && isBlankUnattachedOutcome(row)) {
+                                            result.push({ ...nextForAct[0], id: row.id || nextForAct[0].id });
+                                            result.push(...nextForAct.slice(1));
+                                            inserted = true;
+                                            continue;
+                                        }
+                                        result.push(row);
+                                    }
+                                    if (!inserted) result.push(...nextForAct);
+                                    setOutcomes(result);
+                                }}
                                 getFieldError={getFieldError}
                             />
                         ))}
@@ -364,14 +371,11 @@ export default function Section4Activities() {
                 </button>
             </section>
 
-            {/* 4.7 Scale Dashboard */}
             <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                        4.7
-                    </span>
-                    <h3 className="text-base font-semibold text-slate-900">Implementation scale summary</h3>
-                    <span className={clsx(badgeAuto, "ml-auto")}>Auto-calculated</span>
+                    <span className="cer-secn">4.2</span>
+                    <h3 className="text-base font-semibold text-slate-900">Implementation scale</h3>
+                    <span className={clsx(badgeAuto, "ml-auto")}>Auto — nothing to fill</span>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -390,7 +394,6 @@ export default function Section4Activities() {
                 </div>
             </section>
 
-            {/* ── Finalise Section 4 ────────────────────────────────────── */}
             <section className="space-y-3 border-t border-slate-200 pt-8">
                 {!isSection4Finalized ? (
                     <>
@@ -441,12 +444,11 @@ export default function Section4Activities() {
 
                             <div className="divide-y divide-slate-100 bg-white">
                                 {activities.map((a, i) => {
-                                    const CatIcon = Target;
                                     const statusEmoji = a.status === 'Completed' ? '✅' : a.status === 'Ongoing' ? '⏳' : a.status ? '🔶' : '';
                                     return (
                                         <div key={a.id || i} className="flex gap-4 p-5 sm:px-6">
                                             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                                                <CatIcon className="h-5 w-5" />
+                                                <Target className="h-5 w-5" />
                                             </span>
                                             <div className="min-w-0 flex-1 space-y-1.5">
                                                 <h4 className="text-sm font-bold text-slate-900">
@@ -466,9 +468,9 @@ export default function Section4Activities() {
                                                     </p>
                                                 ))}
                                             </div>
-                                            {a.serves_beneficiaries && a.beneficiaries_reached ? (
+                                            {a.serves_beneficiaries && (a.unique_beneficiaries || a.beneficiaries_reached) ? (
                                                 <div className="shrink-0 text-right">
-                                                    <p className="text-lg font-bold text-indigo-700">~{a.beneficiaries_reached}</p>
+                                                    <p className="text-lg font-bold text-indigo-700">~{a.unique_beneficiaries || a.beneficiaries_reached}</p>
                                                     <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">People</p>
                                                 </div>
                                             ) : null}
@@ -505,9 +507,30 @@ export default function Section4Activities() {
     );
 }
 
-function ActivityBlockComponent({ activity, index, updateActivity, removeActivity, getFieldError }: any) {
-    const [isExpanded, setIsExpanded] = React.useState(true);
-    const descWords = wordCount(activity.description);
+function ActivityLadderCard({
+    activity,
+    index,
+    projectSdgs,
+    outcomes,
+    updateActivity,
+    removeActivity,
+    setOutcomes,
+    getFieldError,
+}: any) {
+    const open = readLadderOpen(activity);
+    const allBen = readLadderAllBen(activity);
+    const descWords = ladderWordCount(activity.description);
+    const ok1 = step1Ok(activity);
+    const ok2 = step2Ok(activity);
+    const ok3 = step3Ok(activity);
+    const ok4 = step4Ok(outcomes);
+    const done4 = ok4 && outcomes.length > 0;
+    const stepOk = [ok1, ok2, ok3, done4];
+
+    const setUi = (patch: Record<string, unknown>) => {
+        updateActivity(index, { ladder_ui: { ...(activity.ladder_ui || {}), ...patch } });
+    };
+    const setOpen = (n: number) => setUi({ open: n });
 
     const update = (fieldOrUpdates: string | Record<string, any>, val?: any) => {
         if (typeof fieldOrUpdates === 'string') {
@@ -517,11 +540,32 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
         }
     };
 
-    const addOutput = () => update('outputs', [...(activity.outputs || []), { title: '', type: '', type_other: '', quantity: '', unit: '', unit_other: '', verification_note: '', is_shared: false }]);
+    const linkedSdgs = matchedProjectSdgs(activity, projectSdgs);
+
+    const setFamily = (family: string) => {
+        const next = {
+            primary_category: family,
+            sub_category: '',
+            other_category_text: '',
+            other_sub_category_text: '',
+        };
+        update({ ...next, sdgs: matchedProjectSdgs({ ...activity, ...next }, projectSdgs) });
+    };
+    const setSub = (sub: string) => {
+        update({ sub_category: sub, sdgs: matchedProjectSdgs({ ...activity, sub_category: sub }, projectSdgs) });
+    };
+
+    const addOutput = (type = '') => {
+        update('outputs', [...(activity.outputs || []), emptyOutput(type)]);
+    };
     const removeOutput = (idx: number) => update('outputs', activity.outputs.filter((_: any, i: number) => i !== idx));
     const updateOutput = (idx: number, field: string, val: any) => {
-        const next = [...activity.outputs];
+        const next = [...(activity.outputs || [])];
         next[idx] = { ...next[idx], [field]: val };
+        if (field === 'type') {
+            next[idx].title = /other/i.test(val) ? (next[idx].type_other || next[idx].title) : val;
+            if (val && !next[idx].unit) next[idx].unit = unitForOutputType(val);
+        }
         update('outputs', next);
     };
 
@@ -531,26 +575,85 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
         else update('beneficiary_categories', [...current, cat]);
     };
 
+    const setPeople = (yes: boolean) => {
+        if (yes) {
+            update({
+                serves_beneficiaries: true,
+                overlap_status: /not known/i.test(String(activity.overlap_status || '')) ? '' : activity.overlap_status,
+            });
+        } else {
+            update({
+                serves_beneficiaries: false,
+                unique_beneficiaries: '',
+                beneficiaries_reached: '',
+                overlap_status: 'Not Known',
+            });
+        }
+    };
+
+    const updateOutcome = (idx: number, patch: Record<string, unknown>) => {
+        const next = outcomes.map((row: LadderOutcome, i: number) => (i === idx ? { ...row, ...patch } : row));
+        setOutcomes(next);
+    };
+    const addOutcome = () => setOutcomes([...outcomes, emptyOutcome(activity.id)]);
+    const removeOutcome = (idx: number) => setOutcomes(outcomes.filter((_: LadderOutcome, i: number) => i !== idx));
+
+    const pickMetric = (idx: number, label: string) => {
+        updateOutcome(idx, metricPickPatch(label));
+    };
+
+    const usedTypes = new Set((activity.outputs || []).map((o: any) => o.type).filter(Boolean));
+    const outHints = (FAM_OUTPUT_HINTS[activity.primary_category] || OUTPUT_TYPES.slice(0, 8))
+        .filter((t) => !usedTypes.has(t))
+        .slice(0, 10);
+
+    const people = activity.serves_beneficiaries !== false;
+    const benQuick = FAM_BEN_HINTS[activity.primary_category] || BENEFICIARY_CATEGORIES.slice(0, 8);
+    const selectedCats: string[] = activity.beneficiary_categories || [];
+    const benList = allBen
+        ? BENEFICIARY_CATEGORIES
+        : [...new Set([...benQuick, ...selectedCats])].filter((x) => BENEFICIARY_CATEGORIES.includes(x));
+
+    const stepSummary = (n: number) => {
+        if (n === 1) {
+            return [stripFamilyEmoji(activity.primary_category), activity.sub_category, linkedSdgs.length ? `↔ SDG ${linkedSdgs.join(', ')}` : '']
+                .filter(Boolean).join(' · ');
+        }
+        if (n === 2) {
+            return (activity.outputs || []).filter(outputRowOk).map((o: any) => (
+                `${o.quantity} ${isOtherLike(o.unit) ? o.unit_other : o.unit} · ${isOtherLike(o.type) ? (o.type_other || o.title) : (o.type || o.title)}`
+            )).join(' · ');
+        }
+        if (n === 3) {
+            if (!people) return 'Environment / systems only';
+            return [
+                activity.unique_beneficiaries ? `${activity.unique_beneficiaries} people` : '',
+                activity.reach_counting_method ? `· ${activity.reach_counting_method}` : '',
+                activity.geographic_reach ? `· ${activity.geographic_reach}` : '',
+            ].join(' ');
+        }
+        if (!outcomes.length) return 'none yet';
+        return outcomes.map((o: LadderOutcome) => `${outcomeDisplayName(o) || '?'} ${o.baseline || '—'}→${o.endline || '—'}`).join(' · ');
+    };
+
+    const parsed = parseActivityPeriod(activity.activity_period);
+    const setPeriod = (from: string, to: string) => {
+        let nextTo = to;
+        if (from && nextTo && nextTo < from) nextTo = from;
+        update('activity_period', formatActivityPeriod(from, nextTo));
+    };
+
     return (
-        <div className="mt-2.5 overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
-            <div className="flex items-center gap-2 border-b border-[#dcebee] bg-[#f5fbfa] px-3.5 py-2">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#e6f6f4] text-[10px] font-extrabold text-[#0e7d74]">
-                    {index + 1}
-                </span>
+        <div className="ladBlk">
+            <div className="ladBlkHead">
+                <span className="an">{index + 1}</span>
                 <input
+                    className="at"
                     value={activity.title || ''}
                     onChange={(e) => update('title', e.target.value)}
-                    placeholder="Unnamed activity — click to name it"
+                    placeholder="New activity"
                     aria-label="Activity name"
-                    className="min-w-0 flex-1 border-0 bg-transparent px-1 text-[12px] font-extrabold text-[#0d2b33] outline-none placeholder:font-semibold placeholder:text-[#7a9498] focus:rounded-md focus:bg-white focus:ring-2 focus:ring-[#0e7d74]"
                 />
-                <button
-                    type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="rounded-lg border border-[#dcebee] bg-white px-2 py-1 text-[10px] font-extrabold text-[#0e7d74]"
-                >
-                    {isExpanded ? 'Hide' : 'Edit'}
-                </button>
                 <button
                     type="button"
                     onClick={() => removeActivity(index)}
@@ -561,405 +664,600 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                 </button>
             </div>
 
-            {isExpanded && (
-                <div className="space-y-4 px-3.5 pb-3.5 pt-1">
-                    {/* 4.1 fields */}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity title <span className="text-rose-500">*</span></Label>
-                            <Input
-                                placeholder="Describe the real activity, not the project title"
-                                value={activity.title}
-                                onChange={e => update('title', e.target.value)}
-                                className={inputClasses}
-                            />
-                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.title`)} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Status <span className="text-rose-500">*</span></Label>
-                            <div className="relative">
-                                <select
-                                    value={activity.status || 'Ongoing'}
-                                    onChange={e => update('status', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    {['Completed', 'Partially Completed', 'Ongoing', 'Cancelled / Not Delivered'].map((status) => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                        </div>
-                    </div>
+            <div className="ladBlkBody">
+                <div className="ladStrip">
+                    {LADDER_STEPS.map((step, k) => (
+                        <button
+                            key={step.id}
+                            type="button"
+                            className={clsx('st', stepOk[k] && 'ok', open === step.id && 'cur', step.id === 4 && 'opt')}
+                            onClick={() => setOpen(step.id)}
+                        >
+                            <i>{stepOk[k] ? '✓' : step.id}</i>
+                            {step.label}
+                        </button>
+                    ))}
+                </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Activity family <span className="text-rose-500">*</span></Label>
-                            <div className="relative">
-                                <select
-                                    value={activity.primary_category || ''}
-                                    onChange={e => update({ primary_category: e.target.value, sub_category: '', other_category_text: '', other_sub_category_text: '' })}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Choose the closest family…</option>
-                                    {ACTIVITY_FAMILY_OPTIONS.map((family) => (
-                                        <option key={family} value={family}>{family}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <p className="text-[11px] text-slate-500">Global library across all disciplines and all 17 SDGs.</p>
-                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.primary_category`)} />
-                            {isOtherTaxonomyChoice(activity.primary_category) ? (
-                                <Input
-                                    placeholder="Name your activity family…"
-                                    value={activity.other_category_text || ''}
-                                    onChange={e => update('other_category_text', e.target.value)}
-                                    className={clsx(inputClasses, "mt-2")}
-                                />
-                            ) : null}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>
-                                Sub-category {activity.primary_category && (GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).length > 0 ? <span className="text-rose-500">*</span> : null}
-                            </Label>
-                            <div className="relative">
-                                <select
-                                    value={activity.sub_category || ''}
-                                    disabled={!activity.primary_category}
-                                    onChange={e => update('sub_category', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Choose closest sub-category…</option>
-                                    {(GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).map((sub) => (
-                                        <option key={sub} value={sub}>{sub}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <p className="text-[11px] text-slate-500">Choose closest fit; use Other / Custom whenever needed.</p>
-                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
-                            {isOtherTaxonomyChoice(activity.sub_category) ? (
-                                <Input
-                                    placeholder="Describe your sub-category…"
-                                    value={activity.other_sub_category_text || ''}
-                                    onChange={e => update('other_sub_category_text', e.target.value)}
-                                    className={clsx(inputClasses, "mt-2")}
-                                />
-                            ) : null}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>
-                                <span className="inline-flex items-center gap-1.5">
-                                    <Calendar className="h-3 w-3 text-slate-400" aria-hidden />
-                                    Activity date / period
-                                </span>{" "}
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                                    Optional if already in session log
+                {LADDER_STEPS.map((step, k) => {
+                    const n = step.id;
+                    const done = stepOk[k];
+                    const isOpen = open === n;
+                    return (
+                        <div key={n} className={clsx('ladStep', isOpen && 'open', done && 'ok')}>
+                            <button type="button" className="ladHead w-full text-left" onClick={() => setOpen(isOpen ? 0 : n)}>
+                                <span className="num">{done ? '✓' : n}</span>
+                                <span>
+                                    {n} · {step.label}{' '}
+                                    <span style={{ fontWeight: 600, color: '#5b6f78' }}>— {step.hint}</span>
                                 </span>
-                            </Label>
-                            {(() => {
-                                const parsed = parseActivityPeriod(activity.activity_period);
-                                const setPeriod = (from: string, to: string) => {
-                                    let nextTo = to;
-                                    if (from && nextTo && nextTo < from) nextTo = from;
-                                    update("activity_period", formatActivityPeriod(from, nextTo));
-                                };
-                                return (
-                                    <>
-                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                                    From
-                                                </p>
-                                                <Input
-                                                    type="date"
-                                                    value={parsed.from}
-                                                    onChange={(e) => setPeriod(e.target.value, parsed.to)}
-                                                    className={dateInputClasses}
-                                                    aria-label="Activity start date"
-                                                />
+                                <span className="sum">{stepSummary(n)}</span>
+                                <span className="chev">{isOpen ? '▴' : '▾'}</span>
+                            </button>
+                            {isOpen ? (
+                                <div className="ladBody">
+                                    {n === 1 && (
+                                        <>
+                                            <div className="g2">
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Activity family <span className="reqstar">*</span></Label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={activity.primary_category || ''}
+                                                            onChange={(e) => setFamily(e.target.value)}
+                                                            className={selectClasses}
+                                                        >
+                                                            <option value="">Choose the closest family…</option>
+                                                            {ACTIVITY_FAMILY_OPTIONS.map((family) => (
+                                                                <option key={family} value={family}>{family}</option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                    </div>
+                                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.primary_category`)} />
+                                                    {isOtherTaxonomyChoice(activity.primary_category) ? (
+                                                        <Input
+                                                            placeholder="Name your activity family…"
+                                                            value={activity.other_category_text || ''}
+                                                            onChange={(e) => update('other_category_text', e.target.value)}
+                                                            className={inputClasses}
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>
+                                                        Sub-category {(GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).length > 0 ? <span className="reqstar">*</span> : null}
+                                                    </Label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={activity.sub_category || ''}
+                                                            disabled={!activity.primary_category}
+                                                            onChange={(e) => setSub(e.target.value)}
+                                                            className={selectClasses}
+                                                        >
+                                                            <option value="">Choose closest sub-category…</option>
+                                                            {(GLOBAL_ACTIVITY_TAXONOMY[activity.primary_category] || []).map((sub) => (
+                                                                <option key={sub} value={sub}>{sub}</option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                    </div>
+                                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
+                                                    {isOtherTaxonomyChoice(activity.sub_category) ? (
+                                                        <Input
+                                                            placeholder="Describe your sub-category…"
+                                                            value={activity.other_sub_category_text || ''}
+                                                            onChange={(e) => update('other_sub_category_text', e.target.value)}
+                                                            className={inputClasses}
+                                                        />
+                                                    ) : null}
+                                                </div>
                                             </div>
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                                    To
-                                                </p>
-                                                <Input
-                                                    type="date"
-                                                    value={parsed.to}
-                                                    min={parsed.from || undefined}
-                                                    onChange={(e) => setPeriod(parsed.from, e.target.value)}
-                                                    className={dateInputClasses}
-                                                    aria-label="Activity end date"
-                                                />
+                                            <p className="ladHint">Global library · 23 families · covers every discipline and all 17 SDGs. Can&apos;t find it? Choose <b>Other / Custom</b> — it is never penalised.</p>
+
+                                            <div className="g2" style={{ marginTop: 8 }}>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Activity title <span className="reqstar">*</span></Label>
+                                                    <Input
+                                                        placeholder="The real activity, not the project name — e.g. Digital-safety workshops"
+                                                        value={activity.title}
+                                                        onChange={(e) => update('title', e.target.value)}
+                                                        className={inputClasses}
+                                                    />
+                                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.title`)} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Status <span className="reqstar">*</span></Label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={activity.status || 'Ongoing'}
+                                                            onChange={(e) => update('status', e.target.value)}
+                                                            className={selectClasses}
+                                                        >
+                                                            {['Completed', 'Partially Completed', 'Ongoing', 'Cancelled / Not Delivered'].map((status) => (
+                                                                <option key={status} value={status}>{status}</option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        {parsed.legacy ? (
-                                            <p className="text-[11px] text-slate-500">
-                                                Previous note: <span className="font-medium text-slate-700">{parsed.legacy}</span>
-                                                {" — "}pick dates above to replace it.
-                                            </p>
-                                        ) : (
-                                            <p className="text-[11px] text-slate-400">
-                                                Single day: set From only. Period: set From and To.
-                                            </p>
-                                        )}
-                                    </>
-                                );
-                            })()}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className={fieldLabel}>Partner / host involved <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Optional</span></Label>
-                            <Input
-                                placeholder="Organization / department / community group"
-                                value={activity.partner_host || ''}
-                                onChange={e => update('partner_host', e.target.value)}
-                                className={inputClasses}
-                            />
-                        </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                        <Label className={fieldLabel}>What was done & who did what <span className="text-rose-500">*</span></Label>
-                        <Textarea
-                            placeholder="15–60 words. Mention the key action and team responsibilities."
-                            value={activity.description}
-                            onChange={e => update('description', e.target.value)}
-                            className={textareaClasses}
-                        />
-                        <WordMeterBar count={descWords} extra="15–200 words required" />
-                        <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
-                    </div>
-
-                    <details className="s4-fold" open>
-                        <summary>📦 Countable outputs — what was delivered?</summary>
-                        <div className="space-y-4 px-3 pb-3">
-                        <p className="rounded-[10px] bg-[#e6f6f4] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
-                            Choose from the global output library. Count delivery here; changes in knowledge, health, behaviour, environment or systems belong in Outcomes below.
-                        </p>
-                        <div className="space-y-3">
-                            {activity.outputs?.map((out: any, idx: number) => (
-                                <div
-                                    key={idx}
-                                    className="relative space-y-3 rounded-[11px] border border-[#dcebee] bg-white p-3"
-                                >
-                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-                                        <div className="space-y-1.5 md:col-span-5">
-                                            <Label className={fieldLabel}>Output title</Label>
-                                            <Input
-                                                placeholder="e.g. Hygiene Kits"
-                                                value={out.title}
-                                                onChange={e => updateOutput(idx, 'title', e.target.value)}
-                                                className={inputClasses}
+                                            <div className="ladQ">
+                                                In one or two lines — what was done, and who on the team did what? <span className="reqstar">*</span>
+                                                <small>15–60 words. Example: “Sara ran four sessions, Ali built the slides, the school arranged the lab.”</small>
+                                            </div>
+                                            <Textarea
+                                                placeholder="What happened, and who did what…"
+                                                value={activity.description}
+                                                onChange={(e) => update('description', e.target.value)}
+                                                className={textareaClasses}
                                             />
-                                        </div>
-                                        <div className="space-y-1.5 md:col-span-4">
-                                            <Label className={fieldLabel}>Type</Label>
-                                            <div className="relative">
-                                                <select
-                                                    value={out.type}
-                                                    onChange={e => updateOutput(idx, 'type', e.target.value)}
-                                                    className={selectClasses}
-                                                >
-                                                    <option value="">Choose output type…</option>
-                                                    {OUTPUT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                                </select>
-                                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                            <div className={clsx('wc', descWords > 60 && 'warn')}>
+                                                {descWords} WORDS · TARGET 15–60{descWords > 60 ? ' — TRIM IT' : ''}
                                             </div>
-                                            {isOtherChoice(out.type) ? (
+                                            <WordMeterBar count={descWords} extra="15–200 words required" />
+                                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
+
+                                            {activity.primary_category ? (
+                                                linkedSdgs.length ? (
+                                                    <div className="sdgNote">
+                                                        🎯 <b>Links to your Section 3 goals:</b>{' '}
+                                                        {linkedSdgs.map((n) => {
+                                                            const sdg = findSdgById(n);
+                                                            return (
+                                                                <span
+                                                                    key={n}
+                                                                    style={{
+                                                                        display: 'inline-block',
+                                                                        background: sdg?.color || '#1d4ed8',
+                                                                        color: '#fff',
+                                                                        borderRadius: 99,
+                                                                        padding: '2px 8px',
+                                                                        fontSize: 10.5,
+                                                                        fontWeight: 800,
+                                                                        margin: '2px 3px 0 0',
+                                                                    }}
+                                                                >
+                                                                    {sdg?.title || `SDG ${n}`} · SDG {n}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                        <span style={{ display: 'block', marginTop: 3 }}>
+                                                            Nothing to pick here — SDGs were set in Section 3. This just confirms the activity fits them.
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="sdgNote warn">
+                                                        ⚠️ This sub-category does not obviously connect to your Section 3 goals
+                                                        {projectSdgs.length ? ` (${(projectSdgs as number[]).map((n: number) => `SDG ${n}`).join(', ')})` : ''}.
+                                                        That can be fine — just make sure Section 3 explains the link, or choose a closer sub-category.
+                                                    </div>
+                                                )
+                                            ) : null}
+
+                                            <div className="g2" style={{ marginTop: 10 }}>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <Calendar className="h-3 w-3 text-slate-400" aria-hidden />
+                                                            When
+                                                        </span>{' '}
+                                                        <span className="optional">OPTIONAL</span>
+                                                    </Label>
+                                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">From</p>
+                                                            <Input
+                                                                type="date"
+                                                                value={parsed.from}
+                                                                onChange={(e) => setPeriod(e.target.value, parsed.to)}
+                                                                className={dateInputClasses}
+                                                                aria-label="Activity start date"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">To</p>
+                                                            <Input
+                                                                type="date"
+                                                                value={parsed.to}
+                                                                min={parsed.from || undefined}
+                                                                onChange={(e) => setPeriod(parsed.from, e.target.value)}
+                                                                className={dateInputClasses}
+                                                                aria-label="Activity end date"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {parsed.legacy ? (
+                                                        <p className="text-[11px] text-slate-500">
+                                                            Previous note: <span className="font-medium text-slate-700">{parsed.legacy}</span>
+                                                            {" — "}pick dates above to replace it.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-[11px] text-slate-400">Single day: set From only. Period: set From and To.</p>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Partner / host involved <span className="optional">OPTIONAL</span></Label>
+                                                    <Input
+                                                        placeholder="Organization / department / community group"
+                                                        value={activity.partner_host || ''}
+                                                        onChange={(e) => update('partner_host', e.target.value)}
+                                                        className={inputClasses}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {n === 2 && (
+                                        <>
+                                            <div className="ladQ">
+                                                What did this activity deliver? <span className="reqstar">*</span>
+                                                <small>Tap a suggestion — or add your own. Only things you could count on the day. People you served come in step 3.</small>
+                                            </div>
+                                            <div className="quickPicks">
+                                                {outHints.map((hint) => (
+                                                    <button key={hint} type="button" className="qp" onClick={() => addOutput(hint)}>
+                                                        ＋ {hint}
+                                                    </button>
+                                                ))}
+                                                <button type="button" className="qp more" onClick={() => addOutput('')}>
+                                                    ＋ Something else (full list)
+                                                </button>
+                                            </div>
+                                            {(activity.outputs || []).length === 0 ? (
+                                                <div className="rollEmpty">Nothing added yet. Tap a suggestion above — e.g. “Sessions Conducted → 4 Sessions”.</div>
+                                            ) : (
+                                                (activity.outputs || []).map((out: any, idx: number) => {
+                                                    const custom = isOtherLike(out.type);
+                                                    return (
+                                                        <div key={idx} className="outRowV13">
+                                                            {out.type ? (
+                                                                <div className="lbl" title={out.type}>
+                                                                    {custom ? `✏️ ${out.type_other || 'Custom output'}` : out.type}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="relative">
+                                                                    <select
+                                                                        value={out.type}
+                                                                        onChange={(e) => updateOutput(idx, 'type', e.target.value)}
+                                                                        className={selectClasses}
+                                                                    >
+                                                                        <option value="">Choose what you delivered…</option>
+                                                                        {OUTPUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                                                    </select>
+                                                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                                </div>
+                                                            )}
+                                                            <Input
+                                                                inputMode="numeric"
+                                                                placeholder="How many"
+                                                                value={out.quantity}
+                                                                onChange={(e) => updateOutput(idx, 'quantity', integerFieldInput(e.target.value, 7))}
+                                                                className={clsx(inputClasses, 'px-2 text-center')}
+                                                            />
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={out.unit}
+                                                                    onChange={(e) => updateOutput(idx, 'unit', e.target.value)}
+                                                                    className={clsx(selectClasses, 'px-2')}
+                                                                >
+                                                                    <option value="">Unit</option>
+                                                                    {UNIVERSAL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                                                                </select>
+                                                                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                            </div>
+                                                            <button type="button" className="delMini" title="Remove" onClick={() => removeOutput(idx)}>✕</button>
+                                                            {custom ? (
+                                                                <Input
+                                                                    placeholder="Name your output — e.g. Bird-nest boxes installed"
+                                                                    value={out.type_other || ''}
+                                                                    onChange={(e) => {
+                                                                        const next = [...activity.outputs];
+                                                                        next[idx] = { ...next[idx], type_other: e.target.value, title: e.target.value };
+                                                                        update('outputs', next);
+                                                                    }}
+                                                                    className={inputClasses}
+                                                                    style={{ gridColumn: '1 / -1' }}
+                                                                />
+                                                            ) : null}
+                                                            {isOtherLike(out.unit) ? (
+                                                                <Input
+                                                                    placeholder="Custom unit…"
+                                                                    value={out.unit_other || ''}
+                                                                    onChange={(e) => updateOutput(idx, 'unit_other', e.target.value)}
+                                                                    className={inputClasses}
+                                                                    style={{ gridColumn: '1 / -1' }}
+                                                                />
+                                                            ) : null}
+                                                            {out.type && !custom ? (
+                                                                <button type="button" className="showAllLink" style={{ gridColumn: '1 / -1', textAlign: 'left' }} onClick={() => updateOutput(idx, 'type', '')}>
+                                                                    change type
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.outputs`)} />
+                                            <p className="ladHint" style={{ marginTop: 8 }}>
+                                                Units fill in automatically — change them if ours is wrong. ❌ “Children learn better” is a change, not a delivery — that goes in step 4.
+                                            </p>
+                                        </>
+                                    )}
+
+                                    {n === 3 && (
+                                        <>
+                                            <div className="ladQ">
+                                                Did this activity directly serve people?
+                                                <small>Choose “No” for environment-only or systems-only work (e.g. a tree plantation with no community session).</small>
+                                            </div>
+                                            <div className="chips">
+                                                <button type="button" className={clsx('s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold', people ? 'on' : 'border-[#dcebee] bg-white text-[#3c5a5c]')} onClick={() => setPeople(true)}>
+                                                    Yes — people took part or received something
+                                                </button>
+                                                <button type="button" className={clsx('s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold', !people ? 'on' : 'border-[#dcebee] bg-white text-[#3c5a5c]')} onClick={() => setPeople(false)}>
+                                                    No — environment / systems only
+                                                </button>
+                                            </div>
+
+                                            {people ? (
+                                                <>
+                                                    <div className="ladQ">
+                                                        How many <u>different</u> people did it directly serve? <span className="reqstar">*</span>
+                                                        <small>Count each person once, even if they came to every session.</small>
+                                                    </div>
+                                                    <Input
+                                                        inputMode="numeric"
+                                                        placeholder="e.g. 120"
+                                                        value={activity.unique_beneficiaries || ''}
+                                                        onChange={(e) => {
+                                                            const v = integerFieldInput(e.target.value, 7);
+                                                            update({ unique_beneficiaries: v, beneficiaries_reached: v || activity.beneficiaries_reached });
+                                                        }}
+                                                        className={inputClasses}
+                                                    />
+                                                    <FieldError message={getFieldError(`section4.activity_blocks.${index}.beneficiaries_reached`)} />
+
+                                                    <div className="ladQ">
+                                                        Did the same people also take part in another activity of this project? <span className="reqstar">*</span>
+                                                        <small>This stops anyone being counted twice in your project total — honesty here is scored.</small>
+                                                    </div>
+                                                    <div className="chips">
+                                                        {OVERLAP_CHIPS.map((chip) => (
+                                                            <button
+                                                                key={chip.value}
+                                                                type="button"
+                                                                className={clsx('s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold', activity.overlap_status === chip.value ? 'on' : 'border-[#dcebee] bg-white text-[#3c5a5c]')}
+                                                                onClick={() => update('overlap_status', chip.value)}
+                                                            >
+                                                                {chip.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {activity.overlap_status && !/mostly unique/i.test(activity.overlap_status) ? (
+                                                        <Input
+                                                            placeholder="Who overlaps? e.g. the same 40 children attended activities 1 and 2"
+                                                            value={activity.overlap_note || ''}
+                                                            onChange={(e) => update('overlap_note', e.target.value)}
+                                                            className={clsx(inputClasses, 'mt-1.5')}
+                                                        />
+                                                    ) : null}
+
+                                                    <div className="ladQ">How did you count them? <span className="reqstar">*</span></div>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={activity.reach_counting_method || ''}
+                                                            onChange={(e) => update('reach_counting_method', e.target.value)}
+                                                            className={selectClasses}
+                                                        >
+                                                            <option value="">Choose a method…</option>
+                                                            {COUNTING_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                                        </select>
+                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                    </div>
+                                                    {isOtherLike(activity.reach_counting_method) ? (
+                                                        <Input
+                                                            placeholder="Describe the counting method…"
+                                                            value={activity.reach_counting_method_other || ''}
+                                                            onChange={(e) => update('reach_counting_method_other', e.target.value)}
+                                                            className={clsx(inputClasses, 'mt-2')}
+                                                        />
+                                                    ) : null}
+                                                </>
+                                            ) : null}
+
+                                            <div className="ladQ">
+                                                Who {people ? 'were they' : 'or what benefited'}? <span className="reqstar">*</span>
+                                                <small>Tap all that apply.</small>
+                                            </div>
+                                            <div className="chips">
+                                                {benList.map((cat) => (
+                                                    <button
+                                                        key={cat}
+                                                        type="button"
+                                                        className={clsx('s4-chip rounded-full border px-3 py-1.5 text-[10.5px] font-bold', selectedCats.includes(cat) ? 'on' : 'border-[#dcebee] bg-white text-[#3c5a5c]')}
+                                                        onClick={() => toggleBeneficiaryCategory(cat)}
+                                                    >
+                                                        {cat}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button type="button" className="showAllLink" onClick={() => setUi({ allBen: !allBen })}>
+                                                {allBen ? 'Show fewer' : 'Show all groups'}
+                                            </button>
+                                            {selectedCats.some((item) => isOtherLike(item)) ? (
                                                 <Input
-                                                    placeholder="Specify custom output…"
-                                                    value={out.type_other || ''}
-                                                    onChange={e => updateOutput(idx, 'type_other', e.target.value)}
+                                                    placeholder="Specify who or what…"
+                                                    value={activity.other_beneficiary_text || ''}
+                                                    onChange={(e) => update('other_beneficiary_text', e.target.value)}
                                                     className={inputClasses}
                                                 />
                                             ) : null}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3 md:col-span-3">
-                                            <div className="space-y-1.5">
-                                                <Label className={fieldLabel}>Qty</Label>
-                                                <Input
-                                                    type="number"
-                                                    value={out.quantity}
-                                                    onChange={e => updateOutput(idx, 'quantity', e.target.value)}
-                                                    className={clsx(inputClasses, "px-2 text-center")}
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className={fieldLabel}>Unit</Label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={out.unit}
-                                                        onChange={e => updateOutput(idx, 'unit', e.target.value)}
-                                                        className={clsx(selectClasses, "px-2")}
-                                                    >
-                                                        <option value="">...</option>
-                                                        {UNIVERSAL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                                            <div className="g2" style={{ marginTop: 10 }}>
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Where did it happen? <span className="reqstar">*</span></Label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={activity.geographic_reach || ''}
+                                                            onChange={(e) => update('geographic_reach', e.target.value)}
+                                                            className={selectClasses}
+                                                        >
+                                                            <option value="">Choose scale…</option>
+                                                            {GEOGRAPHIC_REACH_OPTIONS.map((opt) => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                                    </div>
                                                 </div>
-                                                {isOtherChoice(out.unit) ? (
+                                                <div className="space-y-1.5">
+                                                    <Label className={fieldLabel}>Site / community name <span className="optional">OPTIONAL</span></Label>
                                                     <Input
-                                                        placeholder="Custom unit…"
-                                                        value={out.unit_other || ''}
-                                                        onChange={e => updateOutput(idx, 'unit_other', e.target.value)}
-                                                        className={clsx(inputClasses, "mt-2 px-2")}
+                                                        placeholder="e.g. Classroom 4, SOS Village Lahore"
+                                                        value={activity.site_note || ''}
+                                                        onChange={(e) => update('site_note', e.target.value)}
+                                                        className={inputClasses}
                                                     />
-                                                ) : null}
+                                                </div>
                                             </div>
-                                        </div>
+                                        </>
+                                    )}
+
+                                    {n === 4 && (
+                                        <>
+                                            <div className="ladQ">
+                                                Did a number move because of this activity? <span className="opt">OPTIONAL HERE · AT LEAST 1 IN THE PROJECT</span>
+                                                <small>Before → after. If you only have one measured change for the whole project, add it under the activity that caused it.</small>
+                                            </div>
+                                            {outcomes.map((o: LadderOutcome, idx: number) => {
+                                                const b = numValue(o.baseline);
+                                                const e = numValue(o.endline);
+                                                const d = (b !== null && e !== null) ? e - b : null;
+                                                const pct = (d !== null && b && b > 0) ? ` (${d >= 0 ? '+' : ''}${Math.round((d / b) * 100)}%)` : '';
+                                                const chosen = outcomeDisplayName(o);
+                                                const hints = FAM_METRIC_HINTS[activity.primary_category] || FAM_METRIC_HINTS['📚 Education & Learning'];
+                                                return (
+                                                    <div key={o.id || idx} className="ocCardV13">
+                                                        <div className="ocHead">
+                                                            <span>Result {idx + 1}</span>
+                                                            <span style={{ fontWeight: 700, color: '#5b6f78' }}>{chosen}</span>
+                                                            <button type="button" className="del ml-auto text-[11px] font-extrabold text-rose-500" onClick={() => removeOutcome(idx)}>🗑</button>
+                                                        </div>
+                                                        <div className="ladQ" style={{ marginTop: 4 }}>Which number moved? <span className="reqstar">*</span></div>
+                                                        {chosen ? (
+                                                            <div className="outRowV13" style={{ gridTemplateColumns: '1fr auto' }}>
+                                                                <div className="lbl">📈 {chosen}</div>
+                                                                <button type="button" className="showAllLink" onClick={() => updateOutcome(idx, { metric: '', metric_other: '', outcome_area: '', outcome_sub_category: '', metric_category: '', unit: '' })}>
+                                                                    change
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="quickPicks">
+                                                                    {hints.map((hint) => (
+                                                                        <button key={hint} type="button" className="qp" onClick={() => pickMetric(idx, hint)}>{hint}</button>
+                                                                    ))}
+                                                                    <button type="button" className="qp more" onClick={() => pickMetric(idx, 'My own metric')}>✏️ My own metric</button>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                        {isOtherLike(o.metric) || !chosen ? (
+                                                            <Input
+                                                                placeholder="Name the number — e.g. Usable storage units (out of 6)"
+                                                                value={o.metric_other || ''}
+                                                                onChange={(e) => updateOutcome(idx, o.outcome_area
+                                                                    ? { metric_other: e.target.value, metric: o.metric || 'Other' }
+                                                                    : { ...metricPickPatch('My own metric'), metric_other: e.target.value })}
+                                                                className={clsx(inputClasses, 'mt-2')}
+                                                            />
+                                                        ) : null}
+                                                        <div className="g2" style={{ marginTop: 8 }}>
+                                                            <div className="space-y-1.5">
+                                                                <Label className={fieldLabel}>Before <span className="reqstar">*</span></Label>
+                                                                <Input
+                                                                    inputMode="numeric"
+                                                                    placeholder="e.g. 55"
+                                                                    value={o.baseline || ''}
+                                                                    onChange={(e) => updateOutcome(idx, { baseline: integerFieldInput(e.target.value, 7) })}
+                                                                    className={inputClasses}
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <Label className={fieldLabel}>After <span className="reqstar">*</span></Label>
+                                                                <Input
+                                                                    inputMode="numeric"
+                                                                    placeholder="e.g. 82"
+                                                                    value={o.endline || ''}
+                                                                    onChange={(e) => updateOutcome(idx, { endline: integerFieldInput(e.target.value, 7) })}
+                                                                    className={inputClasses}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="changeBox">
+                                                            {d === null ? '📈 Change computes itself' : (d < 0 ? '📉 Change' : '📈 Change')}
+                                                            <span style={{ marginLeft: 'auto' }}>{d === null ? '—' : `${d >= 0 ? '+' : ''}${d}${pct}`}</span>
+                                                        </div>
+                                                        <div className="ladQ">
+                                                            How sure are we? <span className="reqstar">*</span>
+                                                            <small>Pick the honest one. One directly-measured result beats five estimates.</small>
+                                                        </div>
+                                                        <div className="sureList">
+                                                            {SURE_OPTIONS.map((s) => (
+                                                                <button
+                                                                    key={s.n}
+                                                                    type="button"
+                                                                    className={clsx('su text-left', Number(o.sure) === s.n && 'on')}
+                                                                    onClick={() => updateOutcome(idx, { sure: s.n, confidence_level: [s.cf] })}
+                                                                >
+                                                                    <b>{s.n}</b>{s.t}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="ladQ">Proof — where do these two numbers come from? <span className="reqstar">*</span></div>
+                                                        <Input
+                                                            placeholder="e.g. attendance register, 4 weeks before vs after · photos in Section 7"
+                                                            value={o.measurement_explanation || ''}
+                                                            onChange={(e) => updateOutcome(idx, { measurement_explanation: e.target.value })}
+                                                            className={inputClasses}
+                                                        />
+                                                        {!outcomeLadderOk(o) ? (
+                                                            <p className="ladHint" style={{ color: '#b42318' }}>Incomplete — finish the number, how sure, and proof, or delete this result.</p>
+                                                        ) : null}
+                                                    </div>
+                                                );
+                                            })}
+                                            <button type="button" className="cer-aibtn" onClick={addOutcome}>
+                                                ＋ Add a before → after result
+                                            </button>
+                                        </>
+                                    )}
+
+                                    <div className="ladNext">
+                                        {n < 4 ? (
+                                            <>
+                                                <button type="button" disabled={! [ok1, ok2, ok3][n - 1]} onClick={() => setOpen(n + 1)}>
+                                                    Looks good → step {n + 1}
+                                                </button>
+                                                {![ok1, ok2, ok3][n - 1] ? <span className="why">{stepNeedText(activity, n)}</span> : null}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button type="button" className="ghost" onClick={() => setOpen(0)}>
+                                                    Done with this activity ✓
+                                                </button>
+                                                {!ok4 ? <span className="why">Finish or delete the incomplete result above.</span> : null}
+                                            </>
+                                        )}
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeOutput(idx)}
-                                        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                                        aria-label="Remove output"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
                                 </div>
-                            ))}
+                            ) : null}
                         </div>
-                        <FieldError message={getFieldError(`section4.activity_blocks.${index}.outputs`)} />
-                        <button
-                            type="button"
-                            onClick={addOutput}
-                            className="cer-aibtn"
-                        >
-                            ＋ Add another countable output
-                        </button>
-                        </div>
-                    </details>
-
-                    <details className="s4-fold">
-                        <summary>🫶 Direct beneficiaries / reach</summary>
-                        <div className="space-y-4 px-3 pb-3">
-                        <p className="rounded-[10px] border border-[#bfe6e2] bg-[#e3f4fa] px-3 py-2 text-[10px] leading-snug text-[#0f5e57]">
-                            <b>Double-counting protection:</b> gross engagements may count repeat contacts; estimated unique reach should remove repeat beneficiaries where reasonably possible.
-                        </p>
-
-                        <div className="space-y-4">
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Gross people reached</Label>
-                                        <Input
-                                            type="number"
-                                            placeholder="e.g. 180 contacts"
-                                            value={activity.beneficiaries_reached}
-                                            onChange={e => update('beneficiaries_reached', e.target.value)}
-                                            className={inputClasses}
-                                        />
-                                        <FieldError message={getFieldError(`section4.activity_blocks.${index}.beneficiaries_reached`)} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Estimated unique beneficiaries</Label>
-                                        <Input
-                                            type="number"
-                                            placeholder="e.g. 120 different people"
-                                            value={activity.unique_beneficiaries || ''}
-                                            onChange={e => update('unique_beneficiaries', e.target.value)}
-                                            className={inputClasses}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Overlap with other activities</Label>
-                                        <div className="relative">
-                                            <select
-                                                value={activity.overlap_status}
-                                                onChange={e => update('overlap_status', e.target.value)}
-                                                className={selectClasses}
-                                            >
-                                                <option value="">Select status...</option>
-                                                {OVERLAP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>How was reach counted?</Label>
-                                        <div className="relative">
-                                            <select
-                                                value={activity.reach_counting_method || ''}
-                                                onChange={e => update('reach_counting_method', e.target.value)}
-                                                className={selectClasses}
-                                            >
-                                                <option value="">Select method...</option>
-                                                {COUNTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        </div>
-                                        {isOtherChoice(activity.reach_counting_method) ? (
-                                            <Input
-                                                placeholder="Describe the counting method…"
-                                                value={activity.reach_counting_method_other || ''}
-                                                onChange={e => update('reach_counting_method_other', e.target.value)}
-                                                className={clsx(inputClasses, "mt-2")}
-                                            />
-                                        ) : null}
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className={fieldLabel}>Overlap note</Label>
-                                    <Input
-                                        placeholder="e.g. the same 40 children attended three workshops"
-                                        value={activity.overlap_note || ''}
-                                        onChange={e => update('overlap_note', e.target.value)}
-                                        className={inputClasses}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className={fieldLabel}>Who / what directly benefited? · choose all that apply</Label>
-                                    <PillToggle
-                                        options={BENEFICIARY_CATEGORIES}
-                                        selected={activity.beneficiary_categories || []}
-                                        onToggle={toggleBeneficiaryCategory}
-                                    />
-                                    {(activity.beneficiary_categories || []).some((item: string) => isOtherChoice(item)) ? (
-                                        <Input
-                                            placeholder="Specify the other beneficiary group…"
-                                            value={activity.other_beneficiary_text || ''}
-                                            onChange={e => update('other_beneficiary_text', e.target.value)}
-                                            className={inputClasses}
-                                        />
-                                    ) : null}
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Geographic reach</Label>
-                                        <div className="relative">
-                                            <select
-                                                value={activity.geographic_reach}
-                                                onChange={e => update('geographic_reach', e.target.value)}
-                                                className={selectClasses}
-                                            >
-                                                <option value="">Select reach…</option>
-                                                {GEOGRAPHIC_REACH_OPTIONS.map(opt => (
-                                                    <option key={opt} value={opt}>{opt}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className={fieldLabel}>Specific site / community / platform</Label>
-                                        <Input
-                                            placeholder="Specific site / community / platform"
-                                            value={activity.site_note}
-                                            onChange={e => update('site_note', e.target.value)}
-                                            className={inputClasses}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </details>
-                </div>
-            )}
+                    );
+                })}
+            </div>
         </div>
     );
 }

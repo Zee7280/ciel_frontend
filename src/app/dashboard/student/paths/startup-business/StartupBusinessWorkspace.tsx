@@ -10,6 +10,7 @@ import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { getPathSessionCache } from "@/utils/student-path-session-cache";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
@@ -332,8 +333,9 @@ function workspaceVentureId(entry: { id?: string; createdAt?: string }) {
 export default function StartupBusinessWorkspace() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [loading, setLoading] = useState(true);
-    const [entry, setEntry] = useState<VentureEntry>(EMPTY);
+    const cachedVenture = getPathSessionCache<Partial<VentureEntry>>("startup-venture");
+    const [loading, setLoading] = useState(!cachedVenture);
+    const [entry, setEntry] = useState<VentureEntry>(() => (cachedVenture ? mergeEntry(EMPTY, cachedVenture) : EMPTY));
     const [step, setStep] = useState(0);
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<Record<string, { accepted: boolean; edited: boolean; text: string }>>({});

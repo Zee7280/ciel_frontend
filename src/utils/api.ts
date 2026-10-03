@@ -1,4 +1,6 @@
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
+import { clearPathSessionCache } from "@/utils/student-path-session-cache";
+import { clearImpactSummaryCache } from "@/utils/cielImpactSummary";
 
 /**
  * Base URL for `authenticatedFetch` when the path starts with `/`.
@@ -63,6 +65,7 @@ function leaveForLogin() {
     loginRedirectStarted = true;
     localStorage.removeItem("ciel_token");
     clearStudentDashboardCache();
+    clearPathSessionCache();
     window.location.replace("/login");
 }
 
@@ -170,6 +173,15 @@ export async function authenticatedFetch(
             console.log("Fetcher: 401 detected in background. Skipping redirect.");
         }
         return null;
+    }
+
+    // Any successful student write (apply, create/edit opportunity, report submit, payment, profile…)
+    // makes the short-lived client caches stale — drop them so the next screen refetches.
+    const method = String(options.method || "GET").toUpperCase();
+    if (response.ok && method !== "GET" && /\/api\/v1\/students?\//.test(url)) {
+        clearStudentDashboardCache();
+        clearPathSessionCache();
+        clearImpactSummaryCache();
     }
 
     return response;

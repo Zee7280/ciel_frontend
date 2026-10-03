@@ -1,4 +1,5 @@
 import { buildParticipationProgramLine, normalizeParticipationRowForDossier } from "@/utils/reportTeamScope";
+import { isSchoolOrInstituteAcademicLabel, sanitizeReportAcademicDepartment } from "@/utils/universityData";
 
 export type Section1DossierField = {
     label: string;
@@ -100,14 +101,14 @@ function resolveDegreeProgram(row: Record<string, unknown>): string {
     const student =
         row.student && typeof row.student === "object" ? (row.student as Record<string, unknown>) : null;
     const direct = firstNonBlank(row.academicProgram, row.academic_program);
-    if (!isPlaceholderLabel(direct)) return direct;
+    if (!isPlaceholderLabel(direct) && !isSchoolOrInstituteAcademicLabel(direct)) return direct;
 
     const fromMajor = firstNonBlank(student?.major, row.degree);
-    if (!isPlaceholderLabel(fromMajor)) return fromMajor;
+    if (!isPlaceholderLabel(fromMajor) && !isSchoolOrInstituteAcademicLabel(fromMajor)) return fromMajor;
 
     const line = buildParticipationProgramLine(row);
     const base = line.split("·")[0]?.trim() ?? line;
-    if (!isPlaceholderLabel(base)) return base;
+    if (!isPlaceholderLabel(base) && !isSchoolOrInstituteAcademicLabel(base)) return base;
     return "";
 }
 
@@ -115,8 +116,15 @@ function resolveDepartment(row: Record<string, unknown>): string {
     const student =
         row.student && typeof row.student === "object" ? (row.student as Record<string, unknown>) : null;
     const dept = firstNonBlank(row.department, student?.department);
-    if (isPlaceholderLabel(dept)) return "";
-    return dept;
+    const program = firstNonBlank(
+        row.academicProgram,
+        row.academic_program,
+        student?.major,
+        row.degree,
+    );
+    const cleaned = sanitizeReportAcademicDepartment(isPlaceholderLabel(dept) ? "" : dept, program);
+    if (isPlaceholderLabel(cleaned) || isSchoolOrInstituteAcademicLabel(cleaned)) return "";
+    return cleaned;
 }
 
 function pushField(

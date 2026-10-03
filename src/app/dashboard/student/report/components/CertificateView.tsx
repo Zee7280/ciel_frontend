@@ -30,8 +30,8 @@ type RecipientBlock = {
     program: string;
 };
 
-function displayPersonName(p: { fullName?: string; name?: string }): string {
-    return (p.fullName || p.name || "").trim();
+function displayPersonName(p: { fullName?: string; name?: string } | null | undefined): string {
+    return (p?.fullName || p?.name || "").trim();
 }
 
 function normalizeNameKey(name: string): string {
@@ -82,7 +82,9 @@ function CertFlourish() {
 
 export default function CertificateView({ projectData }: { projectData?: unknown } = {}) {
     const { data } = useReportForm();
-    const { section1, section2, section3 } = data;
+    const section1 = data.section1;
+    const section2 = data.section2;
+    const section3 = data.section3;
 
     const { headline: certificateHeadline } = useMemo(
         () => deriveCertificateProjectDisplay(data),
@@ -90,15 +92,22 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     );
 
     const recipientBlocks = useMemo(() => {
-        const lead = section1.team_lead;
+        const lead = (section1?.team_lead && typeof section1.team_lead === "object"
+            ? section1.team_lead
+            : {}) as LeadShape;
         const leadName = displayPersonName(lead) || "Distinguished Participant";
-        const leadLabel = section1.participation_type === "team" ? "Team Lead" : "Participant";
+        const leadLabel = section1?.participation_type === "team" ? "Team Lead" : "Participant";
         const leadDegree = lead.degree?.trim() || "";
-        const leadProgram = [leadDegree, section2.discipline?.trim() && leadDegree !== section2.discipline.trim() ? section2.discipline.trim() : ""]
+        const discipline = section2?.discipline?.trim() || "";
+        const leadProgram = [leadDegree, discipline && leadDegree !== discipline ? discipline : ""]
             .filter(Boolean)
             .join(" · ");
 
-        if (section1.participation_type !== "team" || !section1.team_members?.length) {
+        if (
+            section1?.participation_type !== "team" ||
+            !Array.isArray(section1?.team_members) ||
+            !section1.team_members.length
+        ) {
             return [{
                 key: "lead",
                 name: leadName,
@@ -132,7 +141,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         });
 
         return rows;
-    }, [section1.participation_type, section1.team_lead, section1.team_members, section2.discipline]);
+    }, [section1?.participation_type, section1?.team_lead, section1?.team_members, section2?.discipline]);
 
     const rosterBlocks = useMemo(() => recipientBlocks.slice(0, 20), [recipientBlocks]);
     const hiddenRosterCount = Math.max(0, recipientBlocks.length - rosterBlocks.length);
@@ -153,14 +162,16 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     const showVerificationQr = Boolean(resolvedVerifyUrl) && isInstitutionallyVerifiedReport(data);
 
     const engagementRecalc = useMemo(() => {
-        const teamSize = (section1.participation_type === "team" ? section1.team_members.length : 0) + 1;
+        const members = Array.isArray(section1?.team_members) ? section1.team_members : [];
+        const teamSize = (section1?.participation_type === "team" ? members.length : 0) + 1;
         const req = data.required_hours || 16;
-        const rosterIds = buildIndividualRosterFromSection1(section1, section1.team_lead?.id);
-        return calculateEngagementMetrics(section1.attendance_logs || [], req, teamSize, section1.team_lead, rosterIds);
+        const logs = Array.isArray(section1?.attendance_logs) ? section1.attendance_logs : [];
+        const rosterIds = buildIndividualRosterFromSection1(section1, section1?.team_lead?.id);
+        return calculateEngagementMetrics(logs, req, teamSize, section1?.team_lead, rosterIds);
     }, [section1, data.required_hours]);
 
     const verifiedHours = useMemo(() => {
-        const stored = Number(section1.metrics?.total_verified_hours);
+        const stored = Number(section1?.metrics?.total_verified_hours);
         if (Number.isFinite(stored) && stored > 0) {
             return Math.round(stored);
         }
@@ -168,24 +179,24 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         if (fromLogs > 0) {
             return Math.round(fromLogs);
         }
-        const leadH = parseFloat(String(section1.team_lead?.hours ?? "")) || 0;
-        const membersH =
-            section1.team_members?.reduce(
-                (sum: number, m: TeamMember) => sum + (parseFloat(String(m.hours ?? "")) || 0),
-                0,
-            ) || 0;
+        const leadH = parseFloat(String(section1?.team_lead?.hours ?? "")) || 0;
+        const members = Array.isArray(section1?.team_members) ? section1.team_members : [];
+        const membersH = members.reduce(
+            (sum: number, m: TeamMember) => sum + (parseFloat(String(m.hours ?? "")) || 0),
+            0,
+        );
         return Math.round(leadH + membersH);
-    }, [section1.metrics?.total_verified_hours, section1.team_lead.hours, section1.team_members, engagementRecalc.total_verified_hours]);
+    }, [section1?.metrics?.total_verified_hours, section1?.team_lead?.hours, section1?.team_members, engagementRecalc.total_verified_hours]);
 
     const engagementSpanDays = useMemo(() => {
-        const stored = Number(section1.metrics?.engagement_span);
+        const stored = Number(section1?.metrics?.engagement_span);
         if (Number.isFinite(stored) && stored > 0) return Math.round(stored);
         const r = engagementRecalc.engagement_span;
         return r > 0 ? Math.round(r) : 0;
-    }, [section1.metrics?.engagement_span, engagementRecalc.engagement_span]);
+    }, [section1?.metrics?.engagement_span, engagementRecalc.engagement_span]);
 
     const reportForCii = useMemo((): ReportData => {
-        const m = section1.metrics;
+        const m = section1?.metrics;
         return {
             ...data,
             section1: {

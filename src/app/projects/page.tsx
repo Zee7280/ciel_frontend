@@ -37,6 +37,7 @@ import {
 } from "@/utils/opportunityListing";
 import { findSdgById } from "@/utils/sdgData";
 import { buildOpportunityMapPoints } from "@/utils/opportunityMapCoordinates";
+import { applicationsOpenFromPayload, applyClosedCtaLabel } from "@/utils/studentApplyMaintenance";
 
 const OpportunitiesMapView = dynamic(
     () => import("@/components/opportunities/OpportunitiesMapView"),
@@ -69,6 +70,9 @@ interface Project {
     sdgLabel: string;
     seatsRemaining: number | null;
     locationPin: string | null;
+    applicationsOpen: boolean;
+    applyClosedMessage: string | null;
+    applyBlockedReason: string | null;
 }
 
 type ListingTab = "open" | "closing" | "university" | "archived";
@@ -189,6 +193,7 @@ export default function ProjectsPage() {
     /** True when the last load failed — keeps a real outage distinguishable from a genuine zero-result filter. */
     const [fetchError, setFetchError] = useState(false);
     const [reloadNonce, setReloadNonce] = useState(0);
+    const [applyBanner, setApplyBanner] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -221,8 +226,19 @@ export default function ProjectsPage() {
                     return;
                 }
 
-                type Payload = { success?: boolean; data?: unknown; opportunities?: unknown };
+                type Payload = {
+                    success?: boolean;
+                    data?: unknown;
+                    opportunities?: unknown;
+                    apply_maintenance?: { enabled?: boolean; message?: string };
+                };
                 const body = data as Payload;
+                const maintenance = body.apply_maintenance;
+                setApplyBanner(
+                    maintenance?.enabled && typeof maintenance.message === "string" && maintenance.message.trim()
+                        ? maintenance.message.trim()
+                        : null,
+                );
                 const list: Record<string, unknown>[] = Array.isArray(body.data)
                     ? (body.data as Record<string, unknown>[])
                     : Array.isArray(body.opportunities)
@@ -283,6 +299,13 @@ export default function ProjectsPage() {
                             sdgLabel,
                             seatsRemaining: computeSeatsRemaining(p),
                             locationPin,
+                            applicationsOpen: applicationsOpenFromPayload(p),
+                            applyClosedMessage:
+                                typeof p.apply_blocked_message === "string" && p.apply_blocked_message.trim()
+                                    ? p.apply_blocked_message.trim()
+                                    : null,
+                            applyBlockedReason:
+                                typeof p.apply_blocked_reason === "string" ? p.apply_blocked_reason : null,
                         };
                     });
                     setProjects(mappedProjects);
@@ -519,6 +542,12 @@ export default function ProjectsPage() {
                             Search
                         </button>
                     </form>
+                    {applyBanner ? (
+                        <div className="mt-6 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                            <p className="font-semibold">Applications temporarily paused</p>
+                            <p className="mt-1 text-amber-900/90">{applyBanner}</p>
+                        </div>
+                    ) : null}
                 </div>
             </section>
 
@@ -856,10 +885,15 @@ export default function ProjectsPage() {
                                                 <span
                                                     className={clsx(
                                                         "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide",
-                                                        statusBadgeClass(project.status),
+                                                        !project.applicationsOpen
+                                                            ? "border-amber-200 bg-amber-50 text-amber-900"
+                                                            : statusBadgeClass(project.status),
                                                     )}
+                                                    title={project.applyClosedMessage || undefined}
                                                 >
-                                                    {statusDisplayLabel(project.status)}
+                                                    {!project.applicationsOpen
+                                                        ? applyClosedCtaLabel(project.applyBlockedReason)
+                                                        : statusDisplayLabel(project.status)}
                                                 </span>
                                             </div>
 

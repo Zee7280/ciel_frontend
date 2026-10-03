@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import EmptyState from "@/components/ciel/EmptyState";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import Tabs, { type CielTab } from "@/components/ciel/Tabs";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
+import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved, pendingFacultyReview } from "@/utils/courseworkSectionReview";
@@ -46,8 +46,9 @@ function CourseProjectHub() {
     const createHref = `${hubHref}?view=create`;
     const goCreate = () => router.push(createHref);
     const openParam = searchParams.get("open");
-    const [loading, setLoading] = useState(true);
-    const [entries, setEntries] = useState<CourseProjectEntry[]>([]);
+    const cachedEntries = usePathSessionCache<CourseProjectEntry[]>("course-projects");
+    const [, setLoading] = useState(!cachedEntries);
+    const [entries, setEntries] = useState<CourseProjectEntry[]>(cachedEntries ?? []);
     const [creating, setCreating] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [name, setName] = useState("there");
@@ -55,11 +56,12 @@ function CourseProjectHub() {
     const [flashId, setFlashId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
-        setLoading(true);
         try {
             const res = await authenticatedFetch("/api/v1/paths/course-projects", {}, { redirectToLogin: true });
             const result = res?.ok ? await res.json() : null;
-            setEntries(Array.isArray(result?.data) ? result.data : []);
+            const next = Array.isArray(result?.data) ? (result.data as CourseProjectEntry[]) : [];
+            setEntries(next);
+            setPathSessionCache("course-projects", next);
         } finally {
             setLoading(false);
         }
@@ -98,14 +100,6 @@ function CourseProjectHub() {
         }
     };
 
-    if (loading) return <WorkspaceSkeleton />;
-
-    // Everything a student owns, split the way the module actually behaves: `status` only ever
-    // flips draft -> submitted (it never reverts), so a record faculty sent back for revision or
-    // rejected is still `status === "submitted"` — only `facultyApprovalStatus` moves. Reading both
-    // fields directly here (rather than reusing the faculty-inbox "waiting" helper for everything)
-    // keeps revision/rejected records visible in "My Workspace" instead of falling into neither the
-    // drafts bucket nor the pending-with-faculty bucket.
     const drafts = entries.filter((e) => e.status !== "submitted");
     const revision = entries.filter((e) => e.status === "submitted" && normalizeReviewStatus(e.facultyApprovalStatus) === "revision_requested");
     const rejected = entries.filter((e) => e.status === "submitted" && normalizeReviewStatus(e.facultyApprovalStatus) === "rejected");
@@ -416,7 +410,7 @@ function CardOpenTarget({
 
 export default function CourseProjectDeckPage() {
     return (
-        <Suspense fallback={<WorkspaceSkeleton />}>
+        <Suspense fallback={null}>
             <CourseProjectHub />
         </Suspense>
     );

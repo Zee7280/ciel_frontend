@@ -21,6 +21,12 @@ import {
     readSupervisionStakeholders,
 } from "@/utils/opportunityDetailView";
 import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
+import {
+    applicationsOpenFromPayload,
+    applyBlockedMessageFromPayload,
+    applyClosedCtaLabel,
+    attachApplyMaintenanceFromEnvelope,
+} from "@/utils/studentApplyMaintenance";
 
 interface ProjectDetails {
     id: string | number;
@@ -120,7 +126,10 @@ export default function ProjectDetailsPage() {
                 const detailData = await detailResponse.json().catch(() => ({}));
 
                 if (detailResponse.ok && detailData.success && detailData.data) {
-                    resolved = detailData.data as ProjectDetails;
+                    resolved = attachApplyMaintenanceFromEnvelope(
+                        detailData.data as ProjectDetails & Record<string, unknown>,
+                        detailData as Record<string, unknown>,
+                    );
                 } else {
                     const fallbackResponse = await fetch(`${backendUrl}/public/opportunities`);
                     const fallbackData = await fallbackResponse.json();
@@ -331,15 +340,33 @@ export default function ProjectDetailsPage() {
                     />
 
                     {/* Apply Action */}
-                    <Link 
-                        href={applyHref}
-                        className="w-full flex items-center justify-center py-4 rounded-2xl bg-[#4285F4] text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-[0.2em] uppercase"
-                    >
-                        {applyLabel}
-                    </Link>
-                    <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">
-                        Apply through the student dashboard. Sign in and use Browse Opportunities to apply.
-                    </p>
+                    {applicationsOpenFromPayload(projectRecord) ? (
+                        <>
+                            <Link
+                                href={applyHref}
+                                className="w-full flex items-center justify-center py-4 rounded-2xl bg-[#4285F4] text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-[0.2em] uppercase"
+                            >
+                                {applyLabel}
+                            </Link>
+                            <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">
+                                Apply through the student dashboard. Sign in and use Browse Opportunities to apply.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-full flex items-center justify-center py-4 rounded-2xl bg-slate-200 text-slate-600 font-bold text-sm tracking-[0.2em] uppercase cursor-not-allowed">
+                                {applyClosedCtaLabel(
+                                    typeof projectRecord.apply_blocked_reason === "string"
+                                        ? projectRecord.apply_blocked_reason
+                                        : null,
+                                )}
+                            </div>
+                            <p className="text-[11px] text-center text-amber-800 font-semibold mt-6 leading-relaxed">
+                                {applyBlockedMessageFromPayload(projectRecord) ||
+                                    "This listing is not accepting new student applications."}
+                            </p>
+                        </>
+                    )}
                 </div>
             </div>
 

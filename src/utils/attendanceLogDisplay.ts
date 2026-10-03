@@ -43,7 +43,7 @@ export function buildSection1AttendanceParticipantNameMap(data: {
         map[`lead:${lead.id}`] = n;
     }
 
-    (s1.team_members ?? []).forEach((m, i) => {
+    (Array.isArray(s1.team_members) ? s1.team_members : []).forEach((m, i) => {
         const id = m?.id || m?.participantId;
         if (!id) return;
         const n = firstNonBlank(m.fullName, m.name) || `Team member ${i + 1}`;

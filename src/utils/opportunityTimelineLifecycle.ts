@@ -205,11 +205,19 @@ export function validateTimelineForPersist(
         if (!deadline) {
             return "Please set an application closing date, or turn off early application close.";
         }
+        if (compareDateOnly(deadline, start) < 0) {
+            return "Application closing date cannot be before the project start date.";
+        }
         if (compareDateOnly(deadline, end) >= 0) {
             return "Application closing date must be before the project end date.";
         }
     }
     return null;
+}
+
+/** Latest date the application-close picker may allow (day before project end). */
+export function lastAllowedApplicationCloseDate(end: string): string | undefined {
+    return addDaysToDateOnly(end, -1) ?? undefined;
 }
 
 /** Build timeline payload from create-opportunity form fields. */

@@ -18,6 +18,7 @@ import TeamVerification from "./TeamVerification";
 import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
 import { formTeamFromLead } from "@/utils/participationGuide";
 import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
+import { pickPreferredEngagementSeat } from "@/utils/teamReportSubmitAccess";
 import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
@@ -53,27 +54,32 @@ function selfParticipantRealIds(
     teamLead: Record<string, unknown>,
     teamMembers: unknown[],
     leadParticipantId: string | null,
+    viewerParticipantId?: string | null,
 ): string[] {
-    if (!currentUserEmail) return [];
-    const email = currentUserEmail.trim().toLowerCase();
+    if (!currentUserEmail && !viewerParticipantId) return [];
+    const email = (currentUserEmail || "").trim().toLowerCase();
     const ids: string[] = [];
+    const push = (v: unknown) => {
+        if (v != null && String(v).trim()) ids.push(String(v).trim());
+    };
+    // Always keep the viewer's own engagement seat id when known (members are excluded from
+    // section1.team_members by mapProjectTeamRowsForReport, so email matching alone is not enough).
+    push(viewerParticipantId);
     const leadEmail = typeof teamLead.email === "string" ? teamLead.email.trim().toLowerCase() : "";
-    if (leadEmail && leadEmail === email) {
-        const leadId = leadParticipantId || teamLead.id || teamLead.participantId;
-        if (leadId != null && String(leadId)) ids.push(String(leadId));
+    if (email && leadEmail && leadEmail === email) {
+        push(leadParticipantId || teamLead.id || teamLead.participantId);
     }
-    if (Array.isArray(teamMembers)) {
+    if (email && Array.isArray(teamMembers)) {
         teamMembers.forEach((m) => {
             if (!m || typeof m !== "object") return;
             const row = m as Record<string, unknown>;
             const rowEmail = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
             if (rowEmail && rowEmail === email) {
-                const mid = row.participantId ?? row.id;
-                if (mid != null && String(mid)) ids.push(String(mid));
+                push(row.participantId ?? row.id);
             }
         });
     }
-    return ids;
+    return [...new Set(ids)];
 }
 
 function canDeleteAttendanceEntry(
@@ -135,9 +141,10 @@ function resolveAttendanceLogParticipantPrefixedId(
     realId: string,
     rawParticipants: { id: string }[],
     resolvedLeadId: string | null,
-    teamMembers: any[],
+    teamMembers: unknown,
 ): string {
     if (!realId) return realId;
+    const members = Array.isArray(teamMembers) ? teamMembers : [];
     const match = rawParticipants.find(
         (p) =>
             p.id === realId ||
@@ -148,8 +155,8 @@ function resolveAttendanceLogParticipantPrefixedId(
     if (resolvedLeadId && realId === resolvedLeadId) {
         return `lead:${resolvedLeadId}`;
     }
-    for (let idx = 0; idx < teamMembers.length; idx++) {
-        const m = teamMembers[idx];
+    for (let idx = 0; idx < members.length; idx++) {
+        const m = members[idx] as { id?: string; participantId?: string } | null;
         if (!m) continue;
         const keys = [m.id, m.participantId].filter(Boolean).map(String);
         if (keys.some((k) => k === realId) || keys.some((k) => engagementParticipantIdsMatch(k, realId))) {
@@ -366,32 +373,38 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const queryProjectId = searchParams.get('project') || searchParams.get('projectId');
     const projectIdFromUrl = queryProjectId || data.project_id;
 
-    const { participation_type, team_lead, team_members } = data.section1;
+    const { participation_type, team_lead: rawTeamLead, team_members: rawTeamMembers } = data.section1 || {};
+    const team_lead = (rawTeamLead && typeof rawTeamLead === "object" ? rawTeamLead : {}) as typeof data.section1.team_lead;
+    const team_members = Array.isArray(rawTeamMembers) ? rawTeamMembers : [];
+    const attendanceLogs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
     // Extract available spots using all possible backend keys for the opportunity
     const maxTeamSize = projectData?.timeline?.volunteers_required || projectData?.volunteers_needed || projectData?.available_spots || 20;
+    const seatCapRaw = Math.floor(Number(projectData?.timeline?.volunteers_required ?? projectData?.volunteers_needed ?? projectData?.volunteersNeeded));
+    // The lead takes one seat, so members are capped at seats − 1. No cap when it has no seat count.
+    const maxTeammates = Number.isFinite(seatCapRaw) && seatCapRaw > 0 ? Math.max(0, seatCapRaw - 1) : undefined;
     const requiredHoursPerStudent = projectData?.required_hours || projectData?.hours_requirement || projectData?.engagement_hours || 16;
 
 
     // Wizard State
     const [internalStep, setInternalStep] = React.useState(
-        data.section1.verified_summary ? 4 : 1
+        data.section1?.verified_summary ? 4 : 1
     );
     const [isLoadingMetrics, setIsLoadingMetrics] = React.useState(false);
     const [verifiedMetrics, setVerifiedMetrics] = React.useState<any>(
-        data.section1.metrics.total_verified_hours > 0 ? {
-            totalHours: data.section1.metrics.total_verified_hours,
-            sessionCount: data.section1.metrics.verified_session_count,
-            eis: data.section1.metrics.eis_score,
-            activeDays: data.section1.metrics.total_active_days,
-            spanWeeks: Math.ceil(data.section1.metrics.engagement_span / 7),
-            frequency: data.section1.metrics.attendance_frequency,
-            weeklyContinuity: data.section1.metrics.weekly_continuity,
-            category: data.section1.metrics.engagement_category,
-            hecStatus: data.section1.metrics.hec_compliance,
-            individual_metrics: data.section1.metrics.individual_metrics,
+        (data.section1?.metrics?.total_verified_hours ?? 0) > 0 ? {
+            totalHours: data.section1?.metrics?.total_verified_hours,
+            sessionCount: data.section1?.metrics?.verified_session_count,
+            eis: data.section1?.metrics?.eis_score,
+            activeDays: data.section1?.metrics?.total_active_days,
+            spanWeeks: Math.ceil((data.section1?.metrics?.engagement_span || 0) / 7),
+            frequency: data.section1?.metrics?.attendance_frequency,
+            weeklyContinuity: data.section1?.metrics?.weekly_continuity,
+            category: data.section1?.metrics?.engagement_category,
+            hecStatus: data.section1?.metrics?.hec_compliance,
+            individual_metrics: data.section1?.metrics?.individual_metrics,
         } : null
     );
-    const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1.verified_summary || "");
+    const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1?.verified_summary || "");
     const isSubmittedReport = [
         "submitted",
         "pending_payment",
@@ -408,14 +421,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
             String(data.report_status || "").toLowerCase(),
         );
     const [isSubmitted, setIsSubmitted] = React.useState(isSubmittedReport);
-    const reviewChecked = data.section1.review_checked || [false, false, false];
+    const reviewChecked = data.section1?.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
     const [leadStatus, setLeadStatus] = React.useState<string>('pending_approval');
-    const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
-    const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
+    const [isVerified, setIsVerified] = React.useState(!!team_lead?.verified);
+    const [participantId, setParticipantId] = React.useState<string | null>(team_lead?.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+    const [viewerIsTeamLead, setViewerIsTeamLead] = React.useState<boolean | null>(null);
+    const [viewerSeat, setViewerSeat] = React.useState<{
+        id: string;
+        name: string;
+        email: string;
+        status: string;
+    } | null>(null);
     const [isLeavingTeam, setIsLeavingTeam] = React.useState(false);
 
     const applyAdminParticipationUnlock = React.useCallback(() => {
@@ -508,25 +528,105 @@ export default function Section1Participation({ projectData }: { projectData?: a
             : null;
     const effectiveLeadStatus = effectiveParticipationStatusForReportActions(leadStatus, projectRecord);
 
-    const rawParticipants = React.useMemo(() => [
-        ...(isVerified || data.section1.team_lead.verified || participantId ? [{
-            id: `lead:${participantId || data.section1.team_lead.id}`,
-            name: `${((data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead")}${((data.section1.team_lead as any).email === currentUserEmail) ? ' (Self)' : ''}`,
-            status: effectiveLeadStatus,
-            email: (data.section1.team_lead as any).email
-        }] : []),
-        ...data.section1.team_members
-            .map((m: any, idx: number) => ({
-                id: `member:${idx}:${m.id || m.participantId || m.cnic || m.email || 'anon'}`,
-                name: `${(m.fullName || m.name || m.email || `Student ${idx + 1}`)}${(m.email === currentUserEmail) ? ' (Self)' : ''}`,
-                verified: m.verified,
-                status: effectiveParticipationStatusForReportActions(
-                    m.status || (m.verified ? 'approved' : 'pending_approval'),
-                    projectRecord,
-                ),
-                email: m.email
-            }))
-    ], [isVerified, participantId, data.section1.team_lead, data.section1.team_members, currentUserEmail, effectiveLeadStatus, projectRecord]);
+    const leadParticipationId = String(
+        (data.section1?.team_lead as { id?: string; participantId?: string } | undefined)?.id ||
+            (data.section1?.team_lead as { participantId?: string } | undefined)?.participantId ||
+            "",
+    ).trim();
+    const leadEmailNorm = String(
+        (data.section1?.team_lead as { email?: string } | undefined)?.email || "",
+    )
+        .trim()
+        .toLowerCase();
+    const viewerEmailNorm = String(currentUserEmail || viewerSeat?.email || "")
+        .trim()
+        .toLowerCase();
+    const iAmTeamLead =
+        viewerIsTeamLead === true ||
+        (!!viewerEmailNorm && !!leadEmailNorm && viewerEmailNorm === leadEmailNorm) ||
+        (!!participantId && !!leadParticipationId && participantId === leadParticipationId);
+
+    const rawParticipants = React.useMemo(() => {
+        const leadName =
+            (data.section1?.team_lead as { fullName?: string; name?: string } | undefined)?.fullName ||
+            (data.section1?.team_lead as { name?: string } | undefined)?.name ||
+            "Team Lead";
+        const leadCard =
+            isVerified || data.section1?.team_lead?.verified || leadParticipationId
+                ? [
+                      {
+                          id: `lead:${leadParticipationId || participantId || "lead"}`,
+                          name: `${leadName}${
+                              leadEmailNorm && viewerEmailNorm && leadEmailNorm === viewerEmailNorm
+                                  ? " (Self)"
+                                  : ""
+                          }`,
+                          status: effectiveLeadStatus,
+                          email: (data.section1?.team_lead as { email?: string } | undefined)?.email,
+                      },
+                  ]
+                : [];
+
+        const memberCards = team_members.map((m: any, idx: number) => ({
+            id: `member:${idx}:${m.id || m.participantId || m.cnic || m.email || "anon"}`,
+            name: `${m.fullName || m.name || m.email || `Student ${idx + 1}`}${
+                m.email &&
+                viewerEmailNorm &&
+                String(m.email).trim().toLowerCase() === viewerEmailNorm
+                    ? " (Self)"
+                    : ""
+            }`,
+            verified: m.verified,
+            status: effectiveParticipationStatusForReportActions(
+                m.status || (m.verified ? "approved" : "pending_approval"),
+                projectRecord,
+            ),
+            email: m.email,
+        }));
+
+        // mapProjectTeamRowsForReport drops the logged-in seat from team_members — inject Self
+        // so teammates always see their own attendance card (not only the team lead).
+        const alreadyListed =
+            !!viewerSeat?.id &&
+            (memberCards.some((c) => engagementParticipantCompareKey(c.id) === viewerSeat.id) ||
+                (viewerSeat.email &&
+                    memberCards.some(
+                        (c) =>
+                            c.email &&
+                            String(c.email).trim().toLowerCase() ===
+                                viewerSeat.email.trim().toLowerCase(),
+                    )));
+        const selfCard =
+            !iAmTeamLead && viewerSeat?.id && !alreadyListed
+                ? [
+                      {
+                          id: `member:self:${viewerSeat.id}`,
+                          name: `${viewerSeat.name || "You"} (Self)`,
+                          verified: true,
+                          status: effectiveParticipationStatusForReportActions(
+                              viewerSeat.status || "approved",
+                              projectRecord,
+                          ),
+                          email: viewerSeat.email,
+                      },
+                  ]
+                : [];
+
+        return [...leadCard, ...selfCard, ...memberCards];
+    }, [
+        isVerified,
+        participantId,
+        leadParticipationId,
+        leadEmailNorm,
+        viewerEmailNorm,
+        iAmTeamLead,
+        viewerSeat,
+        data.section1?.team_lead,
+        data.section1?.team_members,
+        team_members,
+        effectiveLeadStatus,
+        projectRecord,
+    ]);
 
     const [hasSelectedInitial, setHasSelectedInitial] = React.useState(false);
 
@@ -554,11 +654,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
     }, [internalStep]);
 
     // Hard Validation Gates
-    const canMoveToStep2 = participation_type !== null && isVerified && (!!participantId || !!data.section1.team_lead.id);
-    const canMoveToStep3 = isVerified && (!!participantId || !!data.section1.team_lead.id); // Self must be verified and have ID
+    const canMoveToStep2 = participation_type !== null && isVerified && (!!participantId || !!data.section1?.team_lead?.id);
+    const canMoveToStep3 = isVerified && (!!participantId || !!data.section1?.team_lead?.id); // Self must be verified and have ID
     const canMoveToStep4 = participation_type === 'individual' ||
         (participation_type === 'team' && team_members.length > 0 && team_members.every(m => m.verified));
-    const canMoveToStep5 = data.section1.attendance_logs.length > 0;
+    const canMoveToStep5 = attendanceLogs.length > 0;
 
     const steps = [
         { id: 1, title: 'Identity & Team Setup' },
@@ -597,23 +697,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
     }, [requiredHoursPerStudent]);
 
 
-    // Sync selectedParticipantId when participantId is fetched
-    React.useEffect(() => {
-        if (participantId && !selectedParticipantId) {
-            setSelectedParticipantId(`lead:${participantId || data.section1.team_lead.id}`);
-        }
-    }, [participantId, data.section1.team_lead.id]);
+    // Do NOT force `lead:${participantId}` here — for teammates participantId is their own seat,
+    // and fetchInitialData + the Self auto-select effect own the correct default selection.
 
 
     // Sync local states with context if context is updated from elsewhere
     React.useEffect(() => {
-        if (data.section1.team_lead.id && !participantId) {
-            setParticipantId(data.section1.team_lead.id);
+        // Only adopt team_lead.id when we have not yet loaded the viewer's own engagement seat.
+        // Teammates must keep their member participation id, not the lead's.
+        if (data.section1?.team_lead?.id && !participantId && viewerIsTeamLead !== false) {
+            setParticipantId(data.section1?.team_lead?.id);
         }
-        if (data.section1.team_lead.verified && !isVerified) {
+        if (data.section1?.team_lead?.verified && !isVerified) {
             setIsVerified(true);
         }
-    }, [data.section1.team_lead.id, data.section1.team_lead.verified]);
+    }, [data.section1?.team_lead?.id, data.section1?.team_lead?.verified, participantId, viewerIsTeamLead, isVerified]);
 
     const fetchInitialData = async () => {
         if (!queryProjectId || isFetchingRef.current) return;
@@ -623,11 +721,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
             const partRes = await authenticatedFetch(`/api/v1/engagement/my`);
             if (partRes && partRes.ok) {
                 const parts = await partRes.json();
-                console.log("[Identity] Found my records:", parts.data.map((p: any) => `${p.projectId}: ${p.id} (${p.email})`));
-                const myPart = parts.data.find(
-                    (p: any) =>
-                        p.projectId === projectIdFromUrl || p.project_id === projectIdFromUrl,
-                );
+                const partRows = Array.isArray(parts?.data) ? parts.data : [];
+                console.log("[Identity] Found my records:", partRows.map((p: any) => `${p.projectId}: ${p.id} (${p.email})`));
+                const myPart = pickPreferredEngagementSeat(partRows, String(projectIdFromUrl || ""));
 
                 if (myPart) {
                     console.log(`[Identity] Syncing correct ID for this project: ${myPart.id}`);
@@ -636,14 +732,32 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         myPart.is_team_lead === true ||
                         String(myPart.is_team_lead ?? "").toLowerCase() === "true";
 
-                    setParticipantId(myPart.id);
+                    setParticipantId(String(myPart.id));
+                    setViewerIsTeamLead(myPartIsTeamLead);
+                    setViewerSeat({
+                        id: String(myPart.id),
+                        name: String(
+                            myPart.fullName ||
+                                myPart.name ||
+                                myPart.studentName ||
+                                "You",
+                        ),
+                        email: String(myPart.email || "").trim(),
+                        status: String(myPart.status || "approved"),
+                    });
+                    if (myPart.email) {
+                        setCurrentUserEmail(String(myPart.email).trim());
+                    }
                     setSelectedParticipantId(
-                        myPartIsTeamLead ? `lead:${myPart.id}` : `member:0:${myPart.id}`,
+                        myPartIsTeamLead
+                            ? `lead:${myPart.id}`
+                            : `member:self:${myPart.id}`,
                     );
+                    setHasSelectedInitial(true);
 
                     setLeadStatus(
                         effectiveParticipationStatusForReportActions(
-                            myPart.status || 'pending_approval',
+                            String(myPart.status || "pending_approval"),
                             projectRecord,
                         ),
                     );
@@ -651,13 +765,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     syncParticipationAttendanceFlags(myPart);
 
                     // Update wizard step based on progress
-                    if (['submitted', 'verified', 'finalized'].includes(myPart.status)) {
+                    if (
+                        ["submitted", "verified", "finalized"].includes(
+                            String(myPart.status || ""),
+                        )
+                    ) {
                         setInternalStep(4);
                         setIsSubmitted(true);
                     }
 
                     if (myPartIsTeamLead) {
-                        const tlLead = data.section1.team_lead as Record<string, unknown>;
+                        const tlLead = data.section1?.team_lead as Record<string, unknown>;
                         const partCnicDigits = String(myPart?.cnic ?? "")
                             .replace(/\D/g, "")
                             .slice(0, 13);
@@ -669,23 +787,24 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 ? partCnicDigits
                                 : leadCnicDigits.length === 13
                                   ? leadCnicDigits
-                                  : partCnicDigits || leadCnicDigits || String(myPart.cnic ?? tlLead.cnic ?? "");
+                                  : partCnicDigits || leadCnicDigits || String(myPart.cnic ?? tlLead?.cnic ?? "");
 
                         updateSection('section1', {
                             team_lead: {
-                                ...data.section1.team_lead,
+                                ...(data.section1?.team_lead || {}),
                                 id: myPart.id,
                                 verified: true,
-                                name: myPart.fullName || myPart.name || myPart.studentName || data.section1.team_lead.name,
-                                fullName: myPart.fullName || myPart.name || myPart.studentName || (data.section1.team_lead as any).fullName,
+                                name: myPart.fullName || myPart.name || myPart.studentName || data.section1?.team_lead?.name,
+                                fullName: myPart.fullName || myPart.name || myPart.studentName || (data.section1?.team_lead as any).fullName,
                                 cnic: resolvedLeadCnic,
-                                email: myPart.email || (data.section1.team_lead as any).email,
-                                mobile: myPart.mobile || (data.section1.team_lead as any).mobile,
-                                universityName: myPart.universityName || (data.section1.team_lead as any).universityName,
-                                universityId: myPart.universityId || (data.section1.team_lead as any).universityId,
-                                academicProgram: myPart.academicProgram || (data.section1.team_lead as any).academicProgram,
-                                yearOfStudy: myPart.yearOfStudy || (data.section1.team_lead as any).yearOfStudy,
-                                academicIntegrationType: myPart.academicIntegrationType || (data.section1.team_lead as any).academicIntegrationType
+                                email: myPart.email || (data.section1?.team_lead as any).email,
+                                mobile: myPart.mobile || (data.section1?.team_lead as any).mobile,
+                                universityName: myPart.universityName || (data.section1?.team_lead as any).universityName,
+                                universityId: myPart.universityId || (data.section1?.team_lead as any).universityId,
+                                academicProgram: myPart.academicProgram || (data.section1?.team_lead as any).academicProgram,
+                                department: myPart.department || (data.section1?.team_lead as any).department,
+                                yearOfStudy: myPart.yearOfStudy || (data.section1?.team_lead as any).yearOfStudy,
+                                academicIntegrationType: myPart.academicIntegrationType || (data.section1?.team_lead as any).academicIntegrationType
                             }
                         });
                     }
@@ -699,6 +818,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                     // 2. Fetch all team members for this project (Unified Table)
                     let scopedTeamForAttendance: any[] | undefined;
+                    let leadParticipantIdForLogs: string | null = myPartIsTeamLead
+                        ? String(myPart.id)
+                        : null;
                     const teamRes = await authenticatedFetch(`/api/v1/engagement/project/${projectIdFromUrl}/team`);
                     if (teamRes && teamRes.ok) {
                         const teamData = await teamRes.json();
@@ -724,11 +846,31 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 participation_type: scopedMode,
                             });
                             syncParticipationAttendanceFlags(myPart, teamRows);
+
+                            // Never pass a teammate seat id as the lead — that mis-prefixes their logs as lead:*.
+                            const leadFromTeam = teamRows.find((row: unknown) => {
+                                const teamRow =
+                                    row && typeof row === "object"
+                                        ? (row as Record<string, unknown>)
+                                        : {};
+                                return (
+                                    teamRow.isTeamLead === true ||
+                                    teamRow.is_team_lead === true ||
+                                    String(teamRow.is_team_lead ?? "").toLowerCase() === "true"
+                                );
+                            }) as { id?: string } | undefined;
+                            leadParticipantIdForLogs = myPartIsTeamLead
+                                ? String(myPart.id)
+                                : String(
+                                      leadFromTeam?.id ||
+                                          data.section1?.team_lead?.id ||
+                                          "",
+                                  ) || null;
                         }
                     }
 
                     // 3. Fetch all logs (pass lead + roster snapshot: context/rawParticipants are still pre-render here)
-                    await loadAllEntries(myPart.id, scopedTeamForAttendance);
+                    await loadAllEntries(leadParticipantIdForLogs, scopedTeamForAttendance);
                 }
             }
         } catch (err) {
@@ -738,20 +880,24 @@ export default function Section1Participation({ projectData }: { projectData?: a
         }
     };
 
-    const teamVerifications = data.section1.team_members.map((m: any) => m.verified).join(',');
-    const teamMemberParticipantKeys = data.section1.team_members
+    const teamVerifications = team_members.map((m: any) => m.verified).join(',');
+    const teamMemberParticipantKeys = team_members
         .map((m: any) => String(m?.id || m?.participantId || ""))
         .join("|");
     
     // Re-fetch logs whenever the team composition or verification status changes
     React.useEffect(() => {
-        if (projectIdFromUrl && isVerified) {
+        if (!projectIdFromUrl) return;
+        // Teammates land on attendance before team_lead.verified syncs — still load their logs.
+        if (isVerified || isTeamMemberAttendanceOnly || viewerSeat?.id) {
             loadAllEntries();
         }
     }, [
         projectIdFromUrl,
-        isVerified, 
-        data.section1.team_members.length,
+        isVerified,
+        isTeamMemberAttendanceOnly,
+        viewerSeat?.id,
+        (Array.isArray(data.section1?.team_members) ? data.section1?.team_members.length : 0),
         teamVerifications,
         teamMemberParticipantKeys,
         participantId,
@@ -781,12 +927,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
             if (res && res.ok) {
                 // Calculate metrics locally since we have all the data
                 const teamSize = 1 + team_members.length;
-                const rosterIds = buildIndividualRosterFromSection1(data.section1, participantId ?? data.section1.team_lead?.id);
+                const rosterIds = buildIndividualRosterFromSection1(
+                    data.section1,
+                    participantId ?? data.section1?.team_lead?.id,
+                );
                 const calc = calculateEngagementMetrics(
-                    data.section1.attendance_logs,
+                    attendanceLogs,
                     requiredHoursPerStudent,
                     teamSize,
-                    data.section1.team_lead,
+                    data.section1?.team_lead,
                     rosterIds,
                     { includeUnreviewed: true },
                 );
@@ -801,8 +950,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     eis: calc.eis_score,
                     category: calc.engagement_category,
                     hecStatus: calc.hec_compliance,
-                    evidenceCount: data.section1.attendance_logs.filter(l => l.evidence_file).length,
-                    evidenceRatio: Math.round((data.section1.attendance_logs.filter(l => l.evidence_file).length / data.section1.attendance_logs.length) * 100),
+                    evidenceCount: attendanceLogs.filter(l => l.evidence_file).length,
+                    evidenceRatio: Math.round((attendanceLogs.filter(l => l.evidence_file).length / (attendanceLogs.length || 1)) * 100),
                     redFlags: calc.redFlags,
                     isNonCompliant: calc.isNonCompliant,
                     individual_metrics: calc.individual_metrics,
@@ -832,15 +981,22 @@ export default function Section1Participation({ projectData }: { projectData?: a
         () =>
             selfParticipantRealIds(
                 currentUserEmail,
-                data.section1.team_lead as Record<string, unknown>,
-                data.section1.team_members,
+                data.section1?.team_lead as Record<string, unknown>,
+                data.section1?.team_members,
+                leadParticipationId || null,
                 participantId,
             ),
-        [currentUserEmail, data.section1.team_lead, data.section1.team_members, participantId],
+        [
+            currentUserEmail,
+            data.section1?.team_lead,
+            data.section1?.team_members,
+            leadParticipationId,
+            participantId,
+        ],
     );
 
     const handleDeleteEntry = async (entryId: string) => {
-        const entry = data.section1.attendance_logs.find((l: any) => l.id === entryId);
+        const entry = attendanceLogs.find((l: any) => l.id === entryId);
         if (!entry) return;
 
         if (!canDeleteAttendanceEntry(entry as { participantId?: string }, selfParticipantIds, currentUserEmail)) {
@@ -865,7 +1021,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
             });
 
             if (res && res.ok) {
-                const newLogs = data.section1.attendance_logs.filter((l: any) => l.id !== entryId);
+                const newLogs = attendanceLogs.filter((l: any) => l.id !== entryId);
                 updateSection('section1', { attendance_logs: newLogs });
                 toast.success("Attendance entry removed.");
             } else {
@@ -974,14 +1130,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
             
             if (res && res.ok) {
                 const result = await res.json();
-                const rawLogs = result.data || [];
+                const rawLogs = Array.isArray(result.data) ? result.data : [];
 
+                // Prefer explicit lead / stored team_lead — never treat a teammate seat as lead.
+                const storedLeadId = data.section1?.team_lead?.id
+                    ? String(data.section1.team_lead.id)
+                    : null;
                 const resolvedLeadId =
-                    knownLeadParticipantId ?? participantId ?? data.section1.team_lead.id ?? null;
-                const teamMembersForMapping =
-                    teamMembersSnapshot !== undefined && teamMembersSnapshot !== null
-                        ? teamMembersSnapshot
-                        : data.section1.team_members;
+                    (knownLeadParticipantId ? String(knownLeadParticipantId) : null) ||
+                    storedLeadId ||
+                    (viewerIsTeamLead && participantId ? String(participantId) : null);
+                const teamMembersForMapping = Array.isArray(teamMembersSnapshot)
+                    ? teamMembersSnapshot
+                    : Array.isArray(data.section1?.team_members)
+                      ? data.section1.team_members
+                      : team_members;
 
                 // Map raw logs to prefixed IDs for frontend isolation
                 const unifiedLogs = rawLogs.map((e: any) => {
@@ -1003,8 +1166,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 updateSection('section1', { attendance_logs: uniqueLogs });
 
                 // Recalculate metrics
-                const teamSize = 1 + data.section1.team_members.length;
-                const rosterIds = buildIndividualRosterFromSection1(data.section1, participantId ?? data.section1.team_lead?.id);
+                const teamSize =
+                    1 +
+                    (Array.isArray(data.section1?.team_members)
+                        ? data.section1.team_members.length
+                        : team_members.length);
+                const rosterIds = buildIndividualRosterFromSection1(
+                    data.section1,
+                    participantId ?? data.section1?.team_lead?.id,
+                );
                 const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize, undefined, rosterIds, { includeUnreviewed: true });
                 const countedLogs = (uniqueLogs as Array<{ approval_status?: string | null; evidence_file?: unknown; evidence_url?: unknown; evidence_urls?: unknown }>).filter(
                     (log) => String(log.approval_status || "").toLowerCase() !== "rejected",
@@ -1039,16 +1209,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
 
     const liveStudentMetrics = React.useMemo(() => {
-        const logs = data.section1.attendance_logs || [];
+        const logs = attendanceLogs || [];
         const rosterIds = buildIndividualRosterFromSection1(
             data.section1,
-            participantId ?? data.section1.team_lead?.id,
+            participantId ?? data.section1?.team_lead?.id,
         );
         const calc = calculateEngagementMetrics(
             logs,
             requiredHoursPerStudent,
             1 + team_members.length,
-            data.section1.team_lead,
+            data.section1?.team_lead,
             rosterIds,
             { includeUnreviewed: true },
         );
@@ -1085,7 +1255,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
     /** Sum hours only for roster members (matches per-student cards); excludes other project participants in bulk API. */
     const collectiveProjectHours = React.useMemo(() => {
-        const logs = data.section1.attendance_logs || [];
+        const logs = attendanceLogs || [];
         const total = rawParticipants.reduce((sum, u) => {
             const perMember = logs
                 .filter((l: { participantId?: string }) =>
@@ -1095,10 +1265,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
             return sum + perMember;
         }, 0);
         return Math.round(total * 100) / 100;
-    }, [data.section1.attendance_logs, rawParticipants]);
+    }, [attendanceLogs, rawParticipants]);
 
     const isMinimumHoursMet = rawParticipants.every(u => {
-        const hours = data.section1.attendance_logs
+        const hours = attendanceLogs
             .filter((l: any) => {
                 if (!engagementParticipantIdsMatch(l.participantId, u.id)) return false;
                 // Before one-time verification, count logged (non-rejected) hours — not only approved.
@@ -1227,7 +1397,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         setInternalStep={setInternalStep}
                         isVerified={isVerified}
                         teamVerified={canMoveToStep4}
-                        hasSession={data.section1.attendance_logs.length > 0}
+                        hasSession={attendanceLogs.length > 0}
                         hoursMet={isMinimumHoursMet}
                         declared={reviewChecked.slice(0, 3).every(Boolean)}
                     />
@@ -1256,7 +1426,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     {(isVerified && !isEditingLead) ? (
                                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                                             {(() => {
-                                                const leadCnicRaw = String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "");
+                                                const leadCnicRaw = String((data.section1?.team_lead as any).cnic || "").replace(/\D/g, "");
                                                 const leadCnicOk = leadCnicRaw.length === 13;
                                                 return !leadCnicOk ? (
                                                     <div className="border-b border-[#f3d9a0] bg-[#fbf0d7] px-4 py-2.5">
@@ -1274,7 +1444,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                     <div className="min-w-0">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <h4 className="text-sm font-semibold text-slate-900">
-                                                                {(data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead"}
+                                                                {(data.section1?.team_lead as any).fullName || (data.section1?.team_lead as any).name || "Team Lead"}
                                                             </h4>
                                                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[#0e7d74]">
                                                                 <CheckCircle2 className="h-3 w-3" />
@@ -1282,19 +1452,19 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             </span>
                                                         </div>
                                                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                                                            {(data.section1.team_lead as any).university || (data.section1.team_lead as any).universityName || "Academic record linked"}
+                                                            {(data.section1?.team_lead as any).university || (data.section1?.team_lead as any).universityName || "Academic record linked"}
                                                         </p>
                                                         <p className="mt-0.5 font-mono text-[11px] text-slate-600">
                                                             CNIC:{" "}
-                                                            {String((data.section1.team_lead as any).cnic || "")
+                                                            {String((data.section1?.team_lead as any).cnic || "")
                                                                 .replace(/\D/g, "")
                                                                 .length === 13
-                                                                ? formatPakistaniCnicDisplay((data.section1.team_lead as any).cnic)
+                                                                ? formatPakistaniCnicDisplay((data.section1?.team_lead as any).cnic)
                                                                 : "—"}
                                                         </p>
                                                         {(() => {
                                                             const mobile = formatInternationalPhoneDisplay(
-                                                                String((data.section1.team_lead as any).mobile || ""),
+                                                                String((data.section1?.team_lead as any).mobile || ""),
                                                             );
                                                             if (!mobile) return null;
                                                             return (
@@ -1355,6 +1525,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         verified: true,
                                                         university: p.universityName,
                                                         degree: p.academicProgram,
+                                                        department: p.department,
                                                         year: p.yearOfStudy,
                                                         semester: p.semester,
                                                         name: p.fullName
@@ -1383,10 +1554,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         projectId={data.project_id || projectIdFromUrl || ""}
                                         members={team_members}
                                         lockAddMembers={lockTeamMemberAdd}
+                                        maxMembers={maxTeammates}
                                         canRemoveMember={canRemoveTeamMember}
                                         teamId={teamId}
                                         primaryFacultyEmail={primaryFacultyEmail}
                                         secondaryFacultyEmail={secondaryFacultyEmail}
+                                        teamLeadEmail={
+                                            String(
+                                                (team_lead as { email?: string } | undefined)?.email ||
+                                                    currentUserEmail ||
+                                                    "",
+                                            )
+                                        }
                                         onUpdateMembers={async (newMembers) => {
                                             const newType = newMembers.length > 0 ? 'team' : 'individual';
                                             updateSection('section1', {
@@ -1466,7 +1645,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         const selectedStudentName =
                             rawParticipants.find((u: { id: string }) => u.id === selectedParticipantId)
                                 ?.name || "Selected student";
-                        const participantLogs = data.section1.attendance_logs.filter(
+                        const participantLogs = attendanceLogs.filter(
                             (l: { participantId?: string }) => {
                                 if (!selectedParticipantId) return true;
                                 return engagementParticipantIdsMatch(
@@ -1533,7 +1712,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                         {rawParticipants.map((u) => {
                                             const on = u.id === selectedParticipantId;
-                                            const logsFor = data.section1.attendance_logs.filter(
+                                            const logsFor = attendanceLogs.filter(
                                                 (l: { participantId?: string }) =>
                                                     engagementParticipantIdsMatch(l.participantId, u.id),
                                             );
@@ -1889,7 +2068,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             requiredHours: requiredHoursPerStudent,
                                             individual_metrics:
                                                 liveStudentMetrics.individual_metrics ??
-                                                data.section1.metrics.individual_metrics,
+                                                data.section1?.metrics?.individual_metrics,
                                         }}
                                         isTeam={participation_type === "team"}
                                         hideIntensityHero

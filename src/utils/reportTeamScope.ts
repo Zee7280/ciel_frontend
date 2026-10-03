@@ -63,6 +63,12 @@ export function dedupeTeamMemberRowsForReport(
     return out;
 }
 
+/**
+ * Map project `/team` rows for the student report editor's "other teammates" list.
+ * Excludes the viewer's own participation id (team-setup UI already shows Self separately).
+ * Attendance "Your crew" must re-inject Self in Section1Participation — do not reuse this alone
+ * as the attendance roster for team members.
+ */
 export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId: string): ReportTeamRow[] {
     if (!Array.isArray(teamRows) || !myParticipantId) return [];
     return teamRows

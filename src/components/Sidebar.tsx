@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, type ComponentType } from "react";
 import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, type LucideProps } from "lucide-react";
@@ -9,6 +10,7 @@ import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
     CIEL_STUDENT_DASHBOARD_CACHE_EVENT,
     clearStudentDashboardCache,
+    fetchStudentDashboardData,
     readStudentDashboardCache,
 } from "@/utils/student-dashboard-fetch";
 import {
@@ -28,6 +30,7 @@ import {
 } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
+import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
 const SIDEBAR_EXPANDED_WIDTH = "280px";
@@ -51,6 +54,7 @@ function NavRow({
     collapsed,
     indent,
     impact,
+    onPrefetch,
 }: {
     href: string;
     label: string;
@@ -62,11 +66,14 @@ function NavRow({
     collapsed: boolean;
     indent?: boolean;
     impact?: boolean;
+    onPrefetch?: () => void;
 }) {
     return (
         <Link
             href={href}
             scroll
+            onPointerEnter={onPrefetch}
+            onFocus={onPrefetch}
             className={clsx(
                 "ciel-transition relative mb-[5px] flex items-center gap-[13px] rounded-[14px] py-3.5 text-left text-[14px] font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]",
                 collapsed ? "mx-1 w-[calc(100%-8px)] justify-center px-0" : "mx-[10px] w-[calc(100%-20px)] px-3.5",
@@ -215,6 +222,7 @@ export default function Sidebar() {
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();
         clearImpactSummaryCache();
+        clearPathSessionCache();
         clearFacultyScopeSession();
         router.push("/login");
     };
@@ -822,7 +830,17 @@ export default function Sidebar() {
                 ) : isStudent ? (
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
-                        <NavRow href={dashboardHref} label="Dashboard" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
+                        <NavRow
+                            href={dashboardHref}
+                            label="Dashboard"
+                            emoji="🏠"
+                            active={pathname === dashboardHref}
+                            collapsed={collapsed}
+                            onPrefetch={() => {
+                                void fetchStudentDashboardData({ redirectToLogin: false });
+                                void fetchImpactSummary({ redirectToLogin: false });
+                            }}
+                        />
                         <NavSectionLabel collapsed={collapsed}>My Impact Areas</NavSectionLabel>
                         {CIEL_PATHS.map((path) => (
                             <NavRow
@@ -834,6 +852,9 @@ export default function Sidebar() {
                                 needsAction={impactSummary?.pathsStatus?.[path.key]?.needsAction}
                                 countPill={path.key === "communityService" ? impactSummary?.activeEngagements : undefined}
                                 collapsed={collapsed}
+                                onPrefetch={() => {
+                                    prefetchStudentPathData(path.key);
+                                }}
                             />
                         ))}
                         {!collapsed && <div className="mx-0 my-4 border-t border-white/[0.09]" />}
@@ -845,6 +866,7 @@ export default function Sidebar() {
                             active={isNavActive("/dashboard/student/impact") && !searchParams.get("area")}
                             countPill={impactHistoryBadge}
                             collapsed={collapsed}
+                            onPrefetch={() => prefetchStudentImpactPortfolio()}
                         />
                         {!collapsed &&
                             [

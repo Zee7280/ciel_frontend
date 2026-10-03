@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import {
     COUNTRY_DIAL_PICKER_ENTRIES,
     DEFAULT_PHONE_COUNTRY_KEY,
+    formatNationalPhoneInput,
     formatPhoneCountryKey,
+    normalizeNationalPhoneInput,
     resolvePhoneCountryDialEntry,
 } from "@/utils/countryCallingCodes";
 
@@ -222,7 +224,7 @@ function PortalCountryPicker({
                     if (open) setFilter("");
                 }}
                 className={cn(
-                    "inline-flex h-10 w-full min-w-[7.5rem] max-w-[42vw] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-800 shadow-sm outline-none transition-colors hover:bg-slate-50/80 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[9rem] sm:max-w-[11rem]",
+                    "inline-flex h-10 w-[7.25rem] max-w-full shrink-0 items-center justify-between gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-left text-sm font-semibold text-slate-800 shadow-sm outline-none transition-colors hover:bg-slate-50/80 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:w-[8.75rem] sm:px-3",
                     buttonClassName,
                 )}
             >
@@ -251,23 +253,31 @@ export default function PhoneConnectivityRow({
     readOnly = false,
     errorText,
     maxNationalDigits = 15,
-    placeholderNational = "3001234567",
+    placeholderNational = "300 1234567",
     selectClassName,
     inputClassName,
     rowClassName,
     usePortalCountryPicker = false,
 }: PhoneConnectivityRowProps) {
     const locked = readOnly || disabled;
+    const iso2 = resolvePhoneCountryDialEntry(phoneCountryKey).iso2.toUpperCase();
+    const digitCap = iso2 === "PK" ? 10 : maxNationalDigits;
 
     const handleNational = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let v = e.target.value.replace(/\D/g, "");
-        if (maxNationalDigits > 0 && v.length > maxNationalDigits) v = v.slice(0, maxNationalDigits);
-        onNationalDigitsChange?.(v);
+        onNationalDigitsChange?.(
+            normalizeNationalPhoneInput(phoneCountryKey, e.target.value, digitCap),
+        );
     };
 
     return (
-        <div className="space-y-1.5">
-            <div className={cn("flex gap-2", usePortalCountryPicker && "items-stretch gap-3", rowClassName)}>
+        <div className="min-w-0 max-w-full space-y-1.5">
+            <div
+                className={cn(
+                    "flex min-w-0 w-full max-w-full items-stretch gap-2",
+                    usePortalCountryPicker && "gap-2.5",
+                    rowClassName,
+                )}
+            >
                 {usePortalCountryPicker ? (
                     <PortalCountryPicker
                         phoneCountryKey={phoneCountryKey}
@@ -282,7 +292,7 @@ export default function PhoneConnectivityRow({
                         disabled={locked}
                         aria-label="Country calling code"
                         className={cn(
-                            "shrink-0 min-w-[6.5rem] max-w-[40%] truncate rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-2 py-4 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-[8.5rem] sm:max-w-[11rem]",
+                            "w-[6.75rem] max-w-[38%] shrink-0 truncate rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-2 py-4 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 disabled:cursor-not-allowed disabled:opacity-70 sm:w-[8.5rem] sm:max-w-[11rem]",
                             selectClassName,
                         )}
                     >
@@ -301,14 +311,16 @@ export default function PhoneConnectivityRow({
                     inputMode="numeric"
                     autoComplete="tel-national"
                     placeholder={placeholderNational}
-                    value={nationalDigits}
+                    value={formatNationalPhoneInput(phoneCountryKey, nationalDigits)}
                     onChange={handleNational}
                     readOnly={readOnly}
                     disabled={disabled && !readOnly}
+                    aria-invalid={errorText ? true : undefined}
                     className={cn(
                         usePortalCountryPicker
-                            ? "h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-70"
-                            : "min-w-0 flex-1 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-5 py-4 font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-emerald-600 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70",
+                            ? "h-10 min-w-0 w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4"
+                            : "min-w-0 w-0 flex-1 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-3 py-4 font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-emerald-600 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70 sm:px-5",
+                        errorText && "border-red-500 focus:border-red-500",
                         inputClassName,
                     )}
                 />
