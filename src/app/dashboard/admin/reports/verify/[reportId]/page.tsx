@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft,
     ChevronLeft,
@@ -2156,7 +2157,8 @@ function AdminReportDetailPage() {
                             <div id="section8-panel" className="space-y-5">
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has evidence" value={report.section8?.has_evidence} />
-                                    <LabelValue label="Media visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Media visibility" value={mediaVisibilityTitle(report.section8?.media_visible) || "Restricted"} />
+                                    <LabelValue label="Public share permission" value={isPublicMediaVisibility(report.section8?.media_visible) ? (hasPublicSharePermission(report.section8) ? "Confirmed" : "Pending") : "Not required"} />
                                     <LabelValue label="Partner verification" value={report.section8?.partner_verification} />
                                     <LabelValue label="Partner verification type" value={report.section8?.partner_verification_type} />
                                 </div>

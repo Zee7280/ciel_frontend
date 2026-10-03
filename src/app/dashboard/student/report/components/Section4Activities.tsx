@@ -17,6 +17,7 @@ import {
 import { ACTIVITY_FAMILY_OPTIONS, GLOBAL_ACTIVITY_TAXONOMY, isOtherTaxonomyChoice } from '../utils/globalActivityTaxonomy';
 import { reportTextWordMeter } from '../utils/validation';
 import { integerFieldInput } from '@/utils/integerFieldInput';
+import { decimalFieldInput } from '@/utils/decimalFieldInput';
 import { findSdgById } from '@/utils/sdgData';
 import {
     LADDER_STEPS,
@@ -146,8 +147,14 @@ function emptyOutcome(activityId: string | null): LadderOutcome {
     };
 }
 
+/** Keeps a previously saved value selectable after an option list changes. */
+function withCurrent(list: string[], current: unknown): string[] {
+    const cur = String(current ?? '').trim();
+    return cur && !list.includes(cur) ? [...list, cur] : list;
+}
+
 function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
-    const meter = reportTextWordMeter(count, 15, 200);
+    const meter = reportTextWordMeter(count, 15, 60);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
@@ -157,7 +164,7 @@ function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
                 />
             </div>
             <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / 200 words{extra ? ` · ${extra}` : ""}
+                {count} / 60 words{extra ? ` · ${extra}` : ""}
             </p>
         </div>
     );
@@ -168,7 +175,6 @@ export default function Section4Activities() {
     const section3 = data.section3 || {};
     const section4 = data.section4 || { activity_blocks: [], project_summary: {} };
     const section5 = data.section5 || { measurable_outcomes: [] };
-    const section7 = data.section7 || {};
 
     const update = (field: string, val: any) => updateSection('section4', { [field]: val });
 
@@ -193,7 +199,7 @@ export default function Section4Activities() {
 
     const syncSummary = (blocks: any[]) => {
         const uniqueSum = blocks.reduce((sum, a) => {
-            const n = parseInt(String(a.unique_beneficiaries || a.beneficiaries_reached || ''), 10);
+            const n = parseInt(String(a.unique_beneficiaries ?? a.beneficiaries_reached ?? ''), 10);
             return sum + (Number.isFinite(n) ? n : 0);
         }, 0);
         const method = blocks.map((a) => a.reach_counting_method).find(Boolean) || '';
@@ -201,7 +207,7 @@ export default function Section4Activities() {
             activity_blocks: blocks,
             project_summary: {
                 ...(section4.project_summary || {}),
-                distinct_total_beneficiaries: uniqueSum ? String(uniqueSum) : (section4.project_summary?.distinct_total_beneficiaries || ''),
+                distinct_total_beneficiaries: uniqueSum ? String(uniqueSum) : '',
                 counting_method: method || section4.project_summary?.counting_method || '',
             },
         });
@@ -217,6 +223,14 @@ export default function Section4Activities() {
 
     const removeActivity = (index: number) => {
         const target = section4.activity_blocks[index];
+        if (
+            target?.id &&
+            outcomes.some((o) => o.activity_id === target.id && !isBlankUnattachedOutcome({ ...o, activity_id: null })) &&
+            typeof window !== 'undefined' &&
+            !window.confirm('This activity has before → after results attached. Delete them too?')
+        ) {
+            return;
+        }
         const nextBlocks = section4.activity_blocks.filter((_: any, i: number) => i !== index);
         syncSummary(nextBlocks);
         if (target?.id) {
@@ -231,37 +245,31 @@ export default function Section4Activities() {
         syncSummary(blocks);
     };
 
-    const categoriesTouched = useMemo(() => {
-        const set = new Set(
-            (section4.activity_blocks || [])
-                .map((b: any) => b.primary_category)
-                .filter(Boolean),
-        );
-        return set.size;
-    }, [section4.activity_blocks]);
-
-    const scaleClassification = useMemo(() => {
-        const count = section4.activity_blocks?.length || 0;
-        const beneficiaries = parseInt(section4.project_summary?.distinct_total_beneficiaries) || 0;
-        if (count >= 5 || beneficiaries >= 500) return 'Large-Scale / Wide-Reach';
-        if (count >= 3 || beneficiaries >= 150) return 'Moderate-Scale';
-        return 'Small-Scale / Targeted';
-    }, [section4.activity_blocks, section4.project_summary]);
-
-    const sdgMixLabel = useMemo(() => {
-        if (projectSdgs.length) return projectSdgs.map((n) => `SDG ${n}`).join(', ');
-        const goal = section3?.primary_sdg?.goal_number;
-        if (goal != null && String(goal).trim()) {
-            const n = String(goal).replace(/^SDG\s*/i, '');
-            return `SDG ${n}`;
-        }
-        return '—';
-    }, [section3?.primary_sdg?.goal_number, projectSdgs]);
-
-    const partnersCount = Array.isArray(section7?.partners) ? section7.partners.length : 0;
-
     const activities: any[] = section4.activity_blocks || [];
-    const sessionsTotal = activities.reduce((sum, a) => sum + (parseInt(a.sessions_count) || 0), 0);
+    // The ladder never writes sessions_count — fall back to delivered outputs counted in Sessions.
+    const sessionsTotal = activities.reduce((sum, a) => {
+        const own = parseInt(a.sessions_count) || 0;
+        if (own) return sum + own;
+        const fromOutputs = (a.outputs || []).reduce(
+            (n: number, o: any) => (/session/i.test(String(o?.unit || '')) ? n + (Number(o?.quantity) || 0) : n),
+            0,
+        );
+        return sum + fromOutputs;
+    }, 0);
+    const scaleActivities = activities.length;
+    const scaleOutputs = activities.reduce(
+        (sum, a) => sum + (a.outputs || []).filter((o: any) => Number(o?.quantity) > 0).length,
+        0,
+    );
+    const scaleReached = activities.reduce(
+        (sum, a) => sum + (parseInt(String(a.unique_beneficiaries ?? a.beneficiaries_reached ?? ''), 10) || 0),
+        0,
+    );
+    const scaleBroadest = activities.reduce((best: string, a) => {
+        const geo = String(a.geographic_reach || '').trim();
+        if (!geo) return best;
+        return GEOGRAPHIC_REACH_OPTIONS.indexOf(geo) >= GEOGRAPHIC_REACH_OPTIONS.indexOf(best) ? geo : best;
+    }, '') || '—';
     const outputsTotal = activities.reduce((sum, a) => sum + (a.outputs?.length || 0), 0);
     const distinctPeople = section4.project_summary?.distinct_total_beneficiaries || '';
     const countingMethod = section4.project_summary?.counting_method || '';
@@ -380,10 +388,10 @@ export default function Section4Activities() {
 
                 <div className="flex flex-wrap gap-2">
                     {[
-                        { emoji: '🛠️', label: 'Scale tier', value: scaleClassification },
-                        { emoji: '🎯', label: 'Categories touched', value: String(categoriesTouched) },
-                        { emoji: '🌍', label: 'SDG mix', value: sdgMixLabel },
-                        { emoji: '🤝', label: 'Partners involved', value: String(partnersCount) },
+                        { emoji: '🛠️', label: 'Activities', value: String(scaleActivities) },
+                        { emoji: '📦', label: 'Outputs', value: String(scaleOutputs) },
+                        { emoji: '🫶', label: 'Reached', value: String(scaleReached) },
+                        { emoji: '🗺️', label: 'Broadest reach', value: scaleBroadest },
                     ].map((card) => (
                         <div key={card.label} className="s4-scale">
                             <div className="text-base leading-none">{card.emoji}</div>
@@ -599,7 +607,7 @@ function ActivityLadderCard({
     const removeOutcome = (idx: number) => setOutcomes(outcomes.filter((_: LadderOutcome, i: number) => i !== idx));
 
     const pickMetric = (idx: number, label: string) => {
-        updateOutcome(idx, metricPickPatch(label));
+        updateOutcome(idx, metricPickPatch(label, String(activity.primary_category || '')));
     };
 
     const usedTypes = new Set((activity.outputs || []).map((o: any) => o.type).filter(Boolean));
@@ -611,8 +619,8 @@ function ActivityLadderCard({
     const benQuick = FAM_BEN_HINTS[activity.primary_category] || BENEFICIARY_CATEGORIES.slice(0, 8);
     const selectedCats: string[] = activity.beneficiary_categories || [];
     const benList = allBen
-        ? BENEFICIARY_CATEGORIES
-        : [...new Set([...benQuick, ...selectedCats])].filter((x) => BENEFICIARY_CATEGORIES.includes(x));
+        ? [...new Set([...BENEFICIARY_CATEGORIES, ...selectedCats])]
+        : [...new Set([...benQuick, ...selectedCats])];
 
     const stepSummary = (n: number) => {
         if (n === 1) {
@@ -796,7 +804,7 @@ function ActivityLadderCard({
                                             <div className={clsx('wc', descWords > 60 && 'warn')}>
                                                 {descWords} WORDS · TARGET 15–60{descWords > 60 ? ' — TRIM IT' : ''}
                                             </div>
-                                            <WordMeterBar count={descWords} extra="15–200 words required" />
+                                            <WordMeterBar count={descWords} extra="15–60 words required" />
                                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
 
                                             {activity.primary_category ? (
@@ -931,10 +939,10 @@ function ActivityLadderCard({
                                                                 </div>
                                                             )}
                                                             <Input
-                                                                inputMode="numeric"
+                                                                inputMode="decimal"
                                                                 placeholder="How many"
                                                                 value={out.quantity}
-                                                                onChange={(e) => updateOutput(idx, 'quantity', integerFieldInput(e.target.value, 7))}
+                                                                onChange={(e) => updateOutput(idx, 'quantity', decimalFieldInput(e.target.value))}
                                                                 className={clsx(inputClasses, 'px-2 text-center')}
                                                             />
                                                             <div className="relative">
@@ -1014,7 +1022,7 @@ function ActivityLadderCard({
                                                         value={activity.unique_beneficiaries || ''}
                                                         onChange={(e) => {
                                                             const v = integerFieldInput(e.target.value, 7);
-                                                            update({ unique_beneficiaries: v, beneficiaries_reached: v || activity.beneficiaries_reached });
+                                                            update({ unique_beneficiaries: v, beneficiaries_reached: v });
                                                         }}
                                                         className={inputClasses}
                                                     />
@@ -1053,7 +1061,7 @@ function ActivityLadderCard({
                                                             className={selectClasses}
                                                         >
                                                             <option value="">Choose a method…</option>
-                                                            {COUNTING_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                                            {withCurrent(COUNTING_METHODS, activity.reach_counting_method).map((m) => <option key={m} value={m}>{m}</option>)}
                                                         </select>
                                                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                                     </div>
@@ -1106,7 +1114,7 @@ function ActivityLadderCard({
                                                             className={selectClasses}
                                                         >
                                                             <option value="">Choose scale…</option>
-                                                            {GEOGRAPHIC_REACH_OPTIONS.map((opt) => (
+                                                            {withCurrent(GEOGRAPHIC_REACH_OPTIONS, activity.geographic_reach).map((opt) => (
                                                                 <option key={opt} value={opt}>{opt}</option>
                                                             ))}
                                                         </select>
@@ -1170,7 +1178,7 @@ function ActivityLadderCard({
                                                                 value={o.metric_other || ''}
                                                                 onChange={(e) => updateOutcome(idx, o.outcome_area
                                                                     ? { metric_other: e.target.value, metric: o.metric || 'Other' }
-                                                                    : { ...metricPickPatch('My own metric'), metric_other: e.target.value })}
+                                                                    : { ...metricPickPatch('My own metric', String(activity.primary_category || '')), metric_other: e.target.value })}
                                                                 className={clsx(inputClasses, 'mt-2')}
                                                             />
                                                         ) : null}
@@ -1178,20 +1186,20 @@ function ActivityLadderCard({
                                                             <div className="space-y-1.5">
                                                                 <Label className={fieldLabel}>Before <span className="reqstar">*</span></Label>
                                                                 <Input
-                                                                    inputMode="numeric"
+                                                                    inputMode="decimal"
                                                                     placeholder="e.g. 55"
                                                                     value={o.baseline || ''}
-                                                                    onChange={(e) => updateOutcome(idx, { baseline: integerFieldInput(e.target.value, 7) })}
+                                                                    onChange={(e) => updateOutcome(idx, { baseline: decimalFieldInput(e.target.value) })}
                                                                     className={inputClasses}
                                                                 />
                                                             </div>
                                                             <div className="space-y-1.5">
                                                                 <Label className={fieldLabel}>After <span className="reqstar">*</span></Label>
                                                                 <Input
-                                                                    inputMode="numeric"
+                                                                    inputMode="decimal"
                                                                     placeholder="e.g. 82"
                                                                     value={o.endline || ''}
-                                                                    onChange={(e) => updateOutcome(idx, { endline: integerFieldInput(e.target.value, 7) })}
+                                                                    onChange={(e) => updateOutcome(idx, { endline: decimalFieldInput(e.target.value) })}
                                                                     className={inputClasses}
                                                                 />
                                                             </div>
@@ -1216,7 +1224,7 @@ function ActivityLadderCard({
                                                                 </button>
                                                             ))}
                                                         </div>
-                                                        <div className="ladQ">Proof — where do these two numbers come from? <span className="reqstar">*</span></div>
+                                                        <div className="ladQ">Proof — where do these two numbers come from? <span className="reqstar">*</span><small>A short note is enough — a register, a record, a partner confirmation.</small></div>
                                                         <Input
                                                             placeholder="e.g. attendance register, 4 weeks before vs after · photos in Section 7"
                                                             value={o.measurement_explanation || ''}

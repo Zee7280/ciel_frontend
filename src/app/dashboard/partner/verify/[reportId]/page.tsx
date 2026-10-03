@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
@@ -82,6 +83,7 @@ function partnerCanSubmitDecision(report: ReportDetail): boolean {
 }
 
 interface ReportDetail {
+    ciiV2?: { final?: number; provisional?: boolean; level?: { name?: string } } | null;
     id: string;
     student: {
         id?: string;
@@ -116,6 +118,7 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    evidence_access?: { visibility?: string; can_view?: boolean; can_download?: boolean; message?: string | null } | null;
     review_package?: {
         documents?: {
             evidence?: { files?: Array<{ url?: string; name?: string; kind?: string }> };
@@ -550,7 +553,25 @@ export default function ReportDetailPage() {
                         </div>
 
                         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                            {ciiSnapshot ? (
+                            {typeof report.ciiV2?.final === 'number' ? (
+                                <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
+                                    <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">
+                                            CII index{report.ciiV2.provisional ? ' · provisional' : ''}
+                                        </p>
+                                        <p className="text-2xl font-black tabular-nums text-slate-900">
+                                            {Math.round(report.ciiV2.final)}
+                                            <span className="text-base font-semibold text-slate-500">/100</span>
+                                        </p>
+                                        {report.ciiV2.level?.name ? (
+                                            <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
+                                                {report.ciiV2.level.name}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : ciiSnapshot ? (
                                 <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
                                     <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
                                     <div>
@@ -1223,7 +1244,8 @@ export default function ReportDetailPage() {
                                 </div>
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has Evidence" value={report.section8?.has_evidence} />
-                                    <LabelValue label="Media Visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Media Visibility" value={mediaVisibilityTitle(report.section8?.media_visible) || "Restricted"} />
+                                    <LabelValue label="Public share permission" value={isPublicMediaVisibility(report.section8?.media_visible) ? (hasPublicSharePermission(report.section8) ? "Confirmed" : "Pending") : "Not required"} />
                                     <LabelValue label="Partner Verification" value={report.section8?.partner_verification} />
                                     <LabelValue label="Partner Verification Type" value={report.section8?.partner_verification_type} />
                                 </div>
@@ -1255,7 +1277,7 @@ export default function ReportDetailPage() {
                                             name: String(file.name || "Evidence file"),
                                             kind: file.kind || classifyEvidenceGalleryKind(String(file.url || ""), String(file.name || "")),
                                         }))}
-                                        emptyLabel="No evidence files uploaded"
+                                        emptyLabel={report.evidence_access?.can_view === false ? `🔒 ${report.evidence_access.message || "Evidence verified — not publicly available"}` : "No evidence files uploaded"}
                                     />
                                 </div>
                             </div>

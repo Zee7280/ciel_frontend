@@ -293,6 +293,7 @@ export interface CiiV2Result {
     bonusWhy?: { effort?: string; resources?: string; partners?: string };
     integrityWhy?: string;
     redFlags?: string[];
+    integrityChecks?: Array<{ level: "hold" | "review"; title: string; detail: string; source?: string }>;
     needsAdminReview?: boolean;
     studentFeedback?: string;
     frameworkVersion?: string;

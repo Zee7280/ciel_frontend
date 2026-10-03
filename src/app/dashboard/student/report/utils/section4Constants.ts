@@ -146,15 +146,39 @@ export const OUTPUT_TYPES = [
 export const UNIVERSAL_UNITS = [
     "Individuals / People", "Households", "Sessions", "Trainings", "Workshops", "Kits", "Items",
     "Packages", "Meals", "Kg", "Tons", "Liters", "Facilities", "Classrooms", "Systems", "Platforms",
-    "Reports", "Surveys", "Assessments", "Partnerships", "Volunteers", "PKR", "USD", "Hectares / Area Units", "Other"
+    "Reports", "Surveys", "Assessments", "Partnerships", "Volunteers", "PKR", "USD", "Hectares / Area Units",
+    "Trees", "Rooms / Classrooms", "Kilograms", "Hours", "Days", "Devices", "Books / Materials", "Meals / Packages",
+    "Applications / Platforms", "Other"
 ];
 
 export const BENEFICIARY_CATEGORIES = [
-    "Children", "Youth", "Women", "Men", "Elderly", "Students", "Teachers / Educators",
-    "Workers / Laborers", "Farmers / Agricultural Communities", "Entrepreneurs / Small Business Owners",
-    "Persons with Disabilities", "Low-Income Households", "Patients / Health-Service Users",
-    "Refugees / Displaced Populations", "Minority / Marginalized Communities", "Institutions / Organizations",
-    "General Community", "Other"
+    "Infants / Early Childhood",
+    "Children",
+    "Adolescents",
+    "Youth",
+    "Students / Learners",
+    "Teachers / Educators",
+    "Women / Girls",
+    "Men / Boys",
+    "Older Persons",
+    "Persons with Disabilities",
+    "Patients / Service Users",
+    "Caregivers / Families",
+    "Low-income Households",
+    "Rural Communities",
+    "Urban / Informal-Settlement Communities",
+    "Refugees / Displaced Persons / Migrants",
+    "Minority / Marginalized Communities",
+    "Farmers / Fishers / Livestock Keepers",
+    "Workers / Job Seekers",
+    "Entrepreneurs / Small Businesses",
+    "Community Organizations / NGOs",
+    "Schools / Universities / Institutions",
+    "Public Agencies / Service Providers",
+    "Online / Digital Users",
+    "General Public",
+    "Environment / Ecosystem / Wildlife",
+    "Other…",
 ];
 
 export const RELEVANCE_TYPES = ["Primary Target Group", "Secondary Target Group", "Indirect Beneficiary Group"];
@@ -165,8 +189,19 @@ export const OVERLAP_STATUSES = [
 ];
 
 export const GEOGRAPHIC_REACH_OPTIONS = [
-    "Single Site", "Local Community", "Multi-Community", "City-Wide", "District-Wide",
-    "Province / State-Wide", "National", "International", "Digital", "Hybrid"
+    "Single Room / Facility",
+    "Campus / School / University",
+    "Single Site",
+    "Neighbourhood / Local Area",
+    "Village / Rural Community",
+    "Multi-community",
+    "City / Municipality",
+    "District / County",
+    "Province / State / Region",
+    "National",
+    "Multi-country / Regional",
+    "Global / Online",
+    "Hybrid Physical + Digital",
 ];
 
 export const GEOGRAPHIC_SUB_CATEGORIES: Record<string, string[]> = {
@@ -177,6 +212,20 @@ export const GEOGRAPHIC_SUB_CATEGORIES: Record<string, string[]> = {
 };
 
 export const COUNTING_METHODS = [
-    "Verified registration / list", "Partner-provided records", "Distribution / service logs",
-    "Manual counting by team", "Estimate based on activity records", "Mixed method", "Other"
+    "Unique registration / participant IDs",
+    "Attendance register / sign-in",
+    "Service / clinical record",
+    "Distribution log",
+    "Ticket / QR / digital check-in",
+    "Partner administrative record",
+    "Survey respondent list",
+    "Digital platform analytics",
+    "Sensor / GIS / environmental measurement",
+    "Financial / transaction record",
+    "Photo / video-supported count",
+    "Manual tally by team",
+    "Household-level count",
+    "Estimate with documented method",
+    "Mixed / triangulated method",
+    "Other…",
 ];

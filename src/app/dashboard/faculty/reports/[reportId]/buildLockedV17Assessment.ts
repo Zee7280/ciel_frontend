@@ -1,3 +1,4 @@
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle, normalizeMediaVisibility } from "@/app/dashboard/student/report/utils/mediaVisibility";
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 import type { LockedV17Assess, LockedV17DetailBlock, LockedV17FieldRow, LockedV17FlowNode } from "./buildLockedV17Package";
 
@@ -205,8 +206,11 @@ function narrativeOf(fields: LockedV17FieldRow[], headline: string): string {
 }
 
 function ethicsOk(s8: ReportData["section8"] | undefined): boolean {
-    const ethics = s8?.ethical_compliance;
-    return Boolean(ethics?.authentic && ethics?.informed_consent && ethics?.no_harm && ethics?.privacy_respected);
+    if (!s8) return false;
+    const vis = normalizeMediaVisibility(s8.media_visible);
+    if (!vis) return false;
+    if (vis === "public") return hasPublicSharePermission(s8);
+    return true;
 }
 
 function memberHours(data: ReportData, required: number): Array<{ name: string; hours: number; met: boolean }> {
@@ -470,18 +474,18 @@ export function buildLockedV17DetailAndAssessment(
                 field("Additional evidence decision", s8?.has_evidence === "yes" ? "Yes — additional evidence attached" : s8?.has_evidence === "no" ? "No additional evidence" : ""),
                 field("Additional evidence files", evidenceN ? `${evidenceN} evidence item${evidenceN === 1 ? "" : "s"}` : "", s8?.has_evidence === "yes"),
                 field("What evidence shows", txt(s8?.description), s8?.has_evidence === "yes"),
-                field("Ethics / consent confirmation", consentOk ? "Confirmed" : ""),
-                field("Evidence visibility", txt(s8?.media_visible)),
+                field("Public share permission", isPublicMediaVisibility(s8?.media_visible) ? (hasPublicSharePermission(s8) ? "Confirmed" : "") : "Not required"),
+                field("Evidence visibility", mediaVisibilityTitle(s8?.media_visible) || txt(s8?.media_visible)),
             ],
             flow: [
                 { k: "CLAIMS", v: "Report record" },
                 { k: "EVIDENCE", v: `${evidenceN} item(s)` },
-                { k: "ETHICS", v: consentOk ? "Confirmed" : "Pending" },
+                { k: "VISIBILITY", v: mediaVisibilityTitle(s8?.media_visible) || "Restricted" },
             ],
             evidence: `${evidenceN} item(s) available; visibility and consent remain distinct from verification strength.`,
             extraLimit: evidenceN ? undefined : "No evidence files are currently available to substantiate report claims.",
             extraHold: !consentOk,
-            bullets: [`${evidenceN} evidence item${evidenceN === 1 ? "" : "s"}`, consentOk ? "Ethics / consent confirmation is recorded." : "Ethics / consent confirmation is pending."],
+            bullets: [`${evidenceN} evidence item${evidenceN === 1 ? "" : "s"}`, consentOk ? "Evidence visibility is recorded." : "Evidence visibility or public-share permission is pending."],
         },
         {
             n: "09",
@@ -665,7 +669,7 @@ export function buildLockedV17DetailAndAssessment(
             limits: [
                 evidenceN ? "" : "0 evidence items currently support the report.",
                 s8?.has_evidence ? "" : "Auto-collected evidence and additional-evidence decision are missing.",
-                consentOk && txt(s8?.media_visible) ? "" : "Ethics/consent confirmation and evidence visibility are missing.",
+                consentOk && txt(s8?.media_visible) ? "" : "Evidence visibility or public-share permission is missing.",
             ].filter(Boolean),
             improvements: [
                 "Attach evidence that supports the most important claims rather than uploading repetitive files.",

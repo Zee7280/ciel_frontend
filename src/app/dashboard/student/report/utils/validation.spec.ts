@@ -82,13 +82,8 @@ const COMPLETE = {
     section7: { has_partners: "no" },
     section8: {
         has_evidence: "no",
-        media_visible: "internal",
-        ethical_compliance: {
-            authentic: true,
-            informed_consent: true,
-            no_harm: true,
-            privacy_respected: true,
-        },
+        media_visible: "restricted",
+        public_share_permission: false,
     },
     section9: {
         academic_integration: "Course-linked assignment",
@@ -191,10 +186,26 @@ assert.equal(
         evidence_files: ["https://example.com/a.jpg"],
         evidence_types: ["Photo"],
         description: words(12),
-        media_visible: "internal",
-        ethical_compliance: COMPLETE.section8.ethical_compliance,
+        media_visible: "restricted",
     }).isValid,
     true,
+);
+assert.equal(
+    validateSection8({
+        has_evidence: "no",
+        media_visible: "public",
+    }).isValid,
+    false,
+    "public evidence needs share permission",
+);
+assert.equal(
+    validateSection8({
+        has_evidence: "no",
+        media_visible: "public",
+        public_share_permission: true,
+    }).isValid,
+    true,
+    "public evidence with permission passes",
 );
 
 assert.equal(validateSection9({}).isValid, false);

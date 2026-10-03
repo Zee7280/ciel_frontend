@@ -631,7 +631,7 @@ export default function Section5Outcomes() {
         const before = field === "story_before" ? val : section5.story_before || "";
         const now = field === "story_now" ? val : section5.story_now || "";
         const because = field === "story_because" ? val : section5.story_because || "";
-        const composed = `Before our project, ${lowerFirst(before) || "…"}. Now, ${lowerFirst(now) || "…"}. We can see this change because ${lowerFirst(because) || "…"}.`;
+        const composed = `Before our project, ${lowerFirst(before) || "…"}. Now, ${lowerFirst(now) || "…"}. We know because ${lowerFirst(because) || "…"}.`;
         const isStillAuto = !section5.observed_change || section5.observed_change === lastAutoStoryRef.current;
         const patch: Record<string, string> = { [field]: val };
         if (isStillAuto && (before || now || because)) {
@@ -768,7 +768,7 @@ export default function Section5Outcomes() {
                         <div className="space-y-1">
                             <Label className={fieldLabel}>Now…</Label>
                             <Input
-                                placeholder="e.g. 120 children learn in two renovated, equipped classrooms"
+                                placeholder="e.g. 120 children learn in a renovated, equipped classroom"
                                 value={section5.story_now || ""}
                                 onChange={e => updateStoryBlank("story_now", e.target.value)}
                                 className={inputClasses}
@@ -794,7 +794,7 @@ export default function Section5Outcomes() {
                             and what beneficiaries can now do differently.
                         </p>
                         <Textarea
-                            placeholder="Explain the direction and nature of change (20–200 words)…"
+                            placeholder="Explain the direction and nature of change (40–100 words)…"
                             className={clsx(textareaClasses, "min-h-[160px]")}
                             value={section5.observed_change}
                             onChange={e => update("observed_change", e.target.value)}

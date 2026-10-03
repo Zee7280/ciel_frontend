@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ReportData } from "../context/ReportContext";
+import { mediaVisibilityTitle } from "../utils/mediaVisibility";
 import { resolveReportCii } from "../utils/resolveReportCii";
 import { effectiveHoursFromLog } from "../utils/engagementMetrics";
 import { findSdgById } from "@/utils/sdgData";
@@ -1127,7 +1128,7 @@ export function V17ImpactFlashcard({
                                                     <b>{item.cap}</b>
                                                     <small>{item.section}</small>
                                                     <small>
-                                                        {kind} · INSTITUTIONAL
+                                                        {kind} · {mediaVisibilityTitle(data.section8?.media_visible) || "Restricted"}
                                                     </small>
                                                     <span className="state">{evidenceState}</span>
                                                     <div className="c22-file-actions">

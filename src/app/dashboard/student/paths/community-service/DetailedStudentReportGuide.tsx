@@ -226,9 +226,9 @@ const SECTIONS: GuideBlock[] = [
         icon: "📸",
         title: "Evidence",
         short: "Evidence",
-        blurb: "Auto-collected proof plus any additional files, ethics confirmation and visibility choice.",
+        blurb: "Auto-collected proof plus any additional files, and who can see the evidence.",
         tag: "BACK EVERY IMPORTANT CLAIM",
-        purpose: "Make the report independently checkable while protecting people’s dignity and privacy. Evidence can remain Institutional or Private and still be fully useful for verification.",
+        purpose: "Make the report independently checkable while protecting people’s dignity and privacy. Restricted (default) or Private evidence is still fully useful for verification and is not shown publicly.",
         keywords: "evidence photos attendance consent privacy public institutional private survey results feedback confirmation documents ethics dignity verification",
         leftTitle: "Evidence that helps",
         left: [
@@ -251,7 +251,7 @@ const SECTIONS: GuideBlock[] = [
         exampleTitle: "EXCELLENT EVIDENCE DESCRIPTION",
         example: "“Attendance sheet — confirms 40 unique participants across three sessions.” / “Partner letter — confirms classroom access and 18 verified student service hours.” / “Before/after photos — document lighting and display improvements.”",
         weak: "Upload 20 photos with no explanation.",
-        strong: "Use fewer, relevant items and state what each one proves. Choose Public only when consent and policy allow it.",
+        strong: "Use fewer, relevant items and state what each one proves. Choose Public only when you have permission to share it publicly.",
         checks: ["✓ Relevant proof", "✓ Claim explained", "✓ Consent", "✓ Privacy", "✓ Correct visibility", "✓ Identifiers blurred if needed"],
     },
     {

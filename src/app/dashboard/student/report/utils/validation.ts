@@ -3,6 +3,9 @@
  * Updated for the 11-Section Community Engagement Report
  */
 
+import { outputRowOk, step3Ok, stepNeedText } from './section4Ladder';
+import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
+
 export interface ValidationError {
     field: string;
     message: string;
@@ -32,7 +35,9 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     observed_change: { min: 40, max: 100 },
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
-    description: { min: 15, max: 200 },
+    description: { min: 15, max: 60 },
+    /** Section 4 'Proof' one-liner (where the before/after numbers come from). */
+    measurement_explanation: { min: 3, max: 200 },
     /** Step 7 extra-evidence caption — UI meter is 10–45 words. */
     evidence_caption: { min: 10, max: 45 },
 };
@@ -315,6 +320,19 @@ export function validateSection4(data: any): ValidationResult {
 
             pushWordRange(errors, `activity_blocks.${index}.description`, row.description, `Activity ${index + 1} description`);
 
+            // Ladder-built activities (carry ladder_ui) must pass every ladder step, exactly like the
+            // wizard's own step ticks; legacy rows keep the lighter rule below.
+            if (row.ladder_ui && typeof row.ladder_ui === 'object') {
+                const outs = asList(row.outputs);
+                if (!outs.length || !outs.every((o: any) => outputRowOk(asObj(o)))) {
+                    errors.push({ field: `activity_blocks.${index}.outputs`, message: `Activity ${index + 1}: Each delivered item needs a number above 0 and a unit` });
+                }
+                if (!step3Ok(row)) {
+                    errors.push({ field: `activity_blocks.${index}.beneficiaries_reached`, message: `Activity ${index + 1}: ${stepNeedText(row, 3) || 'Finish "Who did it serve, and how many?"'}` });
+                }
+                return;
+            }
+
             const hasOutput = asList(row.outputs).some((out: any) => String(out?.title || '').trim() && String(out?.quantity ?? '').trim());
             const hasReach = String(row.beneficiaries_reached ?? '').trim() && String(row.unique_beneficiaries ?? row.beneficiaries_reached ?? '').trim();
             if (!hasOutput && !hasReach) {
@@ -484,12 +502,9 @@ export function validateSection8(data: any): ValidationResult {
         pushWordRange(errors, 'description', data.description, 'What does your evidence show?', true, 'evidence_caption');
     }
 
-    if (!data.media_visible) {
-        errors.push({ field: 'media_visible', message: 'Choose Public, Institutional, or Private' });
-    }
-    const ethics = data.ethical_compliance || {};
-    if (!ethics.authentic || !ethics.informed_consent || !ethics.no_harm || !ethics.privacy_respected) {
-        errors.push({ field: 'ethical_compliance', message: 'Confirm this evidence was gathered responsibly' });
+    const visibility = resolveMediaVisibility(data.media_visible);
+    if (isPublicMediaVisibility(visibility) && !hasPublicSharePermission(data)) {
+        errors.push({ field: 'public_share_permission', message: 'I have permission to publicly share this evidence.' });
     }
     return { isValid: errors.length === 0, errors };
 }

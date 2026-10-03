@@ -25,14 +25,22 @@ export const SURE_OPTIONS = [
     { n: 4, t: "People told us or we observed it — we cannot prove our project caused it", cf: "Observed" },
 ] as const;
 
+/** Every unit returned here must exist in UNIVERSAL_UNITS (section4Constants). */
 const UNIT_RULES: Array<[RegExp, string]> = [
-    [/sessions?|trainings?|workshops?/i, "Sessions"],
+    [/participant-hours|volunteer hours|hours?$/i, "Hours"],
+    [/trees?/i, "Trees"],
+    [/sessions?|trainings?|workshops?|tutoring|mentoring|counsel|screenings?|consultations?|performances?|exhibitions?|interviews?|focus groups|assessments?|evaluations?/i, "Sessions"],
+    [/meals?|packages|food packages/i, "Meals / Packages"],
+    [/books?|learning materials|materials/i, "Books / Materials"],
     [/kits?/i, "Kits"],
-    [/meals?|packages/i, "Packages"],
-    [/books?|materials/i, "Items"],
-    [/hours?/i, "Volunteer Hours"],
-    [/trees?/i, "Items"],
-    [/people|students?|participants/i, "Individuals / People"],
+    [/devices?/i, "Devices"],
+    [/rooms?|classrooms?/i, "Rooms / Classrooms"],
+    [/facilit|installations?/i, "Facilities"],
+    [/waste|emissions/i, "Kilograms"],
+    [/households?/i, "Households"],
+    [/people|individuals|students?|learners?|patients?|participants|volunteers|farmers?|teachers?/i, "Individuals / People"],
+    [/reports?|datasets?|surveys?|dashboards?|maps/i, "Reports"],
+    [/apps?|platforms?|systems?|tools?/i, "Applications / Platforms"],
     [/events?/i, "Workshops"],
 ];
 
@@ -80,7 +88,7 @@ export function step1Ok(a: Record<string, unknown>): boolean {
     if (a.primary_category && !isOtherLike(a.primary_category) && !sub) return false;
     if (isOtherLike(a.sub_category) && !String(a.other_sub_category_text || "").trim()) return false;
     const w = ladderWordCount(String(a.description || ""));
-    return w >= 15 && w <= 200;
+    return w >= 15 && w <= 60;
 }
 
 export function step2Ok(a: Record<string, unknown>): boolean {
@@ -92,7 +100,7 @@ export function step3Ok(a: Record<string, unknown>): boolean {
     const cats = Array.isArray(a.beneficiary_categories) ? a.beneficiary_categories.map(String) : [];
     const geo = String(a.geographic_reach || "").trim();
     if (a.serves_beneficiaries === false) return cats.length > 0 && !!geo;
-    const unique = String(a.unique_beneficiaries || a.beneficiaries_reached || "").trim();
+    const unique = String(a.unique_beneficiaries ?? a.beneficiaries_reached ?? "").trim();
     if (!numOk(unique)) return false;
     if (!String(a.overlap_status || "").trim()) return false;
     const uniqueLike = /mostly unique/i.test(String(a.overlap_status || ""));
@@ -113,7 +121,7 @@ export function stepNeedText(a: Record<string, unknown>, step: number): string {
         if (!String(a.title || "").trim()) return "Add a title.";
         const w = ladderWordCount(String(a.description || ""));
         if (w < 15) return `Description needs ${15 - w} more word${15 - w === 1 ? "" : "s"}.`;
-        if (w > 200) return "Trim the description to 200 words.";
+        if (w > 60) return "Trim the description to 60 words.";
         return "";
     }
     if (step === 2) {
@@ -126,7 +134,7 @@ export function stepNeedText(a: Record<string, unknown>, step: number): string {
             const cats = Array.isArray(a.beneficiary_categories) ? a.beneficiary_categories : [];
             return cats.length ? "Choose where it happened." : "Tap who or what benefited.";
         }
-        if (!numOk(a.unique_beneficiaries || a.beneficiaries_reached)) return "Enter how many different people.";
+        if (!numOk(a.unique_beneficiaries ?? a.beneficiaries_reached)) return "Enter how many different people.";
         if (!String(a.overlap_status || "").trim()) return "Answer the overlap question.";
         if (!/mostly unique/i.test(String(a.overlap_status || "")) && !String(a.overlap_note || "").trim()) {
             return "Say who overlaps.";
@@ -198,6 +206,9 @@ export function matchedProjectSdgs(activity: Record<string, unknown>, projectSdg
     return projectSdgs.filter((n) => sug.includes(n));
 }
 
+/** Proof is a one-line source note (HTML: just non-empty); keep it light but not a single word. */
+export const PROOF_MIN_WORDS = 3;
+
 export type LadderOutcome = {
     id?: string;
     activity_id?: string | null;
@@ -236,7 +247,7 @@ export function outcomeLadderOk(o: LadderOutcome | Record<string, unknown> | nul
     // Mirror validateSection5 so step 4 never shows "done" for a report that cannot submit.
     if (!String(row.outcome_area || "").trim()) return false;
     const proofWords = String(row.measurement_explanation || "").trim().split(/\s+/).filter(Boolean).length;
-    if (proofWords < 20) return false;
+    if (proofWords < PROOF_MIN_WORDS) return false;
     return true;
 }
 
@@ -264,16 +275,51 @@ export const FAM_METRIC_HINTS: Record<string, string[]> = {
     "🤝 Community Mobilization & Volunteering": ["Active volunteers", "Community groups formed"],
 };
 
-export function metricPickPatch(label: string): Record<string, unknown> {
-    const pct = /%|rate|score/i.test(label);
+/** Activity family → outcome area/sub-category (values from Section5Outcomes `outcomeHierarchy`). */
+const FAMILY_OUTCOME_AREA: Array<[RegExp, string, string]> = [
+    [/Education|Digital|Research/i, "4. Knowledge / Skills Improvement", "Literacy / Numeracy"],
+    [/Health|Mental/i, "8. Health & Well-being", "Physical Health Improvement"],
+    [/WASH/i, "1. Access Improvement", "Access to Clean Water / Sanitation"],
+    [/Food/i, "1. Access Improvement", "Access to Food / Nutrition"],
+    [/Agriculture|Livelihood/i, "6. Economic Improvement", "Household Income Support"],
+    [/Environment/i, "9. Environmental Improvement", "Waste Management"],
+    [/Built Environment|Infrastructure/i, "10. Infrastructure / Facility Development", "Community Space Development"],
+    [/Humanitarian|Relief/i, "2. Service Delivery / Immediate Relief", "Food Distribution"],
+    [/Community|Volunteer/i, "13. Inclusion / Participation", "Community Participation"],
+];
+
+/** Label-level overrides: what the number actually measures wins over the family. */
+const LABEL_OUTCOME_AREA: Array<[RegExp, string, string]> = [
+    [/tree|waste|kg\b|emission|water saved/i, "9. Environmental Improvement", "Waste Management"],
+    [/PKR|income|yield|revenue|saving|employ/i, "6. Economic Improvement", "Household Income Support"],
+];
+
+function metricUnitFor(label: string): string {
+    if (/%|rate/i.test(label)) return "%";
+    if (/\bkg\b|waste/i.test(label)) return "Kilograms";
+    if (/PKR/i.test(label)) return "PKR";
+    if (/score/i.test(label)) return "Score";
+    if (/trees?/i.test(label)) return "Trees";
+    if (/households?/i.test(label)) return "Households";
+    if (/classrooms?|facilit|devices?|datasets?|surveys?|groups?|businesses|volunteers/i.test(label)) {
+        return /classrooms?/i.test(label) ? "Rooms / Classrooms" : "Items";
+    }
+    return "Individuals / People";
+}
+
+export function metricPickPatch(label: string, family = ""): Record<string, unknown> {
     const custom = /own metric|other/i.test(label);
+    const pct = /%|rate|score/i.test(label);
+    const byLabel = LABEL_OUTCOME_AREA.find(([re]) => re.test(label));
+    const byFamily = FAMILY_OUTCOME_AREA.find(([re]) => re.test(family));
+    const [, area, sub] = byLabel || byFamily || [null, "1. Access Improvement", "Access to Information"];
     return {
         metric: custom ? "Other" : pct ? "Percentage Improvement (%)" : "Number of Individuals",
         metric_other: custom ? "" : label,
         metric_category: custom ? "🔹 Other" : pct ? "🔹 Percentage-Based (Advanced)" : "🔹 People-Based Metrics",
-        outcome_area: pct ? "4. Knowledge / Skills Improvement" : "1. Access Improvement",
-        outcome_sub_category: pct ? "Awareness Sessions" : "Access to Education",
-        unit: pct ? "%" : "Individuals / People",
+        outcome_area: area,
+        outcome_sub_category: sub,
+        unit: custom ? "Count" : metricUnitFor(label),
     };
 }
 
@@ -303,12 +349,26 @@ export const FAM_OUTPUT_HINTS: Record<string, string[]> = {
 };
 
 export const FAM_BEN_HINTS: Record<string, string[]> = {
-    "📚 Education & Learning": ["Students", "Children", "Youth", "Teachers / Educators"],
-    "🩺 Health & Clinical Outreach": ["Patients / Health-Service Users", "Children", "Women", "Low-Income Households"],
-    "🧠 Mental Health & Psychosocial Support": ["Students", "Youth", "Women"],
-    "💧 WASH — Water, Sanitation & Hygiene": ["Low-Income Households", "Children", "Women", "Students"],
-    "🍲 Food, Nutrition & Food Security": ["Low-Income Households", "Children", "General Community"],
-    "🌿 Environment, Climate & Biodiversity": ["General Community", "Youth", "Students"],
-    "💼 Livelihoods, Business & Financial Inclusion": ["Youth", "Women", "Entrepreneurs / Small Business Owners"],
-    "📦 Humanitarian, Relief & Resource Distribution": ["Low-Income Households", "Children", "Women", "Refugees / Displaced Populations"],
+    "📚 Education & Learning": ["Students / Learners", "Children", "Adolescents", "Youth", "Teachers / Educators", "Schools / Universities / Institutions", "Caregivers / Families"],
+    "🩺 Health & Clinical Outreach": ["Patients / Service Users", "Children", "Women / Girls", "Older Persons", "Caregivers / Families", "Low-income Households", "Rural Communities"],
+    "🧠 Mental Health & Psychosocial Support": ["Students / Learners", "Adolescents", "Youth", "Caregivers / Families", "Patients / Service Users", "Women / Girls"],
+    "💧 WASH — Water, Sanitation & Hygiene": ["Low-income Households", "Rural Communities", "Children", "Women / Girls", "Students / Learners", "Schools / Universities / Institutions"],
+    "🍲 Food, Nutrition & Food Security": ["Low-income Households", "Children", "Caregivers / Families", "Older Persons", "Infants / Early Childhood", "Urban / Informal-Settlement Communities"],
+    "🌾 Agriculture, Rural & Animal Support": ["Farmers / Fishers / Livestock Keepers", "Rural Communities", "Low-income Households", "Environment / Ecosystem / Wildlife"],
+    "🌿 Environment, Climate & Biodiversity": ["Environment / Ecosystem / Wildlife", "General Public", "Students / Learners", "Youth", "Rural Communities", "Urban / Informal-Settlement Communities"],
+    "🏗️ Built Environment, Infrastructure & Engineering": ["Students / Learners", "Children", "Schools / Universities / Institutions", "Persons with Disabilities", "Low-income Households", "General Public"],
+    "💻 Digital, Data & Technology": ["Online / Digital Users", "Students / Learners", "Youth", "Community Organizations / NGOs", "Public Agencies / Service Providers", "Entrepreneurs / Small Businesses"],
+    "🔬 Research, Citizen Science & Evidence": ["Community Organizations / NGOs", "Public Agencies / Service Providers", "General Public", "Schools / Universities / Institutions", "Environment / Ecosystem / Wildlife"],
+    "⚖️ Legal, Rights & Justice": ["Women / Girls", "Low-income Households", "Refugees / Displaced Persons / Migrants", "Minority / Marginalized Communities", "Children", "Workers / Job Seekers"],
+    "🏛️ Governance, Policy & Public Systems": ["Public Agencies / Service Providers", "General Public", "Community Organizations / NGOs", "Urban / Informal-Settlement Communities"],
+    "💼 Livelihoods, Business & Financial Inclusion": ["Entrepreneurs / Small Businesses", "Workers / Job Seekers", "Women / Girls", "Youth", "Low-income Households"],
+    "♿ Inclusion, Protection & Social Support": ["Persons with Disabilities", "Older Persons", "Refugees / Displaced Persons / Migrants", "Minority / Marginalized Communities", "Children", "Women / Girls"],
+    "🎨 Arts, Culture, Heritage & Creative Practice": ["Youth", "Children", "General Public", "Students / Learners", "Minority / Marginalized Communities"],
+    "📣 Media, Communication & Advocacy": ["General Public", "Online / Digital Users", "Youth", "Students / Learners", "Community Organizations / NGOs"],
+    "⚽ Sports, Recreation & Well-being": ["Children", "Adolescents", "Youth", "Persons with Disabilities", "Women / Girls"],
+    "🤝 Community Mobilization & Volunteering": ["General Public", "Youth", "Community Organizations / NGOs", "Rural Communities", "Urban / Informal-Settlement Communities"],
+    "📦 Humanitarian, Relief & Resource Distribution": ["Low-income Households", "Refugees / Displaced Persons / Migrants", "Children", "Women / Girls", "Older Persons", "Rural Communities"],
+    "💰 Fundraising & Resource Mobilization": ["Community Organizations / NGOs", "Schools / Universities / Institutions", "Low-income Households", "General Public"],
+    "🔗 Partnership & Network Development": ["Community Organizations / NGOs", "Schools / Universities / Institutions", "Public Agencies / Service Providers", "Entrepreneurs / Small Businesses"],
+    "🚀 Innovation, Design & Prototyping": ["General Public", "Students / Learners", "Entrepreneurs / Small Businesses", "Persons with Disabilities", "Community Organizations / NGOs"],
 };

@@ -5,6 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "../utils/mediaVisibility";
 import CertificateView from "./CertificateView";
 import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
 import CIIDashboardMeter from "./CIIDashboardMeter";
@@ -492,11 +493,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             check: Boolean(section8.partner_verification),
         },
         {
-            label: "Ethical safeguards",
-            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "Passed" : "Pending",
-            desc: "CIEL ethical declaration completed.",
+            label: "Evidence visibility",
+            status: isPublicMediaVisibility(section8.media_visible) && !hasPublicSharePermission(section8) ? "Pending" : "Passed",
+            desc: isPublicMediaVisibility(section8.media_visible)
+                ? "Public share permission recorded."
+                : `${mediaVisibilityTitle(section8.media_visible) || "Restricted"} — not shown publicly.`,
             icon: ShieldAlert,
-            check: Object.values(section8.ethical_compliance || {}).every(Boolean),
+            check: !(isPublicMediaVisibility(section8.media_visible) && !hasPublicSharePermission(section8)),
         },
         {
             label: "Sustainability proof",

@@ -437,6 +437,21 @@ export default function CommunityCiiAnalyser({
                 </div>
             </div>
 
+            {ciiV2?.integrityChecks?.length ? (
+                <div className="fx23-method" role="region" aria-label="Integrity checks">
+                    <p>
+                        <b>Integrity checks (admin only)</b>
+                    </p>
+                    <ul>
+                        {ciiV2.integrityChecks.map((check, i) => (
+                            <li key={`${check.title}-${i}`}>
+                                <b>{check.level === "hold" ? "HOLD" : "REVIEW"} · {check.title}</b> — {check.detail}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+
             <details className="fx23-method">
                 <summary>How the Analyzer scores this report</summary>
                 <p>

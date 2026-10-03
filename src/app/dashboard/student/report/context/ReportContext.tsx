@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
+import { hydrateSection8Visibility } from "../utils/mediaVisibility";
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
@@ -351,7 +352,8 @@ export interface ReportData {
             no_harm: boolean;
             privacy_respected: boolean;
         };
-        media_visible: 'public' | 'limited' | 'internal' | '';
+        media_visible: 'public' | 'restricted' | 'private' | 'limited' | 'internal' | '';
+        public_share_permission?: boolean;
         partner_verification: boolean;
         partner_verification_type?: string;
         partner_verification_files: File[];
@@ -549,7 +551,8 @@ export const defaultReportData: ReportData = {
             no_harm: false,
             privacy_respected: false
         },
-        media_visible: '',
+        media_visible: 'restricted',
+        public_share_permission: false,
         partner_verification: false,
         partner_verification_type: '',
         partner_verification_files: [],
@@ -953,7 +956,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 section5: { ...defaultReportData.section5, ...(newData.section5 || {}) },
                 section6: { ...defaultReportData.section6, ...(newData.section6 || {}) },
                 section7: { ...defaultReportData.section7, ...(newData.section7 || {}) },
-                section8: { ...defaultReportData.section8, ...(newData.section8 || {}) },
+                section8: hydrateSection8Visibility({ ...defaultReportData.section8, ...(newData.section8 || {}) } as Record<string, unknown>) as ReportData["section8"],
                 section9: { ...defaultReportData.section9, ...(newData.section9 || {}) },
                 section10: { ...defaultReportData.section10, ...(newData.section10 || {}) },
                 section11: { ...defaultReportData.section11, ...(newData.section11 || {}) },
