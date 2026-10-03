@@ -267,8 +267,101 @@ function FacultyAttendanceLink({ projectId }: { projectId?: string }) {
             href={`${HOURS}?projectId=${encodeURIComponent(projectId)}`}
             className="mt-1.5 inline-block text-[11px] font-extrabold text-[#0e7d74] hover:underline"
         >
-            View hours log →
+            View live hours →
         </Link>
+    );
+}
+
+function projectReportHref(row: { id: string; report_id?: string | null; status?: string; draft_locked?: boolean }): string | undefined {
+    if (row.draft_locked) return undefined;
+    const rid = String(row.report_id || "").trim() || (row.id.startsWith("track:") ? "" : row.id);
+    if (!rid) return undefined;
+    const status = normalizeReviewStatus(row.status);
+    if (status === "assigned" || status === "draft" || status === "continue" || !status) return undefined;
+    return `${REPORTS}/${rid}`;
+}
+
+function FacultyProjectMonitorCard({
+    row,
+}: {
+    row: {
+        id: string;
+        student_name: string;
+        student_email?: string;
+        project_title: string;
+        organization_name?: string;
+        project_id?: string;
+        hours?: number;
+        required_hours?: number;
+        hours_progress_pct?: number;
+        progress_pct?: number;
+        sections_complete?: number;
+        sections_total?: number;
+        last_activity_at?: string;
+        updated_at?: string;
+        status?: string;
+        draft_locked?: boolean;
+        report_id?: string | null;
+        faculty_status?: string;
+    };
+}) {
+    const required = row.required_hours || 16;
+    const hours = row.hours || 0;
+    const hoursPct =
+        typeof row.hours_progress_pct === "number"
+            ? Math.max(0, Math.min(100, Math.round(row.hours_progress_pct)))
+            : required > 0
+              ? Math.max(0, Math.min(100, Math.round((hours / required) * 100)))
+              : 0;
+    const reportHref = projectReportHref(row);
+    const last = row.last_activity_at || row.updated_at;
+    const lastLabel = last
+        ? new Date(last).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+        : null;
+    const meta = [row.student_name, `${hours} / ${required} hrs`, row.organization_name, lastLabel ? `Updated ${lastLabel}` : ""]
+        .filter(Boolean)
+        .join(" · ");
+    return (
+        <div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Student tracking</p>
+                        <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-900">{row.project_title || "Project"}</p>
+                        {meta ? <p className="mt-1 truncate text-xs text-slate-500">{meta}</p> : null}
+                    </div>
+                    <span className="shrink-0 text-lg font-extrabold tabular-nums text-[#0e7d74]">{hoursPct}%</span>
+                </div>
+                <div
+                    className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"
+                    role="progressbar"
+                    aria-valuenow={hoursPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Hours ${hoursPct}% complete`}
+                >
+                    <div className="h-full rounded-full bg-[#0e7d74] transition-all" style={{ width: `${hoursPct}%` }} />
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                    {typeof row.progress_pct === "number" && row.draft_locked
+                        ? `Report ${Math.round(row.progress_pct)}% filled · opens after the student submits`
+                        : reportHref
+                          ? "Submitted report ready to open"
+                          : "Live hours from assigned students"}
+                </p>
+            </div>
+            {isFacultyCommunityLiveCard(row) ? null : (
+                <FacultyRemindButtons email={row.student_email} title={row.project_title} />
+            )}
+            <div className="mt-1 flex flex-wrap gap-3">
+                {reportHref ? (
+                    <Link href={reportHref} className="text-[11px] font-extrabold text-[#0e7d74] hover:underline">
+                        Open report →
+                    </Link>
+                ) : null}
+                <FacultyAttendanceLink projectId={row.project_id} />
+            </div>
+        </div>
     );
 }
 
@@ -317,7 +410,6 @@ function FacultyCommunityServiceHub() {
     const tabParam = searchParams.get("tab") || "";
     const {
         loading,
-        rows,
         draftRows,
         mineRows,
         pendingOppRows,
@@ -327,6 +419,8 @@ function FacultyCommunityServiceHub() {
         historyAppRows,
         hoursProjectCount,
         liveRows,
+        projectRows,
+        projectLiveRows,
         activeProjects,
         revisionOpps,
         deckCards,
@@ -866,8 +960,8 @@ function FacultyCommunityServiceHub() {
                         tabs={[
                             { id: "active", label: "Active", count: activeProjects.length },
                             { id: "progress", label: "In progress", count: draftRows.length },
-                            { id: "verified", label: "Verified", count: liveRows.length },
-                            { id: "all", label: "All", count: rows.length },
+                            { id: "verified", label: "Verified", count: projectLiveRows.length },
+                            { id: "all", label: "All", count: projectRows.length },
                         ]}
                         active={projectTab}
                         onChange={setHubTab}
@@ -897,9 +991,9 @@ function FacultyCommunityServiceHub() {
                         (() => {
                             const list =
                                 projectTab === "verified"
-                                    ? liveRows
+                                    ? projectLiveRows
                                     : projectTab === "all"
-                                      ? rows
+                                      ? projectRows
                                       : activeProjects;
                             if (!list.length) {
                                 return <EmptyPanel title="Nothing here" text="Approved engagements appear here once students are assigned." />;
@@ -907,21 +1001,7 @@ function FacultyCommunityServiceHub() {
                             return (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     {list.map((row) => (
-                                        <div key={row.id}>
-                                            <CommunityQueueCard
-                                                href={`${REPORTS}/${row.id}`}
-                                                title={row.project_title}
-                                                student={row.student_name}
-                                                org={row.organization_name}
-                                                hours={row.hours}
-                                                tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                                cta="View progress →"
-                                            />
-                                            {isFacultyCommunityLiveCard(row) ? null : (
-                                                <FacultyRemindButtons email={row.student_email} title={row.project_title} />
-                                            )}
-                                            <FacultyAttendanceLink projectId={row.project_id} />
-                                        </div>
+                                        <FacultyProjectMonitorCard key={row.id} row={row} />
                                     ))}
                                 </div>
                             );

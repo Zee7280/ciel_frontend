@@ -46,6 +46,13 @@ export type FacultyCsReportRow = {
     cii_locked?: boolean;
     cii_level_name?: string | null;
     cii_numeric_level?: number | null;
+    report_id?: string | null;
+    hours_progress_pct?: number;
+    progress_pct?: number;
+    sections_complete?: number;
+    sections_total?: number;
+    last_activity_at?: string;
+    draft_locked?: boolean;
 };
 
 export type FacultyCsMineRow = {
@@ -105,6 +112,7 @@ export function useFacultyCommunityServiceData() {
     const [pendingAppRows, setPendingAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [historyAppRows, setHistoryAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [hoursProjectCount, setHoursProjectCount] = useState(0);
+    const [trackingRows, setTrackingRows] = useState<FacultyCsReportRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [reloadTick, setReloadTick] = useState(0);
     const reload = useCallback(() => setReloadTick((n) => n + 1), []);
@@ -144,8 +152,11 @@ export function useFacultyCommunityServiceData() {
             fetchJoinApplicationsHistoryRows("/api/v1/faculty/applications"),
             // Reports still being written: progress only, never answers (opens after student submits).
             authenticatedFetch("/api/v1/faculty/reports/progress", {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+            authenticatedFetch("/api/v1/faculty/community-service/tracking", {}, { redirectToLogin: false })
+                .then((r) => (r?.ok ? r.json() : null))
+                .catch(() => null),
         ])
-            .then(([list, award, mine, approvals, history, drafts, apps, appHistory, progress]) => {
+            .then(([list, award, mine, approvals, history, drafts, apps, appHistory, progress, tracking]) => {
                 if (cancelled) return;
                 setDraftRows(
                     (Array.isArray(progress?.data) ? progress.data : [])
@@ -263,9 +274,60 @@ export function useFacultyCommunityServiceData() {
                             };
                         })
                         .filter((r: FacultyCsReportRow) => r.id);
+                const mappedTracking: FacultyCsReportRow[] = (Array.isArray(tracking?.data) ? tracking.data : [])
+                    .filter((item: unknown) => item && typeof item === "object")
+                    .map((item: Record<string, unknown>) => {
+                        const hoursRaw = item.hours;
+                        const hours =
+                            typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
+                                ? hoursRaw
+                                : typeof hoursRaw === "string" && Number.isFinite(Number(hoursRaw))
+                                  ? Number(hoursRaw)
+                                  : 0;
+                        const email = pickStr(item, "student_email", "studentEmail");
+                        return {
+                            id: String(item.id || ""),
+                            student_name: pickStr(item, "student_name", "studentName") || "Student",
+                            student_email: email && email.includes("@") ? email : undefined,
+                            project_title: pickStr(item, "project_title", "projectTitle") || "Project",
+                            organization_name: pickStr(item, "organization_name", "organizationName"),
+                            project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
+                            faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
+                            status: pickStr(item, "status") || "assigned",
+                            hours,
+                            required_hours:
+                                typeof item.required_hours === "number" && Number.isFinite(item.required_hours)
+                                    ? item.required_hours
+                                    : 16,
+                            submission_date: pickStr(item, "submission_date", "submissionDate"),
+                            report_submitted_at: pickStr(item, "report_submitted_at", "reportSubmittedAt"),
+                            updated_at: pickStr(item, "updated_at", "updatedAt", "last_activity_at"),
+                            last_activity_at: pickStr(item, "last_activity_at"),
+                            report_id: pickStr(item, "report_id", "reportId") || null,
+                            hours_progress_pct:
+                                typeof item.hours_progress_pct === "number" ? item.hours_progress_pct : undefined,
+                            progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : undefined,
+                            sections_complete:
+                                typeof item.sections_complete === "number" ? item.sections_complete : undefined,
+                            sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
+                            draft_locked: item.draft_locked === true,
+                            member_hours: Array.isArray(item.member_hours)
+                                ? item.member_hours
+                                      .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
+                                      .map((row) => ({
+                                          name: pickStr(row, "name") || "Student",
+                                          hours: Number(row.hours || 0) || 0,
+                                          required: Number(row.required || 16) || 16,
+                                      }))
+                                : [],
+                        };
+                    })
+                    .filter((r: FacultyCsReportRow) => r.id);
+                setTrackingRows(mappedTracking);
+                const hoursSource = mappedTracking.length ? mappedTracking : mappedRows;
                 setHoursProjectCount(
                     new Set(
-                        mappedRows
+                        hoursSource
                             .filter(
                                 (r) =>
                                     Boolean(r.project_id) &&
@@ -290,6 +352,7 @@ export function useFacultyCommunityServiceData() {
                 setPendingAppRows([]);
                 setHistoryAppRows([]);
                 setHoursProjectCount(0);
+                setTrackingRows([]);
                 setLoading(false);
             });
         return () => {
@@ -298,6 +361,10 @@ export function useFacultyCommunityServiceData() {
     }, [reloadTick]);
 
     const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
+    const projectRows = useMemo(
+        () => (trackingRows.length ? trackingRows : rows),
+        [trackingRows, rows],
+    );
     const revisionReports = useMemo(() => rows.filter(isFacultyCsReportRevision), [rows]);
     const pendingReports = useMemo(
         () => rows.filter((r) => isFacultyCommunityWaiting(r) && !isFacultyCsReportRevision(r)),
@@ -308,8 +375,12 @@ export function useFacultyCommunityServiceData() {
         [rows],
     );
     const activeProjects = useMemo(
-        () => rows.filter((r) => !isFacultyCommunityLiveCard(r) && !isCommunityReportRejected(r)),
-        [rows],
+        () => projectRows.filter((r) => !isFacultyCommunityLiveCard(r) && !isCommunityReportRejected(r)),
+        [projectRows],
+    );
+    const projectLiveRows = useMemo(
+        () => projectRows.filter((r) => isFacultyCommunityLiveCard(r)),
+        [projectRows],
     );
     const revisionOpps = useMemo(() => historyOppRows.filter(isFacultyCsOppRevision), [historyOppRows]);
     const deckCards = useMemo(() => {
@@ -364,6 +435,8 @@ export function useFacultyCommunityServiceData() {
         historyAppRows,
         hoursProjectCount,
         liveRows,
+        projectRows,
+        projectLiveRows,
         pendingReports,
         revisionReports,
         decidedReports,

@@ -1681,7 +1681,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </h3>
                                     <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-[#cdf5f0]">
                                         Tap a member, log date · time · location · activity · photos. Hours compute
-                                        automatically. Faculty reviews pending sessions from their flash-card queue.
+                                        automatically. CIEL PK Admin reviews the whole report after you submit.
                                     </p>
                                 </div>
 

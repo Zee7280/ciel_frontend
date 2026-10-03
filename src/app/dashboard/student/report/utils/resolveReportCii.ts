@@ -84,9 +84,12 @@ export function resolveReportCii(data: ReportData): ResolvedReportCii {
 
     if (facultyFinal != null) {
         const persisted = readPersistedCiiSnapshot(data);
+        // The locked v2 reading owns the level name; the legacy snapshot level belongs to a
+        // different number and would contradict the score shown beside it.
+        const v2Level = (data.ciiV2 as { level?: { name?: unknown } } | null | undefined)?.level?.name;
         return {
             ...live,
-            level: persisted?.level || live.level,
+            level: typeof v2Level === "string" && v2Level.trim() ? v2Level.trim() : persisted?.level || live.level,
             totalScore: facultyFinal,
             breakdown: mergeBreakdown(live.breakdown, persisted?.breakdown),
             suggestions: persisted?.suggestions ?? live.suggestions,

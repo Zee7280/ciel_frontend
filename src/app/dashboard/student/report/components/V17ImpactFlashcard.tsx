@@ -462,7 +462,7 @@ export function V17ImpactFlashcard({
               ? "Submitted · reporting fee pending"
               : status === "pending"
                 ? audience === "faculty"
-                    ? "Submitted for faculty review"
+                    ? "Submitted for CIEL PK review"
                     : `Submitted · waiting on ${reviewer} review`
                 : "Attached · verification pending";
 
@@ -606,7 +606,7 @@ export function V17ImpactFlashcard({
                                 {showCiiScore ? (
                                     <>
                                         <br />
-                                        Faculty-locked CII {Math.round(cii.totalScore)}/100
+                                        CIEL PK-verified CII {Math.round(cii.totalScore)}/100
                                     </>
                                 ) : null}
                             </p>
@@ -1168,7 +1168,7 @@ export function V17ImpactFlashcard({
                                 ? `The report is submitted. ${reviewer} review starts after the reporting fee is approved.`
                                 : status === "pending"
                                   ? audience === "faculty"
-                                      ? "The report is awaiting faculty review."
+                                      ? "The report is awaiting CIEL PK review."
                                       : `The report is submitted and waiting on ${reviewer} review.`
                                   : "This record has not yet been verified."}
                         </div>

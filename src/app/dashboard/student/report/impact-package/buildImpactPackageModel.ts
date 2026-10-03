@@ -3,7 +3,11 @@ import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { mergeReportSdgSnapshotRows } from "../utils/reportSdgMerge";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
-import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
+import {
+    buildIndividualRosterFromSection1,
+    calculateEngagementMetrics,
+    sumNonRejectedLoggedHours,
+} from "../utils/engagementMetrics";
 import {
     MEDIA_VISIBILITY_LABELS,
     hasPublicSharePermission,
@@ -55,8 +59,12 @@ export type ImpactPackageModel = {
     projectId: string;
     reportId: string;
     title: string;
+    /** Designed two-line display title; falls back to project title. */
+    headline: [string] | [string, string];
+    projectName: string;
     story: string;
     heroMeta: string[];
+    changeEyebrow: string;
     statusTitle: string;
     statusDetail: string;
     metrics: ImpactPackageMetric[];
@@ -115,6 +123,31 @@ function displayName(person: { name?: string; fullName?: string } | undefined): 
     return pickString(person?.fullName, person?.name);
 }
 
+function uuidFromRosterId(studentId: string): string {
+    const lead = /^lead:(.+)$/.exec(studentId);
+    if (lead?.[1]) return lead[1];
+    const member = /^member:\d+:(.+)$/.exec(studentId);
+    if (member?.[1]) return member[1];
+    return studentId;
+}
+
+/** Same roster person Section 1 Individual metrics uses (fullName, then name). */
+function participantChipName(data: ReportData, studentId: string): string {
+    const key = uuidFromRosterId(studentId);
+    const lead = data.section1?.team_lead;
+    if (lead?.id && (studentId === `lead:${lead.id}` || key === String(lead.id))) {
+        return displayName(lead) || "Team lead";
+    }
+    const members = Array.isArray(data.section1?.team_members) ? data.section1.team_members : [];
+    for (const member of members) {
+        const memberId = member?.id ?? member?.participantId;
+        if (memberId && (key === String(memberId) || studentId.includes(String(memberId)))) {
+            return displayName(member) || "Member";
+        }
+    }
+    return "Member";
+}
+
 function fmtNum(n: number | string | null | undefined): string {
     const num = typeof n === "number" ? n : Number(String(n ?? "").replace(/,/g, ""));
     if (!Number.isFinite(num)) return String(n || "—");
@@ -143,8 +176,25 @@ function isSubmitted(data: ReportData): boolean {
 
 function sdgChipClass(goal: number): string {
     if (goal === 3) return "goal g3";
+    if (goal === 4) return "goal";
+    if (goal === 11) return "goal g11";
     if (goal === 13) return "goal g13";
     return "goal";
+}
+
+function displayHeadline(title: string): [string] | [string, string] {
+    const trimmed = title.replace(/\s+/g, " ").trim();
+    const dashed = trimmed.split(/\s+[—–-]\s+/);
+    if (dashed.length >= 2 && dashed[0].length <= 42 && dashed[1].length <= 42) {
+        return [dashed[0].replace(/\.$/, "") + ".", dashed[1]];
+    }
+    const sentenced = trimmed.match(/^(.{12,42}[.!?])\s+(.{8,42})$/);
+    if (sentenced) return [sentenced[1], sentenced[2]];
+    const comma = trimmed.split(/:\s+/);
+    if (comma.length === 2 && comma[0].length <= 42 && comma[1].length <= 48) {
+        return [comma[0] + ".", comma[1]];
+    }
+    return [trimmed];
 }
 
 function fileKind(url: string, name: string): ImpactPackageEvidenceKind {
@@ -242,23 +292,47 @@ function collectEvidenceFiles(data: ReportData, extra?: Array<{ url?: string; na
 
 function memberHours(data: ReportData): Array<{ name: string; hours: number; required: number }> {
     const required = data.required_hours || 16;
-    const leadName = displayName(data.section1?.team_lead) || "Team lead";
-    const leadHours = pickNumber(data.section1?.team_lead?.hours) || 0;
-    const rows = [{ name: leadName, hours: leadHours, required }];
-    if (data.section1?.participation_type === "team") {
-        (data.section1.team_members || []).forEach((member) => {
-            rows.push({
-                name: displayName(member) || "Member",
-                hours: pickNumber(member.hours) || 0,
-                required,
-            });
-        });
-    }
     const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
-    if (rows.every((row) => row.hours <= 0) && logs.length) {
-        rows[0].hours = sumNonRejectedLoggedHours(logs);
+    const lead = data.section1?.team_lead;
+    const leadName = displayName(lead) || "Team lead";
+    const members = Array.isArray(data.section1?.team_members) ? data.section1.team_members : [];
+
+    if (data.section1?.participation_type !== "team") {
+        return [
+            {
+                name: leadName,
+                hours: sumNonRejectedLoggedHours(logs) || pickNumber(lead?.hours) || 0,
+                required,
+            },
+        ];
     }
-    return rows;
+
+    const rosterIds = buildIndividualRosterFromSection1(data.section1, lead?.id);
+    const calc = calculateEngagementMetrics(
+        logs,
+        required,
+        1 + members.length,
+        lead,
+        rosterIds,
+        { includeUnreviewed: true },
+    );
+    const liveRows = calc.individual_metrics ?? [];
+    if (liveRows.length > 0) {
+        return liveRows.map((row) => ({
+            name: participantChipName(data, row.student_id),
+            hours: row.individual_hours,
+            required,
+        }));
+    }
+
+    return [
+        { name: leadName, hours: pickNumber(lead?.hours) || 0, required },
+        ...members.map((member) => ({
+            name: displayName(member) || "Member",
+            hours: pickNumber(member.hours) || 0,
+            required,
+        })),
+    ];
 }
 
 export function buildImpactPackageModel(
@@ -307,7 +381,15 @@ export function buildImpactPackageModel(
     const names = members.map((row) => row.name).filter(Boolean);
     const university = pickString(data.section1?.team_lead?.university, asRecord(opportunity).university as string);
     const discipline = pickString(data.section2?.discipline, data.section1?.team_lead?.degree);
-    const faculty = pickString(data.section1?.faculty_supervisor_email);
+    const s1 = asRecord(data.section1);
+    const faculty = pickString(
+        s1.faculty_supervisor_name,
+        s1.facultySupervisorName,
+        asRecord(opportunity).faculty_name,
+        asRecord(opportunity).facultyName,
+        asRecord(project).faculty_name,
+        data.section1?.faculty_supervisor_email,
+    );
     const heroMeta = [
         [context.partnerOrganization, context.projectLocation !== "N/A" ? context.projectLocation : ""].filter(Boolean).join(" · "),
         context.timelineLabel !== "—" ? context.timelineLabel : "",
@@ -500,12 +582,21 @@ export function buildImpactPackageModel(
         sessionTypes.forEach((t) => tiles[0].chips.push({ text: t }));
     }
 
+    const changeEyebrow = numericChange
+        ? /attend/i.test(numericChange.label)
+            ? "Reported attendance change"
+            : `Reported ${numericChange.label} change`.replace(/\s+/g, " ")
+        : "Measured change";
+
     return {
         projectId: pickString(data.project_id, opportunity.id, data.report_id, data.id),
         reportId: pickString(data.report_id, data.id, data.project_id),
         title,
+        headline: displayHeadline(title),
+        projectName: title,
         story,
         heroMeta,
+        changeEyebrow,
         statusTitle,
         statusDetail,
         metrics,
@@ -550,23 +641,26 @@ export function impactPackageLockLine(adminApproved: boolean): string {
 }
 
 
+function ciiHasFinal(data: ReportData): boolean {
+    const final = (data.ciiV2 as { final?: unknown } | null | undefined)?.final;
+    return typeof final === "number"
+        ? Number.isFinite(final)
+        : typeof final === "string" && final.trim() !== "" && Number.isFinite(Number(final));
+}
+
+/** Analysis exists and CIEL PK Admin has locked it. */
 export function hasImpactPackageAnalysis(data: ReportData): boolean {
     const lock = data.ciiV2Lock as { locked?: unknown } | null | undefined;
     const locked = lock?.locked === true || lock?.locked === "true";
-    const cii = data.ciiV2 as { final?: unknown } | null | undefined;
-    const final = cii?.final;
-    const hasFinal =
-        typeof final === "number"
-            ? Number.isFinite(final)
-            : typeof final === "string" && final.trim() !== "" && Number.isFinite(Number(final));
-    return Boolean(locked && hasFinal);
+    return Boolean(locked && ciiHasFinal(data));
 }
 
 /** Partner / NGO never see the analysis report. Student / faculty / university see it after Super Admin approval. Admin sees it when attached. */
 export function shouldShowImpactPackageAnalysis(audience: ImpactPackageAudience, data: ReportData): boolean {
     if (audience === "partner" || audience === "public") return false;
+    // Admin can open the analysis as soon as the analyser has produced a score (before locking).
+    if (audience === "admin") return ciiHasFinal(data);
     if (!hasImpactPackageAnalysis(data)) return false;
-    if (audience === "admin") return true;
     const st = String(data.admin_status || data.admin_approval_status || data.status || "").toLowerCase();
     return st === "approved" || st === "verified";
 }

@@ -64,12 +64,15 @@ type WallRow = {
         evidence?: Array<{ id: string; type: string; claim: string; verdict: "MATCH" | "PARTIAL" | "MISMATCH" }>;
         bonus?: { effort: number; resources: number; partners: number; total: number };
         integrityPenalty?: number;
-        studentFeedback?: {
-            opening_praise?: string;
-            why_score_is_high_or_low?: string;
-            encouragement?: string;
-            five_specific_actions?: string[];
-        };
+        /** The analyser stores one summary string; older records carry the structured object. */
+        studentFeedback?:
+            | string
+            | {
+                  opening_praise?: string;
+                  why_score_is_high_or_low?: string;
+                  encouragement?: string;
+                  five_specific_actions?: string[];
+              };
         redFlags?: Array<{ flag: string; severity?: string }>;
     } | null;
     ciiV2Lock?: {
@@ -222,6 +225,25 @@ function openOrToast(url: string | null | undefined, empty: string) {
     toast.message(empty);
 }
 
+type CiiFeedbackShape = NonNullable<NonNullable<WallRow["ciiV2"]>["studentFeedback"]>;
+
+/** Normalises the analyser's string feedback and the legacy structured object to one shape. */
+function feedbackParts(fb: CiiFeedbackShape | undefined): {
+    praise?: string;
+    summary?: string;
+    encouragement?: string;
+    actions?: string[];
+} {
+    if (!fb) return {};
+    if (typeof fb === "string") return { summary: fb.trim() || undefined };
+    return {
+        praise: fb.opening_praise,
+        summary: fb.why_score_is_high_or_low,
+        encouragement: fb.encouragement,
+        actions: fb.five_specific_actions,
+    };
+}
+
 type CiiSection = NonNullable<NonNullable<WallRow["ciiV2"]>["sections"]>[number];
 type CompetencyScores = NonNullable<NonNullable<WallRow["section9"]>["competency_scores"]>;
 
@@ -300,7 +322,7 @@ function buildFlashcardExtras(
         .filter((s) => s.limit)
         .slice(-3)
         .map((s) => s.limit as string);
-    const nextStep = cii.studentFeedback?.five_specific_actions?.[0] || cii.redFlags?.[0]?.flag;
+    const nextStep = feedbackParts(cii.studentFeedback).actions?.[0] || cii.redFlags?.[0]?.flag;
 
     return {
         badgeSrc: badge.src,
@@ -308,7 +330,7 @@ function buildFlashcardExtras(
         badgeTitle: badge.title,
         checklist,
         metrics,
-        oneLiner: cii.studentFeedback?.opening_praise || r.story,
+        oneLiner: feedbackParts(cii.studentFeedback).praise || r.story,
         path,
         quality: { strongest, limitations, nextStep },
         skills: competencySkills(r.section9?.competency_scores),
@@ -829,14 +851,7 @@ export default function CommunityImpactWall(_props: {
                   sections: cii.sections || [],
                   bonus: cii.bonus || { effort: 0, resources: 0, partners: 0, total: 0 },
                   integrityPenalty: cii.integrityPenalty || 0,
-                  feedback: cii.studentFeedback
-                      ? {
-                            praise: cii.studentFeedback.opening_praise,
-                            summary: cii.studentFeedback.why_score_is_high_or_low,
-                            encouragement: cii.studentFeedback.encouragement,
-                            actions: cii.studentFeedback.five_specific_actions,
-                        }
-                      : undefined,
+                  feedback: cii.studentFeedback ? feedbackParts(cii.studentFeedback) : undefined,
                   redFlags: cii.redFlags,
                   lockedAt: lock?.lockedAt,
                   facultyNote: lock?.facultyNote,

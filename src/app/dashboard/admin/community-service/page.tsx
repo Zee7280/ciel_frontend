@@ -414,8 +414,9 @@ export function AdminCommunityServiceHub() {
                 toast.error(json?.message || "Independent AI analysis failed.");
                 return;
             }
-            const score = json?.data?.score ?? json?.score;
-            const levelName = json?.data?.level?.name ?? json?.level?.name;
+            const score = json?.data?.analysis?.score ?? json?.data?.score ?? json?.score;
+            const lvl = json?.data?.analysis?.level ?? json?.data?.level ?? json?.level;
+            const levelName = typeof lvl === "string" ? lvl : lvl?.name;
             toast.success(
                 score != null
                     ? `Independent analysis complete — ${Math.round(score)}/100${levelName ? ` (${levelName})` : ""}. The faculty-approved score is unchanged.`

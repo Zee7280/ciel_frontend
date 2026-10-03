@@ -69,16 +69,16 @@ function finalDeclarationItems(requiresFee: boolean): string[] {
         "I understand that after final submission, no further edits are possible.",
         requiresFee
             ? "I understand my whole report — not each session — is verified once, by CIEL PK, from the flash card."
-            : "I understand my whole report — not each session — is verified once, by faculty, from the flash card.",
-        "I consent to this report and its evidence being shared with CIEL PK, my faculty, and my institution for verification.",
+            : "I understand my whole report — not each session — is verified once, by CIEL PK, from the flash card.",
+        "I consent to this report and its evidence being shared with CIEL PK, and my faculty and institution after approval.",
         requiresFee
             ? "I understand a reporting fee applies before CIEL PK can review my score and certificate."
-            : "I understand faculty reviews this report next. Hours are confirmed when they lock the flash-card score.",
+            : "I understand CIEL PK Admin reviews this report next. Hours and score are confirmed when the Admin approves it.",
     ];
 }
 
 /** Mockup 10.5 — the final declaration + electronic sign-off that gates submission, once all sections are complete. */
-function FinalDeclarationCard({
+export function FinalDeclarationCard({
     declaration,
     signatureName,
     requiresFee,
@@ -93,16 +93,16 @@ function FinalDeclarationCard({
 }) {
     const allChecked = declaration.slice(0, 5).every(Boolean);
     return (
-        <>
-            <div className="w-16 h-16 bg-[var(--teal-soft)] rounded-xl flex items-center justify-center">
-                <ShieldCheck className="w-8 h-8 text-[var(--teal)]" />
+        <div className="mx-auto flex w-full max-w-lg flex-col items-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--teal-soft)]">
+                <ShieldCheck className="h-8 w-8 text-[var(--teal)]" />
             </div>
-            <div className="max-w-lg w-full space-y-5 text-left">
-                <div>
-                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-1">
+            <div className="mt-5 w-full space-y-5 text-left">
+                <div className="text-center">
+                    <h3 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
                         Final report declaration &amp; electronic sign-off
                     </h3>
-                    <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                    <p className="text-sm font-medium leading-relaxed text-slate-400">
                         All sections and hours are complete. Before submission is accepted, tick every
                         declaration below and sign with your full name.
                     </p>
@@ -142,7 +142,7 @@ function FinalDeclarationCard({
                     </p>
                 )}
             </div>
-        </>
+        </div>
     );
 }
 
@@ -156,7 +156,7 @@ function ReportTravelsCard({ requiresFee }: { requiresFee: boolean }) {
           ]
         : [
               ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
-              ["2 · Faculty approves once", "Faculty reviews the whole report from your flash card — not session by session."],
+              ["2 · CIEL PK Admin approves once", "CIEL PK Admin reviews the whole report from your flash card — not session by session."],
               ["3 · Delivered per stakeholder", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK, faculty, and your institution."],
           ];
     return (
@@ -624,7 +624,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 CII, hours, beneficiaries, SDG alignment, and the auditor narrative stay locked until{" "}
                                 {requiresFee
                                     ? "your reporting fee is confirmed and CIEL PK verifies this submission."
-                                    : "faculty locks the flash-card score."}
+                                    : "CIEL PK Admin approves the report."}
                             </p>
                         </div>
                     </div>
@@ -759,7 +759,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             stay hidden until{" "}
                             {requiresFee
                                 ? "your reporting fee is confirmed and CIEL PK approves your submission"
-                                : "faculty locks the flash-card score"}
+                                : "CIEL PK Admin approves the report"}
                             —the same unlock as quantified scores above.
                         </p>
                     </div>
@@ -786,13 +786,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 <div className={clsx("flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5", surfaceHeaderRow)}>
                     <div className="min-w-0 space-y-1">
                         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
-                            Same template faculty receives
+                            Same package CIEL PK Admin receives
                         </p>
                         <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
                             Impact Package
                         </h3>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                            The same three-tab package faculty and CIEL PK Admin receive: flashcard, detailed report, and evidence gallery.
+                            The same package CIEL PK Admin reviews: flashcard, detailed report and evidence gallery. After approval it goes to faculty, your university and the partner.
                         </p>
                     </div>
                     <button

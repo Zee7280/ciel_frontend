@@ -20,6 +20,7 @@ import {
     impactPackageLockLine,
     shouldShowImpactPackageAnalysis,
     type ImpactPackageAudience,
+    type ImpactPackageChange,
     type ImpactPackageEvidenceFile,
     type ImpactPackageEvidenceKind,
 } from "./buildImpactPackageModel";
@@ -56,13 +57,32 @@ function kindIcon(kind: ImpactPackageEvidenceKind, locked: boolean): "lock" | Im
     return locked ? "lock" : kind;
 }
 
+function changeCaption(change: ImpactPackageChange): { headline: string; note: string } {
+    const before = change.before;
+    const after = change.after;
+    if (before == null || after == null) {
+        return { headline: change.label, note: change.note };
+    }
+    const delta = after - before;
+    const sign = delta > 0 ? "+" : "";
+    const isPct = change.unit === "%" || /%|percent/i.test(change.unit) || /rate|attend/i.test(change.label);
+    const points = isPct
+        ? `${sign}${Math.round(delta * 10) / 10} percentage points`
+        : `${sign}${Math.round(delta * 10) / 10}${change.unit ? ` ${change.unit}` : ""}`;
+    const relative = before !== 0 ? `${sign}${((delta / before) * 100).toFixed(1)}% relative change` : "";
+    return {
+        headline: [points, relative].filter(Boolean).join(" · "),
+        note: change.note || "causation not established",
+    };
+}
 
-function asCii(data: ReportData): { final?: number; level?: { name?: string; level?: number }; sections?: Array<{ id?: number; title?: string; score?: number; weight?: number }>; studentFeedback?: { summary?: string } } {
+
+function asCii(data: ReportData): { final?: number; level?: { name?: string; level?: number }; sections?: Array<{ id?: number; title?: string; score?: number; weight?: number }>; studentFeedback?: string | { summary?: string; why_score_is_high_or_low?: string } } {
     return (data.ciiV2 && typeof data.ciiV2 === "object" ? data.ciiV2 : {}) as {
         final?: number;
         level?: { name?: string; level?: number };
         sections?: Array<{ id?: number; title?: string; score?: number; weight?: number }>;
-        studentFeedback?: { summary?: string };
+        studentFeedback?: string | { summary?: string; why_score_is_high_or_low?: string };
     };
 }
 
@@ -70,7 +90,15 @@ function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyse
     const cii = asCii(data);
     const final = typeof cii.final === "number" ? cii.final : Number(cii.final);
     const sections = Array.isArray(cii.sections) ? cii.sections : [];
-    const summary = typeof cii.studentFeedback?.summary === "string" ? cii.studentFeedback.summary : "";
+    const fb = cii.studentFeedback;
+    const summary =
+        typeof fb === "string"
+            ? fb.trim()
+            : typeof fb?.summary === "string"
+              ? fb.summary
+              : typeof fb?.why_score_is_high_or_low === "string"
+                ? fb.why_score_is_high_or_low
+                : "";
     return (
         <div>
             <div className="evidence-stats">
@@ -161,6 +189,9 @@ export default function ImpactPackage({
     const canDownload = impactPackageCanDownload(audience, visibility, model.publicConsent);
     const lockLine = impactPackageLockLine(previewStage === "approved" || model.adminApproved);
     const accessText = impactPackageAccessText(audience, visibility, previewStage === "approved" || model.adminApproved);
+    const flashChange = model.change && model.change.before != null && model.change.after != null
+        ? changeCaption(model.change)
+        : null;
 
     const go = useCallback((next: ImpactPackageTab) => {
         if (next === "analysis" && !showAnalysis) return;
@@ -213,6 +244,32 @@ export default function ImpactPackage({
         }, 30);
     };
 
+    const exportPublicHtml = () => {
+        const article = document.getElementById("flashcard-capture");
+        if (!article) return;
+        const css = [...document.styleSheets]
+            .map((sheet) => {
+                try {
+                    return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
+                } catch {
+                    return "";
+                }
+            })
+            .join("\n");
+        const scoped = css
+            .split("}")
+            .filter((chunk) => /(?:^|[,\s])(?:\.ipkg|\.flash|html|body|:root)/.test(chunk))
+            .join("}");
+        const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${model.title} · CIEL PK Impact Package</title><style>${scoped || ""}body{margin:0;background:#f0efe8}.ipkg{padding:24px 0 40px}</style></head><body class="ipkg"><main>${article.outerHTML}</main></body></html>`;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${model.title.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "ciel-pk"}-impact-package.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const filteredFiles = model.files.filter((file) => {
         const q = evQuery.trim().toLowerCase();
         const kindOk = evKind === "all" || file.kind === evKind || (evKind === "file" && file.kind !== "image" && file.kind !== "video" && file.kind !== "audio" && file.kind !== "archive");
@@ -222,14 +279,15 @@ export default function ImpactPackage({
 
     const whoLabel = visibility === "public" ? "Public" : "Internal";
     const publicDisplay = visibility === "public" ? "Allowed" : "Hidden";
+    const studentExportsLocked = audience === "student" && !model.adminApproved;
 
     return (
         <div className="ipkg" id="ciel-impact-package">
             <div className="mast">
                 <div className="brand">
-                    <span className="brandmark">C</span>
-                    CIEL PK <span>Impact Package</span>
-                    <small>{showAnalysis ? "STUDENT BUNDLE + ANALYSIS" : "STUDENT BUNDLE · THREE VIEWS"}</small>
+                    <div className="brandmark">c</div>
+                    CIEL<span>PK</span>
+                    <small>THE IMPACT PACKAGE</small>
                 </div>
                 <div className="viewer">
                     <span>
@@ -260,21 +318,41 @@ export default function ImpactPackage({
                     {model.submitted ? (
                         <>
                             <span className="dot" />
-                            <span>{model.adminApproved ? "Published record" : "Sample record · verification pending"}</span>
+                            <span>{model.adminApproved ? "Published record" : "Awaiting CIEL PK approval · downloads locked"}</span>
                         </>
                     ) : (
-                        <span>Draft package · not submitted</span>
+                        <span>Draft package · not submitted · downloads after Super Admin approval</span>
                     )}
                 </div>
                 <div className="right">
-                    <button type="button" onClick={() => void downloadExhibitionFlashcard(model.title)}>
+                    <button
+                        type="button"
+                        disabled={studentExportsLocked}
+                        title={studentExportsLocked ? "Available after CIEL PK Super Admin approval" : undefined}
+                        onClick={() => void downloadExhibitionFlashcard(model.title)}
+                    >
                         <span className="button-content">
                             <Icon name="image" /> Save flashcard PNG
                         </span>
                     </button>
-                    <button type="button" onClick={printPackage}>
+                    <button
+                        type="button"
+                        disabled={studentExportsLocked}
+                        title={studentExportsLocked ? "Available after CIEL PK Super Admin approval" : undefined}
+                        onClick={printPackage}
+                    >
                         <span className="button-content">
                             <Icon name="print" /> Print / Save PDF
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        disabled={studentExportsLocked}
+                        title={studentExportsLocked ? "Available after CIEL PK Super Admin approval" : undefined}
+                        onClick={exportPublicHtml}
+                    >
+                        <span className="button-content">
+                            <Icon name="download" /> Export public HTML
                         </span>
                     </button>
                     {analyserHref ? (
@@ -294,11 +372,30 @@ export default function ImpactPackage({
                                     <div className="eyebrow">CIEL PK / Community Impact Education Lab Pakistan</div>
                                     <div className="sheet-no">01</div>
                                 </div>
-                                <h1>{model.title}</h1>
-                                <div className="hero-meta">
-                                    {model.heroMeta.map((line) => (
-                                        <span key={line}>{line}</span>
+                                <h1>
+                                    {model.headline.map((line, index) => (
+                                        <span key={line}>
+                                            {index > 0 ? <br /> : null}
+                                            {line}
+                                        </span>
                                     ))}
+                                </h1>
+                                {model.headline.length > 1 || model.projectName !== model.headline[0] ? (
+                                    <div className="hero-project">{model.projectName}</div>
+                                ) : null}
+                                <div className="hero-meta">
+                                    {model.heroMeta.map((line, index) => {
+                                        if (index === 0 && line.includes(" · ")) {
+                                            const cut = line.indexOf(" · ");
+                                            return (
+                                                <span key={line}>
+                                                    <b>{line.slice(0, cut)}</b>
+                                                    {line.slice(cut)}
+                                                </span>
+                                            );
+                                        }
+                                        return <span key={line}>{line}</span>;
+                                    })}
                                 </div>
                             </header>
                             <div className="statusstrip">
@@ -320,8 +417,8 @@ export default function ImpactPackage({
                                     <p>{model.story}</p>
                                 </div>
                                 <div className="change">
-                                    <div className="eyebrow">{model.change ? "Reported change" : "Measured change"}</div>
-                                    {model.change && model.change.before != null && model.change.after != null ? (
+                                    <div className="eyebrow">{model.change ? model.changeEyebrow : "Measured change"}</div>
+                                    {flashChange && model.change && model.change.before != null && model.change.after != null ? (
                                         <>
                                             <div className="trend">
                                                 <span className="number">{model.change.before}{model.change.unit === "%" ? "%" : ""}</span>
@@ -339,8 +436,9 @@ export default function ImpactPackage({
                                                 </div>
                                             </div>
                                             <div className="small" style={{ fontSize: 8, marginTop: 7 }}>
-                                                {model.change.label}
-                                                {model.change.note ? ` · ${model.change.note}` : ""}
+                                                {flashChange.headline}
+                                                <br />
+                                                {flashChange.note}
                                             </div>
                                         </>
                                     ) : (
@@ -418,6 +516,7 @@ export default function ImpactPackage({
                                         <span>CIEL PK acceptance: {model.adminApproved ? "accepted" : "pending"}</span>
                                         <span>{model.ciiLabel}</span>
                                         <span>Badge / rank: {model.ciiPending ? "pending" : "issued"}</span>
+                                        <span>QR: {model.adminApproved ? "issued" : "not issued"}</span>
                                     </div>
                                 </div>
                                 <div className="footer-id">
