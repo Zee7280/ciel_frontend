@@ -11,6 +11,7 @@ import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAw
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
@@ -45,6 +46,7 @@ const CS_VIEWS = [
     "allocation",
     "reps",
     "projects",
+    "reports",
     "approved",
     "wall",
     "run",
@@ -89,6 +91,15 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
             ["Applications", "Join applications on this institution’s listings. Monitor only."],
         ],
         rule: "University oversight is institutional; academic report approval remains with Faculty.",
+    },
+    reports: {
+        desc: "Read-only review of submitted Community Service report packages for your institution.",
+        items: [
+            ["Pending review", "Submitted reports waiting for CIEL PK Admin's final verification."],
+            ["Approved", "Verified reports. Evidence unlocks for the University after super-admin approval."],
+            ["Revision / rejected", "Returned to the student for fixes."],
+        ],
+        rule: "Reports open here only after the student submits. Approve / Revise / Reject stay with CIEL PK Admin.",
     },
     approved: {
         desc: "Verified Community Service records from the University.",
@@ -279,6 +290,7 @@ export default function UniversityCommunityServiceHub() {
         createCounts,
         pipeline,
         waiting,
+        draftRows,
         liveRows,
         closedReports,
         deckCards,
@@ -331,7 +343,7 @@ export default function UniversityCommunityServiceHub() {
         : tabParam === "all" || tabParam === "university" || tabParam === "applications"
           ? tabParam
           : "monitor";
-    const projectTab = ["drafts", "approval", "faculty", "active", "verified", "closed"].includes(innerTab)
+    const projectTab = ["drafts", "approval", "faculty", "progress", "active", "verified", "closed"].includes(innerTab)
         ? innerTab
         : "active";
     const effectiveView: CsView = view === "reps" ? "allocation" : view;
@@ -410,11 +422,11 @@ export default function UniversityCommunityServiceHub() {
         },
         {
             key: "progress",
-            n: waiting.length,
+            n: draftRows.length,
             title: "Reports in progress",
-            sub: "Institution-wide",
-            href: `${CS_BASE}?view=projects&tab=active`,
-            tone: waiting.length ? ("warn" as const) : ("default" as const),
+            sub: "Institution-wide · opens after submit",
+            href: `${CS_BASE}?view=projects&tab=progress`,
+            tone: draftRows.length ? ("warn" as const) : ("default" as const),
         },
         {
             key: "impact",
@@ -504,6 +516,8 @@ export default function UniversityCommunityServiceHub() {
                             ? "Faculty Allocation"
                             : effectiveView === "projects"
                               ? "Community Service Projects"
+                              : effectiveView === "reports"
+                                ? "Reports for Review"
                               : effectiveView === "approved"
                                 ? "Approved Impact"
                                 : effectiveView === "wall"
@@ -565,6 +579,7 @@ export default function UniversityCommunityServiceHub() {
                         <MockupActionCard href={`${CS_BASE}?view=create`} emoji="🚀" ghost="🚀" title="Create Opportunity" subtitle="Publish unlimited University opportunities directly and manage Drafts, Under Approval, Action Required, Published and Closed." badge="UNLIMITED PUBLISHING" background={MOCKUP_GRADIENTS.teal} />
                         <MockupActionCard href={`${CS_BASE}?view=allocation`} emoji="👩‍🏫" ghost="👩‍🏫" title="Faculty Allocation" subtitle="Authorise faculty representatives who publish on behalf of the University." badge="AUTHORITY" background="linear-gradient(135deg,#455a78,#7088ad)" />
                         <MockupActionCard href={`${CS_BASE}?view=projects`} emoji="📈" ghost="📈" title="Community Service Projects" subtitle="Monitor every University Community Service project, progress, faculty, partners and student participation." badge="TRACK" background={MOCKUP_GRADIENTS.blue} />
+                        <MockupActionCard href={`${CS_BASE}?view=reports`} emoji="📝" ghost="📝" title="Reports for Review" subtitle="Read-only review of submitted report packages from your institution: score, flashcard, detailed report and evidence (unlocked after super-admin approval)." badge="READ ONLY" background={MOCKUP_GRADIENTS.red} hot={waiting.length > 0} />
                         <MockupActionCard href={`${CS_BASE}?view=approved`} emoji="✅" ghost="✅" title="Approved Impact" subtitle="Verified reports with CII, badges, certificates and QR verification." badge="VERIFIED" background={MOCKUP_GRADIENTS.green} />
                         <MockupActionCard href={`${CS_BASE}?view=wall`} emoji="🏆" ghost="🏆" title="Impact Wall" subtitle="Permission-aware University showcase of verified Community Service work." badge="SHOWCASE" background={MOCKUP_GRADIENTS.orange} />
                         <MockupActionCard href={`${CS_BASE}?view=run`} emoji="🧠" ghost="🧠" title="AI Ranking Analyzer" subtitle="Run University Ruberix Ranking on your institution’s eligible accepted projects only. Preview first; Publish Ranking creates the official run." badge="ANALYZE" background={MOCKUP_GRADIENTS.purple} />
@@ -785,6 +800,7 @@ export default function UniversityCommunityServiceHub() {
                             { id: "drafts", label: "Drafts", count: draftOpps.filter(filterOpp).length },
                             { id: "faculty", label: "Pending Faculty", count: approvalOpps.filter(isPendingFacultyRow).filter(filterOpp).length },
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
+                            { id: "progress", label: "In progress", count: draftRows.filter(filterProject).length },
                             { id: "active", label: "Active reports", count: waiting.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
                             { id: "closed", label: "Closed", count: closedReports.filter(filterProject).length },
@@ -794,6 +810,25 @@ export default function UniversityCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
+                    ) : projectTab === "progress" ? (
+                        draftRows.filter(filterProject).length === 0 ? (
+                            <EmptyPanel title="Nothing in progress" text="Reports students have started but not submitted appear here with how much is filled. A report opens for you only after the student submits it." />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {draftRows.filter(filterProject).map((row) => (
+                                    <ReportProgressCard
+                                        key={row.id}
+                                        title={row.project_title || "Report"}
+                                        student={row.student_name || "Student"}
+                                        org={row.organization_name}
+                                        hours={row.hours}
+                                        progressPct={row.progress_pct ?? 0}
+                                        sectionsComplete={row.sections_complete}
+                                        sectionsTotal={row.sections_total}
+                                    />
+                                ))}
+                            </div>
+                        )
                     ) : projectTab === "drafts" ? (
                         draftOpps.filter(filterOpp).length === 0 ? (
                             <EmptyPanel title="Nothing here" text="Student and institution drafts named to this university appear here. They cannot be approved until submitted." />
@@ -903,6 +938,46 @@ export default function UniversityCommunityServiceHub() {
                         })()
                     )}
                     </>
+                    )}
+                </div>
+            )}
+
+            {effectiveView === "reports" && (
+                <div className="mt-4">
+                    <MockupSectionHead title="Reports for Review" subtitle="Submitted reports only. Read-only for the University: CIEL PK Admin finalises verification." />
+                    <HubTabs
+                        tabs={[
+                            { id: "pending", label: "Pending review", count: waiting.filter(filterProject).length },
+                            { id: "done", label: "Approved", count: liveRows.filter(filterProject).length },
+                            { id: "rejected", label: "Revision / rejected", count: closedReports.filter(filterProject).length },
+                        ]}
+                        active={["pending", "done", "rejected"].includes(innerTab) ? innerTab : "pending"}
+                        onChange={setHubTab}
+                    />
+                    {loading ? (
+                        <p className="text-sm text-slate-500">Loading…</p>
+                    ) : (
+                        (() => {
+                            const tab = ["pending", "done", "rejected"].includes(innerTab) ? innerTab : "pending";
+                            const list = (tab === "done" ? liveRows : tab === "rejected" ? closedReports : waiting).filter(filterProject);
+                            if (!list.length) return <EmptyPanel title="Nothing here" text="Submitted reports for your institution appear here." />;
+                            return (
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {list.map((row) => (
+                                        <CommunityQueueCard
+                                            key={row.id}
+                                            href={`/dashboard/partner/verify/${encodeURIComponent(row.id)}`}
+                                            title={row.project_title || "Report"}
+                                            student={row.student_name || "Student"}
+                                            org={row.organization_name}
+                                            hours={row.hours}
+                                            tone={tab === "done" ? "approved" : "waiting"}
+                                            cta="Open report (read-only) →"
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })()
                     )}
                 </div>
             )}

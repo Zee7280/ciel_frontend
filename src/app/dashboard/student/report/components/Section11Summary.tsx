@@ -5,8 +5,9 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "../utils/mediaVisibility";
 import CertificateView from "./CertificateView";
-import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
+import { openImpactPackageTab } from "../impact-package/impactPackageTabs";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
@@ -68,16 +69,16 @@ function finalDeclarationItems(requiresFee: boolean): string[] {
         "I understand that after final submission, no further edits are possible.",
         requiresFee
             ? "I understand my whole report — not each session — is verified once, by CIEL PK, from the flash card."
-            : "I understand my whole report — not each session — is verified once, by faculty, from the flash card.",
-        "I consent to this report and its evidence being shared with CIEL PK, my faculty, and my institution for verification.",
+            : "I understand my whole report — not each session — is verified once, by CIEL PK, from the flash card.",
+        "I consent to this report and its evidence being shared with CIEL PK, and my faculty and institution after approval.",
         requiresFee
             ? "I understand a reporting fee applies before CIEL PK can review my score and certificate."
-            : "I understand faculty reviews this report next. Hours are confirmed when they lock the flash-card score.",
+            : "I understand CIEL PK Admin reviews this report next. Hours and score are confirmed when the Admin approves it.",
     ];
 }
 
 /** Mockup 10.5 — the final declaration + electronic sign-off that gates submission, once all sections are complete. */
-function FinalDeclarationCard({
+export function FinalDeclarationCard({
     declaration,
     signatureName,
     requiresFee,
@@ -92,16 +93,16 @@ function FinalDeclarationCard({
 }) {
     const allChecked = declaration.slice(0, 5).every(Boolean);
     return (
-        <>
-            <div className="w-16 h-16 bg-[var(--teal-soft)] rounded-xl flex items-center justify-center">
-                <ShieldCheck className="w-8 h-8 text-[var(--teal)]" />
+        <div className="mx-auto flex w-full max-w-lg flex-col items-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--teal-soft)]">
+                <ShieldCheck className="h-8 w-8 text-[var(--teal)]" />
             </div>
-            <div className="max-w-lg w-full space-y-5 text-left">
-                <div>
-                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-1">
+            <div className="mt-5 w-full space-y-5 text-left">
+                <div className="text-center">
+                    <h3 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
                         Final report declaration &amp; electronic sign-off
                     </h3>
-                    <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                    <p className="text-sm font-medium leading-relaxed text-slate-400">
                         All sections and hours are complete. Before submission is accepted, tick every
                         declaration below and sign with your full name.
                     </p>
@@ -141,7 +142,7 @@ function FinalDeclarationCard({
                     </p>
                 )}
             </div>
-        </>
+        </div>
     );
 }
 
@@ -155,7 +156,7 @@ function ReportTravelsCard({ requiresFee }: { requiresFee: boolean }) {
           ]
         : [
               ["1 · Flash card assembled", "Your flash card and full PDF are built live from every section you complete."],
-              ["2 · Faculty approves once", "Faculty reviews the whole report from your flash card — not session by session."],
+              ["2 · CIEL PK Admin approves once", "CIEL PK Admin reviews the whole report from your flash card — not session by session."],
               ["3 · Delivered per stakeholder", "Once approved, your score, certificate, and public card unlock on your dashboard; the full PDF stays archived for CIEL PK, faculty, and your institution."],
           ];
     return (
@@ -288,35 +289,66 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         !["verified", "partner_verified"].includes(reportSt);
 
     const [showPreview, setShowPreview] = useState(false);
-    const [showLockedV17, setShowLockedV17] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
 
-    // Lets My Impact Wall's Certificate / official dossier / V17 package actions link straight
-    // into the real views here (?view=certificate | print | v17). V17 opens without waiting for
-    // score unlock (it is the locked source record). Certificate/print still wait for
-    // showVerifiedImpactScores. Printing still needs a visible "Print / Save PDF" click.
+    // Wall / listing deep-links (?view=certificate | print | v17 | evidence | flash | package).
+    // Certificate and detailed report wait for Super Admin approval. Do not mark the auto-open
+    // as done while scores are still loading — otherwise print/v17/certificate stay on Flash.
     const autoOpenView = searchParams.get("view");
     const autoOpenedViewRef = useRef(false);
     useEffect(() => {
-        if (autoOpenedViewRef.current || !autoOpenView) return;
-        if (autoOpenView === "v17") {
-            autoOpenedViewRef.current = true;
-            setShowLockedV17(true);
+        if (!autoOpenView) return;
+        const view = autoOpenView.trim().toLowerCase();
+        if (view === "v17" || view === "package" || view === "flash" || view === "evidence" || view === "analysis") {
+            if (view === "v17") {
+                if (!showVerifiedImpactScores) {
+                    openImpactPackageTab("flash");
+                    return;
+                }
+                if (!autoOpenedViewRef.current) {
+                    autoOpenedViewRef.current = true;
+                    openImpactPackageTab("report");
+                }
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                openImpactPackageTab(view === "evidence" ? "evidence" : view === "analysis" ? "analysis" : "flash");
+            }
             return;
         }
-        if (!showVerifiedImpactScores) return;
-        autoOpenedViewRef.current = true;
-        if (autoOpenView === "certificate") setShowCertificate(true);
-        else if (autoOpenView === "print") setShowPreview(true);
+        if (view === "print" || view === "report") {
+            if (!showVerifiedImpactScores) {
+                openImpactPackageTab("flash");
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                openImpactPackageTab("report");
+            }
+            return;
+        }
+        if (view === "certificate") {
+            if (!showVerifiedImpactScores) {
+                openImpactPackageTab("flash");
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                setShowCertificate(true);
+            }
+        }
     }, [autoOpenView, showVerifiedImpactScores]);
 
     useEffect(() => {
-        const openFullReport = () => setShowLockedV17(true);
+        const openFullReport = () => {
+            openImpactPackageTab(showVerifiedImpactScores ? "report" : "flash");
+        };
         window.addEventListener("ciel-open-full-report", openFullReport);
         return () => window.removeEventListener("ciel-open-full-report", openFullReport);
-    }, []);
+    }, [showVerifiedImpactScores]);
 
     const clearCertificatePrintScale = () => {
         document.documentElement.style.removeProperty("--cert-print-scale");
@@ -492,11 +524,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             check: Boolean(section8.partner_verification),
         },
         {
-            label: "Ethical safeguards",
-            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "Passed" : "Pending",
-            desc: "CIEL ethical declaration completed.",
+            label: "Evidence visibility",
+            status: isPublicMediaVisibility(section8.media_visible) && !hasPublicSharePermission(section8) ? "Pending" : "Passed",
+            desc: isPublicMediaVisibility(section8.media_visible)
+                ? "Public share permission recorded."
+                : `${mediaVisibilityTitle(section8.media_visible) || "Restricted"} — not shown publicly.`,
             icon: ShieldAlert,
-            check: Object.values(section8.ethical_compliance || {}).every(Boolean),
+            check: !(isPublicMediaVisibility(section8.media_visible) && !hasPublicSharePermission(section8)),
         },
         {
             label: "Sustainability proof",
@@ -618,7 +652,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 CII, hours, beneficiaries, SDG alignment, and the auditor narrative stay locked until{" "}
                                 {requiresFee
                                     ? "your reporting fee is confirmed and CIEL PK verifies this submission."
-                                    : "faculty locks the flash-card score."}
+                                    : "CIEL PK Admin approves the report."}
                             </p>
                         </div>
                     </div>
@@ -753,7 +787,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             stay hidden until{" "}
                             {requiresFee
                                 ? "your reporting fee is confirmed and CIEL PK approves your submission"
-                                : "faculty locks the flash-card score"}
+                                : "CIEL PK Admin approves the report"}
                             —the same unlock as quantified scores above.
                         </p>
                     </div>
@@ -780,22 +814,22 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 <div className={clsx("flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5", surfaceHeaderRow)}>
                     <div className="min-w-0 space-y-1">
                         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
-                            Same template faculty receives
+                            Same package CIEL PK Admin receives
                         </p>
                         <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
-                            V17 Flashcard + Detailed Report
+                            Impact Package
                         </h3>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                            Locked source record, field traceability, and the CII assessment layer — identical to the faculty package.
+                            The same package CIEL PK Admin reviews: flashcard, detailed report and evidence gallery. After approval it goes to faculty, your university and the partner.
                         </p>
                     </div>
                     <button
                         type="button"
                         className="cer-bigbtn shrink-0"
                         style={{ marginTop: 0, width: "auto", padding: "12px 18px" }}
-                        onClick={() => setShowLockedV17(true)}
+                        onClick={() => openImpactPackageTab("flash")}
                     >
-                        Open locked package
+                        Open impact package
                     </button>
                 </div>
             </div>
@@ -879,8 +913,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <button type="button" className="cer-cert-solid" onClick={() => setShowCertificate(true)}>
                                     Download certificate
                                 </button>
-                                <button type="button" className="cer-cert-ghost" onClick={() => setShowLockedV17(true)}>
-                                    V17 detailed report
+                                <button type="button" className="cer-cert-ghost" onClick={() => openImpactPackageTab("report")}>
+                                    Detailed report
                                 </button>
                                 <button
                                     type="button"
@@ -1219,14 +1253,6 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 }
             `}} />
 
-            {showLockedV17 ? (
-                <FacultyLockedV17Modal
-                    report={data as unknown as Record<string, unknown>}
-                    projectData={projectData}
-                    initialTab="assessedView"
-                    onClose={() => setShowLockedV17(false)}
-                />
-            ) : null}
 
             {showPreview && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none transition-all print-active-modal">

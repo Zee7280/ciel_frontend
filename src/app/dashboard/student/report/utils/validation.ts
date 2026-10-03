@@ -3,6 +3,9 @@
  * Updated for the 11-Section Community Engagement Report
  */
 
+import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
+import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
+
 export interface ValidationError {
     field: string;
     message: string;
@@ -32,7 +35,11 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     observed_change: { min: 40, max: 100 },
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
-    description: { min: 15, max: 200 },
+    description: { min: 15, max: 60 },
+    /** Confidence / proof note — 20 words is enough; keep it short. */
+    measurement_explanation: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
+    /** Overlap note when the same people appear in another activity. */
+    overlap_note: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
     /** Step 7 extra-evidence caption — UI meter is 10–45 words. */
     evidence_caption: { min: 10, max: 45 },
 };
@@ -75,7 +82,17 @@ function isCustomActivityChoice(value: unknown): boolean {
 }
 
 export function countWords(str: string): number {
-    return str.trim().split(/\s+/).filter(w => w.length > 0).length;
+    return String(str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function asObj(value: unknown): Record<string, any> {
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, any>)
+        : {};
+}
+
+function asList<T = any>(value: unknown): T[] {
+    return Array.isArray(value) ? value : [];
 }
 
 export function reportTextWordMeter(
@@ -137,11 +154,13 @@ function pushWordRange(
  */
 export function validateSection1(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    const hasPrivacyConsent = Boolean(data.privacy_consent || data.review_checked?.[2]);
+    data = asObj(data);
+    const reviewChecked = asList<boolean>(data.review_checked);
+    const hasPrivacyConsent = Boolean(data.privacy_consent || reviewChecked[2]);
     // The 3-item declaration replaces the old mid-flow attendance-verification request — the
     // whole report is verified once, at the end, by faculty. All three boxes must be ticked.
-    const declarationComplete = Array.isArray(data.review_checked) && data.review_checked.length >= 3
-        ? data.review_checked.slice(0, 3).every(Boolean)
+    const declarationComplete = reviewChecked.length >= 3
+        ? reviewChecked.slice(0, 3).every(Boolean)
         : false;
 
     if (!declarationComplete) {
@@ -162,6 +181,7 @@ export function validateSection1(data: any): ValidationResult {
  */
 export function validateSection2(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
 
     pushWordRange(errors, 'problem_statement', data.problem_statement, 'Problem statement');
 
@@ -184,7 +204,7 @@ export function validateSection2(data: any): ValidationResult {
 
     pushWordRange(errors, 'discipline_contribution', data.discipline_contribution, 'Discipline contribution explanation');
 
-    if (!data.baseline_evidence || data.baseline_evidence.length === 0) {
+    if (!asList(data.baseline_evidence).length) {
         errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
     }
 
@@ -236,19 +256,22 @@ export function validateSection2(data: any): ValidationResult {
  */
 export function validateSection3(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
+    const primary = asObj(data.primary_sdg);
     const hasStudentMappingSelection = Boolean(
-        data.primary_sdg?.goal_number ||
-        data.primary_sdg?.target_id ||
-        data.primary_sdg?.target_code ||
-        data.primary_sdg?.indicator_id ||
-        data.primary_sdg?.indicator_code
+        primary.goal_number ||
+        primary.target_id ||
+        primary.target_code ||
+        primary.indicator_id ||
+        primary.indicator_code
     );
 
     pushWordRange(errors, 'contribution_intent_statement', data.contribution_intent_statement, 'Contribution logic');
 
     const forbiddenPhrases = ["achieved", "solved", "eliminated"];
+    const intent = String(data.contribution_intent_statement || "").toLowerCase();
     forbiddenPhrases.forEach(phrase => {
-        if (data.contribution_intent_statement?.toLowerCase().includes(phrase.toLowerCase())) {
+        if (intent.includes(phrase.toLowerCase())) {
             errors.push({ field: 'contribution_intent_statement', message: `Avoid outcome claims like "${phrase}". Focus on intent.` });
         }
     });
@@ -256,18 +279,17 @@ export function validateSection3(data: any): ValidationResult {
     if (hasStudentMappingSelection) {
         pushWordRange(errors, 'student_contribution_intent_statement', data.student_contribution_intent_statement, 'Student contribution logic');
 
+        const studentIntent = String(data.student_contribution_intent_statement || "").toLowerCase();
         forbiddenPhrases.forEach(phrase => {
-            if (data.student_contribution_intent_statement?.toLowerCase().includes(phrase.toLowerCase())) {
+            if (studentIntent.includes(phrase.toLowerCase())) {
                 errors.push({ field: 'student_contribution_intent_statement', message: `Avoid outcome claims like "${phrase}". Focus on intent.` });
             }
         });
     }
 
-    if (data.secondary_sdgs && data.secondary_sdgs.length > 0) {
-        data.secondary_sdgs.forEach((sdg: any, index: number) => {
-            pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg.justification_text, 'Justification');
-        });
-    }
+    asList(data.secondary_sdgs).forEach((sdg: any, index: number) => {
+        pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg?.justification_text, 'Justification');
+    });
 
     return { isValid: errors.length === 0, errors };
 }
@@ -277,28 +299,44 @@ export function validateSection3(data: any): ValidationResult {
  */
 export function validateSection4(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
+    const activityBlocks = asList(data.activity_blocks);
     
-    if (!data.activity_blocks || data.activity_blocks.length === 0) {
+    if (!activityBlocks.length) {
         errors.push({ field: 'activity_blocks', message: 'At least one activity block is required' });
     } else {
-        data.activity_blocks.forEach((block: any, index: number) => {
-            if (!block.title?.trim()) errors.push({ field: `activity_blocks.${index}.title`, message: `Activity ${index + 1}: Title is required` });
-            if (!block.primary_category) errors.push({ field: `activity_blocks.${index}.primary_category`, message: `Activity ${index + 1}: Activity family is required` });
-            if (isCustomActivityChoice(block.primary_category) && !String(block.other_category_text || '').trim()) {
+        activityBlocks.forEach((block: any, index: number) => {
+            const row = asObj(block);
+            if (!String(row.title || '').trim()) errors.push({ field: `activity_blocks.${index}.title`, message: `Activity ${index + 1}: Title is required` });
+            if (!row.primary_category) errors.push({ field: `activity_blocks.${index}.primary_category`, message: `Activity ${index + 1}: Activity family is required` });
+            if (isCustomActivityChoice(row.primary_category) && !String(row.other_category_text || '').trim()) {
                 errors.push({ field: `activity_blocks.${index}.other_category_text`, message: `Activity ${index + 1}: Name the custom activity family` });
             }
-            if (block.primary_category && !isCustomActivityChoice(block.primary_category) && !block.sub_category) {
+            if (row.primary_category && !isCustomActivityChoice(row.primary_category) && !row.sub_category) {
                 errors.push({ field: `activity_blocks.${index}.sub_category`, message: `Activity ${index + 1}: Sub-category is required` });
             }
-            if (isCustomActivityChoice(block.sub_category) && !String(block.other_sub_category_text || '').trim()) {
+            if (isCustomActivityChoice(row.sub_category) && !String(row.other_sub_category_text || '').trim()) {
                 errors.push({ field: `activity_blocks.${index}.other_sub_category_text`, message: `Activity ${index + 1}: Describe the custom sub-category` });
             }
-            if (!block.status) errors.push({ field: `activity_blocks.${index}.status`, message: `Activity ${index + 1}: Status is required` });
+            if (!row.status) errors.push({ field: `activity_blocks.${index}.status`, message: `Activity ${index + 1}: Status is required` });
 
-            pushWordRange(errors, `activity_blocks.${index}.description`, block.description, `Activity ${index + 1} description`);
+            pushWordRange(errors, `activity_blocks.${index}.description`, row.description, `Activity ${index + 1} description`);
 
-            const hasOutput = (block.outputs || []).some((out: any) => String(out?.title || '').trim() && String(out?.quantity ?? '').trim());
-            const hasReach = String(block.beneficiaries_reached ?? '').trim() && String(block.unique_beneficiaries ?? block.beneficiaries_reached ?? '').trim();
+            // Ladder-built activities (carry ladder_ui) must pass every ladder step, exactly like the
+            // wizard's own step ticks; legacy rows keep the lighter rule below.
+            if (row.ladder_ui && typeof row.ladder_ui === 'object') {
+                const outs = asList(row.outputs);
+                if (!outs.length || !outs.every((o: any) => outputRowOk(asObj(o)))) {
+                    errors.push({ field: `activity_blocks.${index}.outputs`, message: `Activity ${index + 1}: Each delivered item needs a number above 0 and a unit` });
+                }
+                if (!step3Ok(row)) {
+                    errors.push({ field: `activity_blocks.${index}.beneficiaries_reached`, message: `Activity ${index + 1}: ${stepNeedText(row, 3) || 'Finish "Who did it serve, and how many?"'}` });
+                }
+                return;
+            }
+
+            const hasOutput = asList(row.outputs).some((out: any) => String(out?.title || '').trim() && String(out?.quantity ?? '').trim());
+            const hasReach = String(row.beneficiaries_reached ?? '').trim() && String(row.unique_beneficiaries ?? row.beneficiaries_reached ?? '').trim();
             if (!hasOutput && !hasReach) {
                 errors.push({ field: `activity_blocks.${index}.outputs`, message: `Activity ${index + 1}: Add a countable output or a beneficiary reach` });
             }
@@ -313,25 +351,33 @@ export function validateSection4(data: any): ValidationResult {
  */
 export function validateSection5(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
     pushWordRange(errors, 'observed_change', data.observed_change, 'Observed change narrative');
 
-    if (!data.measurable_outcomes || data.measurable_outcomes.length === 0) {
+    const outcomes = asList(data.measurable_outcomes);
+    if (!outcomes.length) {
         errors.push({ field: 'measurable_outcomes', message: 'At least one measurable outcome is required' });
     } else {
-        data.measurable_outcomes.forEach((outcome: any, index: number) => {
-            if (!outcome.outcome_area) errors.push({ field: `measurable_outcomes.${index}.outcome_area`, message: 'Outcome category is required' });
-            if (!outcome.outcome_sub_category && outcome.outcome_area !== 'Other') errors.push({ field: `measurable_outcomes.${index}.outcome_sub_category`, message: 'Outcome sub-category is required' });
-            if (!outcome.metric_category) errors.push({ field: `measurable_outcomes.${index}.metric_category`, message: 'Metric category is required' });
-            if (!outcome.metric) errors.push({ field: `measurable_outcomes.${index}.metric`, message: 'Primary metric unit is required' });
-            if (/^other$/i.test(String(outcome.metric || '').trim()) && !String(outcome.metric_other || '').trim()) {
+        outcomes.forEach((outcome: any, index: number) => {
+            const row = asObj(outcome);
+            if (!row.outcome_area) errors.push({ field: `measurable_outcomes.${index}.outcome_area`, message: 'Outcome category is required' });
+            if (!row.outcome_sub_category && row.outcome_area !== 'Other') errors.push({ field: `measurable_outcomes.${index}.outcome_sub_category`, message: 'Outcome sub-category is required' });
+            if (!row.metric_category) errors.push({ field: `measurable_outcomes.${index}.metric_category`, message: 'Metric category is required' });
+            if (!row.metric) errors.push({ field: `measurable_outcomes.${index}.metric`, message: 'Primary metric unit is required' });
+            if (/^other$/i.test(String(row.metric || '').trim()) && !String(row.metric_other || '').trim()) {
                 errors.push({ field: `measurable_outcomes.${index}.metric_other`, message: 'Please specify the custom metric unit' });
             }
-            if (outcome.baseline === '') errors.push({ field: `measurable_outcomes.${index}.baseline`, message: 'Baseline value is required' });
-            if (outcome.endline === '') errors.push({ field: `measurable_outcomes.${index}.endline`, message: 'Endline value is required' });
-            if (!outcome.unit) errors.push({ field: `measurable_outcomes.${index}.unit`, message: 'Unit of measurement is required' });
-            if (!outcome.confidence_level || outcome.confidence_level.length === 0) errors.push({ field: `measurable_outcomes.${index}.confidence_level`, message: 'At least one confidence level is required' });
+            if (row.baseline === '') errors.push({ field: `measurable_outcomes.${index}.baseline`, message: 'Baseline value is required' });
+            if (row.endline === '') errors.push({ field: `measurable_outcomes.${index}.endline`, message: 'Endline value is required' });
+            if (!row.unit) errors.push({ field: `measurable_outcomes.${index}.unit`, message: 'Unit of measurement is required' });
+            const hasConfidence = Array.isArray(row.confidence_level)
+                ? row.confidence_level.length > 0
+                : Boolean(String(row.confidence_level || '').trim());
+            if (!hasConfidence) {
+                errors.push({ field: `measurable_outcomes.${index}.confidence_level`, message: 'At least one confidence level is required' });
+            }
             
-            pushWordRange(errors, `measurable_outcomes.${index}.measurement_explanation`, outcome.measurement_explanation, 'Measurement explanation');
+            pushWordRange(errors, `measurable_outcomes.${index}.measurement_explanation`, row.measurement_explanation, 'Measurement explanation');
         });
     }
 
@@ -345,31 +391,34 @@ export function validateSection5(data: any): ValidationResult {
  */
 export function validateSection6(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
 
     if (data.use_resources !== 'yes' && data.use_resources !== 'no') {
         errors.push({ field: 'use_resources', message: 'Tell us whether the project used extra resources' });
     }
     
     if (data.use_resources === 'yes') {
-        if (!data.resources?.length) {
+        const resources = asList(data.resources);
+        if (!resources.length) {
             errors.push({ field: 'resources', message: 'Please list the resources used' });
         } else {
-            data.resources.forEach((res: any, index: number) => {
+            resources.forEach((res: any, index: number) => {
+                const row = asObj(res);
                 // One clear line beats a 50-word minimum — just require it's said.
-                if (!String(res.purpose || '').trim()) {
+                if (!String(row.purpose || '').trim()) {
                     errors.push({ field: `resources.${index}.purpose`, message: 'Say what this resource made possible' });
                 }
 
-                if (['Other (Specify)', 'Other / Custom'].includes(res.type) && !String(res.type_other || '').trim()) {
+                if (['Other (Specify)', 'Other / Custom'].includes(row.type) && !String(row.type_other || '').trim()) {
                     errors.push({ field: `resources.${index}.type_other`, message: 'Please specify the resource type' });
                 }
 
-                if (['Other (Specify)', 'Other…'].includes(res.unit) && !String(res.unit_other || '').trim()) {
+                if (['Other (Specify)', 'Other…'].includes(row.unit) && !String(row.unit_other || '').trim()) {
                     errors.push({ field: `resources.${index}.unit_other`, message: 'Please specify the unit' });
                 }
 
-                const sources = Array.isArray(res.sources) ? res.sources : [];
-                if (sources.some((item: string) => item === 'Other (Specify)' || item === 'Other / Custom Source') && !String(res.source_other || '').trim()) {
+                const sources = asList(row.sources);
+                if (sources.some((item: string) => item === 'Other (Specify)' || item === 'Other / Custom Source') && !String(row.source_other || '').trim()) {
                     errors.push({ field: `resources.${index}.source_other`, message: 'Please specify the source' });
                 }
             });
@@ -384,6 +433,7 @@ export function validateSection6(data: any): ValidationResult {
  */
 export function validateSection7(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
 
     // Require explicit selection — empty string means user hasn't chosen yet
     if (!data.has_partners) {
@@ -397,29 +447,31 @@ export function validateSection7(data: any): ValidationResult {
     }
 
     // has_partners === 'yes' — must have at least one partner
-    if (!data.partners?.length) {
+    const partners = asList(data.partners);
+    if (!partners.length) {
         errors.push({ field: 'partners', message: 'Please list your external partners' });
         return { isValid: false, errors };
     }
 
     // Validate individual partner fields
-    data.partners.forEach((p: any, index: number) => {
-        if (!p.name?.trim()) {
+    partners.forEach((p: any, index: number) => {
+        const row = asObj(p);
+        if (!String(row.name || '').trim()) {
             errors.push({ field: `partners.${index}.name`, message: `Partner ${index + 1}: Organization name is required` });
         }
-        if (!p.type) {
+        if (!row.type) {
             errors.push({ field: `partners.${index}.type`, message: `Partner ${index + 1}: Partner type is required` });
         }
         // "Others (please specify)" reveals a required free-text field (Section7Partnerships.tsx)
         // that was never actually enforced here — selecting it and leaving it blank passed submit.
-        if ((p.type === 'Others (please specify)' || p.type === '✏️ Other') && !String(p.type_other || '').trim()) {
+        if ((row.type === 'Others (please specify)' || row.type === '✏️ Other') && !String(row.type_other || '').trim()) {
             errors.push({ field: `partners.${index}.type_other`, message: `Partner ${index + 1}: Please specify the "Other" partner type` });
         }
-        const roleList = Array.isArray(p.role) ? p.role : (p.role ? [String(p.role)] : []);
+        const roleList = Array.isArray(row.role) ? row.role : (row.role ? [String(row.role)] : []);
         if (!roleList.length) {
             errors.push({ field: `partners.${index}.role`, message: `Partner ${index + 1}: At least one role in project is required` });
         }
-        if (!p.contribution?.length) {
+        if (!asList(row.contribution).length && !String(row.contribution || '').trim()) {
             errors.push({ field: `partners.${index}.contribution`, message: `Partner ${index + 1}: At least one contribution type is required` });
         }
     });
@@ -432,31 +484,29 @@ export function validateSection7(data: any): ValidationResult {
  */
 export function validateSection8(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
 
     if (data.has_evidence !== 'yes' && data.has_evidence !== 'no') {
         errors.push({ field: 'has_evidence', message: 'Tell us whether you have more evidence to add' });
     }
 
     if (data.has_evidence === 'yes') {
-        if (!data.evidence_files?.length) {
+        if (!asList(data.evidence_files).length) {
             errors.push({ field: 'evidence_files', message: 'Add at least one evidence file' });
         }
-        if (!data.evidence_types?.length) {
+        if (!asList(data.evidence_types).length) {
             errors.push({ field: 'evidence_types', message: 'Choose at least one evidence type' });
         }
-        const types: string[] = Array.isArray(data.evidence_types) ? data.evidence_types : [];
+        const types: string[] = asList(data.evidence_types);
         if (types.some((type) => /other supporting document/i.test(String(type))) && !String(data.evidence_type_other || '').trim()) {
             errors.push({ field: 'evidence_type_other', message: 'Say what kind of document this is' });
         }
         pushWordRange(errors, 'description', data.description, 'What does your evidence show?', true, 'evidence_caption');
     }
 
-    if (!data.media_visible) {
-        errors.push({ field: 'media_visible', message: 'Choose Public, Institutional, or Private' });
-    }
-    const ethics = data.ethical_compliance || {};
-    if (!ethics.authentic || !ethics.informed_consent || !ethics.no_harm || !ethics.privacy_respected) {
-        errors.push({ field: 'ethical_compliance', message: 'Confirm this evidence was gathered responsibly' });
+    const visibility = resolveMediaVisibility(data.media_visible);
+    if (isPublicMediaVisibility(visibility) && !hasPublicSharePermission(data)) {
+        errors.push({ field: 'public_share_permission', message: 'I have permission to publicly share this evidence.' });
     }
     return { isValid: errors.length === 0, errors };
 }
@@ -466,6 +516,7 @@ export function validateSection8(data: any): ValidationResult {
  */
 export function validateSection9(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
 
     if (!hasAcademicIntegration(data.academic_integration)) {
         errors.push({
@@ -473,10 +524,11 @@ export function validateSection9(data: any): ValidationResult {
             message: 'Tap an Academic integration option (Voluntary, course, credit, capstone, or research)',
         });
     }
-    if (!Array.isArray(data.skills_grown) || data.skills_grown.length === 0) {
+    const skills = asList(data.skills_grown);
+    if (!skills.length) {
         errors.push({ field: 'skills_grown', message: 'Tap at least one skill you grew' });
     }
-    if ((data.skills_grown || []).some((skill: string) => String(skill).replace(/^✏️\s*/, '').trim().toLowerCase() === 'other') && !String(data.skills_grown_other || '').trim()) {
+    if (skills.some((skill: string) => String(skill).replace(/^✏️\s*/, '').trim().toLowerCase() === 'other') && !String(data.skills_grown_other || '').trim()) {
         errors.push({ field: 'skills_grown_other', message: 'Name the other skill you grew' });
     }
     if (!String(data.reflection_biggest_learning || '').trim()) {
@@ -498,7 +550,7 @@ export function validateSection9(data: any): ValidationResult {
         'social_empathy', 'social_diversity', 'social_collaboration',
         'transformative_longterm', 'transformative_benefits', 'transformative_sustainability',
     ];
-    const scores = data.competency_scores || {};
+    const scores = asObj(data.competency_scores);
     if (!scoreKeys.every((key) => Number(scores[key]) >= 1)) {
         errors.push({ field: 'competency_scores', message: 'Rate all 12 competencies' });
     }
@@ -511,15 +563,17 @@ export function validateSection9(data: any): ValidationResult {
  */
 export function validateSection10(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    data = asObj(data);
     if (!data.continuation_status) {
         errors.push({ field: 'continuation_status', message: 'Choose whether the impact will continue after you (Yes / Partial / No)' });
     }
     pushWordRange(errors, 'continuation_details', data.continuation_details, 'What continues, what stops?');
 
-    if (!data.mechanisms?.length) {
+    const mechanisms = asList(data.mechanisms);
+    if (!mechanisms.length) {
         errors.push({ field: 'mechanisms', message: 'Tap at least one option under What keeps it alive?' });
     }
-    if ((data.mechanisms || []).some((item: string) => String(item).replace(/^✏️\s*/, '').trim().toLowerCase() === 'other') && !String(data.mechanism_other || '').trim()) {
+    if (mechanisms.some((item: string) => String(item).replace(/^✏️\s*/, '').trim().toLowerCase() === 'other') && !String(data.mechanism_other || '').trim()) {
         errors.push({ field: 'mechanism_other', message: 'Say what else keeps it going' });
     }
     if (!data.scaling_potential) {
@@ -568,16 +622,16 @@ export function getIncompleteSectionsSummary(data: {
     section10: any;
 }): SectionIncompleteInfo[] {
     const rows: Array<{ section: number; result: ValidationResult }> = [
-        { section: 1, result: validateSection1(data.section1) },
-        { section: 2, result: validateSection2(data.section2) },
-        { section: 3, result: validateSection3(data.section3) },
-        { section: 4, result: validateSection4(data.section4) },
-        { section: 5, result: validateSection5(data.section5) },
-        { section: 6, result: validateSection6(data.section6) },
-        { section: 7, result: validateSection7(data.section7) },
-        { section: 8, result: validateSection8(data.section8) },
-        { section: 9, result: validateSection9(data.section9) },
-        { section: 10, result: validateSection10(data.section10) },
+        { section: 1, result: validateSection1(data?.section1) },
+        { section: 2, result: validateSection2(data?.section2) },
+        { section: 3, result: validateSection3(data?.section3) },
+        { section: 4, result: validateSection4(data?.section4) },
+        { section: 5, result: validateSection5(data?.section5) },
+        { section: 6, result: validateSection6(data?.section6) },
+        { section: 7, result: validateSection7(data?.section7) },
+        { section: 8, result: validateSection8(data?.section8) },
+        { section: 9, result: validateSection9(data?.section9) },
+        { section: 10, result: validateSection10(data?.section10) },
     ];
     return rows
         .filter((r) => !r.result.isValid)

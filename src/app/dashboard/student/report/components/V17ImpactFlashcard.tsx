@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ReportData } from "../context/ReportContext";
+import { mediaVisibilityTitle } from "../utils/mediaVisibility";
 import { resolveReportCii } from "../utils/resolveReportCii";
 import { effectiveHoursFromLog } from "../utils/engagementMetrics";
 import { findSdgById } from "@/utils/sdgData";
@@ -461,16 +462,16 @@ export function V17ImpactFlashcard({
               ? "Submitted · reporting fee pending"
               : status === "pending"
                 ? audience === "faculty"
-                    ? "Submitted for faculty review"
+                    ? "Submitted for CIEL PK review"
                     : `Submitted · waiting on ${reviewer} review`
                 : "Attached · verification pending";
 
     const team = [
         data.section1?.team_lead
             ? {
-                  name: data.section1.team_lead.fullName || data.section1.team_lead.name || "Team lead",
-                  acad: [data.section1.team_lead.degree, data.section1.team_lead.university].filter(Boolean).join(" · "),
-                  hrs: data.section1.team_lead.hours,
+                  name: data.section1?.team_lead?.fullName || data.section1?.team_lead?.name || "Team lead",
+                  acad: [data.section1?.team_lead?.degree, data.section1?.team_lead?.university].filter(Boolean).join(" · "),
+                  hrs: data.section1?.team_lead?.hours,
               }
             : null,
         ...(Array.isArray(data.section1?.team_members)
@@ -605,7 +606,7 @@ export function V17ImpactFlashcard({
                                 {showCiiScore ? (
                                     <>
                                         <br />
-                                        Faculty-locked CII {Math.round(cii.totalScore)}/100
+                                        CIEL PK-verified CII {Math.round(cii.totalScore)}/100
                                     </>
                                 ) : null}
                             </p>
@@ -1127,7 +1128,7 @@ export function V17ImpactFlashcard({
                                                     <b>{item.cap}</b>
                                                     <small>{item.section}</small>
                                                     <small>
-                                                        {kind} · INSTITUTIONAL
+                                                        {kind} · {mediaVisibilityTitle(data.section8?.media_visible) || "Restricted"}
                                                     </small>
                                                     <span className="state">{evidenceState}</span>
                                                     <div className="c22-file-actions">
@@ -1167,7 +1168,7 @@ export function V17ImpactFlashcard({
                                 ? `The report is submitted. ${reviewer} review starts after the reporting fee is approved.`
                                 : status === "pending"
                                   ? audience === "faculty"
-                                      ? "The report is awaiting faculty review."
+                                      ? "The report is awaiting CIEL PK review."
                                       : `The report is submitted and waiting on ${reviewer} review.`
                                   : "This record has not yet been verified."}
                         </div>

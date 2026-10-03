@@ -10,6 +10,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
+import { getPathSessionCache } from "@/utils/student-path-session-cache";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
@@ -540,9 +541,12 @@ export default function CourseProjectWizardPage() {
     const router = useRouter();
     const id = params.id;
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => !getPathSessionCache<CourseProjectEntry[]>("course-projects")?.some((row) => row.id === id));
     const [notFound, setNotFound] = useState(false);
-    const [entry, setEntry] = useState<CourseProjectEntry>(EMPTY_COURSE_PROJECT);
+    const [entry, setEntry] = useState<CourseProjectEntry>(() => {
+        const cached = getPathSessionCache<CourseProjectEntry[]>("course-projects")?.find((row) => row.id === id);
+        return cached ? mergeCourseProjectEntry(EMPTY_COURSE_PROJECT, cached) : EMPTY_COURSE_PROJECT;
+    });
     const [step, setStep] = useState(0);
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<Record<string, { accepted: boolean; edited: boolean; text: string }>>({});

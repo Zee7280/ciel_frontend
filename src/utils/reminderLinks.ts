@@ -42,3 +42,10 @@ export function whatsappTargetedHref(whatsappCode: string | undefined, whatsappN
     if (!code || local.length < 6) return whatsappShareHref(text);
     return `https://wa.me/${code.replace("+", "")}${local}?text=${encodeURIComponent(text)}`;
 }
+
+/** Direct wa.me link for a stored E.164 (or digits) number. Returns null when unusable. */
+export function whatsappHrefFromE164(phone: string | null | undefined, text: string): string | null {
+    const digits = String(phone || "").replace(/\D/g, "");
+    if (digits.length < 10) return null;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}

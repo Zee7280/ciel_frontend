@@ -9,8 +9,9 @@ import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMerged
 import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, sectionStrength } from "./utils/impactJourney";
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
-import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
+import ImpactPackage from "./impact-package/ImpactPackage";
 import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "./utils/mediaVisibility";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -192,8 +193,9 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
         ratedCompetency.length > 0
             ? (ratedCompetency.reduce((sum, n) => sum + (Number(n) || 0), 0) / ratedCompetency.length).toFixed(1)
             : "";
-    const ethicsVals = Object.values(data.section8?.ethical_compliance || {});
-    const ethicsOk = ethicsVals.length > 0 && ethicsVals.every(Boolean);
+    const ethicsOk = isPublicMediaVisibility(data.section8?.media_visible)
+        ? hasPublicSharePermission(data.section8)
+        : true;
     const names = [
         displayName(data.section1?.team_lead),
         ...(Array.isArray(data.section1?.team_members) ? data.section1.team_members.map(displayName) : []),
@@ -435,7 +437,7 @@ export function ReportSectionBridge({
 
     const a = chromeAgg(data, projectData);
     const { context, title, sdgs, members, acts, reach, evidence, competency, bestPct, pkr } = a;
-    const loggedHours = sumNonRejectedLoggedHours(data.section1.attendance_logs || []);
+    const loggedHours = sumNonRejectedLoggedHours(data.section1?.attendance_logs || []);
 
     const pills: Array<[string, string]> = [];
     if (uiStep > 1 && loggedHours) pills.push([`${Math.round(loggedHours * 10) / 10}h`, "TEAM-HOURS LOGGED"]);
@@ -797,12 +799,6 @@ const CONTINUATION_TITLES: Record<string, string> = {
     no: "Stops when we leave",
 };
 
-const VISIBILITY_TITLES: Record<string, string> = {
-    public: "PUBLIC — EXTRA POINTS",
-    limited: "INSTITUTIONAL",
-    internal: "PRIVATE",
-};
-
 const INTEGRATION_TITLES: Record<string, string> = {
     "Voluntary extracurricular activity": "VOLUNTARY / EXTRACURRICULAR",
     "Course-linked assignment": "PART OF A COURSE",
@@ -1020,15 +1016,17 @@ function SectionSummaryStats({
     }
     if (uiStep === 7) {
         const types = cleanedList(data.section8?.evidence_types, data.section8?.evidence_type_other);
-        const visibility = VISIBILITY_TITLES[data.section8?.media_visible || ""] || "";
+        const visibility = (mediaVisibilityTitle(data.section8?.media_visible) || "Restricted").toUpperCase();
         return (
             <StatChart
                 title="📊 Evidence on file"
                 tiles={[
                     ...types.map((type) => `📎 ${type}`),
                     `${agg.evidence} evidence items`,
-                    `🔐 consent ${agg.ethicsOk ? "confirmed" : "pending"}`,
-                    visibility ? `👁 ${visibility}` : "",
+                    isPublicMediaVisibility(data.section8?.media_visible)
+                        ? `🔐 public share ${agg.ethicsOk ? "confirmed" : "pending"}`
+                        : "🔒 not public",
+                    `👁 ${visibility}`,
                 ].filter(Boolean)}
             />
         );
@@ -1534,7 +1532,7 @@ export function ReportLiveBanner({
 
     if (uiStep === 7) {
         const types = cleanedList(data.section8?.evidence_types, data.section8?.evidence_type_other);
-        const visibility = VISIBILITY_TITLES[data.section8?.media_visible || ""] || "";
+        const visibility = (mediaVisibilityTitle(data.section8?.media_visible) || "Restricted").toUpperCase();
         const noEvidence = data.section8?.has_evidence === "no";
         return (
             <BannerShell
@@ -1558,11 +1556,15 @@ export function ReportLiveBanner({
                 ) : null}
                 <div className="cer-mrow">
                     <span className="cer-mtag">📸 {a.evidence} FILES ON RECORD</span>
-                    <span className="cer-mtag">{a.ethicsOk ? "✅ CONSENT CONFIRMED" : "⏳ CONSENT PENDING"}</span>
-                    {visibility ? (
-                        <span className="cer-mtag">{data.section8?.media_visible === "public" ? "🌟" : "👁"} {visibility}</span>
+                    {isPublicMediaVisibility(data.section8?.media_visible) ? (
+                        <span className="cer-mtag">{a.ethicsOk ? "✅ PUBLIC SHARE CONFIRMED" : "⏳ PUBLIC SHARE PENDING"}</span>
                     ) : (
-                        <span className="cer-mtag">👁 VISIBILITY PENDING</span>
+                        <span className="cer-mtag">🔒 NOT PUBLIC</span>
+                    )}
+                    {visibility ? (
+                        <span className="cer-mtag">{isPublicMediaVisibility(data.section8?.media_visible) ? "🌟" : "👁"} {visibility}</span>
+                    ) : (
+                        <span className="cer-mtag">👁 RESTRICTED (DEFAULT)</span>
                     )}
                 </div>
             </BannerShell>
@@ -1806,18 +1808,11 @@ export function ReportFlashCard({
     sending?: boolean;
     paymentHref?: string;
 }) {
-    return (
-        <V17ImpactFlashcard
-            data={data}
-            agg={chromeAgg(data, projectData)}
-            sectionsComplete={sectionsComplete}
-            sectionTotal={REPORT_UI_SECTION_TOTAL}
-            missingLabels={missingLabels}
-            canSend={canSend}
-            onSend={onSend}
-            sending={sending}
-            paymentHref={paymentHref}
-            status={flashStatus(data)}
-        />
-    );
+    void sectionsComplete;
+    void missingLabels;
+    void canSend;
+    void onSend;
+    void sending;
+    void paymentHref;
+    return <ImpactPackage data={data} projectData={projectData} audience="student" />;
 }

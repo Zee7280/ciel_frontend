@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useCallback } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Eye } from "lucide-react";
 import AllFieldsConsolePanel from "@/components/analytics/AllFieldsConsolePanel";
 
@@ -11,12 +12,26 @@ type MasterTab = "view" | "reg";
  * CIEL Master — the per-role, per-field "view exactly what each stakeholder sees" governance
  * console. Platform KPI reporting lives on the separate Analytics & Impact page.
  */
-export default function AdminMasterAnalyticsPage() {
-    const [tab, setTab] = useState<MasterTab>("view");
+function AdminMasterAnalyticsPageInner() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const tab: MasterTab = searchParams.get("tab") === "reg" ? "reg" : "view";
+
+    const setTab = useCallback(
+        (next: MasterTab) => {
+            const params = new URLSearchParams(searchParams.toString());
+            if (next === "view") params.delete("tab");
+            else params.set("tab", next);
+            const qs = params.toString();
+            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        },
+        [router, pathname, searchParams],
+    );
 
     return (
         <div className="mx-auto max-w-[1220px] space-y-4 pb-12">
-            <div className="-mx-4 bg-[#0f1222] px-4 py-3.5 text-white sm:-mx-3 sm:px-3 md:-mx-5 md:px-5 lg:mx-0 lg:rounded-2xl lg:px-6">
+            <div className="-mx-3 bg-[#0f1222] px-3 py-3.5 text-white sm:mx-0 sm:rounded-2xl sm:px-6">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-extrabold">
                         C
@@ -63,7 +78,7 @@ export default function AdminMasterAnalyticsPage() {
                 </span>
             </div>
 
-            <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+            <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
                 <button
                     type="button"
                     onClick={() => setTab("view")}
@@ -95,5 +110,13 @@ export default function AdminMasterAnalyticsPage() {
                 onModeChange={(m) => setTab(m)}
             />
         </div>
+    );
+}
+
+export default function AdminMasterAnalyticsPage() {
+    return (
+        <Suspense fallback={null}>
+            <AdminMasterAnalyticsPageInner />
+        </Suspense>
     );
 }

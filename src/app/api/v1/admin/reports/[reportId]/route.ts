@@ -17,7 +17,7 @@ export async function GET(request: Request, context: RouteContext) {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const response = await fetch(`${base}/admin/reports/${encodeURIComponent(reportId)}`, {
+        const response = await fetch(`${base}/admin/reports/${encodeURIComponent(reportId)}${new URL(request.url).search}`, {
             method: "GET",
             headers: {
                 Authorization: authHeader,

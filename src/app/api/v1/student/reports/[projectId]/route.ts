@@ -23,13 +23,13 @@ export async function GET(
             "Content-Type": "application/json",
         };
 
-        let response = await fetch(`${base}/student/reports/${encoded}`, {
+        let response = await fetch(`${base}/student/reports/${encoded}${new URL(request.url).search}`, {
             method: "GET",
             headers,
         });
 
         if (response.status === 404) {
-            response = await fetch(`${base}/students/reports/${encoded}`, {
+            response = await fetch(`${base}/students/reports/${encoded}${new URL(request.url).search}`, {
                 method: "GET",
                 headers,
             });

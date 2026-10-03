@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Film, Loader2, PlayCircle, Trash2, Upload, FileText } from "lucide-react";
+import { Film, Loader2, PlayCircle, Trash2, Upload, FileText, Pencil } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import {
     resolvePreferredApiV1Base,
@@ -11,6 +11,15 @@ import { Input } from "@/app/dashboard/student/report/components/ui/input";
 import { Label } from "@/app/dashboard/student/report/components/ui/label";
 import { Textarea } from "@/app/dashboard/student/report/components/ui/textarea";
 import { toast } from "sonner";
+import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/app/dashboard/student/report/components/ui/dialog";
 
 type TutorialRow = {
     id: string;
@@ -23,6 +32,9 @@ type TutorialRow = {
     documentUrl?: string | null;
     documentFilename?: string | null;
     sortOrder?: number;
+    /** Present only if the API exposes a published flag. */
+    published?: boolean;
+    isPublished?: boolean;
     createdAt?: string;
 };
 
@@ -35,13 +47,48 @@ function adminTutorialsReadUrl(pathSuffix: "" | `/${string}`): string {
     return `/api/v1/admin/tutorials${pathSuffix}`;
 }
 
+/** PUT a file to a presigned URL with progress reporting (fetch cannot report upload progress). */
+function putWithProgress(url: string, file: File, onProgress: (loaded: number) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+        xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable) onProgress(ev.loaded);
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                onProgress(file.size);
+                resolve();
+            } else {
+                reject(new Error(xhr.responseText?.slice(0, 200) || `S3 upload failed (${xhr.status})`));
+            }
+        };
+        xhr.onerror = () => reject(new Error("Upload failed. Check your connection and the S3 CORS rule."));
+        xhr.onabort = () => reject(new Error("Upload cancelled."));
+        xhr.send(file);
+    });
+}
+
 /** Must match backend `PLATFORM_TUTORIAL_MAX_FILE_BYTES`. */
 const PLATFORM_TUTORIAL_MAX_BYTES = 500 * 1024 * 1024;
 
 export default function AdminTutorialsPage() {
     const [rows, setRows] = useState<TutorialRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null);
+
+    const [editing, setEditing] = useState<TutorialRow | null>(null);
+    const [editTitle, setEditTitle] = useState("");
+    const [editCategory, setEditCategory] = useState("");
+    const [editSort, setEditSort] = useState("0");
+    const [editPublished, setEditPublished] = useState(true);
+    const [editSaving, setEditSaving] = useState(false);
+
+    const [deleting, setDeleting] = useState<TutorialRow | null>(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -54,10 +101,12 @@ export default function AdminTutorialsPage() {
 
     const load = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await authenticatedFetch(adminTutorialsReadUrl(""), {}, { redirectToLogin: true });
             if (!res?.ok) {
                 setRows([]);
+                setLoadError(`Could not load tutorials${res?.status ? ` (HTTP ${res.status})` : ""}.`);
                 return;
             }
             const body = (await res.json()) as { success?: boolean; data?: unknown };
@@ -71,6 +120,7 @@ export default function AdminTutorialsPage() {
             setRows(list);
         } catch {
             setRows([]);
+            setLoadError("Failed to load tutorials. Check your connection and retry.");
         } finally {
             setLoading(false);
         }
@@ -170,22 +220,21 @@ export default function AdminTutorialsPage() {
             }
 
             // 2) Upload bytes directly to S3 (requires S3 CORS to allow PUT from this site).
-            const putOne = async (uploadUrl: string, file: File) => {
-                const r = await fetch(uploadUrl, {
-                    method: "PUT",
-                    headers: { "Content-Type": file.type || "application/octet-stream" },
-                    body: file,
-                });
-                if (!r.ok) {
-                    const text = await r.text().catch(() => "");
-                    throw new Error(text || `S3 upload failed (${r.status})`);
-                }
-            };
-            await putOne(videoSigned.uploadUrl, videoFile);
             const docSigned = d.document as ({ uploadUrl: string; publicUrl: string; filename?: string } | undefined) ?? undefined;
-            if (documentFile && docSigned?.uploadUrl) await putOne(docSigned.uploadUrl, documentFile);
             const posterSigned = d.poster as ({ uploadUrl: string; publicUrl: string } | undefined) ?? undefined;
-            if (posterFile && posterSigned?.uploadUrl) await putOne(posterSigned.uploadUrl, posterFile);
+            const jobs: { label: string; url: string; file: File }[] = [{ label: "video", url: videoSigned.uploadUrl, file: videoFile }];
+            if (documentFile && docSigned?.uploadUrl) jobs.push({ label: "document", url: docSigned.uploadUrl, file: documentFile });
+            if (posterFile && posterSigned?.uploadUrl) jobs.push({ label: "poster", url: posterSigned.uploadUrl, file: posterFile });
+            const totalBytes = jobs.reduce((n, j) => n + j.file.size, 0) || 1;
+            let doneBytes = 0;
+            for (const j of jobs) {
+                setProgress({ pct: Math.round((doneBytes / totalBytes) * 100), label: `Uploading ${j.label}…` });
+                await putWithProgress(j.url, j.file, (loaded) =>
+                    setProgress({ pct: Math.min(100, Math.round(((doneBytes + loaded) / totalBytes) * 100)), label: `Uploading ${j.label}…` }),
+                );
+                doneBytes += j.file.size;
+            }
+            setProgress({ pct: 100, label: "Saving…" });
 
             // 3) Create the tutorial row using the uploaded public URLs (small JSON; safe on Vercel).
             const directRes = await authenticatedFetch(
@@ -219,16 +268,15 @@ export default function AdminTutorialsPage() {
             toast.error(msg.slice(0, 240));
         } finally {
             setSubmitting(false);
+            setProgress(null);
         }
     };
 
-    const onDelete = async (id: string) => {
-        if (!window.confirm("Remove this tutorial? Video and attached files will be deleted from storage.")) {
-            return;
-        }
+    const onDelete = async (row: TutorialRow) => {
+        setDeleteBusy(true);
         try {
             const res = await authenticatedFetch(
-                adminTutorialsReadUrl(`/${encodeURIComponent(id)}`),
+                adminTutorialsReadUrl(`/${encodeURIComponent(row.id)}`),
                 { method: "DELETE" },
                 { redirectToLogin: true },
             );
@@ -237,14 +285,61 @@ export default function AdminTutorialsPage() {
                 return;
             }
             toast.success("Tutorial removed.");
+            setDeleting(null);
             await load();
         } catch {
             toast.error("Delete failed.");
+        } finally {
+            setDeleteBusy(false);
+        }
+    };
+
+    const openEdit = (r: TutorialRow) => {
+        setEditing(r);
+        setEditTitle(r.title ?? "");
+        setEditCategory(r.category ?? "");
+        setEditSort(String(Number(r.sortOrder ?? 0)));
+        setEditPublished(r.published ?? r.isPublished ?? true);
+    };
+
+    const onSaveEdit = async () => {
+        if (!editing) return;
+        const t = editTitle.trim();
+        if (t.length < 2) {
+            toast.error("Title is required.");
+            return;
+        }
+        setEditSaving(true);
+        try {
+            const payload: Record<string, unknown> = {
+                title: t,
+                category: editCategory.trim() || "General",
+                sortOrder: Number.parseInt(editSort, 10) || 0,
+            };
+            // Only send `published` when the API exposes it (whitelist pipes reject unknown fields).
+            if (editing.published !== undefined || editing.isPublished !== undefined) payload.published = editPublished;
+            const res = await authenticatedFetch(
+                adminTutorialsReadUrl(`/${encodeURIComponent(editing.id)}`),
+                { method: "PATCH", body: JSON.stringify(payload) },
+                { redirectToLogin: true },
+            );
+            if (!res?.ok) {
+                const msg = await res?.text?.().catch(() => "");
+                toast.error(msg?.slice(0, 200) || "Could not save changes.");
+                return;
+            }
+            toast.success("Tutorial updated.");
+            setEditing(null);
+            await load();
+        } catch {
+            toast.error("Save failed.");
+        } finally {
+            setEditSaving(false);
         }
     };
 
     return (
-        <div className="p-6 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="mb-8 flex flex-col gap-4 border-b border-slate-200/80 pb-8 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white shadow-lg shadow-slate-900/20">
@@ -343,6 +438,17 @@ export default function AdminTutorialsPage() {
                                 onChange={(e) => setPosterFile(e.target.files?.[0] ?? null)}
                             />
                         </div>
+                        {progress ? (
+                            <div role="progressbar" aria-valuenow={progress.pct} aria-valuemin={0} aria-valuemax={100}>
+                                <div className="mb-1 flex justify-between text-xs text-slate-600">
+                                    <span>{progress.label}</span>
+                                    <span className="tabular-nums">{progress.pct}%</span>
+                                </div>
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress.pct}%` }} />
+                                </div>
+                            </div>
+                        ) : null}
                         <Button type="submit" className="w-full" disabled={submitting}>
                             {submitting ? (
                                 <span className="inline-flex items-center gap-2">
@@ -370,6 +476,13 @@ export default function AdminTutorialsPage() {
                             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
                             <p className="text-sm text-slate-500">Loading tutorials…</p>
                         </div>
+                    ) : loadError ? (
+                        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-6 py-10 text-center">
+                            <p className="text-sm font-medium text-red-900">{loadError}</p>
+                            <Button type="button" variant="outline" className="mt-4" onClick={() => void load()}>
+                                Retry
+                            </Button>
+                        </div>
                     ) : rows.length === 0 ? (
                         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
                             <PlayCircle className="mx-auto mb-4 h-12 w-12 text-slate-300" />
@@ -387,7 +500,12 @@ export default function AdminTutorialsPage() {
                                         <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                                             Order {Number(r.sortOrder ?? 0)} · {r.category}
                                         </p>
-                                        <h3 className="mt-1 font-semibold text-slate-900">{r.title}</h3>
+                                        <h3 className="mt-1 break-words font-semibold text-slate-900">
+                                            {r.title}
+                                            {(r.published ?? r.isPublished) === false ? (
+                                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">Draft</span>
+                                            ) : null}
+                                        </h3>
                                         {r.durationLabel ? (
                                             <p className="mt-1 text-xs text-slate-500">{r.durationLabel}</p>
                                         ) : null}
@@ -408,20 +526,75 @@ export default function AdminTutorialsPage() {
                                             ) : null}
                                         </div>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                                        onClick={() => void onDelete(r.id)}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" /> Remove
-                                    </Button>
+                                    <div className="flex shrink-0 gap-2">
+                                        <Button type="button" variant="outline" onClick={() => openEdit(r)}>
+                                            <Pencil className="mr-2 h-4 w-4" /> Edit
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                                            disabled={deleteBusy && deleting?.id === r.id}
+                                            onClick={() => setDeleting(r)}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" /> Remove
+                                        </Button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
                     )}
                 </section>
             </div>
+
+            <Dialog open={editing !== null} onOpenChange={(o) => (!o && !editSaving ? setEditing(null) : undefined)}>
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit tutorial</DialogTitle>
+                        <DialogDescription>Update the details. Files are not changed here.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="e-title">Title</Label>
+                            <Input id="e-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1.5" />
+                        </div>
+                        <div>
+                            <Label htmlFor="e-cat">Category</Label>
+                            <Input id="e-cat" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="mt-1.5" />
+                        </div>
+                        <div>
+                            <Label htmlFor="e-sort">Display order</Label>
+                            <Input id="e-sort" type="number" min={0} value={editSort} onChange={(e) => setEditSort(e.target.value)} className="mt-1.5" />
+                        </div>
+                        {editing && (editing.published !== undefined || editing.isPublished !== undefined) ? (
+                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                <input type="checkbox" checked={editPublished} onChange={(e) => setEditPublished(e.target.checked)} className="h-4 w-4" />
+                                Published
+                            </label>
+                        ) : null}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={editSaving}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={() => void onSaveEdit()} disabled={editSaving}>
+                            {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <ConfirmModal
+                open={deleting !== null}
+                title="Remove tutorial"
+                tone="danger"
+                confirmLabel="Remove"
+                busy={deleteBusy}
+                onConfirm={() => (deleting ? onDelete(deleting) : undefined)}
+                onCancel={() => setDeleting(null)}
+            >
+                Remove &ldquo;{deleting?.title}&rdquo;? Video and attached files will be deleted from storage.
+            </ConfirmModal>
         </div>
     );
 }

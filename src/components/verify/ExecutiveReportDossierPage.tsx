@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
@@ -103,6 +104,7 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    evidence_access?: { visibility?: string; can_view?: boolean; can_download?: boolean; message?: string | null } | null;
 }
 
 type PartnerBlueprintRow = {
@@ -1162,7 +1164,8 @@ export function ExecutiveReportDossierPage({ config }: { config: ExecutiveReport
                                 </div>
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has Evidence" value={report.section8?.has_evidence} />
-                                    <LabelValue label="Media Visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Media Visibility" value={mediaVisibilityTitle(report.section8?.media_visible) || "Restricted"} />
+                                    <LabelValue label="Public share permission" value={isPublicMediaVisibility(report.section8?.media_visible) ? (hasPublicSharePermission(report.section8) ? "Confirmed" : "Pending") : "Not required"} />
                                     <LabelValue label="Partner Verification" value={report.section8?.partner_verification} />
                                     <LabelValue label="Partner Verification Type" value={report.section8?.partner_verification_type} />
                                 </div>
@@ -1197,7 +1200,11 @@ export function ExecutiveReportDossierPage({ config }: { config: ExecutiveReport
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-slate-500 italic text-sm">No evidence files uploaded</p>
+                                        <p className="text-slate-500 italic text-sm">
+                                            {report.evidence_access?.can_view === false
+                                                ? `🔒 ${report.evidence_access.message || "Evidence verified — not publicly available"}`
+                                                : "No evidence files uploaded"}
+                                        </p>
                                     )}
                                 </div>
                             </div>

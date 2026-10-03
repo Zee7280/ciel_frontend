@@ -5,6 +5,7 @@ import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 import WelcomeModal from "@/components/WelcomeModal";
 import { DashboardChromeProvider } from "@/components/ciel/dashboard/DashboardChromeContext";
 import StudentSessionGuard from "@/components/StudentSessionGuard";
+import DashboardSessionGuard from "@/components/DashboardSessionGuard";
 export default function DashboardLayout({
     children,
 }: {
@@ -14,6 +15,7 @@ export default function DashboardLayout({
         <div className="dashboard-shell min-h-screen min-w-0 overflow-x-clip bg-[#f4f7fa] font-sans text-[#16313d]">
             <DashboardChromeProvider>
                 <StudentSessionGuard />
+                <DashboardSessionGuard />
                 <div className="print:hidden">
                     <Suspense fallback={null}>
                         <Sidebar />

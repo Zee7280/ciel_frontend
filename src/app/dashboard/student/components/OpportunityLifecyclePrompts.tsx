@@ -210,19 +210,27 @@ export function OpportunitySubmittedReviewModal({
 
                     <div className="space-y-4">
                         <PromptRow icon={<Info className="h-4 w-4" />} iconClass="bg-blue-50 text-blue-600">
-                            Your opportunity has been submitted successfully and is now <strong className="text-blue-700">under review</strong>.
+                            Your project is currently under approval. If a partner is involved, they will review it first, followed by the CIEL PK Admin.
                         </PromptRow>
                         <PromptRow icon={<Clock3 className="h-4 w-4" />} iconClass="bg-amber-50 text-amber-600">
-                            Once faculty (and partner if required) and CIEL PK admin approve it, the opportunity goes{" "}
-                            <strong className="text-amber-800">live</strong>. You will get a dashboard reminder.
+                            Once approved, the project will go <strong className="text-amber-800">live</strong>.
                         </PromptRow>
-                        <PromptRow icon={<Users className="h-4 w-4" />} iconClass="bg-emerald-50 text-emerald-600">
-                            After it goes live, open <strong className="text-emerald-700">My Projects</strong> and click{" "}
-                            <strong>Start Report</strong> to begin your community service record. Teammates (if any) still use{" "}
-                            <strong>Join Opportunity / Apply</strong> on the public listing.
+                        <PromptRow icon={<FolderOpen className="h-4 w-4" />} iconClass="bg-emerald-50 text-emerald-600">
+                            You can check your opportunity&apos;s status by clicking{" "}
+                            <Link href="/dashboard/student/projects" className="font-black text-emerald-700 underline underline-offset-2">
+                                View My Projects
+                            </Link>
+                            .
                         </PromptRow>
                         <PromptRow icon={<FileText className="h-4 w-4" />} iconClass="bg-violet-50 text-violet-600">
-                            Reporting unlocks only after the opportunity is fully approved and live — not right after you submit.
+                            After your project is live, go to{" "}
+                            <Link
+                                href="/dashboard/student/paths/community-service?view=workspace"
+                                className="font-black text-violet-700 underline underline-offset-2"
+                            >
+                                My Reports
+                            </Link>{" "}
+                            to start and submit your report.
                         </PromptRow>
                     </div>
 

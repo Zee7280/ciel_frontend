@@ -13,6 +13,7 @@ import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, wordRa
 
 const OBSERVED_CHANGE_WORD_RANGE = FIELD_WORD_POLICY.observed_change;
 const CHALLENGES_WORD_RANGE = FIELD_WORD_POLICY.challenges;
+const EXPLANATION_WORD_RANGE = FIELD_WORD_POLICY.measurement_explanation;
 
 type MeasurableOutcome = {
     id: string;
@@ -192,7 +193,7 @@ function WordMeterBar({
                 />
             </div>
             <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / {max} words
+                {count} / {min}–{max} words
             </p>
         </div>
     );
@@ -520,7 +521,11 @@ function OutcomeCard({
                                 "border-red-300",
                         )}
                     />
-                    <WordMeterBar count={explanationWords} />
+                    <WordMeterBar
+                        count={explanationWords}
+                        min={EXPLANATION_WORD_RANGE.min}
+                        max={EXPLANATION_WORD_RANGE.max}
+                    />
                     <FieldError
                         message={getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
                     />
@@ -631,7 +636,7 @@ export default function Section5Outcomes() {
         const before = field === "story_before" ? val : section5.story_before || "";
         const now = field === "story_now" ? val : section5.story_now || "";
         const because = field === "story_because" ? val : section5.story_because || "";
-        const composed = `Before our project, ${lowerFirst(before) || "…"}. Now, ${lowerFirst(now) || "…"}. We can see this change because ${lowerFirst(because) || "…"}.`;
+        const composed = `Before our project, ${lowerFirst(before) || "…"}. Now, ${lowerFirst(now) || "…"}. We know because ${lowerFirst(because) || "…"}.`;
         const isStillAuto = !section5.observed_change || section5.observed_change === lastAutoStoryRef.current;
         const patch: Record<string, string> = { [field]: val };
         if (isStillAuto && (before || now || because)) {
@@ -768,7 +773,7 @@ export default function Section5Outcomes() {
                         <div className="space-y-1">
                             <Label className={fieldLabel}>Now…</Label>
                             <Input
-                                placeholder="e.g. 120 children learn in two renovated, equipped classrooms"
+                                placeholder="e.g. 120 children learn in a renovated, equipped classroom"
                                 value={section5.story_now || ""}
                                 onChange={e => updateStoryBlank("story_now", e.target.value)}
                                 className={inputClasses}
@@ -794,7 +799,7 @@ export default function Section5Outcomes() {
                             and what beneficiaries can now do differently.
                         </p>
                         <Textarea
-                            placeholder="Explain the direction and nature of change (20–200 words)…"
+                            placeholder="Explain the direction and nature of change (40–100 words)…"
                             className={clsx(textareaClasses, "min-h-[160px]")}
                             value={section5.observed_change}
                             onChange={e => update("observed_change", e.target.value)}

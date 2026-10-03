@@ -125,7 +125,17 @@ export default function UnifiedAnalyticsOverview({
                 setError("Analytics response was incomplete.");
                 return;
             }
-            setData(body.data);
+            const d = body.data;
+            setData({
+                ...d,
+                kpis: Array.isArray(d.kpis) ? d.kpis.filter((k) => k && typeof k === "object") : [],
+                charts: (Array.isArray(d.charts) ? d.charts : [])
+                    .filter((c) => c && typeof c === "object")
+                    .map((c) => ({
+                        ...c,
+                        data: Array.isArray(c.data) ? c.data.filter((p) => p && typeof p === "object") : [],
+                    })),
+            });
         } catch {
             setError("Overall analytics could not be loaded.");
         } finally {
@@ -161,7 +171,7 @@ export default function UnifiedAnalyticsOverview({
         );
     }
 
-    const charts = data?.charts ?? [];
+    const charts = Array.isArray(data?.charts) ? data.charts : [];
     const primaryCharts = charts.filter((c) => c.key === "section_completion" || c.key === "report_status");
     const secondaryCharts = charts.filter((c) => c.key !== "section_completion" && c.key !== "report_status");
 
@@ -191,7 +201,7 @@ export default function UnifiedAnalyticsOverview({
             </div>
 
             <div className="grid grid-cols-2 border border-slate-200 bg-white md:grid-cols-3 xl:grid-cols-6">
-                {(data?.kpis ?? []).map((kpi, index) => {
+                {(Array.isArray(data?.kpis) ? data.kpis : []).map((kpi, index) => {
                     const Icon = KPI_ICONS[kpi.key] ?? BarChart3;
                     return (
                         <article
@@ -230,7 +240,7 @@ export default function UnifiedAnalyticsOverview({
 }
 
 function ChartPanel({ chart, compact = false }: { chart: ChartSeries; compact?: boolean }) {
-    const hasData = chart.data.some((point) => point.value > 0);
+    const hasData = Array.isArray(chart.data) && chart.data.some((point) => Number(point.value) > 0);
     return (
         <article className="border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">

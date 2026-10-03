@@ -208,6 +208,7 @@
 .flv17-evhead>div:last-child,.flv17-attHead>div:last-child{text-align:right}
 .flv17-evhead b,.flv17-attHead b{display:block;font-size:28px;color:#0b6e67;line-height:1}
 .flv17-evhead span,.flv17-attHead span{font-size:11px;color:#728487}
+.flv17-evgallery{padding:14px 12px 4px;border:1px solid #d9e4e1;border-top:0;background:#fff}
 .flv17-evcards{display:grid;gap:10px;padding:12px;border:1px solid #d9e4e1;border-top:0;border-radius:0 0 14px 14px;background:#fff}
 .flv17-evcards article{display:grid;grid-template-columns:48px 1fr;gap:12px;border:1px solid #dce5e3;border-radius:12px;padding:12px}
 .flv17-evcards .ico{width:48px;height:48px;border-radius:10px;background:#eef6f4;color:#0b6e67;display:grid;place-items:center;font-size:11px;font-weight:950}

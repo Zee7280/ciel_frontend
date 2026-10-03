@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { GraduationCap, Loader2, Plus, Trash2, Link2 } from "lucide-react";
+import { GraduationCap, Loader2, Plus, Trash2, Link2, AlertTriangle } from "lucide-react";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import StatusBadge from "@/components/admin/StatusBadge";
+import { formatAdminDate } from "@/utils/adminDate";
+
+const USERS_PAGE_LIMIT = 100;
+const USERS_MAX_PAGES = 50;
 
 type ScopeRow = {
     id: string;
@@ -13,6 +19,9 @@ type ScopeRow = {
     university_organization_id?: string;
     university_organization_name?: string;
     created_at?: string;
+    assigned_by_name?: string;
+    assigned_by_email?: string;
+    assigned_by?: string;
 };
 
 type AdminUser = {
@@ -28,7 +37,13 @@ type AdminOrg = {
     organization_type?: string;
     type?: string;
     orgType?: string;
+    status?: string;
 };
+
+function isEligibleOrg(org: AdminOrg): boolean {
+    const st = String(org.status || "").toLowerCase();
+    return st === "verified" || st === "approved";
+}
 
 function isUniversityOrg(org: AdminOrg): boolean {
     const t = String(org.organization_type || org.type || org.orgType || "").toLowerCase();
@@ -41,6 +56,10 @@ export default function AdminFacultyUniversityScopePage() {
     const [orgs, setOrgs] = useState<AdminOrg[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [showAllOrgs, setShowAllOrgs] = useState(false);
+    const [confirmReplace, setConfirmReplace] = useState(false);
+    const [removeTarget, setRemoveTarget] = useState<ScopeRow | null>(null);
+    const [removing, setRemoving] = useState(false);
 
     const [facultyUserId, setFacultyUserId] = useState("");
     const [universityOrganizationId, setUniversityOrganizationId] = useState("");
@@ -57,23 +76,38 @@ export default function AdminFacultyUniversityScopePage() {
     }, []);
 
     const loadLookups = useCallback(async () => {
-        const [uRes, oRes] = await Promise.all([
-            authenticatedFetch(`/api/v1/admin/users`),
-            authenticatedFetch(`/api/v1/admin/organizations`),
-        ]);
-        if (uRes?.ok) {
-            const j = await uRes.json();
-            const raw = j?.data ?? j;
-            const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
-            setUsers(arr as AdminUser[]);
-        }
-        if (oRes?.ok) {
-            const j = await oRes.json();
-            let arr: AdminOrg[] = [];
-            if (Array.isArray(j)) arr = j;
-            else if (Array.isArray(j?.data)) arr = j.data;
-            setOrgs(arr);
-        }
+        const loadFaculty = async () => {
+            const all: AdminUser[] = [];
+            for (let page = 1; page <= USERS_MAX_PAGES; page++) {
+                const uRes = await authenticatedFetch(
+                    `/api/v1/admin/users?role=faculty&page=${page}&limit=${USERS_PAGE_LIMIT}`,
+                );
+                if (!uRes?.ok) {
+                    if (page === 1) toast.error("Failed to load faculty users");
+                    break;
+                }
+                const j = await uRes.json();
+                const raw = j?.data ?? j;
+                const arr: AdminUser[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+                all.push(...arr);
+                const total = typeof j?.total === "number" ? j.total : null;
+                if (arr.length < USERS_PAGE_LIMIT || (total != null && all.length >= total)) break;
+            }
+            setUsers(all);
+        };
+        const loadOrgs = async () => {
+            const oRes = await authenticatedFetch(`/api/v1/admin/organizations`);
+            if (oRes?.ok) {
+                const j = await oRes.json();
+                let arr: AdminOrg[] = [];
+                if (Array.isArray(j)) arr = j;
+                else if (Array.isArray(j?.data)) arr = j.data;
+                setOrgs(arr);
+            } else {
+                toast.error("Failed to load organizations");
+            }
+        };
+        await Promise.all([loadFaculty(), loadOrgs()]);
     }, []);
 
     useEffect(() => {
@@ -93,14 +127,33 @@ export default function AdminFacultyUniversityScopePage() {
         [users],
     );
 
-    const universityOrgOptions = useMemo(() => orgs.filter(isUniversityOrg), [orgs]);
+    const universityOrgs = useMemo(() => orgs.filter(isUniversityOrg), [orgs]);
+    const universityOrgOptions = useMemo(
+        () => (showAllOrgs ? universityOrgs : universityOrgs.filter(isEligibleOrg)),
+        [universityOrgs, showAllOrgs],
+    );
+    const hiddenOrgCount = universityOrgs.length - universityOrgs.filter(isEligibleOrg).length;
 
-    const handleAssign = async (e: React.FormEvent) => {
+    const existingAssignment = useMemo(
+        () => (facultyUserId ? rows.find((r) => r.faculty_user_id === facultyUserId) ?? null : null),
+        [rows, facultyUserId],
+    );
+    const selectedOrg = orgs.find((o) => o.id === universityOrganizationId);
+
+    const handleAssign = (e: React.FormEvent) => {
         e.preventDefault();
         if (!facultyUserId || !universityOrganizationId) {
             toast.error("Select faculty and university organization");
             return;
         }
+        if (existingAssignment) {
+            setConfirmReplace(true);
+            return;
+        }
+        void doAssign();
+    };
+
+    const doAssign = async () => {
         setSubmitting(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/faculty-university-scope`, {
@@ -118,24 +171,32 @@ export default function AdminFacultyUniversityScopePage() {
             toast.success("University scope assigned");
             setFacultyUserId("");
             setUniversityOrganizationId("");
+            setConfirmReplace(false);
             await loadAssignments();
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleRemove = async (fid: string) => {
-        if (!confirm("Remove university-wide visibility for this faculty?")) return;
-        const res = await authenticatedFetch(`/api/v1/admin/faculty-university-scope/${fid}`, {
-            method: "DELETE",
-        });
-        const data = await res?.json().catch(() => ({}));
-        if (!res?.ok) {
-            toast.error(data?.message || data?.error || "Remove failed");
-            return;
+    const handleRemove = async () => {
+        const fid = removeTarget?.faculty_user_id;
+        if (!fid) return;
+        setRemoving(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/faculty-university-scope/${fid}`, {
+                method: "DELETE",
+            });
+            const data = await res?.json().catch(() => ({}));
+            if (!res?.ok) {
+                toast.error(data?.message || data?.error || "Remove failed");
+                return;
+            }
+            toast.success("Assignment removed");
+            setRemoveTarget(null);
+            await loadAssignments();
+        } finally {
+            setRemoving(false);
         }
-        toast.success("Assignment removed");
-        await loadAssignments();
     };
 
     return (
@@ -170,12 +231,28 @@ export default function AdminFacultyUniversityScopePage() {
                                 onChange={(e) => setFacultyUserId(e.target.value)}
                             >
                                 <option value="">Select faculty…</option>
-                                {facultyOptions.map((u) => (
-                                    <option key={u.id} value={u.id}>
-                                        {(u.name || "—") + " · " + (u.email || u.id)}
-                                    </option>
-                                ))}
+                                {facultyOptions.map((u) => {
+                                    const cur = rows.find((r) => r.faculty_user_id === u.id);
+                                    return (
+                                        <option key={u.id} value={u.id}>
+                                            {(u.name || "—") +
+                                                " · " +
+                                                (u.email || u.id) +
+                                                (cur ? ` (currently: ${cur.university_organization_name || "assigned"})` : "")}
+                                        </option>
+                                    );
+                                })}
                             </select>
+                            {existingAssignment && (
+                                <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                                    <span>
+                                        Already assigned to{" "}
+                                        {existingAssignment.university_organization_name || existingAssignment.university_organization_id}.
+                                        Assigning will replace it.
+                                    </span>
+                                </p>
+                            )}
                             {facultyOptions.length === 0 && (
                                 <p className="text-xs text-amber-600 mt-1">No faculty users in directory — check Users screen.</p>
                             )}
@@ -191,15 +268,25 @@ export default function AdminFacultyUniversityScopePage() {
                                 <option value="">Select organization…</option>
                                 {universityOrgOptions.map((o) => (
                                     <option key={o.id} value={o.id}>
-                                        {(o.name || o.id) +
-                                            " · " +
-                                            String(o.organization_type || o.type || o.orgType || "university")}
+                                        {(o.name || o.id) + (o.status ? ` · ${o.status}` : "")}
                                     </option>
                                 ))}
                             </select>
+                            <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                                <input
+                                    type="checkbox"
+                                    checked={showAllOrgs}
+                                    onChange={(e) => {
+                                        setShowAllOrgs(e.target.checked);
+                                        setUniversityOrganizationId("");
+                                    }}
+                                />
+                                Show unverified / suspended universities too
+                                {!showAllOrgs && hiddenOrgCount > 0 ? ` (${hiddenOrgCount} hidden)` : ""}
+                            </label>
                             {universityOrgOptions.length === 0 && (
                                 <p className="text-xs text-amber-600 mt-1">
-                                    No orgs typed as university — onboard one with type University or adjust org type in backend.
+                                    No eligible university organizations — verify one, or toggle to show all.
                                 </p>
                             )}
                         </div>
@@ -237,11 +324,25 @@ export default function AdminFacultyUniversityScopePage() {
                                         <p className="text-sm text-slate-500 break-words">{r.faculty_email}</p>
                                         <p className="text-sm text-indigo-700 mt-1 break-words">
                                             → {r.university_organization_name || r.university_organization_id}
+                                            {(() => {
+                                                const org = orgs.find((o) => o.id === r.university_organization_id);
+                                                return org?.status ? (
+                                                    <StatusBadge status={org.status} className="ml-2 align-middle" />
+                                                ) : null;
+                                            })()}
                                         </p>
+                                        {r.created_at || r.assigned_by_name || r.assigned_by_email || r.assigned_by ? (
+                                            <p className="mt-0.5 text-xs text-slate-500 break-words">
+                                                {r.created_at ? `Assigned ${formatAdminDate(r.created_at)}` : "Assigned"}
+                                                {r.assigned_by_name || r.assigned_by_email || r.assigned_by
+                                                    ? ` by ${r.assigned_by_name || r.assigned_by_email || r.assigned_by}`
+                                                    : ""}
+                                            </p>
+                                        ) : null}
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => r.faculty_user_id && handleRemove(r.faculty_user_id)}
+                                        onClick={() => setRemoveTarget(r)}
                                         className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -253,6 +354,31 @@ export default function AdminFacultyUniversityScopePage() {
                     )}
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={confirmReplace && !!existingAssignment}
+                title="Replace existing assignment?"
+                description={`${existingAssignment?.faculty_name || "This faculty"} is currently scoped to ${
+                    existingAssignment?.university_organization_name || "another university"
+                }. Assigning ${selectedOrg?.name || "the selected university"} will replace it.`}
+                variant="warning"
+                confirmLabel="Replace assignment"
+                loading={submitting}
+                onConfirm={doAssign}
+                onCancel={() => setConfirmReplace(false)}
+            />
+            <ConfirmDialog
+                open={removeTarget != null}
+                title="Remove university scope?"
+                description={`${removeTarget?.faculty_name || "This faculty"} will lose university-wide visibility${
+                    removeTarget?.university_organization_name ? ` for ${removeTarget.university_organization_name}` : ""
+                }.`}
+                variant="danger"
+                confirmLabel="Remove"
+                loading={removing}
+                onConfirm={handleRemove}
+                onCancel={() => setRemoveTarget(null)}
+            />
         </div>
     );
 }

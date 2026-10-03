@@ -3,6 +3,7 @@
  * Safe for partial / missing nested objects.
  */
 
+import { OPPORTUNITY_BENEFICIARY_PRESETS, ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS, splitCustomValues } from "@/utils/opportunityChipOptions";
 import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 
 type ParticipationRule =
@@ -147,11 +148,14 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         ? (deptRest.departments as string[]).filter(Boolean)
         : [""];
 
-    const beneficiariesType = Array.isArray(objectives.beneficiaries_type)
-        ? (objectives.beneficiaries_type as string[])
-        : [];
-
-    const verification = Array.isArray(d.verification_method) ? (d.verification_method as string[]) : [];
+    const benSplit = splitCustomValues(objectives.beneficiaries_type, OPPORTUNITY_BENEFICIARY_PRESETS);
+    const beneficiariesType = benSplit.known;
+    const skillSplit = splitCustomValues(
+        (d.activity_details as Record<string, unknown> | undefined)?.skills_gained,
+        ORG_SKILL_PRESETS,
+    );
+    const verifySplit = splitCustomValues(d.verification_method, ORG_VERIFICATION_PRESETS);
+    const verification = verifySplit.known;
 
     const facultyDetailsPatch = {
         name: typeof sup.supervisor_name === "string" ? sup.supervisor_name : "",
@@ -163,7 +167,8 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
     };
 
     const formDataPatch: Record<string, unknown> = {
-        title: typeof d.title === "string" ? d.title : "",
+        // The server stores "Untitled opportunity" for a draft saved with no title — show it as blank.
+        title: typeof d.title === "string" && d.title !== "Untitled opportunity" ? d.title : "",
         hook: typeof objectives.hook === "string" ? objectives.hook : "",
         opportunityType,
         isOtherTypeChecked,
@@ -177,19 +182,10 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             fromTime: typeof timeline.from_time === "string" ? timeline.from_time : "",
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
-        applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
-        closeApplicationsEarly:
-            timeline.close_applications_early === true ||
-            (typeof timeline.application_deadline === "string" &&
-                typeof timeline.end_date === "string" &&
-                timeline.application_deadline < timeline.end_date &&
-                timeline.close_applications_early !== false),
         scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
-            hours:
-                timeline.expected_hours != null ? String(timeline.expected_hours) : "",
-            volunteers:
-                timeline.volunteers_required != null ? String(timeline.volunteers_required) : "",
+            hours: Number(timeline.expected_hours) > 0 ? String(timeline.expected_hours) : "",
+            volunteers: Number(timeline.volunteers_required) > 0 ? String(timeline.volunteers_required) : "",
         },
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
@@ -211,20 +207,19 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             description: typeof objectives.description === "string" ? objectives.description : "",
             outputs: typeof objectives.outputs === "string" ? objectives.outputs : "",
             outcome: typeof objectives.outcome === "string" ? objectives.outcome : "",
-            beneficiariesCount:
-                objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
+            beneficiariesCount: Number(objectives.beneficiaries_count) > 0 ? String(objectives.beneficiaries_count) : "",
             beneficiariesType,
-            isOtherBeneficiaryChecked: false,
-            otherBeneficiarySpecs: [""] as string[],
+            isOtherBeneficiaryChecked: benSplit.custom.length > 0,
+            otherBeneficiarySpecs: benSplit.custom.length ? benSplit.custom : [""],
         },
         activity: {
             responsibilities:
                 typeof activity.student_responsibilities === "string"
                     ? activity.student_responsibilities
                     : "",
-            skills: Array.isArray(activity.skills_gained) ? (activity.skills_gained as string[]) : [],
-            isOtherSkillChecked: false,
-            otherSkills: [""] as string[],
+            skills: skillSplit.known,
+            isOtherSkillChecked: skillSplit.custom.length > 0,
+            otherSkills: skillSplit.custom.length ? skillSplit.custom : [""],
             prerequisites: typeof activity.prerequisites === "string" ? activity.prerequisites : "",
             resources: typeof activity.resources === "string" ? activity.resources : "",
         },
@@ -254,8 +249,8 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             precautionsInPlace: safety.precautions_and_basic_safety === true,
         },
         verification,
-        isOtherVerificationChecked: false,
-        otherVerification: "",
+        isOtherVerificationChecked: verifySplit.custom.length > 0,
+        otherVerification: verifySplit.custom.join(", "),
         participationScope: {
             rule,
             selectedUniversities: uniNames,
@@ -278,12 +273,17 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         // These 4 boxes have no backend field to restore from (the backend never stores them) — but this
         // opportunity was already submitted once with them checked, so re-defaulting to unchecked on every
         // edit just re-blocks submit with no way to see why (see extraSafety validation at page.tsx:437).
-        extraSafety: {
-            communicateChanges: true,
-            visibilityIntentional: true,
-            cielNotGuarantee: true,
-            signatureAck: true,
-        },
+        // A draft that was never submitted must NOT arrive with these pre-ticked, or the student can
+        // submit without ever acknowledging them.
+        extraSafety: (() => {
+            const ack = String(d.status ?? "").toLowerCase() !== "draft";
+            return {
+                communicateChanges: ack,
+                visibilityIntentional: ack,
+                cielNotGuarantee: ack,
+                signatureAck: ack,
+            };
+        })(),
     };
 
     return { facultyDetailsPatch, formDataPatch };

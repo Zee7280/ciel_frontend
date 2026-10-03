@@ -69,7 +69,7 @@ export default function Section1AnalyticsPanel({
         void (async () => {
             const payload = await fetchSection1Analytics(apiPath, query);
             if (cancelled) return;
-            setData(payload);
+            setData(payload ? { ...payload, meta: payload.meta && typeof payload.meta === "object" ? payload.meta : {} } : null);
             setLoading(false);
         })();
         return () => {

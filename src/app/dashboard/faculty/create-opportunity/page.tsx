@@ -1,5 +1,7 @@
 "use client";
 
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -19,6 +21,7 @@ import {
 import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
 import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -26,7 +29,7 @@ import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay, validateOptionalNationalPhone } from "@/utils/countryCallingCodes";
 import {
     resolveFacultyFlashEligibility,
     StudentOpportunityFlashcard,
@@ -158,8 +161,6 @@ export default function FacultyOpportunityCreationPage() {
         location: { city: "", venue: "", pin: "" },
         timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
-        applicationDeadline: "",
-        closeApplicationsEarly: false,
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
@@ -258,13 +259,37 @@ export default function FacultyOpportunityCreationPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+        if (i >= schedIdx) {
+            const timelineErr = validateTimelineForPersist({
+                start_date: formData.dates.start,
+                end_date: formData.dates.end,
+            });
+            if (timelineErr) {
+                toast.error(timelineErr);
+                goToStep("SCHED");
+                return;
+            }
+            const hoursNum = parseInt(formData.capacity.hours, 10);
+            const volNum = parseInt(formData.capacity.volunteers, 10);
+            if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
+                toast.error("Required hours per student must be between 1 and 500.");
+                goToStep("SCHED");
+                return;
+            }
+            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
+                toast.error("Available seats must be between 1 and 5000.");
+                goToStep("SCHED");
+                return;
+            }
+        }
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -306,7 +331,11 @@ export default function FacultyOpportunityCreationPage() {
 
     const validateForm = () => {
         if (!facultyDetails.contact.trim()) {
-            toast.error("Contact No. is missing from your profile. Add it under Faculty Profile, then try again.");
+            toast.error(
+                isCielAdminForm
+                    ? "Contact No. is missing from your profile. Add it under your admin Profile, then try again."
+                    : "Contact No. is missing from your profile. Add it under Faculty Profile, then try again.",
+            );
             return false;
         }
         if (!facultyDetails.email.trim() || !isValidEmail(facultyDetails.email)) {
@@ -357,21 +386,32 @@ export default function FacultyOpportunityCreationPage() {
         const timelineErr = validateTimelineForPersist({
             start_date: formData.dates.start,
             end_date: formData.dates.end,
-            close_applications_early: formData.closeApplicationsEarly,
-            application_deadline: formData.applicationDeadline,
         });
         if (timelineErr) {
             toast.error(timelineErr);
+            goToStep("SCHED");
             return false;
         }
         const hoursNum = parseInt(formData.capacity.hours, 10);
         if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
             toast.error("Required hours per student must be between 1 and 500.");
+            goToStep("SCHED");
             return false;
         }
         const volNum = parseInt(formData.capacity.volunteers, 10);
         if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
             toast.error("Available seats must be between 1 and 5000.");
+            goToStep("SCHED");
+            return false;
+        }
+        if (
+            (TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) &&
+            formData.dates.fromTime.trim() &&
+            formData.dates.endTime.trim() &&
+            formData.dates.fromTime >= formData.dates.endTime
+        ) {
+            toast.error("End time must be after start time.");
+            goToStep("SCHED");
             return false;
         }
         // Section C
@@ -441,6 +481,14 @@ export default function FacultyOpportunityCreationPage() {
         }
         if (!formData.academicLead.officialEmail.trim() || !isValidEmail(formData.academicLead.officialEmail)) {
             toast.error("Please enter a valid official email address");
+            return false;
+        }
+        const whatsappErr = validateOptionalNationalPhone(
+            formData.academicLead.whatsappCountryKey,
+            formData.academicLead.whatsappNational,
+        );
+        if (whatsappErr) {
+            toast.error(whatsappErr);
             return false;
         }
 
@@ -580,10 +628,6 @@ export default function FacultyOpportunityCreationPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
-                    close_applications_early: !!formData.closeApplicationsEarly,
-                    application_deadline: formData.closeApplicationsEarly
-                        ? formData.applicationDeadline || undefined
-                        : null,
                     schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
@@ -591,8 +635,8 @@ export default function FacultyOpportunityCreationPage() {
                               ...(formData.dates.endTime.trim() ? { to_time: formData.dates.endTime.trim() } : {}),
                           }
                         : {}),
-                    expected_hours: parseInt(formData.capacity.hours) || 0,
-                    volunteers_required: parseInt(formData.capacity.volunteers) || 0
+                    expected_hours: parseInt(formData.capacity.hours) || undefined,
+                    volunteers_required: parseInt(formData.capacity.volunteers) || undefined
                 },
                 sdg: formData.sdg,
                 sdg_info: {
@@ -616,7 +660,7 @@ export default function FacultyOpportunityCreationPage() {
                     hook: formData.hook.trim(),
                     outputs: formData.objectives.outputs.trim(),
                     outcome: formData.objectives.outcome.trim() || undefined,
-                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
+                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || undefined,
                     beneficiaries_type: otherBeneficiaryMerged
                 },
                 activity_details: {
@@ -689,7 +733,7 @@ export default function FacultyOpportunityCreationPage() {
                               semester: formData.academicLinkage.semester.trim() || null,
                           },
                       }
-                    : {}),
+                    : { academic_linkage: null }), // cleared fields must clear the stored value on edit
                 submission_confirmations: {
                     academically_valid_and_accurately_described: formData.finalConfirmations.academicallyValid,
                     activity_properly_supervised: formData.finalConfirmations.properlySupervised,
@@ -811,10 +855,7 @@ export default function FacultyOpportunityCreationPage() {
                 (data as { data?: { id?: string } } | null)?.data?.id ||
                 (data as { id?: string } | null)?.id;
             if (!res?.ok || !newId) {
-                const msg =
-                    typeof (data as { message?: unknown } | null)?.message === "string"
-                        ? (data as { message: string }).message
-                        : "Could not save this draft.";
+                const msg = apiErrorMessage(data, "Could not save this draft.");
                 toast.warning(msg);
                 return;
             }
@@ -1126,6 +1167,10 @@ export default function FacultyOpportunityCreationPage() {
     const previewSecondarySdg = formData.secondarySdgs[0] ? findSdgById(formData.secondarySdgs[0].sdgId) : null;
     const timelineStartWeekdayLabel = weekdayLabelFromDateInput(formData.dates.start);
     const timelineEndWeekdayLabel = weekdayLabelFromDateInput(formData.dates.end);
+    const scheduleTimelineError = validateTimelineForPersist({
+        start_date: formData.dates.start,
+        end_date: formData.dates.end,
+    });
 
     const flashcardModel = useMemo(() => {
         const scopeMap: Record<FacultyApplyScope, string> = {
@@ -1174,7 +1219,7 @@ export default function FacultyOpportunityCreationPage() {
             seats: formData.capacity.volunteers,
             start: formData.dates.start,
             end: formData.dates.end,
-            deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+            deadline: formData.dates.end,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
             beneficiaryType: bens || "Community",
             responsibilities: formData.activity.responsibilities,
@@ -1214,15 +1259,15 @@ export default function FacultyOpportunityCreationPage() {
 
     return (
         <div className="co-form">
-            <div className="mb-3.5 flex items-center gap-3">
-                <div>
+            <div className="mb-3.5 flex min-w-0 flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-[#7a919a]">
                         Community Service → <b className="text-[#0e7d74]">Create an Opportunity</b>
                     </p>
                 </div>
                 <Link
                     href={hubHref}
-                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
+                    className="shrink-0 rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
                 >
                     ← Back
                 </Link>
@@ -1286,7 +1331,22 @@ export default function FacultyOpportunityCreationPage() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => goToStep(step.key)}
+                                    onClick={() => {
+                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
+                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
+                                        if (to > schedIdx) {
+                                            const timelineErr = validateTimelineForPersist({
+                                                start_date: formData.dates.start,
+                                                end_date: formData.dates.end,
+                                            });
+                                            if (timelineErr) {
+                                                toast.error(timelineErr);
+                                                goToStep("SCHED");
+                                                return;
+                                            }
+                                        }
+                                        goToStep(step.key);
+                                    }}
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
@@ -1335,7 +1395,7 @@ export default function FacultyOpportunityCreationPage() {
                                 nationalDigits={displayFacultyContact.national}
                                 readOnly
                                 placeholderNational="—"
-                                selectClassName="rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
+                                selectClassName="w-auto max-w-none rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
                                 inputClassName="rounded-lg border-transparent bg-transparent py-0 text-sm font-medium text-[#0d2b33]"
                             />
                         </span>
@@ -1510,7 +1570,7 @@ export default function FacultyOpportunityCreationPage() {
 
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Pin Exact Location</label>
-                                        <div className="rounded-xl overflow-hidden border border-slate-200">
+                                        <div className="rounded-xl border border-slate-200">
                                             {(() => {
                                                 let initialLocation: { lat: number; lng: number } | undefined;
                                                 if (formData.location.pin && formData.location.pin.includes(',')) {
@@ -1575,6 +1635,7 @@ export default function FacultyOpportunityCreationPage() {
                             <input
                                 type="date"
                                 value={formData.dates.start}
+                                max={formData.dates.end || undefined}
                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
                             />
                             {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
@@ -1584,43 +1645,15 @@ export default function FacultyOpportunityCreationPage() {
                             <input
                                 type="date"
                                 value={formData.dates.end}
+                                min={formData.dates.start || undefined}
                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
                             />
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
                         </div>
                     </div>
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                        <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="mt-1"
-                                checked={formData.closeApplicationsEarly}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        closeApplicationsEarly: e.target.checked,
-                                        applicationDeadline: e.target.checked ? formData.applicationDeadline : "",
-                                    })
-                                }
-                            />
-                            <span className="text-sm text-slate-800">
-                                <span className="font-semibold">Close applications before project end date</span>
-                                <span className="block text-xs text-slate-500 mt-0.5">
-                                    Optional. When off, students can join until the project end date.
-                                </span>
-                            </span>
-                        </label>
-                        {formData.closeApplicationsEarly ? (
-                            <div className="mt-3 max-w-sm">
-                                <label className="co-label" style={{ marginTop: 0 }}>Application closing date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.applicationDeadline}
-                                    onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
-                                />
-                            </div>
-                        ) : null}
-                    </div>
+                    {scheduleTimelineError && formData.dates.start && formData.dates.end ? (
+                        <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
+                    ) : null}
                     <div className="pt-2">
                         <label className="co-label">Duration type</label>
                         <div className="co-chips mb-3">
@@ -1638,6 +1671,7 @@ export default function FacultyOpportunityCreationPage() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.fromTime}
+                                        max={formData.dates.endTime || undefined}
                                         onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, fromTime: e.target.value } })}
                                     />
                                 </div>
@@ -1647,6 +1681,7 @@ export default function FacultyOpportunityCreationPage() {
                                         type="time"
                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                         value={formData.dates.endTime}
+                                        min={formData.dates.fromTime || undefined}
                                         onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, endTime: e.target.value } })}
                                     />
                                 </div>
@@ -1656,23 +1691,37 @@ export default function FacultyOpportunityCreationPage() {
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={500}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={3}
                                     placeholder="e.g. 16"
                                     value={formData.capacity.hours}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            capacity: { ...formData.capacity, hours: integerFieldInput(e.target.value, 3) },
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
                                 <input
-                                    type="number"
-                                    min={1}
-                                    max={5000}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={4}
                                     placeholder="e.g. 20"
                                     value={formData.capacity.volunteers}
-                                    onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            capacity: { ...formData.capacity, volunteers: integerFieldInput(e.target.value, 4) },
+                                        })
+                                    }
                                 />
                             </div>
                         </div>
@@ -1686,7 +1735,7 @@ export default function FacultyOpportunityCreationPage() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be before project end; hours 1–500; seats 1–5000. Reporting window opens automatically for 60 days after project end.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; hours, seats, and beneficiaries accept digits only. Reporting window opens automatically for 60 days after project end.</span>
                         </div>
                     </div>
                 </div>
@@ -1955,11 +2004,23 @@ export default function FacultyOpportunityCreationPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Number of Beneficiaries</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
+                                    maxLength={7}
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none"
                                     placeholder="e.g. 50"
                                     value={formData.objectives.beneficiariesCount}
-                                    onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            objectives: {
+                                                ...formData.objectives,
+                                                beneficiariesCount: integerFieldInput(e.target.value, 7),
+                                            },
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
@@ -2115,7 +2176,7 @@ export default function FacultyOpportunityCreationPage() {
                     <div>
                         <label className="co-label">E2 · Skills gained · tap what applies</label>
                         <div className="co-chips">
-                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map((s) => (
+                            {ORG_SKILL_PRESETS.map((s) => (
                                 <CoChip
                                     key={s}
                                     selected={formData.activity.skills.includes(s)}
@@ -2335,7 +2396,7 @@ export default function FacultyOpportunityCreationPage() {
                                 <PhoneConnectivityRow
                                     phoneCountryKey={formData.academicLead.whatsappCountryKey}
                                     nationalDigits={formData.academicLead.whatsappNational}
-                                    placeholderNational="3001234567"
+                                    placeholderNational="300 1234567"
                                     selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
                                     inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
                                     onPhoneCountryKeyChange={(key) =>
@@ -2456,7 +2517,7 @@ export default function FacultyOpportunityCreationPage() {
                         <label className="co-label">Participation verification</label>
                         <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will students log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
                         <div className="co-chips">
-                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
+                            {ORG_VERIFICATION_PRESETS.map((v) => (
                                 <CoChip
                                     key={v}
                                     selected={formData.verification.includes(v)}
@@ -2522,7 +2583,11 @@ export default function FacultyOpportunityCreationPage() {
                             ["one_depts", "🏫", "One University · Selected Departments", "Restrict to defined programmes."],
                             ["own_uni_all", "🏠", "My University · All Departments", `Open applications to all eligible students in ${facultyDetails.institution || "your university"}.`],
                             ["own_dept", "👩‍🏫", "My Department / Programme Only", "Restrict applications to your academic unit."],
-                        ] as const).map(([scope, ico, title, sub]) => (
+                        ] as const)
+                            // "My university / department" is meaningless for CIEL PK admins (their institution is
+                            // the platform itself, so no student's university would ever match).
+                            .filter(([scope]) => !(isCielAdminForm && (scope === "own_uni_all" || scope === "own_dept")))
+                            .map(([scope, ico, title, sub]) => (
                             <button
                                 key={scope}
                                 type="button"
@@ -2890,7 +2955,7 @@ export default function FacultyOpportunityCreationPage() {
                         🏛️ {facultyDetails.institution || "—"}<span className="co-lock-badge">🔒</span>
                     </span>
                 </div>
-                <div className="mt-3.5 flex gap-2.5">
+                <div className="mt-3.5 flex flex-col gap-2.5 sm:flex-row">
                     <button
                         type="button"
                         onClick={() => void handleSaveDraft(false)}
@@ -2918,7 +2983,7 @@ export default function FacultyOpportunityCreationPage() {
                             <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
                         ) : <span />}
                         <div className="flex gap-2">
-                        {!editingOpportunityId || isDraftMode ? (
+                        {(!editingOpportunityId || isDraftMode) && activeStep !== "SUBMIT" ? (
                             <button type="button" className="co-nav-btn back" onClick={() => void handleSaveDraft(false)}>
                                 Save draft
                             </button>
@@ -2938,15 +3003,15 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             <div className="sticky bottom-3.5 z-40 mt-4 overflow-hidden rounded-[20px] border border-[#dcebee] bg-white shadow-[0_-8px_30px_rgba(4,37,43,.10)]">
-                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-3 py-3 text-white sm:px-4">
                     <span className="text-[22px]">{previewEmoji}</span>
-                    <div className="min-w-0 flex-1">
-                        <b className="block text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
-                        <span className="text-[9.5px] text-[#cdf5f0]">
+                    <div className="min-w-0 flex-1 basis-[min(100%,12rem)]">
+                        <b className="block truncate text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
+                        <span className="line-clamp-2 text-[9.5px] text-[#cdf5f0]">
                             {previewBits.length ? previewBits.join(" · ") : "fill the form above and watch this card come alive"}
                         </span>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex max-w-full flex-wrap gap-1">
                         {previewPrimarySdg ? (
                             <span className="co-sdg" style={{ background: previewPrimarySdg.color ?? "#0e7d74" }}>
                                 SDG {previewPrimarySdg.number}{formData.target ? ` · ${formData.target}` : ""}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Globe2, LayoutDashboard } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BarChart3, Globe2, LayoutDashboard, RefreshCw } from "lucide-react";
 import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
 import MasterPlatformKpisPanel from "@/components/analytics/MasterPlatformKpisPanel";
 import ImpactHighlightsPanel from "@/components/analytics/ImpactHighlightsPanel";
@@ -17,8 +18,35 @@ const TABS: { id: AnalyticsTab; label: string; icon: typeof LayoutDashboard }[] 
     { id: "stakeholder", label: "Stakeholder lens", icon: Globe2 },
 ];
 
-export default function AdminAnalyticsPage() {
-    const [tab, setTab] = useState<AnalyticsTab>("platform");
+const DEFAULT_TAB: AnalyticsTab = "platform";
+
+function isTab(v: string | null): v is AnalyticsTab {
+    return v === "platform" || v === "impact" || v === "stakeholder";
+}
+
+function AdminAnalyticsPageInner() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const tabParam = searchParams.get("tab");
+    const tab: AnalyticsTab = isTab(tabParam) ? tabParam : DEFAULT_TAB;
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+    useEffect(() => {
+        setLastUpdated(new Date());
+    }, []);
+
+    const setTab = useCallback(
+        (next: AnalyticsTab) => {
+            const params = new URLSearchParams(searchParams.toString());
+            if (next === DEFAULT_TAB) params.delete("tab");
+            else params.set("tab", next);
+            const qs = params.toString();
+            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        },
+        [router, pathname, searchParams],
+    );
 
     return (
         <div className="mx-auto max-w-[1400px] space-y-4 pb-10">
@@ -30,26 +58,45 @@ export default function AdminAnalyticsPage() {
                         Platform KPIs, social impact metrics, and stakeholder-lens reporting for HEC, Government, and UN.
                     </p>
                 </div>
-                <Link
-                    href="/dashboard/admin/master-analytics"
-                    className="inline-flex w-fit items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                    CIEL Master →
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500" aria-live="polite">
+                        {lastUpdated
+                            ? `Last updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                            : ""}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setRefreshKey((k) => k + 1);
+                            setLastUpdated(new Date());
+                        }}
+                        className="inline-flex items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        <RefreshCw className="h-3 w-3" /> Refresh
+                    </button>
+                    <Link
+                        href="/dashboard/admin/master-analytics"
+                        className="inline-flex w-fit items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        CIEL Master →
+                    </Link>
+                </div>
             </header>
 
             <UnifiedAnalyticsOverview
+                key={`overview-${refreshKey}`}
                 apiPath="/api/v1/admin/analytics/overview"
                 query={{ scope: "aggregate" }}
                 title="Platform overview"
             />
 
-            <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+            <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
                 {TABS.map(({ id, label, icon: Icon }) => (
                     <button
                         key={id}
                         type="button"
                         onClick={() => setTab(id)}
+                        aria-pressed={tab === id}
                         className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-wide ${
                             tab === id ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50"
                         }`}
@@ -60,18 +107,19 @@ export default function AdminAnalyticsPage() {
             </div>
 
             {tab === "platform" ? (
-                <MasterPlatformKpisPanel />
+                <MasterPlatformKpisPanel key={`kpis-${refreshKey}`} />
             ) : tab === "impact" ? (
-                <ImpactHighlightsPanel />
+                <ImpactHighlightsPanel key={`impact-${refreshKey}`} />
             ) : (
                 <div className="space-y-8">
-                    <StakeholderSnapshotPanel />
+                    <StakeholderSnapshotPanel key={`stake-${refreshKey}`} />
                     <div className="border-t border-slate-200 pt-6">
                         <div className="mb-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Drill-down</p>
                             <h2 className="text-base font-semibold tracking-tight text-slate-900">Report analytics by section</h2>
                         </div>
                         <AnalyticsHub
+                            key={`hub-${refreshKey}`}
                             views={[
                                 {
                                     id: "ciel",
@@ -95,5 +143,13 @@ export default function AdminAnalyticsPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AdminAnalyticsPage() {
+    return (
+        <Suspense fallback={null}>
+            <AdminAnalyticsPageInner />
+        </Suspense>
     );
 }

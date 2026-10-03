@@ -28,6 +28,11 @@ import {
     lifecycleStatusLabel,
 } from "@/utils/opportunityTimelineLifecycle";
 import {
+    applicationsOpenFromPayload,
+    applyBlockedMessageFromPayload,
+    applyClosedCtaLabel,
+} from "@/utils/studentApplyMaintenance";
+import {
     isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
     isJoinApplicationApprovedStatus,
@@ -45,6 +50,7 @@ import {
 import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2, Building2, ChevronDown, Search } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { fetchStudentBrowsePayload, peekStudentBrowsePayload } from "@/utils/student-community-cache";
 import ApplicationDialog from "./components/ApplicationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 import { ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
@@ -126,6 +132,10 @@ interface BrowseOpportunity {
     seatsApproved?: number | null;
     /** True while a join application is pending or approved; false when rejected so student can re-apply. */
     applyLocked?: boolean;
+    applications_open?: boolean;
+    apply_blocked_reason?: string | null;
+    apply_blocked_message?: string | null;
+    apply_maintenance?: { enabled?: boolean; message?: string };
     /** From bulk `/students/reports/check` when available. */
     report_status?: string;
     report_id?: string;
@@ -265,6 +275,10 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         creatorLabel,
         seatsRemaining,
         seatsApproved,
+        applications_open: op.applications_open,
+        apply_blocked_reason: op.apply_blocked_reason,
+        apply_blocked_message: op.apply_blocked_message,
+        apply_maintenance: op.apply_maintenance,
     };
 }
 
@@ -313,6 +327,11 @@ function shouldShowInBrowse(op: BrowseOpportunity): boolean {
     );
 }
 
+function mapBrowseFromPayload(payload: { data?: unknown[] } | null): BrowseOpportunity[] {
+    if (!payload?.data) return [];
+    return (payload.data as BrowseOpportunity[]).map((op) => normalizeOpportunity(op)).filter((op) => shouldShowInBrowse(op));
+}
+
 function scheduleLabel(op: BrowseOpportunity): string {
     if (op.start_date) {
         const d = new Date(op.start_date);
@@ -344,9 +363,10 @@ function isPendingJoin(op: BrowseOpportunity): boolean {
 }
 
 export default function StudentBrowseOpportunitiesPage() {
-    const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>([]);
+    const cachedBrowse = peekStudentBrowsePayload();
+    const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>(() => mapBrowseFromPayload(cachedBrowse));
     const [studentInstitution, setStudentInstitution] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!cachedBrowse);
     const [applyingId, setApplyingId] = useState<string | null>(null);
     const [applyingTitle, setApplyingTitle] = useState<string | undefined>(undefined);
     const [applyingAttendanceApproverType, setApplyingAttendanceApproverType] = useState<AttendanceApproverType>("faculty");
@@ -364,6 +384,12 @@ export default function StudentBrowseOpportunitiesPage() {
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
     const [hoursLogged, setHoursLogged] = useState(0);
     const [hoursTarget, setHoursTarget] = useState(16);
+    const [applyMaintenanceBanner, setApplyMaintenanceBanner] = useState<string | null>(() => {
+        const maintenance = cachedBrowse?.apply_maintenance;
+        return maintenance?.enabled && typeof maintenance.message === "string" && maintenance.message.trim()
+            ? maintenance.message.trim()
+            : null;
+    });
 
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -477,7 +503,7 @@ export default function StudentBrowseOpportunitiesPage() {
         setApplyingId(null);
         setApplyingTitle(undefined);
         setApplyingAttendanceApproverType("faculty");
-        void fetchOpportunities({ silent: true });
+        void fetchOpportunities({ silent: true, force: true });
     };
 
     const handleWithdraw = async (opportunity: BrowseOpportunity) => {
@@ -496,7 +522,7 @@ export default function StudentBrowseOpportunitiesPage() {
             });
             if (res?.ok) {
                 toast.success("Application withdrawn");
-                void fetchOpportunities({ silent: true });
+                void fetchOpportunities({ silent: true, force: true });
             } else {
                 toast.error("Could not withdraw this application");
             }
@@ -541,32 +567,25 @@ export default function StudentBrowseOpportunitiesPage() {
         return () => document.removeEventListener("mousedown", onDoc);
     }, [moreOpen]);
 
-    const fetchOpportunities = async (options?: { silent?: boolean }) => {
-        if (!options?.silent) {
+    const fetchOpportunities = async (options?: { silent?: boolean; force?: boolean }) => {
+        if (!options?.silent && !peekStudentBrowsePayload()) {
             setIsLoading(true);
         }
         try {
             const userId = getStoredCurrentUserId() || null;
-            // Backend defaults `limit` to 10 — without this, browse shows fewer rows than exist / than "My projects".
-            const res = await authenticatedFetch(`/api/v1/students/opportunities`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ student_id: userId, page: 1, limit: 500 }),
-            });
-
-            if (res && res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    let mappedOps = ((data.data || []) as BrowseOpportunity[])
-                        .map((op) => normalizeOpportunity(op))
-                        .filter((op) => shouldShowInBrowse(op));
-                    if (userId) {
-                        mappedOps = await mergeBrowseOpportunitiesWithReportCheck(mappedOps, userId);
-                    }
-                    setOpportunities(mappedOps);
+            const data = await fetchStudentBrowsePayload({ force: options?.force });
+            if (data.success) {
+                const maintenance = data.apply_maintenance;
+                setApplyMaintenanceBanner(
+                    maintenance?.enabled && typeof maintenance.message === "string" && maintenance.message.trim()
+                        ? maintenance.message.trim()
+                        : null,
+                );
+                let mappedOps = mapBrowseFromPayload(data);
+                if (userId) {
+                    mappedOps = await mergeBrowseOpportunitiesWithReportCheck(mappedOps, userId);
                 }
+                setOpportunities(mappedOps);
             }
         } catch (error) {
             console.error("Failed to fetch opportunities", error);
@@ -582,11 +601,17 @@ export default function StudentBrowseOpportunitiesPage() {
         setIsTeamDialogOpen(true);
     };
 
-    if (isLoading) {
+    if (isLoading && opportunities.length === 0) {
         return (
-            <div className="flex flex-col justify-center items-center h-full min-h-[480px] gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-ciel-green" />
-                <p className="text-sm text-ciel-text-mid">Loading opportunities…</p>
+            <div className="mx-auto max-w-7xl space-y-5 pb-20">
+                <header>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
+                    <p className="mt-1 text-sm text-ciel-text-mid">Published listings from Faculty, NGOs, Partners and CIEL PK.</p>
+                </header>
+                <div className="flex flex-col justify-center items-center min-h-[280px] gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-ciel-green" />
+                    <p className="text-sm text-ciel-text-mid">Loading opportunities…</p>
+                </div>
             </div>
         );
     }
@@ -611,6 +636,13 @@ export default function StudentBrowseOpportunitiesPage() {
                     How scoring works
                 </button>
             </header>
+
+            {applyMaintenanceBanner ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                    <p className="font-semibold">Applications temporarily paused</p>
+                    <p className="mt-1 text-amber-900/90">{applyMaintenanceBanner}</p>
+                </div>
+            ) : null}
 
             <div className="flex flex-col gap-3 rounded-xl border border-ciel-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-5">
                 <p className="shrink-0 text-sm font-bold text-ciel-text">
@@ -870,11 +902,15 @@ export default function StudentBrowseOpportunitiesPage() {
                         const joinOpen = canJoinOrApply(timeline);
                         const lateRecord = canRecordCompletedService(timeline);
                         const lifeLabel = lifecycleStatusLabel(timeline);
-                        const dateAllowsJoin = joinOpen || lateRecord;
+                        const rawOp = op as unknown as Record<string, unknown>;
+                        const catalogOpen = applicationsOpenFromPayload(rawOp);
+                        const dateAllowsJoin = catalogOpen && (joinOpen || lateRecord);
                         const canApplyNow = applyEligibility.canApply && dateAllowsJoin;
                         const joinButtonLabel = !applyEligibility.canApply
                             ? "Not eligible"
-                            : !dateAllowsJoin
+                            : !catalogOpen
+                              ? applyClosedCtaLabel(op.apply_blocked_reason)
+                              : !dateAllowsJoin
                               ? lifeLabel || "Closed"
                               : lateRecord && !joinOpen
                                 ? "Record Completed Service"
@@ -1027,7 +1063,10 @@ export default function StudentBrowseOpportunitiesPage() {
                                             onClick={() => canApplyNow && openApplicationDialog(op)}
                                             disabled={!canApplyNow}
                                             title={
-                                                !dateAllowsJoin
+                                                !catalogOpen
+                                                    ? applyBlockedMessageFromPayload(rawOp) ||
+                                                      "Applications closed"
+                                                    : !dateAllowsJoin
                                                     ? lifeLabel || "Applications closed"
                                                     : applyEligibility.blockedReason || undefined
                                             }

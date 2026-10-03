@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft,
+    ChevronLeft,
+    ChevronRight,
     BarChart3,
     CheckCircle2,
     ChevronDown,
@@ -76,6 +79,16 @@ import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
+import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import ConfirmModal from "../../../_shared/ConfirmModal";
+import { loadReviewQueue, neighbourInQueue } from "../../../_shared/reviewQueue";
+import ReportEvidenceGallery, {
+    classifyEvidenceGalleryKind,
+    type ReportEvidenceGalleryItem,
+} from "@/components/ciel/community-service/ReportEvidenceGallery";
+
+/** Super Admin review uses Impact Package. Flip to true to restore sections 1–9 + print dossier. */
+const SHOW_ADMIN_LEGACY_DOSSIER = false;
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -187,6 +200,10 @@ interface ReportDetail {
     private_candidate?: boolean;
     review_route?: string;
     ciiV2Lock?: { locked?: boolean } | null;
+    ciiV2?: {
+        final?: number | string;
+        level?: { name?: string; level?: number } | null;
+    } | null;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
     section3: ReportData["section3"];
@@ -199,6 +216,15 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    review_package?: {
+        documents?: {
+            flashcard?: { title?: string; href?: string };
+            detailed_report?: { title?: string; href?: string };
+            evidence?: { title?: string; count?: number; files?: ReportEvidenceGalleryItem[] };
+        };
+        admin_review_href?: string;
+        ai_analyser_href?: string;
+    } | null;
     /** Hours target for CII / engagement; falls back to opportunity hours or 16. */
     required_hours?: number;
 }
@@ -207,6 +233,7 @@ type AdminEvidenceFile = {
     url: string;
     name: string;
     isImage: boolean;
+    kind: ReturnType<typeof classifyEvidenceGalleryKind>;
 };
 
 const ADMIN_IMAGE_FILE_EXTENSION_RE = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif)(\?|#|$)/i;
@@ -447,9 +474,37 @@ function pickEvidenceName(value: unknown, fallback: string): string {
 function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFile[] {
     if (!report) return [];
 
+    const packaged = report.review_package?.documents?.evidence?.files;
+    if (Array.isArray(packaged) && packaged.length) {
+        const seen = new Set<string>();
+        return packaged.reduce<AdminEvidenceFile[]>((files, item) => {
+            const url = String(item?.url || "").trim();
+            if (!url || seen.has(url)) return files;
+            seen.add(url);
+            const name = item?.name || pickEvidenceName(item, `Evidence ${files.length + 1}`);
+            files.push({
+                url,
+                name,
+                isImage: (item?.kind || classifyEvidenceGalleryKind(url, name)) === "image",
+                kind: (item?.kind as AdminEvidenceFile["kind"]) || classifyEvidenceGalleryKind(url, name),
+            });
+            return files;
+        }, []);
+    }
+
+    const section6 = report.section6 as { evidence_files?: unknown } | undefined;
+    const section7 = report.section7 as {
+        formalization_files?: unknown;
+        partner_verification_files?: unknown;
+    } | undefined;
+    const logs = Array.isArray(report.section1?.attendance_logs) ? report.section1.attendance_logs : [];
     const candidates: unknown[] = [
         ...(Array.isArray(report.evidence_urls) ? report.evidence_urls : []),
         ...(Array.isArray(report.section8?.evidence_files) ? report.section8.evidence_files : []),
+        ...(Array.isArray(section6?.evidence_files) ? section6.evidence_files : []),
+        ...(Array.isArray(section7?.formalization_files) ? section7.formalization_files : []),
+        ...(Array.isArray(section7?.partner_verification_files) ? section7.partner_verification_files : []),
+        ...logs.map((log) => (log as { evidence_url?: unknown })?.evidence_url),
     ];
 
     const seen = new Set<string>();
@@ -461,6 +516,7 @@ function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFi
             url,
             name: pickEvidenceName(item, `Evidence ${files.length + 1}`),
             isImage: isAdminImageEvidence(url, item),
+            kind: classifyEvidenceGalleryKind(url, pickEvidenceName(item, "")),
         });
         return files;
     }, []);
@@ -634,6 +690,8 @@ function AdminReportDetailPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const ciiView = (searchParams.get("view") || "").trim().toLowerCase() === "cii-v2";
+    const packageView = (searchParams.get("package") || "").trim() === "1";
+    const packageDoc = (searchParams.get("doc") || "").trim().toLowerCase();
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
@@ -691,6 +749,18 @@ function AdminReportDetailPage() {
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
         try {
+            const analyserFinal = Number(report.ciiV2?.final);
+            if (Number.isFinite(analyserFinal)) {
+                const analyserLevel =
+                    (typeof report.ciiV2?.level?.name === "string" && report.ciiV2.level.name.trim()) ||
+                    "";
+                return {
+                    totalScore: Math.round(analyserFinal * 10) / 10,
+                    level: analyserLevel || "Analyzer CII",
+                    cii_score_max: 100,
+                    evaluation_framework_version: "v3.1-balanced",
+                };
+            }
             const persisted = readPersistedCiiSnapshot(report);
             const reqH =
                 typeof report.required_hours === "number" && report.required_hours > 0
@@ -807,21 +877,14 @@ function AdminReportDetailPage() {
     }, [report, sectionOpen]);
 
     const fetchReportDetail = async () => {
-        console.log('📞 ADMIN: Fetching report detail for ID:', params.reportId);
         try {
             setLoading(true);
             const apiUrl = `/api/v1/admin/reports/${params.reportId}`;
-            console.log('🌐 API URL:', apiUrl);
 
             const response = await authenticatedFetch(apiUrl);
-            console.log('📡 Response:', response);
-            console.log('✅ Response OK?:', response?.ok);
 
             if (response?.ok) {
                 const data = await response.json();
-                console.log('📊 Full API Response:', data);
-                console.log('📋 Report data:', data.report);
-                console.log('📋 Data field:', data.data);
 
                 // Backend might return { success, data } or { report }
                 const raw = data.data || data.report || data;
@@ -919,7 +982,48 @@ function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
+    const reportIdStr = String(params.reportId);
+    const [queueIds, setQueueIds] = useState<string[]>([]);
+    const [pendingDecision, setPendingDecision] = useState<
+        { apiAction: 'approve' | 'reject' | 'unlock'; stage: 'confirm' | 'force' } | null
+    >(null);
+
+    useEffect(() => {
+        setQueueIds(loadReviewQueue());
+    }, [reportIdStr]);
+
+    const queueNav = useMemo(() => neighbourInQueue(queueIds, reportIdStr), [queueIds, reportIdStr]);
+
+    const goToReport = useCallback(
+        (id: string | null) => {
+            if (id) router.push(`/dashboard/admin/reports/verify/${id}`);
+        },
+        [router],
+    );
+
+    // j = next, k = previous report in the filtered queue; ignored while typing.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            if (pendingDecision) return;
+            const el = e.target as HTMLElement | null;
+            const tag = el?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+            if (e.key === 'j' && queueNav.next) goToReport(queueNav.next);
+            else if (e.key === 'k' && queueNav.prev) goToReport(queueNav.prev);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [queueNav, goToReport, pendingDecision]);
+
+    /** Verified / paid reports need an explicit force flag to be rejected or reopened. */
+    const isFinalised = (r: ReportDetail | null): boolean => {
+        if (!r) return false;
+        const st = String(r.status || '').trim().toLowerCase();
+        return st === 'verified' || st === 'paid' || String(r.admin_status || '').trim().toLowerCase() === 'approved';
+    };
+
+    const handleVerify = (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
         const apiAction: 'approve' | 'reject' | 'unlock' =
             intent === 'editable' ? 'unlock' : action;
 
@@ -931,7 +1035,10 @@ function AdminReportDetailPage() {
             );
             return;
         }
+        setPendingDecision({ apiAction, stage: 'confirm' });
+    };
 
+    const executeVerify = async (apiAction: 'approve' | 'reject' | 'unlock', force: boolean) => {
         try {
             setIsVerifying(true);
             const userData = JSON.parse(localStorage.getItem('ciel_user') || '{}');
@@ -944,7 +1051,8 @@ function AdminReportDetailPage() {
                         action: apiAction,
                         feedback: feedback.trim() || undefined,
                         reason: feedback.trim() || undefined,
-                        verified_by: userData.id
+                        verified_by: userData.id,
+                        ...(force ? { force: true } : {}),
                     })
                 }
             );
@@ -955,20 +1063,61 @@ function AdminReportDetailPage() {
                         ? 'Report returned to student for edits.'
                         : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
                 );
-                setTimeout(() => router.push('/dashboard/admin/reports/verify'), 1500);
+                setPendingDecision(null);
+                const nextId = queueNav.next;
+                setTimeout(
+                    () => router.push(nextId ? `/dashboard/admin/reports/verify/${nextId}` : '/dashboard/admin/reports/verify'),
+                    1200,
+                );
             } else {
                 const payload = response ? await response.json().catch(() => ({})) : {};
                 const msg =
                     (payload as { message?: string }).message ||
                     (apiAction === 'unlock' ? 'Failed to make report editable' : 'Failed to verify report');
                 toast.error(msg);
+                setPendingDecision(null);
             }
         } catch (error) {
             console.error('Verification error:', error);
             toast.error('An error occurred');
+            setPendingDecision(null);
         } finally {
             setIsVerifying(false);
         }
+    };
+
+    const onDecisionConfirmed = () => {
+        if (!pendingDecision) return;
+        const { apiAction, stage } = pendingDecision;
+        const needsForce = apiAction !== 'approve' && isFinalised(report);
+        if (needsForce && stage === 'confirm') {
+            setPendingDecision({ apiAction, stage: 'force' });
+            return;
+        }
+        void executeVerify(apiAction, needsForce);
+    };
+
+    const decisionCopy = (apiAction: 'approve' | 'reject' | 'unlock') => {
+        const who = report?.student?.name || 'the student';
+        if (apiAction === 'approve') {
+            return {
+                title: 'Approve this report?',
+                label: 'Approve report',
+                body: `Approving publishes the review package for ${who} to the student, partner/NGO, faculty, university and admin views. The student is notified.`,
+            };
+        }
+        if (apiAction === 'reject') {
+            return {
+                title: 'Reject this report?',
+                label: 'Reject report',
+                body: `${who} is notified with your notes and the report is marked as needing revision.`,
+            };
+        }
+        return {
+            title: 'Make this report editable?',
+            label: 'Return for edits',
+            body: `The report is unlocked so ${who} can revise and resubmit it. Their notes below are shared with them.`,
+        };
     };
 
     const LabelValue = ({ label, value, fullWidth = false }: { label: string; value: unknown; fullWidth?: boolean }) => (
@@ -1015,26 +1164,6 @@ function AdminReportDetailPage() {
     }
 
     if (ciiView) {
-        const cielPkRoute =
-            report.private_candidate === true || report.review_route === "ciel_pk";
-        if (!cielPkRoute) {
-            return (
-                <div className={clsx(adminDossier.shell, "flex items-center justify-center p-8")}>
-                    <div className="max-w-md text-center">
-                        <h2 className="mb-2 text-2xl font-bold text-slate-900">Faculty reviews this report</h2>
-                        <p className="mb-4 text-sm text-slate-600">
-                            CIEL PK CII analysis is only for the private-candidate route. Open the faculty console for university-supervised reports.
-                        </p>
-                        <Link
-                            href={`/dashboard/admin/reports/verify/${params.reportId}`}
-                            className="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
-                        >
-                            Back to dossier
-                        </Link>
-                    </div>
-                </div>
-            );
-        }
         return <CommunityCiiAnalyser publisher="ciel_pk" />;
     }
 
@@ -1063,6 +1192,33 @@ function AdminReportDetailPage() {
                         >
                             Student reports
                         </Link>
+                        {queueNav.index >= 0 ? (
+                            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5" aria-label="Queue navigation">
+                                <button
+                                    type="button"
+                                    onClick={() => goToReport(queueNav.prev)}
+                                    disabled={!queueNav.prev}
+                                    title="Previous report (k)"
+                                    aria-label="Previous report"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="px-1 text-xs font-semibold tabular-nums text-slate-600">
+                                    {queueNav.index + 1} / {queueNav.total}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => goToReport(queueNav.next)}
+                                    disabled={!queueNav.next}
+                                    title="Next report (j)"
+                                    aria-label="Next report"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
@@ -1073,6 +1229,17 @@ function AdminReportDetailPage() {
                         </span>
                     </div>
                 </div>
+                <AdminReviewPackageStrip
+                    reportId={String(params.reportId)}
+                    report={report as unknown as Record<string, unknown>}
+                    fallbackFiles={evidenceFiles}
+                    highlight={packageView}
+                    initialDoc={
+                        packageDoc === "flashcard" || packageDoc === "report" || packageDoc === "evidence"
+                            ? packageDoc
+                            : null
+                    }
+                />
                 {(report.private_candidate || report.review_route === "ciel_pk") ? (
                     <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
                         <p className="font-semibold">Private candidate route — CIEL PK reviews this report.</p>
@@ -1253,6 +1420,7 @@ function AdminReportDetailPage() {
                 </div>
 
                 {/* Report sections (form tabs 1–9) + flash/print (10) */}
+                {SHOW_ADMIN_LEGACY_DOSSIER ? (
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky table of contents */}
                     <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
@@ -2009,7 +2177,8 @@ function AdminReportDetailPage() {
                             <div id="section8-panel" className="space-y-5">
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has evidence" value={report.section8?.has_evidence} />
-                                    <LabelValue label="Media visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Media visibility" value={mediaVisibilityTitle(report.section8?.media_visible) || "Restricted"} />
+                                    <LabelValue label="Public share permission" value={isPublicMediaVisibility(report.section8?.media_visible) ? (hasPublicSharePermission(report.section8) ? "Confirmed" : "Pending") : "Not required"} />
                                     <LabelValue label="Partner verification" value={report.section8?.partner_verification} />
                                     <LabelValue label="Partner verification type" value={report.section8?.partner_verification_type} />
                                 </div>
@@ -2026,51 +2195,7 @@ function AdminReportDetailPage() {
 
                                 <div>
                                     <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
-                                    {evidenceFiles.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-                                            {evidenceFiles.map((file, index) =>
-                                                file.isImage ? (
-                                                    <a
-                                                        key={file.url}
-                                                        href={file.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/90 transition-colors hover:border-indigo-200"
-                                                    >
-                                                        <img
-                                                            src={file.url}
-                                                            alt={file.name || `Evidence ${index + 1}`}
-                                                            className="aspect-square w-full object-cover"
-                                                        />
-                                                        <span className="block truncate px-3 py-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-800">
-                                                            {file.name || `Evidence ${index + 1}`}
-                                                        </span>
-                                                    </a>
-                                                ) : (
-                                                    <a
-                                                        key={file.url}
-                                                        href={file.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group col-span-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 sm:col-span-3"
-                                                    >
-                                                        <span className="min-w-0 pr-3 font-semibold text-slate-900 group-hover:text-indigo-800">
-                                                            <span className="block truncate">{file.name || `Evidence ${index + 1}`}</span>
-                                                            <span className="mt-1 block text-xs font-medium text-slate-500">
-                                                                Evidence {index + 1}
-                                                            </span>
-                                                        </span>
-                                                        <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
-                                                    </a>
-                                                ),
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className={adminDossier.inset}>
-                                            <AdminFieldBody value={null} />
-                                            <p className="mt-2 text-xs text-slate-500">No files attached to this submission.</p>
-                                        </div>
-                                    )}
+                                    <ReportEvidenceGallery files={evidenceFiles} emptyLabel="No files attached to this submission." />
                                 </div>
                             </div>
                             ) : null}
@@ -2210,6 +2335,7 @@ function AdminReportDetailPage() {
                         </div>
                     </div>
                 </div>
+                ) : null}
 
                 <div
                     id="actions"
@@ -2222,7 +2348,7 @@ function AdminReportDetailPage() {
                         <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
                         <h3 className="mb-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student report approval</h3>
                         <p className="mb-5 text-sm font-medium text-slate-600">
-                            Review all sections above before making a final determination on this impact report.
+                            Review the Impact Package above before making a final determination on this impact report.
                         </p>
                         {ciiSnapshot ? (
                             <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
@@ -2343,6 +2469,60 @@ function AdminReportDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {pendingDecision ? (
+                (() => {
+                    const copy = decisionCopy(pendingDecision.apiAction);
+                    const finalised = pendingDecision.apiAction !== 'approve' && isFinalised(report);
+                    const notes = feedback.trim();
+                    if (pendingDecision.stage === 'force') {
+                        return (
+                            <ConfirmModal
+                                open
+                                tone="danger"
+                                title="Final confirmation: override a verified report"
+                                confirmLabel="Override and continue"
+                                requireTyped="OVERRIDE"
+                                busy={isVerifying}
+                                onConfirm={() => onDecisionConfirmed()}
+                                onCancel={() => setPendingDecision(null)}
+                            >
+                                <p className="font-medium text-red-700">
+                                    This sends a forced {pendingDecision.apiAction === 'reject' ? 'rejection' : 'unlock'}. The decision is
+                                    recorded against your admin account and cannot be undone automatically.
+                                </p>
+                            </ConfirmModal>
+                        );
+                    }
+                    return (
+                        <ConfirmModal
+                            open
+                            tone={pendingDecision.apiAction === 'approve' ? 'default' : 'danger'}
+                            title={finalised ? `Warning: this report is already verified. ${copy.title}` : copy.title}
+                            confirmLabel={finalised ? 'Continue' : copy.label}
+                            busy={isVerifying}
+                            onConfirm={() => onDecisionConfirmed()}
+                            onCancel={() => setPendingDecision(null)}
+                        >
+                            <div className="space-y-2">
+                                <p>{copy.body}</p>
+                                {finalised ? (
+                                    <p className="rounded-lg border border-red-200 bg-red-50 p-2 font-medium text-red-700">
+                                        This report was already approved or paid. Changing it may affect certificates, payments and
+                                        published results. You will be asked to confirm once more.
+                                    </p>
+                                ) : null}
+                                {notes ? (
+                                    <p className="break-words rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+                                        <span className="font-semibold">Notes: </span>
+                                        {notes.length > 300 ? `${notes.slice(0, 300)}…` : notes}
+                                    </p>
+                                ) : null}
+                            </div>
+                        </ConfirmModal>
+                    );
+                })()
+            ) : null}
 
             {/* Sticky Action Bar for quick access while scrolling */}
             {showStickyActions && !isVerifying && report.admin_status !== "approved" && (

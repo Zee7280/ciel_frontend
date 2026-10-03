@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { School, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { BNU_DEGREE_PROGRAMS, isBnuUniversity, pakistaniUniversities } from "@/utils/universityData";
+import { BNU_DEGREE_PROGRAMS, isBnuUniversity, pakistaniUniversities, sanitizeReportAcademicDepartment } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import { composeInternationalPhone, parsePhoneForDisplay, validateNationalPhone } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
 import clsx from "clsx";
 import { useRef, useEffect } from "react";
@@ -57,6 +57,31 @@ function BnuUniversityIcon() {
     );
 }
 
+function emailKey(value: unknown): string {
+    return String(value || "").trim().toLowerCase();
+}
+
+function nestErrorMessage(err: { message?: unknown } | null | undefined, fallback: string): string {
+    const raw = err?.message;
+    if (Array.isArray(raw)) {
+        const joined = raw.map((item) => String(item).trim()).filter(Boolean).join(", ");
+        return joined || fallback;
+    }
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    return fallback;
+}
+
+function isEmailAlreadyOnTeam(email: string, reservedEmails: string[], selfEmail?: string): boolean {
+    const next = emailKey(email);
+    if (!next) return false;
+    const self = emailKey(selfEmail);
+    if (self && next === self) return false;
+    return reservedEmails.some((item) => emailKey(item) === next);
+}
+
+const DUPLICATE_TEAM_EMAIL_MESSAGE =
+    "This email is already on this team (team lead or another member). Each student must use their own registered email.";
+
 export default function IdentityVerification({
     projectId,
     onSuccess,
@@ -67,6 +92,8 @@ export default function IdentityVerification({
     primaryFacultyEmail = "",
     secondaryFacultyEmail = "",
     showSemester = false,
+    reservedEmails = [],
+    enforceUniqueOnProject = false,
 }: {
     projectId: string;
     onSuccess: (p: Participant) => void;
@@ -78,6 +105,10 @@ export default function IdentityVerification({
     secondaryFacultyEmail?: string;
     /** Community-service report screens pass true to also collect Semester (1-10) here. */
     showSemester?: boolean;
+    /** Team-lead + other member emails that cannot be reused on this add/edit. */
+    reservedEmails?: string[];
+    /** Teammate-add only. Leave false for lead / self-verify so existing seats can still OTP. */
+    enforceUniqueOnProject?: boolean;
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'academic'>('personal');
@@ -130,19 +161,30 @@ export default function IdentityVerification({
         setPhoneNational(next.national);
     }, [initialData?.mobile]);
 
+    const emailTakenOnTeam =
+        !isTeamLead && isEmailAlreadyOnTeam(formData.email, reservedEmails, initialData?.email);
+
     const sendOtp = async (type: 'email') => {
+        if (emailTakenOnTeam) {
+            alert(DUPLICATE_TEAM_EMAIL_MESSAGE);
+            return;
+        }
         setIsVerifyingOtp(prev => ({ ...prev, [type]: true }));
         try {
             const res = await authenticatedFetch(`/api/v1/student/verify-team-member/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: formData.email }),
+                body: JSON.stringify({
+                    email: formData.email,
+                    projectId,
+                    blockIfOnRoster: enforceUniqueOnProject,
+                }),
             });
             if (res && res.ok) {
                 setOtpSent(prev => ({ ...prev, [type]: true }));
             } else {
                 const err = await res?.json();
-                alert(err?.message || "Failed to send OTP");
+                alert(nestErrorMessage(err, "Failed to send OTP"));
             }
         } catch (error) {
             console.error(error);
@@ -291,6 +333,10 @@ export default function IdentityVerification({
     };
 
     const handleSubmit = async () => {
+        if (emailTakenOnTeam) {
+            alert(DUPLICATE_TEAM_EMAIL_MESSAGE);
+            return;
+        }
         if (!otpVerified.email && !initialData.verified) {
             alert("Verify this member by OTP to their email before adding them.");
             return;
@@ -299,14 +345,16 @@ export default function IdentityVerification({
             alert("Enter a 13-digit CNIC (xxxxx-xxxxxxx-x).");
             return;
         }
-        if (phoneNational.replace(/\D/g, "").length < 8) {
-            alert("Enter a mobile number with country code.");
+        const phoneErr = validateNationalPhone(phoneCountryKey, phoneNational);
+        if (phoneErr) {
+            alert(phoneErr);
             return;
         }
         setIsSubmitting(true);
         try {
             const body: any = {
                 ...formData,
+                department: sanitizeReportAcademicDepartment(formData.department, formData.academicProgram),
                 mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
                 projectId,
                 participationMode,
@@ -354,7 +402,7 @@ export default function IdentityVerification({
                 onSuccess(result.data);
             } else {
                 const err = await res?.json();
-                alert(err?.message || "Registration failed");
+                alert(nestErrorMessage(err, "Registration failed"));
             }
         } catch (error) {
             console.error(error);
@@ -365,7 +413,7 @@ export default function IdentityVerification({
     };
 
     const cnicNormalized = normalizePakistaniCnicDigits(formData.cnic);
-    const phoneOk = phoneNational.replace(/\D/g, "").length >= 8;
+    const phoneOk = !validateNationalPhone(phoneCountryKey, phoneNational);
     const isPersonalValid =
         !!formData.fullName.trim() && cnicNormalized.length === 13 && phoneOk && otpVerified.email;
     const isAcademicValid = !!(formData.universityId && formData.universityName && formData.academicProgram && (!showSemester || formData.semester));
@@ -438,7 +486,7 @@ export default function IdentityVerification({
                                 inputClassName="cer-input"
                                 rowClassName="items-stretch gap-2"
                             />
-                            <p className="cer-hint">Country code + mobile number, e.g. +92 · 3001234567.</p>
+                            <p className="cer-hint">Country code + mobile number, e.g. +92 · 300 1234567.</p>
                         </div>
 
                         {/* Email */}
@@ -458,7 +506,7 @@ export default function IdentityVerification({
                                 {!otpSent.email && (
                                     <button
                                         onClick={() => sendOtp('email')}
-                                        disabled={isVerifyingOtp.email || !formData.email}
+                                        disabled={isVerifyingOtp.email || !formData.email || emailTakenOnTeam}
                                         className="cer-aibtn absolute right-1.5 top-1.5 !mt-0 !py-1 !px-2.5 text-[9px] disabled:opacity-50"
                                     >
                                         {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : '📩 Send OTP'}
@@ -500,6 +548,12 @@ export default function IdentityVerification({
                                         {isVerifyingOtp.email ? 'Sending...' : 'Resend OTP'}
                                     </button>
                                 </div>
+                            )}
+
+                            {emailTakenOnTeam && (
+                                <p className="mt-1.5 text-[11px] font-semibold leading-snug text-red-600">
+                                    {DUPLICATE_TEAM_EMAIL_MESSAGE}
+                                </p>
                             )}
 
                             {otpVerified.email && (
@@ -588,7 +642,14 @@ export default function IdentityVerification({
                             {isBnuUniversity(formData.universityName) ? (
                                 <select
                                     value={formData.academicProgram}
-                                    onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
+                                    onChange={(e) => {
+                                        const academicProgram = e.target.value;
+                                        setFormData({
+                                            ...formData,
+                                            academicProgram,
+                                            department: sanitizeReportAcademicDepartment(formData.department, academicProgram),
+                                        });
+                                    }}
                                     className="cer-input"
                                 >
                                     <option value="">Select degree program…</option>
@@ -612,7 +673,14 @@ export default function IdentityVerification({
                                 <input
                                     placeholder="BS Computer Science"
                                     value={formData.academicProgram}
-                                    onChange={(e) => setFormData({ ...formData, academicProgram: e.target.value })}
+                                    onChange={(e) => {
+                                        const academicProgram = e.target.value;
+                                        setFormData({
+                                            ...formData,
+                                            academicProgram,
+                                            department: sanitizeReportAcademicDepartment(formData.department, academicProgram),
+                                        });
+                                    }}
                                     className="cer-input"
                                 />
                             )}

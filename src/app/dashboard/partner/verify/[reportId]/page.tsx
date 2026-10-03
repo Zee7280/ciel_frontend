@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
@@ -17,6 +18,7 @@ import { prepareReportForVerifyDossier } from '@/utils/reportTeamScope';
 import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
 import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
+import { getStoredCurrentUserRole } from "@/utils/currentUser";
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import type { ReportData } from '../../../student/report/context/ReportContext';
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from '../../../student/report/utils/reportSdgMerge';
@@ -38,6 +40,10 @@ import {
 import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
 import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { mailtoHref, whatsappShareHref } from '@/utils/reminderLinks';
+import AdminReviewPackageStrip from "@/app/dashboard/admin/reports/verify/AdminReviewPackageStrip";
+import ReportEvidenceGallery, {
+    classifyEvidenceGalleryKind,
+} from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -81,6 +87,7 @@ function partnerCanSubmitDecision(report: ReportDetail): boolean {
 }
 
 interface ReportDetail {
+    ciiV2?: { final?: number; provisional?: boolean; level?: { name?: string } } | null;
     id: string;
     /** False when the API opened this report read-only for the viewer. */
     viewer_can_review?: boolean;
@@ -117,6 +124,12 @@ interface ReportDetail {
     section10: ReportData["section10"];
     section11: ReportData["section11"];
     evidence_urls: string[];
+    evidence_access?: { visibility?: string; can_view?: boolean; can_download?: boolean; message?: string | null } | null;
+    review_package?: {
+        documents?: {
+            evidence?: { files?: Array<{ url?: string; name?: string; kind?: string }> };
+        };
+    } | null;
 }
 
 type PartnerBlueprintRow = {
@@ -437,7 +450,8 @@ export default function ReportDetailPage() {
         );
     }
 
-    const canSubmitDecision = partnerCanSubmitDecision(report);
+    // University reviews are read-only: Approve / Reject stay with CIEL PK Admin.
+    const canSubmitDecision = partnerCanSubmitDecision(report) && getStoredCurrentUserRole() !== "university";
     const waitingOnFaculty =
         !canSubmitDecision &&
         !facultyHasApprovedReport(report) &&
@@ -469,13 +483,24 @@ export default function ReportDetailPage() {
                             Single-Page Dossier Mode
                         </span>
                         <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black border border-emerald-200 uppercase tracking-widest">
-                            NGO / Partner
+                            {getStoredCurrentUserRole() === "university" ? "University" : "NGO / Partner"}
                         </span>
                     </div>
                 </div>
+                <AdminReviewPackageStrip
+                    reportId={String(params.reportId)}
+                    report={report as unknown as Record<string, unknown>}
+                    fallbackFiles={(report.evidence_urls || []).map((url) => ({
+                        url,
+                        name: url.split("?")[0].split("/").pop() || "Evidence file",
+                        kind: classifyEvidenceGalleryKind(url, url),
+                    }))}
+                    variant="published"
+                    audience={getStoredCurrentUserRole() === "university" ? "university" : "partner"}
+                />
 
-                {/* Quality Insight Banner */}
-                {qualityAlerts.length > 0 && (
+                {/* Quality Insight Banner — university only; partner/NGO do not receive the analysis report */}
+                {qualityAlerts.length > 0 && getStoredCurrentUserRole() === "university" && (
                     <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
@@ -536,7 +561,25 @@ export default function ReportDetailPage() {
                         </div>
 
                         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                            {ciiSnapshot ? (
+                            {typeof report.ciiV2?.final === 'number' ? (
+                                <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
+                                    <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">
+                                            CII index{report.ciiV2.provisional ? ' · provisional' : ''}
+                                        </p>
+                                        <p className="text-2xl font-black tabular-nums text-slate-900">
+                                            {Math.round(report.ciiV2.final)}
+                                            <span className="text-base font-semibold text-slate-500">/100</span>
+                                        </p>
+                                        {report.ciiV2.level?.name ? (
+                                            <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
+                                                {report.ciiV2.level.name}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : ciiSnapshot ? (
                                 <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
                                     <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
                                     <div>
@@ -1209,7 +1252,8 @@ export default function ReportDetailPage() {
                                 </div>
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has Evidence" value={report.section8?.has_evidence} />
-                                    <LabelValue label="Media Visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Media Visibility" value={mediaVisibilityTitle(report.section8?.media_visible) || "Restricted"} />
+                                    <LabelValue label="Public share permission" value={isPublicMediaVisibility(report.section8?.media_visible) ? (hasPublicSharePermission(report.section8) ? "Confirmed" : "Pending") : "Not required"} />
                                     <LabelValue label="Partner Verification" value={report.section8?.partner_verification} />
                                     <LabelValue label="Partner Verification Type" value={report.section8?.partner_verification_type} />
                                 </div>
@@ -1228,24 +1272,21 @@ export default function ReportDetailPage() {
 
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-3">Evidence Files</h3>
-                                    {report.evidence_urls && report.evidence_urls.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {report.evidence_urls.map((url, index) => (
-                                                <a
-                                                    key={index}
-                                                    href={url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-4 bg-slate-50 rounded-2xl hover:bg-indigo-50 transition-all flex items-center justify-between group border border-slate-100"
-                                                >
-                                                    <span className="font-bold text-slate-900 group-hover:text-indigo-600">Evidence {index + 1}</span>
-                                                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-slate-500 italic text-sm">No evidence files uploaded</p>
-                                    )}
+                                    <ReportEvidenceGallery
+                                        files={(
+                                            report.review_package?.documents?.evidence?.files ||
+                                            (report.evidence_urls || []).map((url) => ({
+                                                url,
+                                                name: url.split("?")[0].split("/").pop() || "Evidence file",
+                                                kind: classifyEvidenceGalleryKind(url, url),
+                                            }))
+                                        ).map((file) => ({
+                                            url: String(file.url || ""),
+                                            name: String(file.name || "Evidence file"),
+                                            kind: file.kind || classifyEvidenceGalleryKind(String(file.url || ""), String(file.name || "")),
+                                        }))}
+                                        emptyLabel={report.evidence_access?.can_view === false ? `🔒 ${report.evidence_access.message || "Evidence verified — not publicly available"}` : "No evidence files uploaded"}
+                                    />
                                 </div>
                             </div>
                         </div>

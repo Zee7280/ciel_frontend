@@ -199,6 +199,11 @@ export type CommunityPipelineRow = {
     partner_status?: string;
     admin_status?: string;
     hours?: number;
+    /** Draft progress (backend report-progress util). is_submitted === false → still being written. */
+    is_submitted?: boolean;
+    progress_pct?: number;
+    sections_complete?: number;
+    sections_total?: number;
 };
 
 function pickStr(item: Record<string, unknown>, ...keys: string[]): string | undefined {
@@ -234,6 +239,10 @@ export function mapCommunityPipelineRow(item: Record<string, unknown>): Communit
         partner_status: pickStr(item, "partner_status", "partnerStatus"),
         admin_status: pickStr(item, "admin_status", "adminStatus"),
         hours: Number.isFinite(hours) ? hours : 0,
+        is_submitted: typeof item.is_submitted === "boolean" ? item.is_submitted : undefined,
+        progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : undefined,
+        sections_complete: typeof item.sections_complete === "number" ? item.sections_complete : undefined,
+        sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
     };
 }
 

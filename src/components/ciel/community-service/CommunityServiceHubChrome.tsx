@@ -31,14 +31,14 @@ export function HubTabs({
     onChange: (id: string) => void;
 }) {
     return (
-        <div className="mb-3.5 flex flex-wrap gap-2">
+        <div className="mb-3.5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
             {tabs.map((tab) => (
                 <button
                     key={tab.id}
                     type="button"
                     onClick={() => onChange(tab.id)}
                     className={
-                        "rounded-[10px] border px-3 py-2 text-[11px] font-extrabold " +
+                        "shrink-0 rounded-[10px] border px-3 py-2 text-[11px] font-extrabold " +
                         (active === tab.id
                             ? "border-[#cbece4] bg-[#e8f7f3] text-[#08756b]"
                             : "border-[#dce6ea] bg-white text-[#52636e]")
@@ -52,9 +52,17 @@ export function HubTabs({
     );
 }
 
-export function EmptyPanel({ title, text }: { title: string; text: string }) {
+export function EmptyPanel({ title, text, mark }: { title: string; text: string; mark?: "ok" }) {
     return (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+            {mark === "ok" ? (
+                <div
+                    className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-[#e8f7f3] text-[18px] font-black text-[#08756b]"
+                    aria-hidden
+                >
+                    ✓
+                </div>
+            ) : null}
             <p className="text-sm font-extrabold text-slate-800">{title}</p>
             <p className="mt-1 text-[12.5px] text-slate-500">{text}</p>
         </div>

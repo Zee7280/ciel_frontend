@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { formatDisplayId } from "@/utils/displayIds";
 import { DIVIDEND_HOURLY_RATE_PKR } from "@/utils/communityAwardModel";
 import { approvalActionClass } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import type { FacultyCsReportRow } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
-import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
 
 export type FacultyReportReviewMode = "pending" | "revision" | "decided";
 export type FacultyReportReviewViewer = "faculty" | "admin";
@@ -70,7 +68,6 @@ export default function FacultyReportReviewCard({
     /** Override report detail base path (no trailing slash). */
     reportBase?: string;
 }) {
-    const [lockedOpen, setLockedOpen] = useState(false);
     const has = analyserHasRun(row);
     const locked = Boolean(row.cii_locked);
     const hours = Number(row.hours || 0);
@@ -326,12 +323,12 @@ export default function FacultyReportReviewCard({
                     <div className="flex flex-wrap gap-1.5">
                         {viewer === "admin" ? (
                             <Link href={reportHref} className={approvalActionClass.green}>
-                                Open Locked V17 Package
+                                Open Impact Package
                             </Link>
                         ) : (
-                            <button type="button" className={approvalActionClass.green} onClick={() => setLockedOpen(true)}>
-                                Open Locked V17 Package
-                            </button>
+                            <Link href={reportHref} className={approvalActionClass.green}>
+                                Open Impact Package
+                            </Link>
                         )}
                         {viewer === "admin" ? (
                             <Link href={analyserHref} className={approvalActionClass.blue}>
@@ -360,7 +357,6 @@ export default function FacultyReportReviewCard({
                     </div>
                 </div>
             </article>
-            {lockedOpen && viewer === "faculty" ? <FacultyLockedV17Modal reportId={row.id} onClose={() => setLockedOpen(false)} /> : null}
         </>
     );
 }

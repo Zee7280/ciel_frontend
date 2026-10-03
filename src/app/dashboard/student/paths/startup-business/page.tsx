@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CourseworkCrumb, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import StartupBusinessHub from "./StartupBusinessHub";
 import StartupBusinessWorkspace from "./StartupBusinessWorkspace";
 
@@ -37,7 +36,7 @@ function StartupBusinessRouter() {
 
 export default function StartupBusinessPage() {
     return (
-        <Suspense fallback={<WorkspaceSkeleton />}>
+        <Suspense fallback={null}>
             <StartupBusinessRouter />
         </Suspense>
     );

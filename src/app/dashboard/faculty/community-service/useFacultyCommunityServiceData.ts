@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { reportRowToAwardCard, type CommunityAwardCard } from "@/utils/communityAwardModel";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
@@ -12,6 +12,7 @@ import {
 } from "@/utils/opportunityApplicationsAdmin";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
 
@@ -46,6 +47,13 @@ export type FacultyCsReportRow = {
     cii_locked?: boolean;
     cii_level_name?: string | null;
     cii_numeric_level?: number | null;
+    report_id?: string | null;
+    hours_progress_pct?: number;
+    progress_pct?: number;
+    sections_complete?: number;
+    sections_total?: number;
+    last_activity_at?: string;
+    draft_locked?: boolean;
 };
 
 export type FacultyCsMineRow = {
@@ -72,6 +80,18 @@ function pickStr(item: Record<string, unknown>, ...keys: string[]): string | und
     return undefined;
 }
 
+export type FacultyCsDraftProgressRow = {
+    id: string;
+    student_name: string;
+    project_title: string;
+    organization_name?: string;
+    hours?: number;
+    progress_pct: number;
+    sections_complete?: number;
+    sections_total?: number;
+    updated_at?: string;
+};
+
 export function isFacultyCsReportRevision(row: FacultyCsReportRow): boolean {
     const key = normalizeReviewStatus(row.faculty_status);
     return key === "revision_requested" || key === "revisions_requested" || key === "changes_requested" || key === "returned";
@@ -84,6 +104,7 @@ export function isFacultyCsOppRevision(row: FacultyApprovalRow): boolean {
 
 export function useFacultyCommunityServiceData() {
     const [rows, setRows] = useState<FacultyCsReportRow[]>([]);
+    const [draftRows, setDraftRows] = useState<FacultyCsDraftProgressRow[]>([]);
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [mineRows, setMineRows] = useState<FacultyCsMineRow[]>([]);
     const [pendingOppRows, setPendingOppRows] = useState<FacultyApprovalRow[]>([]);
@@ -92,7 +113,10 @@ export function useFacultyCommunityServiceData() {
     const [pendingAppRows, setPendingAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [historyAppRows, setHistoryAppRows] = useState<OpportunityApplicationListRow[]>([]);
     const [hoursProjectCount, setHoursProjectCount] = useState(0);
+    const [trackingRows, setTrackingRows] = useState<FacultyCsReportRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [reloadTick, setReloadTick] = useState(0);
+    const reload = useCallback(() => setReloadTick((n) => n + 1), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -127,9 +151,30 @@ export function useFacultyCommunityServiceData() {
                 r?.ok ? r.json() : null,
             ),
             fetchJoinApplicationsHistoryRows("/api/v1/faculty/applications"),
+            // Reports still being written: progress only, never answers (opens after student submits).
+            authenticatedFetch("/api/v1/faculty/reports/progress", {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+            authenticatedFetch("/api/v1/faculty/community-service/tracking", {}, { redirectToLogin: false })
+                .then((r) => (r?.ok ? r.json() : null))
+                .catch(() => null),
         ])
-            .then(([list, award, mine, approvals, history, drafts, apps, appHistory]) => {
+            .then(([list, award, mine, approvals, history, drafts, apps, appHistory, progress, tracking]) => {
                 if (cancelled) return;
+                setDraftRows(
+                    (Array.isArray(progress?.data) ? progress.data : [])
+                        .filter((item: unknown) => item && typeof item === "object")
+                        .map((item: Record<string, unknown>) => ({
+                            id: String(item.id || ""),
+                            student_name: pickStr(item, "student_name") || "Student",
+                            project_title: pickStr(item, "project_title") || "Report",
+                            organization_name: displayOrganizationName(pickStr(item, "organization_name")),
+                            hours: typeof item.hours === "number" ? item.hours : 0,
+                            progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : 0,
+                            sections_complete: typeof item.sections_complete === "number" ? item.sections_complete : undefined,
+                            sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
+                            updated_at: pickStr(item, "updated_at"),
+                        }))
+                        .filter((row: FacultyCsDraftProgressRow) => Boolean(row.id)),
+                );
                 const mappedMine = extractFacultyMineOpportunityRows(mine)
                     .map((raw) => {
                         const id = String(raw.id ?? raw._id ?? raw.opportunity_id ?? "").trim();
@@ -144,9 +189,14 @@ export function useFacultyCommunityServiceData() {
                     })
                     .filter((row) => row.id);
                 setMineRows(mappedMine);
-                setPendingOppRows(normalizeFacultyApprovalsResponse(approvals));
-                setHistoryOppRows(normalizeFacultyApprovalsResponse(history));
-                setLinkedDraftRows(normalizeFacultyApprovalsResponse(drafts));
+                // Faculty CS hub = personal / named-supervisor work only.
+                // Pure university_scope rows appear after Faculty↔University assignment and belong
+                // on the university / dashboard university view — not this personal Review queue.
+                const isPersonalApproval = (row: { approvalVisibility?: string }) =>
+                    row.approvalVisibility !== "university_scope";
+                setPendingOppRows(normalizeFacultyApprovalsResponse(approvals).filter(isPersonalApproval));
+                setHistoryOppRows(normalizeFacultyApprovalsResponse(history).filter(isPersonalApproval));
+                setLinkedDraftRows(normalizeFacultyApprovalsResponse(drafts).filter(isPersonalApproval));
                 setPendingAppRows(normalizeOpportunityApplicationsListResponse(apps));
                 setHistoryAppRows(appHistory.rows);
                 const mappedRows: FacultyCsReportRow[] = (Array.isArray(list?.data) ? list.data : [])
@@ -179,7 +229,7 @@ export function useFacultyCommunityServiceData() {
                                     return email && email.includes("@") ? email : undefined;
                                 })(),
                                 project_title: pickStr(item, "project_title", "projectTitle") || "Report",
-                                organization_name: pickStr(item, "organization_name", "organizationName"),
+                                organization_name: displayOrganizationName(pickStr(item, "organization_name", "organizationName")),
                                 project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
                                 faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
                                 status: pickStr(item, "status"),
@@ -225,9 +275,60 @@ export function useFacultyCommunityServiceData() {
                             };
                         })
                         .filter((r: FacultyCsReportRow) => r.id);
+                const mappedTracking: FacultyCsReportRow[] = (Array.isArray(tracking?.data) ? tracking.data : [])
+                    .filter((item: unknown) => item && typeof item === "object")
+                    .map((item: Record<string, unknown>) => {
+                        const hoursRaw = item.hours;
+                        const hours =
+                            typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
+                                ? hoursRaw
+                                : typeof hoursRaw === "string" && Number.isFinite(Number(hoursRaw))
+                                  ? Number(hoursRaw)
+                                  : 0;
+                        const email = pickStr(item, "student_email", "studentEmail");
+                        return {
+                            id: String(item.id || ""),
+                            student_name: pickStr(item, "student_name", "studentName") || "Student",
+                            student_email: email && email.includes("@") ? email : undefined,
+                            project_title: pickStr(item, "project_title", "projectTitle") || "Project",
+                            organization_name: displayOrganizationName(pickStr(item, "organization_name", "organizationName")),
+                            project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
+                            faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
+                            status: pickStr(item, "status") || "assigned",
+                            hours,
+                            required_hours:
+                                typeof item.required_hours === "number" && Number.isFinite(item.required_hours)
+                                    ? item.required_hours
+                                    : 16,
+                            submission_date: pickStr(item, "submission_date", "submissionDate"),
+                            report_submitted_at: pickStr(item, "report_submitted_at", "reportSubmittedAt"),
+                            updated_at: pickStr(item, "updated_at", "updatedAt", "last_activity_at"),
+                            last_activity_at: pickStr(item, "last_activity_at"),
+                            report_id: pickStr(item, "report_id", "reportId") || null,
+                            hours_progress_pct:
+                                typeof item.hours_progress_pct === "number" ? item.hours_progress_pct : undefined,
+                            progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : undefined,
+                            sections_complete:
+                                typeof item.sections_complete === "number" ? item.sections_complete : undefined,
+                            sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
+                            draft_locked: item.draft_locked === true,
+                            member_hours: Array.isArray(item.member_hours)
+                                ? item.member_hours
+                                      .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
+                                      .map((row) => ({
+                                          name: pickStr(row, "name") || "Student",
+                                          hours: Number(row.hours || 0) || 0,
+                                          required: Number(row.required || 16) || 16,
+                                      }))
+                                : [],
+                        };
+                    })
+                    .filter((r: FacultyCsReportRow) => r.id);
+                setTrackingRows(mappedTracking);
+                const hoursSource = mappedTracking.length ? mappedTracking : mappedRows;
                 setHoursProjectCount(
                     new Set(
-                        mappedRows
+                        hoursSource
                             .filter(
                                 (r) =>
                                     Boolean(r.project_id) &&
@@ -243,6 +344,7 @@ export function useFacultyCommunityServiceData() {
             .catch(() => {
                 if (cancelled) return;
                 setRows([]);
+                setDraftRows([]);
                 setCards([]);
                 setMineRows([]);
                 setPendingOppRows([]);
@@ -251,14 +353,19 @@ export function useFacultyCommunityServiceData() {
                 setPendingAppRows([]);
                 setHistoryAppRows([]);
                 setHoursProjectCount(0);
+                setTrackingRows([]);
                 setLoading(false);
             });
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadTick]);
 
     const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
+    const projectRows = useMemo(
+        () => (trackingRows.length ? trackingRows : rows),
+        [trackingRows, rows],
+    );
     const revisionReports = useMemo(() => rows.filter(isFacultyCsReportRevision), [rows]);
     const pendingReports = useMemo(
         () => rows.filter((r) => isFacultyCommunityWaiting(r) && !isFacultyCsReportRevision(r)),
@@ -269,8 +376,12 @@ export function useFacultyCommunityServiceData() {
         [rows],
     );
     const activeProjects = useMemo(
-        () => rows.filter((r) => !isFacultyCommunityLiveCard(r) && !isCommunityReportRejected(r)),
-        [rows],
+        () => projectRows.filter((r) => !isFacultyCommunityLiveCard(r) && !isCommunityReportRejected(r)),
+        [projectRows],
+    );
+    const projectLiveRows = useMemo(
+        () => projectRows.filter((r) => isFacultyCommunityLiveCard(r)),
+        [projectRows],
     );
     const revisionOpps = useMemo(() => historyOppRows.filter(isFacultyCsOppRevision), [historyOppRows]);
     const deckCards = useMemo(() => {
@@ -292,7 +403,7 @@ export function useFacultyCommunityServiceData() {
                 kind: "opp" as const,
                 title: row.projectTitle,
                 meta: `${formatOpportunityCode(row)} · ${row.studentName} · submitted ${row.submittedDate}`,
-                href: `${FACULTY_CS_APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
+                href: `${FACULTY_CS_BASE}?view=review&tab=opps&opportunity=${encodeURIComponent(row.id)}`,
                 cta: "View Flashcard & Approve",
                 studentEmail: row.studentEmail,
             })),
@@ -316,6 +427,7 @@ export function useFacultyCommunityServiceData() {
     return {
         loading,
         rows,
+        draftRows,
         mineRows,
         pendingOppRows,
         linkedDraftRows,
@@ -324,6 +436,8 @@ export function useFacultyCommunityServiceData() {
         historyAppRows,
         hoursProjectCount,
         liveRows,
+        projectRows,
+        projectLiveRows,
         pendingReports,
         revisionReports,
         decidedReports,
@@ -333,5 +447,6 @@ export function useFacultyCommunityServiceData() {
         inboxItems,
         pendingOppReviews: pendingOppRows.length,
         pendingApps: pendingAppRows.length,
+        reload,
     };
 }

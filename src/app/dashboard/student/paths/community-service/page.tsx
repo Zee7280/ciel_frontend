@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, FileText, ListChecks, UploadCloud, Award, Pencil, Trash2 } from "lucide-react";
@@ -8,22 +9,27 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import { fetchStudentDashboardData, useStudentDashboardCache } from "@/utils/student-dashboard-fetch";
+import {
+    fetchCommunityServiceRankings,
+    fetchStudentOpportunityMine,
+    peekStudentOpportunityMine,
+    prefetchCommunityServiceData,
+} from "@/utils/student-community-cache";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import EmptyState from "@/components/ciel/EmptyState";
 import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
-import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import CommunityServiceHub from "./CommunityServiceHub";
-import CommunityServiceCreate from "./CommunityServiceCreate";
-import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
-import CommunityServiceRankings from "./CommunityServiceRankings";
-import CommunityImpactWall from "./CommunityImpactWall";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import DetailedStudentReportGuide from "./DetailedStudentReportGuide";
-import { fetchImpactSummary } from "@/utils/cielImpactSummary";
-import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
-import { isJoinApplicationPendingStatus, pickJoinApplicationStatus } from "@/utils/studentJoinApplication";
+import { fetchImpactSummary, useImpactSummaryCache } from "@/utils/cielImpactSummary";
+import { readStoredCurrentUser } from "@/utils/currentUser";
+
+const CommunityServiceCreate = dynamic(() => import("./CommunityServiceCreate"));
+const CommunityServiceWorkspace = dynamic(() => import("./CommunityServiceWorkspace"));
+const CommunityServiceRankings = dynamic(() => import("./CommunityServiceRankings"));
+const CommunityImpactWall = dynamic(() => import("./CommunityImpactWall"));
+const DetailedStudentReportGuide = dynamic(() => import("./DetailedStudentReportGuide"));
 
 /** Mirrors Nest `LINE_STATUS` (opportunity-workflow.service.ts) — every value the API can send. */
 type ApprovalLineStatus =
@@ -100,6 +106,21 @@ function hourStatus(log: AttendanceLog): CielHourStatus {
 
 const HUB = "/dashboard/student/paths/community-service";
 
+function mapCreatedOpportunities(rows: Record<string, unknown>[]): CreatedOpportunity[] {
+    return rows
+        .filter((r) => r.status !== "draft")
+        .map((r) => ({
+            id: String(r.id),
+            title: String(r.title ?? "Untitled opportunity"),
+            status: typeof r.status === "string" ? r.status : undefined,
+            workflow_stage: (r.workflow_stage as string | null) ?? null,
+            faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
+            partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
+            admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
+            requires_partner_approval: Boolean(r.requires_partner_approval),
+        }));
+}
+
 const TABS = [
     { key: "engagements", label: "My engagements" },
     { key: "log-hours", label: "Log hours" },
@@ -136,87 +157,58 @@ function CommunityServiceContent() {
     const filesView = searchParams.get("view") === "files";
     const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
-    const [loading, setLoading] = useState(true);
+    const cachedDashboard = useStudentDashboardCache();
+    const cachedSummary = useImpactSummaryCache();
     const [loadFailed, setLoadFailed] = useState(false);
-    const [projects, setProjects] = useState<ActiveProject[]>([]);
-    const [verifiedHours, setVerifiedHours] = useState(0);
-    const [wallCount, setWallCount] = useState(0);
-    const [completion, setCompletion] = useState(0);
+    const [projects, setProjects] = useState<ActiveProject[] | null>(
+        cachedDashboard?.activeProjects ?? null,
+    );
+    const [verifiedHours, setVerifiedHours] = useState(
+        cachedDashboard?.overview?.totalVerifiedHours ?? cachedDashboard?.stats?.hoursVolunteered ?? 0,
+    );
+    const [wallCount, setWallCount] = useState(
+        cachedDashboard?.overview?.impactHistoryBadgeCount ?? cachedDashboard?.overview?.completedCount ?? 0,
+    );
+    const [completion, setCompletion] = useState(
+        Math.round(cachedSummary?.pathsStatus?.communityService?.progress ?? 0),
+    );
     const [bestCii, setBestCii] = useState<number | null>(null);
     const [displayName, setDisplayName] = useState("");
-    const [myOpportunities, setMyOpportunities] = useState<CreatedOpportunity[]>([]);
+    const [myOpportunities, setMyOpportunities] = useState<CreatedOpportunity[]>(
+        () => mapCreatedOpportunities(peekStudentOpportunityMine() ?? []),
+    );
     const [pendingApplications, setPendingApplications] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            fetchStudentDashboardData({ redirectToLogin: false }),
-            fetchImpactSummary({ redirectToLogin: false }),
-            authenticatedFetch("/api/v1/student/opportunity/mine", {}, { redirectToLogin: false })
-                .then((res) => (res?.ok ? res.json() : null))
-                .catch(() => null),
-            authenticatedFetch("/api/v1/students/community-service/rankings", {}, { redirectToLogin: false })
-                .then((res) => (res?.ok ? res.json() : null))
-                .catch(() => null),
-            authenticatedFetch("/api/v1/students/opportunities", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ student_id: getStoredCurrentUserId() || null, page: 1, limit: 500 }),
-            }, { redirectToLogin: false })
-                .then((res) => (res?.ok ? res.json() : null))
-                .catch(() => null),
-        ]).then(([data, summary, oppResult, rankingsResult, browseResult]) => {
+        const storedName = readStoredCurrentUser()?.name;
+        setDisplayName(typeof storedName === "string" ? storedName.trim() : "");
+
+        void fetchStudentDashboardData({ redirectToLogin: false }).then((data) => {
             if (cancelled) return;
-            // `data === null` means the dashboard call failed (offline / expired session) — say so
-            // instead of rendering a hub full of confident zeros.
             setLoadFailed(!data);
-            setProjects(data?.activeProjects ?? []);
-            setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
-            setWallCount(data?.overview?.impactHistoryBadgeCount ?? data?.overview?.completedCount ?? 0);
-            setCompletion(Math.round(summary?.pathsStatus?.communityService?.progress ?? 0));
-            const rankingRows = Array.isArray(rankingsResult?.data)
-                ? (rankingsResult.data as { cii?: number }[])
-                : [];
-            const rankingBest = rankingRows.reduce<number | null>((max, row) => {
-                const n = typeof row.cii === "number" ? row.cii : null;
-                if (n == null) return max;
-                return max == null ? n : Math.max(max, n);
-            }, null);
-            setBestCii(rankingBest);
-            const storedName = readStoredCurrentUser()?.name;
-            setDisplayName(typeof storedName === "string" ? storedName.trim() : "");
-            const rows = Array.isArray(oppResult?.data) ? (oppResult.data as Record<string, unknown>[]) : [];
-            setMyOpportunities(
-                rows
-                    .filter((r) => r.status !== "draft")
-                    .map((r) => ({
-                        id: String(r.id),
-                        title: String(r.title ?? "Untitled opportunity"),
-                        status: typeof r.status === "string" ? r.status : undefined,
-                        workflow_stage: (r.workflow_stage as string | null) ?? null,
-                        faculty_approval_status: r.faculty_approval_status as ApprovalLineStatus,
-                        partner_approval_status: r.partner_approval_status as ApprovalLineStatus,
-                        admin_approval_status: r.admin_approval_status as ApprovalLineStatus,
-                        requires_partner_approval: Boolean(r.requires_partner_approval),
-                    })),
-            );
-            const browseRows = Array.isArray(browseResult?.data) ? (browseResult.data as Record<string, unknown>[]) : [];
-            setPendingApplications(
-                browseRows.filter((row) => {
-                    const status = pickJoinApplicationStatus(row);
-                    return Boolean(status) && isJoinApplicationPendingStatus(status);
-                }).length,
-            );
-            setLoading(false);
-        }).catch(() => {
-            if (cancelled) return;
-            setLoadFailed(true);
-            setLoading(false);
+            if (!data) return;
+            setProjects(data.activeProjects ?? []);
+            setVerifiedHours(data.overview?.totalVerifiedHours ?? data.stats?.hoursVolunteered ?? 0);
+            setWallCount(data.overview?.impactHistoryBadgeCount ?? data.overview?.completedCount ?? 0);
         });
+        void fetchImpactSummary({ redirectToLogin: false }).then((summary) => {
+            if (cancelled || !summary) return;
+            setCompletion(Math.round(summary.pathsStatus?.communityService?.progress ?? 0));
+        });
+        prefetchCommunityServiceData();
+        void fetchCommunityServiceRankings().catch(() => undefined);
+        void fetchStudentOpportunityMine().then((rows) => {
+            if (cancelled) return;
+            setMyOpportunities(mapCreatedOpportunities(rows));
+        });
+
         return () => {
             cancelled = true;
         };
     }, []);
+
+    const viewProjects = projects ?? cachedDashboard?.activeProjects ?? [];
 
     const attention = useMemo(() => {
         const oppAction = myOpportunities.filter(
@@ -229,12 +221,12 @@ function CommunityServiceContent() {
         const oppApprovals = myOpportunities.filter((o) =>
             ["pending_faculty", "pending_partner", "pending_admin"].includes(o.workflow_stage ?? ""),
         ).length;
-        const readyProjects = projects.filter((p) => !p.report_status);
-        const reportAction = projects.filter((p) => {
+        const readyProjects = viewProjects.filter((p) => !p.report_status);
+        const reportAction = viewProjects.filter((p) => {
             const st = (p.report_status || "").toLowerCase();
             return st === "rejected" || st.includes("revision");
         }).length;
-        const reportsInProgress = projects.filter(
+        const reportsInProgress = viewProjects.filter(
             (p) => p.report_status && !["verified", "paid", "rejected"].includes(p.report_status) && !String(p.report_status).toLowerCase().includes("revision"),
         ).length;
         return [
@@ -242,7 +234,7 @@ function CommunityServiceContent() {
                 key: "oppAction",
                 n: oppAction,
                 title: "Opportunity action",
-                sub: oppAction ? "Revision waiting inside Create Opportunity" : "No proposal revision waiting",
+                sub: oppAction ? "Revision waiting in My Opportunities" : "No proposal revision waiting",
                 href: `${HUB}?view=create&filter=action`,
                 urgent: oppAction > 0,
                 tone: oppAction > 0 ? ("bad" as const) : ("default" as const),
@@ -251,7 +243,7 @@ function CommunityServiceContent() {
                 key: "oppApprovals",
                 n: oppApprovals,
                 title: "Opportunity approvals",
-                sub: "Faculty / Partner / CIEL PK decisions tracked in Create Opportunity",
+                sub: "Faculty / Partner / CIEL PK decisions tracked in My Opportunities",
                 href: `${HUB}?view=create&filter=review`,
                 urgent: false,
                 tone: "default" as const,
@@ -284,7 +276,7 @@ function CommunityServiceContent() {
                 tone: reportsInProgress > 0 ? ("warn" as const) : ("default" as const),
             },
         ];
-    }, [myOpportunities, projects]);
+    }, [myOpportunities, viewProjects]);
 
     useEffect(() => {
         if (rawTab === "find") {
@@ -308,8 +300,7 @@ function CommunityServiceContent() {
         router.replace(`/dashboard/student/paths/community-service?${qs.toString()}`);
     };
 
-    if (loading) return <WorkspaceSkeleton />;
-    if (rawTab === "find") return <WorkspaceSkeleton />;
+    if (rawTab === "find") return null;
 
     if (wallView) {
         return <CommunityImpactWall />;
@@ -332,7 +323,7 @@ function CommunityServiceContent() {
     if (workspaceView) {
         return (
             <CommunityServiceWorkspace
-                projects={projects}
+                projects={viewProjects}
                 verifiedHours={verifiedHours}
                 wallCount={wallCount}
                 completion={completion}
@@ -346,18 +337,18 @@ function CommunityServiceContent() {
     }
 
     if (filesView) {
-        return <WorkspaceSkeleton />;
+        return null;
     }
 
     if (showHub) {
         const reportInProgress = attention.some((item) => item.key === "reportsInProgress" && item.n > 0);
-        const recordIds = new Set(projects.map((p) => p.id));
+        const recordIds = new Set(viewProjects.map((p) => p.id));
         myOpportunities.forEach((o) => recordIds.add(o.id));
         return (
             <>
                 <LoadFailedBanner show={loadFailed} />
                 <CommunityServiceHub
-                    projects={projects}
+                    projects={viewProjects}
                     verifiedHours={verifiedHours}
                     wallCount={wallCount}
                     completion={completion}
@@ -386,7 +377,7 @@ function CommunityServiceContent() {
                 primaryActionLabel="Log hours"
                 onPrimaryAction={() => setTab("log-hours")}
                 stats={[
-                    { label: "Active engagements", value: String(projects.length), icon: ListChecks },
+                    { label: "Active engagements", value: String(viewProjects.length), icon: ListChecks },
                     { label: "Verified hours", value: String(Math.round(verifiedHours)), icon: Clock, hint: "Contributes to sections 1, 4 of your impact score" },
                 ]}
                 tabs={TABS}
@@ -395,13 +386,13 @@ function CommunityServiceContent() {
             >
                 {activeTab === "engagements" && (
                     <EngagementsTab
-                        projects={projects}
+                        projects={viewProjects}
                         createdOpportunities={myOpportunities}
                         onOpportunityDeleted={(id) => setMyOpportunities((prev) => prev.filter((o) => o.id !== id))}
                     />
                 )}
-                {activeTab === "log-hours" && <LogHoursTab projects={projects} />}
-                {activeTab === "reports" && <ReportsTab projects={projects} />}
+                {activeTab === "log-hours" && <LogHoursTab projects={viewProjects} />}
+                {activeTab === "reports" && <ReportsTab projects={viewProjects} />}
             </PathWorkspaceShell>
         </div>
     );
@@ -970,7 +961,7 @@ function ReportsTab({ projects }: { projects: ActiveProject[] }) {
 
 export default function CommunityServicePage() {
     return (
-        <Suspense fallback={<WorkspaceSkeleton />}>
+        <Suspense fallback={null}>
             <CommunityServiceContent />
         </Suspense>
     );

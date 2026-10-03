@@ -131,8 +131,8 @@ export default function FacultyAttendanceReviewPage() {
             backHref="/dashboard/faculty/community-service?view=projects"
             backLabel="Back to Community Service"
             eyebrow=""
-            title="Attendance review"
-            description=""
+            title="Member hours"
+            description="Live hours logged by assigned students. Attendance is confirmed when the flash-card score is locked."
             projects={projects}
             projectId={projectId}
             setProjectId={setProjectId}
@@ -143,6 +143,7 @@ export default function FacultyAttendanceReviewPage() {
             queueTitle="Logged hours"
             queueDescription=""
             wideQueueLayout
+            liveHoursMonitor
         />
     );
 }

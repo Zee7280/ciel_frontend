@@ -43,6 +43,7 @@ import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFi
 import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 import { formatSdgCodeDisplay } from "@/utils/sdgData";
 import { resolveCiiLevelBadge, resolveCiiLevelTitle } from "@/utils/ciiLevelBadge";
+import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle, PUBLIC_EVIDENCE_LOCKED_LABEL } from "../utils/mediaVisibility";
 
 interface Props {
     projectData?: unknown;
@@ -461,11 +462,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
               ? Math.round(engagementRecalc.total_verified_hours)
               : Math.round(
                     (parseFloat(String(data.section1?.team_lead?.hours ?? "")) || 0) +
-                        (data.section1?.team_members?.reduce(
-                            (sum: number, m: ReportData["section1"]["team_members"][number]) =>
-                                sum + (parseFloat(String(m.hours ?? "")) || 0),
-                            0,
-                        ) || 0),
+                        (Array.isArray(data.section1?.team_members)
+                            ? data.section1.team_members.reduce(
+                                  (sum: number, m: ReportData["section1"]["team_members"][number]) =>
+                                      sum + (parseFloat(String(m.hours ?? "")) || 0),
+                                  0,
+                              )
+                            : 0),
                 );
 
     const mBase = data.section1?.metrics;
@@ -480,7 +483,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         .filter(Boolean)
         .join(" · ");
 
-    const tm = data.section1?.team_members ?? [];
+    const tm = Array.isArray(data.section1?.team_members) ? data.section1.team_members : [];
     const memberAuthor = !authorParticipation.isTeamLeadAuthor && authorParticipation.memberIndex >= 0;
     const authorMemberRow = memberAuthor ? tm[authorParticipation.memberIndex] : undefined;
     const dossierAuthorRoleHoursLine = memberAuthor
@@ -1769,35 +1772,31 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 <div className={dossierSectionStack}>
                     <div className={dossierFieldGrid}>
                     <QandA q="Has evidence" a={data.section8.has_evidence} />
-                    <QandA q="Media visibility" a={data.section8.media_visible} />
+                    <QandA q="Who can see this evidence?" a={mediaVisibilityTitle(data.section8.media_visible) || "Restricted"} />
                     <QandA q="Primary evidence types" a={data.section8.evidence_types} />
                     <QandA q="Evidence description" a={data.section8.description} fullWidth />
-                    {data.section8.media_visible === "public" ? (
+                    {isPublicMediaVisibility(data.section8.media_visible) ? (
                         <FileListQA q="Evidence files" files={data.section8.evidence_files} fullWidth />
                     ) : (
                         <QandA
                             q="Evidence files"
-                            a={`Not included in this export — visibility set to "${data.section8.media_visible === "internal" ? "Private" : "Institutional"}".`}
+                            a={PUBLIC_EVIDENCE_LOCKED_LABEL}
                             fullWidth
                         />
                     )}
-                    <QandA
-                        q="Ethical declaration compliance"
-                        a={
-                            Object.entries(data.section8.ethical_compliance || {})
-                                .filter((entry) => entry[1])
-                                .map(([k]) => k.replace(/_/g, " "))
-                                .join(", ") || "Global ethical compliance adhered"
-                        }
-                    />
+                    {isPublicMediaVisibility(data.section8.media_visible) ? (
+                        <QandA q="Public share permission" a={hasPublicSharePermission(data.section8) ? "Confirmed" : "Pending"} />
+                    ) : (
+                        <QandA q="Public share permission" a="Not required — evidence is not public" />
+                    )}
                     <QandA q="Partner verification" a={data.section8.partner_verification} />
                     <QandA q="Partner verification type" a={data.section8.partner_verification_type} />
-                    {data.section8.media_visible === "public" ? (
+                    {isPublicMediaVisibility(data.section8.media_visible) ? (
                         <FileListQA q="Partner verification files" files={data.section8.partner_verification_files} fullWidth />
                     ) : (
                         <QandA
                             q="Partner verification files"
-                            a={`Not included in this export — visibility set to "${data.section8.media_visible === "internal" ? "Private" : "Institutional"}".`}
+                            a={PUBLIC_EVIDENCE_LOCKED_LABEL}
                             fullWidth
                         />
                     )}

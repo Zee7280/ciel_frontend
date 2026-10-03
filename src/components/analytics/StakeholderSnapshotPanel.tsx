@@ -48,6 +48,10 @@ function labelParticipationType(raw: string): string {
     return raw;
 }
 
+function asRows<T>(v: unknown): T[] {
+    return Array.isArray(v) ? (v.filter((r) => r && typeof r === "object") as T[]) : [];
+}
+
 function DistributionBars({
     title,
     rows,
@@ -65,18 +69,18 @@ function DistributionBars({
             </div>
         );
     }
-    const max = Math.max(...rows.map((r) => r.count), 1);
+    const max = Math.max(...rows.map((r) => toNumber(r.count)), 1);
     return (
         <div className="mt-4 space-y-3">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
             {rows.map((row, i) => {
                 const label = String(row[labelKey] ?? "");
-                const pct = (row.count / max) * 100;
+                const pct = (toNumber(row.count) / max) * 100;
                 return (
                     <div key={`${label}-${i}`} className="space-y-1">
                         <div className="flex justify-between text-xs font-semibold text-slate-700">
                             <span className="min-w-0 truncate pr-2">{label}</span>
-                            <span className="shrink-0 tabular-nums">{row.count.toLocaleString()}</span>
+                            <span className="shrink-0 tabular-nums">{toNumber(row.count).toLocaleString()}</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                             <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
@@ -143,6 +147,10 @@ export default function StakeholderSnapshotPanel() {
     const hec = stakeholder?.hec;
     const gov = stakeholder?.government;
     const un = stakeholder?.un;
+    const participationStructure = asRows<{ participation_type: string; count: number }>(un?.participation_structure).map((r) => ({
+        participation_type: String(r.participation_type ?? "unknown"),
+        count: toNumber(r.count),
+    }));
 
     return (
         <div>
@@ -201,12 +209,12 @@ export default function StakeholderSnapshotPanel() {
                         </ul>
                         <DistributionBars
                             title="Degree distribution"
-                            rows={hec?.degree_distribution ?? []}
+                            rows={asRows<DistributionRow>(hec?.degree_distribution)}
                             labelKey="degree"
                         />
                         <DistributionBars
                             title="Academic integration"
-                            rows={hec?.academic_integration_distribution ?? []}
+                            rows={asRows<DistributionRow>(hec?.academic_integration_distribution)}
                             labelKey="academic_integration_type"
                         />
                     </section>
@@ -225,7 +233,7 @@ export default function StakeholderSnapshotPanel() {
                             </li>
                             <li className="text-xs text-slate-500">Count of all student accounts (same basis as HEC participants).</li>
                             <li className="flex justify-between gap-2">
-                                <span className="text-slate-600">Growth rate</span>
+                                <span className="text-slate-600">Growth rate (month-to-date)</span>
                                 <span className="font-bold tabular-nums text-emerald-700">
                                     {gov?.growth_rate_percent == null
                                         ? "—"
@@ -240,12 +248,12 @@ export default function StakeholderSnapshotPanel() {
                         </ul>
                         <DistributionBars
                             title="Participation by region"
-                            rows={gov?.participation_by_region ?? []}
+                            rows={asRows<DistributionRow>(gov?.participation_by_region)}
                             labelKey="region"
                         />
                         <DistributionBars
                             title="Academic integration mix"
-                            rows={gov?.academic_integration_mix ?? []}
+                            rows={asRows<DistributionRow>(gov?.academic_integration_mix)}
                             labelKey="academic_integration_type"
                         />
                     </section>
@@ -276,11 +284,11 @@ export default function StakeholderSnapshotPanel() {
                         </ul>
                         <div className="mt-4 space-y-3">
                             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Participation structure</p>
-                            {(un?.participation_structure ?? []).length === 0 ? (
+                            {participationStructure.length === 0 ? (
                                 <p className="text-sm text-slate-500">No enrolments in scope.</p>
                             ) : (
-                                (un?.participation_structure ?? []).map((row, i) => {
-                                    const max = Math.max(...(un?.participation_structure ?? []).map((r) => r.count), 1);
+                                participationStructure.map((row, i) => {
+                                    const max = Math.max(...participationStructure.map((r) => toNumber(r.count)), 1);
                                     const pct = (row.count / max) * 100;
                                     return (
                                         <div key={`${row.participation_type}-${i}`} className="space-y-1">

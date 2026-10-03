@@ -21,6 +21,7 @@ import {
     type PartnerTeamBucket,
 } from "@/utils/engagementPartnerTeamScope";
 import { type PartnerParticipantChip } from "@/components/engagement/AttendancePendingQueuePanel";
+import FacultyHoursMonitorPanel from "@/components/engagement/FacultyHoursMonitorPanel";
 
 /** Primary accent aligned with Attendance Verification reference */
 const accent = "text-[#0056B3]";
@@ -91,6 +92,7 @@ export default function AttendanceReviewDashboard({
     variant = "default",
     /** Full-width layout with in-panel table scroll (faculty + partner attendance review). */
     wideQueueLayout = false,
+    liveHoursMonitor = false,
 }: {
     backHref: string;
     backLabel: string;
@@ -111,6 +113,8 @@ export default function AttendanceReviewDashboard({
     /** Partner attendance verification shell; faculty uses plain `default`. */
     variant?: "default" | "partner";
     wideQueueLayout?: boolean;
+    /** Faculty: show live logged hours instead of the deferred pending-queue notice. */
+    liveHoursMonitor?: boolean;
 }) {
     const isPartner = variant === "partner";
     const stretchViewport = wideQueueLayout;
@@ -611,7 +615,9 @@ export default function AttendanceReviewDashboard({
                                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                                             Opportunities
                                         </p>
-                                        {totalPendingAcrossProjects > 0 ? (
+                                        {liveHoursMonitor ? (
+                                            <span className="text-[11px] font-medium text-emerald-700">Live monitoring</span>
+                                        ) : totalPendingAcrossProjects > 0 ? (
                                             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 ring-1 ring-inset ring-amber-200/90">
                                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
                                                 {totalPendingAcrossProjects} pending total
@@ -642,6 +648,7 @@ export default function AttendanceReviewDashboard({
                                         >
                                             All
                                         </button>
+                                        {liveHoursMonitor ? null : (
                                         <button
                                             type="button"
                                             onClick={() => setListTab("pending")}
@@ -672,6 +679,7 @@ export default function AttendanceReviewDashboard({
                                                 </span>
                                             ) : null}
                                         </button>
+                                        )}
                                     </div>
                                     {onRefreshCounts ? (
                                         <button
@@ -1023,12 +1031,14 @@ export default function AttendanceReviewDashboard({
                                                 <p className="mt-0.5 text-xs text-slate-500">{selected.subtitle}</p>
                                             ) : null}
                                         </div>
+                                        {liveHoursMonitor ? null : (
                                         <div className="flex shrink-0 flex-col items-end gap-1">
                                             <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                                                 Pending
                                             </span>
                                             <PendingCountBadge n={selectedPendingCount} partner />
                                         </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <p className="text-sm text-slate-600">
@@ -1045,6 +1055,9 @@ export default function AttendanceReviewDashboard({
                                         stretchViewport && !isPartner && "flex min-h-0 w-full flex-1 flex-col",
                                     )}
                                 >
+                                    {liveHoursMonitor && !isPartner ? (
+                                        <FacultyHoursMonitorPanel projectId={projectId} />
+                                    ) : (
                                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm leading-relaxed text-slate-700">
                                         <p className="font-semibold text-slate-900">Attendance is confirmed on the flash card.</p>
                                         <p className="mt-2">
@@ -1052,6 +1065,7 @@ export default function AttendanceReviewDashboard({
                                             Faculty (or CIEL PK for private candidates) approves those hours when they lock the flash-card score.
                                         </p>
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (

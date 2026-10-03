@@ -9,6 +9,13 @@ import clsx from "clsx";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { countWords } from "../utils/validation";
+import {
+    DEFAULT_MEDIA_VISIBILITY,
+    hasPublicSharePermission,
+    isPublicMediaVisibility,
+    normalizeMediaVisibility,
+    type MediaVisibility,
+} from "../utils/mediaVisibility";
 
 const EVIDENCE_TYPES = [
     { id: "Activity photos (with consent)", label: "📸 Activity photos (with consent)" },
@@ -23,24 +30,27 @@ const EVIDENCE_TYPES = [
 
 const OTHER_EVIDENCE_TYPE = "Other supporting document";
 
-const visibilityOptions = [
+const visibilityOptions: Array<{
+    id: MediaVisibility;
+    label: string;
+    recommended?: boolean;
+    desc: string;
+}> = [
     {
-        id: "public" as const,
+        id: "public",
         label: "Public",
-        emoji: "🌐",
-        desc: "Website & public reports — only when consent and institutional policy permit.",
+        desc: "Anyone viewing the published project can see this evidence. Original files can be downloaded.",
     },
     {
-        id: "limited" as const,
-        label: "Institutional",
-        emoji: "🏛️",
-        desc: "University & HEC only.",
+        id: "restricted",
+        label: "Restricted",
+        recommended: true,
+        desc: "Student and CIEL PK can view it now; Faculty and University unlock after super-admin approval. Partner / NGO never. Not shown publicly. Downloads are blocked.",
     },
     {
-        id: "internal" as const,
+        id: "private",
         label: "Private",
-        emoji: "🔒",
-        desc: "Verification only.",
+        desc: "Internal verification only: Student and CIEL PK now, Faculty and University after super-admin approval. Partner / NGO never. Never published. Downloads are blocked.",
     },
 ];
 
@@ -210,9 +220,10 @@ export default function Section8Evidence() {
         evidence_types = [],
         evidence_files = [],
         description = "",
-        ethical_compliance = {},
         media_visible = "",
+        public_share_permission = false,
     } = section8;
+    const selectedVisibility = normalizeMediaVisibility(media_visible) || DEFAULT_MEDIA_VISIBILITY;
     const evidenceTypeOther = section8.evidence_type_other || "";
     const descriptionWords = countWords(description);
     const captionInRange = descriptionWords >= 10 && descriptionWords <= 45;
@@ -224,16 +235,6 @@ export default function Section8Evidence() {
         const next = cur.filter((value) => value !== type && value.replace(/^✏️\s*/, "") !== type);
         update("evidence_types", on ? next : [...next, type]);
     };
-    /** One combined confirmation drives all four ethics keys at once — the checks themselves are unchanged. */
-    const setAllEthics = (checked: boolean) => {
-        update("ethical_compliance", {
-            authentic: checked,
-            informed_consent: checked,
-            no_harm: checked,
-            privacy_respected: checked,
-        });
-    };
-
     /** Evidence already attached in earlier sections — nothing to re-upload or re-describe. */
     const collectedElsewhere = useMemo(() => {
         const items: { file: EvidenceFileItem; label: string; source: string }[] = [];
@@ -255,10 +256,6 @@ export default function Section8Evidence() {
         return items;
     }, [data.section1?.attendance_logs, data.section6?.evidence_files, data.section7?.formalization_files]);
 
-    const allEthicalChecked =
-        Object.values(ethical_compliance || {}).every((v) => v === true) &&
-        Object.keys(ethical_compliance || {}).length === 4;
-
     const legacyTypes = (evidence_types || []).filter(
         (value) => !EVIDENCE_TYPES.some((type) => evidenceTypeOn([value], type.id)),
     );
@@ -268,15 +265,23 @@ export default function Section8Evidence() {
         const onFile = collectedElsewhere.length;
         const added = evidence_files?.length || 0;
         const total = onFile + added;
-        const consent = allEthicalChecked ? "Ethical consent is confirmed." : "Ethical consent is pending.";
         const visibility =
-            media_visible === "public" ? "Visibility: public."
-            : media_visible === "limited" ? "Visibility: institutional."
-            : media_visible === "internal" ? "Visibility: private."
-            : "Visibility is still pending.";
-        if (!total) return `Evidence already on file will appear here as pictures. ${consent} ${visibility}`;
-        return `${total} evidence file${total === 1 ? "" : "s"} sit on record — ${onFile} from earlier sections${added ? ` and ${added} added here` : ""}. ${consent} ${visibility}`;
+            selectedVisibility === "public" ? "Visibility: public."
+            : selectedVisibility === "restricted" ? "Visibility: restricted."
+            : "Visibility: private.";
+        const publicOk = !isPublicMediaVisibility(selectedVisibility) || hasPublicSharePermission(section8);
+        const shareNote = selectedVisibility === "public"
+            ? (publicOk ? "Public share permission is confirmed." : "Public share permission is pending.")
+            : "Not shown publicly.";
+        if (!total) return `Evidence already on file will appear here as pictures. ${visibility} ${shareNote}`;
+        return `${total} evidence file${total === 1 ? "" : "s"} sit on record — ${onFile} from earlier sections${added ? ` and ${added} added here` : ""}. ${visibility} ${shareNote}`;
     })();
+
+    useEffect(() => {
+        if (!normalizeMediaVisibility(media_visible)) {
+            update("media_visible", DEFAULT_MEDIA_VISIBILITY);
+        }
+    }, [media_visible]);
 
     useEffect(() => {
         if (section8.summary_text !== autoNarrative) {
@@ -472,53 +477,73 @@ export default function Section8Evidence() {
                     </div>
                 ) : null}
 
-                <label
-                    className={clsx(
-                        "flex cursor-pointer items-start gap-3 rounded-xl border border-dashed px-4 py-3",
-                        allEthicalChecked ? "border-[#0e7d74] bg-[#fbfefd]" : "border-[#cbe7e3] bg-[#fbfefd]",
-                    )}
-                >
-                    <input
-                        type="checkbox"
-                        checked={allEthicalChecked}
-                        onChange={(e) => setAllEthics(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e7d74]"
-                    />
-                    <span className="text-[11px] leading-relaxed text-[var(--ink)]">
-                        <b>I confirm this evidence is genuine and gathered responsibly</b> — from this project, with photo consent, privacy and dignity respected.{" "}
-                        <span className="text-[var(--gold)]">False submissions may result in rejection and institutional action.</span>
-                    </span>
-                </label>
-                <FieldError message={getFieldError("ethical_compliance")} />
-
                 <div>
-                    <Label className={fieldLabel}>Default media visibility</Label>
+                    <Label className={fieldLabel}>Who can see this evidence?</Label>
                     <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
                         {visibilityOptions.map((opt) => {
-                            const active = media_visible === opt.id;
+                            const active = selectedVisibility === opt.id;
                             return (
                                 <button
                                     key={opt.id}
                                     type="button"
-                                    onClick={() => update("media_visible", opt.id)}
+                                    onClick={() => {
+                                        updateSection("section8", {
+                                            media_visible: opt.id,
+                                            public_share_permission: opt.id === "public" ? public_share_permission : false,
+                                        });
+                                    }}
                                     className={clsx(
-                                        "rounded-xl border-2 p-5 text-center transition-colors",
+                                        "rounded-xl border-2 p-5 text-left transition-colors",
                                         active
                                             ? "border-[#25b8d8] bg-[#eefbfe] shadow-sm"
                                             : "border-slate-200 bg-white hover:border-[#25b8d8]/40",
                                     )}
                                 >
-                                    <p className="text-2xl">{opt.emoji}</p>
-                                    <p className="mt-2 text-sm font-semibold text-slate-900">{opt.label}</p>
+                                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                        <span className={clsx(
+                                            "inline-flex h-4 w-4 items-center justify-center rounded-full border",
+                                            active ? "border-[#25b8d8]" : "border-slate-300",
+                                        )}>
+                                            {active ? <span className="h-2 w-2 rounded-full bg-[#25b8d8]" /> : null}
+                                        </span>
+                                        {opt.label}
+                                        {opt.recommended ? (
+                                            <span className="rounded-full bg-[#eefbfe] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[#0e7d74]">
+                                                Default
+                                            </span>
+                                        ) : null}
+                                    </p>
                                     <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{opt.desc}</p>
                                 </button>
                             );
                         })}
                     </div>
-                    <p className="cer-hint mt-2">
-                        Privacy does not reduce verification quality. Choose Public only when consent and institutional policy permit it. Institutional or Private evidence can still be fully verified. Blur or redact identifying details whenever needed.
-                    </p>
                     <FieldError message={getFieldError("media_visible")} />
+                    <p className="cer-hint mt-2">
+                        One choice applies to every evidence file in this project.
+                        {selectedVisibility === "public" && !public_share_permission
+                            ? " Until you confirm public-share permission below, evidence stays Restricted."
+                            : ""}
+                    </p>
+                    {selectedVisibility === "public" ? (
+                        <label
+                            className={clsx(
+                                "mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-dashed px-4 py-3",
+                                public_share_permission ? "border-[#0e7d74] bg-[#fbfefd]" : "border-[#cbe7e3] bg-[#fbfefd]",
+                            )}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={Boolean(public_share_permission)}
+                                onChange={(e) => update("public_share_permission", e.target.checked)}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e7d74]"
+                            />
+                            <span className="text-[11px] leading-relaxed text-[var(--ink)]">
+                                <b>I have permission to publicly share this evidence.</b>
+                            </span>
+                        </label>
+                    ) : null}
+                    <FieldError message={getFieldError("public_share_permission")} />
                 </div>
             </section>
 

@@ -132,7 +132,7 @@ export function resolveReportAuthorParticipationSnapshot(
     student: { id?: string | null; email?: string | null; name?: string | null } | null | undefined,
 ): ReportAuthorParticipationSnapshot {
     const lead = section1?.team_lead;
-    const members = section1?.team_members ?? [];
+    const members = Array.isArray(section1?.team_members) ? section1.team_members : [];
 
     const fromLead = (): ReportAuthorParticipationSnapshot => ({
         isTeamLeadAuthor: true,
@@ -252,7 +252,7 @@ export function buildSection1ParticipationDisplay(args: {
             : "") ||
         (section1?.participation_type !== "team" &&
         verifiedHours > 0 &&
-        !(section1?.team_members ?? []).length
+        !(Array.isArray(section1?.team_members) ? section1.team_members : []).length
             ? `${verifiedHours} verified hours`
             : "");
 

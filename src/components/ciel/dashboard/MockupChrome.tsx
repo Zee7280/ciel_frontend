@@ -123,6 +123,7 @@ export function MockupActionCard({
     locked,
     full,
     hot,
+    onPrefetch,
 }: {
     href?: string;
     onClick?: () => void;
@@ -135,6 +136,7 @@ export function MockupActionCard({
     locked?: boolean;
     full?: boolean;
     hot?: boolean;
+    onPrefetch?: () => void;
 }) {
     const className = `relative min-h-[140px] overflow-hidden rounded-[24px] px-4 py-4 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] sm:min-h-[158px] sm:px-[22px] sm:py-5 ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-4 after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION'] sm:after:left-[22px]" : ""}`;
     const inner = (
@@ -159,7 +161,7 @@ export function MockupActionCard({
     );
     if (href) {
         return (
-            <Link href={href} style={{ background }} className={className}>
+            <Link href={href} style={{ background }} className={className} onPointerEnter={onPrefetch} onFocus={onPrefetch}>
                 {inner}
             </Link>
         );

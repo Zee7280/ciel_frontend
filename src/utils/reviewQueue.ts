@@ -202,6 +202,14 @@ export function isAdminCommunityWaiting(row: CommunityReviewRow): boolean {
     return !isAdminCommunityLiveCard(row);
 }
 
+/** Admin "Pending review": in flight, admin has not signed off, not rejected. Does NOT require
+ * faculty approval, so reports still with faculty are counted rather than silently dropped. */
+export function isAdminCommunityPendingReview(row: CommunityReviewRow): boolean {
+    if (!isCommunityReportInFlight(row) || isCommunityReportRejected(row)) return false;
+    if (isCommunityReportAwaitingFee(row)) return false;
+    return !isCommunityReportAdminSignedOff(row);
+}
+
 /** Admin / national board: still in pipeline, not a live faculty-approved card. */
 export function isCommunityReportWaitingForAdmin(row: CommunityReviewRow): boolean {
     return isAdminCommunityWaiting(row);

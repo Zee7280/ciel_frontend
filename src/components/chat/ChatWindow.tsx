@@ -59,7 +59,7 @@ export default function ChatWindow({
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    setMessages(data.data);
+                    setMessages(Array.isArray(data.data) ? data.data : []);
                 }
             }
         } catch (error) {

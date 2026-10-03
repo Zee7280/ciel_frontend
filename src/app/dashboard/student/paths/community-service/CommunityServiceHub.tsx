@@ -6,6 +6,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { prefetchCommunityServiceData, prefetchStudentBrowseOpportunities, fetchCommunityServiceRankings } from "@/utils/student-community-cache";
 
 const HUB = "/dashboard/student/paths/community-service";
 const CREATE_VIEW = `${HUB}?view=create`;
@@ -119,13 +120,13 @@ export default function CommunityServiceHub({
             <div className="mb-1 mt-6">
                 <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Community Service</h2>
                 <p className="mt-1 text-[12.5px] text-[#70808a]">
-                    One contained area. Proposal approval stays in Create / My Opportunities; applications stay in Browse; only approved work moves into My Reports.
+                    One contained area. Proposal approval stays in My Opportunities; applications stay in Browse; only approved work moves into My Reports.
                 </p>
             </div>
 
             <UserGuideBanner
                 desc="Everything for Community Service is grouped here. Choose the stage of your journey; Home stays an overview."
-                rule="Create / My Opportunities happen before My Reports; My Reports starts after approval."
+                rule="My Opportunities happen before My Reports; My Reports starts after approval."
             />
 
             <ZoneRule title="Where am I?">
@@ -141,11 +142,15 @@ export default function CommunityServiceHub({
                     href={CREATE_VIEW}
                     emoji="🚀"
                     ghost="🚀"
-                    title="Create Opportunity"
-                    subtitle="Open the Community Service Opportunity Form and start a new student-created proposal."
+                    title="My Opportunities"
+                    subtitle="Track drafts, reviewer feedback, and publication from one place."
                     badge="PROPOSAL LOOP"
                     background={MOCKUP_GRADIENTS.teal}
                     hot={createHot}
+                    onPrefetch={() => {
+                        prefetchCommunityServiceData();
+                        void import("./CommunityServiceCreate");
+                    }}
                 />
                 <MockupActionCard
                     href={BROWSE_HREF}
@@ -156,16 +161,7 @@ export default function CommunityServiceHub({
                     badge="DISCOVER + APPLY"
                     background={MOCKUP_GRADIENTS.blue}
                     hot={browseHot}
-                />
-                <MockupActionCard
-                    href={CREATE_VIEW}
-                    emoji="📁"
-                    ghost="📁"
-                    title="My Opportunities"
-                    subtitle="Same Opportunity IDs across Drafts, Under Approval, Action Required and Approved / Live — no duplicate records."
-                    badge="TRACK PROPOSALS"
-                    background={MOCKUP_GRADIENTS.teal}
-                    hot={createHot}
+                    onPrefetch={() => prefetchStudentBrowseOpportunities()}
                 />
                 <MockupActionCard
                     href={WORKSPACE_HREF}
@@ -176,6 +172,10 @@ export default function CommunityServiceHub({
                     badge="REPORT HOME"
                     background={MOCKUP_GRADIENTS.orange}
                     hot={workspaceHot}
+                    onPrefetch={() => {
+                        prefetchCommunityServiceData();
+                        void import("./CommunityServiceWorkspace");
+                    }}
                 />
                 <MockupActionCard
                     href={CS_IMPACT_HREF}
@@ -185,6 +185,10 @@ export default function CommunityServiceHub({
                     subtitle="Verified records after faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, certificate and QR."
                     badge="MY IMPACT"
                     background={MOCKUP_GRADIENTS.green}
+                    onPrefetch={() => {
+                        prefetchCommunityServiceData();
+                        void import("./CommunityImpactWall");
+                    }}
                 />
                 <MockupActionCard
                     href={RANKINGS_HREF}
@@ -194,6 +198,10 @@ export default function CommunityServiceHub({
                     subtitle="Official ranking snapshots and badge history for your verified Community Service records."
                     badge="RANKINGS"
                     background={MOCKUP_GRADIENTS.navy}
+                    onPrefetch={() => {
+                        void fetchCommunityServiceRankings().catch(() => undefined);
+                        void import("./CommunityServiceRankings");
+                    }}
                 />
                 <MockupActionCard
                     href={GUIDE_HREF}
@@ -203,6 +211,9 @@ export default function CommunityServiceHub({
                     subtitle="A coach for the 9-section report — one section at a time, with strong examples, what to avoid and what helps your CII."
                     badge="GUIDE INSIDE"
                     background={MOCKUP_GRADIENTS.purple}
+                    onPrefetch={() => {
+                        void import("./DetailedStudentReportGuide");
+                    }}
                 />
             </div>
 
@@ -255,7 +266,7 @@ export default function CommunityServiceHub({
                                 Everything for Community Service is grouped here. Create or apply first; My Reports starts only after approval. Home stays an overview.
                             </p>
                             <p>
-                                <b>Create Opportunity / My Opportunities</b> — your own proposal until Faculty → Partner/NGO (if linked) → CIEL PK decides.
+                                <b>My Opportunities</b> — your own proposal until Faculty → Partner/NGO (if linked) → CIEL PK decides.
                             </p>
                             <p>
                                 <b>Browse</b> — published opportunities. A pending application stays here until participation is approved.
@@ -265,7 +276,7 @@ export default function CommunityServiceHub({
                             </p>
                             <div className="flex flex-wrap gap-2 pt-1">
                                 <Link href={CREATE_VIEW} className="rounded-full bg-[#0e7d74] px-4 py-2 text-[11px] font-extrabold text-white">
-                                    Create opportunity
+                                    My Opportunities
                                 </Link>
                                 <Link href={BROWSE_HREF} className="rounded-full bg-[#e6f6f4] px-4 py-2 text-[11px] font-extrabold text-[#0e7d74]">
                                     Browse opportunities

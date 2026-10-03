@@ -23,14 +23,11 @@ export default function FloatingSupportButton() {
             {/* Floating support + WhatsApp (stacked bottom-right) */}
             {/* Bottom inset: clear dashboard pb-24 + mobile home indicator; avoid clipping FAB */}
             <div
-                className="fixed right-4 z-[60] flex flex-col items-end gap-3 overflow-visible print:hidden sm:right-6"
-                style={{
-                    bottom: "calc(7rem + env(safe-area-inset-bottom, 0px))",
-                }}
+                className="fixed right-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] z-[60] flex flex-col items-end gap-3 overflow-visible print:hidden sm:right-6 sm:bottom-[calc(7rem+env(safe-area-inset-bottom,0px))]"
             >
                 {/* Support Menu (appears when open, above stacks) */}
                 {isOpen && (
-                    <div className="absolute bottom-full right-0 mb-2 w-80 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="absolute bottom-full right-0 mb-2 w-[min(20rem,calc(100vw-1.5rem))] animate-in slide-in-from-bottom-4 duration-300">
                         <div className="rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
                             {/* Header */}
                             <div className="bg-gradient-to-r from-[#0056B3] to-[#0049A3] p-5">
@@ -142,7 +139,7 @@ export default function FloatingSupportButton() {
                     href={`https://wa.me/${WHATSAPP_E164}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:bg-[#20bd5a] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#25D366]/40 focus-visible:ring-offset-2"
+                    className="relative hidden h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#25D366] sm:flex text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:bg-[#20bd5a] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#25D366]/40 focus-visible:ring-offset-2"
                     aria-label={`WhatsApp ${WHATSAPP_DISPLAY} — 24/7 support`}
                 >
                     <WhatsAppGlyph className="h-7 w-7" />
@@ -156,7 +153,7 @@ export default function FloatingSupportButton() {
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
                     className={clsx(
-                        "group relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-2xl transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#0056B3]/30 focus-visible:ring-offset-2",
+                        "group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-2xl sm:h-14 sm:w-14 transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#0056B3]/30 focus-visible:ring-offset-2",
                         isOpen
                             ? "bg-slate-900 hover:bg-black rotate-90"
                             : "bg-gradient-to-br from-[#0056B3] to-[#0049A3] hover:shadow-[0_20px_40px_rgba(0,86,179,0.4)] hover:scale-110"

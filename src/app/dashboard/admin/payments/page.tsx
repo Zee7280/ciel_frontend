@@ -22,11 +22,14 @@ import { Button } from '../../student/report/components/ui/button';
 import { Card, CardContent, CardHeader } from '../../student/report/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../student/report/components/ui/dialog';
 import { Input } from '../../student/report/components/ui/input';
-import { formatPkrAmount, REPORTING_FEE_DISPLAY } from '@/config/reportingFee';
+import { formatPkrAmount } from '@/config/reportingFee';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import { useAbortableFetch, isAbortError, readErrorMessage } from '@/components/admin/useAbortableFetch';
+import { formatAdminDate, formatAdminDateTime } from '@/utils/adminDate';
 
 type PaymentStatusTab = 'pending' | 'approved' | 'rejected';
 
-/** Uses submitted paid amount fields when set; otherwise falls back to the configured reporting fee. */
+/** Uses submitted paid amount fields when set; shows an em dash when the backend sent none (never a configured fee). */
 function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
     const keys = [
         'paid_amount',
@@ -50,7 +53,7 @@ function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
             break;
         }
     }
-    if (val == null) return REPORTING_FEE_DISPLAY;
+    if (val == null) return '—';
     const str = String(val).trim();
     if (!str) return '—';
     if (/pkr/i.test(str) || /(^|\s)rs\.?\s*/i.test(str)) return str;
@@ -227,17 +230,11 @@ function formatTeamMembersSummary(members: PaymentTeamMember[], max = 3): string
 }
 
 function formatPaymentDate(iso: string): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatAdminDate(iso);
 }
 
 function formatPaymentDateTime(iso: string): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatAdminDateTime(iso);
 }
 
 const TH =
@@ -266,6 +263,8 @@ export default function AdminPaymentsPage() {
     const [submissionHistory, setSubmissionHistory] = useState<Payment[]>([]);
     const [submissionHistoryLoading, setSubmissionHistoryLoading] = useState(false);
     const [previewSubmissionId, setPreviewSubmissionId] = useState<string | null>(null);
+
+    const { begin } = useAbortableFetch();
 
     const mapPaymentRows = useCallback(
         (rawList: unknown, fallbackStatus: PaymentStatusTab): Payment[] =>
@@ -336,16 +335,21 @@ export default function AdminPaymentsPage() {
     }, []);
 
     const fetchPayments = useCallback(async () => {
+        const run = begin();
         setIsLoading(true);
         try {
             if (activeTab === 'pending') {
-                const res = await authenticatedFetch(`/api/v1/admin/payments/pending`);
+                const res = await authenticatedFetch(`/api/v1/admin/payments/pending`, { signal: run.signal });
+                if (!run.isCurrent()) return;
                 if (res && res.ok) {
                     const data = await res.json();
+                    if (!run.isCurrent()) return;
                     if (data.success) {
                         const list = mapPaymentRows(data.data, 'pending');
                         setPayments(list);
                         setPendingCount(list.length);
+                    } else {
+                        setPayments([]);
                     }
                 } else {
                     setPayments([]);
@@ -354,30 +358,31 @@ export default function AdminPaymentsPage() {
                 }
             } else {
                 const status = activeTab;
-                const res = await authenticatedFetch(`/api/v1/admin/payments?status=${status}`);
+                const res = await authenticatedFetch(`/api/v1/admin/payments?status=${status}`, { signal: run.signal });
+                if (!run.isCurrent()) return;
                 if (res && res.ok) {
                     const data = await res.json();
+                    if (!run.isCurrent()) return;
                     if (data.success) {
-                        const list = mapPaymentRows(data.data, status);
-                        setPayments(list);
+                        setPayments(mapPaymentRows(data.data, status));
                     } else {
                         setPayments([]);
                     }
                 } else {
                     setPayments([]);
+                    toast.error(`Could not load ${status} payments.`);
                 }
             }
         } catch (error) {
+            if (isAbortError(error) || !run.isCurrent()) return;
             console.error("Failed to fetch payments", error);
             toast.error("Failed to load payments");
-            if (activeTab === 'pending') {
-                setPayments([]);
-                setPendingCount(0);
-            }
+            setPayments([]);
+            if (activeTab === 'pending') setPendingCount(0);
         } finally {
-            setIsLoading(false);
+            if (run.isCurrent()) setIsLoading(false);
         }
-    }, [activeTab, mapPaymentRows]);
+    }, [activeTab, mapPaymentRows, begin]);
 
     useEffect(() => {
         void (async () => {
@@ -411,16 +416,7 @@ export default function AdminPaymentsPage() {
             } else {
                 // Never fake a success here: the payment is still pending server-side, so keep it
                 // in the queue and surface the real error instead.
-                const errText = res ? await res.text().catch(() => '') : '';
-                let message = errText;
-                try {
-                    const parsed = errText ? JSON.parse(errText) : null;
-                    const raw = parsed?.message || parsed?.error;
-                    message = Array.isArray(raw) ? raw.join(', ') : (raw || errText);
-                } catch {
-                    // errText was not JSON; use it as-is
-                }
-                toast.error(message || `Could not ${actionType} payment. Please try again.`);
+                toast.error(await readErrorMessage(res, `Could not ${actionType} payment`));
             }
         } catch (error) {
             console.error("Action failed", error);
@@ -446,8 +442,7 @@ export default function AdminPaymentsPage() {
                 setRevertReason("");
                 await refreshPendingCount();
             } else {
-                const errText = res ? await res.text().catch(() => '') : '';
-                toast.error(errText || "Could not revert. Is the revert API enabled on the server?");
+                toast.error(await readErrorMessage(res, "Could not revert approval"));
             }
         } catch (error) {
             console.error("Revert failed", error);
@@ -550,7 +545,12 @@ export default function AdminPaymentsPage() {
                         <button
                             key={tab.id}
                             type="button"
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => {
+                                if (tab.id !== activeTab) {
+                                    setPayments([]);
+                                    setActiveTab(tab.id);
+                                }
+                            }}
                             className={clsx(
                                 'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors sm:flex-none',
                                 activeTab === tab.id
@@ -866,7 +866,7 @@ export default function AdminPaymentsPage() {
                                             )}
                                         >
                                             #{row.submissionNumber ?? "?"}{" "}
-                                            {row.date ? new Date(row.date).toLocaleDateString() : "—"}
+                                            {row.date ? formatPaymentDate(row.date) : "—"}
                                             <span className="ml-1 uppercase opacity-70">{row.status}</span>
                                         </button>
                                     ))}
@@ -934,107 +934,65 @@ export default function AdminPaymentsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Action Dialog (Approve/Reject) */}
-            <Dialog open={isActionOpen} onOpenChange={setIsActionOpen}>
-                <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-black tracking-tight">
-                            {actionType === 'approve' ? 'Approve Payment' : 'Reject Payment'}
-                        </DialogTitle>
-                        <DialogDescription className="font-medium">
-                            {actionType === 'approve'
-                                ? `Confirm that you've verified the transfer of ${selectedPayment?.amount} from ${selectedPayment?.studentName}${
-                                      selectedPayment?.participationMode === 'team'
-                                          ? ` (team of ${selectedPayment.teamMemberCount})`
-                                          : ''
-                                  }.`
-                                : `Select the reason for rejecting this payment proof.`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-400 tracking-widest uppercase">Internal Feedback / Note</label>
-                            <textarea spellCheck={true}
-                                className="w-full min-h-[100px] p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                placeholder={actionType === 'approve' ? 'Optional note for the logs...' : 'Reason for rejection (will be shown to student)...'}
-                                value={feedback}
-                                onChange={(e) => setFeedback(e.target.value)}
-                            />
-                        </div>
-                        {actionType === 'approve' && (
-                            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex gap-3 italic">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                                <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                                    Approval will unlock the Certificate (cii) and Final Report for this student immediately.
-                                </p>
-                            </div>
-                        )}
-                        {actionType === 'reject' && (
-                            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 italic">
-                                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-                                <p className="text-xs text-red-800 leading-relaxed font-medium">
-                                    Rejection will notify the student and allow them to upload a corrected proof of payment.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                    <DialogFooter className="gap-2">
-                        <Button variant="ghost" onClick={() => setIsActionOpen(false)} disabled={isSubmitting}>Cancel</Button>
-                        <Button 
-                            className={actionType === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}
-                            onClick={handleAction}
-                            disabled={isSubmitting || (actionType === 'reject' && !feedback.trim())}
-                        >
-                            {isSubmitting ? (
-                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Processing...</>
-                            ) : (
-                                actionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Approve / reject confirmation */}
+            <ConfirmDialog
+                open={isActionOpen}
+                title={actionType === 'approve' ? 'Approve payment?' : 'Reject payment?'}
+                description={
+                    actionType === 'approve'
+                        ? `Confirm that you've verified the transfer of ${selectedPayment?.amount ?? '—'} from ${selectedPayment?.studentName ?? 'the student'}${
+                              selectedPayment?.participationMode === 'team'
+                                  ? ` (team of ${selectedPayment.teamMemberCount})`
+                                  : ''
+                          }. The student is notified and the Certificate and Final Report unlock immediately.`
+                        : `Rejecting notifies ${selectedPayment?.studentName ?? 'the student'} and lets them upload a corrected proof. The reason is shown to the student.`
+                }
+                variant={actionType === 'approve' ? 'default' : 'danger'}
+                confirmLabel={actionType === 'approve' ? 'Confirm approval' : 'Confirm rejection'}
+                loading={isSubmitting}
+                confirmDisabled={actionType === 'reject' && !feedback.trim()}
+                onConfirm={handleAction}
+                onCancel={() => {
+                    setIsActionOpen(false);
+                    setFeedback("");
+                }}
+            >
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {actionType === 'approve' ? 'Internal note (optional)' : 'Reason (required)'}
+                </label>
+                <textarea
+                    spellCheck={true}
+                    className="min-h-[90px] w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={actionType === 'approve' ? 'Optional note for the logs...' : 'Reason for rejection (will be shown to student)...'}
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                />
+            </ConfirmDialog>
 
-            <Dialog open={isRevertOpen} onOpenChange={(open) => { setIsRevertOpen(open); if (!open) setRevertReason(""); }}>
-                <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-black tracking-tight">Revert approval?</DialogTitle>
-                        <DialogDescription className="font-medium">
-                            This moves the payment back to <span className="font-bold text-slate-800">pending review</span>.
-                            The student flow should return to awaiting verification (same as before approval).
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-2 py-2">
-                        <label className="text-xs font-black text-slate-400 tracking-widest uppercase">Reason (optional, for audit)</label>
-                        <textarea spellCheck={true}
-                            className="w-full min-h-[88px] p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                            placeholder="e.g. Approved wrong slip / duplicate entry..."
-                            value={revertReason}
-                            onChange={(e) => setRevertReason(e.target.value)}
-                        />
-                    </div>
-                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
-                        <p className="text-xs text-amber-900 leading-relaxed font-medium">
-                            Only use revert for genuine mistakes. Your backend should log this action and roll back any unlocks tied to payment approval.
-                        </p>
-                    </div>
-                    <DialogFooter className="gap-2">
-                        <Button variant="ghost" onClick={() => setIsRevertOpen(false)} disabled={isRevertSubmitting}>Cancel</Button>
-                        <Button
-                            className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
-                            onClick={handleRevert}
-                            disabled={isRevertSubmitting}
-                        >
-                            {isRevertSubmitting ? (
-                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Reverting...</>
-                            ) : (
-                                <><RotateCcw className="w-4 h-4 mr-2" /> Confirm revert</>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDialog
+                open={isRevertOpen}
+                title="Revert approval?"
+                description={`This moves the payment from ${selectedPayment?.studentName ?? 'the student'} back to pending review and rolls back unlocks tied to the approval. Only use for genuine mistakes.`}
+                variant="warning"
+                confirmLabel="Confirm revert"
+                loading={isRevertSubmitting}
+                onConfirm={handleRevert}
+                onCancel={() => {
+                    setIsRevertOpen(false);
+                    setRevertReason("");
+                }}
+            >
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Reason (optional, for audit)
+                </label>
+                <textarea
+                    spellCheck={true}
+                    className="min-h-[80px] w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    placeholder="e.g. Approved wrong slip / duplicate entry..."
+                    value={revertReason}
+                    onChange={(e) => setRevertReason(e.target.value)}
+                />
+            </ConfirmDialog>
         </div>
     );
 }

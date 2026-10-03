@@ -17,18 +17,15 @@ import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
-import { Loader2, MapPin, Calendar, ArrowLeft, Share2, Printer, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
-import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
+import { Loader2, MapPin, Calendar, ArrowLeft, Printer, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import ApplicationDialog from "../components/ApplicationDialog";
-import { fetchParticipationGuide, type ParticipationGuide } from "@/utils/participationGuide";
 import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
 } from "@/utils/studentOpportunityApplyEligibility";
 import {
-    canStudentShowStartReportCta,
     joinApplicationPendingLabel,
     pickJoinApplicationId,
     pickJoinApplicationStage,
@@ -36,9 +33,15 @@ import {
 import { buildJoinApplyFields, resolveStudentProjectActions } from "@/utils/studentProjectActions";
 import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
 import {
+    applicationsOpenFromPayload,
+    applyBlockedMessageFromPayload,
+    applyClosedBannerTitle,
+    attachApplyMaintenanceFromEnvelope,
+} from "@/utils/studentApplyMaintenance";
+import { peekStudentBrowsePayload } from "@/utils/student-community-cache";
+import {
     buildStudentReportsCheckMap,
     pickReportStatusFromCheckRow,
-    resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
 
 type DisplayValue = string | number | null | undefined;
@@ -122,7 +125,6 @@ export default function OpportunityDetailsPage() {
     const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
-    const [participationGuide, setParticipationGuide] = useState<ParticipationGuide | null>(null);
     const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
 
     useLayoutEffect(() => {
@@ -132,7 +134,6 @@ export default function OpportunityDetailsPage() {
     useEffect(() => {
         if (id) {
             fetchOpportunityDetails();
-            void fetchParticipationGuide(id).then(setParticipationGuide);
         }
     }, [id]);
 
@@ -160,7 +161,10 @@ export default function OpportunityDetailsPage() {
             if (resBrowse?.ok) {
                 const dataBrowse = await resBrowse.json();
                 if (dataBrowse.success && dataBrowse.data) {
-                    opData = dataBrowse.data as Record<string, unknown>;
+                    opData = attachApplyMaintenanceFromEnvelope(
+                        dataBrowse.data as Record<string, unknown>,
+                        dataBrowse as Record<string, unknown>,
+                    );
                 }
             }
 
@@ -173,7 +177,10 @@ export default function OpportunityDetailsPage() {
                 if (resDetail?.ok) {
                     const dataDetail = await resDetail.json();
                     if (dataDetail.success && dataDetail.data) {
-                        opData = dataDetail.data as Record<string, unknown>;
+                        opData = attachApplyMaintenanceFromEnvelope(
+                            dataDetail.data as Record<string, unknown>,
+                            dataDetail as Record<string, unknown>,
+                        );
                     }
                 }
             }
@@ -182,6 +189,25 @@ export default function OpportunityDetailsPage() {
                 toast.error("Failed to fetch opportunity");
                 setOpportunity(null);
                 return;
+            }
+
+            const cachedBrowse = peekStudentBrowsePayload();
+            if (cachedBrowse) {
+                opData = attachApplyMaintenanceFromEnvelope(opData, cachedBrowse as Record<string, unknown>);
+                const listed = Array.isArray(cachedBrowse.data)
+                    ? cachedBrowse.data.find((row) => row && typeof row === "object" && String((row as { id?: unknown }).id) === String(id))
+                    : null;
+                if (listed && typeof listed === "object") {
+                    const row = listed as Record<string, unknown>;
+                    if (row.applications_open === false) {
+                        opData = {
+                            ...opData,
+                            applications_open: false,
+                            apply_blocked_reason: row.apply_blocked_reason ?? opData.apply_blocked_reason,
+                            apply_blocked_message: row.apply_blocked_message ?? opData.apply_blocked_message,
+                        };
+                    }
+                }
             }
 
             let myId: string | null = null;
@@ -244,6 +270,14 @@ export default function OpportunityDetailsPage() {
     };
 
     const handleApplyClick = () => {
+        if (!opportunity) return;
+        const raw = opportunity as Record<string, unknown>;
+        if (!applicationsOpenFromPayload(raw)) {
+            toast.error(
+                applyBlockedMessageFromPayload(raw) || "This listing is not accepting new applications.",
+            );
+            return;
+        }
         if (!applyEligibility.canApply) {
             toast.error(applyEligibility.blockedReason || "You cannot apply to this opportunity.");
             return;
@@ -275,8 +309,17 @@ export default function OpportunityDetailsPage() {
     }
 
     const opportunitiesListHref =
-        viewerNavRole === "admin" ? "/dashboard/admin/projects" : "/dashboard/student/browse";
-    const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
+        viewerNavRole === "admin"
+            ? "/dashboard/admin/projects"
+            : opportunity.isStudentOwner
+              ? "/dashboard/student/paths/community-service?view=create"
+              : "/dashboard/student/browse";
+    const opportunitiesBackLabel =
+        viewerNavRole === "admin"
+            ? "Back to all projects"
+            : opportunity.isStudentOwner
+              ? "Back to My Opportunities"
+              : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
     const oppRecord = opportunity as Record<string, unknown>;
     const detailStatusBadgeLabel = formatOpportunityDetailStatusBadge(oppRecord);
@@ -299,22 +342,16 @@ export default function OpportunityDetailsPage() {
                   live: isStudentOpportunityLiveForReporting(oppRecord),
               });
 
-    const startReportCta =
-        opportunity &&
-        canStudentShowStartReportCta(oppRecord, {
-            isStudentOwner: Boolean(opportunity.isStudentOwner),
-        })
-            ? resolveStudentBrowseReportCta(id, opportunity.report_status as string | undefined)
-            : null;
-
     const applyBlockedByUniversity =
         !hideStudentApplyActions &&
         !opportunity.isStudentOwner &&
         !opportunity.applyLocked &&
         !applyEligibility.canApply;
+    const applyPausedMessage = applyBlockedMessageFromPayload(oppRecord);
+    const applyCatalogClosed = !applicationsOpenFromPayload(oppRecord);
 
     return (
-        <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
+        <div className="w-full space-y-4 animate-in fade-in duration-500 pb-10">
             {applyBlockedByUniversity ? (
                 <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 flex gap-3 items-start print:hidden">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -324,50 +361,43 @@ export default function OpportunityDetailsPage() {
                     </div>
                 </div>
             ) : null}
-            {participationGuide?.messages?.en && !hideStudentApplyActions ? (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 flex gap-3 items-start print:hidden">
+            {applyCatalogClosed && !hideStudentApplyActions && !opportunity.isStudentOwner ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex gap-3 items-start print:hidden">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                    <p>{participationGuide.messages.en}</p>
+                    <div>
+                        <p className="font-semibold">
+                            {applyClosedBannerTitle(String(oppRecord.apply_blocked_reason || ""))}
+                        </p>
+                        <p className="text-amber-900/90 mt-1">
+                            {applyPausedMessage ||
+                                "This listing is not accepting new student applications. Existing reports and attendance continue."}
+                        </p>
+                    </div>
                 </div>
             ) : null}
-            {/* Header Actions */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
-                <Link
-                    href={opportunitiesListHref}
-                    className="text-slate-500 hover:text-slate-800 inline-flex items-center gap-2 text-sm font-medium shrink-0"
-                >
-                    <ArrowLeft className="w-4 h-4" /> {opportunitiesBackLabel}
-                </Link>
-                <div className="flex flex-col items-stretch sm:items-end gap-1.5 min-w-0">
+            {/* Header — back + actions on one row; helper never squeezes under Print */}
+            <div className="flex flex-col gap-3 print:hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Link
+                        href={opportunitiesListHref}
+                        className="text-slate-500 hover:text-slate-800 inline-flex items-center gap-2 text-sm font-medium shrink-0"
+                    >
+                        <ArrowLeft className="w-4 h-4" /> {opportunitiesBackLabel}
+                    </Link>
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="gap-2 rounded-lg shadow-none"
-                            onClick={() => void copyOpportunityShareLink(id)}
-                            aria-label="Copy share link"
-                            title="Copy share link"
-                        >
-                            <Share2 className="w-4 h-4 shrink-0" /> Copy share link
-                        </Button>
                         <Button
                             type="button"
                             variant="outline"
                             className="gap-2 rounded-lg shadow-none"
                             onClick={() => window.print()}
                         >
-                            <Printer className="w-4 h-4 shrink-0" /> Print / Save PDF
+                            <Printer className="w-4 h-4 shrink-0" />
+                            <span className="sm:hidden">Print</span>
+                            <span className="hidden sm:inline">Print / Save PDF</span>
                         </Button>
 
                         {!hideStudentApplyActions && projectActions ? (
                             <>
-                                {opportunity.isStudentOwner ? (
-                                    <Link href="/dashboard/student/projects" className="inline-flex">
-                                        <Button variant="outline" className="rounded-lg shadow-none">
-                                            My Projects
-                                        </Button>
-                                    </Link>
-                                ) : null}
                                 {projectActions.showEditResubmit ? (
                                     <Link
                                         href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}
@@ -377,14 +407,6 @@ export default function OpportunityDetailsPage() {
                                             <Pencil className="w-4 h-4 shrink-0" /> Edit & Resubmit
                                         </Button>
                                     </Link>
-                                ) : null}
-                                {startReportCta && !projectActions.showEditResubmit ? (
-                                    <Button
-                                        onClick={() => router.push(startReportCta.href)}
-                                        className="gap-2 rounded-lg bg-blue-600 px-5 text-white shadow-sm hover:bg-blue-700"
-                                    >
-                                        {startReportCta.label}
-                                    </Button>
                                 ) : null}
                                 {projectActions.showJoinAppliedLocked ? (
                                     <span
@@ -407,152 +429,167 @@ export default function OpportunityDetailsPage() {
                                     >
                                         {projectActions.joinCtaLabel}
                                     </Button>
+                                ) : applyCatalogClosed && !opportunity.isStudentOwner && !projectActions.showJoinAppliedLocked ? (
+                                    <Button
+                                        type="button"
+                                        disabled
+                                        title={applyPausedMessage || undefined}
+                                        className="cursor-not-allowed gap-2 rounded-lg bg-slate-300 px-5 text-slate-600 shadow-sm hover:bg-slate-300"
+                                    >
+                                        {projectActions.joinCtaLabel}
+                                    </Button>
                                 ) : null}
                             </>
                         ) : null}
                     </div>
-                    {!hideStudentApplyActions && projectActions ? (
-                        projectActions.helperMessage ? (
-                            <p
-                                className={`text-xs text-right sm:max-w-md ${
-                                    projectActions.showListingClosed
-                                        ? "font-medium text-rose-800"
-                                        : projectActions.showJoinApplyAgain
-                                          ? "font-medium text-rose-700"
-                                          : "font-medium text-amber-800"
-                                }`}
-                            >
-                                {projectActions.helperMessage}
-                            </p>
-                        ) : opportunity.isStudentOwner && !projectActions.showEditResubmit && !projectActions.showListingClosed ? (
-                            <p className="text-xs text-slate-500 text-right">You created this listing.</p>
-                        ) : projectActions.showJoinAppliedLocked &&
-                          opportunity.application_status &&
-                          ["pending", "pending_approval", "applied"].includes(opportunity.application_status) ? (
-                            <p className="text-xs font-medium text-amber-700 text-right">
-                                {joinApplicationPendingLabel(oppRecord)}
-                            </p>
-                        ) : null
-                    ) : null}
                 </div>
+                {!hideStudentApplyActions && projectActions ? (
+                    projectActions.helperMessage ? (
+                        <p
+                            className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
+                                projectActions.showListingClosed
+                                    ? "border-rose-200 bg-rose-50 font-medium text-rose-800"
+                                    : projectActions.showJoinApplyAgain
+                                      ? "border-rose-200 bg-rose-50 font-medium text-rose-700"
+                                      : "border-amber-200 bg-amber-50 font-medium text-amber-800"
+                            }`}
+                        >
+                            {projectActions.helperMessage}
+                        </p>
+                    ) : projectActions.showJoinAppliedLocked &&
+                      opportunity.application_status &&
+                      ["pending", "pending_approval", "applied"].includes(opportunity.application_status) ? (
+                        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-5 text-amber-800">
+                            {joinApplicationPendingLabel(oppRecord)}
+                        </p>
+                    ) : null
+                ) : null}
             </div>
 
-            {/* Document View */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
-                {/* Title Section */}
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 print:bg-white print:border-none">
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-900 mb-2">{opportunity.title}</h1>
-                            {Array.isArray(opportunity.types) && opportunity.types.length > 0 ? (
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {opportunity.types.map((t: string) => (
-                                        <span
-                                            key={t}
-                                            className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200"
-                                        >
-                                            {t}
-                                        </span>
-                                    ))}
-                                </div>
-                            ) : null}
-                            <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
-                                <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {opportunity.location?.city || opportunity.city || "Remote"}</span>
-                                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Project dates: {(() => {
-                                    const startRaw = opportunity.timeline?.start_date || opportunity.start_date;
-                                    const endRaw = opportunity.timeline?.end_date || opportunity.end_date;
-                                    const start = startRaw ? new Date(startRaw) : null;
-                                    const end = endRaw ? new Date(endRaw) : null;
-                                    const startOk = start && !Number.isNaN(start.getTime());
-                                    const endOk = end && !Number.isNaN(end.getTime());
-                                    if (startOk && endOk) return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
-                                    if (startOk) return start.toLocaleDateString();
-                                    if (endOk) return end.toLocaleDateString();
-                                    return "Flexible";
-                                })()}</span>
-                                <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{opportunity.mode || "On Site"}</span>
-                                {applyEligibility.listingRestrictionLabel ? (
-                                    <span className="bg-amber-50 text-amber-900 px-2.5 py-0.5 rounded-full text-xs font-bold border border-amber-200">
-                                        {applyEligibility.listingRestrictionLabel}
-                                    </span>
-                                ) : null}
-                                <span
-                                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
-                                        detailStatusBadgeLabel === "Live"
-                                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                            : detailStatusBadgeLabel === "Completed"
-                                              ? "bg-slate-100 text-slate-800 border-slate-200"
-                                              : detailStatusBadgeLabel === "Rejected"
-                                                ? "bg-rose-50 text-rose-800 border-rose-200"
-                                                : "bg-amber-50 text-amber-900 border border-amber-200"
-                                    }`}
-                                >
-                                    {detailStatusBadgeLabel}
-                                </span>
-                            </div>
-                            {detailWorkflowStageRaw ? (
-                                <p className="text-[11px] text-slate-500 mt-2">
-                                    <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
-                                    {detailWorkflowStageRaw.replace(/_/g, " ")}
-                                </p>
-                            ) : null}
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 sm:py-4">
+                <div className="flex items-start justify-between gap-4">
+                    <h1 className="min-w-0 text-xl font-bold leading-snug tracking-tight text-slate-900 sm:text-2xl">
+                        {opportunity.title}
+                    </h1>
+                    <div className="shrink-0 pt-0.5 text-right">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                            Opportunity ID
                         </div>
-                        <div className="text-right">
-                            <div className="text-sm text-slate-400">Opportunity ID</div>
-                            <div className="font-mono font-bold text-slate-600" title={id}>
-                                {formatDisplayId(id, "OPP")}
-                            </div>
+                        <div className="mt-0.5 font-mono text-sm font-bold whitespace-nowrap text-slate-600" title={id}>
+                            {formatDisplayId(id, "OPP")}
                         </div>
                     </div>
-                    {(remarkSections.length > 0 || reviewFeedback) && opportunity.isStudentOwner ? (
-                        <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
-                                        Return remarks
-                                    </p>
-                                    {remarkSections.length > 0 ? (
-                                        <div className="mt-2 space-y-3">
-                                            {remarkSections.map((s) => (
-                                                <div key={s.label}>
-                                                    <p className="text-[10px] font-semibold text-rose-700">{s.label}</p>
-                                                    <p className="mt-0.5 text-sm text-rose-900 whitespace-pre-wrap">
-                                                        {s.text}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : reviewFeedback ? (
-                                        <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
-                                    ) : null}
-                                </div>
-                                {projectActions?.showEditResubmit ? (
-                                    <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
-                                        <Button variant="outline" className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-100">
-                                            <Pencil className="w-4 h-4" /> Edit now
-                                        </Button>
-                                    </Link>
-                                ) : null}
-                            </div>
-                        </div>
+                </div>
+                {Array.isArray(opportunity.types) && opportunity.types.length > 0 ? (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {opportunity.types.map((t: string) => (
+                            <span
+                                key={t}
+                                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600"
+                            >
+                                {t}
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-500">
+                    <span className="inline-flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        {opportunity.location?.city || opportunity.city || "Remote"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        {(() => {
+                            const startRaw = opportunity.timeline?.start_date || opportunity.start_date;
+                            const endRaw = opportunity.timeline?.end_date || opportunity.end_date;
+                            const start = startRaw ? new Date(startRaw) : null;
+                            const end = endRaw ? new Date(endRaw) : null;
+                            const startOk = start && !Number.isNaN(start.getTime());
+                            const endOk = end && !Number.isNaN(end.getTime());
+                            if (startOk && endOk) return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
+                            if (startOk) return start.toLocaleDateString();
+                            if (endOk) return end.toLocaleDateString();
+                            return "Flexible";
+                        })()}
+                    </span>
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase text-blue-700">
+                        {opportunity.mode || "On Site"}
+                    </span>
+                    {applyEligibility.listingRestrictionLabel ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                            {applyEligibility.listingRestrictionLabel}
+                        </span>
                     ) : null}
+                    <span
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase ${
+                            detailStatusBadgeLabel === "Live"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : detailStatusBadgeLabel === "Completed"
+                                  ? "border-slate-200 bg-slate-100 text-slate-800"
+                                  : detailStatusBadgeLabel === "Rejected"
+                                    ? "border-rose-200 bg-rose-50 text-rose-800"
+                                    : "border-amber-200 bg-amber-50 text-amber-900"
+                        }`}
+                    >
+                        {detailStatusBadgeLabel}
+                    </span>
                 </div>
+                {detailWorkflowStageRaw ? (
+                    <p className="mt-1.5 text-[11px] text-slate-500">
+                        <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
+                        {detailWorkflowStageRaw.replace(/_/g, " ")}
+                    </p>
+                ) : null}
+            </div>
 
-                <div className="p-4 sm:p-6">
-                    <StudentOpportunityFlashcard
-                        model={{
-                            ...buildOpportunityRecordFlashcard(opportunity as Record<string, unknown>, {
-                                studentName: opportunity.isStudentOwner ? "You" : undefined,
-                                university: opportunity.organization?.name || opportunity.organization_name,
-                                partnerOrg: opportunity.organization?.name || opportunity.organization_name,
-                            }),
-                            eligible: applyEligibility.canApply,
-                            eligibilityWhy:
-                                applyEligibility.blockedReason ||
-                                "Students who match the application scope can apply.",
-                        }}
-                    />
+            {(remarkSections.length > 0 || reviewFeedback) && opportunity.isStudentOwner ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 print:hidden">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                                Return remarks
+                            </p>
+                            {remarkSections.length > 0 ? (
+                                <div className="mt-2 space-y-3">
+                                    {remarkSections.map((s) => (
+                                        <div key={s.label}>
+                                            <p className="text-[10px] font-semibold text-rose-700">{s.label}</p>
+                                            <p className="mt-0.5 text-sm text-rose-900 whitespace-pre-wrap">
+                                                {s.text}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : reviewFeedback ? (
+                                <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
+                            ) : null}
+                        </div>
+                        {projectActions?.showEditResubmit ? (
+                            <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
+                                <Button variant="outline" className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-100">
+                                    <Pencil className="w-4 h-4" /> Edit now
+                                </Button>
+                            </Link>
+                        ) : null}
+                    </div>
                 </div>
+            ) : null}
+
+            <div className="overflow-hidden rounded-2xl print:border-none">
+                <StudentOpportunityFlashcard
+                    className="co-flash--page"
+                    model={{
+                        ...buildOpportunityRecordFlashcard(opportunity as Record<string, unknown>, {
+                            studentName: opportunity.isStudentOwner ? "You" : undefined,
+                            university: opportunity.organization?.name || opportunity.organization_name,
+                            partnerOrg: opportunity.organization?.name || opportunity.organization_name,
+                        }),
+                        eligible: applyEligibility.canApply,
+                        eligibilityWhy:
+                            applyEligibility.blockedReason ||
+                            "Students who match the application scope can apply.",
+                    }}
+                />
             </div>
 
             <ApplicationDialog

@@ -9,6 +9,7 @@ import { loadStudentFyp } from "@/utils/fypStudentApi";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { getPathSessionCache } from "@/utils/student-path-session-cache";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
@@ -94,11 +95,12 @@ const FYP_V9_JOURNEY = [
 ];
 
 export default function FypV9Workspace({ id }: { id: string }) {
-    const [loading, setLoading] = useState(true);
+    const cached = getPathSessionCache<FypEntry[]>("fyp-entries")?.find((row) => row.id === id);
+    const [loading, setLoading] = useState(!cached);
     const [notFound, setNotFound] = useState(false);
-    const [entry, setEntry] = useState<FypEntry>(EMPTY_FYP);
-    const [v9, setV9] = useState<FypV9FormState>(EMPTY_FYP_V9);
-    const [step, setStep] = useState(0);
+    const [entry, setEntry] = useState<FypEntry>(() => (cached ? mergeFypEntry(EMPTY_FYP, cached) : EMPTY_FYP));
+    const [v9, setV9] = useState<FypV9FormState>(() => (cached ? hydrateV9(mergeFypEntry(EMPTY_FYP, cached)) : EMPTY_FYP_V9));
+    const [step, setStep] = useState(() => (cached ? Math.min(7, cached.stepCompleted ?? 0) : 0));
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<{ accepted: boolean; edited: boolean; text: string }[]>(
         Array.from({ length: 7 }, () => ({ accepted: false, edited: false, text: "" })),

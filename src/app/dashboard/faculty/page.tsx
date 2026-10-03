@@ -136,7 +136,7 @@ export default function FacultyDashboard() {
                 stats={[
                     { value: "4", label: "Impact areas" },
                     { value: dash(communityActions), label: "Community actions", href: "/dashboard/faculty/community-service?view=review" },
-                    { value: dash(cs.pendingReports.length), label: "Reports to review", href: "/dashboard/faculty/community-service?view=reports" },
+                    { value: dash(cs.draftRows.length), label: "Reports in progress", href: "/dashboard/faculty/community-service?view=projects&tab=progress" },
                     { value: dash(cs.deckCards.length), label: "Verified impact", href: "/dashboard/faculty/community-service?view=impact" },
                 ]}
                 rightStat={{ value: "👩‍🏫", label: "Faculty impact workspace" }}
@@ -186,11 +186,11 @@ export default function FacultyDashboard() {
                             tone: tone(cs.pendingApps, "warn"),
                         },
                         {
-                            n: cs.pendingReports.length,
-                            title: "Reports for review",
-                            sub: "AI Review complete · CII provisional",
-                            href: "/dashboard/faculty/community-service?view=reports&tab=pending",
-                            tone: tone(cs.pendingReports.length),
+                            n: cs.draftRows.length,
+                            title: "Reports in progress",
+                            sub: "Students still writing · opens after submit",
+                            href: "/dashboard/faculty/community-service?view=projects&tab=progress",
+                            tone: tone(cs.draftRows.length),
                         },
                         {
                             n: cs.hoursProjectCount,
@@ -239,7 +239,7 @@ export default function FacultyDashboard() {
                     subtitle="Create, review and supervise Community Service opportunities and reports."
                     badge="OPEN AREA"
                     background={MOCKUP_GRADIENTS.teal}
-                    hot={communityActions + cs.pendingReports.length > 0}
+                    hot={communityActions > 0}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/coursework-projects"

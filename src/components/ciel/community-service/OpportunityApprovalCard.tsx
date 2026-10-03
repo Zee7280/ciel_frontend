@@ -40,6 +40,18 @@ function pickStr(record: Record<string, unknown> | null | undefined, ...keys: st
     return "";
 }
 
+/** Bookkeeping org created per student listing (`Student opportunity — <title> — <id8>`). Never a real university/partner. */
+function isPlaceholderOpportunityOrgName(name: string): boolean {
+    return /^student opportunity\b/i.test(name.trim());
+}
+
+function isPlaceholderOpportunityOrg(org: Record<string, unknown> | null): boolean {
+    if (!org) return false;
+    const status = lower(org.verificationStatus ?? org.verification_status);
+    if (status === "unclaimed_student_initiated") return true;
+    return isPlaceholderOpportunityOrgName(pickStr(org, "name", "organization_name"));
+}
+
 function asObj(value: unknown): Record<string, unknown> | null {
     return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
@@ -88,7 +100,7 @@ function pillLabel(state: ApprovalCardStepState, badWord: string): string {
 
 export function ApprovalChain({ steps, badWord = "Revision" }: { steps: ApprovalCardStep[]; badWord?: string }) {
     return (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
             {steps.map((step) => (
                 <div
                     key={step.role}
@@ -140,24 +152,7 @@ export function buildOpportunityApprovalModel(
     const organization = asObj(row.organization);
     const location = asObj(row.location);
 
-    const studentName =
-        pickStr(row, "student_name", "studentName", "creator_name", "creatorName", "submitted_by_name") ||
-        pickStr(supervision, "student_name");
-    const facultyName =
-        pickStr(row, "faculty_contact_name", "faculty_name", "facultyName") ||
-        pickStr(supervision, "supervisor_name", "faculty_name", "contact_name");
-    const partnerName =
-        pickStr(supervision, "partner_org_name", "external_partner_org_name") ||
-        pickStr(collab, "organization_name") ||
-        pickStr(executingPartner, "organization_name") ||
-        pickStr(partnerOrg, "organization_name", "name") ||
-        options?.orgName ||
-        "";
-    const universityName =
-        pickStr(row, "university", "institution") ||
-        pickStr(organization, "name") ||
-        pickStr(supervision, "university", "institution");
-
+    const creator = asObj(row.creator);
     const createdBy = lower(row.created_by_role ?? row.creator_role ?? row.createdByRole);
     const studentCreated =
         row.isStudentCreated === true ||
@@ -166,6 +161,33 @@ export function buildOpportunityApprovalModel(
         viewer === "student" ||
         (viewer === "faculty" && createdBy !== "faculty" && createdBy !== "ngo" && createdBy !== "partner" && createdBy !== "university");
     const facultyCreated = createdBy === "faculty";
+    const facultyName =
+        pickStr(row, "faculty_contact_name", "faculty_name", "facultyName") ||
+        pickStr(supervision, "supervisor_name", "faculty_name", "contact_name");
+    const studentName =
+        pickStr(row, "student_name", "studentName", "creator_name", "creatorName", "submitted_by_name") ||
+        pickStr(supervision, "student_name") ||
+        (studentCreated && !facultyCreated ? pickStr(creator, "name") : "");
+    const partnerNameRaw =
+        pickStr(supervision, "partner_org_name", "external_partner_org_name") ||
+        pickStr(collab, "organization_name") ||
+        pickStr(executingPartner, "organization_name") ||
+        pickStr(partnerOrg, "organization_name", "name") ||
+        options?.orgName ||
+        "";
+    const partnerName =
+        isPlaceholderOpportunityOrgName(partnerNameRaw) || isPlaceholderOpportunityOrg(partnerOrg)
+            ? ""
+            : partnerNameRaw;
+    const orgName = pickStr(organization, "name", "organization_name");
+    const universityName =
+        pickStr(row, "university", "institution", "creator_university") ||
+        pickStr(creator, "university", "institution") ||
+        pickStr(supervision, "university", "institution", "faculty_university_name") ||
+        (organization && !isPlaceholderOpportunityOrg(organization) && !isPlaceholderOpportunityOrgName(orgName)
+            ? orgName
+            : "");
+
     const requiresPartner =
         row.requires_partner_approval === true ||
         row.requiresPartnerApproval === true ||
@@ -204,8 +226,11 @@ export function buildOpportunityApprovalModel(
 
     if (requiresPartner) {
         const partnerLine =
-            partnerStatus ||
-            (workflow.stage === "pending_partner" ? "pending" : workflow.stage === "pending_admin" || workflow.stage === "live" ? "approved" : "");
+            workflow.stage === "pending_partner"
+                ? "pending"
+                : workflow.stage === "pending_admin" || workflow.stage === "live"
+                  ? "approved"
+                  : partnerStatus || "";
         steps.push({
             role: viewer === "ngo" ? "NGO" : "Partner",
             who: partnerName || undefined,
@@ -213,31 +238,25 @@ export function buildOpportunityApprovalModel(
         });
     }
 
+    // Prefer workflow stage over a stale admin_approval_status so "Pending CIEL" never
+    // paints green Approved while the opportunity is still on the admin queue.
     const adminLine =
-        adminStatus ||
-        (workflow.stage === "pending_admin" ? "pending" : workflow.stage === "live" ? "approved" : "");
+        workflow.stage === "live"
+            ? "approved"
+            : workflow.stage === "pending_admin"
+              ? "pending"
+              : adminStatus || "";
     steps.push({
         role: "CIEL PK",
         who: "Verification",
         state: lineState(adminLine, cursor, blocked),
     });
 
-    // Post-approval handoff marker only — not a reviewer. Unlocks when opportunity is truly live.
-    if (studentCreated) {
-        const live = workflow.stage === "live";
-        steps.push({
-            role: "Live · My Reports",
-            who: live ? "Ready to start report" : "After opportunity goes live",
-            state: live ? "done" : "locked",
-            pill: live ? "Approved" : "Not live yet",
-        });
-    }
-
     const people: ApprovalCardPerson[] = [];
     if (studentName) people.push({ name: studentName, role: "Student", tone: "student" });
     if (facultyName) people.push({ name: facultyName, role: "Faculty", tone: "faculty" });
     if (partnerName) people.push({ name: partnerName, role: viewer === "ngo" ? "NGO" : "Partner", tone: "partner" });
-    if (universityName && universityName !== partnerName) {
+    if (universityName && universityName !== partnerName && universityName !== facultyName && universityName !== studentName && !isPlaceholderOpportunityOrgName(universityName)) {
         people.push({ name: universityName, role: "University", tone: "university" });
     }
     people.push({ name: "CIEL PK", role: "Verification", tone: "ciel" });

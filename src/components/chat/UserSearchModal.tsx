@@ -41,7 +41,7 @@ export default function UserSearchModal({ isOpen, onClose, onSelectUser }: UserS
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    setUsers(data.data);
+                    setUsers(Array.isArray(data.data) ? data.data : []);
                 }
             }
         } catch (error) {

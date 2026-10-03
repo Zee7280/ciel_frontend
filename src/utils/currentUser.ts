@@ -29,6 +29,12 @@ export function getStoredCurrentUserEmail(): string {
     return normalizeEmail(user.email ?? user.official_email ?? user.contact_email);
 }
 
+export function getStoredCurrentUserRole(): string {
+    const user = readStoredCurrentUser();
+    const role = user?.role;
+    return typeof role === "string" ? role.trim().toLowerCase() : "";
+}
+
 export function getStoredCurrentUserId(): string {
     const user = readStoredCurrentUser();
     if (!user) return "";

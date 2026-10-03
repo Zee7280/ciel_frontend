@@ -18,6 +18,7 @@ import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinAppl
 import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
+import { isStudentImpactPackageView } from '@/utils/studentImpactPackageHref';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
     dataSectionsToSummarize,
@@ -51,14 +52,14 @@ import Section7Partnerships from './components/Section7Partnerships';
 import Section8Evidence from './components/Section8Evidence';
 import Section9Reflection from './components/Section9Reflection'; // New
 import Section10Sustainability from './components/Section10Sustainability'; // Renamed
-import Section11Summary from './components/Section11Summary'; // New
+import { FinalDeclarationCard } from './components/Section11Summary';
 import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
@@ -130,6 +131,23 @@ function extractJsonApiMessage(j: Record<string, unknown>): string {
     return "";
 }
 
+/** Appends the per-field / per-member reasons the API sends in `validation_issues`. */
+function withValidationIssues(base: string, j: Record<string, unknown>): string {
+    const issues = Array.isArray(j.validation_issues) ? j.validation_issues : [];
+    const lines = issues
+        .map((i) => {
+            const row = (i || {}) as { message?: unknown; student_name?: unknown; name?: unknown; section?: unknown };
+            const msg = typeof row.message === "string" ? row.message.trim() : "";
+            if (!msg) return "";
+            const who = typeof row.student_name === "string" ? row.student_name : typeof row.name === "string" ? row.name : "";
+            const sec = typeof row.section === "number" ? `Section ${row.section}: ` : "";
+            return `${who ? `${who}: ` : ""}${sec}${msg}`;
+        })
+        .filter(Boolean)
+        .slice(0, 6);
+    return lines.length ? `${base} ${lines.join(" · ")}` : base;
+}
+
 /** Parses JSON/text error bodies from backend `fetch` responses. */
 async function httpFailureUserMessage(res: Response, actionLabel: string): Promise<string> {
     const prefix = `${actionLabel} (HTTP ${res.status}).`;
@@ -140,7 +158,7 @@ async function httpFailureUserMessage(res: Response, actionLabel: string): Promi
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) {
             const j = (await res.json()) as Record<string, unknown>;
-            const serverMsg = extractJsonApiMessage(j);
+            const serverMsg = withValidationIssues(extractJsonApiMessage(j), j).trim();
             if (serverMsg && (res.status === 403 || res.status === 401)) {
                 return serverMsg;
             }
@@ -168,8 +186,7 @@ function ReportFormContent() {
     const projectId = searchParams.get('project') || searchParams.get('projectId');
     const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
     const packageView = searchParams.get('view');
-    const wantsPackageView =
-        packageView === 'v17' || packageView === 'print' || packageView === 'certificate';
+    const wantsPackageView = isStudentImpactPackageView(packageView);
     const {
         activeStep,
         nextStep,
@@ -192,7 +209,6 @@ function ReportFormContent() {
         isTeamMemberAttendanceOnly,
         setMyParticipationIsTeamLead,
         incompleteSectionsSummary,
-        showVerifiedImpactScores,
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
@@ -444,11 +460,16 @@ function ReportFormContent() {
                     }
 
                     const reportAccess = reportForState.report_access as
-                        | { is_team_lead?: boolean; can_submit_report?: boolean }
+                        | {
+                              is_team_lead?: boolean;
+                              can_submit_report?: boolean;
+                              can_edit_report_body?: boolean;
+                          }
                         | undefined;
                     if (reportAccess) {
                         if (
                             reportAccess.can_submit_report === false ||
+                            reportAccess.can_edit_report_body === false ||
                             reportAccess.is_team_lead === false
                         ) {
                             setMyParticipationIsTeamLead(false);
@@ -617,7 +638,7 @@ function ReportFormContent() {
                     toast.error('Only your team lead can submit this team report.');
                 } else if (!isEligibleForSubmission) {
                     toast.error(
-                        `Minimum logged hours not met (${sumNonRejectedLoggedHours(data.section1.attendance_logs || [])}/${data.required_hours || 16}). Complete Section 1 first.`,
+                        `Minimum logged hours not met (${sumNonRejectedLoggedHours(data.section1?.attendance_logs || [])}/${data.required_hours || 16}). Complete Section 1 first.`,
                     );
                 } else {
                     toast.error('Complete all required fields in every section before submitting.');
@@ -710,11 +731,11 @@ function ReportFormContent() {
     const confirmSubmit = async () => {
         if (submitSucceeded) return;
         const hoursOk = loggedHoursClearSubmitBar({
-            logs: data.section1.attendance_logs || [],
+            logs: data.section1?.attendance_logs || [],
             requiredHours: data.required_hours || 16,
             rosterIds: buildIndividualRosterFromSection1(
                 data.section1,
-                data.section1.team_lead?.id,
+                data.section1?.team_lead?.id,
             ),
         });
         const stillIncomplete = getIncompleteSectionsSummary(data);
@@ -772,7 +793,12 @@ function ReportFormContent() {
             submitData = await prepareReportEvidenceForSave(submitData, projectId || submitData.project_id, true);
             setFullData(submitData);
 
-            const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {
+            const submitProjectId = String(projectId || submitData.project_id || "").trim();
+            if (!submitProjectId) {
+                toast.error("Submit failed: this report is not linked to a project. Open it from your project page.");
+                return;
+            }
+            const res = await authenticatedFetch(`/api/v1/student/reports/${encodeURIComponent(submitProjectId)}/submit`, {
                 method: 'POST',
                 body: JSON.stringify({
                     ...submitData,
@@ -818,6 +844,8 @@ function ReportFormContent() {
                 : submittedStatus || "submitted";
 
             setSubmitSucceeded(true);
+            setReadOnly(true);
+            setStep(FLASH_CARD_STEP);
             setFullData({
                 ...submitData,
                 status: nextStatus,
@@ -972,7 +1000,7 @@ function ReportFormContent() {
     }
 
     return (
-        <div className="cer">
+        <div className={onFlash ? "cer cer-ipkg" : "cer"}>
             <div className="cer-wrap">
                 <div className="cer-sticky-head">
                 <div className="cer-apph cer-apph-actions">
@@ -984,17 +1012,19 @@ function ReportFormContent() {
                         >
                             ← Back to my reports
                         </button>
-                        <button
-                            type="button"
-                            className="cer-ghost"
-                            onClick={() => setOpportunityFlashOpen(true)}
-                            disabled={!projectDetails}
-                        >
-                            Opportunity flash card
-                        </button>
+                        {onFlash ? null : (
+                            <button
+                                type="button"
+                                className="cer-ghost"
+                                onClick={() => setOpportunityFlashOpen(true)}
+                                disabled={!projectDetails}
+                            >
+                                Opportunity flash card
+                            </button>
+                        )}
                     </div>
                     <div className="cer-actions">
-                        {onFlash ? (
+                        {onFlash ? null : (
                             <>
                                 <button
                                     type="button"
@@ -1007,7 +1037,7 @@ function ReportFormContent() {
                                     Share
                                 </button>
                             </>
-                        ) : null}
+                        )}
                         {!isReadOnly && !isTeamMemberAttendanceOnly && !onFlash ? (
                             <button
                                 type="button"
@@ -1046,15 +1076,7 @@ function ReportFormContent() {
                     </div>
                 ) : null}
 
-                {onFlash && !showVerifiedImpactScores ? (
-                    <ReportLifecycleBanner
-                        data={data}
-                        sectionsComplete={sectionsCompleteCount}
-                        paymentHref={paymentHref || undefined}
-                    />
-                ) : null}
-
-                <MissionHeroView data={deferredData} projectData={projectDetails} />
+                {!onFlash ? <MissionHeroView data={deferredData} projectData={projectDetails} /> : null}
 
                 {!onFlash && !stepperLockedToSummaryOnly ? (
                     <JourneyView
@@ -1141,13 +1163,45 @@ function ReportFormContent() {
                                         </span>
                                     </div>
                                 </div>
+                            ) : !isReadOnly && !postSubmitAwaitingReview ? (
+                                <div className="mt-5 space-y-4 rounded-2xl border border-[#d9dfd4] bg-[#fffef9] p-6">
+                                    {!isEligibleForSubmission ? (
+                                        <p className="rounded-xl border border-[#efdbb6] bg-[#fff1d8] px-4 py-3 text-sm text-[#744c10]">
+                                            Submit stays closed until every teammate has logged their own required hours.
+                                            Amber chips on Participation show who is still short. Hours cannot be pooled from one member to another.
+                                        </p>
+                                    ) : null}
+                                    {sendBlockLabels.length > 0 ? (
+                                        <p className="text-sm text-[#61716c]">
+                                            Still needed: {sendBlockLabels.join(" · ")}.
+                                        </p>
+                                    ) : null}
+                                    <FinalDeclarationCard
+                                        declaration={data.section11?.final_declaration || [false, false, false, false, false]}
+                                        signatureName={data.section11?.signature_name || ""}
+                                        requiresFee={reportRequiresReportingFee(data)}
+                                        onToggle={(i) => {
+                                            const next = [...(data.section11?.final_declaration || [false, false, false, false, false])];
+                                            next[i] = !next[i];
+                                            const allNowChecked = next.slice(0, 5).every(Boolean);
+                                            updateSection("section11", {
+                                                final_declaration: next,
+                                                ...(allNowChecked && (data.section11?.signature_name || "").trim()
+                                                    ? { signed_at: new Date().toISOString() }
+                                                    : {}),
+                                            });
+                                        }}
+                                        onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
+                                    />
+                                    <p className="mx-auto max-w-lg text-center text-xs text-[#61716c]">
+                                        After you submit, this flashcard is the locked package. Score, badge, QR and downloads unlock when CIEL PK Super Admin approves.
+                                    </p>
+                                </div>
+                            ) : postSubmitAwaitingReview ? (
+                                <p className="mt-4 rounded-xl border border-[#d9dfd4] bg-[#fffef9] px-4 py-3 text-sm text-[#61716c]">
+                                    Report submitted. CIEL PK is reviewing this flashcard. Score and downloads unlock after Super Admin approval.
+                                </p>
                             ) : null}
-                            <Section11Summary
-                                onRequestFinalSubmit={
-                                    summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
-                                }
-                                projectData={projectDetails}
-                            />
                         </>
                     )}
                 </div>
@@ -1155,6 +1209,7 @@ function ReportFormContent() {
                     <LiveBannerView step={activeStep} data={deferredData} projectData={projectDetails} />
                 ) : null}
 
+            {onFlash ? null : (
             <button
                 type="button"
                 className="cer-back cer-back-below"
@@ -1162,6 +1217,7 @@ function ReportFormContent() {
             >
                 ← Back to my reports
             </button>
+            )}
 
             {!ciiVerifiedSummaryLock &&
                 activeStep !== 1 &&
@@ -1203,8 +1259,7 @@ function ReportFormContent() {
                                 disabled={
                                     isSaving ||
                                     submitSucceeded ||
-                                    (isFlashCardStep(activeStep) &&
-                                        (isTeamMemberAttendanceOnly || (!canFinalizeSubmit && !needsRevision)))
+                                    (isFlashCardStep(activeStep) && isTeamMemberAttendanceOnly)
                                 }
                             >
                                 {isSaving ? (
@@ -1271,10 +1326,10 @@ function ReportFormContent() {
                             <p>
                                 Logged hours:{" "}
                                 <span className="font-semibold text-slate-900">
-                                    {sumNonRejectedLoggedHours(data.section1.attendance_logs || [])} / {data.required_hours || 16}
+                                    {sumNonRejectedLoggedHours(data.section1?.attendance_logs || [])} / {data.required_hours || 16}
                                 </span>
-                                . Log attendance in Section 1 until the minimum is met. Faculty reviews the flash card after you submit.
-                                {sumNonRejectedLoggedHours(data.section1.attendance_logs || []) >= (data.required_hours || 16) ? (
+                                . Log attendance in Section 1 until the minimum is met. CIEL PK Admin reviews your flash card after you submit.
+                                {sumNonRejectedLoggedHours(data.section1?.attendance_logs || []) >= (data.required_hours || 16) ? (
                                     <>
                                         {" "}
                                         The team total meets the goal, but every teammate needs their own hours logged — hours can&apos;t be pooled from one member to cover another.

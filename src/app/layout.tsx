@@ -1,26 +1,30 @@
 import type { Metadata } from "next";
-import { Outfit, Dancing_Script } from "next/font/google"; // Added Dancing_Script
+import localFont from "next/font/local";
 import "./globals.css";
+import { Toaster } from "sonner";
+import FloatingSupportButton from "@/components/FloatingSupportButton";
 
-const outfit = Outfit({
-  subsets: ["latin"],
+/** Self-hosted so `next build` does not fetch Google Fonts (Vercel module-not-found on Outfit CSS). */
+const outfit = localFont({
+  src: "./fonts/outfit-latin-wght-normal.woff2",
   variable: "--font-outfit",
-  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+  weight: "300 800",
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const dancingScript = Dancing_Script({
-  subsets: ["latin"],
+const dancingScript = localFont({
+  src: "./fonts/dancing-script-latin-wght-normal.woff2",
   variable: "--font-dancing",
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  weight: "400 700",
+  fallback: ["cursive"],
 });
 
 export const metadata: Metadata = {
   title: "CIEL PK - Community Impact Education Lab",
   description: "Where Youth, Universities & Communities Create Measurable Impact",
 };
-
-import { Toaster } from "sonner";
-import FloatingSupportButton from "@/components/FloatingSupportButton";
 
 export default function RootLayout({
   children,
@@ -29,7 +33,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-
       <body
         className={`${outfit.variable} ${dancingScript.variable} font-sans antialiased text-slate-800 bg-slate-50`}
       >

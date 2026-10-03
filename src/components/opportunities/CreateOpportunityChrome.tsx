@@ -101,21 +101,21 @@ export function CoSectionHead({
 }) {
     return (
         <div
-            className={`-mx-5 -mt-5 mb-4 flex items-center gap-2.5 rounded-t-[21px] border-b border-[#eef2f3] px-5 py-3.5 ${onToggle ? "cursor-pointer" : ""}`}
+            className={`co-section-head ${onToggle ? "cursor-pointer" : ""}`}
             style={{ background: `linear-gradient(135deg, ${color}14, #fff)` }}
             onClick={onToggle}
             role={onToggle ? "button" : undefined}
         >
             <span
-                className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] px-2 text-[11px] font-extrabold text-white"
+                className="flex h-[26px] min-w-[28px] shrink-0 items-center justify-center rounded-[9px] px-2 text-[11px] font-extrabold text-white"
                 style={{ background: color }}
             >
                 {letter}
             </span>
-            <h2 className="text-[14.5px] font-extrabold text-[#0d2b33]">{title}</h2>
+            <h2 className="min-w-0 text-[14.5px] font-extrabold text-[#0d2b33]">{title}</h2>
             {tag ? (
                 <span
-                    className={`ml-auto whitespace-nowrap rounded-full px-2.5 py-1 text-[8px] font-extrabold tracking-[0.08em] ${
+                    className={`ml-auto shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[8px] font-extrabold tracking-[0.08em] ${
                         tagAuto ? "bg-[#e3f4fa] text-[#0891b2]" : "bg-[#fbf0d7] text-[#b45309]"
                     }`}
                 >
@@ -202,15 +202,15 @@ export function CoLivePreview({
 }) {
     return (
         <div className="sticky bottom-3.5 z-40 mt-4 overflow-hidden rounded-[20px] border border-[#dcebee] bg-white shadow-[0_-8px_30px_rgba(4,37,43,.10)]">
-            <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+            <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-3 py-3 text-white sm:px-4">
                 <span className="text-[22px]">{emoji}</span>
-                <div className="min-w-0 flex-1">
-                    <b className="block text-[13px]">{title.trim() || "Your listing builds itself here…"}</b>
-                    <span className="text-[9.5px] text-[#cdf5f0]">
+                <div className="min-w-0 flex-1 basis-[min(100%,12rem)]">
+                    <b className="block truncate text-[13px]">{title.trim() || "Your listing builds itself here…"}</b>
+                    <span className="line-clamp-2 text-[9.5px] text-[#cdf5f0]">
                         {bits.length ? bits.join(" · ") : "fill the form above and watch this card come alive"}
                     </span>
                 </div>
-                <div className="flex gap-1">{sdgs}</div>
+                <div className="flex max-w-full flex-wrap gap-1">{sdgs}</div>
             </div>
             {children}
         </div>

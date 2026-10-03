@@ -9,7 +9,6 @@ import {
     ExternalLink,
     FileImage,
     FileText,
-    File,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -127,8 +126,12 @@ function resolveParticipantDisplayName(
     return "Team member";
 }
 
-function isNativeFile(value: unknown): value is File {
-    return typeof File !== "undefined" && value instanceof File;
+function isNativeFile(value: unknown): value is globalThis.File {
+    // Do not import lucide's `File` in this module — it shadows the browser File
+    // constructor. Minified production then throws "q is not a function" on
+    // `value instanceof File` when an attendance row with evidence renders.
+    const NativeFile = globalThis.File;
+    return typeof NativeFile === "function" && value instanceof NativeFile;
 }
 
 function resolveAttendanceEvidenceHref(evidence: unknown, entry: AttendanceEntry): string | null {
@@ -187,8 +190,7 @@ function evidenceDisplayLabel(nameOrHref: string): string {
 
 function EvidenceFileIcon({ kind, className }: { kind: "image" | "pdf" | "file"; className?: string }) {
     if (kind === "image") return <FileImage className={className} />;
-    if (kind === "pdf") return <FileText className={className} />;
-    return <File className={className} />;
+    return <FileText className={className} />;
 }
 
 function SessionCard({

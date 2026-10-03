@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Bell, CheckCircle, Clock, Info, Loader2, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, Bell, CheckCheck, CheckCircle, Clock, ExternalLink, Info, Loader2, Trash2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
@@ -13,28 +14,54 @@ interface Notification {
     message: string;
     isRead: boolean;
     createdAt: string;
+    link?: string | null;
+    url?: string | null;
+    target?: string | null;
+    data?: unknown;
+    payload?: unknown;
+    metadata?: unknown;
+}
+
+const PAGE_SIZE = 20;
+
+/** Only same-origin relative paths are linkable (avoids javascript:/external URLs). */
+function safePath(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const v = value.trim();
+    return v.startsWith("/") && !v.startsWith("//") ? v : null;
+}
+
+function relatedLink(n: Notification): string | null {
+    const direct = safePath(n.link) ?? safePath(n.url) ?? safePath(n.target);
+    if (direct) return direct;
+    for (const bag of [n.data, n.payload, n.metadata]) {
+        if (bag && typeof bag === "object") {
+            const o = bag as Record<string, unknown>;
+            const found = safePath(o.link) ?? safePath(o.url) ?? safePath(o.target) ?? safePath(o.href);
+            if (found) return found;
+        }
+    }
+    return null;
 }
 
 export default function AdminNotificationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [filter, setFilter] = useState<"all" | "unread">("all");
-
-    useEffect(() => {
-        void fetchNotifications();
-    }, []);
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [markingAll, setMarkingAll] = useState(false);
 
     const fetchNotifications = async () => {
         try {
             const res = await authenticatedFetch("/api/v1/notifications");
-            if (res?.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    const list = data.data || [];
-                    setNotifications(list);
-                    broadcastUnreadNotificationsCount(list.filter((n: Notification) => !n.isRead).length);
-                }
+            if (!res?.ok) {
+                toast.error("Failed to load notifications");
+                return;
             }
+            const data = await res.json();
+            const list: Notification[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            setNotifications(list);
+            broadcastUnreadNotificationsCount(list.filter((n) => !n.isRead).length);
         } catch (error) {
             console.error("Failed to fetch notifications", error);
             toast.error("Failed to load notifications");
@@ -43,12 +70,20 @@ export default function AdminNotificationsPage() {
         }
     };
 
+    useEffect(() => {
+        void fetchNotifications();
+    }, []);
+
     const markAsRead = async (id: number) => {
         try {
             const res = await authenticatedFetch(`/api/v1/notifications/${id}/read`, {
                 method: "PUT",
             });
-            if (res?.ok) {
+            if (!res?.ok) {
+                toast.error("Failed to mark as read");
+                return;
+            }
+            {
                 setNotifications((prev) => {
                     const next = prev.map((item) => (item.id === id ? { ...item, isRead: true } : item));
                     broadcastUnreadNotificationsCount(next.filter((n) => !n.isRead).length);
@@ -66,7 +101,11 @@ export default function AdminNotificationsPage() {
             const res = await authenticatedFetch(`/api/v1/notifications/${id}`, {
                 method: "DELETE",
             });
-            if (res?.ok) {
+            if (!res?.ok) {
+                toast.error("Failed to delete notification");
+                return;
+            }
+            {
                 setNotifications((prev) => {
                     const next = prev.filter((item) => item.id !== id);
                     broadcastUnreadNotificationsCount(next.filter((n) => !n.isRead).length);
@@ -77,6 +116,24 @@ export default function AdminNotificationsPage() {
         } catch (error) {
             console.error("Failed to delete notification", error);
             toast.error("Failed to delete notification");
+        }
+    };
+
+    const markAllAsRead = async () => {
+        setMarkingAll(true);
+        try {
+            const res = await authenticatedFetch("/api/v1/notifications/read-all", { method: "PUT" });
+            if (!res?.ok) {
+                toast.error("Failed to mark all as read");
+                return;
+            }
+            setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+            broadcastUnreadNotificationsCount(0);
+            toast.success("All notifications marked as read");
+        } catch {
+            toast.error("Failed to mark all as read");
+        } finally {
+            setMarkingAll(false);
         }
     };
 
@@ -119,21 +176,21 @@ export default function AdminNotificationsPage() {
 
     const formatDate = (iso: string) => {
         try {
-            return new Date(iso).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-            });
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return "";
+            return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
         } catch {
             return "";
         }
     };
 
-    const filteredNotifications = notifications.filter((item) => (filter === "all" ? true : !item.isRead));
-    const unreadCount = notifications.filter((item) => !item.isRead).length;
+    const safeList = Array.isArray(notifications) ? notifications : [];
+    const filteredAll = safeList.filter((item) => (filter === "all" ? true : !item.isRead));
+    const filteredNotifications = filteredAll.slice(0, visibleCount);
+    const unreadCount = safeList.filter((item) => !item.isRead).length;
 
     return (
-        <div className="p-6 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="mb-8 flex flex-col gap-6 border-b border-slate-200/80 pb-8 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/20">
@@ -148,6 +205,18 @@ export default function AdminNotificationsPage() {
                         </p>
                     </div>
                 </div>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                {unreadCount > 0 ? (
+                    <button
+                        type="button"
+                        onClick={() => void markAllAsRead()}
+                        disabled={markingAll}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                    >
+                        {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4 text-blue-600" />}
+                        Mark all as read
+                    </button>
+                ) : null}
                 <div
                     className="inline-flex w-full shrink-0 rounded-full bg-slate-100/90 p-1 ring-1 ring-slate-200/70 sm:w-auto"
                     role="group"
@@ -155,7 +224,10 @@ export default function AdminNotificationsPage() {
                 >
                     <button
                         type="button"
-                        onClick={() => setFilter("all")}
+                        onClick={() => {
+                            setFilter("all");
+                            setVisibleCount(PAGE_SIZE);
+                        }}
                         className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
                             filter === "all"
                                 ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
@@ -166,7 +238,10 @@ export default function AdminNotificationsPage() {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setFilter("unread")}
+                        onClick={() => {
+                            setFilter("unread");
+                            setVisibleCount(PAGE_SIZE);
+                        }}
                         className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
                             filter === "unread"
                                 ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
@@ -180,6 +255,7 @@ export default function AdminNotificationsPage() {
                             ({unreadCount})
                         </span>
                     </button>
+                </div>
                 </div>
             </div>
 
@@ -244,8 +320,20 @@ export default function AdminNotificationsPage() {
                                                     {formatDate(notification.createdAt)}
                                                 </time>
                                             </div>
-                                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{notification.message}</p>
+                                            <p className="mt-2 break-words text-sm leading-relaxed text-slate-600">{notification.message}</p>
                                             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                                                {relatedLink(notification) ? (
+                                                    <Link
+                                                        href={relatedLink(notification) as string}
+                                                        onClick={() => {
+                                                            if (unread) void markAsRead(notification.id);
+                                                        }}
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-2.5 text-xs font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-50"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} />
+                                                        View
+                                                    </Link>
+                                                ) : null}
                                                 {unread ? (
                                                     <button
                                                         type="button"
@@ -273,6 +361,18 @@ export default function AdminNotificationsPage() {
                     })}
                 </ul>
             )}
+
+            {!isLoading && filteredAll.length > visibleCount ? (
+                <div className="mx-auto mt-4 flex max-w-4xl justify-center">
+                    <button
+                        type="button"
+                        onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                        className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        Show more ({filteredAll.length - visibleCount} remaining)
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }

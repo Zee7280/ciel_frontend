@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentReportsList } from "@/utils/student-community-cache";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected, isPathEntryApproved } from "@/utils/reviewQueue";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { type CourseProjectEntry, courseworkRibbons } from "@/utils/courseProjectTypes";
@@ -220,12 +221,9 @@ export default function StudentImpactPortfolioTable() {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            setLoading(true);
             const me = studentDisplayName();
-            const [community, coursework, fyp, startup] = await Promise.all([
-                authenticatedFetch("/api/v1/student/reports?limit=100", {}, { redirectToLogin: false })
-                    .then((r) => (r?.ok ? r.json() : null))
-                    .catch(() => null),
+            const [communityRows, coursework, fyp, startup] = await Promise.all([
+                fetchStudentReportsList().catch(() => [] as Record<string, unknown>[]),
                 authenticatedFetch("/api/v1/paths/course-projects", {}, { redirectToLogin: false })
                     .then((r) => (r?.ok ? r.json() : null))
                     .catch(() => null),
@@ -240,8 +238,7 @@ export default function StudentImpactPortfolioTable() {
 
             const out: PortfolioRow[] = [];
 
-            const communityRows = Array.isArray(community?.data) ? community.data : [];
-            for (const r of communityRows) {
+            for (const r of communityRows as any[]) {
                 if (!isCommunityReportOnLiveDeck(r) || isCommunityReportRejected(r)) continue;
                 const level = r.level as CommunityServiceLevel | undefined;
                 const extraBadge = Array.isArray(r.awardBadges)

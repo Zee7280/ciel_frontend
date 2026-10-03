@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
+import { hydrateSection8Visibility } from "../utils/mediaVisibility";
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
@@ -245,6 +246,10 @@ export interface ReportData {
             geographic_reach: string;
             geographic_sub_category: string;
             site_note: string;
+            /** Silent SDG links inferred from family/sub — display only. */
+            sdgs?: number[];
+            /** V13 ladder UI: which step is open. Completeness is computed from fields. */
+            ladder_ui?: { open?: number; allBen?: boolean };
         }>;
         project_summary: {
             distinct_total_beneficiaries: string;
@@ -276,6 +281,10 @@ export interface ReportData {
             unit_other?: string;
             confidence_level: string[];
             measurement_explanation?: string;
+            /** Set when the result is created from a Section 4 ladder card. */
+            activity_id?: string | null;
+            /** 1–4 sure scale from the ladder (maps onto confidence_level). */
+            sure?: number;
         }>;
         challenges: string;
         summary_text?: string;
@@ -343,7 +352,8 @@ export interface ReportData {
             no_harm: boolean;
             privacy_respected: boolean;
         };
-        media_visible: 'public' | 'limited' | 'internal' | '';
+        media_visible: 'public' | 'restricted' | 'private' | 'limited' | 'internal' | '';
+        public_share_permission?: boolean;
         partner_verification: boolean;
         partner_verification_type?: string;
         partner_verification_files: File[];
@@ -541,7 +551,8 @@ export const defaultReportData: ReportData = {
             no_harm: false,
             privacy_respected: false
         },
-        media_visible: '',
+        media_visible: 'restricted',
+        public_share_permission: false,
         partner_verification: false,
         partner_verification_type: '',
         partner_verification_files: [],
@@ -681,6 +692,7 @@ function coerceReportArrays(report: ReportData) {
     const lists: Array<[Record<string, unknown> | null | undefined, string]> = [
         [report.section1 as unknown as Record<string, unknown>, "team_members"],
         [report.section1 as unknown as Record<string, unknown>, "attendance_logs"],
+        [report.section1 as unknown as Record<string, unknown>, "review_checked"],
         [report.section4 as unknown as Record<string, unknown>, "activity_blocks"],
         [report.section5 as unknown as Record<string, unknown>, "measurable_outcomes"],
         [report.section6 as unknown as Record<string, unknown>, "resources"],
@@ -692,7 +704,23 @@ function coerceReportArrays(report: ReportData) {
     ];
     for (const [section, key] of lists) {
         if (!section || Array.isArray(section[key])) continue;
-        section[key] = [];
+        section[key] = key === "review_checked" ? [false, false, false] : [];
+    }
+    // Saved / bootstrap payloads sometimes store null for nested objects. Spreading them
+    // over defaults would leave team_lead/metrics null and blank the report wizard.
+    const s1 = report.section1 as unknown as Record<string, unknown> | null | undefined;
+    if (s1) {
+        if (!s1.team_lead || typeof s1.team_lead !== "object") {
+            s1.team_lead = { ...defaultReportData.section1.team_lead };
+        }
+        if (!s1.metrics || typeof s1.metrics !== "object") {
+            s1.metrics = { ...defaultReportData.section1.metrics };
+        } else {
+            s1.metrics = {
+                ...defaultReportData.section1.metrics,
+                ...(s1.metrics as Record<string, unknown>),
+            };
+        }
     }
 }
 
@@ -712,20 +740,19 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     // Hour bar for submission uses logged sessions, including ones faculty has not reviewed yet.
     // Each member must log their own hours. Faculty approves the flash card after submit.
     const isEligibleForSubmission = useMemo(() => {
+        const s1 = data.section1;
+        if (!s1) return false;
         const rosterIds = buildIndividualRosterFromSection1(
-            data.section1,
-            data.section1.team_lead?.id,
+            s1,
+            s1.team_lead?.id,
         );
         return loggedHoursClearSubmitBar({
-            logs: data.section1.attendance_logs || [],
+            logs: s1.attendance_logs || [],
             requiredHours: data.required_hours || 16,
             rosterIds,
         });
     }, [
-        data.section1.attendance_logs,
-        data.section1.participation_type,
-        data.section1.team_lead,
-        data.section1.team_members,
+        data.section1,
         data.required_hours,
     ]);
 
@@ -787,14 +814,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isReportSectionsReadOnly) return;
-        if (String(data.section9.academic_integration || "").trim()) return;
+        if (String(data.section9?.academic_integration || "").trim()) return;
         const mapped = normalizeAcademicIntegration(participationIntegration);
         if (!mapped) return;
         setData((prev) => {
-            if (String(prev.section9.academic_integration || "").trim()) return prev;
+            if (String(prev.section9?.academic_integration || "").trim()) return prev;
             return { ...prev, section9: { ...prev.section9, academic_integration: mapped } };
         });
-    }, [isReportSectionsReadOnly, data.section9.academic_integration, participationIntegration]);
+    }, [isReportSectionsReadOnly, data.section9?.academic_integration, participationIntegration]);
 
     const canFinalizeSubmit = useMemo(
         () => canSubmitReport && isTeamLeadForSubmit,
@@ -835,10 +862,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-calculate Section 1 metrics when logs, team size, or required hours change
     useEffect(() => {
-        const teamSize = (data.section1.participation_type === 'team' ? data.section1.team_members.length : 0) + 1;
-        const rosterIds = buildIndividualRosterFromSection1(data.section1, data.section1.team_lead?.id);
+        const s1 = data.section1;
+        if (!s1) return;
+        const members = Array.isArray(s1.team_members) ? s1.team_members : [];
+        const logs = Array.isArray(s1.attendance_logs) ? s1.attendance_logs : [];
+        const teamSize = (s1.participation_type === 'team' ? members.length : 0) + 1;
+        const rosterIds = buildIndividualRosterFromSection1(s1, s1.team_lead?.id);
         const metrics = calculateEngagementMetrics(
-            data.section1.attendance_logs,
+            logs,
             data.required_hours,
             teamSize,
             undefined,
@@ -846,7 +877,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         );
 
         // Deep compare or just check if meaningful change occurred to avoid loop
-        if (JSON.stringify(metrics) !== JSON.stringify(data.section1.metrics)) {
+        if (JSON.stringify(metrics) !== JSON.stringify(s1.metrics)) {
             setData(prev => ({
                 ...prev,
                 section1: {
@@ -855,7 +886,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 }
             }));
         }
-    }, [data.section1.attendance_logs, data.section1.participation_type, data.section1.team_members, data.required_hours]);
+    }, [data.section1, data.required_hours]);
 
 
     const clearValidationErrors = useCallback((section: string) => {
@@ -872,10 +903,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         // Team members may only touch Section 1 (attendance via engagement APIs + local state).
         if (isTeamMemberAttendanceOnly && section !== 'section1' && section !== 'section11') return;
 
-        setData(prev => ({
-            ...prev,
-            [section]: { ...(prev[section] as object), ...payload }
-        }));
+        setData(prev => {
+            const next = {
+                ...prev,
+                [section]: { ...(prev[section] as object), ...payload }
+            } as ReportData;
+            if (section === 'section1') coerceReportArrays(next);
+            return next;
+        });
 
         // Clear validation errors for this section when data changes
         clearValidationErrors(section);
@@ -890,14 +925,38 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             const merged: ReportData = {
                 ...defaultReportData,
                 ...newData,
-                section1: { ...defaultReportData.section1, ...(newData.section1 || {}) },
+                section1: {
+                    ...defaultReportData.section1,
+                    ...(newData.section1 || {}),
+                    team_lead: {
+                        ...defaultReportData.section1.team_lead,
+                        ...((newData.section1?.team_lead && typeof newData.section1.team_lead === "object")
+                            ? newData.section1.team_lead
+                            : {}),
+                    },
+                    metrics: {
+                        ...defaultReportData.section1.metrics,
+                        ...((newData.section1?.metrics && typeof newData.section1.metrics === "object")
+                            ? newData.section1.metrics
+                            : {}),
+                    },
+                    team_members: Array.isArray(newData.section1?.team_members)
+                        ? newData.section1.team_members
+                        : defaultReportData.section1.team_members,
+                    attendance_logs: Array.isArray(newData.section1?.attendance_logs)
+                        ? newData.section1.attendance_logs
+                        : defaultReportData.section1.attendance_logs,
+                    review_checked: Array.isArray(newData.section1?.review_checked)
+                        ? newData.section1.review_checked
+                        : defaultReportData.section1.review_checked,
+                },
                 section2: { ...defaultReportData.section2, ...(newData.section2 || {}) },
                 section3: normalizeLoadedSection3(newData.section3),
                 section4: { ...defaultReportData.section4, ...(newData.section4 || {}) },
                 section5: { ...defaultReportData.section5, ...(newData.section5 || {}) },
                 section6: { ...defaultReportData.section6, ...(newData.section6 || {}) },
                 section7: { ...defaultReportData.section7, ...(newData.section7 || {}) },
-                section8: { ...defaultReportData.section8, ...(newData.section8 || {}) },
+                section8: hydrateSection8Visibility({ ...defaultReportData.section8, ...(newData.section8 || {}) } as Record<string, unknown>) as ReportData["section8"],
                 section9: { ...defaultReportData.section9, ...(newData.section9 || {}) },
                 section10: { ...defaultReportData.section10, ...(newData.section10 || {}) },
                 section11: { ...defaultReportData.section11, ...(newData.section11 || {}) },

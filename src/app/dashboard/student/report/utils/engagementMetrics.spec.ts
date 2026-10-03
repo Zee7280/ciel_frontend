@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { calculateEngagementMetrics, personDailyHoursOverCap } from "./engagementMetrics";
+import { buildIndividualRosterFromSection1, calculateEngagementMetrics, personDailyHoursOverCap } from "./engagementMetrics";
 
 const teamRoster = [
     "lead:aaa",
@@ -54,3 +54,16 @@ assert.equal(
 );
 
 console.log("engagementMetrics.spec.ts ok");
+
+// Non-array team_members must not throw (production crash: "q is not a function")
+const badRoster = buildIndividualRosterFromSection1(
+    {
+        participation_type: "team",
+        team_lead: { id: "lead-1" },
+        // Intentionally not an array — mirrors bad API payloads
+        team_members: { bad: true } as never,
+    },
+    "lead-1",
+);
+assert.deepEqual(badRoster, ["lead:lead-1"]);
+assert.equal(buildIndividualRosterFromSection1(null, "lead-1"), undefined);

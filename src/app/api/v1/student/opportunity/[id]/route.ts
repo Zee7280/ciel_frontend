@@ -50,7 +50,7 @@ async function forwardStudentOpportunityUpdate(
             "Operation failed";
 
         if (!response.ok) {
-            return NextResponse.json({ success: false, message, ...data }, { status: response.status });
+            return NextResponse.json({ success: false, ...data, message }, { status: response.status });
         }
 
         return NextResponse.json(data);

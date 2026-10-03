@@ -17,6 +17,7 @@ import {
     DEFAULT_PHONE_COUNTRY_KEY,
     parsePhoneForDisplay,
     rawPhoneForProfileDisplay,
+    validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 
 export default function StudentProfilePage() {
@@ -128,13 +129,13 @@ export default function StudentProfilePage() {
             return;
         }
         const contactE164 = composeInternationalPhone(phoneCountryKey, phoneNational);
-        const nationalDigits = phoneNational.replace(/\D/g, "");
+        const phoneErr = validateNationalPhone(phoneCountryKey, phoneNational);
         if (!formData.institution.trim() || !formData.city.trim() || !contactE164.trim()) {
             toast.error("Institution, city, and phone are required");
             return;
         }
-        if (nationalDigits.length < 10) {
-            toast.error("Enter a valid phone number (at least 10 digits after country code)");
+        if (phoneErr) {
+            toast.error(phoneErr);
             return;
         }
 
@@ -498,7 +499,7 @@ export default function StudentProfilePage() {
                                         }));
                                     }}
                                     maxNationalDigits={15}
-                                    placeholderNational="3001234567"
+                                    placeholderNational="300 1234567"
                                     selectClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                                     inputClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                                 />

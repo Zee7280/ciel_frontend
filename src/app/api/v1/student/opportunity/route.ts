@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { success: false, message, ...data },
+                { success: false, ...data, message },
                 { status: response.status },
             );
         }

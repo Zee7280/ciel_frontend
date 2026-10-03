@@ -8,7 +8,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, message: "Backend URL not configured" }, { status: 500 });
         }
         const authHeader = request.headers.get("Authorization");
-        const response = await fetch(`${base}/admin/org-membership/history`, {
+        const response = await fetch(`${base}/admin/org-membership/history${new URL(request.url).search}`, {
             headers: {
                 Authorization: authHeader || "",
                 "Content-Type": "application/json",

@@ -25,6 +25,7 @@ import AdminNationalRankingStudio from "@/components/ciel/community-service/Admi
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import FacultyReportReviewCard from "@/components/ciel/community-service/FacultyReportReviewCard";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
@@ -37,6 +38,7 @@ import {
 } from "@/utils/communityAwardModel";
 import {
     isAdminCommunityLiveCard,
+    isAdminCommunityPendingReview,
     isAdminCommunityWaiting,
     isCommunityReportFacultyApproved,
     isCommunityReportRejected,
@@ -49,6 +51,7 @@ import {
     isFacultyCsReportRevision,
     type FacultyCsReportRow,
 } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
+import { csvCell, escapeHtml } from "@/app/dashboard/admin/_shared/csv";
 import { CII_V2_LEVELS } from "@/utils/communityCiiAnalyser";
 
 const CS_BASE = "/dashboard/admin/community-service";
@@ -69,7 +72,7 @@ type CsView = (typeof CS_VIEWS)[number];
 const CREATE_FORM = "/dashboard/admin/create-opportunity";
 const CREATE_TABS = ["drafts", "review", "action", "published", "closed"] as const;
 type CreateTab = (typeof CREATE_TABS)[number];
-const PROJECT_TABS = ["approval", "active", "verified", "closed"] as const;
+const PROJECT_TABS = ["approval", "progress", "active", "verified", "closed"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: string }> = {
@@ -181,10 +184,6 @@ function downloadText(filename: string, content: string, mime: string) {
         URL.revokeObjectURL(a.href);
         a.remove();
     }, 800);
-}
-
-function csvEscape(value: string) {
-    return `"${value.replace(/"/g, '""')}"`;
 }
 
 function normalizeAdminCsView(view: CsView): Exclude<CsView, "pending" | "hec"> {
@@ -321,6 +320,44 @@ function isAdminCsReportRevision(row: FacultyCsReportRow): boolean {
     );
 }
 
+const REPORT_PAGE_SIZE = 200;
+const REPORT_MAX_PAGES = 50;
+
+/** Loops every page of /admin/reports (deduped by id) so counts/tabs are not silently capped. */
+async function fetchAllAdminReports(): Promise<{ rows: unknown[]; truncated: boolean }> {
+    const byId = new Map<string, unknown>();
+    const noId: unknown[] = [];
+    let page = 1;
+    let totalPages = 1;
+    let truncated = false;
+    while (page <= totalPages) {
+        if (page > REPORT_MAX_PAGES) {
+            truncated = true;
+            break;
+        }
+        const res = await authenticatedFetch(
+            `/api/v1/admin/reports?page=${page}&limit=${REPORT_PAGE_SIZE}`,
+            {},
+            { redirectToLogin: false },
+        );
+        if (!res?.ok) {
+            if (page > 1) truncated = true;
+            break;
+        }
+        const json = await res.json().catch(() => null);
+        const rows: unknown[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        for (const row of rows) {
+            const id = row && typeof row === "object" ? String((row as Record<string, unknown>).id ?? "") : "";
+            if (id) byId.set(id, row);
+            else noId.push(row);
+        }
+        totalPages = Math.max(1, Number(json?.pagination?.total_pages) || 1);
+        if (rows.length === 0) break;
+        page += 1;
+    }
+    return { rows: [...byId.values(), ...noId], truncated };
+}
+
 export default function AdminCommunityServicePage() {
     return (
         <Suspense fallback={<div className="mx-auto max-w-[1040px] py-16 text-center text-sm text-[#71828e]">Loading community service…</div>}>
@@ -359,6 +396,7 @@ export function AdminCommunityServiceHub() {
     const [oppCount, setOppCount] = useState(0);
     const [mine, setMine] = useState<UniOppRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [reportsTruncated, setReportsTruncated] = useState(false);
     const [breakdownFor, setBreakdownFor] = useState<{ id: string; title: string } | null>(null);
     const [rerunningId, setRerunningId] = useState<string | null>(null);
 
@@ -376,8 +414,9 @@ export function AdminCommunityServiceHub() {
                 toast.error(json?.message || "Independent AI analysis failed.");
                 return;
             }
-            const score = json?.data?.score ?? json?.score;
-            const levelName = json?.data?.level?.name ?? json?.level?.name;
+            const score = json?.data?.analysis?.score ?? json?.data?.score ?? json?.score;
+            const lvl = json?.data?.analysis?.level ?? json?.data?.level ?? json?.level;
+            const levelName = typeof lvl === "string" ? lvl : lvl?.name;
             toast.success(
                 score != null
                     ? `Independent analysis complete — ${Math.round(score)}/100${levelName ? ` (${levelName})` : ""}. The faculty-approved score is unchanged.`
@@ -393,17 +432,17 @@ export function AdminCommunityServiceHub() {
             authenticatedFetch("/api/v1/admin/community-service/award-cards", {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
-            authenticatedFetch("/api/v1/admin/reports?limit=200", {}, { redirectToLogin: false }).then((r) =>
-                r?.ok ? r.json() : null,
-            ),
-            authenticatedFetch("/api/v1/admin/projects", {}, { redirectToLogin: false }).then((r) =>
+            fetchAllAdminReports(),
+            authenticatedFetch("/api/v1/admin/projects?fields=lite", {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
             authenticatedFetch("/api/v1/opportunities?created_by=me", {}, { redirectToLogin: false }).then((r) =>
                 r?.ok ? r.json() : null,
             ),
         ])
-            .then(([award, reports, projects, mineRes]) => {
+            .then(([award, reportsAll, projects, mineRes]) => {
+                const reports = { data: reportsAll.rows as any[] };
+                setReportsTruncated(reportsAll.truncated);
                 setCards(Array.isArray(award?.data) ? award.data : []);
                 const reportList = Array.isArray(reports?.data) ? reports.data : [];
                 setPipeline(
@@ -456,6 +495,7 @@ export function AdminCommunityServiceHub() {
                 setLoading(false);
             })
             .catch(() => {
+                setReportsTruncated(true);
                 setCards([]);
                 setPipeline([]);
                 setReportRows([]);
@@ -480,13 +520,20 @@ export function AdminCommunityServiceHub() {
         [pipeline],
     );
     const closedReports = useMemo(() => pipeline.filter((r) => isCommunityReportRejected(r)), [pipeline]);
+    // Reports students are still writing — Admin can open them; everyone else waits for submit.
+    const draftRows = useMemo(
+        () =>
+            pipeline
+                .filter((r) => r.is_submitted === false || ["draft", "continue"].includes(String(r.status || "").toLowerCase()))
+                .sort((a, b) => (b.progress_pct ?? 0) - (a.progress_pct ?? 0)),
+        [pipeline],
+    );
     const revisionReportRows = useMemo(() => reportRows.filter(isAdminCsReportRevision), [reportRows]);
     const pendingReportRows = useMemo(
         () =>
             reportRows.filter(
                 (row) =>
-                    isAdminCommunityWaiting(row) &&
-                    isCommunityReportFacultyApproved(row) &&
+                    isAdminCommunityPendingReview(row) &&
                     !isAdminCsReportRevision(row),
             ),
         [reportRows],
@@ -559,14 +606,14 @@ export function AdminCommunityServiceHub() {
                 c.level || "",
                 String(c.hours || 0),
                 c.sdg,
-            ].map((v) => csvEscape(String(v))),
+            ].map((v) => csvCell(v)),
         );
         const header = ["Project", "ID", "Student", "Faculty", "University", "Department", "CII", "Level", "Hours", "SDG"].join(",");
         if (kind.includes("HTML")) {
             const body = `<h1>CIEL PK Impact Wall</h1><p>Public-safe verified records only. No private contact data.</p><ul>${deckCards
-                .map((c) => `<li>${c.project_title} · ${c.student_name} · CII ${c.cii ?? "—"}</li>`)
+                .map((c) => `<li>${escapeHtml(c.project_title)} · ${escapeHtml(c.student_name)} · CII ${escapeHtml(c.cii ?? "—")}</li>`)
                 .join("")}</ul>`;
-            downloadText("CIEL_PK_impact_wall.html", `<!doctype html><title>CIEL PK</title>${body}`, "text/html");
+            downloadText("CIEL_PK_impact_wall.html", `<!doctype html><meta charset="utf-8"><title>CIEL PK</title>${body}`, "text/html");
         } else {
             downloadText(`CIEL_PK_${kind.replace(/\s+/g, "_")}.csv`, [header, ...rows.map((r) => r.join(","))].join("\n"), "text/csv");
         }
@@ -597,6 +644,15 @@ export function AdminCommunityServiceHub() {
                     <HubBackButton href={CS_BASE} label="← Back to Community Service" />
                 </div>
             )}
+
+            {reportsTruncated && !loading ? (
+                <div
+                    role="alert"
+                    className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                    Some reports could not be loaded, so counts and tabs may be incomplete. Refresh to retry.
+                </div>
+            ) : null}
 
             {effectiveView === "home" && (
                 <>
@@ -831,6 +887,7 @@ export function AdminCommunityServiceHub() {
                     <HubTabs
                         tabs={[
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
+                            { id: "progress", label: "In progress", count: draftRows.filter(filterProject).length },
                             { id: "active", label: "Active reports", count: inPipe.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
                             { id: "closed", label: "Closed", count: closedReports.filter(filterProject).length },
@@ -859,6 +916,26 @@ export function AdminCommunityServiceHub() {
                                             </small>
                                         </div>
                                     </Link>
+                                ))}
+                            </div>
+                        )
+                    ) : projectTab === "progress" ? (
+                        draftRows.filter(filterProject).length === 0 ? (
+                            <EmptyPanel title="Nothing in progress" text="Reports students have started but not yet submitted appear here with how much is filled." />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {draftRows.filter(filterProject).map((r) => (
+                                    <ReportProgressCard
+                                        key={r.id}
+                                        href={reportHref(r.id)}
+                                        title={r.project_title || "Report"}
+                                        student={r.student_name || "Student"}
+                                        org={r.organization_name}
+                                        hours={r.hours}
+                                        progressPct={r.progress_pct ?? 0}
+                                        sectionsComplete={r.sections_complete}
+                                        sectionsTotal={r.sections_total}
+                                    />
                                 ))}
                             </div>
                         )

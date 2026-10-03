@@ -131,7 +131,7 @@ export default function AnalyticsHub({
             const payload = await fetchSection1Analytics(sectionApiPath, activeView.query);
             if (cancelled) return;
             if (payload) {
-                setData(payload);
+                setData({ ...payload, meta: payload.meta && typeof payload.meta === "object" ? payload.meta : {} });
                 setLoadError(null);
             } else {
                 setData((prev) => (prev ? { ...prev, fields: {}, meta: {} } : prev));
@@ -166,7 +166,10 @@ export default function AnalyticsHub({
                 if (!res?.ok || cancelled) return;
                 const json = await res.json().catch(() => null);
                 if (cancelled || !json?.success || !json?.data) return;
-                setSummary(json.data);
+                setSummary({
+                    ...json.data,
+                    sections: Array.isArray(json.data.sections) ? json.data.sections : [],
+                });
             } catch {
                 if (!cancelled) setSummary(null);
             }

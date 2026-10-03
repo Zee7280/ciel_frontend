@@ -144,7 +144,12 @@ export default function AdminProjectEvidencePage() {
             const res = await authenticatedFetch("/api/v1/admin/projects/evidence-overview", {}, { redirectToLogin: true });
             if (!res?.ok) {
                 const body = await res?.json().catch(() => ({}));
-                toast.error((body as { error?: string }).error || "Could not load projects");
+                const b = body as { message?: unknown; error?: unknown };
+                toast.error(
+                    (typeof b.message === "string" && b.message) ||
+                        (typeof b.error === "string" && b.error) ||
+                        "Could not load projects",
+                );
                 setRows([]);
                 return;
             }
@@ -238,6 +243,7 @@ export default function AdminProjectEvidencePage() {
     };
 
     const downloadEvidence = async (row: ProjectEvidenceRow) => {
+        if (downloadingId) return;
         if (row.evidence_file_count === 0) {
             toast.message("No evidence files", { description: "This project has no uploaded evidence yet." });
             return;
@@ -251,7 +257,12 @@ export default function AdminProjectEvidencePage() {
             );
             if (!res?.ok) {
                 const body = await res?.json().catch(() => ({}));
-                toast.error((body as { error?: string }).error || "Download failed");
+                const b = body as { message?: unknown; error?: unknown };
+                toast.error(
+                    (typeof b.message === "string" && b.message) ||
+                        (typeof b.error === "string" && b.error) ||
+                        "Download failed",
+                );
                 return;
             }
             const blob = await res.blob();
@@ -266,7 +277,11 @@ export default function AdminProjectEvidencePage() {
             anchor.click();
             anchor.remove();
             URL.revokeObjectURL(url);
-            toast.success("Evidence ZIP downloaded");
+            toast.success("Evidence ZIP downloaded", {
+                // The backend gives no header/JSON signal for skipped files; it only adds
+                // _README_skipped_files.txt inside the ZIP when storage reads fail.
+                description: "If any files could not be fetched from storage, the ZIP contains _README_skipped_files.txt listing the count.",
+            });
         } catch {
             toast.error("Could not download evidence ZIP");
         } finally {
@@ -362,7 +377,7 @@ export default function AdminProjectEvidencePage() {
             cell: (row) => (
                 <button
                     type="button"
-                    disabled={downloadingId === row.id || row.evidence_file_count === 0}
+                    disabled={downloadingId !== null || row.evidence_file_count === 0}
                     onClick={() => void downloadEvidence(row)}
                     className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -383,7 +398,7 @@ export default function AdminProjectEvidencePage() {
         "w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer";
 
     return (
-        <div className="p-6 sm:p-8">
+        <div className="min-w-0 max-w-full p-4 sm:p-8">
             <div className="mb-8 flex flex-col gap-4 border-b border-slate-200/80 pb-8 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-700 to-slate-900 text-white shadow-lg">
@@ -492,7 +507,7 @@ export default function AdminProjectEvidencePage() {
                 </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="max-w-full overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
                 <DataTable
                     columns={columns}
                     data={filtered}

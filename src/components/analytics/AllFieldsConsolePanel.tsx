@@ -225,6 +225,7 @@ export function AllFieldsConsolePanel({
     const [loadingReg, setLoadingReg] = useState(true);
     const [loadingView, setLoadingView] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const loadRegistry = useCallback(async () => {
         setLoadingReg(true);
@@ -241,8 +242,23 @@ export function AllFieldsConsolePanel({
                 setRegistry(null);
                 return;
             }
-            setRegistry(json.data);
+            const d = json.data as Partial<RegistryPayload>;
+            setRegistry({
+                primary_owner: d.primary_owner ?? "",
+                editable: !!d.editable,
+                note: d.note ?? "",
+                view_count: Number(d.view_count) || 0,
+                roles: Array.isArray(d.roles) ? d.roles : [],
+                sections: (Array.isArray(d.sections) ? d.sections : []).map((sec) => ({
+                    ...sec,
+                    fields: (Array.isArray(sec?.fields) ? sec.fields : []).map((f) => ({
+                        ...f,
+                        mapped_roles: Array.isArray(f?.mapped_roles) ? f.mapped_roles : [],
+                    })),
+                })),
+            });
             setError(null);
+            setLastUpdated(new Date());
         } catch {
             setError("Failed to load field registry");
             setRegistry(null);
@@ -279,8 +295,21 @@ export function AllFieldsConsolePanel({
                 setViewAs(null);
                 return;
             }
-            setViewAs(json.data);
+            const d = json.data as ViewAsPayload;
+            const analytics = (d.analytics && typeof d.analytics === "object" ? d.analytics : {}) as Section1AnalyticsPayload;
+            setViewAs({
+                ...d,
+                analytics: {
+                    ...analytics,
+                    fields:
+                        analytics.fields && typeof analytics.fields === "object" && !Array.isArray(analytics.fields)
+                            ? analytics.fields
+                            : {},
+                },
+                underlying_fields: Array.isArray(d.underlying_fields) ? d.underlying_fields : [],
+            });
             setError(null);
+            setLastUpdated(new Date());
         } catch {
             setError("Failed to load view-as mirror");
             setViewAs(null);
@@ -302,7 +331,7 @@ export function AllFieldsConsolePanel({
         (async () => {
             try {
                 const prRes = await authenticatedFetch(
-                    resolveSameOriginApiPath("/api/v1/admin/projects"),
+                    resolveSameOriginApiPath("/api/v1/admin/projects?fields=lite"),
                     {},
                     { timeoutMs: 60_000 },
                 );
@@ -315,6 +344,7 @@ export function AllFieldsConsolePanel({
                       : [];
                 const projectsOut: { id: string; title: string }[] = [];
                 for (const row of raw as Record<string, unknown>[]) {
+                        if (!row || typeof row !== "object") continue;
                     const id = String(row.id ?? "").trim();
                     const title = String(row.title ?? row.name ?? "Untitled").trim();
                     if (id) projectsOut.push({ id, title });
@@ -330,7 +360,7 @@ export function AllFieldsConsolePanel({
     }, []);
 
     const roleMeta = useMemo(() => {
-        const fromReg = registry?.roles.find((r) => r.id === role);
+        const fromReg = (registry?.roles ?? []).find((r) => r.id === role);
         return (
             fromReg ?? {
                 id: role,
@@ -412,7 +442,25 @@ export function AllFieldsConsolePanel({
                         </div>
                     </header>
                 </>
-            ) : null}
+            ) : (
+                <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+                    <span aria-live="polite">
+                        {lastUpdated
+                            ? `Last updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                            : "Loading…"}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void loadRegistry();
+                            if (mode === "view") void loadViewAs();
+                        }}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        <RefreshCw className="h-3.5 w-3.5" /> Refresh
+                    </button>
+                </div>
+            )}
 
             {showModeTabs ? (
             <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
@@ -791,7 +839,7 @@ export function AllFieldsConsolePanel({
                                                     <div className="flex flex-wrap gap-1">
                                                         {ROLE_ORDER.filter((r) => rolesOnSection.has(r)).map(
                                                             (r) => {
-                                                                const meta = registry?.roles.find(
+                                                                const meta = (registry?.roles ?? []).find(
                                                                     (x) => x.id === r,
                                                                 );
                                                                 return (

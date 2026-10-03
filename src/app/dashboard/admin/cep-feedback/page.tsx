@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     AlertTriangle,
     ChevronDown,
     ChevronUp,
+    Download,
     Loader2,
     MessageSquare,
     RefreshCw,
@@ -12,6 +13,7 @@ import {
     Star,
 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { downloadCsv } from "../_shared/csv";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
@@ -165,6 +167,34 @@ export default function AdminCepFeedbackPage() {
     }, [loadFeedback]);
 
     const displayedRows = rows.filter((row) => matchesSearch(row, searchQuery));
+    const stats = useMemo(() => {
+        const dist = [0, 0, 0, 0, 0];
+        let sum = 0;
+        let n = 0;
+        for (const row of rows) {
+            const v = Math.round(Number(row.overall_rating));
+            if (Number.isFinite(v) && v >= 1 && v <= 5) {
+                dist[v - 1] += 1;
+                sum += v;
+                n += 1;
+            }
+        }
+        return { dist, n, avg: n ? sum / n : 0 };
+    }, [rows]);
+
+    const exportCsv = () => {
+        const header = [
+            "Submitted", "Name", "Email", "Role", "Survey version", "Rating",
+            "Sections ease", "Reflects impact", "Most useful", "Improvements",
+        ];
+        const data = displayedRows.map((r) => [
+            r.created_at ?? "", r.user_name ?? "", r.user_email ?? "", r.user_role || r.account_role || "",
+            r.survey_version ?? "", r.overall_rating ?? "", humanEase(r.sections_ease), humanReflect(r.reflect_impact),
+            r.most_useful_text ?? "", r.improvement_text ?? "",
+        ]);
+        downloadCsv(`cep-feedback-page-${currentPage}.csv`, [header, ...data]);
+    };
+
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
     return (
@@ -195,15 +225,44 @@ export default function AdminCepFeedbackPage() {
                         <Input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Filter current page: student, email, rating, comments…"
+                            placeholder="Search this page only: student, email, rating, comments…"
                             className="pl-9"
                         />
                     </div>
                     <p className="text-sm text-slate-500">
                         {totalItems.toLocaleString()} submission{totalItems === 1 ? "" : "s"}
                     </p>
+                    <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={displayedRows.length === 0}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export page CSV
+                    </Button>
                 </div>
             </Card>
+
+            {stats.n > 0 ? (
+                <Card className="p-4 shadow-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
+                        <div>
+                            <p className="text-3xl font-bold text-slate-900">{stats.avg.toFixed(2)}<span className="text-base font-medium text-slate-400"> / 5</span></p>
+                            <p className="text-xs text-slate-500">Average of {stats.n} rating{stats.n === 1 ? "" : "s"} on this page (not all pages)</p>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            {[5, 4, 3, 2, 1].map((star) => {
+                                const count = stats.dist[star - 1];
+                                return (
+                                    <div key={star} className="flex items-center gap-2 text-xs text-slate-600">
+                                        <span className="w-6 shrink-0">{star}★</span>
+                                        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                            <div className="h-full bg-amber-400" style={{ width: `${(count / stats.n) * 100}%` }} />
+                                        </div>
+                                        <span className="w-8 shrink-0 text-right tabular-nums">{count}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </Card>
+            ) : null}
 
             {error ? (
                 <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

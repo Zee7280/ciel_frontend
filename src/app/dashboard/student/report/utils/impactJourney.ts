@@ -1,3 +1,4 @@
+import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from "./mediaVisibility";
 import type { ReportData } from "../context/ReportContext";
 import { distinctBeneficiaryTotal } from "./activityReach";
 
@@ -93,12 +94,11 @@ export function sectionStrength(step: number, data: ReportData): JourneyGrade {
                 return detailed ? 3 : 2;
             }
             case 7: {
-                const ethics = Object.values(data.section8.ethical_compliance || {});
-                const consented = ethics.length > 0 && ethics.every(Boolean);
-                const visSet = !!data.section8.media_visible;
-                if (!consented) return visSet ? 1 : 0;
+                const vis = resolveMediaVisibility(data.section8.media_visible);
+                const publicOk = !isPublicMediaVisibility(vis) || hasPublicSharePermission(data.section8);
+                if (!publicOk) return 1;
                 const evN = (data.section8.evidence_files || []).length;
-                return visSet && evN >= 5 ? 3 : 2;
+                return evN >= 5 ? 3 : 2;
             }
             case 8: {
                 const done9 =

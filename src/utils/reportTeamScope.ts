@@ -6,6 +6,7 @@
 
 import { authenticatedFetch } from "@/utils/api";
 import { defaultReportData } from "@/app/dashboard/student/report/context/ReportContext";
+import { hydrateSection8Visibility } from "@/app/dashboard/student/report/utils/mediaVisibility";
 
 export function pickTeamIdFromRecord(rec: unknown): string {
     if (!rec || typeof rec !== "object") return "";
@@ -63,6 +64,12 @@ export function dedupeTeamMemberRowsForReport(
     return out;
 }
 
+/**
+ * Map project `/team` rows for the student report editor's "other teammates" list.
+ * Excludes the viewer's own participation id (team-setup UI already shows Self separately).
+ * Attendance "Your crew" must re-inject Self in Section1Participation — do not reuse this alone
+ * as the attendance roster for team members.
+ */
 export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId: string): ReportTeamRow[] {
     if (!Array.isArray(teamRows) || !myParticipantId) return [];
     return teamRows
@@ -469,7 +476,7 @@ export function prepareReportForVerifyDossier(report: Record<string, unknown>): 
         section5: { ...defaultReportData.section5, ...(report.section5 as Record<string, unknown> | undefined) },
         section6: { ...defaultReportData.section6, ...(report.section6 as Record<string, unknown> | undefined) },
         section7: { ...defaultReportData.section7, ...(report.section7 as Record<string, unknown> | undefined) },
-        section8: { ...defaultReportData.section8, ...(report.section8 as Record<string, unknown> | undefined) },
+        section8: hydrateSection8Visibility({ ...defaultReportData.section8, ...(report.section8 as Record<string, unknown> | undefined) }),
         section9: { ...defaultReportData.section9, ...(report.section9 as Record<string, unknown> | undefined) },
         section10: { ...defaultReportData.section10, ...(report.section10 as Record<string, unknown> | undefined) },
         section11: { ...defaultReportData.section11, ...(report.section11 as Record<string, unknown> | undefined) },

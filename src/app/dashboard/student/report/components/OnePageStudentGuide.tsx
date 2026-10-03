@@ -106,8 +106,8 @@ const SECTIONS: GuideSection[] = [
         points: [
             "Review auto-collected photos/documents.",
             "Add missing proof and state what it proves.",
-            "Confirm consent, privacy and dignity.",
-            "Choose Public / Institutional / Private.",
+            "Choose Public, Restricted (default), or Private.",
+            "If Public, confirm you have permission to share.",
         ],
         good: "“Attendance sheet confirms 40 participants across 3 sessions.”",
         avoid: "Avoid: photos without consent or context.",

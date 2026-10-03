@@ -2,9 +2,9 @@
  * Opportunity date lifecycle (CIEL PK Community Service) — FE mirror of
  * ciel_backend/src/opportunities/opportunity-timeline.util.ts
  *
- * Keep rules identical. Project start/end are the only mandatory dates;
- * applications join until project end unless early close is set;
- * reporting window = end + 60 days.
+ * Keep rules identical. Project start/end are the only dates (there is NO application deadline):
+ * students may apply and serve between start and end, applications close after the project end,
+ * and the reporting window = end + 60 days. "Today" is the Pakistan (UTC+5) calendar date.
  */
 
 export const REPORTING_WINDOW_DAYS = 60;
@@ -12,8 +12,6 @@ export const REPORTING_WINDOW_DAYS = 60;
 export type TimelineLike = {
     start_date?: unknown;
     end_date?: unknown;
-    application_deadline?: unknown;
-    close_applications_early?: unknown;
     reporting_window_reopened_until?: unknown;
     type?: unknown;
 };
@@ -38,6 +36,20 @@ export function toDateOnlyString(input: unknown): string | null {
 
 export function todayDateOnlyUtc(now: Date = new Date()): string {
     return now.toISOString().slice(0, 10);
+}
+
+/** Platform calendar is Pakistan Standard Time (UTC+5, no DST). */
+export function todayDateOnlyPk(now: Date = new Date()): string {
+    return new Date(now.getTime() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** True for a genuine calendar date written as YYYY-MM-DD (optionally followed by a time part). */
+export function isRealCalendarDate(input: string): boolean {
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(input.trim());
+    if (!m) return false;
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
 }
 
 export function compareDateOnly(a: string, b: string): number {
@@ -70,24 +82,9 @@ export function getProjectEndDate(timeline: unknown): string | null {
     return toDateOnlyString(asTimeline(timeline).end_date);
 }
 
-export function isCloseApplicationsEarly(timeline: unknown): boolean {
-    const t = asTimeline(timeline);
-    if (t.close_applications_early === true) return true;
-    if (t.close_applications_early === false) return false;
-    const deadline = toDateOnlyString(t.application_deadline);
-    const end = toDateOnlyString(t.end_date);
-    if (deadline && end && compareDateOnly(deadline, end) < 0) return true;
-    return false;
-}
-
+/** Last day students may Join / Apply (inclusive): the project end date. */
 export function getApplicationsCloseDate(timeline: unknown): string | null {
-    const t = asTimeline(timeline);
-    const end = toDateOnlyString(t.end_date);
-    if (isCloseApplicationsEarly(t)) {
-        const deadline = toDateOnlyString(t.application_deadline);
-        if (deadline) return deadline;
-    }
-    return end;
+    return toDateOnlyString(asTimeline(timeline).end_date);
 }
 
 export function getReportingCloseDate(timeline: unknown): string | null {
@@ -103,7 +100,7 @@ export function getReportingCloseDate(timeline: unknown): string | null {
 
 export function resolveLifecyclePhase(
     timeline: unknown,
-    today: string = todayDateOnlyUtc(),
+    today: string = todayDateOnlyPk(),
 ): OpportunityLifecyclePhase {
     const start = getProjectStartDate(timeline);
     const end = getProjectEndDate(timeline);
@@ -122,7 +119,7 @@ export function resolveLifecyclePhase(
 
 export function canJoinOrApply(
     timeline: unknown,
-    today: string = todayDateOnlyUtc(),
+    today: string = todayDateOnlyPk(),
 ): boolean {
     const phase = resolveLifecyclePhase(timeline, today);
     // Legacy listings without start/end must not suddenly block apply.
@@ -132,14 +129,14 @@ export function canJoinOrApply(
 
 export function canRecordCompletedService(
     timeline: unknown,
-    today: string = todayDateOnlyUtc(),
+    today: string = todayDateOnlyPk(),
 ): boolean {
     return resolveLifecyclePhase(timeline, today) === "service_ended_reporting_open";
 }
 
 export function canEditOrSubmitReport(
     timeline: unknown,
-    today: string = todayDateOnlyUtc(),
+    today: string = todayDateOnlyPk(),
 ): boolean {
     const phase = resolveLifecyclePhase(timeline, today);
     if (phase === "no_dates") return true;
@@ -160,7 +157,7 @@ export function isServiceDateAllowed(serviceDate: unknown, timeline: unknown): b
 
 export function lifecycleStatusLabel(
     timeline: unknown,
-    today: string = todayDateOnlyUtc(),
+    today: string = todayDateOnlyPk(),
 ): string | null {
     switch (resolveLifecyclePhase(timeline, today)) {
         case "join_open":
@@ -185,12 +182,14 @@ export function validateTimelineForPersist(
 ): string | null {
     const requireDates = opts?.requireDates !== false;
     const t = asTimeline(timeline);
+    for (const raw of [t.start_date, t.end_date]) {
+        const text = raw == null ? "" : String(raw).trim();
+        if (text && !isRealCalendarDate(text)) return "Dates must be valid calendar dates (YYYY-MM-DD).";
+    }
     const start = toDateOnlyString(t.start_date);
     const end = toDateOnlyString(t.end_date);
-    const deadline = toDateOnlyString(t.application_deadline);
-    const closeEarly = t.close_applications_early === true;
 
-    if (!start && !end && !deadline && !closeEarly) {
+    if (!start && !end) {
         return requireDates
             ? "Please set both a project start date and a project end date."
             : null;
@@ -201,46 +200,5 @@ export function validateTimelineForPersist(
     if (compareDateOnly(start, end) > 0) {
         return "Project end date must be on or after the project start date.";
     }
-    if (closeEarly) {
-        if (!deadline) {
-            return "Please set an application closing date, or turn off early application close.";
-        }
-        if (compareDateOnly(deadline, end) >= 0) {
-            return "Application closing date must be before the project end date.";
-        }
-    }
     return null;
-}
-
-/** Build timeline payload from create-opportunity form fields. */
-export function buildTimelinePayload(input: {
-    timelineType: string;
-    start: string;
-    end: string;
-    fromTime?: string;
-    endTime?: string;
-    closeApplicationsEarly: boolean;
-    applicationDeadline: string;
-    expectedHours?: string | number;
-    volunteersRequired?: string | number;
-    scheduleNotes?: string;
-    includeScheduleTimes?: boolean;
-}): Record<string, unknown> {
-    const closeEarly = !!input.closeApplicationsEarly;
-    const payload: Record<string, unknown> = {
-        type: input.timelineType,
-        start_date: input.start || undefined,
-        end_date: input.end || undefined,
-        close_applications_early: closeEarly,
-        application_deadline: closeEarly ? input.applicationDeadline || undefined : null,
-        expected_hours: input.expectedHours !== undefined ? input.expectedHours : undefined,
-        volunteers_required:
-            input.volunteersRequired !== undefined ? input.volunteersRequired : undefined,
-        schedule_notes: input.scheduleNotes || undefined,
-    };
-    if (input.includeScheduleTimes) {
-        payload.from_time = input.fromTime || undefined;
-        payload.to_time = input.endTime || undefined;
-    }
-    return payload;
 }

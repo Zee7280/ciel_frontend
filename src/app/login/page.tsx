@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
@@ -318,6 +319,7 @@ function LoginContent() {
             const roleNormalized = String(role).trim().toLowerCase().replace(/\s+/g, "_");
             if (authToken && roleNormalized === "student") {
                 clearStudentDashboardCache();
+                clearPathSessionCache();
                 void fetchStudentDashboardData({ redirectToLogin: false })
                     .then((dash) => {
                         if (dash) persistStudentDashboardCache(dash);
@@ -327,6 +329,7 @@ function LoginContent() {
                     });
             } else {
                 clearStudentDashboardCache();
+                clearPathSessionCache();
             }
 
             if (authToken && roleHasNotificationInbox(role)) {

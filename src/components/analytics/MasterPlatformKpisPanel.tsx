@@ -174,7 +174,7 @@ export default function MasterPlatformKpisPanel() {
         (async () => {
             try {
                 const [prRes, orgRes] = await Promise.all([
-                    authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/projects"), {}, { timeoutMs: 60_000 }),
+                    authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/projects?fields=lite"), {}, { timeoutMs: 60_000 }),
                     authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/organizations"), {}, { timeoutMs: 60_000 }),
                 ]);
                 if (cancelled) return;
@@ -184,6 +184,7 @@ export default function MasterPlatformKpisPanel() {
                     const body = await prRes.json().catch(() => ({}));
                     const raw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
                     for (const row of raw as Record<string, unknown>[]) {
+                        if (!row || typeof row !== "object") continue;
                         const id = String(row.id ?? "").trim();
                         const title = String(row.title ?? row.name ?? "Untitled").trim();
                         if (id) projectsOut.push({ id, title });
@@ -195,6 +196,7 @@ export default function MasterPlatformKpisPanel() {
                     const data = await orgRes.json().catch(() => ({}));
                     const raw = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
                     for (const row of raw as Record<string, unknown>[]) {
+                        if (!row || typeof row !== "object") continue;
                         const id = String(row.id ?? "").trim();
                         const name = String(row.name ?? row.title ?? "Organization").trim();
                         if (id) orgsOut.push({ id, name });
@@ -259,7 +261,9 @@ export default function MasterPlatformKpisPanel() {
         );
     }
 
-    const mix = data?.participation_type_mix ?? [];
+    const mix: TypeMixRow[] = (Array.isArray(data?.participation_type_mix) ? data.participation_type_mix : [])
+        .filter((m): m is TypeMixRow => !!m && typeof m === "object")
+        .map((m) => ({ participation_type: String(m.participation_type ?? "unknown"), count: num(m.count) }));
     const maxMix = Math.max(...mix.map((m) => m.count), 1);
     const growth = data?.system_growth_rate_percent;
     const growthLabel =
@@ -542,7 +546,7 @@ export default function MasterPlatformKpisPanel() {
                     <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 text-slate-500">
                             <TrendingUp className="h-5 w-5" />
-                            <CardDescription>System growth rate</CardDescription>
+                            <CardDescription>Growth rate (month-to-date)</CardDescription>
                         </div>
                         <CardTitle className="text-3xl tabular-nums text-emerald-700">{growthLabel}</CardTitle>
                     </CardHeader>
