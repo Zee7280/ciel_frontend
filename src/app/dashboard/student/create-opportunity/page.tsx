@@ -1,12 +1,14 @@
 "use client";
 
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { STUDENT_SKILL_PRESETS } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { lastAllowedApplicationCloseDate, validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from 'next/dynamic';
 import { findSdgById, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
@@ -246,6 +248,8 @@ function StudentOpportunityCreationPageInner() {
             hasCreateOpportunityWizardIntent(new URLSearchParams(window.location.search)));
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    /** Synchronous double-click guard: isSubmitting is state, so two clicks in one tick can both pass. */
+    const submitInFlightRef = useRef(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(editFromUrl || null);
     const draftIdRef = useRef<string | null>(editFromUrl || null);
@@ -290,8 +294,6 @@ function StudentOpportunityCreationPageInner() {
         location: { city: "", venue: "", pin: "", mapSearch: "", mapLink: "" },
         timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
-        applicationDeadline: "",
-        closeApplicationsEarly: false,
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
@@ -403,33 +405,14 @@ function StudentOpportunityCreationPageInner() {
         });
     };
 
-    const applyLiveTimelineErrors = (
-        start: string,
-        end: string,
-        closeEarly: boolean,
-        deadline: string,
-    ) => {
+    const applyLiveTimelineErrors = (start: string, end: string) => {
         setFieldErrors((prev) => {
             const next = { ...prev };
             delete next.dates;
             delete next.dateStart;
             delete next.dateEnd;
-            delete next.applicationDeadline;
-            const timelineErr = validateTimelineForPersist({
-                start_date: start,
-                end_date: end,
-                close_applications_early: closeEarly,
-                application_deadline: closeEarly ? deadline : end,
-            });
-            if (timelineErr && start.trim() && end.trim()) {
-                if (/application closing/i.test(timelineErr)) {
-                    next.applicationDeadline = timelineErr;
-                } else {
-                    next.dates = timelineErr;
-                }
-            } else if (closeEarly && start.trim() && end.trim() && !deadline.trim()) {
-                next.applicationDeadline = "Enter the application closing date.";
-            }
+            const timelineErr = validateTimelineForPersist({ start_date: start, end_date: end });
+            if (timelineErr && start.trim() && end.trim()) next.dates = timelineErr;
             return next;
         });
     };
@@ -483,18 +466,9 @@ function StudentOpportunityCreationPageInner() {
             const timelineErr = validateTimelineForPersist({
                 start_date: formData.dates.start,
                 end_date: formData.dates.end,
-                close_applications_early: formData.closeApplicationsEarly,
-                application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
             });
             if (timelineErr && formData.dates.start.trim() && formData.dates.end.trim()) {
-                if (/application closing/i.test(timelineErr)) {
-                    errors.applicationDeadline = timelineErr;
-                } else {
-                    errors.dates = timelineErr;
-                }
-            }
-            if (formData.closeApplicationsEarly && !formData.applicationDeadline.trim()) {
-                errors.applicationDeadline = errors.applicationDeadline || "Enter the application closing date.";
+                errors.dates = timelineErr;
             }
             const fromTime = formData.dates.fromTime.trim();
             const endTime = formData.dates.endTime.trim();
@@ -767,10 +741,6 @@ function StudentOpportunityCreationPageInner() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
-                    close_applications_early: !!formData.closeApplicationsEarly,
-                    application_deadline: formData.closeApplicationsEarly
-                        ? formData.applicationDeadline || undefined
-                        : null,
                     schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
@@ -778,8 +748,8 @@ function StudentOpportunityCreationPageInner() {
                               ...(formData.dates.endTime.trim() ? { to_time: formData.dates.endTime.trim() } : {}),
                           }
                         : {}),
-                    expected_hours: parseInt(formData.capacity.hours) || 0,
-                    volunteers_required: parseInt(formData.capacity.volunteers) || 0
+                    expected_hours: parseInt(formData.capacity.hours) || undefined,
+                    volunteers_required: parseInt(formData.capacity.volunteers) || undefined
                 },
                 sdg_info: {
                     sdg_id: formData.sdg,
@@ -800,14 +770,14 @@ function StudentOpportunityCreationPageInner() {
                               }
                           ]
                       }
-                    : {}),
+                    : { secondary_sdgs: [] }), // explicit empty array so a removed secondary SDG is cleared on edit/draft
                 objectives: {
                     description: formData.objectives.description,
                     summary: formData.opportunitySummary.trim(),
                     hook: formData.hook.trim(),
                     outputs: formData.objectives.outputs.trim(),
                     outcome: formData.objectives.outcome.trim() || undefined,
-                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
+                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || undefined,
                     beneficiaries_type: otherBeneficiaryMerged,
                     beneficiary_group: groupLabel || undefined,
                 },
@@ -859,7 +829,7 @@ function StudentOpportunityCreationPageInner() {
                               official_email: formData.supervision.partnerEmail.trim(),
                           },
                       }
-                    : { external_partner_collaboration: null }),
+                    : { external_partner_collaboration: null, partner_organization: null }),
                 executing_context: {
                     type: executingType,
                     student_pathway: privatePath ? "private" : "university",
@@ -932,6 +902,7 @@ function StudentOpportunityCreationPageInner() {
 
     const handleSubmit = async () => {
         if (isLoadingEdit) return;
+        if (submitInFlightRef.current) return;
         if (!validateForm()) return;
 
         if (!editingOpportunityId && similarMatches.length > 0 && !formData.privateCandidate) {
@@ -942,6 +913,7 @@ function StudentOpportunityCreationPageInner() {
             return;
         }
 
+        submitInFlightRef.current = true;
         setIsSubmitting(true);
         try {
             const payload = buildOpportunityPayload();
@@ -1020,7 +992,7 @@ function StudentOpportunityCreationPageInner() {
                     setSimilarMatches(similarFrom409);
                 }
                 const fromNest = Array.isArray((data as { message?: unknown }).message)
-                    ? String((data as { message: string[] }).message[0])
+                    ? apiErrorMessage(data, "")
                     : undefined;
                 const flatMsg = typeof errObj.message === "string" ? errObj.message : undefined;
                 const msg =
@@ -1046,6 +1018,7 @@ function StudentOpportunityCreationPageInner() {
             console.error("Error submitting form", error);
             toast.error("An error occurred. Please try again.");
         } finally {
+            submitInFlightRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -1173,7 +1146,7 @@ function StudentOpportunityCreationPageInner() {
             seats: formData.capacity.volunteers,
             start: formData.dates.start,
             end: formData.dates.end,
-            deadline: formData.applicationDeadline,
+            deadline: formData.dates.end,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
             beneficiaryType: formData.objectives.beneficiaryGroup.trim() || bens || "Community",
             responsibilities: formData.activity.responsibilities,
@@ -2276,12 +2249,7 @@ function StudentOpportunityCreationPageInner() {
                                 onChange={(e) => {
                                     const start = e.target.value;
                                     setFormData({ ...formData, dates: { ...formData.dates, start } });
-                                    applyLiveTimelineErrors(
-                                        start,
-                                        formData.dates.end,
-                                        formData.closeApplicationsEarly,
-                                        formData.applicationDeadline,
-                                    );
+                                    applyLiveTimelineErrors(start, formData.dates.end);
                                 }}
                             />
                             {timelineStartWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineStartWeekdayLabel}</p> : null}
@@ -2298,12 +2266,7 @@ function StudentOpportunityCreationPageInner() {
                                 onChange={(e) => {
                                     const end = e.target.value;
                                     setFormData({ ...formData, dates: { ...formData.dates, end } });
-                                    applyLiveTimelineErrors(
-                                        formData.dates.start,
-                                        end,
-                                        formData.closeApplicationsEarly,
-                                        formData.applicationDeadline,
-                                    );
+                                    applyLiveTimelineErrors(formData.dates.start, end);
                                 }}
                             />
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
@@ -2311,60 +2274,6 @@ function StudentOpportunityCreationPageInner() {
                         </div>
                     </div>
                     <FieldError message={fieldErrors.dates} />
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                        <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="mt-1"
-                                checked={formData.closeApplicationsEarly}
-                                onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    const deadline = checked ? formData.applicationDeadline : "";
-                                    setFormData({
-                                        ...formData,
-                                        closeApplicationsEarly: checked,
-                                        applicationDeadline: deadline,
-                                    });
-                                    applyLiveTimelineErrors(
-                                        formData.dates.start,
-                                        formData.dates.end,
-                                        checked,
-                                        deadline,
-                                    );
-                                }}
-                            />
-                            <span className="text-sm text-slate-800">
-                                <span className="font-semibold">Close applications before project end date</span>
-                                <span className="block text-xs text-slate-500 mt-0.5">
-                                    Optional. When off, students can join until the project end date.
-                                </span>
-                            </span>
-                        </label>
-                        {formData.closeApplicationsEarly ? (
-                            <div className="mt-3 max-w-sm">
-                                <label className="co-label" style={{ marginTop: 0 }}>Application closing date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.applicationDeadline}
-                                    min={formData.dates.start || undefined}
-                                    max={lastAllowedApplicationCloseDate(formData.dates.end)}
-                                    aria-invalid={fieldErrors.applicationDeadline ? true : undefined}
-                                    className={fieldErrorClass(!!fieldErrors.applicationDeadline)}
-                                    onChange={(e) => {
-                                        const deadline = e.target.value;
-                                        setFormData({ ...formData, applicationDeadline: deadline });
-                                        applyLiveTimelineErrors(
-                                            formData.dates.start,
-                                            formData.dates.end,
-                                            true,
-                                            deadline,
-                                        );
-                                    }}
-                                />
-                                <FieldError message={fieldErrors.applicationDeadline} />
-                            </div>
-                        ) : null}
-                    </div>
 {/* B5. Timeline */}
                     <div className="pt-2">
                         <label className="co-label">Duration type</label>
@@ -2939,13 +2848,7 @@ function StudentOpportunityCreationPageInner() {
                     <div>
                         <label className="co-label">E2 · Skills students will gain · tap up to 10</label>
                         <div className="co-chips">
-                            {[
-                                "Leadership", "Communication", "Teaching", "Teamwork", 
-                                "Digital Skills", "Community Engagement", "Critical Thinking", 
-                                "Problem Solving", "Time Management", "Project Management", 
-                                "Research", "Documentation", "Financial Literacy", 
-                                "Public Speaking", "Event Planning", "Media/Content Creation"
-                            ].map(s => (
+                            {STUDENT_SKILL_PRESETS.map(s => (
                                 <CoChip
                                     key={s}
                                     selected={formData.activity.skills.includes(s)}

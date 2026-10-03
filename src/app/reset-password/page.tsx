@@ -1,5 +1,6 @@
 "use client";
 
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -56,7 +57,7 @@ function ResetPasswordContent() {
             if (res.ok && data.success) {
                 setSuccess(true);
             } else {
-                setError(data.message || "Password reset failed. The link may have expired.");
+                setError(apiErrorMessage(data, "Password reset failed. The link may have expired."));
             }
         } catch {
             setError("Network error. Please try again.");

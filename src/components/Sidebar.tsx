@@ -276,6 +276,16 @@ export default function Sidebar() {
     const router = useRouter();
 
     const handleLogout = () => {
+        // Revoke server-side (bumps tokenVersion) so the token dies now, not when it expires. Best
+        // effort: the local sign-out below happens regardless.
+        const token = localStorage.getItem("ciel_token");
+        if (token) {
+            void fetch("/api/v1/auth/logout", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                keepalive: true,
+            }).catch(() => undefined);
+        }
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();

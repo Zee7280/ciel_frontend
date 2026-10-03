@@ -235,7 +235,7 @@ function OpportunityDetailsContent() {
                                 name: opp.supervision?.supervisor_name || "",
                                 role: opp.supervision?.role || "",
                                 contact: opp.supervision?.contact || "",
-                                isHarmful: opp.supervision?.safe_environment === false, // Inverted logic as per creation
+                                isHarmful: opp.supervision?.safe_environment === false, // form field is the inverse of safe_environment
                                 isSupervised: opp.supervision?.supervised || false
                             },
                             verification: opp.verification_method || [],
@@ -363,6 +363,17 @@ function OpportunityDetailsContent() {
 
         setIsSubmitting(true);
         try {
+            // The backend replaces each nested object wholesale, so start from what is already stored
+            // and overlay only the fields this legacy form edits — otherwise every save would wipe
+            // hook/outputs/outcome, prerequisites, application-close settings, signature, etc.
+            const existing = (opportunityApiRecord ?? {}) as Record<string, any>;
+            const keep = (key: string): Record<string, unknown> =>
+                existing[key] && typeof existing[key] === "object" && !Array.isArray(existing[key])
+                    ? (existing[key] as Record<string, unknown>)
+                    : {};
+            const existingSecondary: Array<Record<string, unknown>> = Array.isArray(existing.secondary_sdgs)
+                ? existing.secondary_sdgs
+                : [];
             // Transform back to API spec
             const payload = {
                 id: id,
@@ -374,6 +385,7 @@ function OpportunityDetailsContent() {
                 mode: formData.mode,
                 location: formData.mode === 'Remote' ? null : formData.location,
                 timeline: {
+                    ...keep("timeline"),
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
@@ -382,22 +394,26 @@ function OpportunityDetailsContent() {
                 },
                 sdg: formData.sdg,
                 sdg_info: {
+                    ...keep("sdg_info"),
                     sdg_id: formData.sdg,
                     target_id: formData.target,
                     indicator_id: formData.indicator
                 },
-                secondary_sdgs: formData.secondarySdgs.map(s => ({
+                secondary_sdgs: formData.secondarySdgs.map((s, i) => ({
+                    ...(existingSecondary[i] ?? {}),
                     sdg_id: s.sdgId,
                     target_id: s.targetId,
                     indicator_id: s.indicatorId,
                     justification: s.justification
                 })),
                 objectives: {
+                    ...keep("objectives"),
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
                     beneficiaries_type: formData.objectives.beneficiariesType
                 },
                 activity_details: {
+                    ...keep("activity_details"),
                     student_responsibilities: formData.activity.responsibilities,
                     skills_gained: formData.activity.isOtherSkillChecked
                         ? [
@@ -407,10 +423,12 @@ function OpportunityDetailsContent() {
                         : formData.activity.skills,
                 },
                 supervision: {
+                    ...keep("supervision"),
                     supervisor_name: formData.supervision.name,
                     role: formData.supervision.role,
                     contact: formData.supervision.contact,
-                    safe_environment: formData.supervision.isHarmful,
+                    // safe_environment === true means SAFE; the form field is the inverse ("harmful").
+                    safe_environment: !formData.supervision.isHarmful,
                     supervised: formData.supervision.isSupervised
                 },
                 verification_method: formData.verification,

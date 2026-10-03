@@ -1,4 +1,5 @@
 import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import { STUDENT_SKILL_PRESETS, splitCustomValues } from "@/utils/opportunityChipOptions";
 
 /**
  * Maps opportunity detail API shape into student create-opportunity form state.
@@ -118,6 +119,16 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         else beneficiariesOther.push(b);
     }
 
+    // The group label is persisted both as `beneficiary_group` and merged into beneficiaries_type;
+    // reload it only as the group, otherwise renaming the group leaves the old label behind as a
+    // permanent "other beneficiary" chip.
+    const savedGroupLabel =
+        typeof objectives.beneficiary_group === "string" ? objectives.beneficiary_group.trim() : "";
+    const beneficiariesOtherOnly = savedGroupLabel
+        ? beneficiariesOther.filter((b) => b.trim() !== savedGroupLabel)
+        : beneficiariesOther;
+    const skillSplit = splitCustomValues(activity.skills_gained, STUDENT_SKILL_PRESETS);
+
     const verification = Array.isArray(d.verification_method) ? (d.verification_method as string[]) : [];
 
     const secondaryList = Array.isArray(d.secondary_sdgs) ? (d.secondary_sdgs as Record<string, unknown>[]) : [];
@@ -165,7 +176,8 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
         : [];
 
     const formDataPatch: Record<string, unknown> = {
-        title: typeof d.title === "string" ? d.title : "",
+        // The server stores "Untitled opportunity" for a draft saved with no title — show it as blank.
+        title: typeof d.title === "string" && d.title !== "Untitled opportunity" ? d.title : "",
         hook: typeof objectives.hook === "string" ? objectives.hook : "",
         opportunitySummary:
             typeof objectives.summary === "string"
@@ -196,17 +208,10 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             fromTime: typeof timeline.from_time === "string" ? timeline.from_time : "",
             endTime: typeof timeline.to_time === "string" ? timeline.to_time : "",
         },
-        applicationDeadline: typeof timeline.application_deadline === "string" ? timeline.application_deadline : "",
-        closeApplicationsEarly:
-            timeline.close_applications_early === true ||
-            (typeof timeline.application_deadline === "string" &&
-                typeof timeline.end_date === "string" &&
-                timeline.application_deadline < timeline.end_date &&
-                timeline.close_applications_early !== false),
         scheduleNotes: typeof timeline.schedule_notes === "string" ? timeline.schedule_notes : "",
         capacity: {
-            hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",
-            volunteers: timeline.volunteers_required != null ? String(timeline.volunteers_required) : "",
+            hours: Number(timeline.expected_hours) > 0 ? String(timeline.expected_hours) : "",
+            volunteers: Number(timeline.volunteers_required) > 0 ? String(timeline.volunteers_required) : "",
         },
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
@@ -243,22 +248,21 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             description: typeof objectives.description === "string" ? objectives.description : "",
             outputs: typeof objectives.outputs === "string" ? objectives.outputs : "",
             outcome: typeof objectives.outcome === "string" ? objectives.outcome : "",
-            beneficiariesCount:
-                objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
+            beneficiariesCount: Number(objectives.beneficiaries_count) > 0 ? String(objectives.beneficiaries_count) : "",
             beneficiaryGroup:
                 typeof objectives.beneficiary_group === "string"
                     ? objectives.beneficiary_group
                     : beneficiariesOther[0] || "",
             beneficiariesType: beneficiariesPredefined,
-            isOtherBeneficiaryChecked: beneficiariesOther.length > 0,
-            otherBeneficiarySpecs: beneficiariesOther.length ? beneficiariesOther : [""],
+            isOtherBeneficiaryChecked: beneficiariesOtherOnly.length > 0,
+            otherBeneficiarySpecs: beneficiariesOtherOnly.length ? beneficiariesOtherOnly : [""],
         },
         activity: {
             responsibilities:
                 typeof activity.student_responsibilities === "string" ? activity.student_responsibilities : "",
-            skills: Array.isArray(activity.skills_gained) ? [...(activity.skills_gained as string[])] : [],
-            isOtherSkillChecked: false,
-            otherSkills: [""] as string[],
+            skills: skillSplit.known,
+            isOtherSkillChecked: skillSplit.custom.length > 0,
+            otherSkills: skillSplit.custom.length ? skillSplit.custom : [""],
             prerequisites: typeof activity.prerequisites === "string" ? activity.prerequisites : "",
             resources: typeof activity.resources === "string" ? activity.resources : "",
         },

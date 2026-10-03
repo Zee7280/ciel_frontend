@@ -1,5 +1,7 @@
 "use client";
 
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS, OPPORTUNITY_BENEFICIARY_PRESETS, splitCustomValues } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -17,7 +19,7 @@ import {
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
-import { lastAllowedApplicationCloseDate, validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
@@ -26,7 +28,7 @@ import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, validateOptionalNationalPhone } from "@/utils/countryCallingCodes";
+import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay, validateOptionalNationalPhone } from "@/utils/countryCallingCodes";
 import {
     resolveFacultyFlashEligibility,
     StudentOpportunityFlashcard,
@@ -80,6 +82,8 @@ const PARTNER_CREATOR_TYPES = [
     "Other Legitimate Partner",
 ] as const;
 
+const UNIVERSITY_CREATOR_TYPE = "University / Higher-Education Institution";
+
 const COHOST_ORG_TYPES = [
     "NGO / Nonprofit",
     "Private Company / Corporate",
@@ -125,6 +129,7 @@ function isNgoCreatorAccount(orgType: string): boolean {
 }
 
 function defaultCreatorDetailType(orgType: string): string {
+    if (storedSignupRole() === "university") return UNIVERSITY_CREATOR_TYPE;
     if (isNgoOrganizationType(orgType)) return "NGO / Nonprofit";
     const t = orgType.trim().toLowerCase();
     if (t.includes("government") || t.includes("public sector")) return "Public Sector Organization";
@@ -169,6 +174,8 @@ export default function OpportunityPostingPage() {
     const router = useRouter();
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    /** Synchronous double-click guard: isSubmitting is state, so two clicks in one tick can both pass. */
+    const submitInFlightRef = useRef(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     const [isDraftMode, setIsDraftMode] = useState(false);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
@@ -199,8 +206,6 @@ export default function OpportunityPostingPage() {
         location: { city: "", venue: "", pin: "" },
         timelineType: "Fixed dates",
         dates: { start: "", end: "", fromTime: "", endTime: "" },
-        applicationDeadline: "",
-        closeApplicationsEarly: false,
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
@@ -305,8 +310,6 @@ export default function OpportunityPostingPage() {
             const timelineErr = validateTimelineForPersist({
                 start_date: formData.dates.start,
                 end_date: formData.dates.end,
-                close_applications_early: formData.closeApplicationsEarly,
-                application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
             });
             if (timelineErr) {
                 toast.error(timelineErr);
@@ -398,8 +401,6 @@ export default function OpportunityPostingPage() {
         const timelineErr = validateTimelineForPersist({
             start_date: formData.dates.start,
             end_date: formData.dates.end,
-            close_applications_early: formData.closeApplicationsEarly,
-            application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
         });
         if (timelineErr) {
             toast.error(timelineErr);
@@ -587,10 +588,6 @@ export default function OpportunityPostingPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
-                    close_applications_early: !!formData.closeApplicationsEarly,
-                    application_deadline: formData.closeApplicationsEarly
-                        ? formData.applicationDeadline || undefined
-                        : null,
                     schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
@@ -598,8 +595,8 @@ export default function OpportunityPostingPage() {
                             ...(formData.dates.endTime.trim() ? { to_time: formData.dates.endTime.trim() } : {}),
                         }
                         : {}),
-                    expected_hours: parseInt(formData.capacity.hours) || 0,
-                    volunteers_required: parseInt(formData.capacity.volunteers) || 0
+                    expected_hours: parseInt(formData.capacity.hours) || undefined,
+                    volunteers_required: parseInt(formData.capacity.volunteers) || undefined
                 },
                 sdg: formData.sdg,
                 sdg_info: {
@@ -623,7 +620,7 @@ export default function OpportunityPostingPage() {
                     hook: formData.hook.trim(),
                     outputs: formData.objectives.outputs.trim(),
                     outcome: formData.objectives.outcome.trim() || undefined,
-                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
+                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || undefined,
                     beneficiaries_type: formData.objectives.isOtherBeneficiaryChecked && formData.objectives.otherBeneficiary.trim()
                         ? [...formData.objectives.beneficiariesType, formData.objectives.otherBeneficiary.trim()]
                         : formData.objectives.beneficiariesType
@@ -747,8 +744,10 @@ export default function OpportunityPostingPage() {
 
     const handleSubmit = async () => {
         if (isLoadingEdit) return;
+        if (submitInFlightRef.current) return;
         if (!validateForm()) return;
 
+        submitInFlightRef.current = true;
         setIsSubmitting(true);
         try {
             const payload = buildOpportunityPayload();
@@ -786,11 +785,8 @@ export default function OpportunityPostingPage() {
             } else {
                 let detail = "Could not create the opportunity. Please try again.";
                 try {
-                    const errJson = (await res.json()) as { message?: unknown; error?: unknown };
-                    const m =
-                        (typeof errJson.message === "string" && errJson.message) ||
-                        (typeof errJson.error === "string" && errJson.error);
-                    if (m) detail = m;
+                    const errJson = (await res.json()) as unknown;
+                    detail = apiErrorMessage(errJson, detail);
                 } catch {
                     if (res.statusText) detail = `${detail} (${res.status} ${res.statusText})`;
                 }
@@ -800,6 +796,7 @@ export default function OpportunityPostingPage() {
             console.error("Error submitting form", error);
             toast.error("An error occurred. Please try again.");
         } finally {
+            submitInFlightRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -826,10 +823,7 @@ export default function OpportunityPostingPage() {
                 (data as { data?: { id?: string } } | null)?.data?.id ||
                 (data as { id?: string } | null)?.id;
             if (!res?.ok || !newId) {
-                const msg =
-                    typeof (data as { message?: unknown } | null)?.message === "string"
-                        ? (data as { message: string }).message
-                        : "Could not save this draft.";
+                const msg = apiErrorMessage(data, "Could not save this draft.");
                 toast.warning(msg);
                 return;
             }
@@ -1015,6 +1009,17 @@ export default function OpportunityPostingPage() {
                 const loc = (d.location && typeof d.location === "object" ? d.location : {}) as Record<string, unknown>;
                 const types = Array.isArray(d.types) ? d.types.map(String) : [];
                 const otherTypes = types.filter((t) => t.startsWith("Other:")).map((t) => t.slice("Other:".length).trim());
+                const sup = (d.supervision && typeof d.supervision === "object" ? d.supervision : {}) as Record<string, unknown>;
+                const savedSecondary = Array.isArray(d.secondary_sdgs) ? (d.secondary_sdgs as Record<string, unknown>[]) : [];
+                const deptRestriction = (scope.department_restriction && typeof scope.department_restriction === "object"
+                    ? scope.department_restriction
+                    : {}) as Record<string, unknown>;
+                const savedDepartments = Array.isArray(deptRestriction.departments)
+                    ? (deptRestriction.departments as unknown[]).map(String).filter(Boolean)
+                    : [];
+                const skillSplit = splitCustomValues(activity.skills_gained, ORG_SKILL_PRESETS);
+                const verifySplit = splitCustomValues(d.verification_method, ORG_VERIFICATION_PRESETS);
+                const savedWhatsapp = parsePhoneForDisplay(str(sup.whatsapp_e164));
                 const applyScope = str(scope.apply_scope);
                 const allowedScopes = ["all", "multi_all", "multi_depts", "one_all", "one_depts"];
                 if (cancelled) return;
@@ -1040,17 +1045,10 @@ export default function OpportunityPostingPage() {
                         fromTime: str(timeline.from_time),
                         endTime: str(timeline.to_time),
                     },
-                    applicationDeadline: str(timeline.application_deadline),
-                    closeApplicationsEarly:
-                        timeline.close_applications_early === true ||
-                        (!!str(timeline.application_deadline) &&
-                            !!str(timeline.end_date) &&
-                            str(timeline.application_deadline) < str(timeline.end_date) &&
-                            timeline.close_applications_early !== false),
                     scheduleNotes: str(timeline.schedule_notes),
                     capacity: {
-                        hours: timeline.expected_hours != null ? String(timeline.expected_hours) : "",
-                        volunteers: timeline.volunteers_required != null ? String(timeline.volunteers_required) : "",
+                        hours: Number(timeline.expected_hours) > 0 ? String(timeline.expected_hours) : "",
+                        volunteers: Number(timeline.volunteers_required) > 0 ? String(timeline.volunteers_required) : "",
                     },
                     sdg: str(sdgInfo.sdg_id),
                     target: str(sdgInfo.target_id),
@@ -1062,22 +1060,41 @@ export default function OpportunityPostingPage() {
                         description: str(objectives.description),
                         outputs: str(objectives.outputs),
                         outcome: str(objectives.outcome),
-                        beneficiariesCount: objectives.beneficiaries_count != null ? String(objectives.beneficiaries_count) : "",
+                        beneficiariesCount: Number(objectives.beneficiaries_count) > 0 ? String(objectives.beneficiaries_count) : "",
                         beneficiariesType: Array.isArray(objectives.beneficiaries_type) ? objectives.beneficiaries_type.map(String) : [],
                     },
                     activity: {
                         ...prev.activity,
                         responsibilities: str(activity.student_responsibilities),
-                        skills: Array.isArray(activity.skills_gained) ? activity.skills_gained.map(String) : [],
+                        skills: skillSplit.known,
+                        isOtherSkillChecked: skillSplit.custom.length > 0,
+                        otherSkills: skillSplit.custom.length ? skillSplit.custom : [""],
                         prerequisites: str(activity.prerequisites),
                         resources: str(activity.resources),
                     },
+                    secondarySdgs: savedSecondary
+                        .filter((x) => str(x.sdg_id))
+                        .map((x) => ({
+                            sdgId: str(x.sdg_id),
+                            targetId: str(x.target_id),
+                            indicatorId: str(x.indicator_id),
+                            subIndicatorId: str(x.sub_indicator_id),
+                            justification: str(x.justification),
+                        })),
+                    electronicSignature: str(sup.electronic_signature) || prev.electronicSignature,
+                    selectedDepartments: savedDepartments.length ? savedDepartments : prev.selectedDepartments,
                     verificationSafety: {
                         ...prev.verificationSafety,
                         executingOrg: {
                             ...prev.verificationSafety.executingOrg,
                             contactPersonName: str(exec.contact_person_name),
                             officialEmail: str(exec.official_email),
+                            ...(str(sup.whatsapp_e164)
+                                ? {
+                                      whatsappCountryKey: savedWhatsapp.phoneCountryKey,
+                                      whatsappNational: savedWhatsapp.national,
+                                  }
+                                : {}),
                         },
                         partnerOrg: {
                             ...prev.verificationSafety.partnerOrg,
@@ -1101,7 +1118,9 @@ export default function OpportunityPostingPage() {
                     },
                     applyScope: (allowedScopes.includes(applyScope) ? applyScope : prev.applyScope) as NgoApplyScope,
                     restrictedUniversities: Array.isArray(d.restricted_universities) ? d.restricted_universities.map(String) : prev.restrictedUniversities,
-                    verification: Array.isArray(d.verification_method) ? d.verification_method.map(String) : prev.verification,
+                    verification: Array.isArray(d.verification_method) ? verifySplit.known : prev.verification,
+                    isOtherVerificationChecked: verifySplit.custom.length > 0,
+                    otherVerification: verifySplit.custom.join(", "),
                 }));
             } catch {
                 if (!cancelled) toast.error("Could not load this opportunity");
@@ -1138,12 +1157,15 @@ export default function OpportunityPostingPage() {
     const scheduleTimelineError = validateTimelineForPersist({
         start_date: formData.dates.start,
         end_date: formData.dates.end,
-        close_applications_early: formData.closeApplicationsEarly,
-        application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
     });
 
     const isNgoCreator = isNgoCreatorAccount(orgDetails.organizationType || storedOrgTypeHint());
-    const creatorTypes = isNgoCreator ? NGO_CREATOR_TYPES : PARTNER_CREATOR_TYPES;
+    const isUniversityCreator = storedSignupRole() === "university";
+    const creatorTypes: readonly string[] = isNgoCreator
+        ? NGO_CREATOR_TYPES
+        : isUniversityCreator
+          ? [UNIVERSITY_CREATOR_TYPE, ...PARTNER_CREATOR_TYPES]
+          : PARTNER_CREATOR_TYPES;
     const creatorCopy = isNgoCreator
         ? {
             eyebrow: "CIEL PK · NGO / NONPROFIT COMMUNITY SERVICE",
@@ -1217,7 +1239,7 @@ export default function OpportunityPostingPage() {
             seats: formData.capacity.volunteers,
             start: formData.dates.start,
             end: formData.dates.end,
-            deadline: formData.applicationDeadline,
+            deadline: formData.dates.end,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
             beneficiaryType: bens || "Community",
             responsibilities: formData.activity.responsibilities,
@@ -1309,10 +1331,6 @@ export default function OpportunityPostingPage() {
                                             const timelineErr = validateTimelineForPersist({
                                                 start_date: formData.dates.start,
                                                 end_date: formData.dates.end,
-                                                close_applications_early: formData.closeApplicationsEarly,
-                                                application_deadline: formData.closeApplicationsEarly
-                                                    ? formData.applicationDeadline
-                                                    : formData.dates.end,
                                             });
                                             if (timelineErr) {
                                                 toast.error(timelineErr);
@@ -1688,50 +1706,10 @@ export default function OpportunityPostingPage() {
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
                         </div>
                     </div>
-                    {scheduleTimelineError &&
-                    formData.dates.start &&
-                    formData.dates.end &&
-                    !/application closing/i.test(scheduleTimelineError) ? (
+                    {scheduleTimelineError && formData.dates.start && formData.dates.end ? (
                         <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
                     ) : null}
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                        <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="mt-1"
-                                checked={formData.closeApplicationsEarly}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        closeApplicationsEarly: e.target.checked,
-                                        applicationDeadline: e.target.checked ? formData.applicationDeadline : "",
-                                    })
-                                }
-                            />
-                            <span className="text-sm text-slate-800">
-                                <span className="font-semibold">Close applications before project end date</span>
-                                <span className="block text-xs text-slate-500 mt-0.5">
-                                    Optional. When off, students can join until the project end date.
-                                </span>
-                            </span>
-                        </label>
-                        {formData.closeApplicationsEarly ? (
-                            <div className="mt-3 max-w-sm">
-                                <label className="co-label" style={{ marginTop: 0 }}>Application closing date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.applicationDeadline}
-                                    min={formData.dates.start || undefined}
-                                    max={lastAllowedApplicationCloseDate(formData.dates.end)}
-                                    onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
-                                />
-                                {scheduleTimelineError && /application closing/i.test(scheduleTimelineError) ? (
-                                    <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
-                                ) : null}
-                            </div>
-                        ) : null}
-                    </div>
-<div className="pt-2">
+                    <div className="pt-2">
                         <label className="co-label">Duration type</label>
                         <div className="co-chips mb-3">
                             {(["Fixed dates", "Flexible", "Ongoing"] as const).map((t) => (
@@ -1812,7 +1790,7 @@ export default function OpportunityPostingPage() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be on or after start and before project end; hours, seats, and beneficiaries accept digits only.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; hours, seats, and beneficiaries accept digits only.</span>
                         </div>
                     </div>
                 </div>
@@ -2219,7 +2197,7 @@ export default function OpportunityPostingPage() {
                     <div>
                         <label className="co-label">E2 · Skills gained · tap what applies</label>
                         <div className="co-chips">
-                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map((s) => (
+                            {ORG_SKILL_PRESETS.map((s) => (
                                 <CoChip
                                     key={s}
                                     selected={formData.activity.skills.includes(s)}
@@ -2738,7 +2716,7 @@ export default function OpportunityPostingPage() {
                         <label className="co-label">Participation verification</label>
                         <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will students log as they go? Tap what applies.</p>
                         <div className="co-chips">
-                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
+                            {ORG_VERIFICATION_PRESETS.map((v) => (
                                 <CoChip
                                     key={v}
                                     selected={formData.verification.includes(v)}

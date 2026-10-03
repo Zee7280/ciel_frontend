@@ -193,10 +193,8 @@ export function buildOpportunityRecordFlashcard(
         seats: pickStr(timeline.volunteers_required) || "0",
         start: pickStr(timeline.start_date),
         end: pickStr(timeline.end_date),
-        // Applications close on early deadline if set, otherwise project end (lifecycle rule).
-        deadline:
-            pickStr(timeline.application_deadline) ||
-            pickStr(timeline.end_date),
+        // Applications stay open until the project end date (lifecycle rule).
+        deadline: pickStr(timeline.end_date),
         beneficiariesCount: pickStr(objectives.beneficiaries_count) || "0",
         beneficiaryType: listText(objectives.beneficiaries_type) || pickStr(objectives.beneficiary_group) || "Community members",
         responsibilities: pickStr(activity.student_responsibilities),

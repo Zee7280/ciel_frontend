@@ -1,5 +1,7 @@
 "use client";
 
+import { apiErrorMessage } from "@/utils/apiErrorMessage";
+import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +20,7 @@ import {
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
-import { lastAllowedApplicationCloseDate, validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
+import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
@@ -127,6 +129,8 @@ export default function FacultyOpportunityCreationPage() {
     const formPath = isCielAdminForm ? "/dashboard/admin/create-opportunity" : "/dashboard/faculty/create-opportunity";
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    /** Synchronous double-click guard: isSubmitting is state, so two clicks in one tick can both pass. */
+    const submitInFlightRef = useRef(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     const [isDraftMode, setIsDraftMode] = useState(false);
     /** Set once this visit has been submitted, so the autosave timer cannot write that form back. */
@@ -157,8 +161,6 @@ export default function FacultyOpportunityCreationPage() {
         location: { city: "", venue: "", pin: "" },
         timelineType: "Fixed dates", // fixed, flexible, ongoing
         dates: { start: "", end: "", fromTime: "", endTime: "" },
-        applicationDeadline: "",
-        closeApplicationsEarly: false,
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
 
@@ -262,8 +264,6 @@ export default function FacultyOpportunityCreationPage() {
             const timelineErr = validateTimelineForPersist({
                 start_date: formData.dates.start,
                 end_date: formData.dates.end,
-                close_applications_early: formData.closeApplicationsEarly,
-                application_deadline: formData.applicationDeadline,
             });
             if (timelineErr) {
                 toast.error(timelineErr);
@@ -331,7 +331,11 @@ export default function FacultyOpportunityCreationPage() {
 
     const validateForm = () => {
         if (!facultyDetails.contact.trim()) {
-            toast.error("Contact No. is missing from your profile. Add it under Faculty Profile, then try again.");
+            toast.error(
+                isCielAdminForm
+                    ? "Contact No. is missing from your profile. Add it under your admin Profile, then try again."
+                    : "Contact No. is missing from your profile. Add it under Faculty Profile, then try again.",
+            );
             return false;
         }
         if (!facultyDetails.email.trim() || !isValidEmail(facultyDetails.email)) {
@@ -378,8 +382,6 @@ export default function FacultyOpportunityCreationPage() {
         const timelineErr = validateTimelineForPersist({
             start_date: formData.dates.start,
             end_date: formData.dates.end,
-            close_applications_early: formData.closeApplicationsEarly,
-            application_deadline: formData.applicationDeadline,
         });
         if (timelineErr) {
             toast.error(timelineErr);
@@ -622,10 +624,6 @@ export default function FacultyOpportunityCreationPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
-                    close_applications_early: !!formData.closeApplicationsEarly,
-                    application_deadline: formData.closeApplicationsEarly
-                        ? formData.applicationDeadline || undefined
-                        : null,
                     schedule_notes: formData.scheduleNotes.trim() || undefined,
                     ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
                         ? {
@@ -633,8 +631,8 @@ export default function FacultyOpportunityCreationPage() {
                               ...(formData.dates.endTime.trim() ? { to_time: formData.dates.endTime.trim() } : {}),
                           }
                         : {}),
-                    expected_hours: parseInt(formData.capacity.hours) || 0,
-                    volunteers_required: parseInt(formData.capacity.volunteers) || 0
+                    expected_hours: parseInt(formData.capacity.hours) || undefined,
+                    volunteers_required: parseInt(formData.capacity.volunteers) || undefined
                 },
                 sdg: formData.sdg,
                 sdg_info: {
@@ -658,7 +656,7 @@ export default function FacultyOpportunityCreationPage() {
                     hook: formData.hook.trim(),
                     outputs: formData.objectives.outputs.trim(),
                     outcome: formData.objectives.outcome.trim() || undefined,
-                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
+                    beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || undefined,
                     beneficiaries_type: otherBeneficiaryMerged
                 },
                 activity_details: {
@@ -731,7 +729,7 @@ export default function FacultyOpportunityCreationPage() {
                               semester: formData.academicLinkage.semester.trim() || null,
                           },
                       }
-                    : {}),
+                    : { academic_linkage: null }), // cleared fields must clear the stored value on edit
                 submission_confirmations: {
                     academically_valid_and_accurately_described: formData.finalConfirmations.academicallyValid,
                     activity_properly_supervised: formData.finalConfirmations.properlySupervised,
@@ -753,8 +751,10 @@ export default function FacultyOpportunityCreationPage() {
 
     const handleSubmit = async () => {
         if (isLoadingEdit) return;
+        if (submitInFlightRef.current) return;
         if (!validateForm()) return;
 
+        submitInFlightRef.current = true;
         setIsSubmitting(true);
         try {
             const payload = buildOpportunityPayload();
@@ -825,6 +825,7 @@ export default function FacultyOpportunityCreationPage() {
             console.error("Error submitting form", error);
             toast.error("An error occurred. Please try again.");
         } finally {
+            submitInFlightRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -851,10 +852,7 @@ export default function FacultyOpportunityCreationPage() {
                 (data as { data?: { id?: string } } | null)?.data?.id ||
                 (data as { id?: string } | null)?.id;
             if (!res?.ok || !newId) {
-                const msg =
-                    typeof (data as { message?: unknown } | null)?.message === "string"
-                        ? (data as { message: string }).message
-                        : "Could not save this draft.";
+                const msg = apiErrorMessage(data, "Could not save this draft.");
                 toast.warning(msg);
                 return;
             }
@@ -1169,8 +1167,6 @@ export default function FacultyOpportunityCreationPage() {
     const scheduleTimelineError = validateTimelineForPersist({
         start_date: formData.dates.start,
         end_date: formData.dates.end,
-        close_applications_early: formData.closeApplicationsEarly,
-        application_deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
     });
 
     const flashcardModel = useMemo(() => {
@@ -1220,7 +1216,7 @@ export default function FacultyOpportunityCreationPage() {
             seats: formData.capacity.volunteers,
             start: formData.dates.start,
             end: formData.dates.end,
-            deadline: formData.closeApplicationsEarly ? formData.applicationDeadline : formData.dates.end,
+            deadline: formData.dates.end,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
             beneficiaryType: bens || "Community",
             responsibilities: formData.activity.responsibilities,
@@ -1339,8 +1335,6 @@ export default function FacultyOpportunityCreationPage() {
                                             const timelineErr = validateTimelineForPersist({
                                                 start_date: formData.dates.start,
                                                 end_date: formData.dates.end,
-                                                close_applications_early: formData.closeApplicationsEarly,
-                                                application_deadline: formData.applicationDeadline,
                                             });
                                             if (timelineErr) {
                                                 toast.error(timelineErr);
@@ -1654,49 +1648,9 @@ export default function FacultyOpportunityCreationPage() {
                             {timelineEndWeekdayLabel ? <p className="mt-1 text-xs text-slate-500">{timelineEndWeekdayLabel}</p> : null}
                         </div>
                     </div>
-                    {scheduleTimelineError &&
-                    formData.dates.start &&
-                    formData.dates.end &&
-                    !/application closing/i.test(scheduleTimelineError) ? (
+                    {scheduleTimelineError && formData.dates.start && formData.dates.end ? (
                         <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
                     ) : null}
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                        <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="mt-1"
-                                checked={formData.closeApplicationsEarly}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        closeApplicationsEarly: e.target.checked,
-                                        applicationDeadline: e.target.checked ? formData.applicationDeadline : "",
-                                    })
-                                }
-                            />
-                            <span className="text-sm text-slate-800">
-                                <span className="font-semibold">Close applications before project end date</span>
-                                <span className="block text-xs text-slate-500 mt-0.5">
-                                    Optional. When off, students can join until the project end date.
-                                </span>
-                            </span>
-                        </label>
-                        {formData.closeApplicationsEarly ? (
-                            <div className="mt-3 max-w-sm">
-                                <label className="co-label" style={{ marginTop: 0 }}>Application closing date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.applicationDeadline}
-                                    min={formData.dates.start || undefined}
-                                    max={lastAllowedApplicationCloseDate(formData.dates.end)}
-                                    onChange={(e) => setFormData({ ...formData, applicationDeadline: e.target.value })}
-                                />
-                                {scheduleTimelineError && /application closing/i.test(scheduleTimelineError) ? (
-                                    <p className="mt-1 text-xs text-red-600">{scheduleTimelineError}</p>
-                                ) : null}
-                            </div>
-                        ) : null}
-                    </div>
                     <div className="pt-2">
                         <label className="co-label">Duration type</label>
                         <div className="co-chips mb-3">
@@ -1778,7 +1732,7 @@ export default function FacultyOpportunityCreationPage() {
                             />
                         </div>
                         <div className="co-note aqua mt-3">
-                            <span><b>Checks:</b> project end cannot be before project start; if early close is on, application closing date must be on or after start and before project end; hours, seats, and beneficiaries accept digits only. Reporting window opens automatically for 60 days after project end.</span>
+                            <span><b>Checks:</b> project end cannot be before project start; hours, seats, and beneficiaries accept digits only. Reporting window opens automatically for 60 days after project end.</span>
                         </div>
                     </div>
                 </div>
@@ -2219,7 +2173,7 @@ export default function FacultyOpportunityCreationPage() {
                     <div>
                         <label className="co-label">E2 · Skills gained · tap what applies</label>
                         <div className="co-chips">
-                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map((s) => (
+                            {ORG_SKILL_PRESETS.map((s) => (
                                 <CoChip
                                     key={s}
                                     selected={formData.activity.skills.includes(s)}
@@ -2560,7 +2514,7 @@ export default function FacultyOpportunityCreationPage() {
                         <label className="co-label">Participation verification</label>
                         <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will students log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
                         <div className="co-chips">
-                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
+                            {ORG_VERIFICATION_PRESETS.map((v) => (
                                 <CoChip
                                     key={v}
                                     selected={formData.verification.includes(v)}
@@ -2626,7 +2580,11 @@ export default function FacultyOpportunityCreationPage() {
                             ["one_depts", "🏫", "One University · Selected Departments", "Restrict to defined programmes."],
                             ["own_uni_all", "🏠", "My University · All Departments", `Open applications to all eligible students in ${facultyDetails.institution || "your university"}.`],
                             ["own_dept", "👩‍🏫", "My Department / Programme Only", "Restrict applications to your academic unit."],
-                        ] as const).map(([scope, ico, title, sub]) => (
+                        ] as const)
+                            // "My university / department" is meaningless for CIEL PK admins (their institution is
+                            // the platform itself, so no student's university would ever match).
+                            .filter(([scope]) => !(isCielAdminForm && (scope === "own_uni_all" || scope === "own_dept")))
+                            .map(([scope, ico, title, sub]) => (
                             <button
                                 key={scope}
                                 type="button"

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authApiErrorMessage } from "@/utils/authApiError";
 
-const PUBLIC_SIGNUP_ROLES = new Set(["student", "faculty", "university", "ngo", "corporate"]);
+const PUBLIC_SIGNUP_ROLES = new Set(["student", "faculty", "university", "ngo", "corporate", "investor"]);
 
 export async function POST(request: Request) {
     try {

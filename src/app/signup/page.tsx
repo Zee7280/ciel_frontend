@@ -382,6 +382,10 @@ function SignUpContent() {
                     countryCode: dialFromPhoneCountryKey(phoneCountryKey),
                     email: normalizedEmail,
                     role: apiRole,
+                    // The backend refuses signup without explicit acceptance (investors accept via their three agreements).
+                    acceptedTerms: isInvestor
+                        ? investor.agreePlatform && investor.agreePrivacy && investor.agreeAuthority
+                        : consent,
                     name: isOrgRole ? formData.contactPerson.trim() : formData.name.trim(),
                     orgName: formData.orgName.trim(),
                     orgType: isOrgRole ? signupApiRole(role) : formData.orgType,
