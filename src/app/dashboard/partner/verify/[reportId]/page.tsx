@@ -18,6 +18,7 @@ import { prepareReportForVerifyDossier } from '@/utils/reportTeamScope';
 import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
 import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
+import { getStoredCurrentUserRole } from "@/utils/currentUser";
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import type { ReportData } from '../../../student/report/context/ReportContext';
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from '../../../student/report/utils/reportSdgMerge';
@@ -444,7 +445,8 @@ export default function ReportDetailPage() {
         );
     }
 
-    const canSubmitDecision = partnerCanSubmitDecision(report);
+    // University reviews are read-only: Approve / Reject stay with CIEL PK Admin.
+    const canSubmitDecision = partnerCanSubmitDecision(report) && getStoredCurrentUserRole() !== "university";
     const waitingOnFaculty =
         !canSubmitDecision &&
         !facultyHasApprovedReport(report) &&

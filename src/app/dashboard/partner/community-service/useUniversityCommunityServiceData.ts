@@ -219,6 +219,14 @@ export function useUniversityCommunityServiceData() {
     const liveRows = useMemo(() => pipeline.filter((r) => isFacultyCommunityLiveCard(r)), [pipeline]);
     const waiting = useMemo(() => pipeline.filter((r) => isFacultyCommunityWaiting(r)), [pipeline]);
     const closedReports = useMemo(() => pipeline.filter((r) => isCommunityReportRejected(r)), [pipeline]);
+    // Reports students are still writing: progress only (the backend strips their answers).
+    const draftRows = useMemo(
+        () =>
+            pipeline
+                .filter((r) => r.is_submitted === false || ["draft", "continue"].includes(String(r.status || "").toLowerCase()))
+                .sort((x, y) => (y.progress_pct ?? 0) - (x.progress_pct ?? 0)),
+        [pipeline],
+    );
     const decidedReports = useMemo(
         () => pipeline.filter((r) => isFacultyCommunityLiveCard(r) || isCommunityReportRejected(r)),
         [pipeline],
@@ -260,6 +268,7 @@ export function useUniversityCommunityServiceData() {
         publishedMine,
         pipeline,
         waiting,
+        draftRows,
         liveRows,
         closedReports,
         decidedReports,

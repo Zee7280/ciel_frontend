@@ -25,6 +25,7 @@ import AdminNationalRankingStudio from "@/components/ciel/community-service/Admi
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import FacultyReportReviewCard from "@/components/ciel/community-service/FacultyReportReviewCard";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
@@ -71,7 +72,7 @@ type CsView = (typeof CS_VIEWS)[number];
 const CREATE_FORM = "/dashboard/admin/create-opportunity";
 const CREATE_TABS = ["drafts", "review", "action", "published", "closed"] as const;
 type CreateTab = (typeof CREATE_TABS)[number];
-const PROJECT_TABS = ["approval", "active", "verified", "closed"] as const;
+const PROJECT_TABS = ["approval", "progress", "active", "verified", "closed"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: string }> = {
@@ -518,6 +519,14 @@ export function AdminCommunityServiceHub() {
         [pipeline],
     );
     const closedReports = useMemo(() => pipeline.filter((r) => isCommunityReportRejected(r)), [pipeline]);
+    // Reports students are still writing — Admin can open them; everyone else waits for submit.
+    const draftRows = useMemo(
+        () =>
+            pipeline
+                .filter((r) => r.is_submitted === false || ["draft", "continue"].includes(String(r.status || "").toLowerCase()))
+                .sort((a, b) => (b.progress_pct ?? 0) - (a.progress_pct ?? 0)),
+        [pipeline],
+    );
     const revisionReportRows = useMemo(() => reportRows.filter(isAdminCsReportRevision), [reportRows]);
     const pendingReportRows = useMemo(
         () =>
@@ -877,6 +886,7 @@ export function AdminCommunityServiceHub() {
                     <HubTabs
                         tabs={[
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
+                            { id: "progress", label: "In progress", count: draftRows.filter(filterProject).length },
                             { id: "active", label: "Active reports", count: inPipe.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
                             { id: "closed", label: "Closed", count: closedReports.filter(filterProject).length },
@@ -905,6 +915,26 @@ export function AdminCommunityServiceHub() {
                                             </small>
                                         </div>
                                     </Link>
+                                ))}
+                            </div>
+                        )
+                    ) : projectTab === "progress" ? (
+                        draftRows.filter(filterProject).length === 0 ? (
+                            <EmptyPanel title="Nothing in progress" text="Reports students have started but not yet submitted appear here with how much is filled." />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {draftRows.filter(filterProject).map((r) => (
+                                    <ReportProgressCard
+                                        key={r.id}
+                                        href={reportHref(r.id)}
+                                        title={r.project_title || "Report"}
+                                        student={r.student_name || "Student"}
+                                        org={r.organization_name}
+                                        hours={r.hours}
+                                        progressPct={r.progress_pct ?? 0}
+                                        sectionsComplete={r.sections_complete}
+                                        sectionsTotal={r.sections_total}
+                                    />
                                 ))}
                             </div>
                         )

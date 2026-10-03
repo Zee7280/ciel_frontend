@@ -25,8 +25,8 @@ import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChr
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
+import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
-import FacultyReportReviewCard from "@/components/ciel/community-service/FacultyReportReviewCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
@@ -36,13 +36,12 @@ import {
     useFacultyOpportunityReviewActions,
 } from "@/components/faculty/FacultyOpportunityReviewActions";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
-import { isCommunityReportRejected, isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
-import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { formatOpportunityCode } from "@/utils/displayIds";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
-import { CII_V2_LEVELS } from "@/utils/communityCiiAnalyser";
 
 const CS_VIEWS = [
     "home",
@@ -319,6 +318,7 @@ function FacultyCommunityServiceHub() {
     const {
         loading,
         rows,
+        draftRows,
         mineRows,
         pendingOppRows,
         linkedDraftRows,
@@ -327,9 +327,6 @@ function FacultyCommunityServiceHub() {
         historyAppRows,
         hoursProjectCount,
         liveRows,
-        pendingReports,
-        revisionReports,
-        decidedReports,
         activeProjects,
         revisionOpps,
         deckCards,
@@ -356,6 +353,11 @@ function FacultyCommunityServiceHub() {
     useEffect(() => {
         setInnerTab(tabParam);
     }, [tabParam, view]);
+
+    // Report review is Admin / University only. Old faculty links land on Projects instead.
+    useEffect(() => {
+        if (view === "reports" || view === "pending") router.replace(`${CS_BASE}?view=projects`);
+    }, [view, router]);
 
     const opportunityParam = searchParams.get("opportunity") || searchParams.get("id") || "";
     const openOpportunityDetail = reviewActions.openOpportunityDetail;
@@ -400,14 +402,6 @@ function FacultyCommunityServiceHub() {
             tone: pendingApps ? "warn" : "default",
         },
         {
-            key: "reports",
-            n: pendingReports.length,
-            title: "Reports for review",
-            sub: "Locked report received · waiting on CIEL PK Admin",
-            href: `${CS_BASE}?view=reports&tab=pending`,
-            tone: pendingReports.length ? "bad" : "default",
-        },
-        {
             key: "hours",
             n: hoursProjectCount,
             title: "Projects with members below hours",
@@ -432,10 +426,7 @@ function FacultyCommunityServiceHub() {
         | "published"
         | "closed";
     const reviewTab = ["linked", "opps", "revision", "apps", "done"].includes(innerTab) ? innerTab : "opps";
-    const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
-    const reportTab = ["pending", "rev", "done", "rejected"].includes(innerTab) ? innerTab : "pending";
-    const approvedReports = decidedReports.filter((row) => !isCommunityReportRejected(row));
-    const rejectedReports = decidedReports.filter((row) => isCommunityReportRejected(row));
+    const projectTab = ["active", "progress", "verified", "all"].includes(innerTab) ? innerTab : "active";
 
     const crumb = VIEW_CRUMB[view];
     const showHomeHero = view === "home";
@@ -453,7 +444,7 @@ function FacultyCommunityServiceHub() {
                     stats={[
                         { value: String(pendingApprovalsHero), label: "Pending approvals", href: `${CS_BASE}?view=review` },
                         { value: String(activeProjects.length), label: "Active projects", href: `${CS_BASE}?view=projects` },
-                        { value: String(pendingReports.length), label: "Reports to review", href: `${CS_BASE}?view=reports` },
+                        { value: String(draftRows.length), label: "Reports in progress", href: `${CS_BASE}?view=projects&tab=progress` },
                         { value: String(deckCards.length), label: "Verified impact", href: `${CS_BASE}?view=impact` },
                     ]}
                     rightStat={{ value: "🌱", label: "Academic Community Service workflow" }}
@@ -499,16 +490,6 @@ function FacultyCommunityServiceHub() {
                             subtitle="Monitor approved projects, report progress, member hours, last activity and reminders."
                             badge="TRACK"
                             background={MOCKUP_GRADIENTS.navy}
-                        />
-                        <MockupActionCard
-                            href={`${CS_BASE}?view=reports`}
-                            emoji="📝"
-                            ghost="📝"
-                            title="Reports for Review"
-                            subtitle="Read-only faculty review of submitted report packages. Final Approve / Revise / Reject live only on CIEL PK Admin."
-                            badge="READ ONLY"
-                            background={MOCKUP_GRADIENTS.red}
-                            hot={pendingReports.length > 0}
                         />
                         <MockupActionCard
                             href={`${CS_BASE}?view=impact`}
@@ -884,6 +865,7 @@ function FacultyCommunityServiceHub() {
                     <HubTabs
                         tabs={[
                             { id: "active", label: "Active", count: activeProjects.length },
+                            { id: "progress", label: "In progress", count: draftRows.length },
                             { id: "verified", label: "Verified", count: liveRows.length },
                             { id: "all", label: "All", count: rows.length },
                         ]}
@@ -892,6 +874,25 @@ function FacultyCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading projects…</p>
+                    ) : projectTab === "progress" ? (
+                        draftRows.length === 0 ? (
+                            <EmptyPanel title="Nothing in progress" text="Reports your students have started but not submitted appear here with how much is filled. A report opens for you only after the student submits it." />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {draftRows.map((row) => (
+                                    <ReportProgressCard
+                                        key={row.id}
+                                        title={row.project_title}
+                                        student={row.student_name}
+                                        org={row.organization_name}
+                                        hours={row.hours}
+                                        progressPct={row.progress_pct}
+                                        sectionsComplete={row.sections_complete}
+                                        sectionsTotal={row.sections_total}
+                                    />
+                                ))}
+                            </div>
+                        )
                     ) : (
                         (() => {
                             const list =
@@ -935,99 +936,6 @@ function FacultyCommunityServiceHub() {
                 </div>
             )}
 
-            {(view === "reports" || view === "pending") && (
-                <div>
-                    <MockupSectionHead
-                        title="Reports for Review"
-                        subtitle="Read-only faculty review. Open the locked Flashcard + Detailed Report. Final decision controls stay with CIEL PK Admin."
-                    />
-                    <UserGuideBanner {...FACULTY_CS_GUIDES.reports} />
-                    <div className="mb-3 rounded-[14px] border border-[#b7d3e8] bg-[#eef6fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#2f5b86]">
-                        <b>Architecture retained:</b> Pending Review → Revision with Student → Decided remain in their original location.{" "}
-                        Final decision controls are disabled here and live only on CIEL PK / Super Admin.
-                    </div>
-                    <div className="mb-3 rounded-[14px] border border-[#cfe6ef] bg-[#f3f9fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#3e515b]">
-                        <b>CII recognition scale — locked to the live analyser:</b>{" "}
-                        {CII_V2_LEVELS.map((lvl, i) => (
-                            <span key={lvl.level}>
-                                {i > 0 ? " · " : null}
-                                <b>
-                                    L{lvl.level} · {lvl.min === 0 ? "0" : String(lvl.min)}–{Math.floor(lvl.max)}
-                                </b>{" "}
-                                {lvl.name}
-                            </span>
-                        ))}
-                        <span className="mt-1 block text-[11px] text-[#6b7c86]">
-                            Highest levels require quality gates; the numerical total alone is not enough. Faculty views the package; CIEL PK Admin runs analysis and decides.
-                        </span>
-                    </div>
-                    <HubTabs
-                        tabs={[
-                            { id: "pending", label: "Pending review", count: pendingReports.length },
-                            { id: "rev", label: "Revision with student", count: revisionReports.length },
-                            { id: "done", label: "Approved", count: approvedReports.length },
-                            { id: "rejected", label: "Rejected", count: rejectedReports.length },
-                        ]}
-                        active={view === "pending" ? "pending" : reportTab}
-                        onChange={setHubTab}
-                    />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading reports…</p>
-                    ) : (
-                        (() => {
-                            const list =
-                                reportTab === "rev"
-                                    ? revisionReports
-                                    : reportTab === "rejected"
-                                      ? rejectedReports
-                                      : reportTab === "done"
-                                        ? approvedReports
-                                        : pendingReports;
-                            if (!list.length) {
-                                return (
-                                    <EmptyPanel
-                                        title={reportTab === "pending" ? "No reports waiting" : "None"}
-                                        text={
-                                            reportTab === "pending"
-                                                ? "Submitted reports arrive here as a locked Flashcard + Detailed Report. Faculty can open and view; CIEL PK Admin runs analysis and decides."
-                                                : reportTab === "rev"
-                                                  ? "Reports you return for correction stay here until the student resubmits."
-                                                  : reportTab === "rejected"
-                                                    ? "Permanently rejected reports stay here. They are not verified impact."
-                                                    : "Approved reports stay here for history."
-                                        }
-                                    />
-                                );
-                            }
-                            return (
-                                <div className="grid grid-cols-1 gap-3">
-                                    {list.map((row) => (
-                                        <div key={row.id}>
-                                            <FacultyReportReviewCard
-                                                row={row}
-                                                mode={
-                                                    reportTab === "rev"
-                                                        ? "revision"
-                                                        : reportTab === "done" || reportTab === "rejected"
-                                                          ? "decided"
-                                                          : "pending"
-                                                }
-                                            />
-                                            {reportTab === "rev" ? (
-                                                <FacultyRemindButtons email={row.student_email} title={row.project_title} />
-                                            ) : null}
-                                            <FacultyAttendanceLink projectId={row.project_id} />
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        })()
-                    )}
-                    <Link href={`${REPORTS}?tab=waiting`} className="mt-4 inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
-                        Open full reports table →
-                    </Link>
-                </div>
-            )}
 
             {(view === "impact" || view === "approved") && (
                 <div>
