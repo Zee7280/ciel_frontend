@@ -199,10 +199,13 @@ export default function FacultyAiEvaluationConsole() {
         <div className="fae">
             <div className="fae-wrap fae-screen">
                 <div className="fae-logo">
-                    CIEL <span>PK</span> · AI Evaluation Mechanism{" "}
-                    <span className="fae-vtag" style={{ marginLeft: 6 }}>
-                        EVALUATOR {model.frameworkVersion} · RECOGNITION-FIRST
-                    </span>
+                    <img src="/iel-pk-logo.png" alt="CIEL PK" width={44} height={44} />
+                    <div>
+                        CIEL <span>PK</span> · AI Evaluation Mechanism{" "}
+                        <span className="fae-vtag" style={{ marginLeft: 6 }}>
+                            EVALUATOR {model.frameworkVersion} · RECOGNITION-FIRST
+                        </span>
+                    </div>
                 </div>
                 <div className="fae-sub">
                     Faculty read-only view. Open the locked package and scores. Analysis, Approve, Request revision and Reject stay with CIEL PK Admin.

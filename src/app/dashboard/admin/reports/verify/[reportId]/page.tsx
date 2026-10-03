@@ -87,6 +87,9 @@ import ReportEvidenceGallery, {
     type ReportEvidenceGalleryItem,
 } from "@/components/ciel/community-service/ReportEvidenceGallery";
 
+/** Super Admin review uses Impact Package. Flip to true to restore sections 1–9 + print dossier. */
+const SHOW_ADMIN_LEGACY_DOSSIER = false;
+
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
     if (!raw) return fallback;
@@ -197,6 +200,10 @@ interface ReportDetail {
     private_candidate?: boolean;
     review_route?: string;
     ciiV2Lock?: { locked?: boolean } | null;
+    ciiV2?: {
+        final?: number | string;
+        level?: { name?: string; level?: number } | null;
+    } | null;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
     section3: ReportData["section3"];
@@ -742,6 +749,18 @@ function AdminReportDetailPage() {
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
         try {
+            const analyserFinal = Number(report.ciiV2?.final);
+            if (Number.isFinite(analyserFinal)) {
+                const analyserLevel =
+                    (typeof report.ciiV2?.level?.name === "string" && report.ciiV2.level.name.trim()) ||
+                    "";
+                return {
+                    totalScore: Math.round(analyserFinal * 10) / 10,
+                    level: analyserLevel || "Analyzer CII",
+                    cii_score_max: 100,
+                    evaluation_framework_version: "v3.1-balanced",
+                };
+            }
             const persisted = readPersistedCiiSnapshot(report);
             const reqH =
                 typeof report.required_hours === "number" && report.required_hours > 0
@@ -1401,6 +1420,7 @@ function AdminReportDetailPage() {
                 </div>
 
                 {/* Report sections (form tabs 1–9) + flash/print (10) */}
+                {SHOW_ADMIN_LEGACY_DOSSIER ? (
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky table of contents */}
                     <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
@@ -2315,6 +2335,7 @@ function AdminReportDetailPage() {
                         </div>
                     </div>
                 </div>
+                ) : null}
 
                 <div
                     id="actions"
@@ -2327,7 +2348,7 @@ function AdminReportDetailPage() {
                         <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
                         <h3 className="mb-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student report approval</h3>
                         <p className="mb-5 text-sm font-medium text-slate-600">
-                            Review all sections above before making a final determination on this impact report.
+                            Review the Impact Package above before making a final determination on this impact report.
                         </p>
                         {ciiSnapshot ? (
                             <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">

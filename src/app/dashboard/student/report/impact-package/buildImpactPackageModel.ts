@@ -664,3 +664,9 @@ export function shouldShowImpactPackageAnalysis(audience: ImpactPackageAudience,
     const st = String(data.admin_status || data.admin_approval_status || data.status || "").toLowerCase();
     return st === "approved" || st === "verified";
 }
+
+/** Student sees the compiled detailed report only after Super Admin approval. Faculty / admin / university / partner keep it for review. */
+export function shouldShowImpactPackageDetailedReport(audience: ImpactPackageAudience, adminApproved: boolean): boolean {
+    if (audience === "student") return adminApproved;
+    return true;
+}

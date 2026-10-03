@@ -10,13 +10,21 @@ export function isImpactPackageTab(value: unknown): value is ImpactPackageTab {
     return value === "flash" || value === "report" || value === "evidence" || value === "analysis";
 }
 
+export function clampImpactPackageTab(
+    requested: ImpactPackageTab,
+    allowed: readonly ImpactPackageTab[],
+): ImpactPackageTab {
+    return allowed.includes(requested) ? requested : "flash";
+}
+
 export function tabFromPackageQuery(view: string | null | undefined, hash?: string): ImpactPackageTab {
     const fromHash = String(hash || "").replace(/^#/, "").trim().toLowerCase();
     if (isImpactPackageTab(fromHash)) return fromHash;
     const v = String(view || "").trim().toLowerCase();
-    if (v === "print" || v === "report") return "report";
+    if (v === "print" || v === "report" || v === "v17") return "report";
     if (v === "evidence" || v === "gallery") return "evidence";
     if (v === "cii-v2" || v === "analysis" || v === "analyser") return "analysis";
+    if (v === "package" || v === "flash" || v === "certificate") return "flash";
     return "flash";
 }
 

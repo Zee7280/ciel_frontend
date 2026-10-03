@@ -22,6 +22,8 @@ import { findSdgById } from '@/utils/sdgData';
 import {
     LADDER_STEPS,
     OVERLAP_CHIPS,
+    SHORT_NOTE_MIN_WORDS,
+    SHORT_NOTE_MAX_WORDS,
     SURE_OPTIONS,
     FAM_OUTPUT_HINTS,
     FAM_BEN_HINTS,
@@ -153,8 +155,18 @@ function withCurrent(list: string[], current: unknown): string[] {
     return cur && !list.includes(cur) ? [...list, cur] : list;
 }
 
-function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
-    const meter = reportTextWordMeter(count, 15, 60);
+function WordMeterBar({
+    count,
+    min,
+    max,
+    extra,
+}: {
+    count: number;
+    min: number;
+    max: number;
+    extra?: string;
+}) {
+    const meter = reportTextWordMeter(count, min, max);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
@@ -164,7 +176,7 @@ function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
                 />
             </div>
             <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / 60 words{extra ? ` · ${extra}` : ""}
+                {count} / {min}–{max} words{extra ? ` · ${extra}` : ""}
             </p>
         </div>
     );
@@ -528,6 +540,7 @@ function ActivityLadderCard({
     const open = readLadderOpen(activity);
     const allBen = readLadderAllBen(activity);
     const descWords = ladderWordCount(activity.description);
+    const overlapWords = ladderWordCount(activity.overlap_note);
     const ok1 = step1Ok(activity);
     const ok2 = step2Ok(activity);
     const ok3 = step3Ok(activity);
@@ -804,7 +817,7 @@ function ActivityLadderCard({
                                             <div className={clsx('wc', descWords > 60 && 'warn')}>
                                                 {descWords} WORDS · TARGET 15–60{descWords > 60 ? ' — TRIM IT' : ''}
                                             </div>
-                                            <WordMeterBar count={descWords} extra="15–60 words required" />
+                                            <WordMeterBar count={descWords} min={15} max={60} extra="15–60 words required" />
                                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
 
                                             {activity.primary_category ? (
@@ -1045,12 +1058,20 @@ function ActivityLadderCard({
                                                         ))}
                                                     </div>
                                                     {activity.overlap_status && !/mostly unique/i.test(activity.overlap_status) ? (
-                                                        <Input
-                                                            placeholder="Who overlaps? e.g. the same 40 children attended activities 1 and 2"
-                                                            value={activity.overlap_note || ''}
-                                                            onChange={(e) => update('overlap_note', e.target.value)}
-                                                            className={clsx(inputClasses, 'mt-1.5')}
-                                                        />
+                                                        <div className="mt-1.5 space-y-1.5">
+                                                            <Textarea
+                                                                placeholder="Who overlaps? e.g. the same children attended literacy sessions and the weekend club."
+                                                                value={activity.overlap_note || ''}
+                                                                onChange={(e) => update('overlap_note', e.target.value)}
+                                                                className={textareaClasses}
+                                                            />
+                                                            <WordMeterBar
+                                                                count={overlapWords}
+                                                                min={SHORT_NOTE_MIN_WORDS}
+                                                                max={SHORT_NOTE_MAX_WORDS}
+                                                            />
+                                                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.overlap_note`)} />
+                                                        </div>
                                                     ) : null}
 
                                                     <div className="ladQ">How did you count them? <span className="reqstar">*</span></div>
@@ -1224,12 +1245,20 @@ function ActivityLadderCard({
                                                                 </button>
                                                             ))}
                                                         </div>
-                                                        <div className="ladQ">Proof — where do these two numbers come from? <span className="reqstar">*</span><small>A short note is enough — a register, a record, a partner confirmation.</small></div>
-                                                        <Input
-                                                            placeholder="e.g. attendance register, 4 weeks before vs after · photos in Section 7"
+                                                        <div className="ladQ">
+                                                            Proof — where do these two numbers come from? <span className="reqstar">*</span>
+                                                            <small>{SHORT_NOTE_MIN_WORDS}–{SHORT_NOTE_MAX_WORDS} words. A short note is enough — a register, a record, a partner confirmation.</small>
+                                                        </div>
+                                                        <Textarea
+                                                            placeholder="e.g. attendance register kept for four weeks before vs after, with photos in Section 7"
                                                             value={o.measurement_explanation || ''}
                                                             onChange={(e) => updateOutcome(idx, { measurement_explanation: e.target.value })}
-                                                            className={inputClasses}
+                                                            className={textareaClasses}
+                                                        />
+                                                        <WordMeterBar
+                                                            count={ladderWordCount(o.measurement_explanation || '')}
+                                                            min={SHORT_NOTE_MIN_WORDS}
+                                                            max={SHORT_NOTE_MAX_WORDS}
                                                         />
                                                         {!outcomeLadderOk(o) ? (
                                                             <p className="ladHint" style={{ color: '#b42318' }}>Incomplete — finish the number, how sure, and proof, or delete this result.</p>

@@ -3,7 +3,7 @@
  * Updated for the 11-Section Community Engagement Report
  */
 
-import { outputRowOk, step3Ok, stepNeedText } from './section4Ladder';
+import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 
 export interface ValidationError {
@@ -36,8 +36,10 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
     description: { min: 15, max: 60 },
-    /** Section 4 'Proof' one-liner (where the before/after numbers come from). */
-    measurement_explanation: { min: 3, max: 200 },
+    /** Confidence / proof note — 20 words is enough; keep it short. */
+    measurement_explanation: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
+    /** Overlap note when the same people appear in another activity. */
+    overlap_note: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
     /** Step 7 extra-evidence caption — UI meter is 10–45 words. */
     evidence_caption: { min: 10, max: 45 },
 };

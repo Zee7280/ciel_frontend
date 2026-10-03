@@ -14,6 +14,7 @@ import { resolveCiiLevelBadge } from "@/utils/ciiLevelBadge";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
+import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -104,9 +105,42 @@ type WallRow = {
 };
 
 function studentV17Href(r: Pick<WallRow, "project_id" | "opportunity_id" | "actions">): string | null {
-    if (r.actions?.v17_url) return r.actions.v17_url;
-    const id = r.project_id || r.opportunity_id;
-    return id ? `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}&view=v17` : null;
+    return studentImpactPackageHref(r.project_id || r.opportunity_id, "v17") || r.actions?.v17_url || null;
+}
+
+function WallAction({
+    href,
+    label,
+    solid,
+    external,
+}: {
+    href: string | null;
+    label: string;
+    solid?: boolean;
+    external?: boolean;
+}) {
+    const cls = solid
+        ? "rounded-[9px] bg-[#174b43] px-2.5 py-1.5 text-[9px] font-black text-white"
+        : "rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]";
+    if (!href) {
+        return (
+            <button type="button" onClick={() => toast.message(`${label} is not available yet`)} className={cls}>
+                {label}
+            </button>
+        );
+    }
+    if (external) {
+        return (
+            <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+                {label}
+            </a>
+        );
+    }
+    return (
+        <Link href={href} className={cls}>
+            {label}
+        </Link>
+    );
 }
 
 type FlashState = {
@@ -173,6 +207,7 @@ type FlashState = {
         note?: string;
     }>;
     reportId?: string;
+    projectId?: string | null;
 };
 
 function yearOf(iso?: string): string {
@@ -215,14 +250,6 @@ function sdgLine(nums: number[]): string {
 function studentName(): string {
     const user = readStoredCurrentUser();
     return typeof user?.name === "string" && user.name.trim() ? user.name.trim() : "Student";
-}
-
-function openOrToast(url: string | null | undefined, empty: string) {
-    if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
-        return;
-    }
-    toast.message(empty);
 }
 
 type CiiFeedbackShape = NonNullable<NonNullable<WallRow["ciiV2"]>["studentFeedback"]>;
@@ -450,18 +477,10 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                 </div>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-3">
-                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.pdf, "PDF is not attached yet")}>
-                                    PDF Report
-                                </button>
-                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.evidence, "Evidence files open from the report")}>
-                                    Evidence
-                                </button>
-                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.certificate, "Certificate is not ready yet")}>
-                                    Certificate
-                                </button>
-                                <button type="button" className="rounded-[8px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]" onClick={() => openOrToast(flash.qr, "QR verification is not issued yet")}>
-                                    QR Code
-                                </button>
+                                <WallAction href={studentImpactPackageHref(flash.projectId, "print") || flash.pdf || null} label="PDF Report" />
+                                <WallAction href={studentImpactPackageHref(flash.projectId, "evidence") || flash.evidence || null} label="Evidence" />
+                                <WallAction href={studentImpactPackageHref(flash.projectId, "certificate") || flash.certificate || null} label="Certificate" />
+                                <WallAction href={flash.qr || null} label="QR Code" external={Boolean(flash.qr)} />
                             </div>
                         </div>
                     </div>
@@ -894,6 +913,7 @@ export default function CommunityImpactWall(_props: {
             flashcard,
             independentAnalyses,
             reportId: r.id,
+            projectId: r.project_id || r.opportunity_id || null,
         });
     };
 
@@ -924,10 +944,6 @@ export default function CommunityImpactWall(_props: {
                         const year = yearOf(r.created_at);
                         const sdgs = sdgNumbers(r.sdgs);
                         const uni = r.university || r.organization_name || "Community Service";
-                        const reportHref =
-                            r.project_id || r.opportunity_id
-                                ? `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id))}`
-                                : null;
                         const extraBadges = r.awardBadges || [];
                         return (
                             <article key={r.id} className="overflow-hidden rounded-[20px] border border-[#dde5ea] bg-white shadow-[0_7px_18px_rgba(23,49,57,.05)]">
@@ -979,31 +995,32 @@ export default function CommunityImpactWall(_props: {
                                         </div>
                                     ) : null}
                                     <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-2.5">
-                                        <button type="button" onClick={() => openFlash(r)} className="rounded-[9px] bg-[#174b43] px-2.5 py-1.5 text-[9px] font-black text-white">
-                                            Open Flashcard
-                                        </button>
-                                        <button type="button" onClick={() => openOrToast(studentV17Href(r), "V17 detailed report is not available yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
-                                            V17 Detailed Report
-                                        </button>
-                                        <button type="button" onClick={() => openOrToast(r.actions?.pdf_url, "PDF is not attached yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
-                                            PDF Report
-                                        </button>
-                                        <button type="button" onClick={() => openFlash(r)} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
-                                            Combined package
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => openOrToast(r.actions?.evidence_url || reportHref, "Open the report to view evidence")}
-                                            className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]"
-                                        >
-                                            JPEG Evidence
-                                        </button>
-                                        <button type="button" onClick={() => openOrToast(r.actions?.certificate_url, "Certificate is not ready yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
-                                            Certificate
-                                        </button>
-                                        <button type="button" onClick={() => openOrToast(r.impact_verify_url, "QR verification is not issued yet")} className="rounded-[9px] bg-[#f0f4f5] px-2.5 py-1.5 text-[9px] font-black text-[#34505b]">
-                                            QR Code
-                                        </button>
+                                        <WallAction
+                                            solid
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "flash")}
+                                            label="Open Flashcard"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "v17") || studentV17Href(r)}
+                                            label="V17 Detailed Report"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "print")}
+                                            label="PDF Report"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "package")}
+                                            label="Combined package"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "evidence")}
+                                            label="JPEG Evidence"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "certificate")}
+                                            label="Certificate"
+                                        />
+                                        <WallAction href={r.impact_verify_url || null} label="QR Code" external={Boolean(r.impact_verify_url)} />
                                     </div>
                                 </div>
                             </article>

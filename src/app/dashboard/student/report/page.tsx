@@ -18,6 +18,7 @@ import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinAppl
 import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
+import { isStudentImpactPackageView } from '@/utils/studentImpactPackageHref';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
     dataSectionsToSummarize,
@@ -185,8 +186,7 @@ function ReportFormContent() {
     const projectId = searchParams.get('project') || searchParams.get('projectId');
     const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
     const packageView = searchParams.get('view');
-    const wantsPackageView =
-        packageView === 'v17' || packageView === 'print' || packageView === 'certificate' || packageView === 'evidence' || packageView === 'package';
+    const wantsPackageView = isStudentImpactPackageView(packageView);
     const {
         activeStep,
         nextStep,

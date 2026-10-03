@@ -12,6 +12,7 @@ import {
 } from "@/utils/opportunityApplicationsAdmin";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
 
@@ -165,7 +166,7 @@ export function useFacultyCommunityServiceData() {
                             id: String(item.id || ""),
                             student_name: pickStr(item, "student_name") || "Student",
                             project_title: pickStr(item, "project_title") || "Report",
-                            organization_name: pickStr(item, "organization_name"),
+                            organization_name: displayOrganizationName(pickStr(item, "organization_name")),
                             hours: typeof item.hours === "number" ? item.hours : 0,
                             progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : 0,
                             sections_complete: typeof item.sections_complete === "number" ? item.sections_complete : undefined,
@@ -228,7 +229,7 @@ export function useFacultyCommunityServiceData() {
                                     return email && email.includes("@") ? email : undefined;
                                 })(),
                                 project_title: pickStr(item, "project_title", "projectTitle") || "Report",
-                                organization_name: pickStr(item, "organization_name", "organizationName"),
+                                organization_name: displayOrganizationName(pickStr(item, "organization_name", "organizationName")),
                                 project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
                                 faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
                                 status: pickStr(item, "status"),
@@ -290,7 +291,7 @@ export function useFacultyCommunityServiceData() {
                             student_name: pickStr(item, "student_name", "studentName") || "Student",
                             student_email: email && email.includes("@") ? email : undefined,
                             project_title: pickStr(item, "project_title", "projectTitle") || "Project",
-                            organization_name: pickStr(item, "organization_name", "organizationName"),
+                            organization_name: displayOrganizationName(pickStr(item, "organization_name", "organizationName")),
                             project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
                             faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
                             status: pickStr(item, "status") || "assigned",

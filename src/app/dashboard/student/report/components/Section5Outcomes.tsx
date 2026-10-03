@@ -13,6 +13,7 @@ import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, wordRa
 
 const OBSERVED_CHANGE_WORD_RANGE = FIELD_WORD_POLICY.observed_change;
 const CHALLENGES_WORD_RANGE = FIELD_WORD_POLICY.challenges;
+const EXPLANATION_WORD_RANGE = FIELD_WORD_POLICY.measurement_explanation;
 
 type MeasurableOutcome = {
     id: string;
@@ -192,7 +193,7 @@ function WordMeterBar({
                 />
             </div>
             <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
-                {count} / {max} words
+                {count} / {min}–{max} words
             </p>
         </div>
     );
@@ -520,7 +521,11 @@ function OutcomeCard({
                                 "border-red-300",
                         )}
                     />
-                    <WordMeterBar count={explanationWords} />
+                    <WordMeterBar
+                        count={explanationWords}
+                        min={EXPLANATION_WORD_RANGE.min}
+                        max={EXPLANATION_WORD_RANGE.max}
+                    />
                     <FieldError
                         message={getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
                     />

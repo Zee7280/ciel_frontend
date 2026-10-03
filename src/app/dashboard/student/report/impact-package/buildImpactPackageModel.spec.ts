@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { clampImpactPackageTab, tabFromPackageQuery } from "./impactPackageTabs";
 import {
     buildImpactPackageModel,
     impactPackageCanDownload,
     impactPackageCanViewEvidence,
     shouldShowImpactPackageAnalysis,
+    shouldShowImpactPackageDetailedReport,
 } from "./buildImpactPackageModel";
 
 const locked = (admin_status: string) =>
@@ -101,4 +103,29 @@ test("admin sees the analysis tab once a score exists, even before locking", () 
     const d = { ciiV2: { final: 64 }, ciiV2Lock: null, admin_status: "pending" } as never;
     assert.equal(shouldShowImpactPackageAnalysis("admin", d), true);
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
+});
+
+test("student detailed report waits for Super Admin approval; reviewers keep it", () => {
+    assert.equal(shouldShowImpactPackageDetailedReport("student", false), false);
+    assert.equal(shouldShowImpactPackageDetailedReport("student", true), true);
+    for (const a of ["faculty", "admin", "university", "partner", "public"] as const) {
+        assert.equal(shouldShowImpactPackageDetailedReport(a, false), true, a);
+        assert.equal(shouldShowImpactPackageDetailedReport(a, true), true, a);
+    }
+});
+
+test("clampImpactPackageTab falls back to flash when the requested tab is hidden", () => {
+    assert.equal(clampImpactPackageTab("report", ["flash", "evidence"]), "flash");
+    assert.equal(clampImpactPackageTab("evidence", ["flash", "evidence"]), "evidence");
+    assert.equal(clampImpactPackageTab("report", ["flash", "report", "evidence"]), "report");
+});
+
+test("wall deep-links map onto Impact Package tabs", () => {
+    assert.equal(tabFromPackageQuery("v17"), "report");
+    assert.equal(tabFromPackageQuery("print"), "report");
+    assert.equal(tabFromPackageQuery("evidence"), "evidence");
+    assert.equal(tabFromPackageQuery("package"), "flash");
+    assert.equal(tabFromPackageQuery("flash"), "flash");
+    assert.equal(tabFromPackageQuery("certificate"), "flash");
+    assert.equal(tabFromPackageQuery(null, "#report"), "report");
 });

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReportData } from "../context/ReportContext";
-import ReportPrintView from "../components/ReportPrintView";
+import ImpactPackageDetailedReport from "./ImpactPackageDetailedReport";
 import { downloadExhibitionFlashcard, printExhibitionFlashcard } from "../utils/flashcardExport";
 import {
     IMPACT_PACKAGE_TAB_EVENT,
     IMPACT_PACKAGE_TABS,
     IMPACT_PACKAGE_TABS_WITH_ANALYSIS,
+    clampImpactPackageTab,
     isImpactPackageTab,
     tabFromPackageQuery,
     type ImpactPackageTab,
@@ -19,6 +20,7 @@ import {
     impactPackageCanViewEvidence,
     impactPackageLockLine,
     shouldShowImpactPackageAnalysis,
+    shouldShowImpactPackageDetailedReport,
     type ImpactPackageAudience,
     type ImpactPackageChange,
     type ImpactPackageEvidenceFile,
@@ -169,15 +171,22 @@ export default function ImpactPackage({
 }) {
     const model = useMemo(() => buildImpactPackageModel(data, projectData, extraFiles), [data, projectData, extraFiles]);
     const showAnalysis = shouldShowImpactPackageAnalysis(audience, data);
-    const tabs = showAnalysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS;
+    const showDetailedReport = shouldShowImpactPackageDetailedReport(audience, model.adminApproved);
+    const tabs = useMemo(
+        () => (showAnalysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS).filter(
+            (id) => id !== "report" || showDetailedReport,
+        ),
+        [showAnalysis, showDetailedReport],
+    );
     const [tab, setTab] = useState<ImpactPackageTab>(() => {
-        if (initialTab) return initialTab;
-        if (typeof window === "undefined") return "flash";
-        return tabFromPackageQuery(new URLSearchParams(window.location.search).get("view"), window.location.hash);
+        const requested = initialTab
+            || (typeof window === "undefined"
+                ? "flash"
+                : tabFromPackageQuery(new URLSearchParams(window.location.search).get("view"), window.location.hash));
+        return clampImpactPackageTab(requested, tabs);
     });
     const [evQuery, setEvQuery] = useState("");
     const [evKind, setEvKind] = useState("all");
-    const [reportQuery, setReportQuery] = useState("");
     const [preview, setPreview] = useState<ImpactPackageEvidenceFile | null>(null);
     const [previewStage, setPreviewStage] = useState<"pending" | "approved">(model.adminApproved ? "approved" : "pending");
 
@@ -194,14 +203,14 @@ export default function ImpactPackage({
         : null;
 
     const go = useCallback((next: ImpactPackageTab) => {
-        if (next === "analysis" && !showAnalysis) return;
-        setTab(next);
+        const resolved = clampImpactPackageTab(next, tabs);
+        setTab(resolved);
         try {
-            history.replaceState(null, "", `#${next}`);
+            history.replaceState(null, "", `#${resolved}`);
         } catch {
             /* ignore */
         }
-    }, [showAnalysis]);
+    }, [tabs]);
 
     useEffect(() => {
         const onTab = (event: Event) => {
@@ -209,8 +218,7 @@ export default function ImpactPackage({
             if (isImpactPackageTab(detail)) go(detail);
         };
         const onHash = () => {
-            const next = tabFromPackageQuery(null, window.location.hash);
-            setTab(next);
+            go(tabFromPackageQuery(null, window.location.hash));
         };
         window.addEventListener(IMPACT_PACKAGE_TAB_EVENT, onTab);
         window.addEventListener("hashchange", onHash);
@@ -221,12 +229,18 @@ export default function ImpactPackage({
     }, [go]);
 
     useEffect(() => {
-        if (initialTab) setTab(initialTab);
-    }, [initialTab]);
+        if (initialTab) go(initialTab);
+    }, [initialTab, go]);
 
     useEffect(() => {
-        if (!showAnalysis && tab === "analysis") setTab("flash");
-    }, [showAnalysis, tab]);
+        const requested =
+            initialTab ||
+            (typeof window === "undefined"
+                ? "flash"
+                : tabFromPackageQuery(new URLSearchParams(window.location.search).get("view"), window.location.hash));
+        const next = clampImpactPackageTab(requested, tabs);
+        setTab((current) => (current === next ? current : next));
+    }, [tabs, initialTab]);
 
     const printPackage = () => {
         document.body.classList.add("ipkg-printing");
@@ -285,7 +299,9 @@ export default function ImpactPackage({
         <div className="ipkg" id="ciel-impact-package">
             <div className="mast">
                 <div className="brand">
-                    <div className="brandmark">c</div>
+                    <div className="brandmark">
+                        <img src="/iel-pk-logo.png" alt="CIEL PK" width={44} height={44} />
+                    </div>
                     CIEL<span>PK</span>
                     <small>THE IMPACT PACKAGE</small>
                 </div>
@@ -527,44 +543,27 @@ export default function ImpactPackage({
                             </footer>
                         </article>
                         <div className="below-flash">
-                            <span>All nine content sections represented. Detailed report retains the source answers and gaps.</span>
-                            <button type="button" className="btn-link" onClick={() => go("report")}>
-                                Read the complete report →
-                            </button>
+                            <span>
+                                {showDetailedReport
+                                    ? "All nine content sections represented. Detailed report retains the source answers and gaps."
+                                    : "All nine content sections represented. Detailed report and certificate unlock after CIEL PK Super Admin approval."}
+                            </span>
+                            {showDetailedReport ? (
+                                <button type="button" className="btn-link" onClick={() => go("report")}>
+                                    Read the complete report →
+                                </button>
+                            ) : null}
                         </div>
                     </div>
                 ) : null}
 
-                {tab === "report" ? (
-                    <div id="report" className="view">
-                        <header className="page-head">
-                            <div className="page-head-top">
-                                <div className="eyebrow">02 / The complete record</div>
-                                <span className="pill">Source answers preserved</span>
-                            </div>
-                            <h1>
-                                Every question.
-                                <br />
-                                Every answer, preserved.
-                            </h1>
-                            <p>
-                                {model.title}
-                                {model.projectId ? ` · ${model.projectId}` : ""}. The detailed report is the locked student-source record.
-                            </p>
-                        </header>
-                        <div className="report-top no-print">
-                            <input
-                                className="search"
-                                value={reportQuery}
-                                onChange={(e) => setReportQuery(e.target.value)}
-                                aria-label="Search report"
-                                placeholder="Search any question, answer or subsection…"
-                            />
-                        </div>
-                        <div className={reportQuery.trim() ? "ipkg-report-filter" : undefined} data-filter={reportQuery.trim().toLowerCase()}>
-                            <ReportPrintView projectData={projectData} reportData={data} />
-                        </div>
-                    </div>
+                {tab === "report" && showDetailedReport ? (
+                    <ImpactPackageDetailedReport
+                        data={data}
+                        projectData={projectData}
+                        extraFiles={extraFiles}
+                        audience={audience}
+                    />
                 ) : null}
 
                 {tab === "evidence" ? (

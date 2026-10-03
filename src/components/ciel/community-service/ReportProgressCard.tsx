@@ -35,7 +35,7 @@ export default function ReportProgressCard({
                 <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">In progress</p>
                     <p className="mt-0.5 text-sm font-semibold leading-snug text-slate-900">{title || "Report"}</p>
-                    {meta ? <p className="mt-1 truncate text-xs text-slate-500">{meta}</p> : null}
+                    {meta ? <p className="mt-1 text-xs leading-5 text-slate-500">{meta}</p> : null}
                 </div>
                 <span className="shrink-0 text-lg font-extrabold tabular-nums text-[#0e7d74]">{pct}%</span>
             </div>

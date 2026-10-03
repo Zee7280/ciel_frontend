@@ -104,7 +104,10 @@ export function step3Ok(a: Record<string, unknown>): boolean {
     if (!numOk(unique)) return false;
     if (!String(a.overlap_status || "").trim()) return false;
     const uniqueLike = /mostly unique/i.test(String(a.overlap_status || ""));
-    if (!uniqueLike && !String(a.overlap_note || "").trim()) return false;
+    if (!uniqueLike) {
+        const noteWords = ladderWordCount(String(a.overlap_note || ""));
+        if (noteWords < SHORT_NOTE_MIN_WORDS || noteWords > SHORT_NOTE_MAX_WORDS) return false;
+    }
     if (!cats.length) return false;
     if (cats.some((c) => isOtherLike(c)) && !String(a.other_beneficiary_text || "").trim()) return false;
     if (!String(a.reach_counting_method || "").trim()) return false;
@@ -136,8 +139,14 @@ export function stepNeedText(a: Record<string, unknown>, step: number): string {
         }
         if (!numOk(a.unique_beneficiaries ?? a.beneficiaries_reached)) return "Enter how many different people.";
         if (!String(a.overlap_status || "").trim()) return "Answer the overlap question.";
-        if (!/mostly unique/i.test(String(a.overlap_status || "")) && !String(a.overlap_note || "").trim()) {
-            return "Say who overlaps.";
+        if (!/mostly unique/i.test(String(a.overlap_status || ""))) {
+            const noteWords = ladderWordCount(String(a.overlap_note || ""));
+            if (noteWords < SHORT_NOTE_MIN_WORDS) {
+                return `Overlap note needs ${SHORT_NOTE_MIN_WORDS - noteWords} more word${SHORT_NOTE_MIN_WORDS - noteWords === 1 ? "" : "s"} (min ${SHORT_NOTE_MIN_WORDS}).`;
+            }
+            if (noteWords > SHORT_NOTE_MAX_WORDS) {
+                return `Trim the overlap note to ${SHORT_NOTE_MAX_WORDS} words.`;
+            }
         }
         const cats = Array.isArray(a.beneficiary_categories) ? a.beneficiary_categories : [];
         if (!cats.length) return "Tap who they were.";
@@ -206,8 +215,10 @@ export function matchedProjectSdgs(activity: Record<string, unknown>, projectSdg
     return projectSdgs.filter((n) => sug.includes(n));
 }
 
-/** Proof is a one-line source note (HTML: just non-empty); keep it light but not a single word. */
-export const PROOF_MIN_WORDS = 3;
+/** Short notes (overlap + measurement explanation) — 20 words is enough. */
+export const SHORT_NOTE_MIN_WORDS = 20;
+export const SHORT_NOTE_MAX_WORDS = 80;
+export const PROOF_MIN_WORDS = SHORT_NOTE_MIN_WORDS;
 
 export type LadderOutcome = {
     id?: string;
@@ -246,8 +257,8 @@ export function outcomeLadderOk(o: LadderOutcome | Record<string, unknown> | nul
     if (!sure && !cf.length) return false;
     // Mirror validateSection5 so step 4 never shows "done" for a report that cannot submit.
     if (!String(row.outcome_area || "").trim()) return false;
-    const proofWords = String(row.measurement_explanation || "").trim().split(/\s+/).filter(Boolean).length;
-    if (proofWords < PROOF_MIN_WORDS) return false;
+    const proofWords = ladderWordCount(String(row.measurement_explanation || ""));
+    if (proofWords < SHORT_NOTE_MIN_WORDS || proofWords > SHORT_NOTE_MAX_WORDS) return false;
     return true;
 }
 

@@ -24,8 +24,18 @@
 }
 
 .fae .fae-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     font-size: 16px;
     font-weight: 800;
+}
+
+.fae .fae-logo img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    flex: none;
 }
 
 .fae .fae-logo span {

@@ -189,7 +189,14 @@ export default function CommunityCiiAnalyser({
     }, [reportId]);
 
     const runAnalysis = async () => {
-        if (readOnly || !reportId || analysing || locked) return;
+        if (readOnly || !reportId || analysing) return;
+        if (locked && !isCielPk) return;
+        if (locked && isCielPk) {
+            const ok = window.confirm(
+                "This CII is locked. Re-run with Balanced CII v3.1? The lock will clear until you approve the new score.",
+            );
+            if (!ok) return;
+        }
         try {
             setAnalysing(true);
             const res = await authenticatedFetch(analysePath, {
@@ -200,7 +207,7 @@ export default function CommunityCiiAnalyser({
                 toast.error((payload as { error?: string; message?: string }).error || (payload as { message?: string }).message || "CII analysis failed");
                 return;
             }
-            toast.success("CII v2 analysis complete");
+            toast.success("CII analysis complete");
             await loadReport();
         } catch {
             toast.error("CII analysis failed");
@@ -390,7 +397,9 @@ export default function CommunityCiiAnalyser({
 
             {locked ? (
                 <div className="fx23-lock">
-                    CII + badge are locked. The Faculty-Verified score cannot be silently rewritten. Any later correction should create a new version.
+                    {isCielPk
+                        ? "CII is locked. Super Admin can re-run the Analyzer if this score was computed on the previous 9-section rubric."
+                        : "CII + badge are locked. The Faculty-Verified score cannot be silently rewritten. Any later correction should create a new version."}
                 </div>
             ) : readOnly ? (
                 <div className="fx23-lock">
@@ -402,12 +411,18 @@ export default function CommunityCiiAnalyser({
                 </div>
             )}
 
+            {ciiV2?.incomplete ? (
+                <div className="fx23-lock">
+                    This run skipped part of the v3.1 rubric and scored those criteria as 0, which collapses the CII. Super Admin can re-run the Analyzer to rescore it properly.
+                </div>
+            ) : null}
+
             <div className="fx23-aintro">
                 <div>
-                    <small>SYSTEM ASSESSMENT · FACULTY-TRIGGERED</small>
+                    <small>SYSTEM ASSESSMENT · {isCielPk ? "ADMIN AI ANALYZER" : "FACULTY-TRIGGERED"}</small>
                     <h2>CIEL PK CII Analyzer</h2>
                     <p>
-                        Composite Impact Index v2 reads the locked 9-section report and evidence package. Faculty can view results; CIEL PK Admin moderates and decides.
+                        Balanced CII v3.1 reads the locked 10-section report and evidence package. Faculty can view results; CIEL PK Admin moderates and decides.
                     </p>
                 </div>
                 {readOnly ? (
@@ -415,8 +430,8 @@ export default function CommunityCiiAnalyser({
                         {locked ? "Locked · read only" : ciiV2 ? "System CII (view only)" : "Analyzer not run · read only"}
                     </span>
                 ) : (
-                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || locked}>
-                        {analysing ? "Analysing…" : locked ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
+                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || (locked && !isCielPk)}>
+                        {analysing ? "Analysing…" : locked && !isCielPk ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
                     </button>
                 )}
             </div>
@@ -455,7 +470,7 @@ export default function CommunityCiiAnalyser({
             <details className="fx23-method">
                 <summary>How the Analyzer scores this report</summary>
                 <p>
-                    94-point core across 9 weighted sections, 0–4 analytic anchors ({CII_V2_ANCHORS.join(" · ")}), plus up to +6 verified bonus and an integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak.
+                    100-point core across 10 weighted sections (Balanced CII v3.1), 0–4 analytic anchors ({CII_V2_ANCHORS.join(" · ")}), plus up to +5 verified Extra-Mile uplift and an integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak.
                 </p>
                 <ul>
                     {CII_V2_SECTIONS.map((section) => (
@@ -705,7 +720,7 @@ export default function CommunityCiiAnalyser({
 
             <div className="fx23-workfoot">
                 <span>{locked && ciiV2Lock ? `Locked ${new Date(ciiV2Lock.lockedAt).toLocaleString()}` : "Analysis open"}</span>
-                <span>CIEL PK Composite Impact Index v2</span>
+                <span>CIEL PK Balanced CII v3.1</span>
             </div>
         </div>
     );

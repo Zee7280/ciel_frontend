@@ -293,34 +293,62 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
 
-    // Lets My Impact Wall's Certificate / official dossier / V17 package actions link straight
-    // into the real views here (?view=certificate | print | v17). V17 opens without waiting for
-    // score unlock (it is the locked source record). Certificate/print still wait for
-    // showVerifiedImpactScores. Printing still needs a visible "Print / Save PDF" click.
+    // Wall / listing deep-links (?view=certificate | print | v17 | evidence | flash | package).
+    // Certificate and detailed report wait for Super Admin approval. Do not mark the auto-open
+    // as done while scores are still loading — otherwise print/v17/certificate stay on Flash.
     const autoOpenView = searchParams.get("view");
     const autoOpenedViewRef = useRef(false);
     useEffect(() => {
-        if (autoOpenedViewRef.current || !autoOpenView) return;
-        if (autoOpenView === "v17" || autoOpenView === "package" || autoOpenView === "evidence") {
-            autoOpenedViewRef.current = true;
-            openImpactPackageTab(autoOpenView === "evidence" ? "evidence" : "flash");
+        if (!autoOpenView) return;
+        const view = autoOpenView.trim().toLowerCase();
+        if (view === "v17" || view === "package" || view === "flash" || view === "evidence" || view === "analysis") {
+            if (view === "v17") {
+                if (!showVerifiedImpactScores) {
+                    openImpactPackageTab("flash");
+                    return;
+                }
+                if (!autoOpenedViewRef.current) {
+                    autoOpenedViewRef.current = true;
+                    openImpactPackageTab("report");
+                }
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                openImpactPackageTab(view === "evidence" ? "evidence" : view === "analysis" ? "analysis" : "flash");
+            }
             return;
         }
-        if (autoOpenView === "print") {
-            autoOpenedViewRef.current = true;
-            openImpactPackageTab("report");
+        if (view === "print" || view === "report") {
+            if (!showVerifiedImpactScores) {
+                openImpactPackageTab("flash");
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                openImpactPackageTab("report");
+            }
             return;
         }
-        if (!showVerifiedImpactScores) return;
-        autoOpenedViewRef.current = true;
-        if (autoOpenView === "certificate") setShowCertificate(true);
+        if (view === "certificate") {
+            if (!showVerifiedImpactScores) {
+                openImpactPackageTab("flash");
+                return;
+            }
+            if (!autoOpenedViewRef.current) {
+                autoOpenedViewRef.current = true;
+                setShowCertificate(true);
+            }
+        }
     }, [autoOpenView, showVerifiedImpactScores]);
 
     useEffect(() => {
-        const openFullReport = () => openImpactPackageTab("report");
+        const openFullReport = () => {
+            openImpactPackageTab(showVerifiedImpactScores ? "report" : "flash");
+        };
         window.addEventListener("ciel-open-full-report", openFullReport);
         return () => window.removeEventListener("ciel-open-full-report", openFullReport);
-    }, []);
+    }, [showVerifiedImpactScores]);
 
     const clearCertificatePrintScale = () => {
         document.documentElement.style.removeProperty("--cert-print-scale");

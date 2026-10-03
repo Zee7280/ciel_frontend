@@ -106,3 +106,12 @@
   background:#f0efe8;
   border-color:#d9dfd4
 }
+
+.ipkg .toc button{display:flex;gap:10px;align-items:flex-start;font-size:11px;padding:7px 0;color:var(--muted);border:0;background:none;width:100%;text-align:left;font-weight:400;box-shadow:none;border-radius:0}
+.ipkg .toc button:hover{color:var(--ink);background:none}
+.ipkg .toc button b{font-size:10px;color:var(--teal);width:19px;flex:none}
+.cer .ipkg .toc button{border:0;background:none;box-shadow:none;border-radius:0;padding:7px 0;font-weight:400;font-size:11px;color:var(--muted)}
+.cer .ipkg .toc button:hover{background:none;color:var(--ink)}
+
+.ipkg .brandmark{width:44px;height:44px;background:transparent;border-radius:0;padding:0;overflow:visible;display:grid;place-items:center}
+.ipkg .brandmark img{width:44px;height:44px;object-fit:contain;display:block}
