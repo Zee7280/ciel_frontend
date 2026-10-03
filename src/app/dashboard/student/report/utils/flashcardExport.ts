@@ -16,6 +16,8 @@ type ExportMode = "print" | "download";
 
 function findFlashcard(): HTMLElement | null {
     if (typeof document === "undefined") return null;
+    const packageCard = document.querySelector("#flashcard-capture");
+    if (packageCard instanceof HTMLElement) return packageCard;
     const host = document.querySelector(".cer-c22-flash, #cer-v17-flash");
     if (!(host instanceof HTMLElement)) return null;
     const card = host.querySelector(".c22-card");

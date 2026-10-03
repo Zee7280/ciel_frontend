@@ -478,7 +478,7 @@ export default function ReportDetailPage() {
                             Single-Page Dossier Mode
                         </span>
                         <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black border border-emerald-200 uppercase tracking-widest">
-                            NGO / Partner
+                            {getStoredCurrentUserRole() === "university" ? "University" : "NGO / Partner"}
                         </span>
                     </div>
                 </div>
@@ -491,10 +491,11 @@ export default function ReportDetailPage() {
                         kind: classifyEvidenceGalleryKind(url, url),
                     }))}
                     variant="published"
+                    audience={getStoredCurrentUserRole() === "university" ? "university" : "partner"}
                 />
 
-                {/* Quality Insight Banner */}
-                {qualityAlerts.length > 0 && (
+                {/* Quality Insight Banner — university only; partner/NGO do not receive the analysis report */}
+                {qualityAlerts.length > 0 && getStoredCurrentUserRole() === "university" && (
                     <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">

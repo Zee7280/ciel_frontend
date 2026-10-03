@@ -9,7 +9,7 @@ import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMerged
 import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, sectionStrength } from "./utils/impactJourney";
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
-import { V17ImpactFlashcard } from "./components/V17ImpactFlashcard";
+import ImpactPackage from "./impact-package/ImpactPackage";
 import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "./utils/mediaVisibility";
 
@@ -1808,18 +1808,11 @@ export function ReportFlashCard({
     sending?: boolean;
     paymentHref?: string;
 }) {
-    return (
-        <V17ImpactFlashcard
-            data={data}
-            agg={chromeAgg(data, projectData)}
-            sectionsComplete={sectionsComplete}
-            sectionTotal={REPORT_UI_SECTION_TOTAL}
-            missingLabels={missingLabels}
-            canSend={canSend}
-            onSend={onSend}
-            sending={sending}
-            paymentHref={paymentHref}
-            status={flashStatus(data)}
-        />
-    );
+    void sectionsComplete;
+    void missingLabels;
+    void canSend;
+    void onSend;
+    void sending;
+    void paymentHref;
+    return <ImpactPackage data={data} projectData={projectData} audience="student" />;
 }

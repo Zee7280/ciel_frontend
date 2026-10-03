@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "../utils/mediaVisibility";
 import CertificateView from "./CertificateView";
-import FacultyLockedV17Modal from "@/app/dashboard/faculty/reports/[reportId]/FacultyLockedV17Modal";
+import { openImpactPackageTab } from "../impact-package/impactPackageTabs";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
@@ -289,7 +289,6 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         !["verified", "partner_verified"].includes(reportSt);
 
     const [showPreview, setShowPreview] = useState(false);
-    const [showLockedV17, setShowLockedV17] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
@@ -302,19 +301,23 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const autoOpenedViewRef = useRef(false);
     useEffect(() => {
         if (autoOpenedViewRef.current || !autoOpenView) return;
-        if (autoOpenView === "v17") {
+        if (autoOpenView === "v17" || autoOpenView === "package" || autoOpenView === "evidence") {
             autoOpenedViewRef.current = true;
-            setShowLockedV17(true);
+            openImpactPackageTab(autoOpenView === "evidence" ? "evidence" : "flash");
+            return;
+        }
+        if (autoOpenView === "print") {
+            autoOpenedViewRef.current = true;
+            openImpactPackageTab("report");
             return;
         }
         if (!showVerifiedImpactScores) return;
         autoOpenedViewRef.current = true;
         if (autoOpenView === "certificate") setShowCertificate(true);
-        else if (autoOpenView === "print") setShowPreview(true);
     }, [autoOpenView, showVerifiedImpactScores]);
 
     useEffect(() => {
-        const openFullReport = () => setShowLockedV17(true);
+        const openFullReport = () => openImpactPackageTab("report");
         window.addEventListener("ciel-open-full-report", openFullReport);
         return () => window.removeEventListener("ciel-open-full-report", openFullReport);
     }, []);
@@ -786,19 +789,19 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             Same template faculty receives
                         </p>
                         <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
-                            V17 Flashcard + Detailed Report
+                            Impact Package
                         </h3>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                            Locked source record, field traceability, and the CII assessment layer — identical to the faculty package.
+                            The same three-tab package faculty and CIEL PK Admin receive: flashcard, detailed report, and evidence gallery.
                         </p>
                     </div>
                     <button
                         type="button"
                         className="cer-bigbtn shrink-0"
                         style={{ marginTop: 0, width: "auto", padding: "12px 18px" }}
-                        onClick={() => setShowLockedV17(true)}
+                        onClick={() => openImpactPackageTab("flash")}
                     >
-                        Open locked package
+                        Open impact package
                     </button>
                 </div>
             </div>
@@ -882,8 +885,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <button type="button" className="cer-cert-solid" onClick={() => setShowCertificate(true)}>
                                     Download certificate
                                 </button>
-                                <button type="button" className="cer-cert-ghost" onClick={() => setShowLockedV17(true)}>
-                                    V17 detailed report
+                                <button type="button" className="cer-cert-ghost" onClick={() => openImpactPackageTab("report")}>
+                                    Detailed report
                                 </button>
                                 <button
                                     type="button"
@@ -1222,14 +1225,6 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 }
             `}} />
 
-            {showLockedV17 ? (
-                <FacultyLockedV17Modal
-                    report={data as unknown as Record<string, unknown>}
-                    projectData={projectData}
-                    initialTab="assessedView"
-                    onClose={() => setShowLockedV17(false)}
-                />
-            ) : null}
 
             {showPreview && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none transition-all print-active-modal">

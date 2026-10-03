@@ -169,7 +169,7 @@ function ReportFormContent() {
     const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
     const packageView = searchParams.get('view');
     const wantsPackageView =
-        packageView === 'v17' || packageView === 'print' || packageView === 'certificate';
+        packageView === 'v17' || packageView === 'print' || packageView === 'certificate' || packageView === 'evidence' || packageView === 'package';
     const {
         activeStep,
         nextStep,
@@ -1059,7 +1059,7 @@ function ReportFormContent() {
                     />
                 ) : null}
 
-                <MissionHeroView data={deferredData} projectData={projectDetails} />
+                {!onFlash ? <MissionHeroView data={deferredData} projectData={projectDetails} /> : null}
 
                 {!onFlash && !stepperLockedToSummaryOnly ? (
                     <JourneyView

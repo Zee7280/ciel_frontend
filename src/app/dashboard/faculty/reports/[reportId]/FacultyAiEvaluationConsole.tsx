@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
@@ -15,11 +15,7 @@ import {
     type FacultyDecisionKind,
     type FacultyEvidenceItem,
 } from "./facultyAiEvaluation.helpers";
-import { V17ImpactFlashcard } from "@/app/dashboard/student/report/components/V17ImpactFlashcard";
-import { buildReportFlashAgg } from "@/app/dashboard/student/report/ReportFormChrome";
-import { REPORT_UI_SECTION_TOTAL } from "@/app/dashboard/student/report/utils/reportWizardNav";
-import "@/app/dashboard/student/report/community-engagement-report.css";
-import FacultyLockedV17Modal from "./FacultyLockedV17Modal";
+import ImpactPackage from "@/app/dashboard/student/report/impact-package/ImpactPackage";
 
 const PIPE = [
     { id: 0, label: "STUDENT COMPLETES 9 SECTIONS — FLASH CARD IS 10" },
@@ -50,7 +46,6 @@ function pipeClass(index: number, current: number): string {
 
 export default function FacultyAiEvaluationConsole() {
     const params = useParams();
-    const router = useRouter();
     const reportId = String(params.reportId ?? "");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -67,7 +62,6 @@ export default function FacultyAiEvaluationConsole() {
     // Phase 4: Independent AI Analysis states
     const [independentAnalysisRunning, setIndependentAnalysisRunning] = useState(false);
     const [showIndependentAnalyses, setShowIndependentAnalyses] = useState(false);
-    const [lockedOpen, setLockedOpen] = useState(false);
 
     const model = useMemo(
         () => (rawReport ? buildFacultyAiEvaluationModel(rawReport) : null),
@@ -78,11 +72,6 @@ export default function FacultyAiEvaluationConsole() {
         () => (rawReport ? coerceFlashReportData(rawReport) : null),
         [rawReport],
     );
-    const flashAgg = useMemo(
-        () => (flashReport ? buildReportFlashAgg(flashReport, rawReport?.opportunity ?? rawReport) : null),
-        [flashReport, rawReport],
-    );
-
     // Check if CII v2 analysis exists on the report
     const hasCiiV2Analysis = useMemo(() => {
         if (!rawReport) return false;
@@ -220,9 +209,6 @@ export default function FacultyAiEvaluationConsole() {
                 </div>
                 <div className="fae-nav">
                     <Link href="/dashboard/faculty/reports">Back to student reports</Link>
-                    <button type="button" onClick={() => setLockedOpen(true)}>
-                        Open Locked V17 Package
-                    </button>
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
                         Open full dossier
                     </Link>
@@ -242,20 +228,12 @@ export default function FacultyAiEvaluationConsole() {
                     ))}
                 </div>
 
-                {/* Exhibition flash card — same card the student submitted */}
-                {flashReport && flashAgg ? (
-                    <div className="cer-scope fae-v23-host">
-                        <V17ImpactFlashcard
-                            data={flashReport}
-                            agg={flashAgg}
-                            sectionsComplete={REPORT_UI_SECTION_TOTAL}
-                            sectionTotal={REPORT_UI_SECTION_TOTAL}
-                            missingLabels={[]}
-                            status={model.decision === "ap" ? "live" : "pending"}
-                            audience="faculty"
-                            onOpenDetailed={() => router.push(`/dashboard/faculty/reports/${reportId}?view=dossier`)}
-                        />
-                    </div>
+                {flashReport ? (
+                    <ImpactPackage
+                        data={flashReport}
+                        projectData={rawReport?.opportunity ?? rawReport}
+                        audience="faculty"
+                    />
                 ) : null}
 
                 {/* Phase 1: Clear Two-Column Layout — Section feed | AI Analysis & Score */}
@@ -812,7 +790,6 @@ export default function FacultyAiEvaluationConsole() {
                     recalculated on the faculty console.
                 </p>
             </div>
-            {lockedOpen ? <FacultyLockedV17Modal reportId={reportId} onClose={() => setLockedOpen(false)} /> : null}
         </div>
     );
 }
