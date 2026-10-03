@@ -183,6 +183,10 @@ export async function authenticatedFetch(
         clearPathSessionCache();
         clearImpactSummaryCache();
     }
+    // Lets the admin sidebar refresh its pending-work badges right after a decision.
+    if (response.ok && method !== "GET" && typeof window !== "undefined" && /\/api\/v1\/admin\//.test(url)) {
+        window.dispatchEvent(new CustomEvent("ciel:admin-mutated"));
+    }
 
     return response;
 }

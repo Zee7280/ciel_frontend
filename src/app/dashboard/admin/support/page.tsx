@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, LifeBuoy, Loader2, Mail, Pencil, Search, Ticket, Trash2, User } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, LifeBuoy, Loader2, Mail, Pencil, Search, Ticket, Trash2, User } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
@@ -18,10 +18,19 @@ import { Input } from "@/app/dashboard/student/report/components/ui/input";
 import { Label } from "@/app/dashboard/student/report/components/ui/label";
 import { Textarea } from "@/app/dashboard/student/report/components/ui/textarea";
 import { toast } from "sonner";
+import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
 
 type AdminTab = "tickets" | "faqs";
 
-type FaqItem = { id: string; question: string; answer: string; category?: string };
+type FaqItem = {
+    id: string;
+    question: string;
+    answer: string;
+    category?: string;
+    /** undefined when the API does not expose the field. */
+    published?: boolean;
+    sortOrder?: number;
+};
 
 type AdminSupportTicket = {
     id: string | number;
@@ -32,7 +41,10 @@ type AdminSupportTicket = {
     createdAt?: string;
     updatedAt?: string;
     description?: string;
-    internalNote?: string;
+    /** Admin reply / internal note (API field `adminReply` or `internalNote`). */
+    adminReply?: string;
+    /** True when the API payload carries a reply/note field at all (so saving it can work). */
+    adminReplySupported?: boolean;
     studentName?: string;
     studentEmail?: string;
     studentId?: string | number;
@@ -78,7 +90,13 @@ function normalizeAdminTicket(raw: Record<string, unknown>): AdminSupportTicket 
         createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
         updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
         description: typeof raw.description === "string" ? raw.description : undefined,
-        internalNote: typeof raw.internalNote === "string" ? raw.internalNote : undefined,
+        adminReply:
+            typeof raw.adminReply === "string"
+                ? raw.adminReply
+                : typeof raw.internalNote === "string"
+                  ? raw.internalNote
+                  : undefined,
+        adminReplySupported: "adminReply" in raw || "internalNote" in raw,
         studentName:
             typeof raw.studentName === "string"
                 ? raw.studentName
@@ -121,9 +139,24 @@ function pickFaqList(payload: unknown): FaqItem[] {
             category: typeof r.category === "string" ? r.category : undefined,
             question: String(r.question ?? r.title ?? ""),
             answer: String(r.answer ?? r.body ?? r.content ?? ""),
+            published:
+                typeof r.isPublished === "boolean" ? r.isPublished : typeof r.published === "boolean" ? r.published : undefined,
+            sortOrder: typeof r.sortOrder === "number" ? r.sortOrder : undefined,
         };
     });
 }
+
+function pickTotal(payload: unknown): number | null {
+    if (!payload || typeof payload !== "object") return null;
+    const o = payload as Record<string, unknown>;
+    const d = o.data && typeof o.data === "object" && !Array.isArray(o.data) ? (o.data as Record<string, unknown>) : null;
+    for (const src of [d, o, d?.meta as Record<string, unknown> | undefined, o.meta as Record<string, unknown> | undefined]) {
+        if (src && typeof src.total === "number") return src.total;
+    }
+    return null;
+}
+
+const PAGE_SIZE = 20;
 
 const TICKET_STATUSES = ["open", "in_progress", "waiting_on_student", "resolved", "closed"] as const;
 
@@ -132,7 +165,11 @@ export default function AdminSupportPage() {
 
     const [tickets, setTickets] = useState<AdminSupportTicket[]>([]);
     const [ticketsLoading, setTicketsLoading] = useState(false);
-    const [ticketsApiMissing, setTicketsApiMissing] = useState(false);
+    const [ticketsError, setTicketsError] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    /** Total from the server; null when the API returns the full list unpaginated. */
+    const [serverTotal, setServerTotal] = useState<number | null>(null);
+    const [replyDraft, setReplyDraft] = useState("");
 
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
@@ -146,60 +183,64 @@ export default function AdminSupportPage() {
 
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
     const [faqsLoading, setFaqsLoading] = useState(false);
-    const [faqsApiMissing, setFaqsApiMissing] = useState(false);
+    const [faqsError, setFaqsError] = useState<string | null>(null);
     const [faqDialogOpen, setFaqDialogOpen] = useState(false);
     const [faqEditingId, setFaqEditingId] = useState<string | null>(null);
     const [faqCategory, setFaqCategory] = useState("");
     const [faqQuestion, setFaqQuestion] = useState("");
     const [faqAnswer, setFaqAnswer] = useState("");
     const [faqSaving, setFaqSaving] = useState(false);
+    const [faqPublished, setFaqPublished] = useState(true);
+    const [faqSortOrder, setFaqSortOrder] = useState("0");
+    const [faqDeleting, setFaqDeleting] = useState<FaqItem | null>(null);
+    const [faqDeleteBusy, setFaqDeleteBusy] = useState(false);
+    const [ticketDeleting, setTicketDeleting] = useState<AdminSupportTicket | null>(null);
 
     const loadTickets = useCallback(async () => {
         setTicketsLoading(true);
-        setTicketsApiMissing(false);
+        setTicketsError(null);
         try {
-            const res = await authenticatedFetch("/api/v1/admin/support/tickets", {}, { redirectToLogin: false });
-            if (res?.status === 404 || res?.status === 501) {
-                setTickets([]);
-                setTicketsApiMissing(true);
-                return;
-            }
+            const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+            if (statusFilter !== "all") qs.set("status", statusFilter);
+            const res = await authenticatedFetch(`/api/v1/admin/support/tickets?${qs.toString()}`, {}, { redirectToLogin: false });
             if (!res?.ok) {
                 setTickets([]);
-                toast.error("Could not load support tickets");
+                setServerTotal(null);
+                setTicketsError("Could not load support tickets.");
                 return;
             }
             const body = await res.json();
             const list = pickTicketList(body).map((t) => normalizeAdminTicket(t as unknown as Record<string, unknown>));
             setTickets(list);
+            setServerTotal(pickTotal(body));
         } catch {
             setTickets([]);
-            toast.error("Failed to load tickets");
+            setServerTotal(null);
+            setTicketsError("Failed to load tickets. Check your connection and retry.");
         } finally {
             setTicketsLoading(false);
         }
-    }, []);
+    }, [page, statusFilter]);
 
     const loadFaqs = useCallback(async () => {
         setFaqsLoading(true);
-        setFaqsApiMissing(false);
+        setFaqsError(null);
         try {
             const res = await authenticatedFetch("/api/v1/admin/support/faqs", {}, { redirectToLogin: false });
-            if (res?.status === 404 || res?.status === 501) {
-                setFaqs([]);
-                setFaqsApiMissing(true);
-                return;
-            }
             if (!res?.ok) {
                 setFaqs([]);
-                toast.error("Could not load FAQs");
+                setFaqsError("Could not load FAQs.");
                 return;
             }
             const body = await res.json();
-            setFaqs(pickFaqList(body).filter((f) => f.question && f.answer));
+            setFaqs(
+                pickFaqList(body)
+                    .filter((f) => f.question && f.answer)
+                    .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0)),
+            );
         } catch {
             setFaqs([]);
-            toast.error("Failed to load FAQs");
+            setFaqsError("Failed to load FAQs. Check your connection and retry.");
         } finally {
             setFaqsLoading(false);
         }
@@ -226,9 +267,16 @@ export default function AdminSupportPage() {
         });
     }, [tickets, search, statusFilter]);
 
+    // When the API is not paginated it returns everything: slice client-side instead.
+    const serverPaged = serverTotal !== null;
+    const totalCount = serverPaged ? serverTotal : filteredTickets.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    const visibleTickets = serverPaged ? filteredTickets : filteredTickets.slice((Math.min(page, totalPages) - 1) * PAGE_SIZE, Math.min(page, totalPages) * PAGE_SIZE);
+
     const openTicketDetail = async (row: AdminSupportTicket) => {
         setActiveTicket(row);
         setStatusDraft((row.status || "open").toLowerCase());
+        setReplyDraft(row.adminReply || "");
         setDetailOpen(true);
         setDetailLoading(true);
         try {
@@ -243,6 +291,7 @@ export default function AdminSupportPage() {
                 if (one) {
                     setActiveTicket(one);
                     setStatusDraft((one.status || "open").toLowerCase());
+                    setReplyDraft(one.adminReply || "");
                 }
             }
         } catch {
@@ -252,20 +301,20 @@ export default function AdminSupportPage() {
         }
     };
 
+    const replyKey = "adminReply";
+
     const saveTicket = async () => {
         if (!activeTicket) return;
         setSavingTicket(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/support/tickets/${encodeURIComponent(String(activeTicket.id))}`, {
                 method: "PATCH",
-                // UpdateSupportTicketDto only accepts `status`; anything else is stripped by the
-                // global whitelist ValidationPipe, so don't pretend it was saved.
-                body: JSON.stringify({ status: statusDraft }),
+                // Only send the reply field when the API exposes one (the whitelist pipe would reject/strip it otherwise).
+                body: JSON.stringify({
+                    status: statusDraft,
+                    ...(activeTicket.adminReplySupported ? { [replyKey]: replyDraft.trim() } : {}),
+                }),
             });
-            if (res?.status === 404 || res?.status === 501) {
-                toast.message("API not available", { description: "Implement PATCH /api/v1/admin/support/tickets/:id on the server." });
-                return;
-            }
             if (!res?.ok) {
                 toast.error("Failed to update ticket");
                 return;
@@ -282,17 +331,11 @@ export default function AdminSupportPage() {
     };
 
     const deleteTicket = async (row: AdminSupportTicket) => {
-        const label = row.reference || `#${row.id}`;
-        if (!confirm(`Delete ticket ${label}? This cannot be undone.`)) return;
         setTicketDeletingId(row.id);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/support/tickets/${encodeURIComponent(String(row.id))}`, {
                 method: "DELETE",
             });
-            if (res?.status === 404 || res?.status === 501) {
-                toast.message("API not available", { description: "Implement DELETE /api/v1/admin/support/tickets/:id on the server." });
-                return;
-            }
             if (!res?.ok) {
                 toast.error("Failed to delete ticket");
                 return;
@@ -302,6 +345,7 @@ export default function AdminSupportPage() {
                 setDetailOpen(false);
                 setActiveTicket(null);
             }
+            setTicketDeleting(null);
             void loadTickets();
         } catch {
             toast.error("Network error");
@@ -315,6 +359,8 @@ export default function AdminSupportPage() {
         setFaqCategory("");
         setFaqQuestion("");
         setFaqAnswer("");
+        setFaqPublished(true);
+        setFaqSortOrder(String(faqs.reduce((m, f) => Math.max(m, f.sortOrder ?? 0), 0) + 1));
         setFaqDialogOpen(true);
     };
 
@@ -323,6 +369,8 @@ export default function AdminSupportPage() {
         setFaqCategory(f.category || "");
         setFaqQuestion(f.question);
         setFaqAnswer(f.answer);
+        setFaqPublished(f.published ?? true);
+        setFaqSortOrder(String(f.sortOrder ?? 0));
         setFaqDialogOpen(true);
     };
 
@@ -339,6 +387,8 @@ export default function AdminSupportPage() {
                 question: q,
                 answer: a,
                 category: faqCategory.trim() || undefined,
+                isPublished: faqPublished,
+                sortOrder: Number.parseInt(faqSortOrder, 10) || 0,
             };
             const isEdit = faqEditingId != null;
             const url = isEdit ? `/api/v1/admin/support/faqs/${encodeURIComponent(faqEditingId)}` : "/api/v1/admin/support/faqs";
@@ -346,14 +396,6 @@ export default function AdminSupportPage() {
                 method: isEdit ? "PATCH" : "POST",
                 body: JSON.stringify(payload),
             });
-            if (res?.status === 404 || res?.status === 501) {
-                toast.message("API not available", {
-                    description: isEdit
-                        ? "Implement PATCH /api/v1/admin/support/faqs/:id"
-                        : "Implement POST /api/v1/admin/support/faqs",
-                });
-                return;
-            }
             if (!res?.ok) {
                 toast.error("Save failed");
                 return;
@@ -368,22 +410,21 @@ export default function AdminSupportPage() {
         }
     };
 
-    const deleteFaq = async (id: string) => {
-        if (!confirm("Delete this FAQ?")) return;
+    const deleteFaq = async (f: FaqItem) => {
+        setFaqDeleteBusy(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/support/faqs/${encodeURIComponent(id)}`, { method: "DELETE" });
-            if (res?.status === 404 || res?.status === 501) {
-                toast.message("API not available", { description: "Implement DELETE /api/v1/admin/support/faqs/:id" });
-                return;
-            }
+            const res = await authenticatedFetch(`/api/v1/admin/support/faqs/${encodeURIComponent(f.id)}`, { method: "DELETE" });
             if (!res?.ok) {
                 toast.error("Delete failed");
                 return;
             }
             toast.success("FAQ deleted");
+            setFaqDeleting(null);
             void loadFaqs();
         } catch {
             toast.error("Network error");
+        } finally {
+            setFaqDeleteBusy(false);
         }
     };
 
@@ -406,9 +447,7 @@ export default function AdminSupportPage() {
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Help &amp; Support (admin)</h1>
                         <p className="mt-1 max-w-3xl text-sm text-slate-500 sm:text-base">
-                            Student tickets inbox and published FAQs. Student app reads FAQs from{" "}
-                            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">GET /api/v1/student/support/faqs</code> when
-                            implemented.
+                            Student tickets inbox and published FAQs shown on the student Help page.
                         </p>
                     </div>
                 </div>
@@ -427,11 +466,12 @@ export default function AdminSupportPage() {
 
             {tab === "tickets" && (
                 <>
-                    {ticketsApiMissing ? (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                            <strong className="font-semibold">Backend not connected.</strong> Add{" "}
-                            <code className="rounded bg-amber-100/80 px-1">GET /api/v1/admin/support/tickets</code> (and ticket detail /
-                            PATCH / DELETE) so this inbox fills automatically.
+                    {ticketsError ? (
+                        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                            <span>{ticketsError}</span>
+                            <Button type="button" size="sm" variant="outline" onClick={() => void loadTickets()}>
+                                Retry
+                            </Button>
                         </div>
                     ) : null}
 
@@ -453,7 +493,10 @@ export default function AdminSupportPage() {
                                 <select
                                     id="status-filter"
                                     value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    onChange={(e) => {
+                                        setStatusFilter(e.target.value);
+                                        setPage(1);
+                                    }}
                                     className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
                                 >
                                     <option value="all">All statuses</option>
@@ -475,12 +518,12 @@ export default function AdminSupportPage() {
                             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
                             <p className="text-sm font-medium text-slate-500">Loading tickets…</p>
                         </div>
-                    ) : filteredTickets.length === 0 ? (
+                    ) : ticketsError ? null : visibleTickets.length === 0 ? (
                         <Card className="py-16 text-center shadow-sm">
                             <Ticket className="mx-auto h-10 w-10 text-slate-300" strokeWidth={1.5} />
                             <h3 className="mt-4 text-lg font-bold text-slate-900">No tickets</h3>
                             <p className="mt-2 text-sm text-slate-500">
-                                {tickets.length > 0 ? "Nothing matches your filters." : "No rows returned yet."}
+                                {tickets.length > 0 ? "Nothing matches your filters." : "No tickets yet."}
                             </p>
                         </Card>
                     ) : (
@@ -493,7 +536,7 @@ export default function AdminSupportPage() {
                                 <span className="sr-only md:not-sr-only md:w-10 md:text-center">Actions</span>
                             </div>
                             <ul role="list">
-                                {filteredTickets.map((t) => (
+                                {visibleTickets.map((t) => (
                                     <li key={String(t.id)} className="border-b border-slate-100 last:border-0">
                                         <div className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/90 md:grid-cols-[1.2fr_1fr_0.7fr_0.9fr_auto] md:items-center md:gap-4">
                                             <button
@@ -544,7 +587,7 @@ export default function AdminSupportPage() {
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
-                                                        void deleteTicket(t);
+                                                        setTicketDeleting(t);
                                                     }}
                                                 >
                                                     {ticketDeletingId != null && String(ticketDeletingId) === String(t.id) ? (
@@ -558,6 +601,19 @@ export default function AdminSupportPage() {
                                     </li>
                                 ))}
                             </ul>
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+                                <span>
+                                    Page {page} of {totalPages} · {totalCount} ticket{totalCount === 1 ? "" : "s"}
+                                </span>
+                                <div className="flex gap-2">
+                                    <Button type="button" size="sm" variant="outline" disabled={page <= 1 || ticketsLoading} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                                        <ChevronLeft className="h-4 w-4" /> Prev
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" disabled={page >= totalPages || ticketsLoading} onClick={() => setPage((p) => p + 1)}>
+                                        Next <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </>
@@ -565,11 +621,12 @@ export default function AdminSupportPage() {
 
             {tab === "faqs" && (
                 <>
-                    {faqsApiMissing ? (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                            <strong className="font-semibold">Backend not connected.</strong> Add{" "}
-                            <code className="rounded bg-amber-100/80 px-1">GET/POST/PATCH/DELETE /api/v1/admin/support/faqs</code> so FAQs
-                            sync to the student Help page.
+                    {faqsError ? (
+                        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                            <span>{faqsError}</span>
+                            <Button type="button" size="sm" variant="outline" onClick={() => void loadFaqs()}>
+                                Retry
+                            </Button>
                         </div>
                     ) : null}
 
@@ -584,11 +641,11 @@ export default function AdminSupportPage() {
                             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
                             <p className="text-sm font-medium text-slate-500">Loading FAQs…</p>
                         </div>
-                    ) : faqs.length === 0 ? (
+                    ) : faqsError ? null : faqs.length === 0 ? (
                         <Card className="py-16 text-center shadow-sm">
                             <BookOpen className="mx-auto h-10 w-10 text-slate-300" strokeWidth={1.5} />
                             <h3 className="mt-4 text-lg font-bold text-slate-900">No FAQs</h3>
-                            <p className="mt-2 text-sm text-slate-500">Create entries or connect the FAQ API.</p>
+                            <p className="mt-2 text-sm text-slate-500">Create your first FAQ for the student Help page.</p>
                             <Button type="button" className="mt-6" variant="secondary" onClick={openFaqCreate}>
                                 Add FAQ
                             </Button>
@@ -599,9 +656,17 @@ export default function AdminSupportPage() {
                                 <Card key={f.id} className="p-4 shadow-sm">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div className="min-w-0 flex-1">
-                                            {f.category ? (
-                                                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{f.category}</p>
-                                            ) : null}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {f.category ? (
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{f.category}</p>
+                                                ) : null}
+                                                {f.published !== undefined ? (
+                                                    <Badge variant="secondary">{f.published ? "Published" : "Draft"}</Badge>
+                                                ) : null}
+                                                {f.sortOrder !== undefined ? (
+                                                    <span className="text-xs text-slate-400">Order {f.sortOrder}</span>
+                                                ) : null}
+                                            </div>
                                             <h3 className="mt-1 font-semibold text-slate-900">{f.question}</h3>
                                             <p className="mt-2 line-clamp-3 text-sm text-slate-600">{f.answer}</p>
                                         </div>
@@ -609,7 +674,7 @@ export default function AdminSupportPage() {
                                             <Button type="button" variant="outline" size="default" onClick={() => openFaqEdit(f)}>
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button type="button" variant="outline" size="default" onClick={() => void deleteFaq(f.id)}>
+                                            <Button type="button" variant="outline" size="default" onClick={() => setFaqDeleting(f)}>
                                                 <Trash2 className="h-4 w-4 text-red-600" />
                                             </Button>
                                         </div>
@@ -667,10 +732,21 @@ export default function AdminSupportPage() {
                                     <p className="text-xs text-slate-500">{activeTicket.studentEmail || ""}</p>
                                 </div>
                             </div>
-                            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                                Only the status is saved from this dialog. Internal notes and student replies are not
-                                supported by the ticket API yet.
-                            </p>
+                            <div>
+                                <Label htmlFor="adm-ticket-reply">Admin reply / internal note</Label>
+                                <Textarea
+                                    id="adm-ticket-reply"
+                                    value={replyDraft}
+                                    onChange={(e) => setReplyDraft(e.target.value)}
+                                    rows={4}
+                                    disabled={!activeTicket.adminReplySupported}
+                                    placeholder={activeTicket.adminReplySupported ? "Write a reply or note…" : "Not supported by the ticket API yet."}
+                                    className="mt-1.5"
+                                />
+                                {!activeTicket.adminReplySupported ? (
+                                    <p className="mt-1 text-xs text-slate-500">Only the status is saved until the API exposes a reply field.</p>
+                                ) : null}
+                            </div>
                         </div>
                     ) : null}
                     <DialogFooter className="gap-2 sm:gap-0">
@@ -688,7 +764,7 @@ export default function AdminSupportPage() {
                 <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
                     <DialogHeader>
                         <DialogTitle>{faqEditingId ? "Edit FAQ" : "New FAQ"}</DialogTitle>
-                        <DialogDescription>Published to students when GET /api/v1/student/support/faqs is wired.</DialogDescription>
+                        <DialogDescription>Published FAQs appear on the student Help page.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
@@ -709,6 +785,16 @@ export default function AdminSupportPage() {
                             <Label htmlFor="faq-a">Answer</Label>
                             <Textarea id="faq-a" value={faqAnswer} onChange={(e) => setFaqAnswer(e.target.value)} rows={5} className="mt-1.5" />
                         </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <Label htmlFor="faq-sort">Sort order</Label>
+                                <Input id="faq-sort" type="number" value={faqSortOrder} onChange={(e) => setFaqSortOrder(e.target.value)} className="mt-1.5" />
+                            </div>
+                            <label className="flex items-center gap-2 pt-0 text-sm font-medium text-slate-700 sm:pt-7">
+                                <input type="checkbox" checked={faqPublished} onChange={(e) => setFaqPublished(e.target.checked)} className="h-4 w-4" />
+                                Published
+                            </label>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setFaqDialogOpen(false)}>
@@ -720,6 +806,29 @@ export default function AdminSupportPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmModal
+                open={ticketDeleting !== null}
+                title="Delete ticket"
+                tone="danger"
+                confirmLabel="Delete"
+                busy={ticketDeletingId !== null}
+                onConfirm={() => (ticketDeleting ? deleteTicket(ticketDeleting) : undefined)}
+                onCancel={() => setTicketDeleting(null)}
+            >
+                Delete ticket {ticketDeleting?.reference || (ticketDeleting ? `#${ticketDeleting.id}` : "")}? This cannot be undone.
+            </ConfirmModal>
+            <ConfirmModal
+                open={faqDeleting !== null}
+                title="Delete FAQ"
+                tone="danger"
+                confirmLabel="Delete"
+                busy={faqDeleteBusy}
+                onConfirm={() => (faqDeleting ? deleteFaq(faqDeleting) : undefined)}
+                onCancel={() => setFaqDeleting(null)}
+            >
+                Delete &ldquo;{faqDeleting?.question}&rdquo;?
+            </ConfirmModal>
         </div>
     );
 }

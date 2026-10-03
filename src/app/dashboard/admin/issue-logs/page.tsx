@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
@@ -28,6 +28,7 @@ type IssueLog = {
     targetId?: string | null;
     requestId?: string | null;
     ip?: string | null;
+    resolvedAt?: string | null;
     userAgent?: string | null;
     metadata?: unknown;
     createdAt?: string;
@@ -55,6 +56,7 @@ const MODULE_OPTIONS = [
     "admin",
     "opportunities",
 ] as const;
+const METHOD_OPTIONS = ["all", "GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const SEVERITY_OPTIONS = ["all", "error", "warning", "info"] as const;
 
 const SEARCH_DEBOUNCE_MS = 350;
@@ -100,6 +102,16 @@ export default function AdminIssueLogsPage() {
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [moduleFilter, setModuleFilter] = useState("all");
     const [severityFilter, setSeverityFilter] = useState("all");
+    const [methodFilter, setMethodFilter] = useState("all");
+    const [resolvedFilter, setResolvedFilter] = useState<"open" | "resolved" | "all">("open");
+    const [resolving, setResolving] = useState(false);
+    const [resolveMessage, setResolveMessage] = useState("");
+    const [statusCodeFilter, setStatusCodeFilter] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [knownModules, setKnownModules] = useState<string[]>([]);
+    const reqSeq = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
 
@@ -107,7 +119,11 @@ export default function AdminIssueLogsPage() {
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
-            setDebouncedSearch(searchInput.trim());
+            const next = searchInput.trim();
+            setDebouncedSearch((prev) => {
+                if (prev !== next) setCurrentPage(1);
+                return next;
+            });
         }, SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(timer);
     }, [searchInput]);
@@ -120,18 +136,40 @@ export default function AdminIssueLogsPage() {
         if (debouncedSearch) params.set("search", debouncedSearch);
         if (moduleFilter !== "all") params.set("module", moduleFilter);
         if (severityFilter !== "all") params.set("severity", severityFilter);
+        if (methodFilter !== "all") params.set("method", methodFilter);
+        if (/^\d{3}$/.test(statusCodeFilter.trim())) params.set("statusCode", statusCodeFilter.trim());
+        if (dateFrom) params.set("dateFrom", dateFrom);
+        if (dateTo) params.set("dateTo", dateTo);
+        if (resolvedFilter !== "all") params.set("resolved", resolvedFilter);
         return params.toString();
-    }, [currentPage, moduleFilter, debouncedSearch, severityFilter]);
+    }, [currentPage, moduleFilter, debouncedSearch, severityFilter, methodFilter, statusCodeFilter, dateFrom, dateTo, resolvedFilter]);
+
+    const moduleOptions = useMemo(() => {
+        const set = new Set<string>(MODULE_OPTIONS.filter((m) => m !== "all"));
+        knownModules.forEach((m) => set.add(m));
+        if (moduleFilter !== "all") set.add(moduleFilter);
+        return ["all", ...Array.from(set).sort()];
+    }, [knownModules, moduleFilter]);
+
+    const changeFilter = (setter: (v: string) => void) => (value: string) => {
+        setter(value);
+        setCurrentPage(1);
+    };
 
     const loadLogs = useCallback(async () => {
+        const seq = ++reqSeq.current;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         setIsLoading(true);
         setError("");
         try {
             const res = await authenticatedFetch(
                 resolveSameOriginApiPath(`/api/v1/admin/issue-logs?${queryString}`),
-                {},
+                { signal: controller.signal },
                 { redirectToLogin: false },
             );
+            if (seq !== reqSeq.current) return;
             if (!res?.ok) {
                 setLogs([]);
                 setTotalItems(0);
@@ -139,24 +177,50 @@ export default function AdminIssueLogsPage() {
                 return;
             }
             const body = (await res.json()) as IssueLogsResponse;
-            setLogs(Array.isArray(body.data) ? body.data : []);
-            setTotalItems(body.meta?.total ?? 0);
-        } catch {
+            if (seq !== reqSeq.current) return;
+            const rows = Array.isArray(body.data) ? body.data : [];
+            setLogs(rows);
+            setTotalItems(body.meta?.total ?? rows.length);
+            const mods = rows.map((l) => l.module).filter((m): m is string => typeof m === "string" && m.trim() !== "");
+            if (mods.length) setKnownModules((prev) => Array.from(new Set([...prev, ...mods])));
+        } catch (err) {
+            if (seq !== reqSeq.current || (err as { name?: string })?.name === "AbortError") return;
             setLogs([]);
             setTotalItems(0);
             setError("Network error while loading issue logs.");
         } finally {
-            setIsLoading(false);
+            if (seq === reqSeq.current) setIsLoading(false);
         }
     }, [queryString]);
+
+    const resolveLogs = async (ids: string[]) => {
+        if (!ids.length || resolving) return;
+        setResolving(true);
+        setResolveMessage("");
+        try {
+            const res = await authenticatedFetch(
+                resolveSameOriginApiPath("/api/v1/admin/issue-logs/resolve"),
+                { method: "POST", body: JSON.stringify({ ids }) },
+                { redirectToLogin: false },
+            );
+            if (!res?.ok) {
+                setResolveMessage("Could not mark as resolved. Please try again.");
+                return;
+            }
+            const body = (await res.json().catch(() => ({}))) as { resolved?: number };
+            setResolveMessage(`${body.resolved ?? ids.length} issue${(body.resolved ?? ids.length) === 1 ? "" : "s"} marked as resolved.`);
+            void loadLogs();
+        } finally {
+            setResolving(false);
+        }
+    };
+
 
     useEffect(() => {
         void loadLogs();
     }, [loadLogs]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [moduleFilter, debouncedSearch, severityFilter]);
+    useEffect(() => () => abortRef.current?.abort(), []);
 
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
@@ -182,8 +246,8 @@ export default function AdminIssueLogsPage() {
             </div>
 
             <Card className="p-4 shadow-sm">
-                <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px_auto] lg:items-end">
-                    <div className="relative">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+                    <div className="relative sm:col-span-2 lg:col-span-4">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <Input
                             value={searchInput}
@@ -194,10 +258,10 @@ export default function AdminIssueLogsPage() {
                     </div>
                     <select
                         value={moduleFilter}
-                        onChange={(event) => setModuleFilter(event.target.value)}
+                        onChange={(event) => changeFilter(setModuleFilter)(event.target.value)}
                         className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
                     >
-                        {MODULE_OPTIONS.map((option) => (
+                        {moduleOptions.map((option) => (
                             <option key={option} value={option}>
                                 {option === "all" ? "All modules" : option}
                                 {option === "student" ? " (incl. students)" : ""}
@@ -206,7 +270,7 @@ export default function AdminIssueLogsPage() {
                     </select>
                     <select
                         value={severityFilter}
-                        onChange={(event) => setSeverityFilter(event.target.value)}
+                        onChange={(event) => changeFilter(setSeverityFilter)(event.target.value)}
                         className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
                     >
                         {SEVERITY_OPTIONS.map((option) => (
@@ -215,7 +279,39 @@ export default function AdminIssueLogsPage() {
                             </option>
                         ))}
                     </select>
-                    <div className="text-sm text-slate-500 lg:text-right">
+                    <select
+                        value={resolvedFilter}
+                        onChange={(event) => changeFilter((v) => setResolvedFilter(v as "open" | "resolved" | "all"))(event.target.value)}
+                        aria-label="Resolution status"
+                        className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
+                    >
+                        <option value="open">Open only</option>
+                        <option value="resolved">Resolved only</option>
+                        <option value="all">Open + resolved</option>
+                    </select>
+                    <select
+                        value={methodFilter}
+                        onChange={(event) => changeFilter(setMethodFilter)(event.target.value)}
+                        aria-label="HTTP method"
+                        className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
+                    >
+                        {METHOD_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                                {option === "all" ? "All methods" : option}
+                            </option>
+                        ))}
+                    </select>
+                    <Input
+                        inputMode="numeric"
+                        maxLength={3}
+                        value={statusCodeFilter}
+                        onChange={(event) => changeFilter(setStatusCodeFilter)(event.target.value.replace(/\D/g, ""))}
+                        placeholder="Status code (e.g. 500)"
+                        aria-label="Status code"
+                    />
+                    <Input type="date" value={dateFrom} onChange={(event) => changeFilter(setDateFrom)(event.target.value)} aria-label="From date" />
+                    <Input type="date" value={dateTo} onChange={(event) => changeFilter(setDateTo)(event.target.value)} aria-label="To date" />
+                    <div className="text-sm text-slate-500 sm:col-span-2 lg:col-span-4">
                         {totalItems.toLocaleString()} log{totalItems === 1 ? "" : "s"}
                     </div>
                 </div>
@@ -248,6 +344,23 @@ export default function AdminIssueLogsPage() {
                         <span>User / Request</span>
                         <span>Details</span>
                     </div>
+                    {logs.length > 0 || resolveMessage ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-xs text-slate-600">
+                            <span role="status">{resolveMessage || `${logs.length} on this page`}</span>
+                            {logs.some((l) => !l.resolvedAt) ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={resolving}
+                                    onClick={() => void resolveLogs(logs.filter((l) => !l.resolvedAt).map((l) => l.id))}
+                                >
+                                    {resolving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                                    Mark this page resolved
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <ul role="list">
                         {logs.map((log) => {
                             const isExpanded = expandedId === log.id;
@@ -266,6 +379,7 @@ export default function AdminIssueLogsPage() {
                                             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusClass(log.statusCode)}`}>
                                                 {log.statusCode || "N/A"}
                                             </span>
+                                            {log.resolvedAt ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">Resolved</span> : null}
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -288,6 +402,20 @@ export default function AdminIssueLogsPage() {
                                     </button>
                                     {isExpanded ? (
                                         <div className="border-t border-slate-100 bg-slate-950 px-4 py-4 text-slate-200">
+                                            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                                                {log.resolvedAt ? (
+                                                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-bold text-emerald-300">Resolved {formatWhen(log.resolvedAt)}</span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={resolving}
+                                                        onClick={() => void resolveLogs([log.id])}
+                                                        className="rounded-md bg-emerald-500 px-3 py-1 font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+                                                    >
+                                                        Mark resolved
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                                                 <div>
                                                     <p className="font-bold uppercase tracking-wide text-slate-500">User</p>

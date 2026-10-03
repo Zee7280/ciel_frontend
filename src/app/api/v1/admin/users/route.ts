@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         const authHeader = request.headers.get("Authorization");
 
         // Proxy to Real Backend
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/users`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/users${new URL(request.url).search}`, {
             headers: {
                 "Authorization": authHeader || "",
                 "Content-Type": "application/json"

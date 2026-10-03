@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authenticatedFetch } from "@/utils/api";
 import {
@@ -22,14 +22,43 @@ import {
     CheckCircle2,
     AlertCircle,
     MinusCircle,
-    Eye,
-    EyeOff,
-    Copy,
-    Lock,
-    Info,
+    Mail,
+    Download,
+    Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import DataTable from "react-data-table-component";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import StatusBadge from "@/components/admin/StatusBadge";
+import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
+
+const STATUS_OPTIONS = [
+    "active",
+    "approved",
+    "pending",
+    "pending_membership_payment",
+    "inactive",
+    "rejected",
+    "suspended",
+];
+const statusOptionLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+function csvCell(value: unknown): string {
+    let v = value == null ? "" : String(value);
+    if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+    return `"${v.replace(/"/g, '""')}"`;
+}
+
+function getCurrentAdmin(): { id: string; email: string } {
+    try {
+        const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+        if (!raw) return { id: "", email: "" };
+        const u = JSON.parse(raw);
+        return { id: String(u?.id ?? ""), email: String(u?.email ?? "").toLowerCase() };
+    } catch {
+        return { id: "", email: "" };
+    }
+}
 
 function formatJoinDate(createdAt: string | undefined | null): string {
     if (!createdAt) return "N/A";
@@ -61,15 +90,15 @@ interface User {
     status: string;
     joinDate: string;
     orgName?: string;
-    /** Super-admin only: decrypted password copy from backend */
-    stored_password?: string | null;
+    /** Raw ISO timestamp, used for sorting */
+    createdAt: string;
     /** From backend `findAllForAdmin`; absent on older APIs */
     profile_complete?: boolean;
     profile_missing_fields?: string[];
 }
 
-const ACTION_MENU_W = 144;
-const ACTION_MENU_H = 96;
+const ACTION_MENU_W = 224;
+const ACTION_MENU_H = 140;
 const ACTION_MENU_GAP = 8;
 
 function computeActionMenuPosition(trigger: DOMRect) {
@@ -86,6 +115,8 @@ export default function AdminUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [totalUsers, setTotalUsers] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const { begin } = useAbortableFetch();
+    const lastSearchRef = useRef("");
 
     // Filtering & Pagination States — all pushed to the server so the whole users table is never fetched at once.
     const [currentPage, setCurrentPage] = useState(1);
@@ -93,6 +124,8 @@ export default function AdminUsersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
+    // Sorting runs on the server so it covers every page, not just the 20 rows on screen.
+    const [sort, setSort] = useState<{ by: string; dir: "asc" | "desc" }>({ by: "createdAt", dir: "desc" });
 
     // Modal States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -103,11 +136,24 @@ export default function AdminUsersPage() {
         x: number;
         y: number;
     } | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+    const [resetTarget, setResetTarget] = useState<User | null>(null);
+    const [statusConfirm, setStatusConfirm] = useState<{ user: User; from: string; to: string; role: string } | null>(null);
+    const [currentAdmin, setCurrentAdmin] = useState<{ id: string; email: string }>({ id: "", email: "" });
 
     // Form States
     const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "student", status: "active" });
-    const [showPasswordColumn, setShowPasswordColumn] = useState(false);
-    const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        setCurrentAdmin(getCurrentAdmin());
+    }, []);
+
+    const isSelf = (u: User | null) =>
+        !!u &&
+        ((currentAdmin.id !== "" && String(u.id) === currentAdmin.id) ||
+            (currentAdmin.email !== "" && String(u.email || "").toLowerCase() === currentAdmin.email));
 
     // Server already returns exactly the current page, filtered & searched.
     const totalPages = Math.max(1, Math.ceil(totalUsers / itemsPerPage));
@@ -117,16 +163,19 @@ export default function AdminUsersPage() {
     const actionMenuUser =
         actionMenu == null ? null : users.find((u) => u.id === actionMenu.userId) ?? null;
 
-    // Debounce search so typing doesn't fire a request per keystroke
+    // Debounce search so typing doesn't fire a request per keystroke; page resets in the same state update
+    // that changes the filter so only one fetch happens.
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+        const t = setTimeout(() => {
+            const next = searchQuery.trim();
+            if (next !== lastSearchRef.current) {
+                lastSearchRef.current = next;
+                setCurrentPage(1);
+                setDebouncedSearch(next);
+            }
+        }, 350);
         return () => clearTimeout(t);
     }, [searchQuery]);
-
-    // Reset page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearch, roleFilter, itemsPerPage]);
 
     useEffect(() => {
         if (!actionMenu) return;
@@ -154,12 +203,8 @@ export default function AdminUsersPage() {
         if (actionMenu && !actionMenuUser) setActionMenu(null);
     }, [actionMenu, actionMenuUser]);
 
-    useEffect(() => {
-        fetchUsers();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, itemsPerPage, debouncedSearch, roleFilter]);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
+        const run = begin();
         setIsLoading(true);
         try {
             const params = new URLSearchParams({
@@ -168,99 +213,232 @@ export default function AdminUsersPage() {
             });
             if (debouncedSearch) params.set("search", debouncedSearch);
             if (roleFilter !== "all") params.set("role", roleFilter);
+            params.set("sortBy", sort.by);
+            params.set("sortDir", sort.dir);
 
-            const res = await authenticatedFetch(`/api/v1/admin/users?${params.toString()}`);
+            const res = await authenticatedFetch(`/api/v1/admin/users?${params.toString()}`, { signal: run.signal });
+            if (!run.isCurrent()) return;
             if (!res) return;
+            if (!res.ok) {
+                toast.error(await readErrorMessage(res, "Failed to load users"));
+                return;
+            }
             const data = await res.json();
+            if (!run.isCurrent()) return;
 
-            let usersList = [];
+            let usersList: any[] = [];
             if (Array.isArray(data)) usersList = data;
-            else if (data.success && Array.isArray(data.data)) usersList = data.data;
+            else if (Array.isArray(data?.data)) usersList = data.data;
 
-            const mappedUsers = usersList.map((u: any) => ({
+            const mappedUsers: User[] = usersList.map((u: any) => ({
                 id: u.id,
                 name: u.name || u.orgName || "Unknown User",
                 email: u.email,
                 role: u.role,
                 status: u.status || "active",
                 joinDate: formatJoinDate(u.createdAt),
-                stored_password:
-                    typeof u.stored_password === "string" && u.stored_password.trim()
-                        ? u.stored_password
-                        : null,
+                createdAt: u.createdAt || "",
                 profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
             }));
             setUsers(mappedUsers);
-            setTotalUsers(typeof data.total === "number" ? data.total : mappedUsers.length);
+            setTotalUsers(typeof data?.total === "number" ? data.total : mappedUsers.length);
         } catch (error) {
+            if (isAbortError(error) || !run.isCurrent()) return;
             console.error("Failed to fetch users", error);
+            toast.error("Failed to load users");
         } finally {
-            setIsLoading(false);
+            if (run.isCurrent()) setIsLoading(false);
         }
+    }, [begin, currentPage, itemsPerPage, debouncedSearch, roleFilter, sort]);
+
+    useEffect(() => {
+        void fetchUsers();
+    }, [fetchUsers]);
+
+    const changeRoleFilter = (v: string) => {
+        setRoleFilter(v);
+        setCurrentPage(1);
+    };
+    const changeItemsPerPage = (n: number) => {
+        setItemsPerPage(n);
+        setCurrentPage(1);
+    };
+
+    const closeModals = () => {
+        if (isSubmitting) return;
+        setIsAddModalOpen(false);
+        setIsEditModalOpen(false);
+        setFormError(null);
     };
 
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setFormError(null);
+        const name = formData.name.trim();
+        const email = formData.email.trim();
+        if (!name || !email) {
+            setFormError("Name and email are required.");
+            return;
+        }
+        if (formData.password.length < 8) {
+            setFormError("Password must be at least 8 characters.");
+            return;
+        }
+        setIsSubmitting(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/users`, {
                 method: "POST",
-                body: JSON.stringify(formData)
+                body: JSON.stringify({ ...formData, name, email }),
             });
             if (res && res.ok) {
+                toast.success("User created");
                 setIsAddModalOpen(false);
-                fetchUsers(); // Refresh list
                 setFormData({ name: "", email: "", password: "", role: "student", status: "active" });
+                void fetchUsers();
             } else {
-                alert("Failed to create user");
+                const msg = await readErrorMessage(res, "Failed to create user");
+                setFormError(res?.status === 409 ? `${msg} (a user with this email already exists)` : msg);
             }
         } catch (error) {
             console.error("Error creating user", error);
+            setFormError("Failed to create user. Please try again.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleDeleteUser = async (id: number | string) => {
-        if (!confirm("Are you sure you want to delete this user?")) return;
+    const confirmDeleteUser = async () => {
+        if (!deleteTarget || isSubmitting) return;
+        setIsSubmitting(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/users/${id}`, {
-                method: "DELETE"
+            const res = await authenticatedFetch(`/api/v1/admin/users/${deleteTarget.id}`, {
+                method: "DELETE",
             });
-            if (res && res.ok) fetchUsers();
-            else alert("Failed to delete user");
+            if (res && res.ok) {
+                toast.success(`Deleted ${deleteTarget.name}`);
+                setDeleteTarget(null);
+                void fetchUsers();
+            } else {
+                toast.error(await readErrorMessage(res, "Failed to delete user"));
+            }
         } catch (error) {
             console.error("Error deleting user", error);
+            toast.error("Failed to delete user");
+        } finally {
+            setIsSubmitting(false);
         }
-        setActionMenu(null);
+    };
+
+    const confirmSendReset = async () => {
+        if (!resetTarget || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/users/${resetTarget.id}/send-password-reset`, {
+                method: "POST",
+            });
+            if (res && res.ok) {
+                toast.success(`Password reset email sent to ${resetTarget.email}`);
+                setResetTarget(null);
+            } else {
+                toast.error(await readErrorMessage(res, "Failed to send password reset email"));
+            }
+        } catch (error) {
+            console.error("Error sending password reset", error);
+            toast.error("Failed to send password reset email");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const openEditModal = (user: User) => {
         setSelectedUser(user);
         setFormData({ name: user.name, email: user.email, password: "", role: user.role, status: user.status });
+        setFormError(null);
         setIsEditModalOpen(true);
         setActionMenu(null);
     };
 
-    const handleEditUser = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const saveEdit = async () => {
         if (!selectedUser) return;
+        setIsSubmitting(true);
+        setFormError(null);
         try {
-            const payload: any = { ...formData };
+            const payload: any = { ...formData, name: formData.name.trim(), email: formData.email.trim() };
             if (!payload.password) delete payload.password; // Don't send empty password
+            else if (payload.password.length < 8) {
+                setFormError("Password must be at least 8 characters.");
+                return;
+            }
+            if (isSelf(selectedUser)) {
+                // Never let an admin change their own role/status from here.
+                payload.role = selectedUser.role;
+                payload.status = selectedUser.status;
+            }
 
             const res = await authenticatedFetch(`/api/v1/admin/users/${selectedUser.id}`, {
                 method: "POST",
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
             });
             if (res && res.ok) {
+                toast.success("User updated");
                 setIsEditModalOpen(false);
-                fetchUsers();
+                setStatusConfirm(null);
+                void fetchUsers();
             } else {
-                alert("Failed to update user");
+                setFormError(await readErrorMessage(res, "Failed to update user"));
+                setStatusConfirm(null);
             }
         } catch (error) {
             console.error("Error updating user", error);
+            setFormError("Failed to update user. Please try again.");
+            setStatusConfirm(null);
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    const handleEditUser = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUser || isSubmitting) return;
+        if (!isSelf(selectedUser) && (formData.status !== selectedUser.status || formData.role !== selectedUser.role)) {
+            setStatusConfirm({ user: selectedUser, from: selectedUser.status, to: formData.status, role: formData.role });
+            return;
+        }
+        void saveEdit();
+    };
+
+    const exportCsv = () => {
+        if (users.length === 0) {
+            toast.error("Nothing to export");
+            return;
+        }
+        const header = ["Name", "Email", "Role", "Status", "Profile", "Joined"];
+        const rows = users.map((u) => [
+            u.name,
+            u.email,
+            formatRoleLabel(u.role),
+            u.status,
+            u.profile_complete === true ? "Complete" : u.profile_complete === false ? "Incomplete" : "",
+            u.createdAt || "",
+        ]);
+        const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `users-page-${currentPage}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const statusSelectOptions = useMemo(() => {
+        const cur = formData.status;
+        return cur && !STATUS_OPTIONS.includes(cur) ? [...STATUS_OPTIONS, cur] : STATUS_OPTIONS;
+    }, [formData.status]);
 
     const getRoleIcon = (role: string) => {
         switch (role) {
@@ -271,22 +449,6 @@ export default function AdminUsersPage() {
             case "organization_admin": return <User className="w-4 h-4 text-blue-600" />;
             case "faculty": return <User className="w-4 h-4 text-amber-600" />;
             default: return <GraduationCap className="w-4 h-4 text-blue-600" />;
-        }
-    };
-
-    const storedPasswordCount = users.filter((u) => u.stored_password).length;
-
-    const togglePasswordReveal = (userId: string | number) => {
-        const key = String(userId);
-        setRevealedPasswordIds((prev) => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const copyStoredPassword = async (password: string) => {
-        try {
-            await navigator.clipboard.writeText(password);
-            toast.success("Password copied");
-        } catch {
-            toast.error("Could not copy password");
         }
     };
 
@@ -324,7 +486,7 @@ export default function AdminUsersPage() {
                         <select
                             className={`${toolbarControlClass} w-full appearance-none pl-9 pr-8`}
                             value={roleFilter}
-                            onChange={(e) => setRoleFilter(e.target.value)}
+                            onChange={(e) => changeRoleFilter(e.target.value)}
                         >
                             <option value="all">All roles</option>
                             <option value="student">Student</option>
@@ -340,31 +502,19 @@ export default function AdminUsersPage() {
 
                     <button
                         type="button"
-                        onClick={() => {
-                            setShowPasswordColumn((v) => {
-                                if (v) setRevealedPasswordIds({});
-                                return !v;
-                            });
-                        }}
-                        className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:px-4 ${
-                            showPasswordColumn
-                                ? "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
-                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                        title="Show stored password column (super admin)"
+                        onClick={exportCsv}
+                        disabled={isLoading || users.length === 0}
+                        className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:px-4"
+                        title="Export the users on this page as CSV"
                     >
-                        {showPasswordColumn ? <EyeOff className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                        Passwords
-                        {storedPasswordCount > 0 && (
-                            <span className="rounded-full bg-violet-200/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-violet-900">
-                                {storedPasswordCount}
-                            </span>
-                        )}
+                        <Download className="h-4 w-4" />
+                        Export CSV
                     </button>
 
                     <button
                         onClick={() => {
                             setFormData({ name: "", email: "", password: "", role: "student", status: "active" });
+                            setFormError(null);
                             setIsAddModalOpen(true);
                         }}
                         className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -375,23 +525,25 @@ export default function AdminUsersPage() {
                 </div>
                 </div>
 
-                {showPasswordColumn && (
-                    <div className="flex gap-3 rounded-xl border border-violet-200/80 bg-violet-50/80 px-4 py-3 text-sm text-violet-950">
-                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
-                        <p className="leading-relaxed">
-                            Passwords appear after signup, when you set a new password in <strong>Edit</strong>, or when the user logs in again.
-                            Empty rows need a login or an admin password reset.
-                        </p>
-                    </div>
-                )}
             </div>
 
             {/* Table */}
             <div className="relative min-h-[320px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm">
 
                 <DataTable
+                    sortServer
+                    defaultSortFieldId="createdAt"
+                    defaultSortAsc={false}
+                    onSort={(column, direction) => {
+                        const by = String((column as { sortField?: string }).sortField || "createdAt");
+                        setSort({ by, dir: direction === "asc" ? "asc" : "desc" });
+                        setCurrentPage(1);
+                    }}
                     columns={[
                         {
+                            id: "name",
+                            sortField: "name",
+                            sortable: true,
                             name: "User",
                             cell: (user: User) => (
                                 <div className="flex items-center gap-3 py-2">
@@ -406,58 +558,6 @@ export default function AdminUsersPage() {
                             ),
                             grow: 2
                         },
-                        ...(showPasswordColumn
-                            ? [
-                                  {
-                                      name: "Password",
-                                      cell: (user: User) => {
-                                          const key = String(user.id);
-                                          const stored = user.stored_password;
-                                          if (!stored) {
-                                              return (
-                                                  <span
-                                                      className="text-xs text-slate-400"
-                                                      title="Set via Edit, or captured on next login"
-                                                  >
-                                                      Not stored yet
-                                                  </span>
-                                              );
-                                          }
-                                          const revealed = revealedPasswordIds[key];
-                                          return (
-                                              <div className="flex items-center gap-1 py-1">
-                                                  <code className="max-w-[140px] truncate rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800">
-                                                      {revealed ? stored : "••••••••"}
-                                                  </code>
-                                                  <button
-                                                      type="button"
-                                                      onClick={() => togglePasswordReveal(user.id)}
-                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                                                      title={revealed ? "Hide password" : "Show password"}
-                                                      aria-label={revealed ? "Hide password" : "Show password"}
-                                                  >
-                                                      {revealed ? (
-                                                          <EyeOff className="h-3.5 w-3.5" />
-                                                      ) : (
-                                                          <Eye className="h-3.5 w-3.5" />
-                                                      )}
-                                                  </button>
-                                                  <button
-                                                      type="button"
-                                                      onClick={() => copyStoredPassword(stored)}
-                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                                                      title="Copy password"
-                                                      aria-label="Copy password"
-                                                  >
-                                                      <Copy className="h-3.5 w-3.5" />
-                                                  </button>
-                                              </div>
-                                          );
-                                      },
-                                      minWidth: "200px",
-                                  },
-                              ]
-                            : []),
                         {
                             name: "Role",
                             cell: (user: User) => (
@@ -472,16 +572,7 @@ export default function AdminUsersPage() {
                         {
                             name: "Status",
                             cell: (user: User) => (
-                                <span
-                                    className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold capitalize ${user.status === "active"
-                                        ? "border-slate-200 bg-slate-50 text-slate-700"
-                                        : user.status === "pending"
-                                            ? "border-amber-200 bg-amber-50 text-amber-800"
-                                            : "border-red-200 bg-red-50 text-red-700"
-                                        }`}
-                                >
-                                    {user.status}
-                                </span>
+                                <StatusBadge status={user.status} />
                             )
                         },
                         {
@@ -526,9 +617,11 @@ export default function AdminUsersPage() {
                             },
                         },
                         {
+                            id: "createdAt",
+                            sortField: "createdAt",
                             name: "Joined Date",
                             selector: (user: User) => user.joinDate,
-                            sortable: true
+                            sortable: true,
                         },
                         {
                             name: "Actions",
@@ -613,7 +706,7 @@ export default function AdminUsersPage() {
                             <select
                                 className="border border-slate-200 rounded-md py-1 pl-2 pr-7 bg-white text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                                 value={itemsPerPage}
-                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                onChange={(e) => changeItemsPerPage(Number(e.target.value))}
                             >
                                 {[10, 25, 50].map((n) => (
                                     <option key={n} value={n}>
@@ -675,7 +768,7 @@ export default function AdminUsersPage() {
                 createPortal(
                     <div
                         data-user-actions-portal
-                        className="fixed z-[10000] w-36 rounded-lg border border-slate-100 bg-white py-1 shadow-xl"
+                        className="fixed z-[10000] w-56 rounded-lg border border-slate-100 bg-white py-1 shadow-xl"
                         style={{ left: actionMenu.x, top: actionMenu.y }}
                         role="menu"
                     >
@@ -688,8 +781,23 @@ export default function AdminUsersPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => handleDeleteUser(actionMenuUser.id)}
-                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                                setResetTarget(actionMenuUser);
+                                setActionMenu(null);
+                            }}
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                            <Mail className="h-4 w-4 shrink-0" /> Send password reset email
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isSelf(actionMenuUser)}
+                            title={isSelf(actionMenuUser) ? "You cannot delete your own account" : undefined}
+                            onClick={() => {
+                                setDeleteTarget(actionMenuUser);
+                                setActionMenu(null);
+                            }}
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:hover:bg-transparent"
                         >
                             <Trash2 className="h-4 w-4 shrink-0" /> Delete
                         </button>
@@ -705,12 +813,17 @@ export default function AdminUsersPage() {
                             <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
                                 {isAddModalOpen ? "Add New User" : "Edit User"}
                             </h2>
-                            <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="text-slate-400 hover:text-slate-600">
+                            <button type="button" aria-label="Close" onClick={closeModals} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
                         <form onSubmit={isAddModalOpen ? handleAddUser : handleEditUser} className="space-y-4">
+                            {formError && (
+                                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 break-words">
+                                    {formError}
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
                                 <input
@@ -735,6 +848,7 @@ export default function AdminUsersPage() {
                                     <select
                                         className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                         value={formData.role}
+                                        disabled={isEditModalOpen && isSelf(selectedUser)}
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                     >
                                         <option value="student">Student</option>
@@ -752,12 +866,18 @@ export default function AdminUsersPage() {
                                     <select
                                         className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                         value={formData.status}
+                                        disabled={isEditModalOpen && isSelf(selectedUser)}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                     >
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="pending">Pending</option>
+                                        {statusSelectOptions.map((st) => (
+                                            <option key={st} value={st}>
+                                                {statusOptionLabel(st)}
+                                            </option>
+                                        ))}
                                     </select>
+                                    {isEditModalOpen && isSelf(selectedUser) && (
+                                        <p className="mt-1 text-xs text-slate-500">You cannot change your own role or status.</p>
+                                    )}
                                 </div>
                             </div>
                             <div>
@@ -767,19 +887,65 @@ export default function AdminUsersPage() {
                                 <input
                                     type="password"
                                     required={isAddModalOpen}
+                                    minLength={8}
+                                    autoComplete="new-password"
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />
                             </div>
 
-                            <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2">
+                            <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2 inline-flex items-center justify-center gap-2 disabled:opacity-60">
+                                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                                 {isAddModalOpen ? "Create User" : "Save Changes"}
                             </button>
                         </form>
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                title={`Delete ${deleteTarget?.name ?? "user"}?`}
+                description={`This permanently deletes ${deleteTarget?.name ?? "this user"} (${deleteTarget?.email ?? ""}). This cannot be undone.`}
+                confirmLabel="Delete user"
+                variant="danger"
+                loading={isSubmitting}
+                onConfirm={confirmDeleteUser}
+                onCancel={() => setDeleteTarget(null)}
+            />
+            <ConfirmDialog
+                open={!!resetTarget}
+                title="Send password reset email?"
+                description={`A password reset link will be emailed to ${resetTarget?.name ?? "the user"} (${resetTarget?.email ?? ""}).`}
+                confirmLabel="Send email"
+                loading={isSubmitting}
+                onConfirm={confirmSendReset}
+                onCancel={() => setResetTarget(null)}
+            />
+            <ConfirmDialog
+                open={!!statusConfirm}
+                title={`Update ${statusConfirm?.user.name ?? "user"}?`}
+                description={
+                    statusConfirm
+                        ? [
+                              statusConfirm.from !== statusConfirm.to
+                                  ? `Status for ${statusConfirm.user.name} (${statusConfirm.user.email}) will change from ${statusOptionLabel(statusConfirm.from)} to ${statusOptionLabel(statusConfirm.to)}.`
+                                  : "",
+                              statusConfirm.user.role !== statusConfirm.role
+                                  ? `Role will change from ${formatRoleLabel(statusConfirm.user.role)} to ${formatRoleLabel(statusConfirm.role)}.`
+                                  : "",
+                          ]
+                              .filter(Boolean)
+                              .join(" ")
+                        : ""
+                }
+                confirmLabel="Confirm change"
+                variant="warning"
+                loading={isSubmitting}
+                onConfirm={saveEdit}
+                onCancel={() => setStatusConfirm(null)}
+            />
         </div>
     );
 }

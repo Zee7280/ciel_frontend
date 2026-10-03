@@ -23,3 +23,20 @@ export function parseMembershipFeePkrSettingValue(
     const parsed = parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultPkr;
 }
+
+/** Must match backend `PLATFORM_SETTING_KEYS`. */
+export const MEMBERSHIP_FEE_UNIVERSITY_PKR_KEY = "MEMBERSHIP_FEE_UNIVERSITY_PKR";
+export const MEMBERSHIP_FEE_CORPORATE_PKR_KEY = "MEMBERSHIP_FEE_CORPORATE_PKR";
+export const REPORTING_FEE_PKR_KEY = "REPORTING_FEE_PKR";
+
+/** Fee limits enforced by the backend (whole PKR). */
+export const FEE_PKR_MIN = 1;
+export const FEE_PKR_MAX = 1_000_000;
+
+/** True for a plain whole-number string within [min, max] (no decimals, no signs, no separators). */
+export function isValidWholeNumberInRange(value: string | null | undefined, min: number, max: number): boolean {
+    const v = String(value ?? "").trim();
+    if (!/^\d+$/.test(v)) return false;
+    const n = Number(v);
+    return Number.isSafeInteger(n) && n >= min && n <= max;
+}

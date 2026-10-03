@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AlertCircle, Bell, CheckCircle, Clock, GraduationCap, Info, Loader2, LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -89,14 +89,15 @@ function studentPageKicker(pathname: string): string {
     return "Student";
 }
 
-function adminPageKicker(pathname: string): string {
+function adminPageKicker(pathname: string, searchParams: { get(name: string): string | null }): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/admin") return "Overview";
     if (p.startsWith("/dashboard/admin/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/admin/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/admin/path-submissions")) {
-        if (typeof window !== "undefined" && window.location.search.includes("tab=fyp-thesis")) return "Final Year Project (FYP)";
-        if (typeof window !== "undefined" && window.location.search.includes("tab=course-project")) return "Coursework";
+        const tab = searchParams.get("tab");
+        if (tab === "fyp-thesis") return "Final Year Project (FYP)";
+        if (tab === "course-project") return "Coursework";
         return "Path submissions";
     }
     if (p.startsWith("/dashboard/admin/analytics")) return "Impact Intelligence Hub";
@@ -105,7 +106,14 @@ function adminPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/admin/join-applications")) return "Applications";
     if (p.startsWith("/dashboard/admin/users")) return "Users";
     if (p.startsWith("/dashboard/admin/organizations")) return "Organizations";
-    if (p.startsWith("/dashboard/admin/reports")) return "Reports";
+    if (p.startsWith("/dashboard/admin/reports/verify")) return "Student Reports";
+    if (p.startsWith("/dashboard/admin/reports")) return "Reports & Moderation";
+    if (p.startsWith("/dashboard/admin/payments")) return "Payments";
+    if (p.startsWith("/dashboard/admin/org-membership")) return "Org membership fees";
+    if (p.startsWith("/dashboard/admin/projects")) return "All projects";
+    if (p.startsWith("/dashboard/admin/issue-logs")) return "Issue Logs";
+    if (p.startsWith("/dashboard/admin/support")) return "Support";
+    if (p.startsWith("/dashboard/admin/audit-logs")) return "Audit Logs";
     if (p.startsWith("/dashboard/admin/notifications")) return "Notifications";
     if (p.startsWith("/dashboard/admin/messages")) return "Messages";
     if (p.startsWith("/dashboard/admin/settings")) return "Settings";
@@ -130,8 +138,9 @@ type HeaderNotification = {
     createdAt: string;
 };
 
-export default function DashboardHeader() {
+function DashboardHeaderInner() {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const router = useRouter();
     const [navRole, setNavRole] = useState<DashboardNavRole>(() => dashboardNavRoleFromPathname(pathname));
 
@@ -215,7 +224,7 @@ export default function DashboardHeader() {
                 : navRole === "partner"
                   ? universityPageKicker(pathname)
                 : navRole === "admin"
-                  ? adminPageKicker(pathname)
+                  ? adminPageKicker(pathname, searchParams)
                   : navRole === "investor"
                     ? investorPageKicker(pathname)
                   : "Overview";
@@ -580,5 +589,13 @@ export default function DashboardHeader() {
                 </div>
             </div>
         </header>
+    );
+}
+
+export default function DashboardHeader() {
+    return (
+        <Suspense fallback={null}>
+            <DashboardHeaderInner />
+        </Suspense>
     );
 }

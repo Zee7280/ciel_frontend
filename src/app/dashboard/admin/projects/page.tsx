@@ -7,6 +7,8 @@ import type { TableColumn } from "react-data-table-component";
 import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
+import { downloadCsv } from "@/app/dashboard/admin/_shared/csv";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
 import {
     attendanceUnlockLabel,
@@ -21,6 +23,8 @@ type AdminProjectRow = {
     subtitle: string;
     displayStatus: string;
     statusKey: string;
+    /** Backend says CIEL final approval is available (or derived from the pipeline stage). */
+    adminCanApprove: boolean;
     locationLabel: string;
     locationKey: string;
     /** Current enrolled / joined volunteers */
@@ -107,15 +111,28 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     const status = lower(raw.status);
     const fac = lower(raw.faculty_approval_status);
     const part = lower(raw.partner_approval_status);
+    const adm = lower(raw.admin_approval_status);
 
-    let statusKey = workflow || status || "unknown";
-    if (!workflow && status === "pending" && fac === "pending") statusKey = "pending_faculty";
-    if (!workflow && fac === "approved" && part === "pending") statusKey = "pending_partner";
+    // Operational states (closed/draft/...) live on `status` and win over a stale "live" workflow stage.
+    const operationalStatus = ["closed", "completed", "draft", "cancelled"].includes(status) ? status : "";
+    let statusKey: string;
+    if (operationalStatus) statusKey = operationalStatus;
+    else if (workflow === "pending_admin" && status === "pending_execution") statusKey = "pending_execution";
+    else if (workflow) statusKey = workflow;
+    else if (adm === "rejected" || status === "rejected") statusKey = "rejected";
+    else if (adm === "revision_requested" || status === "revision") statusKey = "revision";
+    else if (fac === "pending") statusKey = "pending_faculty";
+    else if (part === "pending") statusKey = "pending_partner";
+    else if (status === "pending_execution") statusKey = "pending_execution";
+    else if (adm === "pending" && (status === "pending_approval" || status === "pending")) statusKey = "pending_admin";
+    else statusKey = status || "unknown";
+    if (statusKey === "live" && status === "active") statusKey = "active";
 
-    let displayStatus = statusKey.replace(/_/g, " ").trim() || "unknown";
-    if (workflow) displayStatus = String(raw.workflow_stage ?? raw.approval_stage ?? displayStatus).replace(/_/g, " ");
-    else if (status) displayStatus = String(raw.status).replace(/_/g, " ");
-    displayStatus = displayStatus.toUpperCase();
+    const displayStatus = statusKey.replace(/_/g, " ").trim().toUpperCase() || "UNKNOWN";
+    const adminCanApprove =
+        typeof raw.admin_can_approve === "boolean" ?
+            raw.admin_can_approve
+        :   statusKey === "pending_admin" || statusKey === "pending_approval";
 
     const timeline = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : null;
     /** Enrolled count only — never use volunteers_required here (capacity is separate). */
@@ -153,6 +170,7 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
         subtitle: subtitleFromRaw(raw),
         displayStatus,
         statusKey,
+        adminCanApprove,
         locationLabel: pickLocation(raw),
         locationKey: pickLocation(raw).toLowerCase(),
         volunteers,
@@ -717,6 +735,8 @@ function statusBadgeClass(statusKey: string): string {
     if (s === "active" || s === "live" || s === "approved") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
     if (s === "completed") return "bg-blue-50 text-blue-700 border border-blue-200";
     if (s === "rejected") return "bg-rose-50 text-rose-700 border border-rose-200";
+    if (s === "revision") return "bg-orange-50 text-orange-800 border border-orange-200";
+    if (s === "pending_execution") return "bg-indigo-50 text-indigo-800 border border-indigo-200";
     if (s.includes("pending_faculty") || s === "pending_faculty" || s.includes("faculty"))
         return "bg-slate-100 text-slate-700 border border-slate-200";
     if (s.includes("pending_partner") || s.includes("partner")) return "bg-violet-50 text-violet-800 border border-violet-200";
@@ -758,10 +778,22 @@ function seatsNote(r: AdminProjectRow): {
     return { primary: "", primaryTone: "slate", extra: null };
 }
 
+/** Prefer the Nest `message` (string or string[]), then legacy `error`. */
+function errorMessage(body: unknown, fallback: string): string {
+    if (body && typeof body === "object") {
+        const o = body as { message?: unknown; error?: unknown };
+        if (typeof o.message === "string" && o.message.trim()) return o.message;
+        if (Array.isArray(o.message) && o.message.length) return o.message.map(String).join(", ");
+        if (typeof o.error === "string" && o.error.trim()) return o.error;
+    }
+    return fallback;
+}
+
 export default function AdminProjectsPage() {
     const [rows, setRows] = useState<AdminProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [mobileVisible, setMobileVisible] = useState(20);
     const [remindingZeroHours, setRemindingZeroHours] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [studentEmailInput, setStudentEmailInput] = useState("");
@@ -805,33 +837,41 @@ export default function AdminProjectsPage() {
         return () => clearTimeout(id);
     }, [studentEmailInput]);
 
-    const loadProjects = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const qp = studentEmailApplied.trim();
-            const path =
-                qp.length > 0
-                    ? `/api/v1/admin/projects?student_email=${encodeURIComponent(qp)}`
-                    : `/api/v1/admin/projects`;
-            const res = await authenticatedFetch(path);
-            if (!res || !res.ok) {
-                const err = res ? await res.json().catch(() => ({})) : {};
-                toast.error(typeof (err as { error?: string }).error === "string" ? (err as { error: string }).error : "Could not load projects");
-                setRows([]);
-                return;
+    const loadProjectsSeq = useRef(0);
+    /** `silent` refetches in place: no global spinner, and the current rows stay on error. */
+    const loadProjects = useCallback(
+        async (silent = false) => {
+            const seq = ++loadProjectsSeq.current;
+            if (!silent) setIsLoading(true);
+            try {
+                const qp = studentEmailApplied.trim();
+                const path =
+                    qp.length > 0
+                        ? `/api/v1/admin/projects?student_email=${encodeURIComponent(qp)}`
+                        : `/api/v1/admin/projects`;
+                const res = await authenticatedFetch(path);
+                if (seq !== loadProjectsSeq.current) return;
+                if (!res || !res.ok) {
+                    const err = res ? await res.json().catch(() => ({})) : {};
+                    toast.error(errorMessage(err, "Could not load projects"));
+                    if (!silent) setRows([]);
+                    return;
+                }
+                const data = await res.json();
+                if (seq !== loadProjectsSeq.current) return;
+                const list = extractAdminProjectsList(data);
+                const mapped = list.map(normalizeAdminProjectRow).filter(Boolean) as AdminProjectRow[];
+                setRows(mapped);
+            } catch {
+                if (seq !== loadProjectsSeq.current) return;
+                toast.error("Failed to load projects");
+                if (!silent) setRows([]);
+            } finally {
+                if (seq === loadProjectsSeq.current) setIsLoading(false);
             }
-            const data = await res.json();
-            const list = extractAdminProjectsList(data);
-            const mapped = list.map(normalizeAdminProjectRow).filter(Boolean) as AdminProjectRow[];
-            setRows(mapped);
-        } catch (e) {
-            console.error(e);
-            toast.error("Failed to load projects");
-            setRows([]);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [studentEmailApplied]);
+        },
+        [studentEmailApplied],
+    );
 
     useEffect(() => {
         void loadProjects();
@@ -997,7 +1037,7 @@ export default function AdminProjectsPage() {
             if (res && (res.ok || res.status === 204)) {
                 toast.success("Team removed successfully");
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 const data = res ? await res.json().catch(() => ({})) : {};
                 toast.error(
@@ -1033,7 +1073,7 @@ export default function AdminProjectsPage() {
                 toast.success("Member removed successfully");
                 setTeamMemberEditor((cur) => (cur?.memberId === memberId ? null : cur));
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 const data = res ? await res.json().catch(() => ({})) : {};
                 toast.error(
@@ -1126,7 +1166,7 @@ export default function AdminProjectsPage() {
                           : "No duplicate seats found",
                 );
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
@@ -1168,7 +1208,7 @@ export default function AdminProjectsPage() {
                           : "Enrollments reconciled",
                 );
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
@@ -1218,7 +1258,7 @@ export default function AdminProjectsPage() {
                           : "Roster checked — no repairs needed",
                 );
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
@@ -1286,7 +1326,7 @@ export default function AdminProjectsPage() {
                 setTeamMergeLeadId("");
                 setTeamMergeTargetTeamId("");
                 setTeamMergePanelOpen(false);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
@@ -1368,7 +1408,7 @@ export default function AdminProjectsPage() {
                 toast.success("Member details updated");
                 setTeamMemberEditor(null);
                 await loadTeamOverview(teamOverviewModal.opportunityId);
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
@@ -1402,7 +1442,7 @@ export default function AdminProjectsPage() {
             if (res && (res.ok || res.status === 204)) {
                 toast.success("Applicant withdrawn; seat freed");
                 setIncompleteApplicants((prev) => prev.filter((r) => r.applicationId !== applicationId));
-                await loadProjects();
+                void loadProjects(true);
             } else {
                 const body = res ? await res.json().catch(() => ({})) : {};
                 toast.error(
@@ -1678,45 +1718,27 @@ export default function AdminProjectsPage() {
             "Remaining hours",
             "Location",
         ];
-        const csvContent = [
-            headers.join(","),
-            ...filteredRows.map((r) => {
-                const seatVsApp =
-                    r.studentMatch?.matchSource === "application_pipeline"
-                        ? "Application pipeline"
-                        : r.studentMatch
-                          ? "Enrolled seat"
-                          : "";
-                const extra =
-                    studentEmailApplied.trim().length > 0 ?
-                        [
-                            `"${String(r.studentMatch?.role ?? "").replace(/"/g, '""')}"`,
-                            `"${seatVsApp.replace(/"/g, '""')}"`,
-                        ]
-                    :   [];
-                return [
-                    r.id,
-                    `"${r.title.replace(/"/g, '""')}"`,
-                    `"${r.subtitle.replace(/"/g, '""')}"`,
-                    `"${r.displayStatus.replace(/"/g, '""')}"`,
-                    ...extra,
-                    r.volunteers,
-                    r.volunteersRequired ?? "",
-                    r.remainingSeats ?? "",
-                    r.remainingMembers ?? "",
-                    r.hours,
-                    r.remainingHours ?? "",
-                    `"${r.locationLabel.replace(/"/g, '""')}"`,
-                ].join(",");
-            }),
-        ].join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.download = `projects_report_${new Date().toISOString().split("T")[0]}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
+        const body = filteredRows.map((r) => {
+            const seatVsApp =
+                r.studentMatch?.matchSource === "application_pipeline" ? "Application pipeline"
+                : r.studentMatch ? "Enrolled seat"
+                : "";
+            return [
+                r.id,
+                r.title,
+                r.subtitle,
+                r.displayStatus,
+                ...(studentEmailApplied.trim() ? [r.studentMatch?.role ?? "", seatVsApp] : []),
+                r.volunteers,
+                r.volunteersRequired ?? "",
+                r.remainingSeats ?? "",
+                r.remainingMembers ?? "",
+                r.hours,
+                r.remainingHours ?? "",
+                r.locationLabel,
+            ];
+        });
+        downloadCsv(`projects_report_${new Date().toISOString().split("T")[0]}.csv`, [headers, ...body]);
         toast.success("Export started");
     };
 
@@ -1745,27 +1767,64 @@ export default function AdminProjectsPage() {
     const showZeroHoursBanner =
         summaryStats.total > 0 && summaryStats.totalHoursLogged === 0 && summaryStats.totalHoursCommitted > 0;
 
-    const handleRemindZeroHours = async () => {
-        if (
-            !confirm(
-                "Send an hours-logging reminder email to every enrolled student on projects with 0 verified hours?",
-            )
-        ) {
-            return;
+    const [zeroHoursPreview, setZeroHoursPreview] = useState<{ students: number; projects: number } | null>(null);
+    const [zeroHoursPreviewLoading, setZeroHoursPreviewLoading] = useState(false);
+
+    const pickCount = (data: unknown, keys: string[]): number | null => {
+        if (!data || typeof data !== "object") return null;
+        const o = data as Record<string, unknown>;
+        const inner = o.data && typeof o.data === "object" ? (o.data as Record<string, unknown>) : null;
+        for (const src of [o, inner]) {
+            if (!src) continue;
+            for (const k of keys) {
+                const v = src[k];
+                if (Array.isArray(v)) return v.length;
+                const n = Number(v);
+                if (v !== undefined && v !== null && v !== "" && Number.isFinite(n)) return n;
+            }
         }
+        return null;
+    };
+
+    /** Step 1: dry run so the admin sees the blast radius before any email is sent. */
+    const handleRemindZeroHours = async () => {
+        setZeroHoursPreviewLoading(true);
+        try {
+            const res = await authenticatedFetch("/api/v1/admin/projects/remind-zero-hours", {
+                method: "POST",
+                body: JSON.stringify({ dryRun: true }),
+            });
+            const data = res ? await res.json().catch(() => ({})) : null;
+            if (!res?.ok) {
+                toast.error(errorMessage(data, "Could not check who would be reminded"));
+                return;
+            }
+            const students =
+                pickCount(data, ["students_to_notify", "students_would_notify", "would_notify", "students_notified", "students"]) ?? 0;
+            const projects = pickCount(data, ["opportunities_with_zero_hours", "projects_with_zero_hours", "projects"]) ?? 0;
+            setZeroHoursPreview({ students, projects });
+        } catch {
+            toast.error("Could not check who would be reminded");
+        } finally {
+            setZeroHoursPreviewLoading(false);
+        }
+    };
+
+    /** Step 2: confirmed — actually send. */
+    const sendZeroHoursReminders = async () => {
         setRemindingZeroHours(true);
         try {
-            const res = await authenticatedFetch("/api/v1/admin/projects/remind-zero-hours", { method: "POST" });
+            const res = await authenticatedFetch("/api/v1/admin/projects/remind-zero-hours", {
+                method: "POST",
+                body: JSON.stringify({ dryRun: false }),
+            });
             const data = res ? await res.json().catch(() => ({})) : null;
             if (res?.ok) {
-                const notified = Number((data as { students_notified?: number })?.students_notified ?? 0);
+                const notified = pickCount(data, ["students_notified"]) ?? 0;
                 toast.success(`Reminder sent to ${notified} student${notified === 1 ? "" : "s"}.`);
+                setZeroHoursPreview(null);
             } else {
-                toast.error(
-                    typeof (data as { message?: string })?.message === "string"
-                        ? (data as { message: string }).message
-                        : "Could not send reminders",
-                );
+                toast.error(errorMessage(data, "Could not send reminders"));
             }
         } catch {
             toast.error("Could not send reminders");
@@ -1774,62 +1833,63 @@ export default function AdminProjectsPage() {
         }
     };
 
-    const handleStatusUpdate = async (id: string, newStatus: string) => {
-        try {
-            const res = await authenticatedFetch(`/api/v1/admin/opportunities/${id}/status`, {
-                method: "PUT",
-                body: JSON.stringify({ status: newStatus }),
-            });
-            if (res?.ok) {
-                toast.success("Status updated");
-                setActiveMenu(null);
-                await loadProjects();
-            } else {
-                toast.error("Could not update status");
-            }
-        } catch {
-            toast.error("Could not update status");
-        }
+    type WorkflowAction =
+        | { kind: "approve" | "reject" | "revise" | "close" | "draft" | "delete"; id: string; title: string };
+    const [workflowAction, setWorkflowAction] = useState<WorkflowAction | null>(null);
+    const [workflowBusy, setWorkflowBusy] = useState(false);
+
+    const requestWorkflowAction = (kind: WorkflowAction["kind"], row: AdminProjectRow) => {
+        setActiveMenu(null);
+        setWorkflowAction({ kind, id: row.id, title: row.title });
     };
 
-    const handleDeleteOpportunity = async (id: string) => {
-        const target = rows.find((row) => row.id === id);
-        const label = target?.title?.trim() || "this opportunity";
-        if (!confirm(`Delete "${label}"?\n\nThis should also remove related dependent records from the backend and cannot be undone.`)) {
-            return;
-        }
-
-        setDeletingId(id);
+    const runWorkflowAction = async (reason: string) => {
+        if (!workflowAction) return;
+        const { kind, id } = workflowAction;
+        const base = `/api/v1/admin/opportunities/${encodeURIComponent(id)}`;
+        setWorkflowBusy(true);
+        if (kind === "delete") setDeletingId(id);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/opportunities/${id}`, {
-                method: "DELETE",
-            });
-
-            if (!res) {
-                toast.error("Failed to delete opportunity");
+            let res: Response | null | undefined;
+            let okMsg = "Updated";
+            let failMsg = "Could not update opportunity";
+            if (kind === "approve") {
+                res = await authenticatedFetch(`${base}/approve`, { method: "POST" });
+                okMsg = "Opportunity approved";
+                failMsg = "Could not approve opportunity";
+            } else if (kind === "reject" || kind === "revise") {
+                res = await authenticatedFetch(`${base}/${kind}`, {
+                    method: "POST",
+                    body: JSON.stringify({ reason }),
+                });
+                okMsg = kind === "reject" ? "Opportunity rejected" : "Revision requested";
+                failMsg = kind === "reject" ? "Could not reject opportunity" : "Could not request revision";
+            } else if (kind === "close" || kind === "draft") {
+                res = await authenticatedFetch(`${base}/status`, {
+                    method: "PUT",
+                    body: JSON.stringify({ status: kind === "close" ? "closed" : "draft" }),
+                });
+                okMsg = kind === "close" ? "Opportunity closed" : "Moved to draft";
+                failMsg = "Could not update status";
+            } else {
+                res = await authenticatedFetch(base, { method: "DELETE" });
+                okMsg = "Opportunity deleted successfully";
+                failMsg = "Failed to delete opportunity";
+            }
+            if (res && (res.ok || res.status === 204)) {
+                toast.success(okMsg);
+                if (kind === "delete") setRows((prev) => prev.filter((r) => r.id !== id));
+                setWorkflowAction(null);
+                void loadProjects(true);
                 return;
             }
-
-            if (res.ok) {
-                toast.success("Opportunity deleted successfully");
-                setActiveMenu(null);
-                await loadProjects();
-                return;
-            }
-
-            const body = await res.json().catch(() => ({}));
-            const message =
-                typeof (body as { message?: string; error?: string }).message === "string"
-                    ? (body as { message: string }).message
-                    : typeof (body as { message?: string; error?: string }).error === "string"
-                      ? (body as { error: string }).error
-                      : "Failed to delete opportunity";
-            toast.error(message);
-        } catch (error) {
-            console.error("Delete opportunity failed:", error);
-            toast.error("Failed to delete opportunity");
+            const body = res ? await res.json().catch(() => ({})) : {};
+            toast.error(errorMessage(body, failMsg));
+        } catch {
+            toast.error("Request failed");
         } finally {
-            setDeletingId(null);
+            setWorkflowBusy(false);
+            if (kind === "delete") setDeletingId(null);
         }
     };
 
@@ -2034,10 +2094,10 @@ export default function AdminProjectsPage() {
                         <button
                             type="button"
                             onClick={handleRemindZeroHours}
-                            disabled={remindingZeroHours}
+                            disabled={remindingZeroHours || zeroHoursPreviewLoading}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {remindingZeroHours ?
+                            {remindingZeroHours || zeroHoursPreviewLoading ?
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             :   <Send className="w-3.5 h-3.5" />}
                             Remind enrolled students
@@ -2191,6 +2251,78 @@ export default function AdminProjectsPage() {
                         </p>
                     </div>
                 ) : (
+                    <>
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {isLoading ?
+                            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+                        :   filteredRows.slice(0, mobileVisible).map((r) => {
+                                const note = seatsNote(r);
+                                return (
+                                    <div key={r.id} className="min-w-0 p-3.5">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <Link
+                                                    href={`/dashboard/student/browse/${encodeURIComponent(r.id)}`}
+                                                    className="block break-words font-bold text-slate-900"
+                                                >
+                                                    {r.title}
+                                                </Link>
+                                                <div className="mt-0.5 break-words text-xs font-medium text-slate-500">{r.subtitle}</div>
+                                            </div>
+                                            <span
+                                                className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass(r.statusKey)}`}
+                                            >
+                                                {r.displayStatus}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                                            <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-slate-400" />{r.locationLabel}</span>
+                                            <span>
+                                                {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers} volunteers
+                                                {note.primary ? ` (${note.primary})` : ""}
+                                            </span>
+                                            <span>{r.hours} h logged</span>
+                                            {studentEmailFiltered && r.studentMatch ? <span className="capitalize">Role: {r.studentMatch.role}</span> : null}
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-end gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => openProjectTrackerModal(r)}
+                                                className="rounded-full p-2.5 text-blue-600 hover:bg-blue-50"
+                                                aria-label="Track project pipeline"
+                                            >
+                                                <ClipboardList className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setActiveMenu((prev) =>
+                                                        prev?.id === r.id ? null : { id: r.id, top: Math.min(rect.bottom + 6, window.innerHeight - 320), right: Math.max(8, window.innerWidth - rect.right) },
+                                                    );
+                                                }}
+                                                className="admin-project-menu-trigger rounded-full p-2.5 text-slate-400 hover:bg-slate-200"
+                                                aria-label="More actions"
+                                            >
+                                                <MoreVertical className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        {!isLoading && filteredRows.length > mobileVisible ? (
+                            <div className="p-3 text-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileVisible((n) => n + 20)}
+                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700"
+                                >
+                                    Show more ({filteredRows.length - mobileVisible} left)
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="hidden md:block">
                     <DataTable<AdminProjectRow>
                         columns={columns}
                         data={filteredRows}
@@ -2220,6 +2352,8 @@ export default function AdminProjectsPage() {
                             cells: { style: { overflow: "visible" } },
                         }}
                     />
+                    </div>
+                    </>
                 )}
                 {activeMenu && activeMenuRow && (
                     <>
@@ -2297,37 +2431,77 @@ export default function AdminProjectsPage() {
                             >
                                 <Users className="w-4 h-4" /> Teams &amp; enrollments
                             </button>
-                            {lower(activeMenuRow.raw.status) === "active" && (
-                                <button
-                                    type="button"
-                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "pending_approval")}
-                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-50 flex items-center gap-2"
-                                >
-                                    Revert to pending
-                                </button>
-                            )}
-                            {lower(activeMenuRow.raw.status) === "pending_approval" && (
-                                <button
-                                    type="button"
-                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "active")}
-                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 flex items-center gap-2"
-                                >
-                                    Mark active
-                                </button>
-                            )}
-                            {lower(activeMenuRow.raw.status) !== "rejected" && (
-                                <button
-                                    type="button"
-                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "rejected")}
-                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                    Reject
-                                </button>
-                            )}
+                            {(() => {
+                                const r = activeMenuRow;
+                                const k = r.statusKey;
+                                const pipelineLabel: Record<string, string> = {
+                                    pending_faculty: "Awaiting faculty verification",
+                                    pending_partner: "Awaiting partner confirmation",
+                                    pending_execution: "Awaiting execution-partner confirmation",
+                                };
+                                const item = "w-full text-left px-3 py-2.5 text-sm font-medium flex items-center gap-2";
+                                const terminal = k === "rejected";
+                                const reviewable = !terminal && k !== "draft" && k !== "closed" && k !== "completed" && k !== "cancelled";
+                                return (
+                                    <>
+                                        {pipelineLabel[k] ? (
+                                            <div className="px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border-y border-slate-100">
+                                                {pipelineLabel[k]}
+                                                {r.adminCanApprove ? "" : " — admin approval not available yet"}
+                                            </div>
+                                        ) : null}
+                                        {r.adminCanApprove && reviewable ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestWorkflowAction("approve", r)}
+                                                className={`${item} text-green-700 hover:bg-green-50`}
+                                            >
+                                                Approve
+                                            </button>
+                                        ) : null}
+                                        {reviewable ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestWorkflowAction("revise", r)}
+                                                    className={`${item} text-amber-700 hover:bg-amber-50`}
+                                                >
+                                                    Request revision
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestWorkflowAction("reject", r)}
+                                                    className={`${item} text-red-600 hover:bg-red-50`}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
+                                        ) : null}
+                                        {k !== "closed" && k !== "completed" && k !== "rejected" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestWorkflowAction("close", r)}
+                                                className={`${item} text-slate-700 hover:bg-slate-50`}
+                                            >
+                                                Close
+                                            </button>
+                                        ) : null}
+                                        {k !== "draft" && k !== "rejected" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestWorkflowAction("draft", r)}
+                                                className={`${item} text-slate-700 hover:bg-slate-50`}
+                                            >
+                                                Move to draft
+                                            </button>
+                                        ) : null}
+                                    </>
+                                );
+                            })()}
                             <div className="h-px bg-slate-100 my-0.5" />
                             <button
                                 type="button"
-                                onClick={() => void handleDeleteOpportunity(activeMenuRow.id)}
+                                onClick={() => requestWorkflowAction("delete", activeMenuRow)}
                                 disabled={deletingId === activeMenuRow.id}
                                 className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
@@ -2338,6 +2512,66 @@ export default function AdminProjectsPage() {
                     </>
                 )}
             </div>
+
+            {workflowAction ? (() => {
+                const wa = workflowAction;
+                const row = rows.find((r) => r.id === wa.id);
+                const raw = row?.raw ?? {};
+                const reports = pickCount(raw, ["reports_count", "report_count", "student_reports_count", "reports"]);
+                const cfg: Record<WorkflowAction["kind"], { title: string; label: string; danger: boolean; reason: boolean; text: string }> = {
+                    approve: { title: "Approve opportunity", label: "Approve", danger: false, reason: false, text: "This gives final CIEL approval and publishes the opportunity." },
+                    reject: { title: "Reject opportunity", label: "Reject", danger: true, reason: true, text: "Rejecting is permanent: the creator can no longer edit this opportunity. The reason is emailed to the creator." },
+                    revise: { title: "Request revision", label: "Send for revision", danger: false, reason: true, text: "The creator is asked to update and resubmit. The reason is shared with them." },
+                    close: { title: "Close opportunity", label: "Close", danger: false, reason: false, text: "Closing stops new applications. Existing participants are kept." },
+                    draft: { title: "Move to draft", label: "Move to draft", danger: false, reason: false, text: "The opportunity is hidden from the public listing until it is published again." },
+                    delete: { title: "Delete opportunity", label: "Delete permanently", danger: true, reason: false, text: "This permanently deletes the opportunity and related records. It cannot be undone." },
+                };
+                const c = cfg[wa.kind];
+                return (
+                    <ConfirmModal
+                        open
+                        title={c.title}
+                        confirmLabel={c.label}
+                        tone={c.danger ? "danger" : "default"}
+                        busy={workflowBusy}
+                        requireReason={c.reason}
+                        requireTyped={wa.kind === "delete" ? wa.title : undefined}
+                        onConfirm={runWorkflowAction}
+                        onCancel={() => !workflowBusy && setWorkflowAction(null)}
+                    >
+                        <p className="break-words font-semibold text-gray-800">&ldquo;{wa.title}&rdquo;</p>
+                        <p className="mt-1">{c.text}</p>
+                        {wa.kind === "delete" ? (
+                            <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                                <li>
+                                    {row ? `${row.volunteers} enrolled participant${row.volunteers === 1 ? "" : "s"}` : "Enrolled participants"} will lose their seat.
+                                </li>
+                                <li>
+                                    {reports != null ? `${reports} student report${reports === 1 ? "" : "s"}` : "Linked student reports"} and attendance/timesheets will be removed.
+                                </li>
+                            </ul>
+                        ) : null}
+                    </ConfirmModal>
+                );
+            })() : null}
+
+            <ConfirmModal
+                open={zeroHoursPreview !== null}
+                title="Send hours-logging reminders"
+                confirmLabel="Send emails"
+                busy={remindingZeroHours}
+                onConfirm={sendZeroHoursReminders}
+                onCancel={() => !remindingZeroHours && setZeroHoursPreview(null)}
+            >
+                {zeroHoursPreview ? (
+                    zeroHoursPreview.students === 0 ?
+                        <p>No enrolled students need a reminder right now.</p>
+                    :   <p>
+                            <strong>{zeroHoursPreview.students}</strong> student{zeroHoursPreview.students === 1 ? "" : "s"} across{" "}
+                            <strong>{zeroHoursPreview.projects}</strong> active project{zeroHoursPreview.projects === 1 ? "" : "s"} will be emailed.
+                        </p>
+                ) : null}
+            </ConfirmModal>
 
             {applicantsModal && (
                 <>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Award, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Award, Trash2, ArrowRight, GraduationCap } from 'lucide-react';
 import { downloadAdminReportAiPayload, regenerateAdminReportAiScore, regenerateAdminReportMasterRubricAiScore } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import DataTable from 'react-data-table-component';
 import type { TableColumn } from 'react-data-table-component';
 import { normalizeReportPartnerStatus } from '@/utils/reportPartnerApprovalDisplay';
 import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
+import { saveReviewQueue } from '../../_shared/reviewQueue';
 
 function formatDisplayName(name: string) {
     return name
@@ -32,6 +33,7 @@ interface Report {
     project_title: string;
     organization_id?: string | null;
     organization_name?: string;
+    university?: string | null;
     submission_date: string;
     submitted_at?: string;
     report_submitted_at?: string;
@@ -54,6 +56,32 @@ function reportProjectKey(report: Report): string {
 }
 
 /** Same student + same project — rows admins usually merge together. */
+function formatSubmittedDate(report: Report): string {
+    const ms = reportSubmittedMs(report);
+    return ms > 0
+        ? new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '—';
+}
+
+function AgingChip({ days }: { days: number | null }) {
+    if (days === null) return null;
+    const tone =
+        days >= 14
+            ? 'bg-red-50 text-red-700 ring-red-200/70'
+            : days >= 7
+              ? 'bg-amber-50 text-amber-800 ring-amber-200/70'
+              : 'bg-slate-50 text-slate-600 ring-slate-200/80';
+    return (
+        <span
+            className={clsx('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ring-1 ring-inset whitespace-nowrap', tone)}
+            title="Days waiting for admin review"
+        >
+            <Clock className="h-2.5 w-2.5" />
+            {days === 0 ? 'Today' : `${days}d waiting`}
+        </span>
+    );
+}
+
 function reportDuplicateGroupKey(report: Report): string {
     const projectKey = reportProjectKey(report);
     if (!projectKey) return "";
@@ -77,6 +105,21 @@ type DuplicateGroup = {
     studentName: string;
     projectTitle: string;
 };
+
+type QueueCounts = { needsReview: number; verified: number; revision: number; all: number };
+
+function parseMetaCounts(meta: unknown): QueueCounts | null {
+    if (!meta || typeof meta !== 'object') return null;
+    const m = meta as Record<string, unknown>;
+    const c = (m.counts && typeof m.counts === 'object' ? m.counts : m) as Record<string, unknown>;
+    const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const needsReview = n(c.needsReview);
+    const verified = n(c.verified);
+    const revision = n(c.revision);
+    const all = n(c.all);
+    if (needsReview === null || verified === null || revision === null || all === null) return null;
+    return { needsReview, verified, revision, all };
+}
 
 function normalizeStatus(value: string | null | undefined): string {
     if (!value) return '';
@@ -125,12 +168,16 @@ function reportPaymentQueueStatus(report: Report): string {
 function isReportAdminVerified(report: Report): boolean {
     const overall = reportOverallStatus(report);
     const admin = reportAdminStatus(report);
-    return (
-        admin === 'approved' ||
-        overall === 'verified' ||
-        overall === 'paid' ||
-        overall === 'partner_verified'
-    );
+    // partner_verified means the NGO signed off; the admin still has to approve it.
+    return admin === 'approved' || overall === 'verified' || overall === 'paid';
+}
+
+/** Whole days a report has been waiting for admin review (null when already verified/unknown). */
+function reportWaitingDays(report: Report): number | null {
+    if (isReportAdminVerified(report)) return null;
+    const ms = reportSubmittedMs(report);
+    if (ms <= 0) return null;
+    return Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
 }
 
 /** Overall status tab — uses lifecycle fields only (NGO has its own filter). */
@@ -156,16 +203,10 @@ function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
     }
 
     if (tab === 'pending') {
+        // Needs review = anything submitted whose admin decision is not "approved" yet
+        // (includes partner_verified reports).
         if (isReportAdminVerified(report)) return false;
-        if (overall === 'draft' || overall === '' || overall === 'continue') return false;
-        return (
-            overall === 'submitted' ||
-            overall === 'pending' ||
-            overall.includes('under_review') ||
-            overall.includes('awaiting') ||
-            reportAdminStatus(report) === 'pending' ||
-            !reportAdminStatus(report)
-        );
+        return !(overall === 'draft' || overall === '' || overall === 'continue');
     }
 
     return true;
@@ -283,6 +324,9 @@ export default function AdminReportsVerificationPage() {
     const router = useRouter();
     const [reports, setReports] = useState<Report[]>([]);
     const [totalLoadedReports, setTotalLoadedReports] = useState(0);
+    const [metaCounts, setMetaCounts] = useState<QueueCounts | null>(null);
+    const [loadError, setLoadError] = useState(false);
+    const [selectedUniversity, setSelectedUniversity] = useState('all');
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<ReportStatusFilter>('pending');
     const [partnerFilter, setPartnerFilter] = useState<PartnerStatusFilter>('all');
@@ -327,7 +371,9 @@ export default function AdminReportsVerificationPage() {
         try {
             setLoading(true);
 
-            const allRows: Report[] = [];
+            setLoadError(false);
+            const byId = new Map<string, Report>();
+            let nextMeta: QueueCounts | null = null;
             let page = 1;
             let totalPages = 1;
             const pageSize = 200;
@@ -345,14 +391,23 @@ export default function AdminReportsVerificationPage() {
 
                 if (!response?.ok) {
                     toast.error('Failed to load reports');
+                    setLoadError(true);
                     setReports([]);
                     setTotalLoadedReports(0);
+                    setMetaCounts(null);
                     return;
                 }
 
                 const data = await response.json();
                 const rows = Array.isArray(data?.data) ? (data.data as Report[]) : Array.isArray(data) ? (data as Report[]) : [];
-                allRows.push(...rows);
+                // Rows can shift between pages while we load; dedupe by id.
+                let added = 0;
+                for (const row of rows) {
+                    if (!row || typeof row.id !== 'string' || byId.has(row.id)) continue;
+                    byId.set(row.id, row);
+                    added += 1;
+                }
+                if (page === 1) nextMeta = parseMetaCounts(data?.meta);
 
                 const pagination = data?.pagination as
                     | { total?: number; total_pages?: number }
@@ -361,13 +416,15 @@ export default function AdminReportsVerificationPage() {
                 if (typeof pagination?.total === 'number') {
                     setTotalLoadedReports(pagination.total);
                 } else {
-                    setTotalLoadedReports(allRows.length);
+                    setTotalLoadedReports(byId.size);
                 }
 
-                if (rows.length === 0) break;
+                if (rows.length === 0 || added === 0) break;
                 page += 1;
             }
 
+            const allRows = Array.from(byId.values());
+            setMetaCounts(nextMeta);
             setReports(allRows);
             setCiiScores((prev) => {
                 const next = { ...prev };
@@ -381,6 +438,8 @@ export default function AdminReportsVerificationPage() {
         } catch (error) {
             console.error('Error fetching reports:', error);
             toast.error('Failed to load reports');
+            setLoadError(true);
+            setMetaCounts(null);
             setReports([]);
             setTotalLoadedReports(0);
         } finally {
@@ -398,7 +457,7 @@ export default function AdminReportsVerificationPage() {
 
     useEffect(() => {
         setTablePage(1);
-    }, [searchQuery, activeTab, partnerFilter, sortBy, dateFrom, dateTo, selectedOrg, duplicatesOnly]);
+    }, [searchQuery, activeTab, partnerFilter, sortBy, dateFrom, dateTo, selectedOrg, selectedUniversity, duplicatesOnly]);
 
     const getStatusBadge = (status: string, compact = false) => {
         const config = {
@@ -481,9 +540,11 @@ export default function AdminReportsVerificationPage() {
         let list = reports.filter((report) => {
             const matchesSearch =
                 !q ||
-                report.student_name.toLowerCase().includes(q) ||
-                report.student_email.toLowerCase().includes(q) ||
-                report.project_title.toLowerCase().includes(q) ||
+                String(report.id ?? '').toLowerCase().includes(q) ||
+                String(report.student_name ?? '').toLowerCase().includes(q) ||
+                String(report.student_email ?? '').toLowerCase().includes(q) ||
+                String(report.project_title ?? '').toLowerCase().includes(q) ||
+                String(report.university ?? '').toLowerCase().includes(q) ||
                 (report.organization_name && report.organization_name.toLowerCase().includes(q)) ||
                 (report.organization_id && report.organization_id.toLowerCase().includes(q)) ||
                 (report.opportunity_id && report.opportunity_id.toLowerCase().includes(q)) ||
@@ -491,6 +552,9 @@ export default function AdminReportsVerificationPage() {
 
             const matchesTab = reportMatchesTab(report, activeTab);
             const matchesPartner = reportMatchesPartnerFilter(report, partnerFilter);
+            const matchesUniversity =
+                selectedUniversity === 'all' ||
+                String(report.university ?? '').trim().toLowerCase() === selectedUniversity.toLowerCase();
 
             const submittedMs = reportSubmittedMs(report);
             const hasSubmittedDate = submittedMs > 0;
@@ -500,7 +564,7 @@ export default function AdminReportsVerificationPage() {
             const duplicateCount = duplicateAnalysis.countByReportId.get(report.id) ?? 0;
             const matchesDuplicatesOnly = !duplicatesOnly || duplicateCount >= 2;
 
-            return matchesSearch && matchesTab && matchesPartner && matchesFrom && matchesTo && matchesDuplicatesOnly;
+            return matchesSearch && matchesTab && matchesPartner && matchesUniversity && matchesFrom && matchesTo && matchesDuplicatesOnly;
         });
 
         list = [...list].sort((a, b) => {
@@ -533,12 +597,58 @@ export default function AdminReportsVerificationPage() {
         searchQuery,
         activeTab,
         partnerFilter,
+        selectedUniversity,
         sortBy,
         dateFrom,
         dateTo,
         duplicatesOnly,
         duplicateAnalysis,
     ]);
+
+    const universities = useMemo(() => {
+        const seen = new Map<string, string>();
+        for (const r of reports) {
+            const name = String(r.university ?? '').trim();
+            if (name && !seen.has(name.toLowerCase())) seen.set(name.toLowerCase(), name);
+        }
+        return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+    }, [reports]);
+
+    const computedCounts = useMemo<QueueCounts>(() => {
+        let needsReview = 0;
+        let verified = 0;
+        let revision = 0;
+        for (const r of reports) {
+            if (isReportReturnedForRevision(r)) revision += 1;
+            else if (reportMatchesTab(r, 'verified')) verified += 1;
+            else if (reportMatchesTab(r, 'pending')) needsReview += 1;
+        }
+        return { needsReview, verified, revision, all: reports.length };
+    }, [reports]);
+
+    // Server counts only describe the org-scoped full set; use them while no client-side filter narrows the rows.
+    const clientNarrowing =
+        searchQuery.trim() !== '' ||
+        partnerFilter !== 'all' ||
+        selectedUniversity !== 'all' ||
+        dateFrom !== '' ||
+        dateTo !== '' ||
+        duplicatesOnly;
+    const tabCounts = metaCounts && !clientNarrowing ? metaCounts : computedCounts;
+
+    /** Ordered ids of the filtered queue that still need an admin decision. */
+    const reviewQueueIds = useMemo(
+        () =>
+            filteredReports
+                .filter((r) => !isReportAdminVerified(r) && !isReportReturnedForRevision(r) && reportOverallStatus(r) !== 'draft')
+                .map((r) => r.id),
+        [filteredReports],
+    );
+
+    useEffect(() => {
+        // The detail page walks this list with next / previous and j / k.
+        saveReviewQueue(filteredReports.map((r) => r.id));
+    }, [filteredReports]);
 
     const statusOptions = [
         { id: 'pending', label: 'Needs review' },
@@ -547,6 +657,28 @@ export default function AdminReportsVerificationPage() {
         { id: 'verified', label: 'Verified' },
         { id: 'rejected', label: 'Revision / rejected' },
     ] as const;
+
+    const tabCountFor = (id: ReportStatusFilter): number | null => {
+        if (id === 'pending') return tabCounts.needsReview;
+        if (id === 'verified') return tabCounts.verified;
+        if (id === 'rejected') return tabCounts.revision;
+        if (id === 'all') return tabCounts.all;
+        return null;
+    };
+
+    const openNextNeedingReview = () => {
+        const id = reviewQueueIds[0];
+        if (!id) {
+            toast.info('No reports waiting for review in the current filters.');
+            return;
+        }
+        saveReviewQueue(reviewQueueIds);
+        router.push(`/dashboard/admin/reports/verify/${id}`);
+    };
+
+    const pageStart = (tablePage - 1) * rowsPerPage;
+    const mobileRows = filteredReports.slice(pageStart, pageStart + rowsPerPage);
+    const mobilePageCount = Math.max(1, Math.ceil(filteredReports.length / rowsPerPage));
 
     const handleDownloadAiPayload = async (reportId: string) => {
         if (downloadingAiPayloadIds[reportId]) return;
@@ -649,6 +781,7 @@ export default function AdminReportsVerificationPage() {
         setActiveTab('pending');
         setPartnerFilter('all');
         setSortBy('submitted_newest');
+        setSelectedUniversity('all');
         setDateFrom('');
         setDateTo('');
         setDuplicatesOnly(false);
@@ -681,6 +814,7 @@ export default function AdminReportsVerificationPage() {
         activeTab !== 'pending' ||
         partnerFilter !== 'all' ||
         sortBy !== 'submitted_newest' ||
+        selectedUniversity !== 'all' ||
         dateFrom !== '' ||
         dateTo !== '' ||
         duplicatesOnly;
@@ -950,19 +1084,16 @@ export default function AdminReportsVerificationPage() {
             },
             {
                 name: 'Submitted',
-                width: '108px',
+                width: '120px',
                 sortable: true,
                 sortFunction: (a, b) => reportSubmittedMs(a) - reportSubmittedMs(b),
                 cell: (report) => (
-                    <span className="whitespace-nowrap text-xs font-medium tabular-nums text-slate-700">
-                        {reportSubmittedMs(report) > 0
-                            ? new Date(reportSubmittedMs(report)).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                              })
-                            : '—'}
-                    </span>
+                    <div className="flex flex-col items-start gap-1">
+                        <span className="whitespace-nowrap text-xs font-medium tabular-nums text-slate-700">
+                            {formatSubmittedDate(report)}
+                        </span>
+                        <AgingChip days={reportWaitingDays(report)} />
+                    </div>
                 ),
             },
             {
@@ -1131,26 +1262,73 @@ export default function AdminReportsVerificationPage() {
                 ) : null}
 
                 <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm space-y-3 sm:p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div role="tablist" aria-label="Report queues" className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-1">
+                            {statusOptions.map((option) => {
+                                const count = tabCountFor(option.id);
+                                const active = activeTab === option.id;
+                                return (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={active}
+                                        onClick={() => setActiveTab(option.id)}
+                                        className={clsx(
+                                            'inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition',
+                                            active
+                                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+                                        )}
+                                    >
+                                        {option.label}
+                                        {count !== null ? (
+                                            <span
+                                                className={clsx(
+                                                    'rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                                                    active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700',
+                                                )}
+                                            >
+                                                {count}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={openNextNeedingReview}
+                            disabled={loading || reviewQueueIds.length === 0}
+                            className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 lg:w-auto"
+                        >
+                            Open next needing review
+                            <ArrowRight className="h-4 w-4" />
+                        </button>
+                    </div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12 xl:items-center xl:gap-3">
-                        <div className="relative min-w-0 md:col-span-2 xl:col-span-5">
+                        <div className="relative min-w-0 md:col-span-2 xl:col-span-4">
                             <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Search by name, email, project, organization..."
+                                placeholder="Search student, email, project, report ID..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                             />
                         </div>
                         <div className="relative min-w-0 xl:col-span-2">
+                            <GraduationCap className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <select
-                                value={activeTab}
-                                onChange={(e) => setActiveTab(e.target.value as ReportStatusFilter)}
-                                className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                value={selectedUniversity}
+                                onChange={(e) => setSelectedUniversity(e.target.value)}
+                                aria-label="University"
+                                className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                             >
-                                {statusOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
+                                <option value="all">All universities</option>
+                                {universities.map((u) => (
+                                    <option key={u} value={u}>
+                                        {u}
                                     </option>
                                 ))}
                             </select>
@@ -1169,7 +1347,7 @@ export default function AdminReportsVerificationPage() {
                             </select>
                             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         </div>
-                        <div className="relative min-w-0 md:col-span-2 xl:col-span-3">
+                        <div className="relative min-w-0 md:col-span-2 xl:col-span-2">
                             <Building2 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <select
                                 value={selectedOrg}
@@ -1293,6 +1471,16 @@ export default function AdminReportsVerificationPage() {
                                     <X className="h-3 w-3" />
                                 </button>
                             ) : null}
+                            {selectedUniversity !== 'all' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedUniversity('all')}
+                                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                                >
+                                    University
+                                    <X className="h-3 w-3" />
+                                </button>
+                            ) : null}
                             {searchQuery.trim() ? (
                                 <button
                                     type="button"
@@ -1395,8 +1583,96 @@ export default function AdminReportsVerificationPage() {
                         <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
                         <p className="text-sm font-medium text-slate-500">Loading reports…</p>
                     </div>
+                ) : loadError && reports.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-16 text-center">
+                        <XCircle className="h-9 w-9 text-red-500" />
+                        <p className="text-sm font-semibold text-red-800">Could not load reports.</p>
+                        <button
+                            type="button"
+                            onClick={() => void fetchReports()}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                            Retry
+                        </button>
+                    </div>
                 ) : (
-                    <div className="relative min-h-[320px] min-w-0 overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <>
+                    <div className="space-y-3 md:hidden">
+                        {mobileRows.length === 0 ? (
+                            <div className="rounded-2xl border border-slate-200/80 bg-white py-12 text-center shadow-sm">
+                                <FileText className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+                                <h3 className="text-sm font-semibold text-slate-800">No reports match these filters</h3>
+                            </div>
+                        ) : (
+                            mobileRows.map((report) => (
+                                <div key={report.id} className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold text-slate-900">
+                                                {formatDisplayName(report.student_name || 'Unknown')}
+                                            </p>
+                                            <p className="truncate text-xs text-slate-500">{report.student_email}</p>
+                                        </div>
+                                        {getStatusBadge(report.status, true)}
+                                    </div>
+                                    <p className="mt-2 line-clamp-2 break-words text-sm font-medium text-slate-800">{report.project_title}</p>
+                                    <p className="mt-0.5 truncate text-xs text-slate-500">{formatOrganizationLabel(report.organization_name).short}</p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                        <span className="tabular-nums">{formatSubmittedDate(report)}</span>
+                                        <AgingChip days={reportWaitingDays(report)} />
+                                        {getStatusBadge(report.partner_status, true)}
+                                        <span className="font-bold text-indigo-700">
+                                            CII {typeof ciiScores[report.id] === 'number' ? ciiScores[report.id] : typeof report.cii_score === 'number' ? Math.round(report.cii_score) : '—'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
+                                            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                            Review
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => openDeleteDialog(report)}
+                                            disabled={deletingReportId === report.id}
+                                            aria-label={`Delete report for ${report.student_name || 'student'}`}
+                                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 disabled:opacity-50"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                        {filteredReports.length > rowsPerPage ? (
+                            <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+                                <button
+                                    type="button"
+                                    disabled={tablePage <= 1}
+                                    onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                                    className="h-9 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40"
+                                >
+                                    Prev
+                                </button>
+                                <span className="tabular-nums">
+                                    {Math.min(tablePage, mobilePageCount)} / {mobilePageCount}
+                                </span>
+                                <button
+                                    type="button"
+                                    disabled={tablePage >= mobilePageCount}
+                                    onClick={() => setTablePage((p) => Math.min(mobilePageCount, p + 1))}
+                                    className="h-9 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="relative hidden min-h-[320px] min-w-0 overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm md:block">
                         <DataTable<Report>
                             key={mergePanelOpen ? 'reports-merge' : 'reports-default'}
                             columns={tableColumns}
@@ -1445,6 +1721,7 @@ export default function AdminReportsVerificationPage() {
                             customStyles={REPORTS_TABLE_STYLES}
                         />
                     </div>
+                  </>
                 )}
             </div>
             {deleteTarget ? (

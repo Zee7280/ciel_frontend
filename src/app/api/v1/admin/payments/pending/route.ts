@@ -13,7 +13,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const response = await fetch(`${base}/admin/payments/pending`, {
+        const response = await fetch(`${base}/admin/payments/pending${new URL(request.url).search}`, {
             headers: {
                 Authorization: authHeader,
                 "Content-Type": "application/json",

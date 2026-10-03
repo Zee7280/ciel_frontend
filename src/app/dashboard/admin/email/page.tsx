@@ -5,6 +5,9 @@ import { Mail, Send, Loader2, Bold, Italic, Underline, List, ListOrdered, Link2,
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { resolvePreferredApiV1Base } from "@/utils/backendApiV1Base";
+import { getStoredCurrentUserEmail } from "@/utils/currentUser";
+import ConfirmModal from "../_shared/ConfirmModal";
+import { escapeHtml } from "../_shared/csv";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Input } from "@/app/dashboard/student/report/components/ui/input";
 import { Label } from "@/app/dashboard/student/report/components/ui/label";
@@ -30,6 +33,44 @@ function stripHtmlToText(html: string): string {
         .trim();
 }
 
+const MAX_RECIPIENTS = 200;
+const CONFIRM_THRESHOLD = 5;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ALLOWED_TAGS = new Set(["P", "BR", "B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "A", "DIV", "SPAN", "H1", "H2", "H3", "BLOCKQUOTE"]);
+
+/** Allowlist sanitiser for the preview (no scripts, handlers, or unsafe URLs). */
+function sanitizeHtml(html: string): string {
+    if (typeof window === "undefined" || typeof DOMParser === "undefined") return escapeHtml(stripHtmlToText(html));
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+    const walk = (node: Element) => {
+        for (const child of Array.from(node.children)) {
+            if (!ALLOWED_TAGS.has(child.tagName)) {
+                if (["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "SVG", "MATH"].includes(child.tagName.toUpperCase())) {
+                    child.remove();
+                    continue;
+                }
+                walk(child);
+                child.replaceWith(...Array.from(child.childNodes));
+                continue;
+            }
+            for (const attr of Array.from(child.attributes)) {
+                const keep = child.tagName === "A" && attr.name === "href" && /^(https?:|mailto:)/i.test(attr.value.trim());
+                if (!keep) child.removeAttribute(attr.name);
+            }
+            if (child.tagName === "A") {
+                child.setAttribute("target", "_blank");
+                child.setAttribute("rel", "noopener noreferrer");
+            }
+            walk(child);
+        }
+    };
+    walk(doc.body);
+    return doc.body.innerHTML;
+}
+
+type SendSummary = { sent: number; failed: number; skipped: number };
+
 export default function AdminEmailPage() {
     const [subject, setSubject] = useState("");
     const [recipients, setRecipients] = useState<string[]>([]);
@@ -37,6 +78,8 @@ export default function AdminEmailPage() {
     const [messageHtml, setMessageHtml] = useState<string>("<p></p>");
     const [sending, setSending] = useState(false);
     const [loadingUsers, setLoadingUsers] = useState(false);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [summary, setSummary] = useState<SendSummary | null>(null);
     const [userQuery, setUserQuery] = useState("");
     const [users, setUsers] = useState<RecipientUser[]>([]);
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -44,14 +87,24 @@ export default function AdminEmailPage() {
     const editorRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        const load = async () => {
+        const q = userQuery.trim();
+        const controller = new AbortController();
+        const timer = window.setTimeout(async () => {
             setLoadingUsers(true);
             try {
-                const res = await authenticatedFetch("/api/v1/admin/users", {}, { redirectToLogin: true });
-                if (!res?.ok) return;
+                const params = new URLSearchParams({ search: q, limit: "20" });
+                const res = await authenticatedFetch(
+                    `/api/v1/admin/users?${params.toString()}`,
+                    { signal: controller.signal },
+                    { redirectToLogin: false },
+                );
+                if (controller.signal.aborted) return;
+                if (!res?.ok) {
+                    setUsers([]);
+                    return;
+                }
                 const data = await res.json();
-                const list: any[] =
-                    Array.isArray(data) ? data : data?.success && Array.isArray(data.data) ? data.data : [];
+                const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
                 const mapped = list
                     .map((u) => ({
                         id: u.id,
@@ -59,30 +112,33 @@ export default function AdminEmailPage() {
                         email: u.email as string,
                         role: u.role as string | undefined,
                     }))
-                    .filter((u) => typeof u.email === "string" && u.email.includes("@"));
-                setUsers(mapped);
+                    .filter((u) => typeof u.email === "string" && u.email.includes("@"))
+                    .slice(0, 20);
+                if (!controller.signal.aborted) setUsers(mapped);
             } catch {
-                // ignore
+                // aborted or network error: keep previous list
             } finally {
-                setLoadingUsers(false);
+                if (!controller.signal.aborted) setLoadingUsers(false);
             }
+        }, 300);
+        return () => {
+            window.clearTimeout(timer);
+            controller.abort();
         };
-        void load();
-    }, []);
+    }, [userQuery]);
 
-    const filteredUsers = useMemo(() => {
-        const q = userQuery.trim().toLowerCase();
-        if (!q) return users.slice(0, 50);
-        return users
-            .filter((u) => u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q))
-            .slice(0, 50);
-    }, [users, userQuery]);
+    const filteredUsers = users;
+    const previewHtml = useMemo(() => sanitizeHtml(messageHtml), [messageHtml]);
 
     const addRecipient = (emailRaw: string) => {
         const email = emailRaw.trim();
         if (!email) return;
-        if (!email.includes("@")) {
+        if (!EMAIL_RE.test(email)) {
             toast.error("Enter a valid email address.");
+            return;
+        }
+        if (recipients.length >= MAX_RECIPIENTS && !recipients.some((x) => x.toLowerCase() === email.toLowerCase())) {
+            toast.error(`Maximum ${MAX_RECIPIENTS} recipients per send.`);
             return;
         }
         setRecipients((prev) => {
@@ -111,30 +167,59 @@ export default function AdminEmailPage() {
         setMessageHtml(editorRef.current?.innerHTML || "<p></p>");
     };
 
-    const onSend = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const validate = (to: string[]): { subjectClean: string; msgText: string } | null => {
         const subjectClean = subject.trim();
         const msgText = stripHtmlToText(messageHtml);
-        if (recipients.length === 0) {
+        if (to.length === 0) {
             toast.error("Add at least one recipient.");
-            return;
+            return null;
+        }
+        if (to.length > MAX_RECIPIENTS) {
+            toast.error(`Too many recipients (${to.length}). Maximum is ${MAX_RECIPIENTS} per send.`);
+            return null;
         }
         if (subjectClean.length < 2) {
             toast.error("Subject is required.");
-            return;
+            return null;
         }
         if (msgText.length < 2) {
             toast.error("Message is required.");
+            return null;
+        }
+        return { subjectClean, msgText };
+    };
+
+    const onSend = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validate(recipients)) return;
+        if (recipients.length > CONFIRM_THRESHOLD) {
+            setConfirmOpen(true);
             return;
         }
+        void doSend(recipients, false);
+    };
 
+    const onSendTest = () => {
+        const me = getStoredCurrentUserEmail();
+        if (!me) {
+            toast.error("Could not determine your email address. Please sign in again.");
+            return;
+        }
+        if (!validate([me])) return;
+        void doSend([me], true);
+    };
+
+    const doSend = async (to: string[], isTest: boolean) => {
+        const checked = validate(to);
+        if (!checked) return;
+        const { subjectClean, msgText } = checked;
         const apiBase = resolvePreferredApiV1Base();
         const url = apiBase ? `${apiBase}/admin/email/send` : "/api/v1/admin/email/send";
 
         setSending(true);
         try {
             const fd = new FormData();
-            for (const r of recipients) fd.append("to", r);
+            for (const r of to) fd.append("to", r);
             fd.append("subject", subjectClean);
             fd.append("messageHtml", messageHtml);
             fd.append("messageText", msgText);
@@ -153,7 +238,18 @@ export default function AdminEmailPage() {
                 toast.error(text?.slice(0, 240) || "Email send failed.");
                 return;
             }
-            toast.success("Email sent.");
+            const body = await res.json().catch(() => null);
+            const src = (body && typeof body === "object" ? ((body as any).data ?? body) : {}) as Record<string, unknown>;
+            const num = (v: unknown) => (Array.isArray(v) ? v.length : Number.isFinite(Number(v)) ? Number(v) : 0);
+            const result: SendSummary = {
+                sent: src.sent !== undefined ? num(src.sent) : to.length,
+                failed: num(src.failed),
+                skipped: num(src.skipped),
+            };
+            setSummary(result);
+            if (result.failed > 0) toast.warning(`Sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}.`);
+            else toast.success(isTest ? "Test email sent to you." : `Email sent (${result.sent}).`);
+            if (isTest) return;
             setSubject("");
             setRecipients([]);
             setToInput("");
@@ -165,11 +261,12 @@ export default function AdminEmailPage() {
             toast.error(msg.slice(0, 240));
         } finally {
             setSending(false);
+            setConfirmOpen(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-50/50 p-6 sm:p-8">
+        <div className="min-h-screen overflow-x-hidden bg-slate-50/50 p-4 sm:p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-4 border-b border-slate-200/80 pb-8 sm:flex-row sm:items-end sm:justify-between">
                     <div className="flex items-start gap-4">
@@ -185,15 +282,15 @@ export default function AdminEmailPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-8 lg:grid-cols-[1fr_400px] xl:gap-12">
-                    <section className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-lg shadow-slate-900/5">
+                <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_400px] xl:gap-12">
+                    <section className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-900/5 sm:p-8">
                         <div className="mb-6 flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white">
                                 <Mail className="h-5 w-5" />
                             </div>
                             <h2 className="text-xl font-bold text-slate-900">Compose Message</h2>
                         </div>
-                        <form onSubmit={(e) => void onSend(e)} className="space-y-6">
+                        <form onSubmit={onSend} className="space-y-6">
                         <div className="space-y-4">
                             <div>
                                 <Label htmlFor="email-to" className="text-sm font-semibold text-slate-900">Recipients</Label>
@@ -219,7 +316,7 @@ export default function AdminEmailPage() {
                                     {recipients.length > 0 && (
                                         <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
                                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                Selected Recipients ({recipients.length})
+                                                Selected Recipients ({recipients.length}/{MAX_RECIPIENTS})
                                             </p>
                                             <div className="flex flex-wrap gap-2">
                                                 {recipients.map((r) => (
@@ -251,7 +348,7 @@ export default function AdminEmailPage() {
                                         </span>
                                     </div>
                                     <span className="text-xs text-slate-500 font-medium">
-                                        {loadingUsers ? "Loading…" : `${users.length} users available`}
+                                        {loadingUsers ? "Searching…" : `${users.length} shown (type to search)`}
                                     </span>
                                 </div>
                                 <Input
@@ -376,7 +473,7 @@ export default function AdminEmailPage() {
                             <Label htmlFor="email-image" className="text-sm font-semibold text-slate-900">Image Attachment</Label>
                             <p className="mt-1 text-sm text-slate-600">Optionally attach an image to your email (JPG, PNG, GIF - max 3 MB)</p>
                             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                                     <Input
                                         id="email-image"
                                         type="file"
@@ -422,6 +519,22 @@ export default function AdminEmailPage() {
                                     </span>
                                 )}
                             </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="mt-3 w-full"
+                                disabled={sending}
+                                onClick={onSendTest}
+                            >
+                                Send test to me
+                            </Button>
+                            {summary ? (
+                                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm" role="status">
+                                    <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800"><b>{summary.sent}</b><br />sent</div>
+                                    <div className="rounded-lg bg-red-50 p-2 text-red-800"><b>{summary.failed}</b><br />failed</div>
+                                    <div className="rounded-lg bg-slate-100 p-2 text-slate-700"><b>{summary.skipped}</b><br />skipped</div>
+                                </div>
+                            ) : null}
                             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
                                 <p className="text-xs text-amber-800">
                                     <span className="font-semibold">Note:</span> Emails are sent from{" "}
@@ -433,7 +546,7 @@ export default function AdminEmailPage() {
                     </form>
                 </section>
 
-                    <section className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-lg shadow-slate-900/5 lg:sticky lg:top-8">
+                    <section className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-900/5 sm:p-8 lg:sticky lg:top-8">
                         <div className="mb-6 flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 text-white">
                                 <Mail className="h-5 w-5" />
@@ -464,10 +577,10 @@ export default function AdminEmailPage() {
                                     )}
                                 </div>
                                 <div
-                                    className="prose prose-slate prose-sm max-w-none rounded-lg border border-slate-100 bg-white p-4 text-slate-700 leading-relaxed"
+                                    className="prose prose-slate prose-sm max-w-none overflow-x-auto break-words rounded-lg border border-slate-100 bg-white p-4 text-slate-700 leading-relaxed"
                                     dangerouslySetInnerHTML={{ 
                                         __html: messageHtml && messageHtml !== "<p></p>" 
-                                            ? messageHtml 
+                                            ? previewHtml 
                                             : "<p class='text-slate-400 italic'>Start typing your message above...</p>" 
                                     }}
                                 />
@@ -486,6 +599,18 @@ export default function AdminEmailPage() {
                     </section>
                 </div>
             </div>
+            <ConfirmModal
+                open={confirmOpen}
+                title={`Send to ${recipients.length} recipients?`}
+                confirmLabel={`Send to ${recipients.length}`}
+                busy={sending}
+                onConfirm={() => doSend(recipients, false)}
+                onCancel={() => setConfirmOpen(false)}
+            >
+                <p className="text-sm text-slate-600">
+                    This email will be sent to {recipients.length} recipients with subject &quot;{subject.trim()}&quot;. This cannot be undone.
+                </p>
+            </ConfirmModal>
         </div>
     );
 }

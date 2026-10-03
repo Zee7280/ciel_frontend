@@ -4,7 +4,7 @@ import Link from "next/link";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -30,6 +30,14 @@ import {
 } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
+import {
+    CIEL_ADMIN_MUTATED_EVENT,
+    CIEL_ADMIN_PENDING_COUNTS_EVENT,
+    clearAdminPendingCountsCache,
+    fetchAdminPendingCounts,
+    readAdminPendingCountsCache,
+    type AdminPendingCounts,
+} from "@/utils/adminPendingCounts";
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
@@ -83,10 +91,15 @@ function NavRow({
                 indent && !collapsed && "mb-1 ml-5 w-[calc(100%-40px)] py-2.5 text-[13px] font-bold",
             )}
             title={collapsed ? label : undefined}
+            aria-label={collapsed ? (countPill && countPill > 0 ? `${label} (${countPill > 99 ? "99+" : countPill} pending)` : label) : undefined}
+            aria-current={active ? "page" : undefined}
         >
             {emoji ? <span className="w-7 shrink-0 text-center text-lg leading-none" aria-hidden>{emoji}</span> : Icon ? <Icon className="h-[18px] w-[18px] shrink-0" /> : null}
             {!collapsed && <span className="flex-1 truncate">{label}</span>}
             {!collapsed && needsAction && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ciel-amber" aria-label="Needs action" />}
+            {collapsed && !!countPill && countPill > 0 && (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-ciel-amber ring-2 ring-[#133747]" aria-hidden />
+            )}
             {!collapsed && !!countPill && countPill > 0 && (
                 <span className="ml-auto grid h-6 min-w-6 shrink-0 place-items-center rounded-xl bg-[#355c6b] px-1.5 text-[11px] font-bold text-white">{countPill > 99 ? "99+" : countPill}</span>
             )}
@@ -99,24 +112,70 @@ function NavSectionLabel({ collapsed, children }: { collapsed: boolean; children
     return <p className="px-2.5 pb-2 pt-[18px] text-[11px] font-black uppercase tracking-[0.08em] text-[#6e92a5]">{children}</p>;
 }
 
+type MenuSection = { heading: string; items: NavItem[] };
+
 function RoleMenuSheet({
     open,
     onClose,
     title,
     items,
+    sections,
     isActive,
+    onSignOut,
 }: {
     open: boolean;
     onClose: () => void;
     title: string;
     items: NavItem[];
+    sections?: MenuSection[];
     isActive: (href: string) => boolean;
+    onSignOut?: () => void;
 }) {
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKey);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            window.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [open, onClose]);
+
     if (!open) return null;
+
+    const renderItem = (item: NavItem) => {
+        const active = isActive(item.href);
+        return (
+            <Link
+                key={`${item.href}|${item.label}`}
+                href={item.href}
+                onClick={onClose}
+                className={clsx(
+                    "ciel-transition flex items-center gap-3 rounded-ciel-md border px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
+                    active
+                        ? "border-ciel-green/40 bg-ciel-green-soft text-ciel-green-deep"
+                        : "border-ciel-border text-ciel-text hover:border-ciel-green/40",
+                )}
+            >
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 text-sm font-bold">{item.label}</span>
+                {!!item.countPill && item.countPill > 0 && (
+                    <span className="rounded-full bg-ciel-navy/10 px-2 py-0.5 text-[10px] font-bold">
+                        {item.countPill > 99 ? "99+" : item.countPill}
+                    </span>
+                )}
+            </Link>
+        );
+    };
+
     return (
         <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label={title}>
             <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ciel-text/40" />
-            <div className="ciel-crossfade-enter absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-ciel-xl bg-white p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)]">
+            <div className="ciel-crossfade-enter absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto overscroll-contain rounded-t-ciel-xl bg-white p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)]">
                 <div className="flex items-center justify-between">
                     <h2 className="text-base font-black text-ciel-text">{title}</h2>
                     <button
@@ -128,32 +187,31 @@ function RoleMenuSheet({
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="mt-4 space-y-1">
-                    {items.map((item) => {
-                        const active = isActive(item.href);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={onClose}
-                                className={clsx(
-                                    "ciel-transition flex items-center gap-3 rounded-ciel-md border px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
-                                    active
-                                        ? "border-ciel-green/40 bg-ciel-green-soft text-ciel-green-deep"
-                                        : "border-ciel-border text-ciel-text hover:border-ciel-green/40",
-                                )}
-                            >
-                                <item.icon className="h-4 w-4 shrink-0" />
-                                <span className="flex-1 text-sm font-bold">{item.label}</span>
-                                {!!item.countPill && item.countPill > 0 && (
-                                    <span className="rounded-full bg-ciel-navy/10 px-2 py-0.5 text-[10px] font-bold">
-                                        {item.countPill > 99 ? "99+" : item.countPill}
-                                    </span>
-                                )}
-                            </Link>
-                        );
-                    })}
-                </div>
+                {sections ? (
+                    sections
+                        .filter((sec) => sec.items.length > 0)
+                        .map((sec) => (
+                            <div key={sec.heading} className="mt-4">
+                                <p className="px-1 pb-2 text-[11px] font-black uppercase tracking-[0.08em] text-ciel-text-soft">{sec.heading}</p>
+                                <div className="space-y-1">{sec.items.map(renderItem)}</div>
+                            </div>
+                        ))
+                ) : (
+                    <div className="mt-4 space-y-1">{items.map(renderItem)}</div>
+                )}
+                {onSignOut ? (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onClose();
+                            onSignOut();
+                        }}
+                        className="ciel-transition mt-5 flex w-full items-center gap-3 rounded-ciel-md border border-ciel-border px-4 py-3 text-left text-sm font-bold text-ciel-text hover:border-red-300 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                    >
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        Sign out
+                    </button>
+                ) : null}
             </div>
         </div>
     );
@@ -224,34 +282,9 @@ export default function Sidebar() {
         clearImpactSummaryCache();
         clearPathSessionCache();
         clearFacultyScopeSession();
+        clearAdminPendingCountsCache();
         router.push("/login");
     };
-
-    const isMessagesPage =
-        /^\/dashboard\/(student|partner|faculty|admin)\/messages$/.test(pathname);
-
-    useEffect(() => {
-        if (!isMessagesPage) return;
-
-        const fetchUnreadCount = async () => {
-            if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
-            try {
-                const res = await authenticatedFetch("/api/v1/chat/unread-count", {}, { redirectToLogin: false });
-                if (res && res.ok) {
-                    const data = await res.json();
-                    if (data.success) {
-                        setUnreadCount(data.data.count);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to fetch unread count", error);
-            }
-        };
-
-        fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 30000);
-        return () => clearInterval(interval);
-    }, [isMessagesPage]);
 
     const [navRole, setNavRole] = useState<DashboardNavRole>(() => dashboardNavRoleFromPathname(pathname));
 
@@ -266,6 +299,70 @@ export default function Sidebar() {
     const isFaculty = navRole === "faculty";
     const isAdmin = navRole === "admin";
     const isInvestor = navRole === "investor";
+
+    // Admins see the Messages badge on every page; other roles only poll while on their Messages page.
+    const isMessagesPage =
+        /^\/dashboard\/(student|partner|faculty|admin)\/messages$/.test(pathname);
+    const shouldPollUnread = isMessagesPage || isAdmin;
+
+    useEffect(() => {
+        if (!shouldPollUnread) return;
+
+        const fetchUnreadCount = async () => {
+            if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+            if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
+            try {
+                const res = await authenticatedFetch("/api/v1/chat/unread-count", {}, { redirectToLogin: false });
+                if (res && res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        setUnreadCount(Number(data.data?.count) || 0);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch unread count", error);
+            }
+        };
+
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, [shouldPollUnread, pathname]);
+
+    // Admin pending-work badges: on mount, route change, every 60s while visible, and after admin writes.
+    const [adminCounts, setAdminCounts] = useState<AdminPendingCounts | null>(null);
+    useEffect(() => {
+        if (!isAdmin) {
+            setAdminCounts(null);
+            return;
+        }
+        setAdminCounts(readAdminPendingCountsCache());
+        let cancelled = false;
+        const load = (force: boolean) => {
+            if (document.visibilityState === "hidden") return;
+            void fetchAdminPendingCounts({ force }).then((c) => {
+                if (!cancelled && c) setAdminCounts(c);
+            });
+        };
+        load(false);
+        const onMutated = () => load(true);
+        const onCounts = (e: Event) => {
+            const d = (e as CustomEvent<AdminPendingCounts>).detail;
+            if (d && !cancelled) setAdminCounts(d);
+        };
+        const onVisible = () => load(false);
+        window.addEventListener(CIEL_ADMIN_MUTATED_EVENT, onMutated);
+        window.addEventListener(CIEL_ADMIN_PENDING_COUNTS_EVENT, onCounts);
+        document.addEventListener("visibilitychange", onVisible);
+        const interval = setInterval(() => load(true), 60_000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            window.removeEventListener(CIEL_ADMIN_MUTATED_EVENT, onMutated);
+            window.removeEventListener(CIEL_ADMIN_PENDING_COUNTS_EVENT, onCounts);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [isAdmin, pathname]);
 
     const [partnerMembershipNav, setPartnerMembershipNav] = useState(false);
     useEffect(() => {
@@ -423,20 +520,47 @@ export default function Sidebar() {
     const settingsHref = `/dashboard/${roleSlug}/settings`;
     const helpHref = isAdmin ? "/dashboard/admin/support" : `/dashboard/${roleSlug}/help`;
 
+    const adminHrefCount = useCallback(
+        (href: string): number | undefined => {
+            if (!isAdmin || !adminCounts) return undefined;
+            const path = href.split("?")[0];
+            switch (path) {
+                case "/dashboard/admin/approvals":
+                    return adminCounts.opportunityApprovals + adminCounts.userApprovals;
+                case "/dashboard/admin/join-applications":
+                    return adminCounts.joinApplications;
+                case "/dashboard/admin/payments":
+                    return adminCounts.payments;
+                case "/dashboard/admin/org-membership":
+                    return adminCounts.orgMembership;
+                case "/dashboard/admin/reports/verify":
+                    return adminCounts.reportsAwaitingAdmin;
+                case "/dashboard/admin/issue-logs":
+                    return adminCounts.issueLogsOpen;
+                case "/dashboard/admin/support":
+                    return adminCounts.supportOpen;
+                default:
+                    return undefined;
+            }
+        },
+        [isAdmin, adminCounts],
+    );
+
     const withCounts = useCallback(
         (items: Omit<NavItem, "countPill">[]): NavItem[] =>
             items.map((item) => ({
                 ...item,
                 countPill:
-                    item.label === "Messages"
+                    adminHrefCount(item.href) ??
+                    (item.label === "Messages"
                         ? unreadCount
                         : item.label === "Notifications"
                           ? notificationUnreadCount
                           : item.label === "Impact" && isStudent
                             ? impactHistoryBadge
-                            : undefined,
+                            : undefined),
             })),
-        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent],
+        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, adminHrefCount],
     );
 
     const partnerWorkspace = useMemo(
@@ -543,7 +667,6 @@ export default function Sidebar() {
                 { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
                 { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
-                { label: "Community service", href: "/dashboard/admin/community-service", icon: Globe2 },
                 { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
                 { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             ]),
@@ -621,9 +744,10 @@ export default function Sidebar() {
             label: isInvestor ? "Help & Deal Desk" : "Help",
             href: isInvestor ? "/dashboard/investor?view=agreements" : helpHref,
             icon: HelpCircle,
+            countPill: isAdmin ? adminHrefCount(helpHref) : undefined,
         });
         return items;
-    }, [isFaculty, isInvestor, settingsHref, helpHref]);
+    }, [isFaculty, isInvestor, isAdmin, settingsHref, helpHref, adminHrefCount]);
 
     const allRoleHrefs = useMemo(
         () => [
@@ -667,6 +791,11 @@ export default function Sidebar() {
         }
         if (hrefMode) {
             return pathname === hrefPath && searchParams.get("mode") === hrefMode;
+        }
+        if (hrefPath === "/dashboard/admin/path-submissions") {
+            // Bare "Path submissions" link: only active when no tab/view query selects a specific path.
+            if (pathname === hrefPath) return !searchParams.get("tab") && !searchParams.get("view");
+            return pathname.startsWith(`${hrefPath}/`);
         }
         if (hrefPath === dashboardHref) return pathname === hrefPath;
         if (hrefPath === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
@@ -719,6 +848,27 @@ export default function Sidebar() {
               : isInvestor
                 ? { label: "Profile", href: "/dashboard/investor?view=profile", icon: Building2 }
               : { label: "Settings", href: settingsHref, icon: Settings };
+
+    const adminPathIcons: ComponentType<LucideProps>[] = [Tent, BookOpen, GraduationCap, Rocket];
+    const adminMenuSections: MenuSection[] | undefined = isAdmin
+        ? [
+              { heading: "Super Admin", items: [{ label: "Overview", href: dashboardHref, icon: LayoutDashboard }] },
+              {
+                  heading: "Impact Areas",
+                  items: adminPaths.map((p, i) => ({ label: p.label, href: p.href, icon: adminPathIcons[i] ?? BookOpen })),
+              },
+              {
+                  heading: "Intelligence",
+                  items: [
+                      { label: impactLabel, href: "/dashboard/admin/analytics", icon: FileBarChart },
+                      { label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: Users },
+                  ],
+              },
+              { heading: "Workspace", items: workspaceLinks },
+              { heading: "More", items: moreLinksRole },
+              { heading: "Account", items: footerLinks },
+          ]
+        : undefined;
 
     const mobileMenuItems = [
         ...rolePaths.map((p) => ({ label: p.label, href: p.href, icon: BookOpen })),
@@ -982,13 +1132,6 @@ export default function Sidebar() {
                                                 Approved faculty work from all departments flows automatically into the relevant impact wall. Analytics access is controlled by CIEL PK subscription.
                                             </div>
                                         )}
-                                        {!collapsed && isAdmin && (
-                                            <div className="mx-3.5 mt-2 rounded-[14px] bg-white/[0.055] p-3.5 text-[11px] leading-[1.55] text-[#a9c2cc]">
-                                                <b className="text-white">Super Admin rule</b>
-                                                <br />
-                                                Wherever a student, faculty member, partner or reviewer is holding the workflow, show Email + WhatsApp reminder actions on that exact record.
-                                            </div>
-                                        )}
                                     </>
                                 ) : null}
                             </>
@@ -1143,6 +1286,8 @@ export default function Sidebar() {
                     onClose={() => setMobileMenuOpen(false)}
                     title={isInvestor ? "Investor Hub" : isUniversityPartnerOrg ? "University menu" : isPartner ? "Partner menu" : isFaculty ? "Faculty menu" : "Admin menu"}
                     items={mobileMenuItems}
+                    sections={adminMenuSections}
+                    onSignOut={isAdmin ? handleLogout : undefined}
                     isActive={isNavActive}
                 />
             </>

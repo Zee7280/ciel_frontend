@@ -36,6 +36,7 @@ export default function AdminReviewPackageStrip({
     highlight = false,
     initialDoc = null,
     variant = "admin",
+    loading = false,
 }: {
     reportId: string;
     report: Record<string, unknown>;
@@ -43,8 +44,11 @@ export default function AdminReviewPackageStrip({
     highlight?: boolean;
     initialDoc?: "flashcard" | "report" | "evidence" | null;
     variant?: "admin" | "published";
+    loading?: boolean;
 }) {
-    const pack = (report.review_package || {}) as ReviewPackageShape;
+    const rawPack = report?.review_package;
+    const hasPackage = Boolean(rawPack) && typeof rawPack === "object" && Object.keys(rawPack as object).length > 0;
+    const pack = (hasPackage ? rawPack : {}) as ReviewPackageShape;
     const files = useMemo<ReportEvidenceGalleryItem[]>(() => {
         const packaged = Array.isArray(pack.documents?.evidence?.files) ? pack.documents.evidence.files : [];
         const fromPackage = packaged
@@ -99,7 +103,20 @@ export default function AdminReviewPackageStrip({
                 </Link>
                 ) : null}
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {loading ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm font-medium text-slate-500" role="status">
+                    Loading review package...
+                </div>
+            ) : !hasPackage ? (
+                <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 p-5 text-sm text-amber-900" role="status">
+                    <p className="font-bold">Review package not available</p>
+                    <p className="mt-1 text-xs">
+                        The flashcard and detailed report documents have not been generated for this submission yet.
+                        {files.length ? " Uploaded evidence files are still shown below." : " No evidence files were found either."}
+                    </p>
+                </div>
+            ) : null}
+            <div className={`grid grid-cols-1 gap-3 md:grid-cols-3 ${!loading && hasPackage ? "" : "hidden"}`}>
                 <button
                     type="button"
                     onClick={() => setOpenTab("flashView")}
@@ -130,11 +147,13 @@ export default function AdminReviewPackageStrip({
                     </p>
                 </button>
             </div>
-            <div className="mt-6">
-                <h3 className="mb-3 text-sm font-black text-slate-800">Evidence gallery</h3>
-                <ReportEvidenceGallery files={files} />
-            </div>
-            {openTab ? (
+            {!loading && (hasPackage || files.length > 0) ? (
+                <div className="mt-6">
+                    <h3 className="mb-3 text-sm font-black text-slate-800">Evidence gallery</h3>
+                    <ReportEvidenceGallery files={files} />
+                </div>
+            ) : null}
+            {openTab && hasPackage ? (
                 <FacultyLockedV17Modal
                     reportId={reportId}
                     report={report}

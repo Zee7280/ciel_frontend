@@ -7,6 +7,8 @@ import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import {
     ArrowLeft,
+    ChevronLeft,
+    ChevronRight,
     BarChart3,
     CheckCircle2,
     ChevronDown,
@@ -77,6 +79,8 @@ import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import ConfirmModal from "../../../_shared/ConfirmModal";
+import { loadReviewQueue, neighbourInQueue } from "../../../_shared/reviewQueue";
 import ReportEvidenceGallery, {
     classifyEvidenceGalleryKind,
     type ReportEvidenceGalleryItem,
@@ -853,21 +857,14 @@ function AdminReportDetailPage() {
     }, [report, sectionOpen]);
 
     const fetchReportDetail = async () => {
-        console.log('📞 ADMIN: Fetching report detail for ID:', params.reportId);
         try {
             setLoading(true);
             const apiUrl = `/api/v1/admin/reports/${params.reportId}`;
-            console.log('🌐 API URL:', apiUrl);
 
             const response = await authenticatedFetch(apiUrl);
-            console.log('📡 Response:', response);
-            console.log('✅ Response OK?:', response?.ok);
 
             if (response?.ok) {
                 const data = await response.json();
-                console.log('📊 Full API Response:', data);
-                console.log('📋 Report data:', data.report);
-                console.log('📋 Data field:', data.data);
 
                 // Backend might return { success, data } or { report }
                 const raw = data.data || data.report || data;
@@ -965,7 +962,48 @@ function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
+    const reportIdStr = String(params.reportId);
+    const [queueIds, setQueueIds] = useState<string[]>([]);
+    const [pendingDecision, setPendingDecision] = useState<
+        { apiAction: 'approve' | 'reject' | 'unlock'; stage: 'confirm' | 'force' } | null
+    >(null);
+
+    useEffect(() => {
+        setQueueIds(loadReviewQueue());
+    }, [reportIdStr]);
+
+    const queueNav = useMemo(() => neighbourInQueue(queueIds, reportIdStr), [queueIds, reportIdStr]);
+
+    const goToReport = useCallback(
+        (id: string | null) => {
+            if (id) router.push(`/dashboard/admin/reports/verify/${id}`);
+        },
+        [router],
+    );
+
+    // j = next, k = previous report in the filtered queue; ignored while typing.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            if (pendingDecision) return;
+            const el = e.target as HTMLElement | null;
+            const tag = el?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+            if (e.key === 'j' && queueNav.next) goToReport(queueNav.next);
+            else if (e.key === 'k' && queueNav.prev) goToReport(queueNav.prev);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [queueNav, goToReport, pendingDecision]);
+
+    /** Verified / paid reports need an explicit force flag to be rejected or reopened. */
+    const isFinalised = (r: ReportDetail | null): boolean => {
+        if (!r) return false;
+        const st = String(r.status || '').trim().toLowerCase();
+        return st === 'verified' || st === 'paid' || String(r.admin_status || '').trim().toLowerCase() === 'approved';
+    };
+
+    const handleVerify = (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
         const apiAction: 'approve' | 'reject' | 'unlock' =
             intent === 'editable' ? 'unlock' : action;
 
@@ -977,7 +1015,10 @@ function AdminReportDetailPage() {
             );
             return;
         }
+        setPendingDecision({ apiAction, stage: 'confirm' });
+    };
 
+    const executeVerify = async (apiAction: 'approve' | 'reject' | 'unlock', force: boolean) => {
         try {
             setIsVerifying(true);
             const userData = JSON.parse(localStorage.getItem('ciel_user') || '{}');
@@ -990,7 +1031,8 @@ function AdminReportDetailPage() {
                         action: apiAction,
                         feedback: feedback.trim() || undefined,
                         reason: feedback.trim() || undefined,
-                        verified_by: userData.id
+                        verified_by: userData.id,
+                        ...(force ? { force: true } : {}),
                     })
                 }
             );
@@ -1001,20 +1043,61 @@ function AdminReportDetailPage() {
                         ? 'Report returned to student for edits.'
                         : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
                 );
-                setTimeout(() => router.push('/dashboard/admin/reports/verify'), 1500);
+                setPendingDecision(null);
+                const nextId = queueNav.next;
+                setTimeout(
+                    () => router.push(nextId ? `/dashboard/admin/reports/verify/${nextId}` : '/dashboard/admin/reports/verify'),
+                    1200,
+                );
             } else {
                 const payload = response ? await response.json().catch(() => ({})) : {};
                 const msg =
                     (payload as { message?: string }).message ||
                     (apiAction === 'unlock' ? 'Failed to make report editable' : 'Failed to verify report');
                 toast.error(msg);
+                setPendingDecision(null);
             }
         } catch (error) {
             console.error('Verification error:', error);
             toast.error('An error occurred');
+            setPendingDecision(null);
         } finally {
             setIsVerifying(false);
         }
+    };
+
+    const onDecisionConfirmed = () => {
+        if (!pendingDecision) return;
+        const { apiAction, stage } = pendingDecision;
+        const needsForce = apiAction !== 'approve' && isFinalised(report);
+        if (needsForce && stage === 'confirm') {
+            setPendingDecision({ apiAction, stage: 'force' });
+            return;
+        }
+        void executeVerify(apiAction, needsForce);
+    };
+
+    const decisionCopy = (apiAction: 'approve' | 'reject' | 'unlock') => {
+        const who = report?.student?.name || 'the student';
+        if (apiAction === 'approve') {
+            return {
+                title: 'Approve this report?',
+                label: 'Approve report',
+                body: `Approving publishes the review package for ${who} to the student, partner/NGO, faculty, university and admin views. The student is notified.`,
+            };
+        }
+        if (apiAction === 'reject') {
+            return {
+                title: 'Reject this report?',
+                label: 'Reject report',
+                body: `${who} is notified with your notes and the report is marked as needing revision.`,
+            };
+        }
+        return {
+            title: 'Make this report editable?',
+            label: 'Return for edits',
+            body: `The report is unlocked so ${who} can revise and resubmit it. Their notes below are shared with them.`,
+        };
     };
 
     const LabelValue = ({ label, value, fullWidth = false }: { label: string; value: unknown; fullWidth?: boolean }) => (
@@ -1089,6 +1172,33 @@ function AdminReportDetailPage() {
                         >
                             Student reports
                         </Link>
+                        {queueNav.index >= 0 ? (
+                            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5" aria-label="Queue navigation">
+                                <button
+                                    type="button"
+                                    onClick={() => goToReport(queueNav.prev)}
+                                    disabled={!queueNav.prev}
+                                    title="Previous report (k)"
+                                    aria-label="Previous report"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="px-1 text-xs font-semibold tabular-nums text-slate-600">
+                                    {queueNav.index + 1} / {queueNav.total}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => goToReport(queueNav.next)}
+                                    disabled={!queueNav.next}
+                                    title="Next report (j)"
+                                    aria-label="Next report"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
@@ -2336,6 +2446,60 @@ function AdminReportDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {pendingDecision ? (
+                (() => {
+                    const copy = decisionCopy(pendingDecision.apiAction);
+                    const finalised = pendingDecision.apiAction !== 'approve' && isFinalised(report);
+                    const notes = feedback.trim();
+                    if (pendingDecision.stage === 'force') {
+                        return (
+                            <ConfirmModal
+                                open
+                                tone="danger"
+                                title="Final confirmation: override a verified report"
+                                confirmLabel="Override and continue"
+                                requireTyped="OVERRIDE"
+                                busy={isVerifying}
+                                onConfirm={() => onDecisionConfirmed()}
+                                onCancel={() => setPendingDecision(null)}
+                            >
+                                <p className="font-medium text-red-700">
+                                    This sends a forced {pendingDecision.apiAction === 'reject' ? 'rejection' : 'unlock'}. The decision is
+                                    recorded against your admin account and cannot be undone automatically.
+                                </p>
+                            </ConfirmModal>
+                        );
+                    }
+                    return (
+                        <ConfirmModal
+                            open
+                            tone={pendingDecision.apiAction === 'approve' ? 'default' : 'danger'}
+                            title={finalised ? `Warning: this report is already verified. ${copy.title}` : copy.title}
+                            confirmLabel={finalised ? 'Continue' : copy.label}
+                            busy={isVerifying}
+                            onConfirm={() => onDecisionConfirmed()}
+                            onCancel={() => setPendingDecision(null)}
+                        >
+                            <div className="space-y-2">
+                                <p>{copy.body}</p>
+                                {finalised ? (
+                                    <p className="rounded-lg border border-red-200 bg-red-50 p-2 font-medium text-red-700">
+                                        This report was already approved or paid. Changing it may affect certificates, payments and
+                                        published results. You will be asked to confirm once more.
+                                    </p>
+                                ) : null}
+                                {notes ? (
+                                    <p className="break-words rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+                                        <span className="font-semibold">Notes: </span>
+                                        {notes.length > 300 ? `${notes.slice(0, 300)}…` : notes}
+                                    </p>
+                                ) : null}
+                            </div>
+                        </ConfirmModal>
+                    );
+                })()
+            ) : null}
 
             {/* Sticky Action Bar for quick access while scrolling */}
             {showStickyActions && !isVerifying && report.admin_status !== "approved" && (

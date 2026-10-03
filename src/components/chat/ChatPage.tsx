@@ -76,8 +76,7 @@ function ChatPageContent() {
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    console.log("Fetched Conversations: ", JSON.stringify(data.data, null, 2));
-                    setConversations(data.data);
+                    setConversations(Array.isArray(data.data) ? data.data : []);
                 }
             }
         } catch (error) {

@@ -5,6 +5,9 @@ export const STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY =
 export const STUDENT_APPLY_CLOSED_BEFORE_KEY = "STUDENT_APPLY_CLOSED_BEFORE";
 export const STUDENT_APPLY_EXPIRED_MESSAGE_KEY = "STUDENT_APPLY_EXPIRED_MESSAGE";
 
+/** Sentinel the backend accepts to switch the "close listings created before" cutoff OFF. Never send "". */
+export const STUDENT_APPLY_CLOSED_BEFORE_DISABLED = "disabled";
+
 export const DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE =
     "Student applications are temporarily paused for maintenance. Existing reports, attendance, and reviews continue as usual.";
 
@@ -20,6 +23,14 @@ export function parseStudentApplyMaintenanceEnabled(
     if (["true", "1", "yes", "on", "enabled"].includes(v)) return true;
     if (["false", "0", "no", "off", "disabled"].includes(v)) return false;
     return fallback;
+}
+
+/** Returns the active cutoff date, or null when expiry is off (blank / "disabled" / unparsable). */
+export function parseStudentApplyClosedBefore(value: string | null | undefined): Date | null {
+    const v = String(value ?? "").trim();
+    if (!v || v.toLowerCase() === STUDENT_APPLY_CLOSED_BEFORE_DISABLED) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export function applyClosedCtaLabel(reason: string | null | undefined): string {

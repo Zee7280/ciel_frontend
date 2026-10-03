@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     AlertTriangle,
     ChevronDown,
@@ -83,6 +83,34 @@ function matchesSearch(log: AuditLogRow, q: string): boolean {
     return hay.includes(needle);
 }
 
+function detailsObj(details: unknown): Record<string, unknown> {
+    if (details && typeof details === "object" && !Array.isArray(details)) return details as Record<string, unknown>;
+    if (typeof details === "string") {
+        try {
+            const parsed = JSON.parse(details);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+        } catch {
+            /* ignore */
+        }
+    }
+    return {};
+}
+
+function isFailure(log: AuditLogRow): boolean {
+    return String(detailsObj(log.details).outcome ?? "").toLowerCase() === "failure";
+}
+
+function summarize(log: AuditLogRow): string {
+    const d = detailsObj(log.details);
+    const method = String(d.method ?? "").toUpperCase();
+    const route = String(d.path ?? d.route ?? d.url ?? "");
+    const target = log.target ? `${log.target}${log.target_type ? ` (${log.target_type})` : ""}` : "";
+    const head = [method, route].filter(Boolean).join(" ");
+    return [head, target && `→ ${target}`].filter(Boolean).join(" ") || log.action?.trim() || "—";
+}
+
+const EMPTY_FILTERS = { userEmail: "", path: "", dateFrom: "", dateTo: "" };
+
 export default function AdminAuditLogsPage() {
     const [logs, setLogs] = useState<AuditLogRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -92,16 +120,26 @@ export default function AdminAuditLogsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
     const [totalItems, setTotalItems] = useState(0);
+    const [draft, setDraft] = useState(EMPTY_FILTERS);
+    const [filters, setFilters] = useState(EMPTY_FILTERS);
+    const reqSeq = useRef(0);
 
     const loadLogs = useCallback(async () => {
+        const seq = ++reqSeq.current;
         setIsLoading(true);
         setError("");
         try {
+            const qs = new URLSearchParams({ page: String(currentPage), limit: String(itemsPerPage) });
+            (Object.keys(filters) as (keyof typeof filters)[]).forEach((k) => {
+                const v = filters[k].trim();
+                if (v) qs.set(k, v);
+            });
             const res = await authenticatedFetch(
-                `/api/v1/admin/audit-logs?page=${currentPage}&limit=${itemsPerPage}`,
+                `/api/v1/admin/audit-logs?${qs.toString()}`,
                 {},
                 { redirectToLogin: false },
             );
+            if (seq !== reqSeq.current) return;
             if (!res?.ok) {
                 setLogs([]);
                 setTotalItems(0);
@@ -109,6 +147,7 @@ export default function AdminAuditLogsPage() {
                 return;
             }
             const body = (await res.json()) as AuditLogsResponse;
+            if (seq !== reqSeq.current) return;
             if (body.success && Array.isArray(body.data)) {
                 setLogs(body.data);
                 setTotalItems(body.meta?.total ?? body.data.length);
@@ -118,13 +157,25 @@ export default function AdminAuditLogsPage() {
                 setError("Unexpected response from audit logs API.");
             }
         } catch {
+            if (seq !== reqSeq.current) return;
             setLogs([]);
             setTotalItems(0);
             setError("Network error while loading audit logs.");
         } finally {
-            setIsLoading(false);
+            if (seq === reqSeq.current) setIsLoading(false);
         }
-    }, [currentPage, itemsPerPage]);
+    }, [currentPage, itemsPerPage, filters]);
+
+    const applyFilters = () => {
+        setCurrentPage(1);
+        setFilters(draft);
+    };
+    const clearFilters = () => {
+        setCurrentPage(1);
+        setDraft(EMPTY_FILTERS);
+        setFilters(EMPTY_FILTERS);
+        setSearchQuery("");
+    };
 
     useEffect(() => {
         void loadLogs();
@@ -155,13 +206,43 @@ export default function AdminAuditLogsPage() {
             </div>
 
             <Card className="p-4 shadow-sm">
+                <form
+                    className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        applyFilters();
+                    }}
+                >
+                    <Input
+                        value={draft.userEmail}
+                        onChange={(e) => setDraft({ ...draft, userEmail: e.target.value })}
+                        placeholder="User email contains…"
+                        aria-label="User email"
+                    />
+                    <Input
+                        value={draft.path}
+                        onChange={(e) => setDraft({ ...draft, path: e.target.value })}
+                        placeholder="Action / route contains…"
+                        aria-label="Action or route"
+                    />
+                    <Input type="date" value={draft.dateFrom} onChange={(e) => setDraft({ ...draft, dateFrom: e.target.value })} aria-label="From date" />
+                    <Input type="date" value={draft.dateTo} onChange={(e) => setDraft({ ...draft, dateTo: e.target.value })} aria-label="To date" />
+                    <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
+                        <Button type="submit" size="sm" disabled={isLoading}>
+                            Apply filters
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                            Clear
+                        </Button>
+                    </div>
+                </form>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <Input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Filter current page: action, user, target, details…"
+                            placeholder="Search this page only: action, user, target, details…"
                             className="pl-9"
                         />
                     </div>
@@ -200,6 +281,7 @@ export default function AdminAuditLogsPage() {
                         {displayedLogs.map((log) => {
                             const actionLabel = log.action?.trim() || "unknown_action";
                             const isExpanded = expandedId === log.id;
+                            const failed = isFailure(log);
                             return (
                                 <li key={log.id} className="border-b border-slate-100 last:border-0">
                                     <button
@@ -212,6 +294,12 @@ export default function AdminAuditLogsPage() {
                                             <Badge variant="outline" className={`inline-block max-w-full whitespace-normal text-left leading-snug ${actionAccent(actionLabel)}`}>
                                                 {actionLabel}
                                             </Badge>
+                                            {failed ? (
+                                                <Badge variant="outline" className="ml-2 inline-block border-red-300 bg-red-50 font-bold text-red-700">
+                                                    FAIL
+                                                </Badge>
+                                            ) : null}
+                                            <p className="mt-1 break-words text-xs text-slate-600">{summarize(log)}</p>
                                         </div>
                                         <div className="min-w-0 text-sm text-slate-700">
                                             <p className="truncate font-semibold text-slate-900">{log.user || "Unknown"}</p>

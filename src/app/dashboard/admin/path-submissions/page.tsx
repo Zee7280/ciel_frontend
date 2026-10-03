@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
-import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
+import { authenticatedFetch } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
@@ -268,7 +268,7 @@ function AdminPathSubmissionsHub() {
     const [reviewTab, setReviewTab] = useState<"all" | "pending" | "revision" | "rejected">("all");
     const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
     const [openReviewId, setOpenReviewId] = useState<string | null>(null);
-    const [hubStats, setHubStats] = useState<{ active: number; attention: number; hub: number; completion: number } | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [approvedMeritEntries, setApprovedMeritEntries] = useState<MeritEntry[]>([]);
@@ -322,57 +322,37 @@ function AdminPathSubmissionsHub() {
     }, [pathTab, fypView]);
 
     useEffect(() => {
-        if (pathTab !== "fyp-thesis" || fypView !== "home") return;
-        let cancelled = false;
-        authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/dashboard"), {}, { redirectToLogin: false, timeoutMs: 60_000 })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => {
-                if (cancelled) return;
-                const metrics = result?.data?.metrics as
-                    | { opportunities?: number; pendingApprovals?: number; totalReports?: number; totalUsers?: { total?: number } }
-                    | undefined;
-                if (!metrics) return;
-                const pending = metrics.pendingApprovals ?? 0;
-                const reports = metrics.totalReports ?? 0;
-                const active = metrics.opportunities ?? metrics.totalUsers?.total ?? 0;
-                setHubStats({
-                    active,
-                    attention: pending,
-                    hub: reports,
-                    completion: reports + pending > 0 ? Math.round((reports / (reports + pending)) * 100) : 0,
-                });
-            })
-            .catch(() => undefined);
-        return () => {
-            cancelled = true;
-        };
-    }, [pathTab, fypView]);
-
-    useEffect(() => {
         setExpandedId(null);
     }, [pathTab, courseFilter, ventureFilter]);
 
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
+        setLoadError(null);
 
         const load = async () => {
+            const url =
+                pathTab === "course-project"
+                    ? "/api/v1/admin/paths/course-projects"
+                    : pathTab === "fyp-thesis"
+                      ? "/api/v1/admin/paths/fyp-thesis"
+                      : "/api/v1/admin/paths/startup-business";
             try {
-                if (pathTab === "course-project") {
-                    const res = await authenticatedFetch(`/api/v1/admin/paths/course-projects`);
-                    const payload = res?.ok ? await res.json() : null;
-                    if (!cancelled) setCourseRows(Array.isArray(payload?.data) ? payload.data : []);
-                    return;
+                const res = await authenticatedFetch(url);
+                if (!res?.ok) {
+                    const body = await res?.json().catch(() => null);
+                    throw new Error(body?.message || body?.error || "Could not load submissions.");
                 }
-                if (pathTab === "fyp-thesis") {
-                    const res = await authenticatedFetch(`/api/v1/admin/paths/fyp-thesis`);
-                    const payload = res?.ok ? await res.json() : null;
-                    if (!cancelled) setFypRows(Array.isArray(payload?.data) ? payload.data : []);
-                    return;
+                const payload = await res.json();
+                const rows = Array.isArray(payload?.data) ? payload.data : [];
+                if (cancelled) return;
+                if (pathTab === "course-project") setCourseRows(rows);
+                else if (pathTab === "fyp-thesis") setFypRows(rows);
+                else setVentureRows(rows);
+            } catch (err) {
+                if (!cancelled) {
+                    setLoadError(err instanceof Error && err.message ? err.message : "Could not load submissions.");
                 }
-                const res = await authenticatedFetch(`/api/v1/admin/paths/startup-business`);
-                const payload = res?.ok ? await res.json() : null;
-                if (!cancelled) setVentureRows(Array.isArray(payload?.data) ? payload.data : []);
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -622,17 +602,22 @@ function AdminPathSubmissionsHub() {
                     />
                     {fypView === "home" ? (
                     <>
+                    {loadError ? (
+                        <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                            {loadError} The figures below may be incomplete.
+                        </div>
+                    ) : null}
                     <MockupHero
                         title="Final Year Project (FYP)"
                         subtitle="Track Final Year Projects from initial draft through faculty approval and final EI analysis."
                         stats={[
-                            { value: String(hubStats?.active ?? fypRows.length), label: "Active Records" },
-                            { value: String(hubStats?.attention ?? underReviewFypBadge), label: "Need Attention" },
-                            { value: String(hubStats?.hub ?? approvedFyp.length), label: "On Impact Hub" },
+                            { value: String(fypRows.length), label: "Total Records" },
+                            { value: String(underReviewFypBadge), label: "Waiting for Review" },
+                            { value: String(approvedFyp.length), label: "Approved" },
                         ]}
                         rightStat={{
-                            value: `${hubStats?.completion ?? (approvedFyp.length + underReviewFypBadge > 0 ? Math.round((approvedFyp.length / (approvedFyp.length + underReviewFypBadge)) * 100) : 0)}%`,
-                            label: "approval completion this semester",
+                            value: `${approvedFyp.length + underReviewFypBadge > 0 ? Math.round((approvedFyp.length / (approvedFyp.length + underReviewFypBadge)) * 100) : 0}%`,
+                            label: "of submitted FYPs approved",
                         }}
                     />
                     <MockupSectionHead
@@ -736,6 +721,10 @@ function AdminPathSubmissionsHub() {
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
+                    ) : loadError ? (
+                        <Card role="alert" className="border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+                            {loadError} Refresh the page to try again.
+                        </Card>
                     ) : commandRows.length === 0 ? (
                         <Card className="border-dashed p-10 text-center text-slate-500">
                             {commandTab === "stalled" ? "Nothing stalled right now." : "No records in this view."}
@@ -1092,6 +1081,10 @@ function AdminPathSubmissionsHub() {
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
+                    ) : loadError ? (
+                        <Card role="alert" className="border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+                            {loadError} Refresh the page to try again.
+                        </Card>
                     ) : (
                         <AdminFypFacultyWorkPanel
                             entries={fypRowsAsMerit}
@@ -1152,6 +1145,10 @@ function AdminPathSubmissionsHub() {
                 <div className="flex justify-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                 </div>
+            ) : loadError ? (
+                <Card role="alert" className="border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+                    {loadError} Refresh the page to try again.
+                </Card>
             ) : activeCount === 0 ? (
                 <Card className="border-dashed p-10 text-center text-slate-500">{emptyMessage}</Card>
             ) : (

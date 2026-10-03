@@ -1,77 +1,138 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Filter, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import StatusBadge from "@/components/admin/StatusBadge";
+import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
+
+type OrgAction = "approve" | "suspend" | "unsuspend" | "reject" | "delete";
+
+const STATUS_FILTERS: { value: string; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "pending", label: "Pending" },
+    { value: "verified", label: "Verified" },
+    { value: "suspended", label: "Suspended" },
+    { value: "rejected", label: "Rejected" },
+];
+
+const MENU_W = 208;
+const MENU_H = 260;
+const MENU_GAP = 8;
+
+function computeMenuPosition(trigger: DOMRect) {
+    const spaceBelow = window.innerHeight - trigger.bottom - MENU_GAP;
+    const openAbove = spaceBelow < MENU_H && trigger.top > spaceBelow;
+    let x = trigger.right - MENU_W;
+    let y = openAbove ? trigger.top - MENU_H - MENU_GAP : trigger.bottom + MENU_GAP;
+    x = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
+    y = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
+    return { x, y };
+}
+
+const orgStatusOf = (org: any): string =>
+    String(org?.status || org?.verification_status || "unknown").toLowerCase();
 
 export default function AdminOrganizationsPage() {
     const [orgs, setOrgs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+    const { begin } = useAbortableFetch();
 
-    const fetchOrganizations = async () => {
+    const fetchOrganizations = useCallback(async () => {
+        const run = begin();
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/organizations`);
-            if (res && res.ok) {
+            const res = await authenticatedFetch(`/api/v1/admin/organizations`, { signal: run.signal });
+            if (!run.isCurrent() || !res) return;
+            if (res.ok) {
                 const data = await res.json();
+                if (!run.isCurrent()) return;
 
-                // Hnadle different data structures (array directly or { data: [...] })
-                let orgsList = [];
+                // Handle different data structures (array directly or { data: [...] })
+                let orgsList: any[] = [];
                 if (Array.isArray(data)) {
                     orgsList = data;
-                } else if (data.data && Array.isArray(data.data)) {
+                } else if (data?.data && Array.isArray(data.data)) {
                     orgsList = data.data;
                 }
 
                 setOrgs(orgsList);
             } else {
-                console.error("Failed to fetch organizations", res?.status);
+                toast.error(await readErrorMessage(res, "Failed to load organizations"));
             }
         } catch (error) {
+            if (isAbortError(error) || !run.isCurrent()) return;
             console.error("Error fetching organizations", error);
-            // toast.error("Error loading data");
+            toast.error("Failed to load organizations");
         } finally {
-            setIsLoading(false);
+            if (run.isCurrent()) setIsLoading(false);
         }
-    };
+    }, [begin]);
 
     useEffect(() => {
-        fetchOrganizations();
-    }, []);
+        void fetchOrganizations();
+    }, [fetchOrganizations]);
 
-    // Filter Logic
-    const filteredOrgs = orgs.filter(org => {
-        const query = searchQuery.toLowerCase();
-        return (
-            org.name?.toLowerCase().includes(query) ||
-            org.email?.toLowerCase().includes(query) ||
-            org.contact?.toLowerCase().includes(query)
+    // Filter Logic (only fields the API actually returns)
+    const query = searchQuery.trim().toLowerCase();
+    const filteredOrgs = orgs.filter((org) => {
+        if (statusFilter !== "all" && orgStatusOf(org) !== statusFilter) return false;
+        if (!query) return true;
+        return [org.name, org.email, org.contact_person, org.contact_number, org.organization_type].some((v) =>
+            String(v ?? "").toLowerCase().includes(query),
         );
     });
 
-    const totalPages = Math.ceil(filteredOrgs.length / itemsPerPage);
-    const paginatedOrgs = filteredOrgs.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery]);
+    const totalPages = Math.max(1, Math.ceil(filteredOrgs.length / itemsPerPage));
+    const safePage = Math.min(currentPage, totalPages);
+    const paginatedOrgs = filteredOrgs.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [activeActionMenu, setActiveActionMenu] = useState<number | string | null>(null);
+    const [actionMenu, setActionMenu] = useState<{ orgId: number | string; x: number; y: number } | null>(null);
     const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
     const [isDetailsLoading, setIsDetailsLoading] = useState(false);
     const [formData, setFormData] = useState({ name: "", email: "", contact: "", type: "ngo", password: "" });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [confirm, setConfirm] = useState<{ action: OrgAction; org: any } | null>(null);
+    const [rejectNotes, setRejectNotes] = useState("");
+
+    const actionMenuOrg = actionMenu == null ? null : orgs.find((o) => o.id === actionMenu.orgId) ?? null;
+
+    useEffect(() => {
+        if (!actionMenu) return;
+        const onPointerDown = (e: PointerEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest("[data-org-row-actions]") || t?.closest("[data-org-actions-portal]")) return;
+            setActionMenu(null);
+        };
+        const close = () => setActionMenu(null);
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setActionMenu(null);
+        };
+        document.addEventListener("pointerdown", onPointerDown);
+        document.addEventListener("keydown", onKey);
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown);
+            document.removeEventListener("keydown", onKey);
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+        };
+    }, [actionMenu]);
 
     const handleAddOrganization = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/organizations/create`, {
                 method: "POST",
@@ -81,78 +142,108 @@ export default function AdminOrganizationsPage() {
                 toast.success("Organization onboarded successfully");
                 setIsAddModalOpen(false);
                 setFormData({ name: "", email: "", contact: "", type: "ngo", password: "" });
-                fetchOrganizations();
+                void fetchOrganizations();
             } else {
-                toast.error("Failed to onboard organization");
+                toast.error(await readErrorMessage(res, "Failed to onboard organization"));
             }
         } catch (error) {
             console.error("Error onboarding organization", error);
             toast.error("Error creating organization");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleAction = async (id: string, action: 'approve' | 'suspend' | 'delete', currentStatus?: string) => {
+    const openConfirm = (action: OrgAction, org: any) => {
+        setRejectNotes("");
+        setConfirm({ action, org });
+        setActionMenu(null);
+    };
+
+    const runConfirmedAction = async () => {
+        if (!confirm || isSubmitting) return;
+        const { action, org } = confirm;
+        const id = org.id;
+        const name = org.name || "organization";
+        const status = orgStatusOf(org);
+        setIsSubmitting(true);
         try {
-            if (action === 'delete') {
-                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}`, {
-                    method: 'DELETE'
-                });
+            if (action === "delete") {
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}`, { method: "DELETE" });
                 if (res && res.ok) {
-                    toast.success("Organization deleted successfully");
-                    fetchOrganizations();
+                    toast.success(`${name} deleted`);
                 } else {
-                    toast.error("Failed to delete organization");
+                    toast.error(await readErrorMessage(res, "Failed to delete organization"));
+                    return;
                 }
-            } else if (action === 'approve') {
-                // Use the real approve endpoint so verifiedBy/verifiedAt are recorded (audit trail);
-                // the generic status update cannot set verifiedBy.
-                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/approve`, {
-                    method: 'PATCH'
+            } else if (action === "approve") {
+                // Real approve endpoint records verifiedBy/verifiedAt. A suspended org also needs the
+                // block lifted, which is a second call: run sequentially and report partial failure.
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/approve`, { method: "PATCH" });
+                if (!res || !res.ok) {
+                    toast.error(await readErrorMessage(res, "Failed to approve organization"));
+                    return;
+                }
+                if (status === "suspended") {
+                    const unblockRes = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
+                        method: "POST",
+                        body: JSON.stringify({ id, status: "active" }),
+                    });
+                    if (!unblockRes || !unblockRes.ok) {
+                        const msg = await readErrorMessage(unblockRes, "request failed");
+                        toast.error(`${name} was approved but is still suspended (${msg}). Use Unsuspend to retry.`);
+                        return;
+                    }
+                }
+                toast.success(`${name} approved`);
+            } else if (action === "unsuspend") {
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
+                    method: "POST",
+                    body: JSON.stringify({ id, status: "active" }),
                 });
-
-                if (res && res.ok) {
-                    // Approving a suspended organization must also lift the block; the approve
-                    // endpoint only touches verification fields.
-                    let unblockFailed = false;
-                    if (String(currentStatus || '').toLowerCase() === 'suspended') {
-                        const unblockRes = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
-                            method: 'POST',
-                            body: JSON.stringify({ id, status: 'active' })
-                        });
-                        unblockFailed = !unblockRes || !unblockRes.ok;
-                    }
-                    if (unblockFailed) {
-                        toast.error("Organization was approved but is still suspended — please retry lifting the suspension.");
-                    } else {
-                        toast.success("Organization approved successfully");
-                    }
-                    fetchOrganizations();
-                } else {
-                    toast.error("Failed to approve organization");
+                if (!res || !res.ok) {
+                    toast.error(await readErrorMessage(res, "Failed to unsuspend organization"));
+                    return;
                 }
+                toast.success(`${name} unsuspended`);
+            } else if (action === "reject") {
+                const notes = rejectNotes.trim();
+                if (!notes) {
+                    toast.error("Please enter a reason for rejection");
+                    return;
+                }
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/reject`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ notes }),
+                });
+                if (!res || !res.ok) {
+                    toast.error(await readErrorMessage(res, "Failed to reject organization"));
+                    return;
+                }
+                toast.success(`${name} rejected`);
             } else {
-                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/block`, {
-                    method: 'PATCH'
-                });
-
-                if (res && res.ok) {
-                    toast.success("Organization suspended successfully");
-                    fetchOrganizations();
-                } else {
-                    toast.error("Failed to suspend organization");
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}/block`, { method: "PATCH" });
+                if (!res || !res.ok) {
+                    toast.error(await readErrorMessage(res, "Failed to suspend organization"));
+                    return;
                 }
+                toast.success(`${name} suspended`);
             }
+            setConfirm(null);
         } catch (error) {
-            console.error(`Error ${action}ing organization`, error);
+            console.error(`Error running ${action} on organization`, error);
             toast.error("Action failed");
+        } finally {
+            setIsSubmitting(false);
+            // Always resync: a partial failure may have changed state server-side.
+            void fetchOrganizations();
         }
-        setActiveActionMenu(null);
     };
 
     const openOrganizationDetails = async (org: any) => {
         setSelectedOrg(org);
         setIsDetailsLoading(true);
-        setActiveActionMenu(null);
+        setActionMenu(null);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/organizations/${org.id}`);
             if (res && res.ok) {
@@ -203,7 +294,8 @@ export default function AdminOrganizationsPage() {
     const handleAddUniversityMember = async (e: React.FormEvent) => {
         e.preventDefault();
         const orgId = selectedOrg?.id;
-        if (!orgId) return;
+        if (!orgId || isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/organizations/${orgId}/members`, {
                 method: "POST",
@@ -225,6 +317,8 @@ export default function AdminOrganizationsPage() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to add staff account");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -249,15 +343,35 @@ export default function AdminOrganizationsPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search organizations..."
+                        placeholder="Search name, email, contact, type..."
                         className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-blue-500"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                        }}
                     />
                 </div>
-                <button className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                    <Filter className="w-4 h-4" /> Filter
-                </button>
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
+                    {STATUS_FILTERS.map((f) => (
+                        <button
+                            key={f.value}
+                            type="button"
+                            aria-pressed={statusFilter === f.value}
+                            onClick={() => {
+                                setStatusFilter(f.value);
+                                setCurrentPage(1);
+                            }}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                                statusFilter === f.value
+                                    ? "border-blue-600 bg-blue-600 text-white"
+                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Table */}
@@ -274,21 +388,21 @@ export default function AdminOrganizationsPage() {
                 ) : (
                     <>
                         <div className="overflow-x-auto">
-                        <table className="min-w-[900px] w-full text-left">
+                        <table className="min-w-[760px] w-full text-left">
                             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                                 <tr>
-                                    <th className="p-6">Organization</th>
-                                    <th className="p-6">Type</th>
-                                    <th className="p-6">Contact Person</th>
-                                    <th className="p-6">Status</th>
-                                    <th className="p-6">Active Projects</th>
-                                    <th className="p-6 text-right">Actions</th>
+                                    <th className="p-4 sm:p-6">Organization</th>
+                                    <th className="p-4 sm:p-6">Type</th>
+                                    <th className="p-4 sm:p-6">Contact Person</th>
+                                    <th className="p-4 sm:p-6">Status</th>
+                                    <th className="p-4 sm:p-6">Active Projects</th>
+                                    <th className="p-4 sm:p-6 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {paginatedOrgs.map((org) => (
                                     <tr key={org.id} className="group hover:bg-slate-50/50 transition-colors">
-                                        <td className="p-6">
+                                        <td className="p-4 sm:p-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
                                                     <Building2 className="w-5 h-5" />
@@ -299,62 +413,40 @@ export default function AdminOrganizationsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-6">
+                                        <td className="p-4 sm:p-6">
                                             <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                                 <Globe className="w-4 h-4 text-blue-500" /> {org.organization_type || org.type || "N/A"}
                                             </span>
                                         </td>
-                                        <td className="p-6 text-sm text-slate-600">
-                                            {org.contact_person || org.contact || "N/A"}
+                                        <td className="p-4 sm:p-6 text-sm text-slate-600">
+                                            {org.contact_person || "N/A"}
                                         </td>
-                                        <td className="p-6">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 w-fit
-                                                ${(org.status === 'verified' || org.verification_status === 'verified') ? 'bg-green-50 text-green-600' :
-                                                    (org.status === 'pending' || org.verification_status === 'pending') ? 'bg-amber-50 text-amber-600' :
-                                                        'bg-red-50 text-red-600'}`}>
-                                                {(org.status === 'verified' || org.verification_status === 'verified') && <ShieldCheck className="w-3 h-3" />}
-                                                {(org.status === 'suspended' || org.verification_status === 'suspended') && <AlertCircle className="w-3 h-3" />}
-                                                {org.status || org.verification_status || "Unknown"}
-                                            </span>
+                                        <td className="p-4 sm:p-6">
+                                            <StatusBadge status={orgStatusOf(org)} className="gap-1">
+                                                {orgStatusOf(org) === "verified" && <ShieldCheck className="w-3 h-3" />}
+                                                {orgStatusOf(org) === "suspended" && <AlertCircle className="w-3 h-3" />}
+                                                {orgStatusOf(org).replace(/_/g, " ")}
+                                            </StatusBadge>
                                         </td>
-                                        <td className="p-6 font-bold text-slate-900">{org.active_projects_count || org.projects || 0}</td>
-                                        <td className="p-6 text-right relative">
-                                            <button
-                                                onClick={() => setActiveActionMenu(activeActionMenu === org.id ? null : org.id)}
-                                                className="p-2.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                                            >
-                                                <MoreVertical className="w-5 h-5" />
-                                            </button>
-
-                                            {/* Action Dropdown */}
-                                            {activeActionMenu === org.id && (
-                                                <div className="absolute right-8 top-12 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 text-left">
-                                                    <button
-                                                        onClick={() => openOrganizationDetails(org)}
-                                                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 font-medium"
-                                                    >
-                                                        View Details
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(org.id, 'approve', org.status || org.verification_status)}
-                                                        className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 font-medium"
-                                                    >
-                                                        Approve Organization
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(org.id, 'suspend')}
-                                                        className="w-full text-left px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 font-medium"
-                                                    >
-                                                        Suspend Organization
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(org.id, 'delete')}
-                                                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-medium"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            )}
+                                        <td className="p-4 sm:p-6 font-bold text-slate-900">{org.active_projects_count || org.projects || 0}</td>
+                                        <td className="p-4 sm:p-6 text-right">
+                                            <div className="inline-block" data-org-row-actions>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Actions for ${org.name}`}
+                                                    onClick={(e) => {
+                                                        if (actionMenu?.orgId === org.id) {
+                                                            setActionMenu(null);
+                                                            return;
+                                                        }
+                                                        const { x, y } = computeMenuPosition(e.currentTarget.getBoundingClientRect());
+                                                        setActionMenu({ orgId: org.id, x, y });
+                                                    }}
+                                                    className="p-2.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                >
+                                                    <MoreVertical className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -364,7 +456,7 @@ export default function AdminOrganizationsPage() {
                         {/* Pagination Controls */}
                         <div className="bg-slate-50 p-4 border-t border-slate-100">
                             <PaginationControls
-                                currentPage={currentPage}
+                                currentPage={safePage}
                                 totalPages={totalPages}
                                 onPageChange={setCurrentPage}
                                 totalItems={filteredOrgs.length}
@@ -437,7 +529,7 @@ export default function AdminOrganizationsPage() {
                                 />
                             </div>
 
-                            <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2">
+                            <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2 disabled:opacity-60">
                                 Complete Onboarding
                             </button>
                         </form>
@@ -622,7 +714,8 @@ export default function AdminOrganizationsPage() {
                             </div>
                             <button
                                 type="submit"
-                                className="mt-2 w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700"
+                                disabled={isSubmitting}
+                                className="mt-2 w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-60"
                             >
                                 Create account
                             </button>
@@ -630,6 +723,122 @@ export default function AdminOrganizationsPage() {
                     </div>
                 </div>
             )}
+
+            {typeof document !== "undefined" &&
+                actionMenu &&
+                actionMenuOrg &&
+                createPortal(
+                    <div
+                        data-org-actions-portal
+                        role="menu"
+                        className="fixed z-[10000] w-52 rounded-lg border border-slate-100 bg-white py-1 text-left shadow-xl"
+                        style={{ left: actionMenu.x, top: actionMenu.y }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => openOrganizationDetails(actionMenuOrg)}
+                            className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                            View Details
+                        </button>
+                        {orgStatusOf(actionMenuOrg) !== "verified" && (
+                            <button
+                                type="button"
+                                onClick={() => openConfirm("approve", actionMenuOrg)}
+                                className="w-full px-4 py-2.5 text-left text-sm font-medium text-green-600 hover:bg-green-50"
+                            >
+                                Approve Organization
+                            </button>
+                        )}
+                        {orgStatusOf(actionMenuOrg) !== "rejected" && (
+                            <button
+                                type="button"
+                                onClick={() => openConfirm("reject", actionMenuOrg)}
+                                className="w-full px-4 py-2.5 text-left text-sm font-medium text-orange-600 hover:bg-orange-50"
+                            >
+                                Reject Organization
+                            </button>
+                        )}
+                        {orgStatusOf(actionMenuOrg) === "suspended" ? (
+                            <button
+                                type="button"
+                                onClick={() => openConfirm("unsuspend", actionMenuOrg)}
+                                className="w-full px-4 py-2.5 text-left text-sm font-medium text-blue-600 hover:bg-blue-50"
+                            >
+                                Unsuspend Organization
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => openConfirm("suspend", actionMenuOrg)}
+                                className="w-full px-4 py-2.5 text-left text-sm font-medium text-amber-600 hover:bg-amber-50"
+                            >
+                                Suspend Organization
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => openConfirm("delete", actionMenuOrg)}
+                            className="w-full px-4 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                        >
+                            Delete
+                        </button>
+                    </div>,
+                    document.body,
+                )}
+
+            <ConfirmDialog
+                open={!!confirm}
+                title={
+                    confirm
+                        ? {
+                              approve: `Approve ${confirm.org.name}?`,
+                              suspend: `Suspend ${confirm.org.name}?`,
+                              unsuspend: `Unsuspend ${confirm.org.name}?`,
+                              reject: `Reject ${confirm.org.name}?`,
+                              delete: `Delete ${confirm.org.name}?`,
+                          }[confirm.action]
+                        : ""
+                }
+                description={
+                    confirm
+                        ? {
+                              approve:
+                                  orgStatusOf(confirm.org) === "suspended"
+                                      ? "The organization will be marked verified and its suspension lifted (two sequential steps)."
+                                      : "The organization will be marked as verified.",
+                              suspend: "The organization will be blocked and all its users will be signed out.",
+                              unsuspend: "The block will be lifted so the organization's users can sign in again.",
+                              reject: "The organization will be marked as rejected. The reason is stored with the verification record.",
+                              delete: "This permanently deletes the organization. This cannot be undone.",
+                          }[confirm.action]
+                        : undefined
+                }
+                confirmLabel={
+                    confirm
+                        ? { approve: "Approve", suspend: "Suspend", unsuspend: "Unsuspend", reject: "Reject", delete: "Delete organization" }[confirm.action]
+                        : "Confirm"
+                }
+                variant={confirm?.action === "delete" ? "danger" : confirm?.action === "approve" || confirm?.action === "unsuspend" ? "default" : "warning"}
+                requireText={confirm?.action === "delete" ? String(confirm.org.name ?? "") : undefined}
+                confirmDisabled={confirm?.action === "reject" && !rejectNotes.trim()}
+                loading={isSubmitting}
+                onConfirm={runConfirmedAction}
+                onCancel={() => setConfirm(null)}
+            >
+                {confirm?.action === "reject" && (
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Reason (required)</label>
+                        <textarea
+                            data-autofocus
+                            rows={3}
+                            value={rejectNotes}
+                            onChange={(e) => setRejectNotes(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                        />
+                    </div>
+                )}
+            </ConfirmDialog>
         </div>
     );
 }

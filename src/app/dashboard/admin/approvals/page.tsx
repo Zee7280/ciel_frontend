@@ -32,6 +32,36 @@ import {
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import AgingChip from "@/components/admin/AgingChip";
+import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
+
+const QUEUE_LIMIT = 500;
+
+type BulkResult = { id: string; title: string; status: "ok" | "failed" | "skipped"; message?: string };
+
+/** Bulk approve is offered only when the backend explicitly says admin_can_approve is true. */
+function readAdminCanApproveExplicit(row: Record<string, unknown> | null | undefined): boolean {
+    if (!row) return false;
+    return (row.admin_can_approve ?? row.adminCanApprove) === true;
+}
+
+function readRowWaiterRole(row: Record<string, unknown>): string {
+    return String(row.currently_with_role ?? row.currentlyWithRole ?? "")
+        .trim()
+        .toLowerCase();
+}
+
+function rowTitle(row: Record<string, unknown> | null | undefined): string {
+    const t = row && typeof row.title === "string" ? row.title.trim() : "";
+    return t || "this opportunity";
+}
+
+function registrationSubmittedMs(row: Record<string, unknown>): number {
+    const raw = row.created_at ?? row.createdAt ?? row.submitted_at ?? row.submittedAt;
+    const ms = typeof raw === "string" || typeof raw === "number" ? new Date(raw).getTime() : 0;
+    return Number.isFinite(ms) ? ms : 0;
+}
 
 type AdminApprovalHistoryEntry = {
     line: "faculty" | "partner" | "admin";
@@ -507,42 +537,71 @@ export default function AdminApprovalsPage() {
     const [opportunityReviewMode, setOpportunityReviewMode] = useState<"revise" | "reject_permanent">("revise");
     const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
     const autoOpenedIdRef = useRef<string | null>(null);
+    const { begin } = useAbortableFetch();
+    const [pendingRows, setPendingRows] = useState<any[]>([]);
+    const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const [liveConfirm, setLiveConfirm] = useState<{
+        id: string;
+        mode: "revise" | "reject_permanent";
+        title: string;
+    } | null>(null);
+    const [registrationSort, setRegistrationSort] = useState<"default" | "oldest" | "newest">("default");
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+    const [bulkRunning, setBulkRunning] = useState(false);
+    const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
 
     const fetchPendingOpportunities = useCallback(async (options?: { withLoading?: boolean }) => {
+        const run = begin();
         if (options?.withLoading !== false) setIsLoading(true);
-        try {
+        const loadQueue = async (queue: OpportunityQueueFilter): Promise<any[] | null> => {
             const params = new URLSearchParams();
-            params.set("queue", opportunityQueue);
-            params.set("limit", "500");
-            const res = await authenticatedFetch(`/api/v1/admin/opportunities/approval-queue?${params.toString()}`);
+            params.set("queue", queue);
+            params.set("limit", String(QUEUE_LIMIT));
+            const res = await authenticatedFetch(`/api/v1/admin/opportunities/approval-queue?${params.toString()}`, {
+                signal: run.signal,
+            });
             if (res && res.ok) {
                 const data = await res.json();
                 const raw =
-                    (Array.isArray(data.data) && data.data) ||
-                    (Array.isArray(data.opportunities) && data.opportunities) ||
-                    (Array.isArray(data.items) && data.items) ||
+                    (Array.isArray(data?.data) && data.data) ||
+                    (Array.isArray(data?.opportunities) && data.opportunities) ||
+                    (Array.isArray(data?.items) && data.items) ||
                     (Array.isArray(data) ? data : []);
-                if (data.success !== false && Array.isArray(raw)) {
-                    setOpportunities(raw);
-                } else {
-                    setOpportunities([]);
-                }
-            } else if (res && !res.ok) {
-                try {
-                    const err = await res.json();
-                    console.error("Opportunity approval queue:", err?.message || res.status);
-                    toast.error(err?.message || "Failed to load opportunity requests");
-                } catch {
-                    toast.error("Failed to load opportunity requests");
-                }
+                if (data?.success !== false && Array.isArray(raw)) return raw;
+                return [];
             }
+            if (res && !res.ok) {
+                const msg = await readErrorMessage(res, "Failed to load opportunity requests");
+                if (run.isCurrent()) toast.error(msg);
+            }
+            return null;
+        };
+        try {
+            // Tab badges always describe the pending queue, regardless of which queue is shown.
+            const [selected, pending] = await Promise.all([
+                loadQueue(opportunityQueue),
+                opportunityQueue === "pending"
+                    ? Promise.resolve<any[] | null>(null)
+                    : loadQueue("pending").catch((e) => {
+                          if (isAbortError(e)) throw e;
+                          return null;
+                      }),
+            ]);
+            if (!run.isCurrent()) return;
+            if (selected) {
+                setOpportunities(selected);
+                if (opportunityQueue === "pending") setPendingRows(selected);
+            }
+            if (pending) setPendingRows(pending);
         } catch (error) {
+            if (isAbortError(error)) return;
             console.error("Failed to fetch opportunities", error);
-            toast.error("Failed to load opportunity requests");
+            if (run.isCurrent()) toast.error("Failed to load opportunity requests");
         } finally {
-            if (options?.withLoading !== false) setIsLoading(false);
+            if (options?.withLoading !== false && run.isCurrent()) setIsLoading(false);
         }
-    }, [opportunityQueue]);
+    }, [opportunityQueue, begin]);
 
     const fetchPendingUsers = async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
@@ -635,7 +694,7 @@ export default function AdminApprovalsPage() {
 
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
         const submittingKey = `${type}:${id}`;
-        if (approveSubmittingKey === submittingKey) return;
+        if (approveSubmittingKey === submittingKey || bulkRunning) return;
         if (type === "opportunity") {
             const row = opportunities.find((o) => String(o?.id) === String(id)) as Record<string, unknown> | undefined;
             if (row && !readAdminCanApprove(row)) return;
@@ -659,14 +718,7 @@ export default function AdminApprovalsPage() {
             } else if (res?.status === 403) {
                 toast.error("Not authorized to perform this approval.");
             } else if (res) {
-                let msg = "Approval request failed.";
-                try {
-                    const err = (await res.json()) as { message?: unknown };
-                    if (typeof err?.message === "string" && err.message.trim()) msg = err.message.trim();
-                } catch {
-                    /* ignore */
-                }
-                toast.error(msg);
+                toast.error(await readErrorMessage(res, "Approval request failed"));
             }
         } catch (error) {
             console.error("Failed to approve", error);
@@ -680,7 +732,18 @@ export default function AdminApprovalsPage() {
         id: string,
         type: "opportunity" | "user" = "opportunity",
         mode: "revise" | "reject_permanent" = "revise",
+        skipLiveConfirm = false,
     ) => {
+        if (type === "opportunity" && !skipLiveConfirm) {
+            const row = (opportunities.find((o) => String(o?.id) === String(id)) ??
+                (selectedOpportunity && String(selectedOpportunity.id) === String(id) ? selectedOpportunity : null)) as
+                | Record<string, unknown>
+                | null;
+            if (row && (readAdminApproved(row) || readWorkflowStage(row) === "live")) {
+                setLiveConfirm({ id, mode, title: rowTitle(row) });
+                return;
+            }
+        }
         setRejectId(id);
         setRejectType(type);
         setOpportunityReviewMode(mode);
@@ -721,8 +784,11 @@ export default function AdminApprovalsPage() {
     };
 
     const confirmReject = async () => {
-        if (!rejectId) return;
+        if (!rejectId || rejectSubmitting) return;
+        const reason = rejectReason.trim();
+        if (!reason) return;
 
+        setRejectSubmitting(true);
         try {
             const endpoint =
                 rejectType === "opportunity"
@@ -733,7 +799,7 @@ export default function AdminApprovalsPage() {
 
             const res = await authenticatedFetch(endpoint, {
                 method: "POST",
-                body: JSON.stringify({ reason: rejectReason }),
+                body: JSON.stringify({ reason }),
             });
 
             if (res && res.ok) {
@@ -742,47 +808,60 @@ export default function AdminApprovalsPage() {
                         ? "Revision request sent."
                         : "Request rejected.",
                 );
+                const doneId = rejectId;
+                setIsRejectModalOpen(false);
+                setRejectId(null);
                 if (rejectType === "opportunity") {
                     await fetchPendingOpportunities({ withLoading: false });
                 } else {
-                    setPendingUsers((prev) => prev.filter((c) => c.id !== rejectId));
+                    setPendingUsers((prev) => prev.filter((c) => c.id !== doneId));
                 }
-                setIsRejectModalOpen(false);
-                setRejectId(null);
             } else if (res) {
-                let msg = "Review action failed.";
-                try {
-                    const err = (await res.json()) as { message?: unknown };
-                    if (typeof err?.message === "string" && err.message.trim()) msg = err.message.trim();
-                } catch {
-                    /* ignore */
-                }
-                toast.error(msg);
+                toast.error(await readErrorMessage(res, "Review action failed"));
+            } else {
+                toast.error("Review action failed. Check your connection and try again.");
             }
         } catch (error) {
             console.error("Failed to submit review action", error);
+            toast.error("Review action failed. Check your connection and try again.");
+        } finally {
+            setRejectSubmitting(false);
         }
+    };
+
+    const closeRejectModal = () => {
+        if (rejectSubmitting) return;
+        setIsRejectModalOpen(false);
     };
 
     // Filter & Pagination Logic
     const waiterCounts = useMemo(() => {
-        const counts = { faculty: 0, partner: 0, admin: 0 };
-        for (const item of opportunities) {
-            const row = item as Record<string, unknown>;
-            const role = String(row.currently_with_role ?? row.currentlyWithRole ?? "")
-                .trim()
-                .toLowerCase();
+        const counts = { faculty: 0, partner: 0, admin: 0, all: pendingRows.length };
+        for (const item of pendingRows) {
+            const role = readRowWaiterRole(item as Record<string, unknown>);
             if (role === "faculty" || role === "partner" || role === "admin") counts[role] += 1;
         }
         return counts;
-    }, [opportunities]);
+    }, [pendingRows]);
+
+    const truncated = opportunities.length >= QUEUE_LIMIT || pendingRows.length >= QUEUE_LIMIT;
 
     const filteredItems = useMemo(() => {
         const items = activeTab === "projects" ? opportunities : pendingUsers;
         if (activeTab !== "projects") {
-            if (!searchQuery) return items;
+            const sortRegs = (list: any[]) => {
+                if (registrationSort === "default") return list;
+                const dir = registrationSort === "oldest" ? 1 : -1;
+                return [...list].sort(
+                    (a, b) =>
+                        dir *
+                        (registrationSubmittedMs(a as Record<string, unknown>) -
+                            registrationSubmittedMs(b as Record<string, unknown>)),
+                );
+            };
+            if (!searchQuery) return sortRegs(items);
             const lowerQuery = searchQuery.toLowerCase();
-            return items.filter((item) => {
+            return sortRegs(items).filter((item) => {
                 const row = item as Record<string, unknown>;
                 const teammates = pendingBrowseTeammatesForDisplay(row);
                 const teamHay = teammates.map((m) => `${m.name} ${m.email}`).join(" ");
@@ -869,6 +948,7 @@ export default function AdminApprovalsPage() {
         opportunitySort,
         opportunityQueue,
         pendingWaiter,
+        registrationSort,
     ]);
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
     const paginatedItems = filteredItems.slice(
@@ -876,10 +956,79 @@ export default function AdminApprovalsPage() {
         currentPage * itemsPerPage
     );
 
+    const bulkEligibleRows = useMemo(() => {
+        if (activeTab !== "projects" || opportunityQueue !== "pending") return [];
+        return filteredItems.filter((item) => {
+            const row = item as Record<string, unknown>;
+            return (
+                readAdminCanApproveExplicit(row) &&
+                !(readAdminApproved(row) || readWorkflowStage(row) === "live")
+            );
+        });
+    }, [filteredItems, activeTab, opportunityQueue]);
+    const bulkSelectedRows = useMemo(
+        () => bulkEligibleRows.filter((r) => selectedIds.has(String(r.id))),
+        [bulkEligibleRows, selectedIds],
+    );
+    const allEligibleSelected =
+        bulkEligibleRows.length > 0 && bulkSelectedRows.length === bulkEligibleRows.length;
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+    const toggleSelectAll = () => {
+        setSelectedIds(allEligibleSelected ? new Set() : new Set(bulkEligibleRows.map((r) => String(r.id))));
+    };
+
+    const runBulkApprove = async () => {
+        if (bulkRunning || bulkSelectedRows.length === 0) return;
+        const targets = bulkSelectedRows.map((r) => ({ id: String(r.id), title: rowTitle(r as Record<string, unknown>) }));
+        setBulkRunning(true);
+        setBulkConfirmOpen(false);
+        const results: BulkResult[] = [];
+        let stopped = false;
+        for (const t of targets) {
+            if (stopped) {
+                results.push({ ...t, status: "skipped", message: "Not attempted (stopped after a network failure)" });
+                continue;
+            }
+            try {
+                const res = await authenticatedFetch(`/api/v1/admin/opportunities/${t.id}/approve`, { method: "POST" });
+                if (res && res.ok) {
+                    results.push({ ...t, status: "ok" });
+                } else if (res) {
+                    results.push({ ...t, status: "failed", message: await readErrorMessage(res, "Approval failed") });
+                } else {
+                    results.push({ ...t, status: "failed", message: "No response from server" });
+                    stopped = true;
+                }
+            } catch (error) {
+                console.error("Bulk approve network failure", error);
+                results.push({ ...t, status: "failed", message: "Network error" });
+                stopped = true;
+            }
+        }
+        setBulkResults(results);
+        setSelectedIds(new Set());
+        const okCount = results.filter((r) => r.status === "ok").length;
+        if (okCount === results.length) toast.success(`${okCount} opportunit${okCount === 1 ? "y" : "ies"} approved.`);
+        else toast.error(`${okCount} of ${results.length} approved. See the summary below.`);
+        try {
+            await fetchPendingOpportunities({ withLoading: false });
+        } finally {
+            setBulkRunning(false);
+        }
+    };
+
     // Reset page when tab or search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, searchQuery, opportunityQueue, pendingWaiter, opportunitySort, opportunityCreatorFilter, opportunityDateFrom, opportunityDateTo]);
+    }, [activeTab, searchQuery, opportunityQueue, pendingWaiter, opportunitySort, opportunityCreatorFilter, opportunityDateFrom, opportunityDateTo, registrationSort]);
 
     const resetOpportunityFilters = () => {
         setSearchQuery("");
@@ -986,11 +1135,27 @@ export default function AdminApprovalsPage() {
                 >
                     <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4" /> Opportunity Requests
-                        <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{opportunities.length}</span>
+                        <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full" title="Pending opportunities">{pendingRows.length}</span>
                     </div>
                     {activeTab === "projects" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
                 </button>
             </div>
+
+            {activeTab === "registrations" && (
+                <div className="mb-4 flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-slate-400" aria-hidden />
+                    <select
+                        aria-label="Sort registrations"
+                        value={registrationSort}
+                        onChange={(e) => setRegistrationSort(e.target.value as "default" | "oldest" | "newest")}
+                        className="h-10 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-400"
+                    >
+                        <option value="default">Default order</option>
+                        <option value="oldest">Oldest waiting first</option>
+                        <option value="newest">Newest first</option>
+                    </select>
+                </div>
+            )}
 
             {activeTab === "projects" && (
                 <div className="mb-4 space-y-3">
@@ -1004,10 +1169,10 @@ export default function AdminApprovalsPage() {
                             {(
                                 [
                                     ["drafts", "Drafts"],
-                                    ["pending_faculty", `Pending Faculty${opportunityQueue === "pending" ? ` (${waiterCounts.faculty})` : ""}`],
-                                    ["pending_partner", `Pending Partner${opportunityQueue === "pending" ? ` (${waiterCounts.partner})` : ""}`],
-                                    ["pending_admin", `Pending CIEL${opportunityQueue === "pending" ? ` (${waiterCounts.admin})` : ""}`],
-                                    ["pending", "All pending"],
+                                    ["pending_faculty", `Pending Faculty (${waiterCounts.faculty})`],
+                                    ["pending_partner", `Pending Partner (${waiterCounts.partner})`],
+                                    ["pending_admin", `Pending CIEL (${waiterCounts.admin})`],
+                                    ["pending", `All pending (${waiterCounts.all})`],
                                     ["revision", "Action required"],
                                     ["approved", "Published"],
                                     ["closed", "Closed"],
@@ -1087,6 +1252,72 @@ export default function AdminApprovalsPage() {
                             </span>
                         </div>
                     </div>
+                    {truncated ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                            Only the first {QUEUE_LIMIT} rows are loaded. Search, date, creator and sort filters apply to the
+                            loaded rows only, so older items may not appear. Narrow the queue tab to see the rest.
+                        </div>
+                    ) : null}
+                    {bulkEligibleRows.length > 0 ? (
+                        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={allEligibleSelected}
+                                    onChange={toggleSelectAll}
+                                    disabled={bulkRunning}
+                                    className="h-4 w-4"
+                                />
+                                Select all ready to approve ({bulkEligibleRows.length})
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setBulkConfirmOpen(true)}
+                                disabled={bulkSelectedRows.length === 0 || bulkRunning}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {bulkRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                Approve selected ({bulkSelectedRows.length})
+                            </button>
+                        </div>
+                    ) : null}
+                    {bulkResults ? (
+                        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
+                            <div className="mb-2 flex items-start justify-between gap-3">
+                                <p className="font-semibold text-slate-900">
+                                    Bulk approval: {bulkResults.filter((r) => r.status === "ok").length} approved,{" "}
+                                    {bulkResults.filter((r) => r.status === "failed").length} failed,{" "}
+                                    {bulkResults.filter((r) => r.status === "skipped").length} not attempted
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setBulkResults(null)}
+                                    className="shrink-0 text-xs font-bold text-slate-500 hover:text-slate-700"
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                            <ul className="max-h-48 space-y-1 overflow-y-auto">
+                                {bulkResults.map((r) => (
+                                    <li key={r.id} className="break-words text-slate-700">
+                                        <span
+                                            className={`mr-2 font-bold ${
+                                                r.status === "ok"
+                                                    ? "text-emerald-700"
+                                                    : r.status === "failed"
+                                                      ? "text-red-600"
+                                                      : "text-slate-500"
+                                            }`}
+                                        >
+                                            {r.status === "ok" ? "Approved" : r.status === "failed" ? "Failed" : "Skipped"}
+                                        </span>
+                                        {r.title}
+                                        {r.message ? <span className="text-slate-500"> — {r.message}</span> : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
                 </div>
             )}
 
@@ -1125,6 +1356,7 @@ export default function AdminApprovalsPage() {
                                     <span>
                                         • Applied: {formatDateTime(req.created_at || req.createdAt || req.submitted_at || req.submittedAt)}
                                     </span>
+                                    <AgingChip since={req.created_at || req.createdAt || req.submitted_at || req.submittedAt} />
                                 </div>
                                 {teammates.length > 0 ? (
                                     <div className="mt-3 max-w-xl rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1149,7 +1381,8 @@ export default function AdminApprovalsPage() {
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                                 <button
                                     onClick={() => handleRejectClick(req.id, 'user')}
-                                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600">
+                                    disabled={rejectSubmitting}
+                                    className="disabled:opacity-60 flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600">
                                     <XCircle className="w-4 h-4" /> Reject
                                 </button>
                                 <button
@@ -1202,6 +1435,29 @@ export default function AdminApprovalsPage() {
                             statusPill={flowLabel || undefined}
                             actions={
                             <div className="flex w-full flex-wrap items-center justify-start gap-2">
+                                {bulkEligibleRows.some((r) => String(r.id) === String(proj.id)) ? (
+                                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(String(proj.id))}
+                                            onChange={() => toggleSelected(String(proj.id))}
+                                            disabled={bulkRunning}
+                                            className="h-4 w-4"
+                                            aria-label={`Select ${rowTitle(projRow)} for bulk approval`}
+                                        />
+                                        Select
+                                    </label>
+                                ) : null}
+                                {opportunityQueue === "pending" ? (
+                                    <AgingChip
+                                        since={
+                                            (projRow.submitted_at ??
+                                                projRow.submittedAt ??
+                                                projRow.created_at ??
+                                                projRow.createdAt) as string | undefined
+                                        }
+                                    />
+                                ) : null}
                                 <button
                                     type="button"
                                     title="View full opportunity details"
@@ -1294,8 +1550,8 @@ export default function AdminApprovalsPage() {
                                 <>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
-                                    disabled={!canRequestRevision}
-                                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border ${
+                                    disabled={!canRequestRevision || rejectSubmitting}
+                                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border disabled:opacity-60 ${
                                         canRequestRevision
                                             ? "bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200"
                                             : "bg-slate-100 text-slate-400 border-slate-100 cursor-not-allowed"
@@ -1312,7 +1568,8 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "reject_permanent")}
-                                    className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
+                                    disabled={rejectSubmitting}
+                                    className="px-4 py-2.5 disabled:opacity-60 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
                                     title={
                                         showPostApprovalActions
                                             ? "Permanently reject even after approval"
@@ -1327,7 +1584,7 @@ export default function AdminApprovalsPage() {
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}
                                     disabled={
-                                        !canAdminApprove || approveSubmittingKey === `opportunity:${proj.id}`
+                                        !canAdminApprove || bulkRunning || approveSubmittingKey === `opportunity:${proj.id}`
                                     }
                                     title={
                                         !canAdminApprove
@@ -1767,7 +2024,7 @@ export default function AdminApprovalsPage() {
                                         setOpportunityDetail(null);
                                         handleRejectClick(selectedOpportunity.id, "opportunity", "revise");
                                     }}
-                                    disabled={!canRequestOpportunityRevision(adminDetailView)}
+                                    disabled={!canRequestOpportunityRevision(adminDetailView) || rejectSubmitting}
                                     title={
                                         canRequestOpportunityRevision(adminDetailView)
                                             ? undefined
@@ -1800,6 +2057,7 @@ export default function AdminApprovalsPage() {
                                     disabled={
                                         !readAdminCanApprove(adminDetailView as Record<string, unknown>) ||
                                         opportunityDetailLoading ||
+                                        bulkRunning ||
                                         approveSubmittingKey === `opportunity:${selectedOpportunity.id}`
                                     }
                                     title={
@@ -1831,7 +2089,7 @@ export default function AdminApprovalsPage() {
             {
                 isRejectModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                        <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold text-slate-900">
                                     {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
@@ -1840,7 +2098,7 @@ export default function AdminApprovalsPage() {
                                           ? "Request revision"
                                           : "Reject registration"}
                                 </h2>
-                                <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                                <button onClick={closeRejectModal} disabled={rejectSubmitting} aria-label="Close" className="text-slate-400 hover:text-slate-600 p-2 disabled:opacity-50">
                                     <XCircle className="w-6 h-6" />
                                 </button>
                             </div>
@@ -1851,7 +2109,7 @@ export default function AdminApprovalsPage() {
                                         ? "Reason for permanent rejection"
                                         : "Feedback for the student"}
                                 </label>
-                                <textarea spellCheck={true}
+                                <textarea spellCheck={true} disabled={rejectSubmitting}
                                     className="w-full h-32 p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                                     placeholder={
                                         rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
@@ -1865,16 +2123,18 @@ export default function AdminApprovalsPage() {
 
                             <div className="flex justify-end gap-3">
                                 <button
-                                    onClick={() => setIsRejectModalOpen(false)}
-                                    className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700"
+                                    onClick={closeRejectModal}
+                                    disabled={rejectSubmitting}
+                                    className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 disabled:opacity-50"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={confirmReject}
-                                    disabled={!rejectReason.trim()}
-                                    className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={!rejectReason.trim() || rejectSubmitting}
+                                    className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                                 >
+                                    {rejectSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                     {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
                                         ? "Confirm permanent reject"
                                         : rejectType === "opportunity"
@@ -1886,6 +2146,39 @@ export default function AdminApprovalsPage() {
                     </div>
                 )
             }
+
+            <ConfirmDialog
+                open={!!liveConfirm}
+                title={
+                    liveConfirm?.mode === "reject_permanent"
+                        ? `Reject "${liveConfirm?.title}" permanently?`
+                        : `Request revision on "${liveConfirm?.title}"?`
+                }
+                description={
+                    <>
+                        <strong className="break-words">{liveConfirm?.title}</strong> is already approved and live. This will pull it
+                        back from students and notify the creator
+                        {liveConfirm?.mode === "reject_permanent" ? "; permanent rejection closes it." : "."}
+                    </>
+                }
+                variant={liveConfirm?.mode === "reject_permanent" ? "danger" : "warning"}
+                confirmLabel="Continue"
+                onCancel={() => setLiveConfirm(null)}
+                onConfirm={() => {
+                    const c = liveConfirm;
+                    setLiveConfirm(null);
+                    if (c) handleRejectClick(c.id, "opportunity", c.mode, true);
+                }}
+            />
+            <ConfirmDialog
+                open={bulkConfirmOpen}
+                title={`Approve ${bulkSelectedRows.length} selected opportunit${bulkSelectedRows.length === 1 ? "y" : "ies"}?`}
+                description="Approvals run one at a time. If a network failure occurs, the remaining ones are not attempted."
+                confirmLabel="Approve selected"
+                loading={bulkRunning}
+                onCancel={() => setBulkConfirmOpen(false)}
+                onConfirm={runBulkApprove}
+            />
 
             {historyRow ? (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
