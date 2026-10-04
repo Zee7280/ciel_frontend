@@ -4,7 +4,6 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { countWords } from "../utils/validation";
-import { resolveReportCii } from "../utils/resolveReportCii";
 
 const NO_MECHANISM = "No continuation mechanism";
 const OTHER_MECHANISM = "Other";
@@ -276,21 +275,17 @@ export default function Section10Sustainability() {
                 </div>
             </section>
 
-            <ConsistencyReview data={data} gaps={incompleteSectionsSummary} />
+            <ConsistencyReview gaps={incompleteSectionsSummary} />
             <ReportTravelCard />
         </div>
     );
 }
 
 function ConsistencyReview({
-    data,
     gaps,
 }: {
-    data: ReturnType<typeof useReportForm>["data"];
     gaps: Array<{ section: number; label: string }>;
 }) {
-    const cii = resolveReportCii(data);
-    const score = Math.round(cii.totalScore);
     const hold = gaps.length > 0;
     return (
         <section className="cer-card space-y-3" style={{ border: "2px solid #e2d9f7" }}>
@@ -300,18 +295,11 @@ function ConsistencyReview({
                 <span className="cer-tag auto">Auto — updates live</span>
             </div>
             <p className="cer-sub">
-                This is the same reading the flashcard and the detailed report use for the CII score. It does not create a second score.
+                Checks that every required section is filled in before you submit. No score is calculated here.
             </p>
             <div className="rounded-xl border border-[#d7c8f5] bg-[#faf8ff] px-4 py-3">
                 <p className="text-sm font-extrabold text-[#3b2a6d]">
-                    {hold ? "Hold CII · required corrections" : cii.official ? "CII on record" : "CII input ready"} · {score}/100
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                    {cii.source === "faculty_locked"
-                        ? "Faculty has locked this total. The flashcard and the detailed report both show it."
-                        : cii.source === "submitted_snapshot"
-                          ? "This is the score saved when the report was submitted. Both views print this number."
-                          : "Live preview from the answers on this report. It becomes the saved score at submit."}
+                    {hold ? "Hold · required corrections" : "Ready to submit"}
                 </p>
                 {hold ? (
                     <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-600">
