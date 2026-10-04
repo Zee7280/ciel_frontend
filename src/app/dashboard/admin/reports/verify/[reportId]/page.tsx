@@ -34,7 +34,6 @@ import {
     Sparkles,
     Loader2,
     Download,
-    Award,
 } from "lucide-react";
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -48,12 +47,7 @@ import type { ReportData } from "../../../../student/report/context/ReportContex
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
 import { readPersistedCiiSnapshot, resolveCiiScoreMaxFromReport } from "@/utils/reportCiiSnapshot";
-import {
-    buildReportPayloadForAi,
-    downloadAdminReportAiPayload,
-    regenerateAdminReportAiScore,
-    regenerateAdminReportMasterRubricAiScore,
-} from "@/utils/adminRegenerateReportAiScore";
+import { downloadAdminReportAiPayload } from "@/utils/adminRegenerateReportAiScore";
 import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
@@ -696,8 +690,6 @@ function AdminReportDetailPage() {
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
-    const [isRegeneratingAiScore, setIsRegeneratingAiScore] = useState(false);
-    const [isRegeneratingMasterRubricAiScore, setIsRegeneratingMasterRubricAiScore] = useState(false);
     const [isDownloadingAiPayload, setIsDownloadingAiPayload] = useState(false);
     const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
@@ -926,60 +918,8 @@ function AdminReportDetailPage() {
         }
     };
 
-    const handleRegenerateAiScore = async () => {
-        if (!report || isRegeneratingAiScore || isRegeneratingMasterRubricAiScore) return;
-
-        setIsRegeneratingAiScore(true);
-        try {
-            toast.info("Running ChatGPT CII audit (v8.2) — this may take up to 3 minutes.");
-            const result = await regenerateAdminReportAiScore(
-                String(params.reportId),
-                buildReportPayloadForAi(report as ReportData),
-            );
-            if (!result.success) {
-                toast.error(result.error || "AI scoring failed");
-                return;
-            }
-            toast.success(
-                typeof result.score === "number"
-                    ? `CII score updated (${result.score}/100)`
-                    : "CII score updated",
-            );
-            await fetchReportDetail();
-        } catch (error) {
-            console.error("Admin AI score regeneration failed:", error);
-            toast.error("AI scoring failed. Please try again.");
-        } finally {
-            setIsRegeneratingAiScore(false);
-        }
-    };
-
-    const handleRegenerateMasterRubricAiScore = async () => {
-        if (!report || isRegeneratingMasterRubricAiScore || isRegeneratingAiScore) return;
-
-        setIsRegeneratingMasterRubricAiScore(true);
-        try {
-            toast.info("Running Master Rubric v1.2 AI audit — this may take up to 3 minutes.");
-            const result = await regenerateAdminReportMasterRubricAiScore(
-                String(params.reportId),
-                buildReportPayloadForAi(report as ReportData),
-            );
-            if (!result.success) {
-                toast.error(result.error || "Master Rubric AI scoring failed");
-                return;
-            }
-            toast.success(
-                typeof result.score === "number"
-                    ? `Master Rubric CII updated (${result.score}/100)`
-                    : "Master Rubric CII updated",
-            );
-            await fetchReportDetail();
-        } catch (error) {
-            console.error("Admin Master Rubric AI score regeneration failed:", error);
-            toast.error("Master Rubric AI scoring failed. Please try again.");
-        } finally {
-            setIsRegeneratingMasterRubricAiScore(false);
-        }
+    const handleOpenAiAnalyzer = () => {
+        router.push(`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v2`);
     };
 
     const reportIdStr = String(params.reportId);
@@ -1343,38 +1283,20 @@ function AdminReportDetailPage() {
                             <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
                             <button
                                 type="button"
-                                onClick={handleRegenerateAiScore}
-                                disabled={isRegeneratingAiScore || isRegeneratingMasterRubricAiScore || isVerifying}
+                                onClick={handleOpenAiAnalyzer}
+                                disabled={isVerifying}
                                 className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Run ChatGPT CII audit (v8.2) and save updated score to this report"
+                                title="Run the CIEL PK AI Analyzer (Balanced CII v3.1) and save the updated score to this report"
                             >
-                                {isRegeneratingAiScore ? (
-                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                                ) : (
-                                    <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                )}
-                                {isRegeneratingAiScore ? "Updating score…" : "Regenerate AI score (v8.2)"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleRegenerateMasterRubricAiScore}
-                                disabled={isRegeneratingMasterRubricAiScore || isRegeneratingAiScore || isVerifying}
-                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Score with Master Rubric v1.2 (0–100 CII)"
-                            >
-                                {isRegeneratingMasterRubricAiScore ? (
-                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                                ) : (
-                                    <Award className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                )}
-                                {isRegeneratingMasterRubricAiScore ? "Scoring…" : "Master Rubric v1.2 score"}
+                                <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                Run AI Analyzer (CII v3.1)
                             </button>
                             <button
                                 type="button"
                                 onClick={handleDownloadAiPayload}
                                 disabled={isDownloadingAiPayload || isVerifying}
                                 className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Download JSON payload sent to AI (section11)"
+                                title="Download JSON payload sent to the AI Analyzer"
                             >
                                 {isDownloadingAiPayload ? (
                                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
@@ -2376,38 +2298,20 @@ function AdminReportDetailPage() {
                         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                         <button
                             type="button"
-                            onClick={handleRegenerateAiScore}
-                            disabled={isRegeneratingAiScore || isRegeneratingMasterRubricAiScore || isVerifying}
+                            onClick={handleOpenAiAnalyzer}
+                            disabled={isVerifying}
                             className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Run ChatGPT CII audit (v8.2) and save updated score to this report"
+                            title="Run the CIEL PK AI Analyzer (Balanced CII v3.1) and save the updated score to this report"
                         >
-                            {isRegeneratingAiScore ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                            ) : (
-                                <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                            )}
-                            {isRegeneratingAiScore ? "Running AI audit…" : "Regenerate AI score (v8.2)"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleRegenerateMasterRubricAiScore}
-                            disabled={isRegeneratingMasterRubricAiScore || isRegeneratingAiScore || isVerifying}
-                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Score with Master Rubric v1.2 (0–100 CII)"
-                        >
-                            {isRegeneratingMasterRubricAiScore ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                            ) : (
-                                <Award className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                            )}
-                            {isRegeneratingMasterRubricAiScore ? "Scoring…" : "Master Rubric v1.2 score"}
+                            <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                            Run AI Analyzer (CII v3.1)
                         </button>
                         <button
                             type="button"
                             onClick={handleDownloadAiPayload}
                             disabled={isDownloadingAiPayload || isVerifying}
                             className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Download JSON payload sent to AI (section11)"
+                            title="Download JSON payload sent to the AI Analyzer"
                         >
                             {isDownloadingAiPayload ? (
                                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />

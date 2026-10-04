@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Award, Trash2, ArrowRight, GraduationCap } from 'lucide-react';
-import { downloadAdminReportAiPayload, regenerateAdminReportAiScore, regenerateAdminReportMasterRubricAiScore } from '@/utils/adminRegenerateReportAiScore';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Sparkles, Trash2, ArrowRight, GraduationCap } from 'lucide-react';
+import { downloadAdminReportAiPayload } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -338,8 +338,6 @@ export default function AdminReportsVerificationPage() {
     const [tablePage, setTablePage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
-    const [refreshingReportIds, setRefreshingReportIds] = useState<Record<string, boolean>>({});
-    const [refreshingMasterRubricReportIds, setRefreshingMasterRubricReportIds] = useState<Record<string, boolean>>({});
     const [downloadingAiPayloadIds, setDownloadingAiPayloadIds] = useState<Record<string, boolean>>({});
     const [ciiScores, setCiiScores] = useState<Record<string, number>>({});
     const [mergePanelOpen, setMergePanelOpen] = useState(false);
@@ -703,76 +701,8 @@ export default function AdminReportsVerificationPage() {
         }
     };
 
-    const handleRefreshAiScore = async (reportId: string) => {
-        if (refreshingReportIds[reportId]) return;
-
-        setRefreshingReportIds((prev) => ({ ...prev, [reportId]: true }));
-        try {
-            toast.info('Running AI audit (v8.2) — may take up to 3 minutes.');
-            const result = await regenerateAdminReportAiScore(reportId);
-            if (!result.success) {
-                toast.error(result.error || 'Failed to refresh AI score');
-                return;
-            }
-            if (typeof result.score === 'number') {
-                setCiiScores((prev) => ({ ...prev, [reportId]: result.score as number }));
-                setReports((prev) =>
-                    prev.map((row) =>
-                        row.id === reportId ? { ...row, cii_score: result.score ?? row.cii_score } : row,
-                    ),
-                );
-            }
-            toast.success(
-                typeof result.score === 'number'
-                    ? `CII score updated (${result.score}/100)`
-                    : 'CII score updated',
-            );
-        } catch (error) {
-            console.error('List AI score refresh failed:', error);
-            toast.error('AI scoring failed');
-        } finally {
-            setRefreshingReportIds((prev) => {
-                const next = { ...prev };
-                delete next[reportId];
-                return next;
-            });
-        }
-    };
-
-    const handleRefreshMasterRubricAiScore = async (reportId: string) => {
-        if (refreshingMasterRubricReportIds[reportId]) return;
-
-        setRefreshingMasterRubricReportIds((prev) => ({ ...prev, [reportId]: true }));
-        try {
-            toast.info('Running Master Rubric v1.2 AI audit — may take up to 3 minutes.');
-            const result = await regenerateAdminReportMasterRubricAiScore(reportId);
-            if (!result.success) {
-                toast.error(result.error || 'Failed to refresh Master Rubric score');
-                return;
-            }
-            if (typeof result.score === 'number') {
-                setCiiScores((prev) => ({ ...prev, [reportId]: result.score as number }));
-                setReports((prev) =>
-                    prev.map((row) =>
-                        row.id === reportId ? { ...row, cii_score: result.score ?? row.cii_score } : row,
-                    ),
-                );
-            }
-            toast.success(
-                typeof result.score === 'number'
-                    ? `Master Rubric CII updated (${result.score}/100)`
-                    : 'Master Rubric CII updated',
-            );
-        } catch (error) {
-            console.error('List Master Rubric AI score refresh failed:', error);
-            toast.error('Master Rubric AI scoring failed');
-        } finally {
-            setRefreshingMasterRubricReportIds((prev) => {
-                const next = { ...prev };
-                delete next[reportId];
-                return next;
-            });
-        }
+    const handleOpenAiAnalyzer = (reportId: string) => {
+        router.push(`/dashboard/admin/reports/verify/${reportId}?view=cii-v2`);
     };
 
     const resetFilters = () => {
@@ -1127,29 +1057,11 @@ export default function AdminReportsVerificationPage() {
                         </span>
                         <button
                             type="button"
-                            onClick={() => void handleRefreshAiScore(report.id)}
-                            disabled={Boolean(refreshingReportIds[report.id]) || Boolean(refreshingMasterRubricReportIds[report.id])}
-                            title="Refresh AI CII score (v8.2)"
-                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-violet-200/80 bg-violet-50 text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => handleOpenAiAnalyzer(report.id)}
+                            title="Run CIEL PK AI Analyzer (Balanced CII v3.1)"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-violet-200/80 bg-violet-50 text-violet-700 transition hover:bg-violet-100"
                         >
-                            {refreshingReportIds[report.id] ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                            ) : (
-                                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                            )}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => void handleRefreshMasterRubricAiScore(report.id)}
-                            disabled={Boolean(refreshingMasterRubricReportIds[report.id]) || Boolean(refreshingReportIds[report.id])}
-                            title="Score with Master Rubric v1.2 (0–100)"
-                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-amber-200/80 bg-amber-50 text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {refreshingMasterRubricReportIds[report.id] ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                            ) : (
-                                <Award className="h-3.5 w-3.5" aria-hidden />
-                            )}
+                            <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         </button>
                         <button
                             type="button"
@@ -1214,8 +1126,6 @@ export default function AdminReportsVerificationPage() {
         mergeKeepId,
         duplicateAnalysis.countByReportId,
         ciiScores,
-        refreshingReportIds,
-        refreshingMasterRubricReportIds,
         downloadingAiPayloadIds,
         router,
         deletingReportId,
