@@ -15,7 +15,6 @@ import {
     UserGuideBanner,
     ZoneRule,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     communityReportReviewerName,
     isCommunityReportAwaitingFee,
@@ -163,25 +162,6 @@ function opportunityFullyApproved(op: OpportunityRow): boolean {
         return partner === "approved" || partner === "not_applicable";
     }
     return true;
-}
-
-/** One Email + one WhatsApp action, each addressed to the actual contact when we have one on file
- * (falls back to an unaddressed mailto: / the generic WhatsApp share sheet when we don't) —
- * mirrors the named-recipient reminder pattern used in Coursework/FYP's cards. */
-function buildReminderActions(
-    title: string,
-    role: string,
-    contactName: string | null | undefined,
-    contactEmail: string | null | undefined,
-    style: WorkCard["actions"][number]["style"] = "blue",
-): WorkCard["actions"] {
-    const who = contactName?.trim() || role;
-    const subject = `CIEL PK reminder — ${title}`;
-    const body = `Hi ${who},\n\nA polite reminder that "${title}" is waiting for ${role} on CIEL PK.\n`;
-    return [
-        { label: `Email ${who}`, href: mailtoHref(contactEmail || "", subject, body), style },
-        { label: `WhatsApp ${who}`, href: whatsappShareHref(`${subject}\n\n${body}`), style },
-    ];
 }
 
 /** Private-candidate reports still hold for the reporting-fee gateway. University
@@ -448,12 +428,12 @@ export default function CommunityServiceWorkspace({
                     sideDetail: `Pending ${reviewer} Approval`,
                     actions: [
                         { label: "View Submitted Report", href, style: "soft" },
-                        ...(reviewer === "Faculty"
-                            ? [
-                                  ...buildReminderActions(title, "faculty review", report.faculty_name, report.faculty_email),
-                                  { label: "Email Faculty (platform)", href: "#remind", style: "blue" as const, remindReportId: report.id },
-                              ]
-                            : []),
+                        // Faculty login is read-only for report review now — CIEL PK Admin is the
+                        // sole approver for every report, so the reminder always goes through the
+                        // platform (`remind-reviewer`), which already emails admin regardless of
+                        // label. There is no direct-mailto fallback to faculty any more — they have
+                        // no action to take on it.
+                        { label: "Email CIEL PK (platform)", href: "#remind", style: "blue" as const, remindReportId: report.id },
                     ],
                 });
                 continue;

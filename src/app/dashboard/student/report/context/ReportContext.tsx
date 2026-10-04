@@ -835,6 +835,10 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
     const showVerifiedImpactScores = useMemo(() => {
         const st = String(data.status || '').toLowerCase();
+        // A closed (retracted) report must never read as verified again, even though
+        // admin_status/payment_status are deliberately left untouched by the close action so
+        // they stay the historical record of what was once approved/paid.
+        if (st === 'closed') return false;
         const rs = String(data.report_status || '').toLowerCase();
         const adm = String(data.admin_status || '').toLowerCase();
         const adminApproval = String(data.admin_approval_status || '').toLowerCase();

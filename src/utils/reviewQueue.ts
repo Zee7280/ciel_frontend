@@ -45,17 +45,22 @@ function isPrivateCandidateReview(row: {
     return row.private_candidate === true || row.review_route === "ciel_pk";
 }
 
-/** Who reviews after submit (and after the private-candidate fee, when that applies). */
+/** Who reviews after submit. Faculty login is read-only for report review now (CIEL PK Admin is
+ * the sole approver for every report, private-candidate or not — see the "Faculty login is
+ * read-only going forward" note in student-reports.service.ts `verifyReport`); kept taking `row`
+ * for call-site compatibility even though both pathways now resolve the same way. */
 export function communityReportReviewerName(
     row: { private_candidate?: boolean | null; review_route?: string | null } | null | undefined,
-): "Faculty" | "CIEL PK" {
-    return isPrivateCandidateReview(row ?? {}) ? "CIEL PK" : "Faculty";
+): "CIEL PK" {
+    void (row ?? {});
+    return "CIEL PK";
 }
 
 export function communityReportSendCta(
     row: { private_candidate?: boolean | null; review_route?: string | null } | null | undefined,
-): "Send to Faculty" | "Send to CIEL PK" {
-    return isPrivateCandidateReview(row ?? {}) ? "Send to CIEL PK" : "Send to Faculty";
+): "Send to CIEL PK" {
+    void (row ?? {});
+    return "Send to CIEL PK";
 }
 
 export function isCommunityReportRejected(row: CommunityReviewRow): boolean {
