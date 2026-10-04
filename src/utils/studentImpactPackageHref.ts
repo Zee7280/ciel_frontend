@@ -13,7 +13,7 @@ export type StudentImpactPackageView =
 const HASH_FOR_VIEW: Record<StudentImpactPackageView, string> = {
     flash: "flash",
     package: "flash",
-    certificate: "flash",
+    certificate: "certificate",
     report: "report",
     print: "report",
     v17: "report",

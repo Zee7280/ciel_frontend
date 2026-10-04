@@ -1016,20 +1016,8 @@ export default function CommunityImpactWall(_props: {
                                             label="Detailed report"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "print", { from: "wall" })}
-                                            label="PDF Report"
-                                        />
-                                        <WallAction
                                             href={studentImpactPackageHref(r.project_id || r.opportunity_id, "package", { from: "wall" })}
                                             label="Combined package"
-                                        />
-                                        <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "evidence", { from: "wall" })}
-                                            label="JPEG Evidence"
-                                        />
-                                        <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "analysis", { from: "wall" })}
-                                            label="Analysis report"
                                         />
                                         <WallAction
                                             href={studentImpactPackageHref(r.project_id || r.opportunity_id, "certificate", { from: "wall" })}

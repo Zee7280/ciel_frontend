@@ -7,7 +7,10 @@ import {
     IMPACT_PACKAGE_TABS_WITH_ANALYSIS,
     tabFromPackageQuery,
 } from "../app/dashboard/student/report/impact-package/impactPackageTabs";
-import { shouldShowImpactPackageDetailedReport } from "../app/dashboard/student/report/impact-package/buildImpactPackageModel";
+import {
+    shouldShowImpactPackageCertificate,
+    shouldShowImpactPackageDetailedReport,
+} from "../app/dashboard/student/report/impact-package/buildImpactPackageModel";
 
 test("builds same-tab Impact Package hrefs from project id", () => {
     assert.equal(
@@ -32,7 +35,7 @@ test("builds same-tab Impact Package hrefs from project id", () => {
     );
     assert.equal(
         studentImpactPackageHref("opp-1", "certificate"),
-        "/dashboard/student/report?projectId=opp-1&view=certificate#flash",
+        "/dashboard/student/report?projectId=opp-1&view=certificate#certificate",
     );
     assert.equal(studentImpactPackageHref("  ", "flash"), null);
 });
@@ -63,9 +66,9 @@ test("report page treats every wall view as an Impact Package deep-link", () => 
 function landingTab(href: string, adminApproved: boolean, analysis = false) {
     const url = new URL(href, "https://cielpk.com");
     const requested = tabFromPackageQuery(url.searchParams.get("view"), url.hash);
-    const tabs = (analysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS).filter(
-        (id) => id !== "report" || shouldShowImpactPackageDetailedReport("student", adminApproved),
-    );
+    const tabs = (analysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS)
+        .filter((id) => id !== "report" || shouldShowImpactPackageDetailedReport("student", adminApproved))
+        .concat(shouldShowImpactPackageCertificate("student", adminApproved) ? (["certificate"] as const) : []);
     return clampImpactPackageTab(requested, tabs);
 }
 
@@ -73,11 +76,17 @@ test("verified student wall buttons land on the matching package tab", () => {
     const id = "opp-1";
     assert.equal(landingTab(studentImpactPackageHref(id, "flash")!, true), "flash");
     assert.equal(landingTab(studentImpactPackageHref(id, "package")!, true), "flash");
-    assert.equal(landingTab(studentImpactPackageHref(id, "certificate")!, true), "flash");
+    assert.equal(landingTab(studentImpactPackageHref(id, "certificate")!, true), "certificate");
     assert.equal(landingTab(studentImpactPackageHref(id, "report")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "v17")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "print")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "evidence")!, true), "evidence");
+});
+
+test("student certificate link stays on flash until Super Admin approval", () => {
+    const href = studentImpactPackageHref("opp-1", "certificate")!;
+    assert.equal(landingTab(href, false), "flash");
+    assert.equal(landingTab(href, true), "certificate");
 });
 
 test("student detailed-report links stay on flash until Super Admin approval", () => {

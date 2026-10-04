@@ -1,4 +1,4 @@
-export type ImpactPackageTab = "flash" | "report" | "evidence" | "analysis";
+export type ImpactPackageTab = "flash" | "report" | "evidence" | "analysis" | "certificate";
 
 export const IMPACT_PACKAGE_TAB_EVENT = "ciel-impact-package-tab";
 
@@ -7,7 +7,13 @@ export const IMPACT_PACKAGE_TABS: ImpactPackageTab[] = ["flash", "report", "evid
 export const IMPACT_PACKAGE_TABS_WITH_ANALYSIS: ImpactPackageTab[] = ["flash", "report", "evidence", "analysis"];
 
 export function isImpactPackageTab(value: unknown): value is ImpactPackageTab {
-    return value === "flash" || value === "report" || value === "evidence" || value === "analysis";
+    return (
+        value === "flash" ||
+        value === "report" ||
+        value === "evidence" ||
+        value === "analysis" ||
+        value === "certificate"
+    );
 }
 
 export function clampImpactPackageTab(
@@ -25,7 +31,8 @@ export function tabFromPackageQuery(view: string | null | undefined, hash?: stri
     if (v === "print" || v === "report" || v === "v17") return "report";
     if (v === "evidence" || v === "gallery") return "evidence";
     if (v === "cii-v2" || v === "analysis" || v === "analyser") return "analysis";
-    if (v === "package" || v === "flash" || v === "certificate") return "flash";
+    if (v === "certificate") return "certificate";
+    if (v === "package" || v === "flash") return "flash";
     return "flash";
 }
 

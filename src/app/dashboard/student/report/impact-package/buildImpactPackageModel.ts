@@ -688,3 +688,9 @@ export function shouldShowImpactPackageDetailedReport(audience: ImpactPackageAud
     if (audience === "student") return adminApproved;
     return true;
 }
+
+/** Same gate as the detailed report — the certificate names real participants, so it only appears once the record is real (Super Admin approved for the student view). */
+export function shouldShowImpactPackageCertificate(audience: ImpactPackageAudience, adminApproved: boolean): boolean {
+    if (audience === "student") return adminApproved;
+    return true;
+}

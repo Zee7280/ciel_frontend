@@ -6,6 +6,7 @@ import {
     impactPackageCanDownload,
     impactPackageCanViewEvidence,
     shouldShowImpactPackageAnalysis,
+    shouldShowImpactPackageCertificate,
     shouldShowImpactPackageDetailedReport,
 } from "./buildImpactPackageModel";
 
@@ -114,6 +115,15 @@ test("student detailed report waits for Super Admin approval; reviewers keep it"
     }
 });
 
+test("student certificate waits for Super Admin approval; reviewers keep it", () => {
+    assert.equal(shouldShowImpactPackageCertificate("student", false), false);
+    assert.equal(shouldShowImpactPackageCertificate("student", true), true);
+    for (const a of ["faculty", "admin", "university", "partner", "public"] as const) {
+        assert.equal(shouldShowImpactPackageCertificate(a, false), true, a);
+        assert.equal(shouldShowImpactPackageCertificate(a, true), true, a);
+    }
+});
+
 test("clampImpactPackageTab falls back to flash when the requested tab is hidden", () => {
     assert.equal(clampImpactPackageTab("report", ["flash", "evidence"]), "flash");
     assert.equal(clampImpactPackageTab("evidence", ["flash", "evidence"]), "evidence");
@@ -127,7 +137,7 @@ test("wall deep-links map onto Impact Package tabs", () => {
     assert.equal(tabFromPackageQuery("evidence"), "evidence");
     assert.equal(tabFromPackageQuery("package"), "flash");
     assert.equal(tabFromPackageQuery("flash"), "flash");
-    assert.equal(tabFromPackageQuery("certificate"), "flash");
+    assert.equal(tabFromPackageQuery("certificate"), "certificate");
     assert.equal(tabFromPackageQuery(null, "#report"), "report");
 });
 

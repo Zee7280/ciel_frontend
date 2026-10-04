@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReportData } from "../context/ReportContext";
 import ImpactPackageDetailedReport from "./ImpactPackageDetailedReport";
+import ImpactPackageCertificate from "./ImpactPackageCertificate";
 import { downloadExhibitionFlashcard, printExhibitionFlashcard } from "../utils/flashcardExport";
 import {
     IMPACT_PACKAGE_TAB_EVENT,
@@ -20,6 +21,7 @@ import {
     impactPackageCanViewEvidence,
     impactPackageLockLine,
     shouldShowImpactPackageAnalysis,
+    shouldShowImpactPackageCertificate,
     shouldShowImpactPackageDetailedReport,
     type ImpactPackageAudience,
     type ImpactPackageChange,
@@ -33,6 +35,7 @@ const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: s
     report: { num: "02", label: "Detailed report", crumb: "02 / Complete detailed report" },
     evidence: { num: "03", label: "Evidence gallery", crumb: "03 / Evidence gallery" },
     analysis: { num: "04", label: "Analysis report", crumb: "04 / Analysis report" },
+    certificate: { num: "05", label: "Certificate", crumb: "05 / Certificate" },
 };
 
 function Icon({ name }: { name: "file" | "image" | "lock" | "download" | "arrow" | "video" | "audio" | "archive" | "eye" | "print" }) {
@@ -172,11 +175,13 @@ export default function ImpactPackage({
     const model = useMemo(() => buildImpactPackageModel(data, projectData, extraFiles), [data, projectData, extraFiles]);
     const showAnalysis = shouldShowImpactPackageAnalysis(audience, data);
     const showDetailedReport = shouldShowImpactPackageDetailedReport(audience, model.adminApproved);
+    const showCertificate = shouldShowImpactPackageCertificate(audience, model.adminApproved);
     const tabs = useMemo(
-        () => (showAnalysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS).filter(
-            (id) => id !== "report" || showDetailedReport,
-        ),
-        [showAnalysis, showDetailedReport],
+        () =>
+            (showAnalysis ? IMPACT_PACKAGE_TABS_WITH_ANALYSIS : IMPACT_PACKAGE_TABS)
+                .filter((id) => id !== "report" || showDetailedReport)
+                .concat(showCertificate ? ["certificate" as const] : []),
+        [showAnalysis, showDetailedReport, showCertificate],
     );
     const [tab, setTab] = useState<ImpactPackageTab>(() => {
         const requested = initialTab
@@ -749,6 +754,12 @@ export default function ImpactPackage({
                             <p>Faculty, the student and the university receive this report after Super Admin approval. Partner / NGO copies of the package do not include it.</p>
                         </header>
                         <ImpactAnalysisPanel data={data} analyserHref={audience === "admin" ? analyserHref : undefined} />
+                    </div>
+                ) : null}
+
+                {tab === "certificate" && showCertificate ? (
+                    <div id="certificate" className="view">
+                        <ImpactPackageCertificate data={data} projectData={projectData} />
                     </div>
                 ) : null}
             </main>
