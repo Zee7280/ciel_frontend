@@ -29,6 +29,16 @@ const TABS: Array<{ id: TabId; label: string }> = [
     { id: "badgeView", label: "Flashcard + CII Badge" },
 ];
 
+export function facultyLockedPackageTabFromQuery(doc: string | null | undefined): TabId {
+    const d = String(doc || "").trim().toLowerCase().replace(/^#/, "");
+    if (d === "report" || d === "detailed" || d === "detail" || d === "print") return "reportView";
+    if (d === "evidence" || d === "gallery") return "evidenceView";
+    if (d === "flash" || d === "flashcard") return "flashView";
+    if (d === "attendance" || d === "hours") return "attendanceView";
+    if (d === "analyzer" || d === "analysis" || d === "cii" || d === "cii-v4-5") return "analyzerView";
+    return "flashView";
+}
+
 function sourceTabsOf(model: LockedV17PackageModel | null | undefined): LockedV17SourceTabs {
     return model?.sourceTabs ?? emptyLockedV17SourceTabs();
 }
@@ -718,6 +728,7 @@ export default function FacultyLockedV17Modal({
     projectData,
     initialTab = "flashView",
     analyzerHref: analyzerHrefProp,
+    variant = "modal",
     onClose,
 }: {
     reportId?: string;
@@ -726,6 +737,8 @@ export default function FacultyLockedV17Modal({
     projectData?: unknown;
     initialTab?: TabId;
     analyzerHref?: string;
+    /** `page` = faculty dossier route (no overlay). `modal` keeps the existing overlay. */
+    variant?: "modal" | "page";
     onClose: () => void;
 }) {
     const [tab, setTab] = useState<TabId>(initialTab);
@@ -796,13 +809,18 @@ export default function FacultyLockedV17Modal({
     }, [flash, raw, projectData]);
     const cii = flash ? resolveReportCii(flash) : null;
     const analyzerHref =
-        analyzerHrefProp || (reportId ? `/dashboard/faculty/reports/${reportId}?view=cii-v2` : undefined);
+        analyzerHrefProp || (reportId ? `/dashboard/faculty/reports/${reportId}?view=cii-v4-5` : undefined);
+
+    const asPage = variant === "page";
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape") onClose();
         };
         window.addEventListener("keydown", onKey);
+        if (asPage) {
+            return () => window.removeEventListener("keydown", onKey);
+        }
         const prev = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         return () => {
@@ -812,7 +830,7 @@ export default function FacultyLockedV17Modal({
             const mount = document.getElementById("flv17-print-mount");
             if (mount) mount.innerHTML = "";
         };
-    }, [onClose]);
+    }, [onClose, asPage]);
 
     const printPackage = () => {
         const source = document.getElementById("flv17-print-root");
@@ -836,10 +854,10 @@ export default function FacultyLockedV17Modal({
         window.setTimeout(cleanup, 800);
     };
 
-    if (!mounted) return null;
+    if (!asPage && !mounted) return null;
 
-    return createPortal(
-        <div className="flv17-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="flv17-title">
+    const shell = (
+        <div className={asPage ? "flv17-page" : "flv17-modal-backdrop"} role="dialog" aria-modal={!asPage} aria-labelledby="flv17-title">
             <div className="flv17-modal">
                 <div className="flv17-modal-top flv17-modal-chrome">
                     <button type="button" className="flv17-close" onClick={onClose} aria-label="Close">
@@ -972,7 +990,9 @@ export default function FacultyLockedV17Modal({
                     </div>
                 </div>
             </div>
-        </div>,
-        document.body,
+        </div>
     );
+
+    if (asPage) return shell;
+    return createPortal(shell, document.body);
 }

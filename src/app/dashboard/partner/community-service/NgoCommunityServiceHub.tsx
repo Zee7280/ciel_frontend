@@ -141,7 +141,7 @@ function NgoRemindButtons({ email, title }: { email?: string | null; title: stri
 }
 
 function reportHref(id: string) {
-    return `/dashboard/partner/verify/${encodeURIComponent(id)}`;
+    return `/dashboard/partner/verify/${encodeURIComponent(id)}?package=1`;
 }
 
 const TONE_CLASS = {

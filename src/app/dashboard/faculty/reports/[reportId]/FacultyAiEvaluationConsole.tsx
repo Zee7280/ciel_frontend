@@ -72,11 +72,11 @@ export default function FacultyAiEvaluationConsole() {
         () => (rawReport ? coerceFlashReportData(rawReport) : null),
         [rawReport],
     );
-    // Check if CII v2 analysis exists on the report
-    const hasCiiV2Analysis = useMemo(() => {
+    // Check if CII v4.5 analysis exists on the report
+    const hasCiiV45Analysis = useMemo(() => {
         if (!rawReport) return false;
-        const ciiV2 = rawReport.ciiV2 as Record<string, unknown> | null | undefined;
-        return Boolean(ciiV2 && typeof ciiV2 === "object" && Object.keys(ciiV2).length > 0);
+        const ciiV45 = rawReport.ciiV45 as Record<string, unknown> | null | undefined;
+        return Boolean(ciiV45 && typeof ciiV45 === "object" && Object.keys(ciiV45).length > 0);
     }, [rawReport]);
 
     // Phase 2: Computed values for faculty override
@@ -107,7 +107,7 @@ export default function FacultyAiEvaluationConsole() {
     // Phase 4: Check if report is locked (approved)
     const isReportLocked = useMemo(() => {
         if (!rawReport) return false;
-        const lock = rawReport.ciiV2Lock as { locked?: boolean } | null | undefined;
+        const lock = rawReport.ciiV45Lock as { locked?: boolean } | null | undefined;
         return Boolean(lock?.locked);
     }, [rawReport]);
 
@@ -213,9 +213,9 @@ export default function FacultyAiEvaluationConsole() {
                 <div className="fae-nav">
                     <Link href="/dashboard/faculty/community-service">Back to Community Service</Link>
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
-                        Open full dossier
+                        Open Impact Package
                     </Link>
-                    <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v2`}>
+                    <Link href={`/dashboard/faculty/reports/${reportId}?view=cii-v4-5`}>
                         View CII record
                     </Link>
                 </div>

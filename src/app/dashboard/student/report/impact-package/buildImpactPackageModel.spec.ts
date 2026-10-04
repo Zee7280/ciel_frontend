@@ -11,7 +11,7 @@ import {
 } from "./buildImpactPackageModel";
 
 const locked = (admin_status: string) =>
-    ({ ciiV2: { final: 72 }, ciiV2Lock: { locked: true }, admin_status }) as never;
+    ({ ciiV45: { finalCII: 72 }, ciiV45Lock: { locked: true }, admin_status }) as never;
 
 test("analysis report goes to student, faculty, university and admin after approval only", () => {
     for (const a of ["student", "faculty", "university"] as const) {
@@ -27,7 +27,7 @@ test("partner / NGO and public never get the analysis report", () => {
 });
 
 test("no analysis tab when CII is not locked", () => {
-    const d = { ciiV2: { final: 72 }, ciiV2Lock: null, admin_status: "approved" } as never;
+    const d = { ciiV45: { finalCII: 72 }, ciiV45Lock: null, admin_status: "approved" } as never;
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
 });
 
@@ -101,7 +101,7 @@ test("flash Participation chips do not dump pooled hours onto the team lead", ()
 
 
 test("admin sees the analysis tab once a score exists, even before locking", () => {
-    const d = { ciiV2: { final: 64 }, ciiV2Lock: null, admin_status: "pending" } as never;
+    const d = { ciiV45: { finalCII: 64 }, ciiV45Lock: null, admin_status: "pending" } as never;
     assert.equal(shouldShowImpactPackageAnalysis("admin", d), true);
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
 });

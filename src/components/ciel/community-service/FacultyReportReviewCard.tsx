@@ -75,8 +75,9 @@ export default function FacultyReportReviewCard({
     const submitted = ago(row.report_submitted_at || row.submission_date);
     const lastActivity = ago(row.updated_at || row.report_submitted_at || row.submission_date);
     const base = (reportBase || DEFAULT_REPORT_BASE[viewer]).replace(/\/$/, "");
-    const reportHref = `${base}/${row.id}`;
-    const analyserHref = `${reportHref}?view=cii-v2`;
+    const recordHref = `${base}/${row.id}`;
+    const packageHref = viewer === "faculty" ? `${recordHref}?view=dossier` : recordHref;
+    const analyserHref = `${recordHref}?view=cii-v4-5`;
     const idLabel = formatDisplayId(row.id, "RPT");
     const score = typeof row.cii_provisional === "number" ? Math.round(row.cii_provisional * 10) / 10 : null;
     const levelLabel = row.cii_level_name
@@ -322,11 +323,11 @@ export default function FacultyReportReviewCard({
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                         {viewer === "admin" ? (
-                            <Link href={reportHref} className={approvalActionClass.green}>
+                            <Link href={packageHref} className={approvalActionClass.green}>
                                 Open Impact Package
                             </Link>
                         ) : (
-                            <Link href={reportHref} className={approvalActionClass.green}>
+                            <Link href={packageHref} className={approvalActionClass.green}>
                                 Open Impact Package
                             </Link>
                         )}
@@ -341,16 +342,19 @@ export default function FacultyReportReviewCard({
                         ) : null}
                         {mode === "pending" ? (
                             viewer === "admin" ? (
-                                <Link href={reportHref} className={approvalActionClass.gold}>
+                                <Link href={recordHref} className={approvalActionClass.gold}>
                                     Open verify · Decide
                                 </Link>
                             ) : (
-                                <Link href={reportHref} className={approvalActionClass.soft}>
+                                <Link href={packageHref} className={approvalActionClass.soft}>
                                     Open record
                                 </Link>
                             )
                         ) : (
-                            <Link href={reportHref} className={approvalActionClass.soft}>
+                            <Link
+                                href={viewer === "admin" ? recordHref : packageHref}
+                                className={approvalActionClass.soft}
+                            >
                                 Open record
                             </Link>
                         )}

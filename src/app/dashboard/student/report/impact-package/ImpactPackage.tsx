@@ -82,28 +82,25 @@ function changeCaption(change: ImpactPackageChange): { headline: string; note: s
 }
 
 
-function asCii(data: ReportData): { final?: number; level?: { name?: string; level?: number }; sections?: Array<{ id?: number; title?: string; score?: number; weight?: number }>; studentFeedback?: string | { summary?: string; why_score_is_high_or_low?: string } } {
-    return (data.ciiV2 && typeof data.ciiV2 === "object" ? data.ciiV2 : {}) as {
-        final?: number;
-        level?: { name?: string; level?: number };
-        sections?: Array<{ id?: number; title?: string; score?: number; weight?: number }>;
-        studentFeedback?: string | { summary?: string; why_score_is_high_or_low?: string };
+function asCii(data: ReportData): {
+    finalCII?: number;
+    finalBadge?: { name?: string; level?: number };
+    sectionScores?: Array<{ dimension?: string; name?: string; score?: number; maximumPoints?: number }>;
+    studentFeedback?: string;
+} {
+    return (data.ciiV45 && typeof data.ciiV45 === "object" ? data.ciiV45 : {}) as {
+        finalCII?: number;
+        finalBadge?: { name?: string; level?: number };
+        sectionScores?: Array<{ dimension?: string; name?: string; score?: number; maximumPoints?: number }>;
+        studentFeedback?: string;
     };
 }
 
 function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyserHref?: string }) {
     const cii = asCii(data);
-    const final = typeof cii.final === "number" ? cii.final : Number(cii.final);
-    const sections = Array.isArray(cii.sections) ? cii.sections : [];
-    const fb = cii.studentFeedback;
-    const summary =
-        typeof fb === "string"
-            ? fb.trim()
-            : typeof fb?.summary === "string"
-              ? fb.summary
-              : typeof fb?.why_score_is_high_or_low === "string"
-                ? fb.why_score_is_high_or_low
-                : "";
+    const final = typeof cii.finalCII === "number" ? cii.finalCII : Number(cii.finalCII);
+    const sections = Array.isArray(cii.sectionScores) ? cii.sectionScores : [];
+    const summary = typeof cii.studentFeedback === "string" ? cii.studentFeedback.trim() : "";
     return (
         <div>
             <div className="evidence-stats">
@@ -112,8 +109,8 @@ function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyse
                     <span>CII / 100</span>
                 </div>
                 <div className="evidence-stat">
-                    <b>{cii.level?.name || "Level pending"}</b>
-                    <span>{cii.level?.level != null ? `L${cii.level.level}` : "recognition"}</span>
+                    <b>{cii.finalBadge?.name || "Level pending"}</b>
+                    <span>{cii.finalBadge?.level != null ? `L${cii.finalBadge.level}` : "recognition"}</span>
                 </div>
                 <div className="evidence-stat">
                     <b>{sections.length}</b>
@@ -131,17 +128,17 @@ function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyse
             ) : null}
             <div className="report-section" style={{ display: "block", padding: 0 }}>
                 {sections.map((section) => (
-                    <div key={String(section.id || section.title)} className="subsection">
+                    <div key={String(section.dimension || section.name)} className="subsection">
                         <h3>
-                            <span>{String(section.id || "").padStart(2, "0")}</span>
-                            {section.title || "Section"}
+                            <span>{String(section.dimension || "")}</span>
+                            {section.name || "Section"}
                         </h3>
                         <div className="qa">
                             <div className="question">Score</div>
                             <div className="answer">
                                 <p>
                                     {section.score ?? "—"}
-                                    {section.weight != null ? ` / ${section.weight}` : ""}
+                                    {section.maximumPoints != null ? ` / ${section.maximumPoints}` : ""}
                                 </p>
                             </div>
                         </div>
@@ -379,7 +376,7 @@ export default function ImpactPackage({
                     {analyserHref ? (
                         <a href={analyserHref} className="primary" style={{ textDecoration: "none" }}>
                             <span className="button-content">
-                                {(data as { ciiV2?: unknown }).ciiV2 ? "Open AI analyser" : "Run AI analyser"}
+                                {(data as { ciiV45?: unknown }).ciiV45 ? "Open AI analyser" : "Run AI analyser"}
                             </span>
                         </a>
                     ) : null}

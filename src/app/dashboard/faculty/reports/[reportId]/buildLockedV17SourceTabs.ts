@@ -113,11 +113,13 @@ function claimArea(name: string, source: string): string {
 }
 
 function verdictToState(verdict: string): LockedV17ClaimState {
-    const key = verdict.trim().toUpperCase();
-    if (key === "MATCH" || key === "SUPPORTS") return "Supports Claim";
-    if (key === "PARTIAL" || key === "PARTIALLY SUPPORTS") return "Partially Supports";
-    if (key === "UNRELATED") return "Unrelated";
-    if (key === "CONTRADICTS" || key === "MISMATCH") return "Cannot Verify";
+    const key = verdict.trim().toUpperCase().replace(/[\s_]+/g, "_");
+    // v2 verdicts (MATCH/PARTIAL/MISMATCH) and v4.5 `supportStatus` values
+    // (SUPPORTED/PARTIALLY_SUPPORTED/UNSUPPORTED/CONTRADICTED/PROCESSING_REQUIRED) both land here.
+    if (key === "MATCH" || key === "SUPPORTS" || key === "SUPPORTED") return "Supports Claim";
+    if (key === "PARTIAL" || key === "PARTIALLY_SUPPORTS" || key === "PARTIALLY_SUPPORTED") return "Partially Supports";
+    if (key === "UNRELATED" || key === "UNSUPPORTED") return "Unrelated";
+    if (key === "CONTRADICTS" || key === "MISMATCH" || key === "CONTRADICTED") return "Cannot Verify";
     return "Cannot Verify";
 }
 
@@ -227,17 +229,22 @@ function buildLockedV17SourceTabsUnsafe(
     assessment: Array<{ name: string; score: string; max: number }>,
     opts: { ciiLocked: boolean; ciiScore: number | null; badgeLabel: string; overall: string },
 ): LockedV17SourceTabs {
-    const ciiV2 = asRecord((data as unknown as Record<string, unknown>).ciiV2);
-    const ciiEvidence = Array.isArray(ciiV2.evidence) ? ciiV2.evidence : [];
+    const ciiV45 = asRecord((data as unknown as Record<string, unknown>).ciiV45);
+    // v4.5's per-file mapping lives in `evidenceAudit` (full admin/faculty shape only — this
+    // array is absent from the redacted student/partner/university payload, same as v2's
+    // `evidence` was).
+    const ciiEvidence = Array.isArray(ciiV45.evidenceAudit) ? ciiV45.evidenceAudit : [];
     const ciiByFile = new Map<string, { state: LockedV17ClaimState; finding: string; inspected: boolean }>();
     for (const row of ciiEvidence) {
         const rec = asRecord(row);
-        const file = txt(rec.file, rec.url, rec.name);
+        const file = txt(rec.fileName, rec.file, rec.url, rec.name);
         if (!file) continue;
-        const state = verdictToState(txt(rec.verdict));
-        const finding = txt(rec.why, rec.claim) || "Analyzer mapped this file to a material claim from the locked report.";
-        ciiByFile.set(file.toLowerCase(), { state, finding, inspected: Boolean(rec.verdict) });
-        ciiByFile.set(fileName(file).toLowerCase(), { state, finding, inspected: Boolean(rec.verdict) });
+        const state = verdictToState(txt(rec.supportStatus, rec.verdict));
+        const finding =
+            txt(rec.explanation, rec.why, rec.claim) || "Analyzer mapped this file to a material claim from the locked report.";
+        const inspected = txt(rec.processingStatus).toUpperCase() === "INSPECTED" || Boolean(rec.verdict);
+        ciiByFile.set(file.toLowerCase(), { state, finding, inspected });
+        ciiByFile.set(fileName(file).toLowerCase(), { state, finding, inspected });
     }
 
     const files = new Map<string, LockedV17EvidenceItem>();

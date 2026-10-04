@@ -46,6 +46,9 @@ import ReportEvidenceGallery, {
     classifyEvidenceGalleryKind,
 } from "@/components/ciel/community-service/ReportEvidenceGallery";
 
+/** Partner / university review uses Impact Package. Flip to true to restore sections 1–9 + print dossier. */
+const SHOW_PARTNER_LEGACY_DOSSIER = false;
+
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
         .trim()
@@ -88,7 +91,8 @@ function partnerCanSubmitDecision(report: ReportDetail): boolean {
 }
 
 interface ReportDetail {
-    ciiV2?: { final?: number; provisional?: boolean; level?: { name?: string } } | null;
+    // No pre-lock "provisional" concept in v4.5 — this is null until an Admin has locked it.
+    ciiV45?: { finalCII?: number; finalBadge?: { name?: string } } | null;
     id: string;
     /** False when the API opened this report read-only for the viewer. */
     viewer_can_review?: boolean;
@@ -488,7 +492,7 @@ function ReportDetailPage() {
                     </Link>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black border border-indigo-200 uppercase tracking-widest">
-                            Single-Page Dossier Mode
+                            Impact Package
                         </span>
                         <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black border border-emerald-200 uppercase tracking-widest">
                             {getStoredCurrentUserRole() === "university" ? "University" : "NGO / Partner"}
@@ -578,20 +582,20 @@ function ReportDetailPage() {
                         </div>
 
                         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                            {typeof report.ciiV2?.final === 'number' ? (
+                            {typeof report.ciiV45?.finalCII === 'number' ? (
                                 <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
                                     <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
                                     <div>
                                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">
-                                            CII index{report.ciiV2.provisional ? ' · provisional' : ''}
+                                            CII index
                                         </p>
                                         <p className="text-2xl font-black tabular-nums text-slate-900">
-                                            {Math.round(report.ciiV2.final)}
+                                            {Math.round(report.ciiV45.finalCII)}
                                             <span className="text-base font-semibold text-slate-500">/100</span>
                                         </p>
-                                        {report.ciiV2.level?.name ? (
+                                        {report.ciiV45.finalBadge?.name ? (
                                             <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
-                                                {report.ciiV2.level.name}
+                                                {report.ciiV45.finalBadge.name}
                                             </p>
                                         ) : null}
                                     </div>
@@ -642,6 +646,7 @@ function ReportDetailPage() {
                 </div>
 
                 {/* Report Content - Unified Scrollable Dossier */}
+                {SHOW_PARTNER_LEGACY_DOSSIER ? (
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky Table of Contents */}
                     <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
@@ -1395,6 +1400,7 @@ function ReportDetailPage() {
                         </div>
                     </div>
                 </div>
+                ) : null}
 
                 {canSubmitDecision && (
                     <div id="actions" className="relative mt-12 mb-20 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl sm:rounded-[3rem] sm:p-12">
@@ -1404,7 +1410,7 @@ function ReportDetailPage() {
                         <div className="relative z-10">
                             <h3 className="text-3xl font-black text-slate-900 mb-2">Impact Decision Hub</h3>
                             <p className="text-slate-500 font-medium mb-8">
-                                Review the student&apos;s impact dossier above before providing your organization&apos;s verification.
+                                Review the student&apos;s Impact Package above before providing your organization&apos;s verification.
                             </p>
 
                             <div className="space-y-6">
@@ -1461,7 +1467,7 @@ function ReportDetailPage() {
 
                 {waitingOnFaculty && (
                     <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 mt-8 mb-16 text-amber-900 text-sm font-medium">
-                        This report is awaiting Faculty approval. Only Faculty can approve or reject a Community Service report — use the reminder buttons above to nudge them once you&apos;ve reviewed the dossier.
+                        This report is awaiting Faculty approval. Only Faculty can approve or reject a Community Service report — use the reminder buttons above to nudge them once you&apos;ve reviewed the Impact Package.
                     </div>
                 )}
             </div>

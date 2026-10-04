@@ -1,356 +1,432 @@
 /**
- * Composite Impact Index (CII) v3.1 — client-side twin of
- * `ciel_backend/src/reports/cii-v2.constants.ts`. Static tables only (section/criteria
- * definitions, badge levels, bonus tiers) — the actual score is always computed
- * server-side and delivered on `report.ciiV2` / `report.ciiV2Lock`. Keep in sync with
- * the backend file.
+ * Composite Impact Index (CII) v4.5 — client-side twin of
+ * `ciel_backend/src/reports/cii-v4-5.constants.ts`. Static tables + types only (dimension/
+ * criteria definitions, badge bands, anchor factors) — the actual score is always computed
+ * server-side and delivered on `report.ciiV45` / `report.ciiV45Lock`. The AI never returns a
+ * numeric score or badge — only per-criterion anchors, claims, evidence audit and narrative
+ * text; all arithmetic/bands/gates are server-owned. Keep in sync with the backend file.
  */
 
-export interface CiiV2Criterion {
-    key: string;
-    label: string;
-    weight: number;
-    evidenceHint: string;
+// --- Shared literal types (mirrors cii-v4-5.constants.ts) ---
+
+export type CiiV45Anchor = 0 | 1 | 2 | 3 | 4 | "P";
+
+export type CiiV45VerificationStatus =
+    | "VERIFIED"
+    | "NARRATIVE_ONLY"
+    | "PROCESSING_REQUIRED"
+    | "NOT_APPLICABLE"
+    | "CONTRADICTED";
+
+export type CiiV45ProcessingStatus =
+    | "INSPECTED"
+    | "UNREADABLE"
+    | "CORRUPTED"
+    | "CONVERSION_FAILED"
+    | "INACCESSIBLE"
+    | "DUPLICATE";
+
+export type CiiV45SupportStatus =
+    | "SUPPORTED"
+    | "PARTIALLY_SUPPORTED"
+    | "UNSUPPORTED"
+    | "CONTRADICTED"
+    | "PROCESSING_REQUIRED";
+
+export type CiiV45Privacy = "PUBLIC" | "RESTRICTED" | "PRIVATE";
+
+export type CiiV45Dimension = "1" | "2" | "3" | "4A" | "4B" | "5" | "6" | "7" | "8" | "9";
+
+export type CiiV45UpliftCategory = "effort" | "resources" | "partnerships" | "outcomes";
+
+export type CiiV45ScoreStatus = "RESUBMISSION_REQUIRED" | "ADMIN_REVIEW_REQUIRED" | "FINAL";
+
+// --- Evaluator payload / result shapes (mirrors backend CiiV45* interfaces) ---
+
+export interface CiiV45CriterionScore {
+    criterion: string;
+    anchor: CiiV45Anchor;
+    qualityAnchor: CiiV45Anchor;
+    verificationStatus: CiiV45VerificationStatus;
+    sourceRefs: string[];
+    evidenceIds: string[];
+    reasoningSummary: string;
+    deductionReason?: string | null;
 }
 
-export interface CiiV2Section {
-    id: number;
-    key: string;
-    title: string;
-    weight: number;
-    rationale: string;
-    criteria: CiiV2Criterion[];
+export interface CiiV45SectionScore {
+    dimension: CiiV45Dimension;
+    criterionScores: CiiV45CriterionScore[];
 }
 
-export const CII_V2_ANCHORS = ["Missing / Invalid", "Basic", "Sound", "Strong", "Exceptional"] as const;
+export interface CiiV45IndividualHours {
+    studentId: string;
+    hours: number | null;
+    requiredHours: number;
+    verified: boolean;
+    recordComplete?: boolean;
+}
 
-export const CII_V2_SECTIONS: CiiV2Section[] = [
-  {
-    id: 1,
-    key: 'participation',
-    title: 'Participation & Verified Effort',
-    weight: 8,
-    rationale:
-      'Evaluate individual role, verified hours, continuity, participation quality, attendance realism and repeated engagement. Required hours are compliance, not exceptional marks.',
-    criteria: [
-      { key: 'role_clarity', label: 'Individual role clarity & responsibility', weight: 2, evidenceHint: 'Activity responsibilities + member record' },
-      { key: 'participation_quality', label: 'Quality & realism of participation', weight: 2, evidenceHint: 'Session ledger + timestamps' },
-      { key: 'attendance_consistency', label: 'Evidence-backed attendance consistency', weight: 2, evidenceHint: 'Attendance register + session proof' },
-      { key: 'engagement_continuity', label: 'Depth / continuity of engagement', weight: 2, evidenceHint: 'Session pattern + activity history' },
-    ],
-  },
-  {
-    id: 2,
-    key: 'context',
-    title: 'Community Need & Starting Point',
-    weight: 10,
-    rationale:
-      'Evaluate actual community need, beneficiary group, community/beneficiary voice, starting situation, local context and discipline relevance. Formal research-grade baseline is not mandatory for Sound.',
-    criteria: [
-      { key: 'need_specificity', label: 'Specificity & significance of the community need', weight: 2, evidenceHint: 'Baseline narrative + site audit' },
-      { key: 'beneficiary_voice', label: 'Community / beneficiary voice & reciprocity', weight: 2, evidenceHint: 'Partner input + feedback' },
-      { key: 'baseline_context', label: 'Starting situation / baseline context', weight: 2, evidenceHint: 'Before photos + observed conditions' },
-      { key: 'contextual_understanding', label: 'Local / contextual understanding', weight: 2, evidenceHint: 'Need assessment' },
-      { key: 'disciplinary_relevance', label: 'Academic / disciplinary relevance', weight: 2, evidenceHint: 'Academic application field' },
-    ],
-  },
-  {
-    id: 3,
-    key: 'sdg',
-    title: 'SDG Contribution',
-    weight: 7,
-    rationale:
-      'Evaluate Need → Activity → Output → Outcome → SDG. One correctly justified SDG is stronger than several weakly connected SDGs.',
-    criteria: [
-      { key: 'sdg_alignment', label: 'Correct primary SDG / target alignment', weight: 2, evidenceHint: 'Opportunity SDG + target' },
-      { key: 'contribution_logic', label: 'Need → activity → output → outcome → SDG logic', weight: 2, evidenceHint: 'Contribution narrative' },
-      { key: 'activity_output_outcome_alignment', label: 'Activity / output / outcome alignment', weight: 2, evidenceHint: 'Activities + outcomes' },
-      { key: 'sdg_restraint', label: 'Restraint / no SDG inflation', weight: 1, evidenceHint: 'Full SDG set' },
-    ],
-  },
-  {
-    id: 4,
-    key: 'activities',
-    title: 'Activities & Outputs',
-    weight: 15,
-    rationale:
-      'WHAT WAS ACTUALLY DONE AND PRODUCED. Small scale does not cap the score; large scale does not automatically increase it.',
-    criteria: [
-      { key: 'planned_vs_actual', label: 'Planned intention → actual execution', weight: 3, evidenceHint: 'Activity records' },
-      { key: 'delivery_rigor', label: 'Rigor & quality of delivery', weight: 3, evidenceHint: 'Activity descriptions + photos' },
-      { key: 'execution_ownership', label: 'Execution ownership & depth of engagement', weight: 3, evidenceHint: 'Session ledger + responsibilities' },
-      { key: 'output_quality_integrity', label: 'Outputs & counting integrity', weight: 3, evidenceHint: 'Output records + partner register' },
-      { key: 'depth_or_scale', label: 'Depth OR verified scale', weight: 3, evidenceHint: 'Unique reach + session history' },
-    ],
-  },
-  {
-    id: 5,
-    key: 'outcomes',
-    title: 'Outcomes & Measured Change',
-    weight: 15,
-    rationale:
-      'WHAT CHANGED BECAUSE OF THE WORK. A credible narrative outcome without formal measurement may receive Sound. Formal measurement primarily supports Strong/Exceptional.',
-    criteria: [
-      { key: 'outcome_clarity', label: 'Outcome clarity', weight: 3, evidenceHint: 'Before/after narrative' },
-      { key: 'measurable_change', label: 'Measurable / demonstrated change', weight: 4, evidenceHint: 'Registers + assessment data' },
-      { key: 'outcome_source_quality', label: 'Outcome source quality', weight: 3, evidenceHint: 'Data source / feedback instrument' },
-      { key: 'beneficiary_value', label: 'Beneficiary value, inclusion & appropriateness', weight: 3, evidenceHint: 'Beneficiary narrative + feedback' },
-      { key: 'attribution_honesty', label: 'Attribution honesty & limitations', weight: 2, evidenceHint: 'Limitations narrative' },
-    ],
-  },
-  {
-    id: 6,
-    key: 'resources',
-    title: 'Resources & Stewardship',
-    weight: 8,
-    rationale:
-      'Judge HOW WELL AVAILABLE RESOURCES WERE USED, not HOW RICH THE PROJECT WAS. Zero-budget projects may receive full marks.',
-    criteria: [
-      { key: 'resource_stewardship', label: 'Stewardship / efficient use of available resources', weight: 2, evidenceHint: 'Resource pathway + outputs' },
-      { key: 'resource_traceability', label: 'Traceability & verification', weight: 2, evidenceHint: 'Receipts + handover records' },
-      { key: 'resource_appropriateness', label: 'Appropriateness / proportionality', weight: 2, evidenceHint: 'Resource ledger + activity need' },
-      { key: 'resource_delivery_link', label: 'Resource → delivery link', weight: 2, evidenceHint: 'Enabled-by statements' },
-    ],
-  },
-  {
-    id: 7,
-    key: 'partnerships',
-    title: 'Partnership & Collaboration',
-    weight: 8,
-    rationale:
-      'One meaningful partner can score strongly. Multiple logos do not automatically receive more marks.',
-    criteria: [
-      { key: 'stakeholder_relevance', label: 'Relevance & reciprocity of stakeholder relationship', weight: 2, evidenceHint: 'Partner/community identity + role' },
-      { key: 'stakeholder_role_clarity', label: 'Clarity of stakeholder / partner role', weight: 2, evidenceHint: 'Partner roles' },
-      { key: 'collaboration_quality', label: 'Quality of collaboration / co-design', weight: 2, evidenceHint: 'Coordination evidence' },
-      { key: 'ownership_verification', label: 'Verification, ownership & continuation involvement', weight: 2, evidenceHint: 'Verification letter + handover' },
-    ],
-  },
-  {
-    id: 8,
-    key: 'evidence',
-    title: 'Evidence, Ethics & Verification',
-    weight: 15,
-    rationale:
-      'Score only AFTER the complete evidence audit. Do not count files — judge what those files actually prove.',
-    criteria: [
-      { key: 'participation_evidence', label: 'Evidence supports participation / hours', weight: 2, evidenceHint: 'Attendance evidence' },
-      { key: 'activity_output_evidence', label: 'Evidence supports activities / outputs', weight: 3, evidenceHint: 'Activity/output evidence' },
-      { key: 'beneficiary_scale_evidence', label: 'Evidence supports beneficiaries / scale', weight: 2, evidenceHint: 'Beneficiary reach evidence' },
-      { key: 'outcome_evidence', label: 'Evidence supports outcomes / change', weight: 3, evidenceHint: 'Before/after outcome evidence' },
-      { key: 'resource_partner_evidence', label: 'Resource / partner evidence', weight: 2, evidenceHint: 'Resource/stakeholder evidence' },
-      { key: 'ethics_integrity', label: 'Ethics, consent, consistency & integrity', weight: 2, evidenceHint: 'Evidence declarations + consistency scan' },
-      { key: 'evidence_coverage_traceability', label: 'Evidence coverage & traceability', weight: 1, evidenceHint: 'Claim-to-file mapping' },
-    ],
-  },
-  {
-    id: 9,
-    key: 'learning',
-    title: 'Reflection & Academic Growth',
-    weight: 7,
-    rationale:
-      'Score specificity and self-awareness, not polished language. External evidence is not required for genuine personal reflection.',
-    criteria: [
-      { key: 'personal_learning', label: 'Specific, honest personal learning', weight: 2, evidenceHint: 'Personal reflection' },
-      { key: 'academic_application', label: 'Application of discipline / knowledge where relevant', weight: 1.5, evidenceHint: 'Academic application' },
-      { key: 'ethical_understanding', label: 'Ethical / community understanding', weight: 1.5, evidenceHint: 'Reflection narrative' },
-      { key: 'self_awareness', label: 'Self-awareness, challenge & future improvement', weight: 2, evidenceHint: 'Future-action reflection' },
-    ],
-  },
-  {
-    id: 10,
-    key: 'sustainability',
-    title: 'Sustainability & Handover',
-    weight: 7,
-    rationale:
-      'Not every project must continue forever. An honest No or Partial with clear reasoning may score higher than an unsupported Yes.',
-    criteria: [
-      { key: 'continuation_assessment', label: 'Realistic continuation assessment', weight: 2, evidenceHint: 'Sustainability narrative' },
-      { key: 'named_ownership', label: 'Named ownership / handover', weight: 2, evidenceHint: 'Handover record' },
-      { key: 'continuation_mechanism', label: 'Continuation mechanism / follow-up', weight: 2, evidenceHint: 'Handover + follow-up' },
-      { key: 'scaling_realism', label: 'Scaling / system influence realism', weight: 1, evidenceHint: 'Scaling statement' },
-    ],
-  },
-];
+export interface CiiV45Gap {
+    type: string;
+    material: boolean;
+    mandatory?: boolean;
+    field?: string;
+}
 
-export const CII_V2_BASE_MAX = CII_V2_SECTIONS.reduce((sum, s) => sum + s.weight, 0); // 100
-export const CII_V2_BONUS_MAX = 5;
-export const CII_V2_MAX = 100;
+export interface CiiV45InputCompleteness {
+    gaps: CiiV45Gap[];
+    individualHours: CiiV45IndividualHours[];
+    mandatoryFieldsComplete: boolean;
+}
 
-export interface CiiV2Level {
+export interface CiiV45Claim {
+    claimId: string;
+    text?: string;
+    material: boolean;
+    evidenceIds: string[];
+    supportStatus: CiiV45SupportStatus;
+}
+
+export interface CiiV45EvidenceAudit {
+    evidenceId: string;
+    fileName?: string;
+    fileType?: string;
+    privacy: CiiV45Privacy;
+    material: boolean;
+    processingStatus: CiiV45ProcessingStatus;
+    claimIds: string[];
+    actualContentSummary?: string;
+    matchConfidence?: number | null;
+    supportStatus: CiiV45SupportStatus;
+    evidenceStrength?: string;
+    independence?: string;
+    explanation?: string;
+}
+
+export interface CiiV45UpliftItem {
+    category: CiiV45UpliftCategory;
+    points: number;
+    studentId?: string;
+    beyondBaseJustification?: string;
+    evidenceIds?: string[];
+}
+
+export interface CiiV45ExtraMileUplift {
+    assessmentStatus: "ASSESSED" | "PROCESSING_REQUIRED";
+    items: CiiV45UpliftItem[];
+    total?: number | null;
+    knownTotal?: number;
+}
+
+export interface CiiV45IntegrityIssue {
+    origin: "STUDENT";
+    confirmed: boolean;
+    claimId?: string;
+    evidenceIds: string[];
+    reason: string;
+}
+
+export interface CiiV45IntegrityPenalty {
+    points: number;
+    issues: CiiV45IntegrityIssue[];
+}
+
+export interface CiiV45ExceptionalFeature {
+    verified: boolean;
+    explanation?: string;
+    evidenceIds?: string[];
+}
+
+export type CiiV45DeductionLedgerEntry = Record<string, unknown>;
+
+/** Shape the AI actually returns — anchors/claims/evidence/narrative only, no score fields. */
+export interface CiiV45EvaluatorPayload {
+    frameworkVersion: "4.5";
+    reportId: string;
+    inputFingerprint: string;
+    inputCompleteness: CiiV45InputCompleteness;
+    claimInventory: CiiV45Claim[];
+    evidenceAudit: CiiV45EvidenceAudit[];
+    sectionScores: CiiV45SectionScore[];
+    deductionLedger: CiiV45DeductionLedgerEntry[];
+    extraMileUplift: CiiV45ExtraMileUplift;
+    integrityPenalty: CiiV45IntegrityPenalty;
+    exceptionalFeature: CiiV45ExceptionalFeature | null;
+    adminReviewReasons: string[];
+    strengths: string[];
+    developmentPriorities: string[];
+    analysisSummary: string;
+    evidenceSummary: string;
+    studentFeedback: string;
+}
+
+export interface CiiV45Band {
     level: number;
     min: number;
     max: number;
     name: string;
-    quality: string;
-    icon: string;
+    assetKey: string;
 }
 
-export const CII_V2_LEVELS: CiiV2Level[] = [
-    { level: 7, min: 92, max: 100, name: "Transformative Impact Contributor", quality: "PHENOMENAL", icon: "🏆" },
-    { level: 6, min: 84, max: 91.999, name: "Distinguished Impact Contributor", quality: "EXCELLENT", icon: "💎" },
-    { level: 5, min: 75, max: 83.999, name: "Strong Impact Contributor", quality: "VERY GOOD", icon: "⭐" },
-    { level: 4, min: 67, max: 74.999, name: "Developing Impact Contributor", quality: "GOOD", icon: "🌟" },
-    { level: 3, min: 58, max: 66.999, name: "Emerging Community Contributor", quality: "AVERAGE", icon: "🌱" },
-    { level: 2, min: 48, max: 57.999, name: "Foundation Stage Contributor", quality: "FOUNDATION", icon: "🔹" },
-    { level: 1, min: 0, max: 47.999, name: "Participation Acknowledgement", quality: "BASIC", icon: "🔸" },
-];
-
-export interface CiiV2BonusTier {
-    label: string;
-    amount: number;
-}
-
-export interface CiiV2BonusChannel {
-    key: "effort" | "resources" | "partners" | "outcome";
-    name: string;
-    max: number;
-    tiers: CiiV2BonusTier[];
-}
-
-export const CII_V2_BONUS_CHANNELS: CiiV2BonusChannel[] = [
-    {
-        key: "effort",
-        name: "Extra verified effort above the opportunity minimum",
-        max: 1.25,
-        tiers: [
-            { label: "≤ 1.24×", amount: 0 },
-            { label: "1.25–1.49×", amount: 0.25 },
-            { label: "1.50–1.99×", amount: 0.5 },
-            { label: "2.00–2.49×", amount: 0.75 },
-            { label: "≥ 2.50×", amount: 1.25 },
-        ],
-    },
-    {
-        key: "resources",
-        name: "Exceptional resource mobilisation",
-        max: 1.25,
-        tiers: [
-            { label: "None", amount: 0 },
-            { label: "Useful additional verified contribution", amount: 0.25 },
-            { label: "Multiple meaningful resources / notable initiative", amount: 0.5 },
-            { label: "Resources materially strengthen delivery", amount: 0.75 },
-            { label: "Significant external leverage", amount: 1 },
-            { label: "Exceptional verified mobilisation", amount: 1.25 },
-        ],
-    },
-    {
-        key: "partners",
-        name: "Exceptional partnership building",
-        max: 1.25,
-        tiers: [
-            { label: "None", amount: 0 },
-            { label: "Activates one useful stakeholder", amount: 0.25 },
-            { label: "One genuine participating partner", amount: 0.5 },
-            { label: "Partner meaningfully contributes", amount: 0.75 },
-            { label: "Co-delivery / sustained collaboration", amount: 1 },
-            { label: "Continuation / multi-stakeholder coordination", amount: 1.25 },
-        ],
-    },
-    {
-        key: "outcome",
-        name: "Exceptional outcome contribution",
-        max: 1.25,
-        tiers: [
-            { label: "None", amount: 0 },
-            { label: "Clearly above-normal verified result", amount: 0.25 },
-            { label: "Meaningful measurable improvement", amount: 0.5 },
-            { label: "Strong verified beneficiary change", amount: 0.75 },
-            { label: "Unusually strong verified impact", amount: 1 },
-            { label: "Exceptional evidence-backed outcome", amount: 1.25 },
-        ],
-    },
-];
-
-export function sectionById(id: number): CiiV2Section | undefined {
-    return CII_V2_SECTIONS.find((s) => s.id === id);
-}
-
-export function criterionLabel(sectionId: number, key: string): string {
-    return sectionById(sectionId)?.criteria.find((c) => c.key === key)?.label || key;
-}
-
-export function levelByNumber(level: number): CiiV2Level {
-    return CII_V2_LEVELS.find((l) => l.level === level) || CII_V2_LEVELS[CII_V2_LEVELS.length - 1];
-}
-
-// --- Server-delivered score shape (mirrors ciel_backend CiiV2Result) ---
-
-export interface CiiV2CriterionResult {
-    key: string;
-    label: string;
-    weight: number;
-    anchor: number;
-    points: number;
-    note?: string;
-}
-
-export interface CiiV2SectionResult {
-    id: number;
-    key: string;
-    title: string;
-    weight: number;
-    score: number;
-    good?: string;
-    limit?: string;
-    criteria: CiiV2CriterionResult[];
-}
-
-export interface CiiV2EvidenceRow {
-    id: string;
-    file: string;
-    claim: string;
-    type: string;
-    match: number;
-    verdict: "MATCH" | "PARTIAL" | "MISMATCH";
-    why: string;
-}
-
-export interface CiiV2Result {
-    sections: CiiV2SectionResult[];
-    individualCore: number;
-    projectQuality: number;
-    base: number;
-    bonus: { effort: number; resources: number; partners: number; outcome?: number; total: number };
-    integrityPenalty: number;
-    final: number;
+export interface CiiV45Badge extends CiiV45Band {
+    code: string;
     numericLevel: number;
-    level: CiiV2Level;
-    gateCap: number;
-    gateExplanation: string;
-    evidence: CiiV2EvidenceRow[];
-    evidenceAverage: number;
-    bonusWhy?: { effort?: string; resources?: string; partners?: string; outcome?: string };
-    integrityWhy?: string;
-    redFlags?: string[];
-    integrityChecks?: Array<{ level: "hold" | "review"; title: string; detail: string; source?: string }>;
-    incomplete?: boolean;
-    studentFeedback?: string;
-    frameworkVersion?: string;
-    computedAt?: string;
+    gateCapped: boolean;
 }
 
-export interface CiiV2Lock {
+export interface CiiV45CriterionResult extends CiiV45CriterionScore {
+    maximumPoints: number;
+    score: number | null;
+}
+
+export interface CiiV45SectionResult {
+    dimension: CiiV45Dimension;
+    name: string;
+    maximumPoints: number;
+    criterionScores: CiiV45CriterionResult[];
+    /** null if any criterion in this dimension is pending ('P'). */
+    score: number | null;
+    /** Sum of known (non-pending) criteria, even when `score` is null. */
+    knownPoints: number;
+}
+
+export interface CiiV45Result extends Omit<CiiV45EvaluatorPayload, "sectionScores" | "extraMileUplift"> {
+    sectionScores: CiiV45SectionResult[];
+    knownBasePoints: number;
+    baseCII: number | null;
+    extraMileUplift: CiiV45ExtraMileUplift;
+    diagnosticCII: number | null;
+    scoreStatus: CiiV45ScoreStatus;
+    needsAdminReview: boolean;
+    finalCII: number | null;
+    recommendedBadge: CiiV45Badge | null;
+    diagnosticBadge: CiiV45Badge | null;
+    finalBadge: CiiV45Badge | null;
+    qualityGates: { L4: boolean; L5: boolean; L6: boolean };
+    publicationEligible: boolean;
+    rounding: string;
+    evidenceInspection?: { inspected: unknown[]; notInspected: unknown[] } | null;
+    computedAt?: string;
+    runHistory?: Array<{
+        score: number | null;
+        status: CiiV45ScoreStatus;
+        at: string;
+        model?: string | null;
+        inspectedImages?: number;
+        notInspectedFiles?: number;
+    }>;
+}
+
+/** Admin Accept & Publish decision for the CII v4.5 score — immutable once locked. */
+export interface CiiV45Lock {
     locked: boolean;
     hash: string;
     lockedAt: string;
-    lockedByFacultyId: string;
-    facultyNote?: string;
+    lockedByAdminId: string;
+    adminNote?: string;
+    inputFingerprint: string;
+    scoreStatusAtLock: "FINAL";
+    aiRecommendedScore?: number;
+    adminApprovedScore?: number;
+    scoreWasModerated?: boolean;
+    scoreModerationReason?: string;
+    finalBadge?: CiiV45Badge | null;
 }
 
-export function verdictTone(verdict: CiiV2EvidenceRow["verdict"]): { bg: string; fg: string } {
-    if (verdict === "MATCH") return { bg: "#e7f7ef", fg: "#176b5e" };
-    if (verdict === "PARTIAL") return { bg: "#fff3dc", fg: "#886210" };
-    return { bg: "#fff0f2", fg: "#a34758" };
+// --- Fixed dimensions / criteria / weights (base 100) ---
+
+export interface CiiV45CriterionDef {
+    key: string;
+    weight: number;
+    /** Short, plain-English display label — not the full rubric prose. */
+    label: string;
 }
 
-export function anchorTone(anchor: number): { bg: string; fg: string } {
-    const tones = [
-        { bg: "#fff0f2", fg: "#a44b59" },
-        { bg: "#fff6e9", fg: "#936719" },
-        { bg: "#eef5f7", fg: "#496b75" },
-        { bg: "#edf5ff", fg: "#31658e" },
-        { bg: "#e8f7ef", fg: "#176b61" },
-    ];
-    return tones[Math.min(4, Math.max(0, Math.round(anchor)))];
+export interface CiiV45DimensionDef {
+    id: CiiV45Dimension;
+    name: string;
+    maxPoints: number;
+    criteria: CiiV45CriterionDef[];
+}
+
+/** Fixed dimensions/criteria/weights — base 100. Criterion IDs are exact and immutable. */
+export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
+    {
+        id: "1",
+        name: "Participation & Verified Effort",
+        maxPoints: 10,
+        criteria: [
+            { key: "role", weight: 2.5, label: "Individual responsibility" },
+            { key: "quality", weight: 2.5, label: "Meaningful involvement" },
+            { key: "hoursConsistency", weight: 2.5, label: "Hours log reliability" },
+            { key: "continuity", weight: 2.5, label: "Regularity & follow-through" },
+        ],
+    },
+    {
+        id: "2",
+        name: "Community Need & Starting Point",
+        maxPoints: 10,
+        criteria: [
+            { key: "specificity", weight: 2, label: "Problem specificity" },
+            { key: "communityGrounding", weight: 2, label: "Beneficiary identification" },
+            { key: "baseline", weight: 2, label: "Starting condition / baseline" },
+            { key: "context", weight: 2, label: "Contextual understanding" },
+            { key: "discipline", weight: 2, label: "Academic / disciplinary link" },
+        ],
+    },
+    {
+        id: "3",
+        name: "SDG Contribution",
+        maxPoints: 5,
+        criteria: [
+            { key: "alignment", weight: 1.5, label: "SDG goal/target fit" },
+            { key: "logic", weight: 1.5, label: "Need-to-SDG logic chain" },
+            { key: "coherence", weight: 1.5, label: "Consistency with report" },
+            { key: "focus", weight: 0.5, label: "SDG selectivity" },
+        ],
+    },
+    {
+        id: "4A",
+        name: "Activities & Outputs",
+        maxPoints: 15,
+        criteria: [
+            { key: "delivery", weight: 3, label: "Planned vs actual delivery" },
+            { key: "rigor", weight: 3, label: "Method and care" },
+            { key: "ownership", weight: 3, label: "Individual contribution" },
+            { key: "outputQuality", weight: 3, label: "Output quality" },
+            { key: "appropriateScale", weight: 3, label: "Scale and depth" },
+        ],
+    },
+    {
+        id: "4B",
+        name: "Outcomes & Measured Change",
+        maxPoints: 15,
+        criteria: [
+            { key: "clarity", weight: 3, label: "Outcome vs output clarity" },
+            { key: "change", weight: 4, label: "Credible change" },
+            { key: "measurement", weight: 3, label: "Measurement source/method" },
+            { key: "communityValue", weight: 3, label: "Value to beneficiaries" },
+            { key: "attribution", weight: 2, label: "Attribution honesty" },
+        ],
+    },
+    {
+        id: "5",
+        name: "Resources & Stewardship",
+        maxPoints: 10,
+        criteria: [
+            { key: "stewardship", weight: 2.5, label: "Resource mobilisation & use" },
+            { key: "traceability", weight: 2.5, label: "Resource traceability" },
+            { key: "appropriateness", weight: 2.5, label: "Fit to need" },
+            { key: "deliveryContribution", weight: 2.5, label: "What resources enabled" },
+        ],
+    },
+    {
+        id: "6",
+        name: "Partnership & Collaboration",
+        maxPoints: 10,
+        criteria: [
+            { key: "relevance", weight: 2.5, label: "Right stakeholders" },
+            { key: "roleClarity", weight: 2.5, label: "Partner's actual contribution" },
+            { key: "collaboration", weight: 2.5, label: "Co-design / co-delivery" },
+            { key: "ownership", weight: 2.5, label: "Community ownership" },
+        ],
+    },
+    {
+        id: "7",
+        name: "Evidence, Ethics & Verification",
+        maxPoints: 15,
+        criteria: [
+            { key: "participation", weight: 2, label: "Attendance proof" },
+            { key: "activities", weight: 3, label: "Delivery proof" },
+            { key: "reach", weight: 2, label: "Beneficiary count proof" },
+            { key: "outcomes", weight: 3, label: "Change proof" },
+            { key: "resourcesPartners", weight: 2, label: "Resources & partner proof" },
+            { key: "ethics", weight: 2, label: "Consent, dignity, privacy" },
+            { key: "coverage", weight: 1, label: "Evidence traceability" },
+        ],
+    },
+    {
+        id: "8",
+        name: "Reflection & Academic Growth",
+        maxPoints: 5,
+        criteria: [
+            { key: "learning", weight: 1.5, label: "Personal learning" },
+            { key: "academicApplication", weight: 1, label: "Discipline applied" },
+            { key: "ethicalUnderstanding", weight: 1, label: "Ethics & community awareness" },
+            { key: "improvement", weight: 1.5, label: "Concrete next steps" },
+        ],
+    },
+    {
+        id: "9",
+        name: "Sustainability & Handover",
+        maxPoints: 5,
+        criteria: [
+            { key: "continuation", weight: 1.5, label: "Continuation plan" },
+            { key: "owner", weight: 1.5, label: "Named responsibility" },
+            { key: "handover", weight: 1.5, label: "Handover / closure" },
+            { key: "realism", weight: 0.5, label: "Scaling realism" },
+        ],
+    },
+];
+
+export const CII_V45_BASE_MAX = CII_V45_DIMENSIONS.reduce((sum, d) => sum + d.maxPoints, 0); // 100
+export const CII_V45_BONUS_MAX = 5;
+export const CII_V45_MAX = 100;
+
+/** 0=Missing, 1=Basic, 2=Sound, 3=Strong, 4=Exceptional. */
+export const CII_V45_ANCHOR_FACTORS = [0, 0.5, 0.7, 0.85, 1] as const;
+
+export const CII_V45_ANCHOR_NAMES = ["Missing", "Basic", "Sound", "Strong", "Exceptional"] as const;
+
+/** Six contiguous locked bands (CIEL PK CII v4.5 badge manifest). */
+export const CII_V45_BANDS: CiiV45Band[] = [
+    { level: 1, min: 0, max: 49, name: "Participation Acknowledgement", assetKey: "L1" },
+    { level: 2, min: 50, max: 59, name: "Foundation Stage Contributor", assetKey: "L2" },
+    { level: 3, min: 60, max: 69, name: "Emerging Community Contributor", assetKey: "L3" },
+    { level: 4, min: 70, max: 79, name: "Developing Impact Contributor", assetKey: "L4" },
+    { level: 5, min: 80, max: 89, name: "Distinguished Impact Contributor", assetKey: "L5" },
+    { level: 6, min: 90, max: 100, name: "Transformative Impact Contributor", assetKey: "L6" },
+];
+
+export function dimensionById(id: CiiV45Dimension): CiiV45DimensionDef | undefined {
+    return CII_V45_DIMENSIONS.find((d) => d.id === id);
+}
+
+export function criterionLabel(dimensionId: CiiV45Dimension, key: string): string {
+    return dimensionById(dimensionId)?.criteria.find((c) => c.key === key)?.label || key;
+}
+
+/**
+ * Maps a (possibly null) score onto the six locked bands and walks the badge down to the
+ * highest level whose cumulative quality gate actually passes — mirrors the backend's
+ * `resolveBadgeForScore` in `cii-v4-5.constants.ts` so this UI's own badge chip (and any
+ * client-side preview of a moderated score) never disagrees with the server's gate-capping.
+ */
+export function resolveBadgeForScore(
+    score: number | null,
+    qualityGates: { L4: boolean; L5: boolean; L6: boolean } | undefined,
+): CiiV45Badge | null {
+    const numeric = score === null ? null : [...CII_V45_BANDS].reverse().find((b) => score >= b.min) || null;
+    let badge: CiiV45Band | null = numeric;
+    const gates = qualityGates ?? { L4: false, L5: false, L6: false };
+    while (badge && badge.level >= 4 && !gates[`L${badge.level}` as "L4" | "L5" | "L6"]) {
+        badge = CII_V45_BANDS.find((b) => b.level === badge!.level - 1) || null;
+    }
+    return badge
+        ? {
+              ...badge,
+              code: `L${badge.level}`,
+              numericLevel: numeric!.level,
+              gateCapped: badge.level !== numeric!.level,
+          }
+        : null;
+}
+
+/** Lightweight badge lookup by score alone (no quality-gate walk) — for display contexts where
+ * only the raw band name/level is needed (e.g. a "this score would land in L4" hint) and the
+ * gate-aware badge object from the server/`resolveBadgeForScore` isn't available yet. */
+export function badgeForScore(score: number | null): CiiV45Band | null {
+    if (score === null) return null;
+    return [...CII_V45_BANDS].reverse().find((b) => score >= b.min) || null;
 }

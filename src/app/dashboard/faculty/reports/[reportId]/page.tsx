@@ -1,38 +1,35 @@
 "use client";
 
 import { Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import {
-    ExecutiveReportDossierPage,
-    type ExecutiveReportDossierConfig,
-} from "@/components/verify/ExecutiveReportDossierPage";
 import FacultyAiEvaluationConsole from "./FacultyAiEvaluationConsole";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
+import FacultyLockedV17Modal, { facultyLockedPackageTabFromQuery } from "./FacultyLockedV17Modal";
 
 function FacultyReportView() {
     const params = useParams();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const reportId = String(params.reportId ?? "");
     const view = (searchParams.get("view") || "").trim().toLowerCase();
 
-    if (view === "dossier") {
-        const facultyDossierConfig: ExecutiveReportDossierConfig = {
-            reportApiPath: (id) => `/api/v1/faculty/reports/${id}`,
-            backHref: `/dashboard/faculty/reports/${reportId}`,
-            backLabel: "Back to AI evaluation",
-            badges: ["Single-Page Dossier Mode", "Faculty · Full dossier"],
-            readOnlyAudience: "faculty",
-            notFoundMessage: "Executive dossier unavailable",
-        };
-        return <ExecutiveReportDossierPage config={facultyDossierConfig} />;
-    }
-
-    if (view === "cii-v2") {
+    if (view === "cii-v4-5") {
         return <CommunityCiiAnalyser readOnly />;
     }
 
-    return <FacultyAiEvaluationConsole />;
+    if (view === "console") {
+        return <FacultyAiEvaluationConsole />;
+    }
+
+    return (
+        <FacultyLockedV17Modal
+            reportId={reportId}
+            variant="page"
+            initialTab={facultyLockedPackageTabFromQuery(searchParams.get("doc"))}
+            onClose={() => router.back()}
+        />
+    );
 }
 
 export default function FacultyReportDossierPage() {

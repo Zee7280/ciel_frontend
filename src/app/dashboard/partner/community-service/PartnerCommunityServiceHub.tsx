@@ -184,7 +184,7 @@ function mineBucket(row: OppRow): "drafts" | "review" | "action" | "published" |
 }
 
 function reportHref(id: string) {
-    return `/dashboard/partner/verify/${encodeURIComponent(id)}`;
+    return `/dashboard/partner/verify/${encodeURIComponent(id)}?package=1`;
 }
 
 const TONE_CLASS = {

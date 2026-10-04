@@ -660,7 +660,7 @@ export function impactPackageLockLine(adminApproved: boolean): string {
 
 
 function ciiHasFinal(data: ReportData): boolean {
-    const final = (data.ciiV2 as { final?: unknown } | null | undefined)?.final;
+    const final = (data.ciiV45 as { finalCII?: unknown } | null | undefined)?.finalCII;
     return typeof final === "number"
         ? Number.isFinite(final)
         : typeof final === "string" && final.trim() !== "" && Number.isFinite(Number(final));
@@ -668,7 +668,7 @@ function ciiHasFinal(data: ReportData): boolean {
 
 /** Analysis exists and CIEL PK Admin has locked it. */
 export function hasImpactPackageAnalysis(data: ReportData): boolean {
-    const lock = data.ciiV2Lock as { locked?: unknown } | null | undefined;
+    const lock = data.ciiV45Lock as { locked?: unknown } | null | undefined;
     const locked = lock?.locked === true || lock?.locked === "true";
     return Boolean(locked && ciiHasFinal(data));
 }

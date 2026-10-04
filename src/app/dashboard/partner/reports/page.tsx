@@ -361,9 +361,9 @@ export default function PartnerReportsPage() {
                                 <div className="flex gap-2 shrink-0">
                                     {isStudentImpactReportRow(report) ? (
                                         <Link
-                                            href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}`}
+                                            href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            title="Open report dossier (review / verify)"
+                                            title="Open Impact Package (review / verify)"
                                         >
                                             <Eye className="w-4 h-4" />
                                         </Link>
@@ -420,10 +420,10 @@ export default function PartnerReportsPage() {
                             </p>
                             {isStudentImpactReportRow(report) && (
                                 <Link
-                                    href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}`}
+                                    href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
                                     className="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700 mb-3"
                                 >
-                                    Review & verify (dossier)
+                                    Review & verify (Impact Package)
                                 </Link>
                             )}
 

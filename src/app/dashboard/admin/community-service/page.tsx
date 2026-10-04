@@ -52,7 +52,7 @@ import {
     type FacultyCsReportRow,
 } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { csvCell, escapeHtml } from "@/app/dashboard/admin/_shared/csv";
-import { CII_V2_LEVELS } from "@/utils/communityCiiAnalyser";
+import { CII_V45_LEVEL_BANDS } from "@/utils/ciiLevelBadge";
 
 const CS_BASE = "/dashboard/admin/community-service";
 const CS_VIEWS = [
@@ -223,10 +223,10 @@ function mapAdminCsReportRow(
         item.cii_score ??
         item.ciiScore ??
         item.cii ??
-        (item.ciiV2 && typeof item.ciiV2 === "object"
-            ? (item.ciiV2 as Record<string, unknown>).final ??
-              (item.ciiV2 as Record<string, unknown>).score ??
-              (item.ciiV2 as Record<string, unknown>).final_score
+        (item.ciiV45 && typeof item.ciiV45 === "object"
+            ? (item.ciiV45 as Record<string, unknown>).diagnosticCII ??
+              (item.ciiV45 as Record<string, unknown>).finalCII ??
+              (item.ciiV45 as Record<string, unknown>).baseCII
             : null);
     const ciiProvisional =
         typeof ciiRaw === "number" && Number.isFinite(ciiRaw)
@@ -235,7 +235,7 @@ function mapAdminCsReportRow(
               ? Number(ciiRaw)
               : null;
     const levelRaw = item.cii_numeric_level ?? item.ciiNumericLevel;
-    const lock = item.ciiV2Lock ?? item.cii_v2_lock;
+    const lock = item.ciiV45Lock ?? item.cii_v45_lock;
     const lockObj = lock && typeof lock === "object" ? (lock as Record<string, unknown>) : null;
     const lockedFromPayload =
         item.cii_locked === true ||
@@ -269,7 +269,7 @@ function mapAdminCsReportRow(
             item.cii_analyser_run === true ||
             item.ciiAnalyserRun === true ||
             ciiProvisional != null ||
-            Boolean(item.ciiV2),
+            Boolean(item.ciiV45),
         cii_provisional: ciiProvisional,
         cii_locked: lockedFromPayload,
         cii_level_name:
@@ -997,7 +997,7 @@ export function AdminCommunityServiceHub() {
                     </div>
                     <div className="mb-3 rounded-[14px] border border-[#cfe6ef] bg-[#f3f9fb] px-3.5 py-3 text-[12px] leading-relaxed text-[#3e515b]">
                         <b>CII recognition scale — locked to the live analyser:</b>{" "}
-                        {CII_V2_LEVELS.map((lvl, i) => (
+                        {CII_V45_LEVEL_BANDS.map((lvl, i) => (
                             <span key={lvl.level}>
                                 {i > 0 ? " · " : null}
                                 <b>
@@ -1259,7 +1259,7 @@ export function AdminCommunityServiceHub() {
 
             {breakdownFor && (
                 <CommunityCiiBreakdownModal
-                    fetchUrl={`/api/v1/admin/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v2`}
+                    fetchUrl={`/api/v1/admin/community-service/reports/${encodeURIComponent(breakdownFor.id)}/cii-v4-5`}
                     title={breakdownFor.title}
                     onClose={() => setBreakdownFor(null)}
                 />

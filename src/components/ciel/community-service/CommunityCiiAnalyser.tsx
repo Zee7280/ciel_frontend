@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import {
-    CII_V2_ANCHORS,
-    CII_V2_LEVELS,
-    CII_V2_SECTIONS,
-    levelByNumber,
-    type CiiV2Lock,
-    type CiiV2Result,
+    CII_V45_ANCHOR_NAMES,
+    CII_V45_DIMENSIONS,
+    criterionLabel,
+    type CiiV45Badge,
+    type CiiV45Lock,
+    type CiiV45Result,
 } from "@/utils/communityCiiAnalyser";
 import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import "./community-cii-analyser.css";
@@ -106,17 +106,25 @@ function partnerCount(report: Record<string, unknown>): number {
     return Array.isArray(partners) ? partners.length : 0;
 }
 
-function clampScore(n: number): number {
-    return Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+/** Mirrors the exact 400 messages `persistCiiV45Approval` throws (faculty-reports.service.ts),
+ * surfaced up-front in the UI instead of only after a failed POST. */
+function approveBlockMessage(stored: CiiV45Result | null, locked: boolean): string | null {
+    if (locked) return "This report's CII v4.5 score is already locked.";
+    if (!stored) return "Run the CII v4.5 analysis before approving.";
+    if (stored.scoreStatus === "RESUBMISSION_REQUIRED") {
+        return "This report cannot be published yet — mandatory hours or student material are incomplete. The student must resubmit.";
+    }
+    if (stored.scoreStatus === "ADMIN_REVIEW_REQUIRED") {
+        const reasons = Array.isArray(stored.adminReviewReasons) ? stored.adminReviewReasons : [];
+        return `This report cannot be published yet: ${reasons.join("; ") || "the evaluation is still ADMIN_REVIEW_REQUIRED"}. Resolve the blockers, then re-run the analysis.`;
+    }
+    return null;
 }
 
-function splitLines(text: string | undefined): string[] {
-    if (!text?.trim()) return [];
-    return text
-        .split(/[.;]\s+/)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .slice(0, 4);
+function badgeLabel(badge: CiiV45Badge | null): string {
+    if (!badge) return "Pending";
+    const base = `${badge.code} · ${badge.name}`;
+    return badge.gateCapped ? `${base} (capped from L${badge.numericLevel} — quality gate not met)` : base;
 }
 
 export default function CommunityCiiAnalyser({
@@ -134,11 +142,11 @@ export default function CommunityCiiAnalyser({
         ? `/api/v1/admin/reports/${reportId}`
         : `/api/v1/faculty/reports/${reportId}`;
     const analysePath = isCielPk
-        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v2/analyse`
-        : `/api/v1/faculty/reports/${reportId}/cii-v2/analyse`;
+        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v4-5/analyse`
+        : `/api/v1/faculty/reports/${reportId}/cii-v4-5/analyse`;
     const approvePath = isCielPk
-        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v2/approve`
-        : `/api/v1/faculty/reports/${reportId}/cii-v2/approve`;
+        ? `/api/v1/admin/community-service/reports/${reportId}/cii-v4-5/approve`
+        : `/api/v1/faculty/reports/${reportId}/cii-v4-5/approve`;
     const inboxHref = isCielPk
         ? "/dashboard/admin/reports/verify"
         : "/dashboard/faculty/community-service";
@@ -149,14 +157,13 @@ export default function CommunityCiiAnalyser({
     const [analysing, setAnalysing] = useState(false);
     const [approving, setApproving] = useState(false);
     const [deciding, setDeciding] = useState(false);
-    const [facultyNote, setFacultyNote] = useState("");
-    const [revisionSection, setRevisionSection] = useState("");
-    const [requiredCorrection, setRequiredCorrection] = useState("");
-    const [facultySectionScores, setFacultySectionScores] = useState<Record<number, number>>({});
+    const [note, setNote] = useState("");
+    const [adjustedScoreInput, setAdjustedScoreInput] = useState("");
+    const [moderationReason, setModerationReason] = useState("");
 
-    const ciiV2 = (report?.ciiV2 as CiiV2Result | undefined) || null;
-    const ciiV2Lock = (report?.ciiV2Lock as CiiV2Lock | undefined) || null;
-    const locked = Boolean(ciiV2Lock?.locked);
+    const ciiV45 = (report?.ciiV45 as unknown as CiiV45Result | undefined) || null;
+    const ciiV45Lock = (report?.ciiV45Lock as unknown as CiiV45Lock | undefined) || null;
+    const locked = Boolean(ciiV45Lock?.locked);
 
     const loadReport = async () => {
         if (!reportId) return;
@@ -171,11 +178,9 @@ export default function CommunityCiiAnalyser({
             const data = await res.json();
             const next = (data.data || data) as Record<string, unknown>;
             setReport(next);
-            const nextCii = next.ciiV2 as CiiV2Result | undefined;
-            if (nextCii?.sections?.length) {
-                const scores: Record<number, number> = {};
-                for (const section of nextCii.sections) scores[section.id] = section.score;
-                setFacultySectionScores(scores);
+            const nextCii = next.ciiV45 as unknown as CiiV45Result | undefined;
+            if (nextCii?.diagnosticCII != null) {
+                setAdjustedScoreInput(String(nextCii.diagnosticCII));
             }
         } catch {
             toast.error("Failed to load report");
@@ -195,11 +200,11 @@ export default function CommunityCiiAnalyser({
         if (locked && !isCielPk) return;
         if (locked && isCielPk) {
             const ok = window.confirm(
-                "This CII is locked. Re-run with Balanced CII v3.1? The lock will clear until you approve the new score.",
+                "This CII is locked. Re-run the CII v4.5 Analyzer? The lock will clear until you approve the new score.",
             );
             if (!ok) return;
         }
-        const previousAt = String(ciiV2?.computedAt || "");
+        const previousAt = String(ciiV45?.computedAt || "");
         const pollForFreshCii = async (): Promise<boolean> => {
             for (let i = 0; i < 12; i++) {
                 await new Promise((r) => setTimeout(r, 4000));
@@ -207,14 +212,10 @@ export default function CommunityCiiAnalyser({
                 if (!check?.ok) continue;
                 const data = await check.json().catch(() => null);
                 const next = ((data as { data?: Record<string, unknown> } | null)?.data || data) as Record<string, unknown> | null;
-                const nextCii = next?.ciiV2 as CiiV2Result | undefined;
+                const nextCii = next?.ciiV45 as unknown as CiiV45Result | undefined;
                 if (nextCii?.computedAt && String(nextCii.computedAt) !== previousAt) {
                     setReport(next);
-                    if (nextCii.sections?.length) {
-                        const scores: Record<number, number> = {};
-                        for (const section of nextCii.sections) scores[section.id] = section.score;
-                        setFacultySectionScores(scores);
-                    }
+                    if (nextCii.diagnosticCII != null) setAdjustedScoreInput(String(nextCii.diagnosticCII));
                     return true;
                 }
             }
@@ -242,10 +243,10 @@ export default function CommunityCiiAnalyser({
                     toast.error("Analyzer is still running. Refresh this page in a minute.");
                     return;
                 }
-                toast.success("CII analysis complete");
+                toast.success("CII v4.5 analysis complete");
                 return;
             }
-            toast.success("CII analysis complete");
+            toast.success("CII v4.5 analysis complete");
             await loadReport();
         } catch {
             toast.error("CII analysis failed");
@@ -254,28 +255,31 @@ export default function CommunityCiiAnalyser({
         }
     };
 
-    const facultyFinal = useMemo(() => {
-        if (!ciiV2) return null;
-        const base = ciiV2.sections.reduce((sum, section) => {
-            const value = facultySectionScores[section.id];
-            return sum + (typeof value === "number" && Number.isFinite(value) ? value : section.score);
-        }, 0);
-        return clampScore(base + (ciiV2.bonus?.total || 0) - (ciiV2.integrityPenalty || 0));
-    }, [ciiV2, facultySectionScores]);
+    const blockMessage = approveBlockMessage(ciiV45, locked);
 
     const approveAndLock = async () => {
-        if (readOnly || !reportId || approving || locked || !ciiV2 || facultyFinal == null) return;
-        const adjusted = Math.round(facultyFinal) !== Math.round(ciiV2.final);
-        if (adjusted && !facultyNote.trim()) {
-            toast.error("A moderation reason is required when the Faculty-Verified CII differs from the system score.");
+        if (readOnly || !reportId || approving || locked || !ciiV45) return;
+        if (blockMessage) {
+            toast.error(blockMessage);
+            return;
+        }
+        const aiScore = ciiV45.diagnosticCII ?? 0;
+        const parsedAdjusted = adjustedScoreInput.trim() === "" ? null : Number(adjustedScoreInput);
+        const hasModeration =
+            parsedAdjusted != null &&
+            Number.isFinite(parsedAdjusted) &&
+            Math.round(parsedAdjusted * 10) / 10 !== Math.round(aiScore * 10) / 10;
+        if (hasModeration && !moderationReason.trim()) {
+            toast.error("A reason is required when moderating the AI-recommended score.");
             return;
         }
         try {
             setApproving(true);
-            const body: Record<string, unknown> = { note: facultyNote };
-            if (adjusted) {
-                body.facultyAdjustedScore = facultyFinal;
-                body.scoreAdjustmentReason = facultyNote.trim();
+            const body: Record<string, unknown> = {};
+            if (note.trim()) body.note = note.trim();
+            if (hasModeration) {
+                body.adminAdjustedScore = parsedAdjusted;
+                body.scoreModerationReason = moderationReason.trim();
             }
             const res = await authenticatedFetch(approvePath, {
                 method: "POST",
@@ -287,7 +291,7 @@ export default function CommunityCiiAnalyser({
                 toast.error((payload as { message?: string }).message || "Could not approve CII");
                 return;
             }
-            toast.success("CII approved and locked — badge issued");
+            toast.success("CII v4.5 approved and locked — badge issued");
             await loadReport();
         } catch {
             toast.error("Could not approve CII");
@@ -299,7 +303,7 @@ export default function CommunityCiiAnalyser({
     const returnForRevision = async () => {
         if (readOnly) return;
         if (!reportId || deciding || locked) return;
-        if (!facultyNote.trim()) {
+        if (!note.trim()) {
             toast.error("State exactly what needs clarification or review.");
             return;
         }
@@ -315,8 +319,8 @@ export default function CommunityCiiAnalyser({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "unlock",
-                    feedback: facultyNote.trim(),
-                    reason: facultyNote.trim(),
+                    feedback: note.trim(),
+                    reason: note.trim(),
                 }),
             });
             if (!res?.ok) {
@@ -336,7 +340,7 @@ export default function CommunityCiiAnalyser({
     const rejectReport = async () => {
         if (readOnly) return;
         if (!reportId || deciding || locked) return;
-        if (!facultyNote.trim()) {
+        if (!note.trim()) {
             toast.error("A reason is required when rejecting a report.");
             return;
         }
@@ -351,8 +355,8 @@ export default function CommunityCiiAnalyser({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "reject",
-                    feedback: facultyNote.trim(),
-                    reason: facultyNote.trim(),
+                    feedback: note.trim(),
+                    reason: note.trim(),
                 }),
             });
             if (!res?.ok) {
@@ -396,12 +400,13 @@ export default function CommunityCiiAnalyser({
     const outcomes = outcomeCount(report);
     const sessions = sessionCount(report);
     const partners = partnerCount(report);
-    const lvl = ciiV2 ? ciiV2.level || levelByNumber(ciiV2.numericLevel) : null;
-    const facultyLvl =
-        facultyFinal != null
-            ? CII_V2_LEVELS.find((level) => facultyFinal >= level.min && facultyFinal <= level.max) ||
-              levelByNumber(ciiV2?.numericLevel ?? 1)
-            : null;
+
+    const scoreStatus = ciiV45?.scoreStatus ?? null;
+    const currentScore = locked ? ciiV45?.finalCII ?? null : ciiV45?.diagnosticCII ?? null;
+    const currentBadge = locked
+        ? ciiV45?.finalBadge ?? null
+        : ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null;
+    const diagnosticBadge = ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null;
 
     const flags: Array<{ label: string; value: string; note: string; warn?: boolean }> = [
         { label: "HOURS", value: hours > 0 ? `${hours}h` : "Not recorded", note: "Logged service time", warn: hours <= 0 },
@@ -411,9 +416,13 @@ export default function CommunityCiiAnalyser({
         { label: "PARTNERS", value: String(partners), note: "Named collaborators" },
         {
             label: "INTEGRITY",
-            value: ciiV2 ? (ciiV2.redFlags?.length ? `${ciiV2.redFlags.length} flag${ciiV2.redFlags.length === 1 ? "" : "s"}` : "Clear") : "Pending run",
-            note: "Contradictions / gaming",
-            warn: Boolean(ciiV2?.redFlags?.length),
+            value: ciiV45
+                ? ciiV45.integrityPenalty?.issues?.length
+                    ? `${ciiV45.integrityPenalty.issues.length} issue${ciiV45.integrityPenalty.issues.length === 1 ? "" : "s"}`
+                    : "Clear"
+                : "Pending run",
+            note: "Confirmed student-origin issues",
+            warn: Boolean(ciiV45?.integrityPenalty?.issues?.length),
         },
     ];
 
@@ -421,7 +430,7 @@ export default function CommunityCiiAnalyser({
         <div className="fx23-analyzer">
             <div className="fx23-workhead">
                 <div>
-                    <span>{isCielPk ? "CIEL PK Super Admin review · A Analyzer" : "Faculty review workspace · A Analyzer"}</span>
+                    <span>{isCielPk ? "CIEL PK Super Admin review · CII v4.5 Analyzer" : "Faculty review workspace · CII v4.5 Analyzer"}</span>
                     <h2>{projectTitle}</h2>
                     <p>
                         {studentName} · submitted Flashcard + Detailed Report stay locked. The Analyzer runs only when you choose to run it.
@@ -429,55 +438,70 @@ export default function CommunityCiiAnalyser({
                 </div>
                 <div>
                     <Link href={inboxHref}>{inboxLabel}</Link>
-                    {!isCielPk ? <Link href={`/dashboard/faculty/reports/${reportId}`}>Standard console</Link> : <Link href={`/dashboard/admin/reports/verify/${reportId}`}>Review dossier</Link>}
+                    {!isCielPk ? <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>Impact Package</Link> : <Link href={`/dashboard/admin/reports/verify/${reportId}?package=1`}>Review package</Link>}
                 </div>
             </div>
 
             {locked ? (
                 <div className="fx23-lock">
                     {isCielPk
-                        ? "CII is locked. Super Admin can re-run the Analyzer if this score was computed on the previous 9-section rubric."
-                        : "CII + badge are locked. The Faculty-Verified score cannot be silently rewritten. Any later correction should create a new version."}
+                        ? "CII v4.5 is locked. Super Admin can re-run the Analyzer if this score needs to be recomputed."
+                        : "CII + badge are locked. The approved score cannot be silently rewritten. Any later correction should create a new version."}
                 </div>
             ) : readOnly ? (
                 <div className="fx23-lock">
-                    Faculty access is read-only. You can view the locked package and any System / Verified CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
+                    Faculty access is read-only. You can view the locked package and any diagnostic CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
                 </div>
             ) : (
                 <div className="fx23-lock">
-                    Locked flow: review the submitted record first. Running the Analyzer generates a provisional System CII. Student-source text is not rewritten.
+                    Locked flow: review the submitted record first. Running the Analyzer generates a provisional diagnostic CII. Student-source text is not rewritten.
                 </div>
             )}
 
-            {ciiV2?.incomplete ? (
+            {!locked && ciiV45 && scoreStatus === "RESUBMISSION_REQUIRED" ? (
                 <div className="fx23-lock">
-                    This run skipped part of the v3.1 rubric and scored those criteria as 0, which collapses the CII. Super Admin can re-run the Analyzer to rescore it properly.
+                    <b>Resubmission required</b> — mandatory hours or student material are incomplete. The student must resubmit before this can be scored.
+                </div>
+            ) : null}
+            {!locked && ciiV45 && scoreStatus === "ADMIN_REVIEW_REQUIRED" ? (
+                <div className="fx23-lock">
+                    <b>Admin review required</b> — the evaluation is pending resolution:
+                    <ul style={{ margin: "4px 0 0 14px" }}>
+                        {(ciiV45.adminReviewReasons?.length ? ciiV45.adminReviewReasons : ["Material input is still pending processing."]).map((r, i) => (
+                            <li key={i}>{r}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+            {!locked && ciiV45 && scoreStatus === "FINAL" ? (
+                <div className="fx23-lock" style={{ background: "#e8f7ef", borderColor: "#bfe3cf", color: "#176b47" }}>
+                    <b>Ready to approve</b> — the evaluation is complete and eligible for publication.
                 </div>
             ) : null}
 
             <div className="fx23-aintro">
                 <div>
-                    <small>SYSTEM ASSESSMENT · gpt-5.6-sol · HIGH REASONING</small>
+                    <small>SYSTEM ASSESSMENT · CII v4.5 · HIGH REASONING</small>
                     <h2>CIEL PK CII Analyzer</h2>
                     <p>
-                        Balanced CII v3.1 with structured JSON scoring and multimodal evidence ingestion. Faculty can view results; CIEL PK Admin moderates and decides.
+                        CII v4.5 with structured JSON scoring and multimodal evidence ingestion. The AI returns only anchors, claims, evidence audit and narrative — all arithmetic, bands and gates are computed server-side. Faculty can view results; CIEL PK Admin moderates and decides.
                     </p>
                 </div>
                 {readOnly ? (
                     <span className="fx23-run" style={{ opacity: 0.75, cursor: "default" }}>
-                        {locked ? "Locked · read only" : ciiV2 ? "System CII (view only)" : "Analyzer not run · read only"}
+                        {locked ? "Locked · read only" : ciiV45 ? "Diagnostic CII (view only)" : "Analyzer not run · read only"}
                     </span>
                 ) : (
                     <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || (locked && !isCielPk)}>
-                        {analysing ? "Analysing evidence & scoring…" : locked && !isCielPk ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
+                        {analysing ? "Analysing evidence & scoring…" : locked && !isCielPk ? "Locked" : ciiV45 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
                     </button>
                 )}
             </div>
 
             <div className="fx23-ready">
                 <div className="score">
-                    <b>{ciiV2 ? Math.round(ciiV2.final) : "—"}</b>
-                    <span>System CII / 100</span>
+                    <b>{currentScore != null ? Math.round(currentScore) : "—"}</b>
+                    <span>{locked ? "Final CII / 100" : "Diagnostic CII / 100"}</span>
                 </div>
                 <div className="grid">
                     {flags.map((flag) => (
@@ -490,241 +514,295 @@ export default function CommunityCiiAnalyser({
                 </div>
             </div>
 
-            {ciiV2?.integrityChecks?.length ? (
-                <div className="fx23-method" role="region" aria-label="Integrity checks">
-                    <p>
-                        <b>Integrity checks (admin only)</b>
-                    </p>
-                    <ul>
-                        {ciiV2.integrityChecks.map((check, i) => (
-                            <li key={`${check.title}-${i}`}>
-                                <b>{check.level === "hold" ? "HOLD" : "REVIEW"} · {check.title}</b> — {check.detail}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ) : null}
-
             <details className="fx23-method">
                 <summary>How the Analyzer scores this report</summary>
                 <p>
-                    gpt-5.6-sol reads the locked 10-section report and inspects attached evidence images (multimodal). Scoring returns structured JSON on Balanced CII v3.1: 100-point core, 0–4 analytic anchors ({CII_V2_ANCHORS.join(" · ")}), plus up to +5 verified Extra-Mile uplift and an integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak.
+                    The model reads the locked 10-section report and inspects attached evidence images (multimodal). Scoring returns structured JSON on CII v4.5: 100-point core across ten analytical dimensions, 0–4 anchors ({CII_V45_ANCHOR_NAMES.join(" · ")}) plus Pending, up to +5 verified Extra-Mile uplift, and an admin-adjudicated integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak. Levels 4–6 additionally require their cumulative quality gates to pass, independent of the numeric score.
                 </p>
                 <ul>
-                    {CII_V2_SECTIONS.map((section) => (
-                        <li key={section.id}>
-                            S{section.id} {section.title} · {section.weight} pts
+                    {CII_V45_DIMENSIONS.map((dim) => (
+                        <li key={dim.id}>
+                            D{dim.id} {dim.name} · {dim.maxPoints} pts
                         </li>
                     ))}
                 </ul>
             </details>
 
-            {ciiV2 && lvl ? (
+            {ciiV45 ? (
                 <>
                     <div className="fx23-scorehero">
                         <div>
-                            <small>SYSTEM PROVISIONAL CII</small>
+                            <small>{locked ? "FINAL CII" : "DIAGNOSTIC CII"}</small>
                             <b>
-                                {ciiV2.final.toFixed(1)}
-                                <em>/100</em>
+                                {currentScore != null ? currentScore.toFixed(1) : "Pending"}
+                                {currentScore != null ? <em>/100</em> : null}
                             </b>
-                            <strong>
-                                {lvl.icon} L{lvl.level} · {lvl.name}
-                            </strong>
-                            <p>{ciiV2.gateExplanation || "Provisional system assessment of the locked submission. Faculty moderation below decides the verified score."}</p>
+                            <strong>{badgeLabel(currentBadge)}</strong>
+                            <p>
+                                {ciiV45.analysisSummary ||
+                                    (currentScore == null
+                                        ? "Score is pending — see the status banner above for what is blocking it."
+                                        : "Provisional system assessment of the locked submission. Admin moderation below decides the published score.")}
+                            </p>
                         </div>
                         <div className="fx23-confidence">
-                            <span>Evidence match</span>
-                            <b>{ciiV2.evidenceAverage}%</b>
-                            <small>{ciiV2.evidence.length} claim-to-evidence checks</small>
+                            <span>Quality gates (L4–L6)</span>
+                            <b>
+                                {[ciiV45.qualityGates?.L4, ciiV45.qualityGates?.L5, ciiV45.qualityGates?.L6].filter(Boolean).length}/3
+                            </b>
+                            <small>
+                                L4 {ciiV45.qualityGates?.L4 ? "pass" : "not met"} · L5 {ciiV45.qualityGates?.L5 ? "pass" : "not met"} · L6{" "}
+                                {ciiV45.qualityGates?.L6 ? "pass" : "not met"}
+                            </small>
                         </div>
                     </div>
 
                     <div className="fx23-a2">
                         <div>
-                            <h3>What scored well</h3>
+                            <h3>Strengths</h3>
                             <ul>
-                                {ciiV2.sections.filter((s) => s.good).slice(0, 5).map((s) => (
-                                    <li key={`g-${s.id}`}>
-                                        S{s.id}: {s.good}
-                                    </li>
+                                {(ciiV45.strengths?.length ? ciiV45.strengths : ["—"]).map((s, i) => (
+                                    <li key={`st-${i}`}>{s}</li>
                                 ))}
                             </ul>
                         </div>
                         <div>
-                            <h3>What limited the score</h3>
+                            <h3>Development priorities</h3>
                             <ul>
-                                {ciiV2.sections.filter((s) => s.limit).slice(0, 5).map((s) => (
-                                    <li key={`l-${s.id}`}>
-                                        S{s.id}: {s.limit}
-                                    </li>
+                                {(ciiV45.developmentPriorities?.length ? ciiV45.developmentPriorities : ["—"]).map((s, i) => (
+                                    <li key={`dp-${i}`}>{s}</li>
                                 ))}
                             </ul>
                         </div>
                     </div>
 
                     <div className="fx23-ciisections">
-                        {ciiV2.sections.map((section) => (
-                            <article key={section.id} className="fx23-ciisec">
+                        {ciiV45.sectionScores.map((section) => (
+                            <article key={section.dimension} className="fx23-ciisec">
                                 <header>
-                                    <span>S{section.id}</span>
+                                    <span>D{section.dimension}</span>
                                     <div>
-                                        <h3>{section.title}</h3>
-                                        <small>
-                                            {section.id === 1 ? "Individual" : "Project-level"} · {section.criteria.length} criteria
-                                        </small>
+                                        <h3>{section.name}</h3>
+                                        <small>{section.criterionScores.length} criteria</small>
                                     </div>
                                     <b>
-                                        {section.score.toFixed(1)}/{section.weight}
+                                        {section.score != null ? section.score.toFixed(1) : `${section.knownPoints.toFixed(1)}*`}/{section.maximumPoints}
                                     </b>
                                 </header>
                                 <div className="fx23-ciibody">
-                                    <p>{section.good || section.limit || "Section scored from the locked report record."}</p>
+                                    <p>
+                                        {section.score == null
+                                            ? `Pending — ${section.knownPoints.toFixed(1)} of ${section.maximumPoints} known so far.`
+                                            : `Scored from the locked report record.`}
+                                    </p>
                                     <div className="fx23-subrub">
-                                        {section.criteria.map((criterion) => (
-                                            <div key={criterion.key}>
-                                                <span>{criterion.label}</span>
+                                        {section.criterionScores.map((criterion) => (
+                                            <div key={criterion.criterion}>
+                                                <span>{criterionLabel(section.dimension, criterion.criterion)}</span>
                                                 <b>
-                                                    {criterion.anchor}/4 · {criterion.points.toFixed(1)}
+                                                    {criterion.anchor === "P" ? "Pending" : `${criterion.anchor}/4`} ·{" "}
+                                                    {criterion.score == null ? "—" : criterion.score.toFixed(2)}
                                                 </b>
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="fx23-3col">
-                                        <div>
-                                            <small>Scored well</small>
-                                            <ul>
-                                                {(splitLines(section.good).length ? splitLines(section.good) : ["—"]).map((line) => (
-                                                    <li key={line}>{line}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                        <div>
-                                            <small>Limited</small>
-                                            <ul>
-                                                {(splitLines(section.limit).length ? splitLines(section.limit) : ["—"]).map((line) => (
-                                                    <li key={`lim-${line}`}>{line}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                        <div>
-                                            <small>Improve</small>
-                                            <ul>
-                                                {(section.criteria.filter((c) => c.anchor <= 2).map((c) => c.label).slice(0, 3).length
-                                                    ? section.criteria.filter((c) => c.anchor <= 2).map((c) => c.label).slice(0, 3)
-                                                    : ["No weak criteria"]).map((line) => (
-                                                    <li key={line}>{line}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
+                                    <details style={{ marginTop: 7 }}>
+                                        <summary style={{ fontSize: "7.5px", fontWeight: 900, color: "#0b6e67", cursor: "pointer" }}>
+                                            Criterion detail &amp; evidence
+                                        </summary>
+                                        {section.criterionScores.map((criterion) => (
+                                            <div
+                                                key={`detail-${criterion.criterion}`}
+                                                style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #e4ecea" }}
+                                            >
+                                                <b style={{ fontSize: "7.5px" }}>{criterionLabel(section.dimension, criterion.criterion)}</b>
+                                                <div style={{ fontSize: "7px", color: "#5d7377", margin: "2px 0" }}>
+                                                    Quality anchor {criterion.qualityAnchor === "P" ? "Pending" : `${criterion.qualityAnchor}/4`} · Verification{" "}
+                                                    {criterion.verificationStatus}
+                                                </div>
+                                                <p style={{ fontSize: "7.3px", margin: "3px 0", color: "#425a5e" }}>{criterion.reasoningSummary}</p>
+                                                {criterion.sourceRefs.length ? (
+                                                    <div style={{ fontSize: "6.5px", color: "#788" }}>Sources: {criterion.sourceRefs.join("; ")}</div>
+                                                ) : null}
+                                                {criterion.evidenceIds.length ? (
+                                                    <div style={{ fontSize: "6.5px", color: "#788" }}>Evidence: {criterion.evidenceIds.join(", ")}</div>
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                    </details>
                                 </div>
                             </article>
                         ))}
                     </div>
 
+                    <details className="fx23-method">
+                        <summary>
+                            Claim inventory &amp; evidence audit ({ciiV45.claimInventory?.length ?? 0} claims · {ciiV45.evidenceAudit?.length ?? 0} files)
+                        </summary>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+                            <div>
+                                <b style={{ fontSize: "7.5px" }}>Claims</b>
+                                <ul style={{ paddingLeft: 12, margin: "4px 0" }}>
+                                    {(ciiV45.claimInventory?.length ? ciiV45.claimInventory : []).map((c) => (
+                                        <li key={c.claimId} style={{ fontSize: "7px", margin: "2px 0" }}>
+                                            {c.claimId} — {c.supportStatus}
+                                            {c.material ? "" : " (non-material)"}
+                                        </li>
+                                    ))}
+                                    {!ciiV45.claimInventory?.length ? <li style={{ fontSize: "7px" }}>—</li> : null}
+                                </ul>
+                            </div>
+                            <div>
+                                <b style={{ fontSize: "7.5px" }}>Evidence files</b>
+                                <ul style={{ paddingLeft: 12, margin: "4px 0" }}>
+                                    {(ciiV45.evidenceAudit?.length ? ciiV45.evidenceAudit : []).map((e) => (
+                                        <li key={e.evidenceId} style={{ fontSize: "7px", margin: "2px 0" }}>
+                                            {e.fileName || e.evidenceId} — {e.processingStatus} / {e.supportStatus}
+                                            {e.actualContentSummary ? `: ${e.actualContentSummary}` : ""}
+                                        </li>
+                                    ))}
+                                    {!ciiV45.evidenceAudit?.length ? <li style={{ fontSize: "7px" }}>—</li> : null}
+                                </ul>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div className="fx23-a2">
+                        <div>
+                            <h3>Extra-mile uplift</h3>
+                            {ciiV45.extraMileUplift?.assessmentStatus === "PROCESSING_REQUIRED" ? (
+                                <p>Pending — evidence still processing.</p>
+                            ) : ciiV45.extraMileUplift?.items?.length ? (
+                                <ul>
+                                    {ciiV45.extraMileUplift.items.map((it, i) => (
+                                        <li key={`${it.category}-${i}`}>
+                                            {it.category}: +{it.points.toFixed(2)} — {it.beyondBaseJustification || "—"}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p>No extra-mile uplift awarded.</p>
+                            )}
+                            <p>
+                                <b>Total: {ciiV45.extraMileUplift?.total == null ? "Pending" : `+${ciiV45.extraMileUplift.total.toFixed(2)}`}</b>
+                            </p>
+                        </div>
+                        <div>
+                            <h3>Integrity penalty</h3>
+                            <p>
+                                <b>{(ciiV45.integrityPenalty?.points ?? 0).toFixed(1)} pts</b>
+                            </p>
+                            {ciiV45.integrityPenalty?.issues?.length ? (
+                                <ul>
+                                    {ciiV45.integrityPenalty.issues.map((iss, i) => (
+                                        <li key={i}>{iss.reason}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p>No confirmed integrity issues.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {ciiV45.exceptionalFeature ? (
+                        <div className="fx23-method">
+                            <p>
+                                <b>Exceptional feature</b> — {ciiV45.exceptionalFeature.verified ? "Verified" : "Not verified"}
+                            </p>
+                            {ciiV45.exceptionalFeature.explanation ? <p>{ciiV45.exceptionalFeature.explanation}</p> : null}
+                        </div>
+                    ) : null}
+
+                    {ciiV45.deductionLedger?.length ? (
+                        <details className="fx23-method">
+                            <summary>Deduction ledger ({ciiV45.deductionLedger.length})</summary>
+                            <ul>
+                                {ciiV45.deductionLedger.map((entry, i) => (
+                                    <li key={i} style={{ fontSize: "7px" }}>
+                                        {JSON.stringify(entry)}
+                                    </li>
+                                ))}
+                            </ul>
+                        </details>
+                    ) : null}
+
+                    <div className="fx23-method">
+                        <p>
+                            <b>Evidence summary</b> — {ciiV45.evidenceSummary || "—"}
+                        </p>
+                        <p>
+                            <b>Student feedback</b> — {ciiV45.studentFeedback || "—"}
+                        </p>
+                    </div>
+
                     <div className="fx23-moderation">
                         <div className="fx23-modhead">
                             <div>
-                                <small>FACULTY ACADEMIC MODERATION</small>
-                                <h2>Review, adjust, approve</h2>
+                                <small>ADMIN ACCEPT &amp; PUBLISH</small>
+                                <h2>Review, moderate, publish</h2>
                                 <p>
-                                    System CII stays on record. If you change a domain score, the Faculty-Verified CII updates and a reason is required before lock.
+                                    Accept the AI-recommended score as-is, or moderate the whole score. v4.5 has no per-criterion override — a reason is required only
+                                    when the published score differs from the AI recommendation.
                                 </p>
                             </div>
                             <div className="fx23-final">
-                                <span>Faculty-verified CII</span>
-                                <b>{facultyFinal ?? "—"}</b>
+                                <span>AI recommended</span>
+                                <b>{ciiV45.diagnosticCII != null ? ciiV45.diagnosticCII.toFixed(1) : "—"}</b>
                                 <small>/100</small>
-                                <strong>
-                                    {facultyLvl ? `L${facultyLvl.level} · ${facultyLvl.name}` : "Pending"}
-                                </strong>
+                                <strong>{badgeLabel(diagnosticBadge)}</strong>
                             </div>
                         </div>
-                        <div className="fx23-modtable">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Domain</th>
-                                        <th>System</th>
-                                        <th>Faculty</th>
-                                        <th>Δ</th>
-                                        <th>Max</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {ciiV2.sections.map((section) => {
-                                        const facultyScore = facultySectionScores[section.id] ?? section.score;
-                                        const delta = Math.round((facultyScore - section.score) * 10) / 10;
-                                        return (
-                                            <tr key={section.id}>
-                                                <td>
-                                                    S{section.id} {section.title}
-                                                    <small>{section.good || section.limit || ""}</small>
-                                                </td>
-                                                <td>{section.score.toFixed(1)}</td>
-                                                <td>
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        max={section.weight}
-                                                        step={0.1}
-                                                        disabled={locked || readOnly}
-                                                        value={facultyScore}
-                                                        onChange={(e) => {
-                                                            const next = Number(e.target.value);
-                                                            setFacultySectionScores((prev) => ({
-                                                                ...prev,
-                                                                [section.id]: Number.isFinite(next)
-                                                                    ? Math.min(section.weight, Math.max(0, next))
-                                                                    : section.score,
-                                                            }));
-                                                        }}
-                                                    />
-                                                </td>
-                                                <td className={delta > 0 ? "delta up" : delta < 0 ? "delta down" : undefined}>
-                                                    {delta > 0 ? `+${delta}` : String(delta)}
-                                                </td>
-                                                <td>{section.weight}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="fx23-comment">
-                            <label>
-                                Faculty final assessment <span>{facultyFinal != null && Math.round(facultyFinal) !== Math.round(ciiV2.final) ? "required when the score changes" : "optional on approve · required to return or reject"}</span>
-                            </label>
-                            <textarea
-                                value={facultyNote}
-                                onChange={(e) => setFacultyNote(e.target.value)}
-                                disabled={locked || readOnly}
-                                placeholder="Record why the system assessment is accepted or adjusted. This becomes the Faculty Analysis note."
-                            />
-                            <label>
-                                Section(s) for revision <span>optional · additive</span>
-                            </label>
-                            <input
-                                value={revisionSection}
-                                onChange={(e) => setRevisionSection(e.target.value)}
-                                disabled={locked || readOnly}
-                                placeholder="e.g. Section 4 Activities, Section 8 Evidence"
-                                style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
-                            />
-                            <label>
-                                Required correction <span>optional · shown to the team</span>
-                            </label>
-                            <textarea
-                                value={requiredCorrection}
-                                onChange={(e) => setRequiredCorrection(e.target.value)}
-                                disabled={locked || readOnly}
-                                placeholder="What the Team Lead must fix before resubmit"
-                            />
-                            <small>
-                                Approve locks the Faculty-Verified CII and badge. Revision / reject keep the record unlocked and send the same note to the student.
-                            </small>
-                        </div>
+
+                        {blockMessage ? (
+                            <div className="fx23-lock" style={{ margin: 0 }}>
+                                {blockMessage}
+                            </div>
+                        ) : null}
+
+                        {!readOnly ? (
+                            <div className="fx23-comment">
+                                <label>
+                                    Admin approved score <span>defaults to the AI-recommended score</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={0.1}
+                                    disabled={locked || Boolean(blockMessage)}
+                                    value={adjustedScoreInput}
+                                    onChange={(e) => setAdjustedScoreInput(e.target.value)}
+                                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
+                                />
+                                <label style={{ marginTop: 10 }}>
+                                    Score moderation reason{" "}
+                                    <span>
+                                        {adjustedScoreInput.trim() !== "" &&
+                                        ciiV45.diagnosticCII != null &&
+                                        Math.round(Number(adjustedScoreInput) * 10) / 10 !== Math.round(ciiV45.diagnosticCII * 10) / 10
+                                            ? "required when the score changes"
+                                            : "optional — only required if the score changes"}
+                                    </span>
+                                </label>
+                                <textarea
+                                    value={moderationReason}
+                                    onChange={(e) => setModerationReason(e.target.value)}
+                                    disabled={locked || Boolean(blockMessage)}
+                                    placeholder="Explain why the published score differs from the AI recommendation."
+                                />
+                                <label style={{ marginTop: 10 }}>
+                                    Admin note <span>optional</span>
+                                </label>
+                                <textarea
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    disabled={locked}
+                                    placeholder="Optional note for this decision — also used as the reason for Request revision / Reject below."
+                                />
+                                <small>Approve locks the published CII v4.5 score and badge. Revision / reject keep the record unlocked and send the same note to the student.</small>
+                            </div>
+                        ) : null}
+
                         <div className="fx23-decision">
                             {readOnly ? (
                                 <p style={{ margin: 0, fontSize: 11, color: "#617579", fontWeight: 700 }}>
@@ -736,11 +814,11 @@ export default function CommunityCiiAnalyser({
                                         Request revision
                                     </button>
                                     {!isCielPk ? (
-                                    <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
-                                        Reject
-                                    </button>
+                                        <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
+                                            Reject
+                                        </button>
                                     ) : null}
-                                    <button type="button" className="approve" disabled={locked || approving || !ciiV2} onClick={approveAndLock}>
+                                    <button type="button" className="approve" disabled={locked || approving || Boolean(blockMessage)} onClick={approveAndLock}>
                                         {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
                                     </button>
                                 </>
@@ -757,8 +835,8 @@ export default function CommunityCiiAnalyser({
             )}
 
             <div className="fx23-workfoot">
-                <span>{locked && ciiV2Lock ? `Locked ${new Date(ciiV2Lock.lockedAt).toLocaleString()}` : "Analysis open"}</span>
-                <span>gpt-5.6-sol · high reasoning · structured JSON · multimodal evidence</span>
+                <span>{locked && ciiV45Lock ? `Locked ${new Date(ciiV45Lock.lockedAt).toLocaleString()}` : "Analysis open"}</span>
+                <span>CII v4.5 · high reasoning · structured JSON · multimodal evidence</span>
             </div>
         </div>
     );

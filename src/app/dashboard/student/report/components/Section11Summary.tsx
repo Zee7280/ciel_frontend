@@ -1279,21 +1279,21 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     <div className="cii-certificate-print-root fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none print-active-modal">
                         <div className="relative w-full max-w-7xl bg-white rounded-xl shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
                             {/* Modal Header */}
-                            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-xl z-[110] print-no-ui">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-[var(--teal)] text-white flex items-center justify-center">
+                            <div className="flex items-center justify-between gap-2 px-4 py-4 sm:px-8 sm:py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-xl z-[110] print-no-ui">
+                                <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+                                    <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-[var(--teal)] text-white flex items-center justify-center">
                                         <Award className="w-5 h-5" />
                                     </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight">CII certificate</h3>
-                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.14em]">Certificate of institutional impact</p>
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight truncate">CII certificate</h3>
+                                        <p className="hidden sm:block text-[10px] font-semibold text-slate-400 uppercase tracking-[0.14em]">Certificate of institutional impact</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                                     <button
                                         type="button"
                                         onClick={handlePrint}
-                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                                        className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                                         aria-label="Save certificate as PDF — opens print dialog"
                                         title="Save as PDF"
                                     >
@@ -1301,14 +1301,17 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </button>
                                     <Button
                                         onClick={handlePrint}
-                                        className="bg-[var(--teal)] hover:opacity-90 text-white h-10 px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
+                                        className="bg-[var(--teal)] hover:opacity-90 text-white h-10 px-3 sm:px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
                                     >
-                                        <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+                                        <Printer className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="hidden sm:inline">Print / Save PDF</span>
+                                        <span className="sm:hidden">Print</span>
                                     </Button>
                                     <button
                                         type="button"
                                         onClick={() => setShowCertificate(false)}
-                                        className="w-10 h-10 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors flex items-center justify-center"
+                                        className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors flex items-center justify-center"
+                                        aria-label="Close certificate"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
@@ -1316,7 +1319,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                             <div
                                 id="print-area-certificate"
-                                className="overflow-x-auto overflow-y-auto max-h-[85vh] p-4 md:p-6 print:max-h-none print:overflow-visible print:p-0 print-scroll-auto"
+                                className="overflow-y-auto max-h-[85vh] p-4 md:p-6 print:max-h-none print:overflow-visible print:p-0 print-scroll-auto"
                             >
                                 <CertificateView projectData={projectData} />
                             </div>

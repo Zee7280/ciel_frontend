@@ -54,8 +54,8 @@ function isCiiFacultyLocked(lock: { locked?: unknown } | null | undefined): bool
     return lock?.locked === true || lock?.locked === "true";
 }
 
-function readCiiV2Final(data: ReportData): number | null {
-    const raw = (data.ciiV2 as { final?: unknown } | null | undefined)?.final;
+function readCiiV45Final(data: ReportData): number | null {
+    const raw = (data.ciiV45 as { finalCII?: unknown } | null | undefined)?.finalCII;
     if (typeof raw === "number" && Number.isFinite(raw)) return clampCii(raw);
     if (typeof raw === "string" && raw.trim() && Number.isFinite(Number(raw))) return clampCii(Number(raw));
     return null;
@@ -71,7 +71,7 @@ function hasSubmittedLifecycle(data: ReportData): boolean {
 
 /**
  * One CII reading for the flashcard and the detailed report.
- * Faculty-locked CII v2 wins, then the snapshot saved at submit, then a live preview of the same fields.
+ * Admin-locked CII v4.5 wins, then the snapshot saved at submit, then a live preview of the same fields.
  */
 export function resolveReportCii(data: ReportData): ResolvedReportCii {
     let live: CIIResult;
@@ -80,16 +80,16 @@ export function resolveReportCii(data: ReportData): ResolvedReportCii {
     } catch {
         live = emptyLive();
     }
-    const facultyFinal = isCiiFacultyLocked(data.ciiV2Lock) ? readCiiV2Final(data) : null;
+    const facultyFinal = isCiiFacultyLocked(data.ciiV45Lock) ? readCiiV45Final(data) : null;
 
     if (facultyFinal != null) {
         const persisted = readPersistedCiiSnapshot(data);
-        // The locked v2 reading owns the level name; the legacy snapshot level belongs to a
+        // The locked v4.5 reading owns the badge name; the legacy snapshot level belongs to a
         // different number and would contradict the score shown beside it.
-        const v2Level = (data.ciiV2 as { level?: { name?: unknown } } | null | undefined)?.level?.name;
+        const v45Level = (data.ciiV45 as { finalBadge?: { name?: unknown } } | null | undefined)?.finalBadge?.name;
         return {
             ...live,
-            level: typeof v2Level === "string" && v2Level.trim() ? v2Level.trim() : persisted?.level || live.level,
+            level: typeof v45Level === "string" && v45Level.trim() ? v45Level.trim() : persisted?.level || live.level,
             totalScore: facultyFinal,
             breakdown: mergeBreakdown(live.breakdown, persisted?.breakdown),
             suggestions: persisted?.suggestions ?? live.suggestions,

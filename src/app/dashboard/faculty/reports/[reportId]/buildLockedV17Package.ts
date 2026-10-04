@@ -147,8 +147,8 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         .filter(Boolean)
         .join(" · ");
 
-    const ciiV2 = asRecord(data.ciiV2);
-    const finalNumRaw = finiteNum(ciiV2.final);
+    const ciiV45 = asRecord(data.ciiV45);
+    const finalNumRaw = finiteNum(ciiV45.diagnosticCII ?? ciiV45.finalCII);
     const finalNum = finalNumRaw == null ? null : Math.round(finalNumRaw * 10) / 10;
     const locked = cii.source === "faculty_locked";
     const gaps: string[] = [];
@@ -306,15 +306,12 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         },
     ];
 
-    const v2Sections = Array.isArray(ciiV2.sections) ? (ciiV2.sections as Array<Record<string, unknown>>) : [];
-    const { detailBlocks, assessment } = buildLockedV17DetailAndAssessment(data, agg, { locked, v2Sections });
+    const ciiSections = Array.isArray(ciiV45.sectionScores) ? (ciiV45.sectionScores as Array<Record<string, unknown>>) : [];
+    const { detailBlocks, assessment } = buildLockedV17DetailAndAssessment(data, agg, { locked, ciiSections });
 
-    const levelRec = asRecord(ciiV2.level);
-    const feedbackRaw = ciiV2.studentFeedback;
-    const feedback =
-        typeof feedbackRaw === "string"
-            ? txt(feedbackRaw)
-            : txt(asRecord(feedbackRaw).opening_praise, asRecord(feedbackRaw).why_score_is_high_or_low);
+    const levelRec = asRecord(ciiV45.finalBadge);
+    // v4.5 studentFeedback is a plain string (v2 was a structured object) — no fallback fields.
+    const feedback = txt(ciiV45.studentFeedback);
     const badgeLabel = locked
         ? txt(levelRec.name) || "Faculty-Verified Impact Badge"
         : finalNum != null

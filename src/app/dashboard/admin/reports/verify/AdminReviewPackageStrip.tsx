@@ -30,7 +30,7 @@ export default function AdminReviewPackageStrip({
     const initialTab: ImpactPackageTab =
         initialDoc === "report" ? "report" : initialDoc === "evidence" ? "evidence" : initialDoc === "analysis" ? "analysis" : "flash";
     const audience: ImpactPackageAudience = audienceProp || (variant === "admin" ? "admin" : "partner");
-    const analyserHref = variant === "admin" ? `/dashboard/admin/reports/verify/${reportId}?view=cii-v2` : undefined;
+    const analyserHref = variant === "admin" ? `/dashboard/admin/reports/verify/${reportId}?view=cii-v4-5` : undefined;
 
     useEffect(() => {
         if (!highlight) return;

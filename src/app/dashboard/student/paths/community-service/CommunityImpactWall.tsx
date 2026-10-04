@@ -54,42 +54,34 @@ type WallRow = {
         v17_url?: string | null;
         evidence_url?: string | null;
     };
-    // Phase 3: CII v2 AI Analysis data for two-column display
-    ciiV2?: {
-        final?: number;
-        aiRecommendedScore?: number;
-        facultyApprovedScore?: number;
-        level?: { level: number; name: string; quality: string };
-        sections?: Array<{
-            id: number;
-            title: string;
-            score: number;
-            weight: number;
-            good?: string;
-            limit?: string;
+    // Phase 3: CII v4.5 AI Analysis data for two-column display — this is the student's own
+    // listing, so the backend redacts it (null until an Admin has locked it; no pre-lock
+    // "provisional" release in v4.5, and no evidence/redFlags/facultyNote in the redacted shape).
+    ciiV45?: {
+        finalCII?: number;
+        diagnosticCII?: number;
+        finalBadge?: { level: number; name: string } | null;
+        recommendedBadge?: { level: number; name: string } | null;
+        sectionScores?: Array<{
+            dimension: string;
+            name: string;
+            score: number | null;
+            maximumPoints: number;
         }>;
-        evidence?: Array<{ id: string; type: string; claim: string; verdict: "MATCH" | "PARTIAL" | "MISMATCH" }>;
-        bonus?: { effort: number; resources: number; partners: number; total: number };
-        integrityPenalty?: number;
-        /** The analyser stores one summary string; older records carry the structured object. */
-        studentFeedback?:
-            | string
-            | {
-                  opening_praise?: string;
-                  why_score_is_high_or_low?: string;
-                  encouragement?: string;
-                  five_specific_actions?: string[];
-              };
-        redFlags?: Array<{ flag: string; severity?: string }>;
+        extraMileUplift?: { total?: number | null };
+        integrityPenalty?: { points?: number };
+        strengths?: string[];
+        developmentPriorities?: string[];
+        /** v4.5 studentFeedback is always a plain string (v2's structured object is gone). */
+        studentFeedback?: string;
     } | null;
-    ciiV2Lock?: {
+    ciiV45Lock?: {
         locked?: boolean;
         lockedAt?: string;
         aiRecommendedScore?: number;
-        facultyApprovedScore?: number;
-        scoreWasAdjusted?: boolean;
-        scoreAdjustmentReason?: string;
-        facultyNote?: string;
+        adminApprovedScore?: number;
+        scoreWasModerated?: boolean;
+        scoreModerationReason?: string;
     } | null;
     // Phase 4: Independent AI analyses from My Impact Wall
     independentAiAnalyses?: Array<{
@@ -165,37 +157,29 @@ type FlashState = {
     evidence?: string | null;
     certificate?: string | null;
     qr?: string | null;
-    // Phase 3: AI Analysis data for two-column display
+    // Phase 3: AI Analysis data for two-column display. v4.5's redacted student-facing shape has
+    // no per-file evidence, red flags, moderation reason text or faculty note — those only exist
+    // in the full admin record — so this is deliberately thinner than the old v2 shape.
     aiAnalysis?: {
         aiScore: number | null;
         facultyScore: number | null;
         scoreWasAdjusted: boolean;
-        scoreAdjustmentReason?: string;
         levelName: string;
-        levelQuality: string;
         sections: Array<{
-            id: number;
-            title: string;
-            score: number;
-            weight: number;
-            good?: string;
-            limit?: string;
+            dimension: string;
+            name: string;
+            score: number | null;
+            maximumPoints: number;
         }>;
-        bonus: { effort: number; resources: number; partners: number; total: number };
+        upliftTotal: number;
         integrityPenalty: number;
-        feedback?: {
-            praise?: string;
-            summary?: string;
-            encouragement?: string;
-            actions?: string[];
-        };
-        redFlags?: Array<{ flag: string; severity?: string }>;
+        feedback?: string;
+        strengths: string[];
+        developmentPriorities: string[];
         lockedAt?: string;
-        facultyNote?: string;
-        evidence?: Array<{ id: string; type: string; claim: string; verdict: "MATCH" | "PARTIAL" | "MISMATCH" }>;
     } | null;
     // Verified impact flashcard: badge, checklist, metrics, path and skills built from the
-    // faculty-locked CII v2 record above — only present when aiAnalysis is present.
+    // admin-locked CII v4.5 record above — only present when aiAnalysis is present.
     flashcard?: {
         badgeSrc: string;
         badgeAlt: string;
@@ -263,31 +247,7 @@ function studentName(): string {
     return typeof user?.name === "string" && user.name.trim() ? user.name.trim() : "Student";
 }
 
-type CiiFeedbackShape = NonNullable<NonNullable<WallRow["ciiV2"]>["studentFeedback"]>;
-
-/** Normalises the analyser's string feedback and the legacy structured object to one shape. */
-function feedbackParts(fb: CiiFeedbackShape | undefined): {
-    praise?: string;
-    summary?: string;
-    encouragement?: string;
-    actions?: string[];
-} {
-    if (!fb) return {};
-    if (typeof fb === "string") return { summary: fb.trim() || undefined };
-    return {
-        praise: fb.opening_praise,
-        summary: fb.why_score_is_high_or_low,
-        encouragement: fb.encouragement,
-        actions: fb.five_specific_actions,
-    };
-}
-
-type CiiSection = NonNullable<NonNullable<WallRow["ciiV2"]>["sections"]>[number];
 type CompetencyScores = NonNullable<NonNullable<WallRow["section9"]>["competency_scores"]>;
-
-function findSection(sections: CiiSection[] | undefined, id: number): CiiSection | undefined {
-    return sections?.find((s) => s.id === id);
-}
 
 /** Self-rated reflection competencies (Section 9 of the report) — the closest real equivalent
  * to a "skill capability" chart; not fabricated scores, just relabeled from CIEL's own framework. */
@@ -305,17 +265,20 @@ function competencySkills(scores: CompetencyScores | null | undefined): Array<{ 
 }
 
 /** Builds the richer "verified impact flashcard" visuals (badge, checklist, metric rail, path,
- * quality judgement, skills) entirely from the faculty-locked CII v2 record — no new/fabricated
- * data, just a presentational layer on top of what CommunityCiiAnalyser already approved. */
+ * quality judgement, skills) entirely from the admin-locked CII v4.5 record — no new/fabricated
+ * data, just a presentational layer on top of what CommunityCiiAnalyser already approved.
+ * The redacted student-facing `ciiV45` carries no per-file evidence, red flags or faculty note
+ * (those only exist in the full admin shape), so the checklist/metrics/path below lean on what
+ * the redacted payload actually has: section scores, uplift total, integrity points, the overall
+ * `strengths`/`developmentPriorities` and `studentFeedback` string. */
 function buildFlashcardExtras(
     r: WallRow,
-    cii: NonNullable<WallRow["ciiV2"]>,
+    cii: NonNullable<WallRow["ciiV45"]>,
     hours: number,
     facultyScore: number | null,
 ): NonNullable<FlashState["flashcard"]> {
-    const sections = cii.sections || [];
-    const badge = resolveCiiLevelBadge(facultyScore ?? cii.final ?? 0);
-    const evidenceCount = cii.evidence?.length ?? 0;
+    const sections = cii.sectionScores || [];
+    const badge = resolveCiiLevelBadge(facultyScore ?? cii.finalCII ?? 0);
     const reach = r.section4?.project_summary?.distinct_total_beneficiaries;
     const sdgCount = sdgNumbers(r.sdgs).length;
 
@@ -323,7 +286,6 @@ function buildFlashcardExtras(
         { label: "Faculty approved", ok: r.faculty_status === "approved" },
         { label: "Partner verified", ok: r.partner_verified ?? r.partner_status === "approved" },
         { label: "Hours compliant", ok: r.required_hours ? hours >= r.required_hours : hours > 0 },
-        { label: "Evidence triangulated", ok: evidenceCount > 0 },
         { label: "CIEL PK verified", ok: true },
         { label: "Privacy protected", ok: true },
     ];
@@ -333,34 +295,19 @@ function buildFlashcardExtras(
     ];
     if (r.required_hours) metrics.push({ label: "Required minimum", value: `${Math.round(r.required_hours)}h` });
     if (typeof reach === "number" && reach > 0) metrics.push({ label: "People reached", value: String(reach) });
-    metrics.push({ label: "Evidence items", value: String(evidenceCount) });
     if (sdgCount) metrics.push({ label: "SDGs linked", value: String(sdgCount) });
 
     const path = [
-        {
-            label: "Need",
-            text: findSection(sections, 2)?.good || "Community need documented in the baseline.",
-        },
-        {
-            label: "Student Action & Result",
-            text: findSection(sections, 4)?.good || "Verified activities and outputs delivered in the field.",
-        },
-        {
-            label: "Continuity",
-            text: findSection(sections, 9)?.good || "Handover and continuation reviewed by faculty.",
-        },
+        { label: "Need", text: "Community need documented in the baseline." },
+        { label: "Student Action & Result", text: "Verified activities and outputs delivered in the field." },
+        { label: "Continuity", text: "Handover and continuation reviewed by faculty." },
     ];
 
-    const ranked = [...sections].sort((a, b) => b.score / (b.weight || 1) - a.score / (a.weight || 1));
-    const strongest = ranked
-        .filter((s) => s.good)
-        .slice(0, 3)
-        .map((s) => s.good as string);
-    const limitations = ranked
-        .filter((s) => s.limit)
-        .slice(-3)
-        .map((s) => s.limit as string);
-    const nextStep = feedbackParts(cii.studentFeedback).actions?.[0] || cii.redFlags?.[0]?.flag;
+    // v4.5's redacted sectionScores carry no per-section narrative (no `good`/`limit`); the
+    // overall strengths/developmentPriorities are the closest real equivalent.
+    const strongest = (cii.strengths || []).slice(0, 3);
+    const limitations = (cii.developmentPriorities || []).slice(0, 3);
+    const nextStep = (cii.developmentPriorities || [])[0];
 
     return {
         badgeSrc: badge.src,
@@ -368,7 +315,7 @@ function buildFlashcardExtras(
         badgeTitle: badge.title,
         checklist,
         metrics,
-        oneLiner: feedbackParts(cii.studentFeedback).praise || r.story,
+        oneLiner: cii.studentFeedback || r.story,
         path,
         quality: { strongest, limitations, nextStep },
         skills: competencySkills(r.section9?.competency_scores),
@@ -382,17 +329,6 @@ function confidenceLabel(score: number, weight: number): string {
     if (ratio >= 0.65) return "Med-High";
     if (ratio >= 0.45) return "Developing";
     return "Needs work";
-}
-
-function evidenceIcon(type: string): string {
-    const t = type.toLowerCase();
-    if (t.includes("attend") || t.includes("session") || t.includes("ledger")) return "📋";
-    if (t.includes("before") || t.includes("baseline")) return "📷";
-    if (t.includes("after") || t.includes("complet") || t.includes("output")) return "🏫";
-    if (t.includes("receipt") || t.includes("resource")) return "🧾";
-    if (t.includes("partner")) return "🤝";
-    if (t.includes("outcome") || t.includes("attendance sheet")) return "📊";
-    return "📄";
 }
 
 /**
@@ -418,7 +354,6 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
     const ai = flash.aiAnalysis;
     const hasTwoColumns = Boolean(ai);
     const fc = flash.flashcard;
-    const [evidenceOpen, setEvidenceOpen] = useState<{ type: string; claim: string; verdict: string } | null>(null);
 
     return (
         <div
@@ -512,7 +447,7 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                     </div>
                                     <div>
                                         <span className="inline-block rounded-full bg-[#f1ebfd] px-2.5 py-1 text-[9px] font-black text-[#6d28d9]">
-                                            {ai.levelQuality}
+                                            VERIFIED
                                         </span>
                                         <div className="mt-1 text-[14px] font-bold text-[#16313d]">{ai.levelName}</div>
                                         {ai.scoreWasAdjusted && (
@@ -523,36 +458,26 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                     </div>
                                 </div>
 
-                                {/* Score Adjustment Note (if any) */}
-                                {ai.scoreWasAdjusted && ai.scoreAdjustmentReason && (
-                                    <div className="mt-3 rounded-lg border border-[#f3d9a0] bg-[#fffbf0] p-2.5">
-                                        <span className="text-[9px] font-black text-[#8b600a]">FACULTY ADJUSTMENT REASON</span>
-                                        <p className="mt-1 text-[10px] leading-relaxed text-[#6b5b3f]">
-                                            {ai.scoreAdjustmentReason}
-                                        </p>
-                                    </div>
-                                )}
-
                                 {/* Section Scores */}
                                 {ai.sections.length > 0 && (
                                     <div className="mt-4 border-t border-[#e0daf0] pt-3">
                                         <span className="text-[9px] font-black text-[#8b82a6]">SECTION SCORES</span>
                                         <div className="mt-2 space-y-1.5">
                                             {ai.sections.map((s) => (
-                                                <div key={s.id} className="flex items-center justify-between gap-2 text-[10px]">
-                                                    <span className="text-[#5d5775]">S{s.id}. {s.title.slice(0, 30)}{s.title.length > 30 ? "…" : ""}</span>
-                                                    <span className="font-bold text-[#6d28d9]">{s.score.toFixed(1)}/{s.weight}</span>
+                                                <div key={s.dimension} className="flex items-center justify-between gap-2 text-[10px]">
+                                                    <span className="text-[#5d5775]">S{s.dimension}. {s.name.slice(0, 30)}{s.name.length > 30 ? "…" : ""}</span>
+                                                    <span className="font-bold text-[#6d28d9]">{(s.score ?? 0).toFixed(1)}/{s.maximumPoints}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Bonus & Penalty */}
+                                {/* Uplift & Penalty */}
                                 <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#e0daf0] pt-3">
                                     <div className="rounded-lg bg-[#e9f8f0] p-2 text-center">
-                                        <span className="text-[8px] font-black text-[#16865a]">BONUS</span>
-                                        <div className="text-[12px] font-bold text-[#16865a]">+{ai.bonus.total.toFixed(1)}</div>
+                                        <span className="text-[8px] font-black text-[#16865a]">EXTRA-MILE UPLIFT</span>
+                                        <div className="text-[12px] font-bold text-[#16865a]">+{ai.upliftTotal.toFixed(1)}</div>
                                     </div>
                                     <div className="rounded-lg bg-[#fff3dc] p-2 text-center">
                                         <span className="text-[8px] font-black text-[#8b600a]">PENALTY</span>
@@ -564,36 +489,19 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                 {ai.feedback && (
                                     <div className="mt-3 border-t border-[#e0daf0] pt-3">
                                         <span className="text-[9px] font-black text-[#8b82a6]">FEEDBACK</span>
-                                        {ai.feedback.praise && (
-                                            <p className="mt-1.5 text-[10px] leading-relaxed text-[#5d5775]">
-                                                {ai.feedback.praise}
-                                            </p>
-                                        )}
-                                        {ai.feedback.summary && (
-                                            <p className="mt-1.5 text-[10px] leading-relaxed text-[#5d5775]">
-                                                {ai.feedback.summary}
-                                            </p>
-                                        )}
-                                        {ai.feedback.actions && ai.feedback.actions.length > 0 && (
+                                        <p className="mt-1.5 text-[10px] leading-relaxed text-[#5d5775]">
+                                            {ai.feedback}
+                                        </p>
+                                        {ai.developmentPriorities.length > 0 && (
                                             <div className="mt-2">
                                                 <span className="text-[8px] font-black text-[#8b82a6]">IMPROVEMENT ACTIONS</span>
                                                 <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-[#5d5775]">
-                                                    {ai.feedback.actions.slice(0, 3).map((action, i) => (
+                                                    {ai.developmentPriorities.slice(0, 3).map((action, i) => (
                                                         <li key={i}>{action}</li>
                                                     ))}
                                                 </ul>
                                             </div>
                                         )}
-                                    </div>
-                                )}
-
-                                {/* Faculty Note */}
-                                {ai.facultyNote && (
-                                    <div className="mt-3 rounded-lg border border-[#bfe3d1] bg-[#f0faf5] p-2.5">
-                                        <span className="text-[9px] font-black text-[#16865a]">FACULTY NOTE</span>
-                                        <p className="mt-1 text-[10px] leading-relaxed text-[#2d6654]">
-                                            {ai.facultyNote}
-                                        </p>
                                     </div>
                                 )}
 
@@ -609,8 +517,8 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                 </div>
 
                 {/* Verified Impact Flashcard: badge, checklist, metric rail, path, section grid,
-                    quality judgement, skills and evidence gallery — all built from the same
-                    faculty-locked CII v2 record shown in the AI Analysis column above. */}
+                    quality judgement and skills — all built from the same admin-locked CII v4.5
+                    record shown in the AI Analysis column above. */}
                 {fc && ai && (
                     <div className="border-t border-[#dde5ea] px-5 py-5 sm:px-[26px]">
                         <div className="flex flex-col items-center gap-3 rounded-[18px] bg-[linear-gradient(125deg,#052c37,#0b4850,#0d7c72)] p-5 text-center text-white sm:flex-row sm:text-left">
@@ -658,18 +566,13 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                 <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Section-by-section summary</h4>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     {ai.sections.map((s) => (
-                                        <div key={s.id} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
+                                        <div key={s.dimension} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
                                             <div className="flex items-start justify-between gap-2">
-                                                <b className="text-[10.5px] leading-tight text-[#16313d]">{s.id}. {s.title}</b>
-                                                <span className="whitespace-nowrap rounded-full border border-[#efdfb6] bg-[#fff9e9] px-1.5 py-0.5 text-[8.5px] font-black text-[#875f16]">{s.score}/{s.weight}</span>
+                                                <b className="text-[10.5px] leading-tight text-[#16313d]">{s.dimension}. {s.name}</b>
+                                                <span className="whitespace-nowrap rounded-full border border-[#efdfb6] bg-[#fff9e9] px-1.5 py-0.5 text-[8.5px] font-black text-[#875f16]">{s.score ?? "—"}/{s.maximumPoints}</span>
                                             </div>
-                                            {s.good && (
-                                                <div className="mt-1.5 rounded-r-lg border-l-[3px] border-[#18aa9c] bg-[#f3fbf9] px-2 py-1 text-[8.6px] leading-relaxed text-[#315a57]">
-                                                    <b>Verified highlight:</b> {s.good}
-                                                </div>
-                                            )}
                                             <div className="mt-1.5 text-[8px] font-black text-[#70808a]">
-                                                <span className="rounded-full bg-[#edf9f5] px-1.5 py-0.5 text-[#287565]">{confidenceLabel(s.score, s.weight)} confidence</span>
+                                                <span className="rounded-full bg-[#edf9f5] px-1.5 py-0.5 text-[#287565]">{confidenceLabel(s.score ?? 0, s.maximumPoints)} confidence</span>
                                             </div>
                                         </div>
                                     ))}
@@ -723,60 +626,6 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                             </>
                         )}
 
-                        {ai.evidence && ai.evidence.length > 0 && (
-                            <>
-                                <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Evidence gallery</h4>
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                                    {ai.evidence.map((e) => (
-                                        <button
-                                            key={e.id}
-                                            type="button"
-                                            onClick={() => setEvidenceOpen(e)}
-                                            className="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-[14px] border border-[#dde5ea] bg-[linear-gradient(145deg,#f4fbfa,#f7f9fc)] p-2.5 text-center hover:border-[#b7d9d4]"
-                                        >
-                                            <span className="text-xl">{evidenceIcon(e.type)}</span>
-                                            <b className="text-[8px] leading-tight text-[#16313d]">{e.type}</b>
-                                            <span
-                                                className={`rounded-full px-1.5 py-0.5 text-[6.5px] font-black ${
-                                                    e.verdict === "MATCH"
-                                                        ? "bg-[#e7f7ef] text-[#176b5e]"
-                                                        : e.verdict === "PARTIAL"
-                                                          ? "bg-[#fff3dc] text-[#886210]"
-                                                          : "bg-[#fff0f2] text-[#a34758]"
-                                                }`}
-                                            >
-                                                {e.verdict === "MATCH" ? "Verified" : e.verdict === "PARTIAL" ? "Partial" : "Needs review"}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {evidenceOpen && (
-                    <div
-                        className="fixed inset-0 z-[1000] flex items-center justify-center bg-[rgba(7,28,35,.58)] p-4"
-                        onClick={(e) => {
-                            if (e.target === e.currentTarget) setEvidenceOpen(null);
-                        }}
-                        role="presentation"
-                    >
-                        <div role="dialog" aria-modal="true" className="w-[min(420px,94vw)] rounded-[18px] bg-white p-5">
-                            <div className="mb-2.5 grid h-[70px] place-items-center rounded-[14px] bg-[linear-gradient(145deg,#e2f4ef,#eff3fa)] text-[38px]">
-                                {evidenceIcon(evidenceOpen.type)}
-                            </div>
-                            <h3 className="m-0 text-sm font-semibold text-[#16313d]">{evidenceOpen.type}</h3>
-                            <p className="mt-1.5 text-[11px] leading-relaxed text-[#70808a]">{evidenceOpen.claim}</p>
-                            <button
-                                type="button"
-                                onClick={() => setEvidenceOpen(null)}
-                                className="mt-4 rounded-[9px] bg-[#174b43] px-3 py-1.5 text-[10px] font-black text-white"
-                            >
-                                Close
-                            </button>
-                        </div>
                     </div>
                 )}
 
@@ -866,26 +715,24 @@ export default function CommunityImpactWall(_props: {
         const uni = r.university || r.organization_name || "Community Service";
         const reportHref = r.project_id || r.opportunity_id ? `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id))}` : null;
 
-        // Phase 3: Build AI Analysis data from ciiV2 + ciiV2Lock
-        const cii = r.ciiV2;
-        const lock = r.ciiV2Lock;
-        const facultyScore = cii ? (lock?.facultyApprovedScore ?? cii.facultyApprovedScore ?? cii.final ?? null) : null;
+        // Phase 3: Build AI Analysis data from ciiV45 + ciiV45Lock (redacted student shape —
+        // null until an Admin has locked it; no pre-lock provisional release in v4.5).
+        const cii = r.ciiV45;
+        const lock = r.ciiV45Lock;
+        const facultyScore = cii ? (lock?.adminApprovedScore ?? cii.finalCII ?? null) : null;
         const aiAnalysis = cii
             ? {
-                  aiScore: lock?.aiRecommendedScore ?? cii.aiRecommendedScore ?? cii.final ?? null,
+                  aiScore: lock?.aiRecommendedScore ?? cii.diagnosticCII ?? cii.finalCII ?? null,
                   facultyScore,
-                  scoreWasAdjusted: lock?.scoreWasAdjusted ?? false,
-                  scoreAdjustmentReason: lock?.scoreAdjustmentReason,
-                  levelName: cii.level?.name || r.level || "Approved",
-                  levelQuality: cii.level?.quality || "VERIFIED",
-                  sections: cii.sections || [],
-                  bonus: cii.bonus || { effort: 0, resources: 0, partners: 0, total: 0 },
-                  integrityPenalty: cii.integrityPenalty || 0,
-                  feedback: cii.studentFeedback ? feedbackParts(cii.studentFeedback) : undefined,
-                  redFlags: cii.redFlags,
+                  scoreWasAdjusted: lock?.scoreWasModerated ?? false,
+                  levelName: cii.finalBadge?.name || r.level || "Approved",
+                  sections: cii.sectionScores || [],
+                  upliftTotal: cii.extraMileUplift?.total || 0,
+                  integrityPenalty: cii.integrityPenalty?.points || 0,
+                  feedback: cii.studentFeedback,
+                  strengths: cii.strengths || [],
+                  developmentPriorities: cii.developmentPriorities || [],
                   lockedAt: lock?.lockedAt,
-                  facultyNote: lock?.facultyNote,
-                  evidence: cii.evidence || [],
               }
             : null;
 

@@ -702,7 +702,7 @@ export default function AdminReportsVerificationPage() {
     };
 
     const handleOpenAiAnalyzer = (reportId: string) => {
-        router.push(`/dashboard/admin/reports/verify/${reportId}?view=cii-v2`);
+        router.push(`/dashboard/admin/reports/verify/${reportId}?view=cii-v4-5`);
     };
 
     const resetFilters = () => {

@@ -1140,8 +1140,8 @@ function FacultyCommunityServiceHub() {
                                                 href={`${REPORTS}/${c.id}`}
                                                 viewer="faculty"
                                                 packageHrefs={{
-                                                    detailedPdf: `${REPORTS}/${c.id}?view=dossier`,
-                                                    combinedPdf: `${REPORTS}/${c.id}?view=dossier`,
+                                    detailedPdf: `${REPORTS}/${c.id}?view=dossier&doc=report`,
+                                    combinedPdf: `${REPORTS}/${c.id}?view=dossier`,
                                                     verify: c.impact_verify_url || undefined,
                                                 }}
                                             />

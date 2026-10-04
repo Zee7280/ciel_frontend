@@ -66,11 +66,12 @@ export interface ReportData {
         breakdown?: Record<string, number>;
         suggestions?: string[];
     };
-    /** Community Service's dedicated CII v2 score (see ciel_backend cii-v2.constants.ts) — only
-     * present once faculty has locked it; takes priority over the legacy `calculateCII` used by
-     * other path types (FYP/Coursework/Venture), which never populate this field. */
-    ciiV2?: { final?: number } | null;
-    ciiV2Lock?: { locked?: boolean | string } | null;
+    /** Community Service's dedicated CII v4.5 score (see ciel_backend cii-v4-5.constants.ts) —
+     * only present once an Admin has locked it (no pre-lock provisional release in v4.5); takes
+     * priority over the legacy `calculateCII` used by other path types (FYP/Coursework/Venture),
+     * which never populate this field. */
+    ciiV45?: { finalCII?: number | null; finalBadge?: { name?: string; level?: number } | null } | null;
+    ciiV45Lock?: { locked?: boolean | string } | null;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
@@ -965,8 +966,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 section10: { ...defaultReportData.section10, ...(newData.section10 || {}) },
                 section11: { ...defaultReportData.section11, ...(newData.section11 || {}) },
                 cii_index: newData.cii_index,
-                ciiV2: newData.ciiV2 ?? null,
-                ciiV2Lock: newData.ciiV2Lock ?? null,
+                ciiV45: newData.ciiV45 ?? null,
+                ciiV45Lock: newData.ciiV45Lock ?? null,
             };
             if (newData.section1?.metrics) {
                 merged.section1 = {

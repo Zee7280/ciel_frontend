@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import type { ReportData } from "../context/ReportContext";
 import { BarChart3, Calendar, Clock, Globe, Lock, Target, Users } from "lucide-react";
 import "../components/certificate-print.css";
+import CertificateScaleShell from "../components/CertificateScaleShell";
 import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
 import {
@@ -228,11 +229,11 @@ export default function ImpactPackageCertificate({
     }, [data, section1, verifiedHours, engagementSpanDays, engagementRecalc]);
 
     const ciiScore = useMemo(() => {
-        // Community Service reports carry a faculty-locked CII v2 score, which is stricter and
+        // Community Service reports carry an admin-locked CII v4.5 score, which is stricter and
         // more current than the generic v1 formula below — prefer it whenever it's present so the
-        // certificate can never show a different score than the record faculty actually approved.
-        if (data.ciiV2Lock?.locked && typeof data.ciiV2?.final === "number") {
-            return Math.min(100, Math.max(0, Math.round(data.ciiV2.final)));
+        // certificate can never show a different score than the record Admin actually approved.
+        if (data.ciiV45Lock?.locked && typeof data.ciiV45?.finalCII === "number") {
+            return Math.min(100, Math.max(0, Math.round(data.ciiV45.finalCII)));
         }
         const persisted = readPersistedCiiSnapshot(data);
         if (persisted) {
@@ -275,6 +276,7 @@ export default function ImpactPackageCertificate({
 
     return (
         <div className="certificate-print-shell flex justify-center p-4 print:p-0">
+            <CertificateScaleShell>
             <div className="certificate-one-page w-[210mm] min-h-[297mm] max-w-[210mm] mx-auto shadow-2xl print:shadow-none break-inside-avoid">
                 <div className="cert-frame">
                     <div className="cert-corner cert-corner--tl" aria-hidden />
@@ -447,6 +449,7 @@ export default function ImpactPackageCertificate({
                     </div>
                 </div>
             </div>
+            </CertificateScaleShell>
         </div>
     );
 }

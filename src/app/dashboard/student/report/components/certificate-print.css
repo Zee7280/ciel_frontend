@@ -1,5 +1,30 @@
 /* CIL verified community impact certificate — matches official print template */
 
+/* Scale-to-fit shell (see CertificateScaleShell.tsx) — on screen only; neutralised for print
+   below so the existing --cert-print-scale mechanism (Section11Summary.tsx) keeps owning print
+   sizing against the certificate's true, unscaled dimensions. */
+.cert-scale-outer {
+  overflow: hidden;
+}
+
+.cert-scale-inner {
+  width: fit-content;
+  transform-origin: top left;
+}
+
+@media print {
+  .cert-scale-outer {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .cert-scale-inner {
+    width: auto !important;
+    margin-left: 0 !important;
+    transform: none !important;
+  }
+}
+
 .certificate-one-page {
   --cert-navy: #071b3a;
   --cert-gold: #b67835;

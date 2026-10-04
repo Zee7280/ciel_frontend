@@ -5,12 +5,16 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * POST /api/v1/impact-wall/reports/[id]/independent-analysis
  *
- * Proxies to backend: POST /faculty/reports/:id/cii-v2/independent-analysis
+ * Proxies to backend: POST /admin/community-service/reports/:id/independent-analysis
  *
  * Phase 4: Independent AI Analysis from My Impact Wall
- * - Does NOT overwrite the faculty-approved record
+ * - Does NOT overwrite the admin-approved record
  * - Results stored separately for audit purposes
- * - Available for authorized stakeholders (Faculty, University, CIEL Admin)
+ * - Admin-only on the backend as of CII v4.5 (the faculty/university entrypoint — the route this
+ *   file used to proxy to, `faculty/reports/:id/cii-v4-5/independent-analysis` — is now a
+ *   permanent 403 stub; this BFF route is not currently called from any frontend page, so this
+ *   repoint is a judgment call to keep it working rather than guaranteed-403 if it's ever wired
+ *   up again — see the migration report for why).
  */
 export async function POST(request: Request, context: RouteContext) {
     try {
@@ -27,7 +31,7 @@ export async function POST(request: Request, context: RouteContext) {
         const authHeader = request.headers.get("Authorization");
 
         const response = await fetch(
-            `${backendBase}/faculty/reports/${encodeURIComponent(id)}/cii-v2/independent-analysis`,
+            `${backendBase}/admin/community-service/reports/${encodeURIComponent(id)}/independent-analysis`,
             {
                 method: "POST",
                 headers: {

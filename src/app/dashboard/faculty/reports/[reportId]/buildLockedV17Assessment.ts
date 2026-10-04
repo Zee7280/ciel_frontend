@@ -245,7 +245,7 @@ function listJoin(items: unknown[], mapFn?: (item: unknown) => string): string {
 export function buildLockedV17DetailAndAssessment(
     data: ReportData,
     agg: AggLike,
-    options: { locked: boolean; v2Sections: Array<Record<string, unknown>> },
+    options: { locked: boolean; ciiSections: Array<Record<string, unknown>> },
 ): { detailBlocks: LockedV17DetailBlock[]; assessment: LockedV17Assess[] } {
     const requiredHours = data.required_hours || 16;
     const s1 = data.section1;
@@ -713,21 +713,29 @@ export function buildLockedV17DetailAndAssessment(
         },
     };
 
-    const v2ByHint = (no: string): Record<string, unknown> | undefined => {
-        const aliases: Record<string, string[]> = {
-            "01": ["participation"],
-            "02": ["context"],
-            "03": ["sdg"],
-            "04": ["outputs"],
-            "05": ["outcomes"],
-            "06": ["resources"],
-            "07": ["partnerships"],
-            "08": ["evidence"],
-            "09": ["learning"],
-            "10": ["sustainability"],
+    // CII v4.5 `sectionScores` key by a `dimension` code ('1'..'9', with '4' split into '4A'
+    // Activities/Outputs and '4B' Outcomes) rather than the old v2 string keys. Block "04"
+    // (Activities, Outputs & Outcomes) merges both v4.5 halves; the rest map 1:1.
+    const ciiByHint = (no: string): Record<string, unknown> | undefined => {
+        const dims: Record<string, string[]> = {
+            "01": ["1"],
+            "02": ["2"],
+            "03": ["3"],
+            "04": ["4A", "4B"],
+            "05": ["5"],
+            "06": ["6"],
+            "07": ["7"],
+            "08": ["8"],
+            "09": ["9"],
         };
-        const keys = aliases[no] || [];
-        return options.v2Sections.find((row) => keys.includes(String(row.key || row.id || "").toLowerCase()));
+        const wanted = dims[no] || [];
+        const rows = options.ciiSections.filter((row) => wanted.includes(String(row.dimension ?? row.key ?? row.id ?? "")));
+        if (!rows.length) return undefined;
+        if (rows.length === 1) return rows[0];
+        // Block 04 merges 4A + 4B — combine their scores/max so the card shows one figure.
+        const scoreSum = rows.reduce((sum, row) => sum + (finiteNum(row.score) ?? 0), 0);
+        const maxSum = rows.reduce((sum, row) => sum + (finiteNum(row.weight ?? row.maximumPoints) ?? 0), 0);
+        return { ...rows[0], score: scoreSum, weight: maxSum, maximumPoints: maxSum };
     };
 
     const detailBlocks: LockedV17DetailBlock[] = blocks.map((block) => {
@@ -758,19 +766,21 @@ export function buildLockedV17DetailAndAssessment(
             limits: ["Pending Analyzer / Faculty moderation."],
             improvements: [],
         };
-        const fromV2 = v2ByHint(block.n);
-        const scoreRaw = finiteNum(fromV2?.score);
+        const fromCii = ciiByHint(block.n);
+        const scoreRaw = finiteNum(fromCii?.score);
         const missReq = block.fields.some((row) => row.required && row.status !== "Recorded");
         const showScore = scoreRaw != null && (options.locked || !missReq);
-        const analyserReason = txt(fromV2?.reason, fromV2?.comment);
-        const analyserGood = txt(fromV2?.good);
-        const analyserLimit = txt(fromV2?.limit);
-        const analyserImprove = txt(fromV2?.improve, fromV2?.improvement);
+        // v4.5 carries no per-section narrative (good/limit/reason/improve) — only overall
+        // strengths/developmentPriorities — so these stay empty and the generated copy below wins.
+        const analyserReason = txt(fromCii?.reason, fromCii?.comment);
+        const analyserGood = txt(fromCii?.good);
+        const analyserLimit = txt(fromCii?.limit);
+        const analyserImprove = txt(fromCii?.improve, fromCii?.improvement);
         return {
             no: block.n,
             name: rubric.name,
             score: showScore ? String(scoreRaw) : "HOLD",
-            max: finiteNum(fromV2?.weight) || rubric.max,
+            max: finiteNum(fromCii?.weight ?? fromCii?.maximumPoints) || rubric.max,
             chips: rubric.chips,
             reason: missReq || !analyserReason ? generated.reason : analyserReason,
             strengths: analyserGood && showScore ? [analyserGood] : generated.strengths.length ? generated.strengths : ["Pending Analyzer / Faculty moderation."],

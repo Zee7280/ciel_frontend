@@ -100,6 +100,16 @@ function nice(value: unknown): string {
         .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Session rows stay `pending` in the DB until CII Confirm. Hours already count; do not show raw pending on the package. */
+function attendanceStatusLabel(status: unknown): string {
+    const key = String(status || "")
+        .trim()
+        .toLowerCase();
+    if (key === "rejected" || key === "declined") return "Rejected";
+    if (key === "approved" || key === "verified" || key === "accepted") return "Approved";
+    return "Logged";
+}
+
 function isEmpty(value: DetailedReportValue): boolean {
     if (value == null) return true;
     if (typeof value === "string") return !value.trim() || value === NOT_SUPPLIED;
@@ -249,7 +259,7 @@ export function buildImpactPackageDetailedReport(
                             location: text(log.location),
                             activity: text(log.activity_type),
                             description: text(log.description),
-                            status: text(log.approval_status) || "logged",
+                            status: attendanceStatusLabel(log.approval_status),
                         })),
                     ),
                 ],

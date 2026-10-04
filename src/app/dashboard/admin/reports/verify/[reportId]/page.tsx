@@ -194,10 +194,10 @@ interface ReportDetail {
     faculty_status?: string;
     private_candidate?: boolean;
     review_route?: string;
-    ciiV2Lock?: { locked?: boolean } | null;
-    ciiV2?: {
-        final?: number | string;
-        level?: { name?: string; level?: number } | null;
+    ciiV45Lock?: { locked?: boolean } | null;
+    ciiV45?: {
+        finalCII?: number | string;
+        finalBadge?: { name?: string; level?: number } | null;
     } | null;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
@@ -684,7 +684,7 @@ function AdminReportDetailPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const ciiView = (searchParams.get("view") || "").trim().toLowerCase() === "cii-v2";
+    const ciiView = (searchParams.get("view") || "").trim().toLowerCase() === "cii-v4-5";
     const packageView = (searchParams.get("package") || "").trim() === "1";
     const packageDoc = (searchParams.get("doc") || "").trim().toLowerCase();
     const [report, setReport] = useState<ReportDetail | null>(null);
@@ -746,16 +746,16 @@ function AdminReportDetailPage() {
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
         try {
-            const analyserFinal = Number(report.ciiV2?.final);
+            const analyserFinal = Number(report.ciiV45?.finalCII);
             if (Number.isFinite(analyserFinal)) {
                 const analyserLevel =
-                    (typeof report.ciiV2?.level?.name === "string" && report.ciiV2.level.name.trim()) ||
+                    (typeof report.ciiV45?.finalBadge?.name === "string" && report.ciiV45.finalBadge.name.trim()) ||
                     "";
                 return {
                     totalScore: Math.round(analyserFinal * 10) / 10,
                     level: analyserLevel || "Analyzer CII",
                     cii_score_max: 100,
-                    evaluation_framework_version: "v3.1-balanced",
+                    evaluation_framework_version: "v4.5",
                 };
             }
             const persisted = readPersistedCiiSnapshot(report);
@@ -924,7 +924,7 @@ function AdminReportDetailPage() {
     };
 
     const handleOpenAiAnalyzer = () => {
-        router.push(`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v2`);
+        router.push(`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v4-5`);
     };
 
     const reportIdStr = String(params.reportId);
@@ -1248,7 +1248,7 @@ function AdminReportDetailPage() {
                             Run the AI analyzer, confirm the final score, then publish. Faculty does not review this listing.
                         </p>
                         <Link
-                            href={`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v2`}
+                            href={`/dashboard/admin/reports/verify/${params.reportId}?view=cii-v4-5`}
                             className="mt-2 inline-flex font-semibold text-[#0e7d74] underline"
                         >
                             Open CIEL PK AI analyzer
@@ -2413,7 +2413,7 @@ function AdminReportDetailPage() {
                                         isVerifying ||
                                         report.admin_status === "approved" ||
                                         ((report.private_candidate || report.review_route === "ciel_pk") &&
-                                            report.ciiV2Lock?.locked !== true)
+                                            report.ciiV45Lock?.locked !== true)
                                     }
                                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
                                 >
@@ -2527,7 +2527,7 @@ function AdminReportDetailPage() {
                                 onClick={() => handleVerify("approve")}
                                 disabled={
                                     (report.private_candidate || report.review_route === "ciel_pk") &&
-                                    report.ciiV2Lock?.locked !== true
+                                    report.ciiV45Lock?.locked !== true
                                 }
                                 className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                             >

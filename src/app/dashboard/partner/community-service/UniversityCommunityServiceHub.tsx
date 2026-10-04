@@ -966,7 +966,7 @@ export default function UniversityCommunityServiceHub() {
                                     {list.map((row) => (
                                         <CommunityQueueCard
                                             key={row.id}
-                                            href={`/dashboard/partner/verify/${encodeURIComponent(row.id)}`}
+                                            href={`/dashboard/partner/verify/${encodeURIComponent(row.id)}?package=1`}
                                             title={row.project_title || "Report"}
                                             student={row.student_name || "Student"}
                                             org={row.organization_name}
@@ -1042,7 +1042,7 @@ export default function UniversityCommunityServiceHub() {
                                 <CommunityFlashCard
                                     key={c.id}
                                     card={c}
-                                    href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}`}
+                                    href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1`}
                                     viewer="university"
                                     packageHrefs={{
                                         detailedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=report`,

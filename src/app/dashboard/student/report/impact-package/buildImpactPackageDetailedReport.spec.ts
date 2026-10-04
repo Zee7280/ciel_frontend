@@ -25,7 +25,7 @@ const base = {
         },
         team_members: [],
         attendance_logs: [
-            { id: "a", date: "2026-05-04", start_time: "09:00", end_time: "13:00", location: "Lahore", activity_type: "field_visit", description: "Paint", hours: 4 },
+            { id: "a", date: "2026-05-04", start_time: "09:00", end_time: "13:00", location: "Lahore", activity_type: "field_visit", description: "Paint", hours: 4, approval_status: "pending" },
         ],
         metrics: { total_verified_hours: 16, total_active_days: 1, engagement_span: 1, attendance_frequency: 1, weekly_continuity: 1, eis_score: 1, engagement_category: "ok", hec_compliance: "recognized" },
     },
@@ -51,6 +51,9 @@ test("detailed report uses the 10-section mockup outline with live answers", () 
     assert.equal(name?.origin, "Source record");
     assert.ok(dossier.fieldCount > 30);
     assert.ok(dossier.banner?.htmlTitle.includes("Super Admin"));
+    const sessionRow = dossier.sections[0].subsections.find((sub) => sub.id === "1.3")?.rows[0];
+    const entries = sessionRow?.answer as Array<{ status?: string }>;
+    assert.equal(entries[0]?.status, "Logged");
 });
 
 test("partner package redacts CNIC; faculty keeps the identity number", () => {

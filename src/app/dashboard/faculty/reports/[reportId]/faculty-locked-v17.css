@@ -155,6 +155,8 @@
 }
 #flv17-print-mount{display:none}
 .flv17-modal-backdrop{position:fixed;inset:0;z-index:200;background:rgba(8,28,32,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px 16px 40px;overflow:auto}
+.flv17-page{min-height:100vh;background:#eef4f3;padding:12px 10px 40px}
+.flv17-page .flv17-modal{margin:0 auto;box-shadow:0 18px 50px rgba(4,37,43,.12)}
 .flv17-modal{width:min(1180px,100%);background:#fff;border-radius:22px;box-shadow:0 30px 80px rgba(4,37,43,.28);overflow:hidden}
 .flv17-modal-top{padding:16px 20px 12px;border-bottom:1px solid #e4eeec;position:relative}
 .flv17-modal-top .pill{display:inline-flex;background:#123f45;color:#fff;border-radius:999px;padding:4px 10px;font-size:10px;font-weight:900;letter-spacing:.06em}

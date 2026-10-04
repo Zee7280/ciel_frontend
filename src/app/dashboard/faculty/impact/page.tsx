@@ -177,7 +177,7 @@ export default function FacultyImpactWallPage() {
                                 href={`/dashboard/faculty/reports/${card.id}`}
                                 viewer="faculty"
                                 packageHrefs={{
-                                    detailedPdf: `/dashboard/faculty/reports/${card.id}?view=dossier`,
+                                    detailedPdf: `/dashboard/faculty/reports/${card.id}?view=dossier&doc=report`,
                                     combinedPdf: `/dashboard/faculty/reports/${card.id}?view=dossier`,
                                     verify: card.impact_verify_url || undefined,
                                 }}
