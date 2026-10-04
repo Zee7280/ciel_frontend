@@ -144,7 +144,7 @@ export default function AttendanceForm({
     setParticipationUnlocked,
     allowManualUnlock = true,
 }: {
-    verifiedUsers: { id: string; name: string; status?: string }[];
+    verifiedUsers: { id: string; name: string; status?: string; email?: string }[];
     onSuccess: () => void;
     selectedParticipantId?: string | null;
     onParticipantChange?: (id: string) => void;
@@ -159,6 +159,22 @@ export default function AttendanceForm({
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
     const [pinnedAddress, setPinnedAddress] = useState("");
     const [mounted, setMounted] = React.useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState("");
+    const [teammateOtpSent, setTeammateOtpSent] = useState(false);
+    const [teammateOtpCode, setTeammateOtpCode] = useState("");
+    const [isSendingTeammateOtp, setIsSendingTeammateOtp] = useState(false);
+
+    React.useEffect(() => {
+        try {
+            const stored = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+            if (stored) {
+                const u = JSON.parse(stored);
+                if (u?.email) setCurrentUserEmail(String(u.email).trim().toLowerCase());
+            }
+        } catch {
+            /* ignore */
+        }
+    }, []);
     const [formData, setFormData] = useState({
         participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ""),
         dateOfEngagement: "",
@@ -201,6 +217,42 @@ export default function AttendanceForm({
     const isUserApproved =
         !!selectedUser && canLogAttendanceForParticipationStatus(selectedUser.status);
 
+    // Logging this session for someone other than yourself (Team Lead proxy entry) is exactly the
+    // fake-hour-claim risk an OTP exists to curb — self-logged sessions need no extra proof.
+    const selectedUserEmailNorm = String(selectedUser?.email || "").trim().toLowerCase();
+    const isProxyForTeammate =
+        Boolean(selectedUserEmailNorm) &&
+        Boolean(currentUserEmail) &&
+        selectedUserEmailNorm !== currentUserEmail;
+
+    React.useEffect(() => {
+        setTeammateOtpSent(false);
+        setTeammateOtpCode("");
+    }, [formData.participantId]);
+
+    const sendTeammateOtp = async () => {
+        if (!selectedUser?.email) return;
+        setIsSendingTeammateOtp(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/student/verify-team-member/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: selectedUser.email }),
+            });
+            if (res?.ok) {
+                setTeammateOtpSent(true);
+                toast.success(`Code sent to ${selectedUser.email}`);
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string })?.message || "Failed to send verification code");
+            }
+        } catch {
+            toast.error("Network error while sending the verification code");
+        } finally {
+            setIsSendingTeammateOtp(false);
+        }
+    };
+
     const effectiveLocked = isParticipationUnlocked
         ? false
         : !isUserApproved || isLocked;
@@ -237,6 +289,13 @@ export default function AttendanceForm({
             .reduce((sum, log) => sum + (Number(log.hours) || 0), 0);
         if (existingDailyHours + numericHours > MAX_DAILY_ATTENDANCE_HOURS) {
             alert(dailyCapMessage);
+            return;
+        }
+
+        if (isProxyForTeammate && !teammateOtpCode.trim()) {
+            const message = `Ask ${selectedUser?.name || "your teammate"} for the verification code sent to their email, then enter it below before logging this session on their behalf.`;
+            setSubmitError(message);
+            toast.error(message, { duration: 8000 });
             return;
         }
 
@@ -329,6 +388,7 @@ export default function AttendanceForm({
                     evidenceUploaded: Boolean(presignedEvidenceUrl),
                     evidenceUrl: presignedEvidenceUrl,
                     locationPin: formData.locationPin || undefined,
+                    ...(isProxyForTeammate ? { teammateOtp: teammateOtpCode.trim() } : {}),
                 };
 
                 fetchOptions = {
@@ -379,6 +439,8 @@ export default function AttendanceForm({
                 otherActivity: "",
             });
             setEvidenceFile(null);
+            setTeammateOtpSent(false);
+            setTeammateOtpCode("");
         } catch (error) {
             const message =
                 error instanceof Error && error.message.trim()
@@ -422,6 +484,48 @@ export default function AttendanceForm({
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 </div>
             </div>
+
+            {isProxyForTeammate ? (
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="flex items-start gap-1.5 text-xs font-medium text-amber-800">
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        You&apos;re logging this session for {selectedUser?.name || "a teammate"}. They must confirm it
+                        themselves with a code sent to their own email before it can be saved.
+                    </p>
+                    {!teammateOtpSent ? (
+                        <Button
+                            type="button"
+                            onClick={sendTeammateOtp}
+                            disabled={isSendingTeammateOtp}
+                            className="h-9 w-full text-xs"
+                        >
+                            {isSendingTeammateOtp ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                `Send verification code to ${selectedUser?.email || "teammate"}`
+                            )}
+                        </Button>
+                    ) : (
+                        <div className="space-y-1.5">
+                            <Input
+                                placeholder="6-digit code from teammate"
+                                maxLength={6}
+                                value={teammateOtpCode}
+                                onChange={(e) => setTeammateOtpCode(e.target.value.replace(/\D/g, ""))}
+                                className={clsx(fieldClass, "text-center tracking-[0.3em]")}
+                            />
+                            <button
+                                type="button"
+                                onClick={sendTeammateOtp}
+                                disabled={isSendingTeammateOtp}
+                                className="text-[11px] font-semibold text-amber-700 underline underline-offset-2 disabled:opacity-50"
+                            >
+                                {isSendingTeammateOtp ? "Sending…" : "Resend code"}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-1">
                 <div className="space-y-1.5 min-w-0">

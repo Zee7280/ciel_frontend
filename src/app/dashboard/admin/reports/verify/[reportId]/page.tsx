@@ -74,6 +74,7 @@ import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import type { ImpactPackageAudience } from "@/app/dashboard/student/report/impact-package/buildImpactPackageModel";
 import ConfirmModal from "../../../_shared/ConfirmModal";
 import { loadReviewQueue, neighbourInQueue } from "../../../_shared/reviewQueue";
 import ReportEvidenceGallery, {
@@ -688,6 +689,10 @@ function AdminReportDetailPage() {
     const packageDoc = (searchParams.get("doc") || "").trim().toLowerCase();
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    /** Lets Admin see exactly what each stakeholder sees of the same Impact Package below, without
+     * leaving this page or changing anyone's real access — the decision buttons further down always
+     * act as Admin regardless of what's previewed here. */
+    const [previewAudience, setPreviewAudience] = useState<ImpactPackageAudience>("admin");
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isDownloadingAiPayload, setIsDownloadingAiPayload] = useState(false);
@@ -925,7 +930,7 @@ function AdminReportDetailPage() {
     const reportIdStr = String(params.reportId);
     const [queueIds, setQueueIds] = useState<string[]>([]);
     const [pendingDecision, setPendingDecision] = useState<
-        { apiAction: 'approve' | 'reject' | 'unlock'; stage: 'confirm' | 'force' } | null
+        { apiAction: 'approve' | 'reject' | 'unlock' | 'close'; stage: 'confirm' | 'force' } | null
     >(null);
 
     useEffect(() => {
@@ -963,22 +968,28 @@ function AdminReportDetailPage() {
         return st === 'verified' || st === 'paid' || String(r.admin_status || '').trim().toLowerCase() === 'approved';
     };
 
-    const handleVerify = (action: 'approve' | 'reject' | 'unlock', intent: 'decision' | 'editable' = 'decision') => {
-        const apiAction: 'approve' | 'reject' | 'unlock' =
+    /** 'closed' = CIEL PK Admin retracted an already-published report (e.g. fraud found later). */
+    const isReportClosed = (r: ReportDetail | null): boolean =>
+        String(r?.status || '').trim().toLowerCase() === 'closed';
+
+    const handleVerify = (action: 'approve' | 'reject' | 'unlock' | 'close', intent: 'decision' | 'editable' = 'decision') => {
+        const apiAction: 'approve' | 'reject' | 'unlock' | 'close' =
             intent === 'editable' ? 'unlock' : action;
 
-        if ((apiAction === 'reject' || apiAction === 'unlock') && !feedback.trim()) {
+        if ((apiAction === 'reject' || apiAction === 'unlock' || apiAction === 'close') && !feedback.trim()) {
             toast.error(
                 apiAction === 'unlock'
                     ? 'Please provide notes so the student knows what to edit'
-                    : 'Please provide notes/feedback for rejection',
+                    : apiAction === 'close'
+                        ? 'Please provide a reason for closing this report'
+                        : 'Please provide notes/feedback for rejection',
             );
             return;
         }
         setPendingDecision({ apiAction, stage: 'confirm' });
     };
 
-    const executeVerify = async (apiAction: 'approve' | 'reject' | 'unlock', force: boolean) => {
+    const executeVerify = async (apiAction: 'approve' | 'reject' | 'unlock' | 'close', force: boolean) => {
         try {
             setIsVerifying(true);
             const userData = JSON.parse(localStorage.getItem('ciel_user') || '{}');
@@ -1001,7 +1012,9 @@ function AdminReportDetailPage() {
                 toast.success(
                     apiAction === 'unlock'
                         ? 'Report returned to student for edits.'
-                        : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
+                        : apiAction === 'close'
+                            ? 'Report closed and removed from published results.'
+                            : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
                 );
                 setPendingDecision(null);
                 const nextId = queueNav.next;
@@ -1029,7 +1042,9 @@ function AdminReportDetailPage() {
     const onDecisionConfirmed = () => {
         if (!pendingDecision) return;
         const { apiAction, stage } = pendingDecision;
-        const needsForce = apiAction !== 'approve' && isFinalised(report);
+        // 'close' only ever targets an already-finalised report (that's the point of it), so it
+        // doesn't need the same forced-override step reject/unlock use to protect a *live* result.
+        const needsForce = apiAction !== 'approve' && apiAction !== 'close' && isFinalised(report);
         if (needsForce && stage === 'confirm') {
             setPendingDecision({ apiAction, stage: 'force' });
             return;
@@ -1037,7 +1052,7 @@ function AdminReportDetailPage() {
         void executeVerify(apiAction, needsForce);
     };
 
-    const decisionCopy = (apiAction: 'approve' | 'reject' | 'unlock') => {
+    const decisionCopy = (apiAction: 'approve' | 'reject' | 'unlock' | 'close') => {
         const who = report?.student?.name || 'the student';
         if (apiAction === 'approve') {
             return {
@@ -1051,6 +1066,13 @@ function AdminReportDetailPage() {
                 title: 'Reject this report?',
                 label: 'Reject report',
                 body: `${who} is notified with your notes and the report is marked as needing revision.`,
+            };
+        }
+        if (apiAction === 'close') {
+            return {
+                title: 'Close this published report?',
+                label: 'Close report',
+                body: `This retracts ${who}'s report from every published view (impact wall, certificates, leaderboards) and keeps your reason on record. The locked AI/admin score is preserved as a historical record, not deleted.`,
             };
         }
         return {
@@ -1170,11 +1192,46 @@ function AdminReportDetailPage() {
                         </span>
                     </div>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <span className={clsx(adminDossier.microLabel, "shrink-0")}>Preview package as</span>
+                    <div className="flex flex-wrap gap-1.5">
+                        {(
+                            [
+                                ["admin", "CIEL PK Admin (you)"],
+                                ["student", "Student"],
+                                ["faculty", "Faculty"],
+                                ["university", "University"],
+                                ["partner", "Partner / NGO"],
+                                ["public", "Public visitor"],
+                            ] as [ImpactPackageAudience, string][]
+                        ).map(([value, label]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setPreviewAudience(value)}
+                                className={clsx(
+                                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                                    previewAudience === value
+                                        ? "bg-indigo-600 text-white shadow-sm"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                                )}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    {previewAudience !== "admin" ? (
+                        <span className="ml-auto text-[11px] font-medium text-amber-700">
+                            Preview only — your own admin access and the decision buttons below are unaffected.
+                        </span>
+                    ) : null}
+                </div>
                 <AdminReviewPackageStrip
                     reportId={String(params.reportId)}
                     report={report as unknown as Record<string, unknown>}
                     fallbackFiles={evidenceFiles}
                     highlight={packageView}
+                    audience={previewAudience}
                     initialDoc={
                         packageDoc === "flashcard" ||
                         packageDoc === "report" ||
@@ -2372,6 +2429,24 @@ function AdminReportDetailPage() {
                                     <XCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                                     {isReportReturnedForRevision(report) ? "Revision requested" : "Reject"}
                                 </button>
+                                {isFinalised(report) && !isReportClosed(report) ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerify("close")}
+                                        disabled={isVerifying}
+                                        className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 sm:w-auto"
+                                        title="Retract this already-published report (e.g. fraud found after publication). The locked score stays on record; the report stops counting everywhere it was published."
+                                    >
+                                        <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                        Close (retract publication)
+                                    </button>
+                                ) : null}
+                                {isReportClosed(report) ? (
+                                    <span className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 sm:w-auto">
+                                        <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                        Closed
+                                    </span>
+                                ) : null}
                             </div>
                         </div>
                     </div>
