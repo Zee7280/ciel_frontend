@@ -21,6 +21,7 @@ export function tabFromPackageQuery(view: string | null | undefined, hash?: stri
     const fromHash = String(hash || "").replace(/^#/, "").trim().toLowerCase();
     if (isImpactPackageTab(fromHash)) return fromHash;
     const v = String(view || "").trim().toLowerCase();
+    // `v17` is a legacy inbound alias for the detailed report (old emails / bookmarks).
     if (v === "print" || v === "report" || v === "v17") return "report";
     if (v === "evidence" || v === "gallery") return "evidence";
     if (v === "cii-v2" || v === "analysis" || v === "analyser") return "analysis";

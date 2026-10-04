@@ -373,7 +373,9 @@ export default function ImpactPackage({
                     </button>
                     {analyserHref ? (
                         <a href={analyserHref} className="primary" style={{ textDecoration: "none" }}>
-                            <span className="button-content">Run AI analyser</span>
+                            <span className="button-content">
+                                {(data as { ciiV2?: unknown }).ciiV2 ? "Open AI analyser" : "Run AI analyser"}
+                            </span>
                         </a>
                     ) : null}
                 </div>

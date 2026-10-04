@@ -18,6 +18,7 @@ import {
     isCommunityReportRejected,
     isReviewDraftStatus,
 } from "@/utils/reviewQueue";
+import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
 
 const HUB = "/dashboard/student/paths/community-service";
 const FILES_TABS = [
@@ -44,9 +45,10 @@ function isFilesTab(value: string | null): value is FilesTab {
 
 function reportHref(row: FileRow): string {
     const id = row.project_id || row.opportunity_id || row.id;
-    // Same faculty V17 package the report page opens (`view=v17`). Official print dossier
-    // stays on `view=print` from Impact Wall PDF / certificate links.
-    return `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}&view=v17`;
+    return (
+        studentImpactPackageHref(String(id), "report") ||
+        `/dashboard/student/report?projectId=${encodeURIComponent(String(id))}&view=report`
+    );
 }
 
 export default function CommunityServiceFiles() {

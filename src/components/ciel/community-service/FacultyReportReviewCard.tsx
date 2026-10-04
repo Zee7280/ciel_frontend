@@ -144,7 +144,7 @@ export default function FacultyReportReviewCard({
     const finalStep: "done" | "cur" | "" = mode === "decided" ? "done" : has && mode === "pending" ? "cur" : "";
 
     const stages: { label: string; sub: string; state: "done" | "cur" | "" }[] = [
-        { label: "Flashcard", sub: "Locked V17 template", state: "done" },
+        { label: "Flashcard", sub: "Locked impact flashcard", state: "done" },
         { label: "Detailed Report", sub: "Full section + sub-section record", state: "done" },
         { label: "Evidence", sub: `${evidenceCount} items · full access`, state: "done" },
         { label: "Full PDF", sub: `${idLabel}-R01.pdf`, state: "done" },

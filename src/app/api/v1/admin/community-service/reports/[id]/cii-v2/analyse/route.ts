@@ -6,15 +6,12 @@ export const maxDuration = 300;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/**
- * POST /api/v1/faculty/reports/[id]/cii-v2/analyse
- * Proxies to Nest: POST /faculty/reports/:id/cii-v2/analyse
- */
+/** POST /api/v1/admin/community-service/reports/:id/cii-v2/analyse */
 export async function POST(req: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     return proxyToNest(
         req,
-        `faculty/reports/${encodeURIComponent(id)}/cii-v2/analyse`,
+        `admin/community-service/reports/${encodeURIComponent(id)}/cii-v2/analyse`,
         { tryAlternatePaths: false },
     );
 }

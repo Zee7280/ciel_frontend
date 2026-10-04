@@ -1045,8 +1045,8 @@ export default function UniversityCommunityServiceHub() {
                                     href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}`}
                                     viewer="university"
                                     packageHrefs={{
-                                        detailedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}`,
-                                        combinedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}`,
+                                        detailedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=report`,
+                                        combinedPdf: `/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1`,
                                         verify: c.impact_verify_url || undefined,
                                     }}
                                 />

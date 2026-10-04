@@ -3648,7 +3648,7 @@
     }
 }
 
-/* V17 flashcard — one card, same CII as the detailed report, print matches the screen */
+/* Impact flashcard — one card, same CII as the detailed report, print matches the screen */
 :is(.cer, .cer-scope) .cer-v17-flash {
     width: min(1160px, 100%);
     margin: 0 auto 16px;

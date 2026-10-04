@@ -4,24 +4,26 @@ import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
 import Footer from "@/components/Footer";
+import BrowseOpportunityCard, { sdgsForBrowseCard } from "@/app/dashboard/student/browse/BrowseOpportunityCard";
 import {
     Search,
-    MapPin,
     Users,
-    ArrowRight,
     Loader2,
-    Share2,
-    Briefcase,
-    Building2,
+    Boxes,
     LayoutGrid,
+    List,
     Map as MapIcon,
     Clock,
-    GraduationCap,
-    Sparkles,
+    CheckCircle2,
+    BarChart3,
+    Leaf,
+    Lightbulb,
+    Filter,
+    ChevronDown,
+    X,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { toast } from "sonner";
 import clsx from "clsx";
 import type { ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
@@ -30,14 +32,21 @@ import {
     computeSeatsRemaining,
     modeMenuLabel,
     normalizeModeBucket,
-    passesSeatsFilter,
     pickOpportunityTypes,
     pickUniversityLabel,
     pickVisibilityBucket,
 } from "@/utils/opportunityListing";
 import { findSdgById } from "@/utils/sdgData";
 import { buildOpportunityMapPoints } from "@/utils/opportunityMapCoordinates";
-import { applicationsOpenFromPayload, applyClosedCtaLabel } from "@/utils/studentApplyMaintenance";
+import { applicationsOpenFromPayload } from "@/utils/studentApplyMaintenance";
+import {
+    BROWSE_PATHS,
+    BROWSE_PATH_BY_KEY,
+    classifyBrowseCreator,
+    classifyBrowsePath,
+    isUrgentBrowseDeadline,
+    type BrowsePathKey,
+} from "@/utils/browseOpportunityPath";
 
 const OpportunitiesMapView = dynamic(
     () => import("@/components/opportunities/OpportunitiesMapView"),
@@ -51,39 +60,70 @@ const OpportunitiesMapView = dynamic(
     },
 );
 
-interface Project {
-    id: string | number;
+type ExploreCreator = "student" | "faculty" | "partner" | "admin";
+
+type ExploreProject = {
+    id: string;
     title: string;
-    partner_name?: string;
-    org?: string;
-    location?: string;
-    status: string;
-    participant_count?: number;
-    volunteers?: number;
     description: string;
-    category?: string;
-    types?: string[];
+    status: string;
+    org: string;
+    city: string;
+    location: string;
+    locationPin: string | null;
     universityLabel: string;
     modeBucket: ModeBucket;
     visibilityBucket: VisibilityBucket;
     opportunityTypes: string[];
     sdgLabel: string;
+    sdgNumber: number | null;
+    sdgTitle: string | null;
+    sdg_ids: string[];
     seatsRemaining: number | null;
-    locationPin: string | null;
+    hours: number | null;
+    start_date: string | null;
+    end_date: string | null;
+    createdAt?: string;
+    department: string | null;
+    partner_name: string | null;
+    path_key: BrowsePathKey;
+    path_label: string;
+    cover_url: string | null;
+    is_full: boolean;
+    is_virtual: boolean;
+    is_urgent: boolean;
+    created_by_role: ExploreCreator | null;
+    faculty_verified: boolean;
+    execution_verified: boolean;
+    admin_approved: boolean;
+    participant_count: number;
     applicationsOpen: boolean;
-    applyClosedMessage: string | null;
     applyBlockedReason: string | null;
-}
+};
 
-type ListingTab = "open" | "closing" | "university" | "archived";
+type ExploreStats = {
+    total: number;
+    verified: number;
+    partners: number;
+    students_impacted: number;
+};
 
-function buildPublicProjectShareUrl(projectId: string | number): string {
+type PathCounts = Record<BrowsePathKey | "all", number>;
+
+const EMPTY_PATH_COUNTS: PathCounts = {
+    all: 0,
+    community_service: 0,
+    coursework: 0,
+    fyp: 0,
+    startup: 0,
+};
+
+function buildPublicProjectShareUrl(projectId: string): string {
     if (typeof window === "undefined") return "";
-    const id = encodeURIComponent(String(projectId));
-    return `${window.location.origin}/projects/${id}`;
+    return `${window.location.origin}/projects/${encodeURIComponent(projectId)}`;
 }
 
-async function copyPublicProjectShareLink(projectId: string | number): Promise<void> {
+async function copyPublicProjectShareLink(projectId: string): Promise<void> {
     const url = buildPublicProjectShareUrl(projectId);
     if (!url) return;
     try {
@@ -103,40 +143,10 @@ function isArchivedStatus(status: string): boolean {
     return ["completed", "archived", "closed", "inactive", "cancelled"].some((x) => s.includes(x));
 }
 
-function isOpenStatus(status: string): boolean {
-    return !isArchivedStatus(status) && !normalizeStatus(status).includes("full");
-}
-
-function isClosingSoon(project: Project): boolean {
-    const s = normalizeStatus(project.status);
-    if (s.includes("closing")) return true;
-    if (project.seatsRemaining != null && project.seatsRemaining > 0 && project.seatsRemaining <= 5) {
-        return true;
-    }
-    return false;
-}
-
 function extractCityLabel(location?: string): string {
     if (!location) return "Pakistan";
     const first = location.split(",")[0]?.trim();
     return first || location;
-}
-
-function parseSdgNumber(sdgLabel: string): number | null {
-    const match = sdgLabel.match(/^(\d+)\./);
-    if (!match) return null;
-    const n = Number(match[1]);
-    return Number.isFinite(n) ? n : null;
-}
-
-function statusBadgeClass(status: string): string {
-    const s = normalizeStatus(status);
-    if (s.includes("closing")) return "bg-amber-50 text-amber-800 border-amber-200";
-    if (s.includes("full")) return "bg-slate-100 text-slate-600 border-slate-200";
-    if (isArchivedStatus(status)) return "bg-slate-100 text-slate-600 border-slate-200";
-    if (s === "active" || s.includes("open")) return "bg-emerald-50 text-emerald-800 border-emerald-200";
-    if (s === "recruiting") return "bg-sky-50 text-sky-800 border-sky-200";
-    return "bg-slate-50 text-slate-700 border-slate-200";
 }
 
 function statusDisplayLabel(status: string): string {
@@ -149,51 +159,172 @@ function statusDisplayLabel(status: string): string {
     return status || "Open";
 }
 
-function FilterPill({
-    active,
-    onClick,
-    children,
-    className,
-}: {
-    active: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-    className?: string;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={clsx(
-                "rounded-lg border px-3 py-2.5 text-left text-xs font-semibold transition-colors",
-                active
-                    ? "border-[#0F8F83] bg-[#0F8F83]/10 text-[#065f46]"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
-                className,
-            )}
-        >
-            {children}
-        </button>
-    );
+function formatStat(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return "0";
+    return value.toLocaleString("en-US");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function str(value: unknown): string {
+    return typeof value === "string" ? value.trim() : "";
+}
+
+function pickCity(raw: Record<string, unknown>, fallbackLocation: string): string {
+    const loc = raw.location;
+    if (loc && typeof loc === "object") {
+        const l = loc as Record<string, unknown>;
+        return str(l.city) || str(l.district) || str(l.venue) || extractCityLabel(fallbackLocation);
+    }
+    if (typeof loc === "string" && loc.trim()) return extractCityLabel(loc);
+    return extractCityLabel(fallbackLocation) || "Remote";
+}
+
+function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
+    let displayLocation = "Remote / Pakistan";
+    let locationPin: string | null = null;
+    const loc = raw.location;
+    if (typeof loc === "object" && loc !== null) {
+        const l = loc as Record<string, unknown>;
+        const parts: string[] = [];
+        if (typeof l.city === "string") parts.push(l.city);
+        if (typeof l.venue === "string") parts.push(l.venue);
+        if (typeof l.pin === "string" && l.pin.trim()) locationPin = l.pin.trim();
+        displayLocation =
+            parts.length > 0
+                ? parts.join(", ")
+                : typeof l.pin === "string" && l.pin.trim()
+                  ? l.pin
+                  : "Pakistan";
+    } else if (typeof loc === "string" && loc.trim()) {
+        displayLocation = loc;
+    }
+
+    const opportunityTypes = pickOpportunityTypes(raw);
+    const sdgLabel = buildSdgFilterLabel(raw);
+    const sdgIdRaw =
+        (asRecord(raw.sdg_info)?.sdg_id as unknown) ?? raw.sdg;
+    const sdg = findSdgById(sdgIdRaw as string | number | undefined);
+    const sdgIds = Array.isArray(raw.sdg_ids)
+        ? raw.sdg_ids.map((id) => String(id))
+        : [sdgIdRaw].filter((id) => id != null && String(id).trim()).map((id) => String(id));
+    const path_key = classifyBrowsePath(opportunityTypes.length ? opportunityTypes : raw.types, raw.path_key);
+    const org =
+        str(raw.partner_name) ||
+        str(raw.organization_name) ||
+        str(asRecord(raw.organization)?.name) ||
+        "Verified Partner";
+    const seatsRemaining = computeSeatsRemaining(raw);
+    const hoursRaw = Number(raw.hours);
+    const timeline = asRecord(raw.timeline);
+    const start_date = str(raw.start_date) || str(timeline?.start_date) || null;
+    const end_date =
+        str(raw.end_date) || str(timeline?.end_date) || str(timeline?.application_deadline) || null;
+    const remainingForFull = typeof seatsRemaining === "number" ? seatsRemaining : null;
+    const volunteersNeeded = Number(raw.volunteersNeeded ?? timeline?.volunteers_required);
+    const hasSeatCap = Number.isFinite(volunteersNeeded) && volunteersNeeded > 0;
+
+    return {
+        id: String(raw.id ?? ""),
+        title: String(raw.title ?? ""),
+        description: String(raw.description ?? ""),
+        status: String(raw.status || "Active"),
+        org,
+        city: pickCity(raw, displayLocation),
+        location: displayLocation,
+        locationPin,
+        universityLabel: pickUniversityLabel(raw),
+        modeBucket: normalizeModeBucket(raw.mode),
+        visibilityBucket: pickVisibilityBucket(raw),
+        opportunityTypes,
+        sdgLabel,
+        sdgNumber: sdg?.number ?? null,
+        sdgTitle: sdg?.title ?? null,
+        sdg_ids: sdgIds,
+        seatsRemaining,
+        hours: Number.isFinite(hoursRaw) && hoursRaw > 0 ? hoursRaw : null,
+        start_date,
+        end_date,
+        createdAt: str(raw.created_at || raw.createdAt) || undefined,
+        department: str(raw.department) || null,
+        partner_name: str(raw.partner_name) || org,
+        path_key,
+        path_label: str(raw.path_label) || BROWSE_PATH_BY_KEY[path_key].shortLabel,
+        cover_url: str(raw.cover_url) || null,
+        is_full:
+            typeof raw.is_full === "boolean"
+                ? raw.is_full
+                : Boolean(hasSeatCap && remainingForFull != null && remainingForFull <= 0),
+        is_virtual:
+            typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(raw.mode) === "remote",
+        is_urgent:
+            typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(end_date),
+        created_by_role: classifyBrowseCreator(raw),
+        faculty_verified: raw.faculty_verified === true,
+        execution_verified: raw.execution_verified === true,
+        admin_approved: raw.admin_approved === true,
+        participant_count: Number(raw.participant_count) || 0,
+        applicationsOpen: applicationsOpenFromPayload(raw),
+        applyBlockedReason: str(raw.apply_blocked_reason) || null,
+    };
+}
+
+function computeExploreStats(rows: ExploreProject[]): ExploreStats {
+    const partners = new Set<string>();
+    let studentsImpacted = 0;
+    let verified = 0;
+    for (const row of rows) {
+        if (row.org && row.org.toLowerCase() !== "unknown") partners.add(row.org);
+        if (row.participant_count > 0) studentsImpacted += row.participant_count;
+        if (row.faculty_verified || row.execution_verified || row.admin_approved) verified += 1;
+    }
+    return {
+        total: rows.length,
+        verified: verified || rows.length,
+        partners: partners.size,
+        students_impacted: studentsImpacted,
+    };
+}
+
+function computePathCounts(rows: ExploreProject[]): PathCounts {
+    const counts: PathCounts = { ...EMPTY_PATH_COUNTS, all: rows.length };
+    for (const row of rows) counts[row.path_key] += 1;
+    return counts;
+}
+
+const filterSelectClass =
+    "h-10 w-full min-w-0 appearance-none rounded-xl border border-[#e4eeec] bg-white px-3 pr-8 text-sm text-[#16313d] transition-colors hover:border-slate-300 focus:border-[#0e7d74] focus:outline-none focus:ring-2 focus:ring-[#0e7d74]/20";
+
 export default function ProjectsPage() {
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [projects, setProjects] = useState<ExploreProject[]>([]);
+    const [apiStats, setApiStats] = useState<ExploreStats | null>(null);
+    const [apiPathCounts, setApiPathCounts] = useState<PathCounts | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [universityFilter, setUniversityFilter] = useState("all");
     const [modeFilter, setModeFilter] = useState<"all" | ModeBucket>("all");
-    const [oppTypeFilter, setOppTypeFilter] = useState("all");
     const [sdgFilter, setSdgFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
-    const [seatsFilter, setSeatsFilter] = useState<"all" | "1" | "5" | "10">("all");
-    const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
-    const [activeTab, setActiveTab] = useState<ListingTab>("open");
-    const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
-    /** True when the last load failed — keeps a real outage distinguishable from a genuine zero-result filter. */
+    const [pathTab, setPathTab] = useState<"all" | BrowsePathKey>("all");
+    const [departmentFilter, setDepartmentFilter] = useState("all");
+    const [partnerFilter, setPartnerFilter] = useState("all");
+    const [timeCommitment, setTimeCommitment] = useState<"all" | "8" | "16" | "17">("all");
+    const [creatorFilter, setCreatorFilter] = useState<"all" | ExploreCreator>("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
+    const [virtualOnly, setVirtualOnly] = useState(false);
+    const [urgentOnly, setUrgentOnly] = useState(false);
+    const [sortNewest, setSortNewest] = useState(true);
+    const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("grid");
+    const [filtersOpen, setFiltersOpen] = useState(true);
+    const [promoOpen, setPromoOpen] = useState(true);
     const [fetchError, setFetchError] = useState(false);
     const [reloadNonce, setReloadNonce] = useState(0);
     const [applyBanner, setApplyBanner] = useState<string | null>(null);
+    const resultsRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -216,9 +347,9 @@ export default function ProjectsPage() {
                     return;
                 }
                 const rawText = await response.text();
-                let data: { success?: boolean; data?: unknown };
+                let data: Record<string, unknown>;
                 try {
-                    data = rawText ? (JSON.parse(rawText) as { success?: boolean; data?: unknown }) : {};
+                    data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
                 } catch {
                     console.error("Invalid JSON from /public/opportunities");
                     setProjects([]);
@@ -226,89 +357,48 @@ export default function ProjectsPage() {
                     return;
                 }
 
-                type Payload = {
-                    success?: boolean;
-                    data?: unknown;
-                    opportunities?: unknown;
-                    apply_maintenance?: { enabled?: boolean; message?: string };
-                };
-                const body = data as Payload;
-                const maintenance = body.apply_maintenance;
+                const maintenance = asRecord(data.apply_maintenance);
                 setApplyBanner(
-                    maintenance?.enabled && typeof maintenance.message === "string" && maintenance.message.trim()
+                    maintenance?.enabled === true && typeof maintenance.message === "string" && maintenance.message.trim()
                         ? maintenance.message.trim()
                         : null,
                 );
-                const list: Record<string, unknown>[] = Array.isArray(body.data)
-                    ? (body.data as Record<string, unknown>[])
-                    : Array.isArray(body.opportunities)
-                      ? (body.opportunities as Record<string, unknown>[])
+                const list: Record<string, unknown>[] = Array.isArray(data.data)
+                    ? (data.data as Record<string, unknown>[])
+                    : Array.isArray(data.opportunities)
+                      ? (data.opportunities as Record<string, unknown>[])
                       : [];
 
                 const shouldLoad =
                     Array.isArray(list) &&
-                    (body.success === true || (body.success !== false && (Array.isArray(body.data) || list.length > 0)));
+                    (data.success === true || (data.success !== false && (Array.isArray(data.data) || list.length > 0)));
 
                 if (shouldLoad) {
-                    const mappedProjects = list.map((p: Record<string, unknown>) => {
-                        let displayLocation = "Remote / Pakistan";
-                        let locationPin: string | null = null;
-                        const loc = p.location;
-                        if (typeof loc === "object" && loc !== null) {
-                            const l = loc as Record<string, unknown>;
-                            const parts: string[] = [];
-                            if (typeof l.city === "string") parts.push(l.city);
-                            if (typeof l.venue === "string") parts.push(l.venue);
-                            if (typeof l.pin === "string" && l.pin.trim()) {
-                                locationPin = l.pin.trim();
-                            }
-                            displayLocation =
-                                parts.length > 0
-                                    ? parts.join(", ")
-                                    : typeof l.pin === "string" && l.pin.trim()
-                                      ? l.pin
-                                      : "Pakistan";
-                        } else if (typeof loc === "string" && loc.trim()) {
-                            displayLocation = loc;
-                        }
-
-                        const opportunityTypes = pickOpportunityTypes(p);
-                        const sdgLabel = buildSdgFilterLabel(p);
-
-                        return {
-                            id: p.id as string | number,
-                            title: String(p.title ?? ""),
-                            org:
-                                (typeof p.partner_name === "string" && p.partner_name) ||
-                                (typeof p.organization_name === "string" && p.organization_name) ||
-                                "Verified Partner",
-                            location: displayLocation,
-                            status: String(p.status || "Active"),
-                            volunteers: Number(p.participant_count) || 0,
-                            description: String(p.description ?? ""),
-                            category:
-                                opportunityTypes[0] ||
-                                (typeof sdgLabel === "string" && sdgLabel !== "Unspecified SDG"
-                                    ? sdgLabel
-                                    : "Social Impact"),
-                            types: opportunityTypes,
-                            universityLabel: pickUniversityLabel(p),
-                            modeBucket: normalizeModeBucket(p.mode),
-                            visibilityBucket: pickVisibilityBucket(p),
-                            opportunityTypes,
-                            sdgLabel,
-                            seatsRemaining: computeSeatsRemaining(p),
-                            locationPin,
-                            applicationsOpen: applicationsOpenFromPayload(p),
-                            applyClosedMessage:
-                                typeof p.apply_blocked_message === "string" && p.apply_blocked_message.trim()
-                                    ? p.apply_blocked_message.trim()
-                                    : null,
-                            applyBlockedReason:
-                                typeof p.apply_blocked_reason === "string" ? p.apply_blocked_reason : null,
-                        };
-                    });
-                    setProjects(mappedProjects);
+                    const mapped = list.filter((row) => str(row.id)).map(mapPublicOpportunity);
+                    setProjects(mapped);
+                    const stats = asRecord(data.stats);
+                    if (stats) {
+                        setApiStats({
+                            total: Number(stats.total) || mapped.length,
+                            verified: Number(stats.verified) || mapped.length,
+                            partners: Number(stats.partners) || 0,
+                            students_impacted: Number(stats.students_impacted) || 0,
+                        });
+                    } else {
+                        setApiStats(null);
+                    }
+                    const counts = asRecord(data.path_counts);
+                    if (counts) {
+                        setApiPathCounts({
+                            all: Number(counts.all) || mapped.length,
+                            community_service: Number(counts.community_service) || 0,
+                            coursework: Number(counts.coursework) || 0,
+                            fyp: Number(counts.fyp) || 0,
+                            startup: Number(counts.startup) || 0,
+                        });
+                    } else {
+                        setApiPathCounts(null);
+                    }
                 } else {
                     setProjects([]);
                     setFetchError(true);
@@ -326,32 +416,35 @@ export default function ProjectsPage() {
     }, [reloadNonce]);
 
     const universityOptions = useMemo(() => {
-        const s = new Set<string>();
-        projects.forEach((p) => {
-            if (p.universityLabel) s.add(p.universityLabel);
-        });
-        return ["all", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
-    }, [projects]);
-
-    const oppTypeOptions = useMemo(() => {
-        const s = new Set<string>();
-        projects.forEach((p) => (p.opportunityTypes ?? []).forEach((t) => s.add(t)));
-        return ["all", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+        return Array.from(new Set(projects.map((p) => p.universityLabel).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b),
+        );
     }, [projects]);
 
     const sdgOptions = useMemo(() => {
-        const s = new Set<string>();
-        projects.forEach((p) => s.add(p.sdgLabel));
-        return ["all", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+        return Array.from(new Set(projects.map((p) => p.sdgLabel).filter((s) => s && s !== "Unspecified SDG"))).sort(
+            (a, b) => a.localeCompare(b),
+        );
     }, [projects]);
 
     const locationOptions = useMemo(() => {
-        const s = new Set<string>();
-        projects.forEach((p) => {
-            if (p.location) s.add(p.location);
-        });
-        return ["all", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+        return Array.from(new Set(projects.map((p) => p.city || "Remote"))).sort((a, b) => a.localeCompare(b));
     }, [projects]);
+
+    const departmentOptions = useMemo(() => {
+        return Array.from(new Set(projects.map((p) => p.department).filter((d): d is string => Boolean(d)))).sort(
+            (a, b) => a.localeCompare(b),
+        );
+    }, [projects]);
+
+    const partnerOptions = useMemo(() => {
+        return Array.from(new Set(projects.map((p) => p.partner_name || p.org).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b),
+        );
+    }, [projects]);
+
+    const liveStats = useMemo(() => apiStats || computeExploreStats(projects), [apiStats, projects]);
+    const pathCounts = useMemo(() => apiPathCounts || computePathCounts(projects), [apiPathCounts, projects]);
 
     const partnerHighlights = useMemo(() => {
         const map = new Map<string, number>();
@@ -364,88 +457,108 @@ export default function ProjectsPage() {
             .slice(0, 6);
     }, [projects]);
 
-    const stats = useMemo(() => {
-        const openCount = projects.filter((p) => isOpenStatus(p.status)).length;
-        const partners = new Set(projects.map((p) => p.org).filter(Boolean)).size;
-        const cities = new Set(projects.map((p) => extractCityLabel(p.location))).size;
-        return { openCount, partners, cities };
-    }, [projects]);
-
     const resetFilters = () => {
         setSearchQuery("");
         setUniversityFilter("all");
         setModeFilter("all");
-        setOppTypeFilter("all");
         setSdgFilter("all");
         setLocationFilter("all");
-        setSeatsFilter("all");
-        setVisibilityFilter("all");
+        setPathTab("all");
+        setDepartmentFilter("all");
+        setPartnerFilter("all");
+        setTimeCommitment("all");
+        setCreatorFilter("all");
+        setDateFrom("");
+        setDateTo("");
+        setOnlyOpenSeats(false);
+        setVirtualOnly(false);
+        setUrgentOnly(false);
+        setSortNewest(true);
     };
 
-    const filteredProjects = projects.filter((project) => {
-        const q = searchQuery.trim().toLowerCase();
-        if (q) {
-            const hay = [
-                project.title,
-                project.location,
-                project.org,
-                project.universityLabel,
-                project.sdgLabel,
-                project.opportunityTypes.join(" "),
-            ]
-                .join(" ")
-                .toLowerCase();
-            if (!hay.includes(q)) return false;
-        }
-        if (universityFilter !== "all" && project.universityLabel !== universityFilter) return false;
-        if (modeFilter !== "all" && project.modeBucket !== modeFilter) return false;
-        if (oppTypeFilter !== "all" && !project.opportunityTypes.includes(oppTypeFilter)) return false;
-        if (sdgFilter !== "all" && project.sdgLabel !== sdgFilter) return false;
-        if (locationFilter !== "all" && project.location !== locationFilter) return false;
-        if (!passesSeatsFilter(project.seatsRemaining, seatsFilter)) return false;
-        if (visibilityFilter !== "all" && project.visibilityBucket !== visibilityFilter) return false;
-        return true;
-    });
+    const filteredProjects = useMemo(() => {
+        const needle = searchQuery.trim().toLowerCase();
+        return projects
+            .filter((project) => {
+                // Defense-in-depth: the backend already excludes admin_hidden rows from this
+                // endpoint, but never render one as a normal "Open" card if it ever slips through.
+                if (project.applyBlockedReason === "opportunity_hidden") return false;
+                if (pathTab !== "all" && project.path_key !== pathTab) return false;
+                if (needle) {
+                    const hay = [
+                        project.title,
+                        project.description,
+                        project.org,
+                        project.partner_name,
+                        project.universityLabel,
+                        project.sdgLabel,
+                        project.department,
+                        project.city,
+                        project.opportunityTypes.join(" "),
+                        project.sdg_ids.join(" "),
+                    ]
+                        .join(" ")
+                        .toLowerCase();
+                    if (!hay.includes(needle)) return false;
+                }
+                if (universityFilter !== "all" && project.universityLabel !== universityFilter) return false;
+                if (modeFilter !== "all" && project.modeBucket !== modeFilter) return false;
+                if (sdgFilter !== "all" && project.sdgLabel !== sdgFilter) return false;
+                if (locationFilter !== "all" && project.city !== locationFilter) return false;
+                if (departmentFilter !== "all" && project.department !== departmentFilter) return false;
+                if (partnerFilter !== "all" && (project.partner_name || project.org) !== partnerFilter) return false;
+                if (creatorFilter !== "all" && project.created_by_role !== creatorFilter) return false;
+                if (timeCommitment !== "all") {
+                    const hours = project.hours;
+                    if (hours == null) return false;
+                    if (timeCommitment === "8" && hours > 8) return false;
+                    if (timeCommitment === "16" && (hours <= 8 || hours > 16)) return false;
+                    if (timeCommitment === "17" && hours <= 16) return false;
+                }
+                if (dateFrom && project.end_date && String(project.end_date).slice(0, 10) < dateFrom) return false;
+                if (dateTo && (project.start_date || project.end_date) && String(project.start_date || project.end_date).slice(0, 10) > dateTo) {
+                    return false;
+                }
+                if (onlyOpenSeats && (project.is_full || (project.seatsRemaining != null && project.seatsRemaining <= 0))) {
+                    return false;
+                }
+                if (virtualOnly && !project.is_virtual) return false;
+                if (urgentOnly && !project.is_urgent) return false;
+                return true;
+            })
+            .sort((a, b) => {
+                const ta = new Date(a.createdAt || a.start_date || 0).getTime();
+                const tb = new Date(b.createdAt || b.start_date || 0).getTime();
+                const na = Number.isFinite(ta) ? ta : 0;
+                const nb = Number.isFinite(tb) ? tb : 0;
+                return sortNewest ? nb - na : na - nb;
+            });
+    }, [
+        projects,
+        pathTab,
+        searchQuery,
+        universityFilter,
+        modeFilter,
+        sdgFilter,
+        locationFilter,
+        departmentFilter,
+        partnerFilter,
+        creatorFilter,
+        timeCommitment,
+        dateFrom,
+        dateTo,
+        onlyOpenSeats,
+        virtualOnly,
+        urgentOnly,
+        sortNewest,
+    ]);
 
-    const tabFilteredProjects = useMemo(() => {
-        return filteredProjects.filter((project) => {
-            switch (activeTab) {
-                case "open":
-                    return isOpenStatus(project.status);
-                case "closing":
-                    return isOpenStatus(project.status) && isClosingSoon(project);
-                case "university":
-                    return (
-                        isOpenStatus(project.status) &&
-                        (project.visibilityBucket === "restricted" ||
-                            !project.universityLabel.toLowerCase().includes("open (all"))
-                    );
-                case "archived":
-                    return isArchivedStatus(project.status);
-                default:
-                    return true;
-            }
-        });
-    }, [filteredProjects, activeTab]);
-
-    const tabCounts = useMemo(() => {
-        return {
-            open: filteredProjects.filter((p) => isOpenStatus(p.status)).length,
-            closing: filteredProjects.filter((p) => isOpenStatus(p.status) && isClosingSoon(p)).length,
-            university: filteredProjects.filter(
-                (p) =>
-                    isOpenStatus(p.status) &&
-                    (p.visibilityBucket === "restricted" ||
-                        !p.universityLabel.toLowerCase().includes("open (all")),
-            ).length,
-            archived: filteredProjects.filter((p) => isArchivedStatus(p.status)).length,
-        };
-    }, [filteredProjects]);
+    const filteredPathCounts = useMemo(() => computePathCounts(filteredProjects), [filteredProjects]);
 
     const mapPoints = useMemo(
         () =>
             buildOpportunityMapPoints(
-                tabFilteredProjects.map((p) => ({
+                filteredProjects.map((p) => ({
                     id: p.id,
                     title: p.title,
                     org: p.org,
@@ -456,94 +569,101 @@ export default function ProjectsPage() {
                 })),
                 statusDisplayLabel,
             ),
-        [tabFilteredProjects],
+        [filteredProjects],
     );
 
-    const listingTabs: { id: ListingTab; label: string; count: number }[] = [
-        { id: "open", label: "Open Opportunities", count: tabCounts.open },
-        { id: "closing", label: "Closing Soon", count: tabCounts.closing },
-        { id: "university", label: "University-Specific", count: tabCounts.university },
-        { id: "archived", label: "Completed / Archived", count: tabCounts.archived },
-    ];
+    const activeFilterCount =
+        [
+            universityFilter,
+            modeFilter,
+            sdgFilter,
+            locationFilter,
+            departmentFilter,
+            partnerFilter,
+            timeCommitment,
+            creatorFilter,
+        ].filter((v) => v !== "all").length +
+        (searchQuery.trim() ? 1 : 0) +
+        (pathTab !== "all" ? 1 : 0) +
+        (onlyOpenSeats ? 1 : 0) +
+        (virtualOnly ? 1 : 0) +
+        (urgentOnly ? 1 : 0) +
+        (dateFrom || dateTo ? 1 : 0);
 
-    const activeFilterCount = [
-        universityFilter !== "all",
-        modeFilter !== "all",
-        oppTypeFilter !== "all",
-        sdgFilter !== "all",
-        locationFilter !== "all",
-        seatsFilter !== "all",
-        visibilityFilter !== "all",
-        searchQuery.trim().length > 0,
-    ].filter(Boolean).length;
-
-    const toggleMode = (bucket: ModeBucket) => {
-        setModeFilter((prev) => (prev === bucket ? "all" : bucket));
+    const scrollToResults = () => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
-    const toggleOppType = (type: string) => {
-        setOppTypeFilter((prev) => (prev === type ? "all" : type));
-    };
-
-    const toggleUniversity = (uni: string) => {
-        setUniversityFilter((prev) => (prev === uni ? "all" : uni));
-    };
-
-    const toggleVisibility = (bucket: VisibilityBucket) => {
-        setVisibilityFilter((prev) => (prev === bucket ? "all" : bucket));
-    };
-
-    const toggleSdg = (sdg: string) => {
-        setSdgFilter((prev) => (prev === sdg ? "all" : sdg));
-    };
-
-    const toggleLocation = (loc: string) => {
-        setLocationFilter((prev) => (prev === loc ? "all" : loc));
+    const pathIcon = (key: BrowsePathKey) => {
+        if (key === "coursework") return Leaf;
+        if (key === "startup") return Lightbulb;
+        if (key === "fyp") return Search;
+        return Users;
     };
 
     return (
-        <main className="min-h-screen bg-[#faf8f4] font-sans">
+        <main className="min-h-screen bg-[#f7f8f4] font-sans">
             <Navbar />
 
-            {/* Hero — no background image */}
-            <section className="relative overflow-hidden border-b border-slate-200/80 bg-[#faf8f4] pt-28 pb-12">
+            <section className="relative overflow-hidden border-b border-slate-200/80 bg-[#f7f8f4] pt-28 pb-8">
                 <div className="relative z-10 mx-auto max-w-7xl px-6">
-                    <div className="max-w-3xl">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#0F8F83]">
-                            CIEL PK Opportunities Hub
-                        </p>
-                        <h1 className="mt-3 font-serif text-4xl font-bold tracking-tight text-[#1a3d34] sm:text-5xl">
+                    <div className="mx-auto max-w-3xl text-center">
+                        <h1 className="font-serif text-4xl font-bold tracking-tight text-[#16313d] sm:text-5xl">
                             Explore Opportunities
                         </h1>
-                        <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                            Discover verified community engagement opportunities from partner organizations across
-                            Pakistan — filter by interest, location, SDG, and eligibility.
+                        <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
+                            Discover meaningful community impact opportunities. Gain real-world experience,
+                            develop new skills, and contribute to a more sustainable and inclusive future.
                         </p>
                     </div>
 
                     <form
-                        className="mt-8 flex max-w-3xl flex-col gap-3 sm:flex-row"
-                        onSubmit={(e) => e.preventDefault()}
+                        className="mx-auto mt-8 flex max-w-3xl flex-col gap-3 sm:flex-row"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            scrollToResults();
+                        }}
                     >
                         <div className="relative min-w-0 flex-1">
                             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="search"
-                                placeholder="Search by project, partner, SDG, city, skill, or university…"
+                                placeholder="Search by title, partner, skills, SDGs, or keywords..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-[#0F8F83] focus:ring-4 focus:ring-[#0F8F83]/15"
+                                className="h-12 w-full rounded-full border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-[#0F8F83] focus:ring-4 focus:ring-[#0F8F83]/15"
                             />
                         </div>
                         <button
                             type="submit"
-                            className="inline-flex h-14 shrink-0 items-center justify-center rounded-2xl bg-[#1a3d34] px-8 text-sm font-bold text-white shadow-md transition hover:bg-[#143029]"
+                            className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-[#174b43] px-8 text-sm font-bold text-white shadow-md transition hover:bg-[#123c36]"
                         >
                             Search
                         </button>
                     </form>
+
+                    {promoOpen ? (
+                        <div className="relative mx-auto mt-6 max-w-5xl rounded-2xl border border-amber-200 bg-[#fff8e8] px-5 py-4 text-left">
+                            <button
+                                type="button"
+                                aria-label="Dismiss"
+                                className="absolute right-3 top-3 text-amber-700/70 hover:text-amber-900"
+                                onClick={() => setPromoOpen(false)}
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                            <p className="pr-6 text-sm font-bold text-amber-950">
+                                Make a difference with real opportunities
+                            </p>
+                            <p className="mt-1 pr-6 text-sm text-amber-900/90">
+                                Explore community service, sustainability projects, research opportunities and startup
+                                initiatives from our trusted partners.
+                            </p>
+                        </div>
+                    ) : null}
+
                     {applyBanner ? (
-                        <div className="mt-6 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                        <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                             <p className="font-semibold">Applications temporarily paused</p>
                             <p className="mt-1 text-amber-900/90">{applyBanner}</p>
                         </div>
@@ -551,443 +671,497 @@ export default function ProjectsPage() {
                 </div>
             </section>
 
-            {/* Stats */}
-            <section className="relative z-10 mx-auto -mt-6 max-w-7xl px-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <section className="mx-auto max-w-7xl px-6 py-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {[
-                        {
-                            label: "Active Opportunities",
-                            value: stats.openCount,
-                            icon: Briefcase,
-                            suffix: "",
-                        },
-                        {
-                            label: "Partner Organizations",
-                            value: stats.partners,
-                            icon: Building2,
-                            suffix: stats.partners > 0 ? "+" : "",
-                        },
-                        {
-                            label: "Cities Covered",
-                            value: stats.cities,
-                            icon: MapPin,
-                            suffix: stats.cities > 0 ? "+" : "",
-                        },
-                    ].map(({ label, value, icon: Icon, suffix }) => (
-                        <div
-                            key={label}
-                            className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"
-                        >
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0F8F83]/10 text-[#0F8F83]">
+                        { label: "Total Opportunities", value: liveStats.total, icon: Boxes, tint: "bg-emerald-50 text-emerald-700" },
+                        { label: "Verified Opportunities", value: liveStats.verified, icon: CheckCircle2, tint: "bg-sky-50 text-sky-700" },
+                        { label: "Partner Organizations", value: liveStats.partners, icon: Users, tint: "bg-teal-50 text-teal-700" },
+                        { label: "Student Impacted", value: liveStats.students_impacted, icon: BarChart3, tint: "bg-lime-50 text-lime-700" },
+                    ].map(({ label, value, icon: Icon, tint }) => (
+                        <div key={label} className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                            <div className={clsx("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", tint)}>
                                 <Icon className="h-5 w-5" />
                             </div>
                             <div>
-                                <p className="text-2xl font-black tabular-nums text-slate-900">
-                                    {value}
-                                    {suffix}
-                                </p>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                                <p className="text-2xl font-black tabular-nums text-slate-900">{formatStat(value)}</p>
+                                <p className="text-xs font-semibold text-slate-500">{label}</p>
                             </div>
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* Main hub */}
-            <section className="mx-auto max-w-7xl px-6 py-10">
-                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-1 lg:border-none lg:pb-0">
-                        {listingTabs.map((tab) => (
+            <section className="mx-auto max-w-7xl px-6 pb-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {BROWSE_PATHS.map((path) => {
+                        const Icon = pathIcon(path.key);
+                        const active = pathTab === path.key;
+                        return (
                             <button
-                                key={tab.id}
+                                key={path.key}
                                 type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={clsx(
-                                    "rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors",
-                                    activeTab === tab.id
-                                        ? "border-b-2 border-[#0F8F83] bg-white text-[#065f46] shadow-sm"
-                                        : "text-slate-600 hover:bg-white/70 hover:text-slate-900",
-                                )}
+                                onClick={() => setPathTab(active ? "all" : path.key)}
+                                className="flex items-start gap-3 rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm transition"
+                                style={
+                                    active
+                                        ? { borderColor: path.accent, boxShadow: `0 0 0 1px ${path.accent}` }
+                                        : { borderColor: "#e4eeec" }
+                                }
                             >
-                                {tab.label}
-                                <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                                    {tab.count}
+                                <span
+                                    className="mt-0.5 grid h-10 w-10 place-items-center rounded-xl"
+                                    style={{ background: path.accentSoft, color: path.accentText }}
+                                >
+                                    <Icon className="h-5 w-5" />
                                 </span>
+                                <span>
+                                    <span className="block text-[15px] font-bold leading-tight" style={{ color: path.accentText }}>
+                                        {path.label}
+                                    </span>
+                                    <span className="mt-0.5 block text-[12px] text-[#6b7c86]">{path.tagline}</span>
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-7xl px-6 pb-10">
+                <div className="rounded-2xl border border-[#e4eeec] bg-white p-4 shadow-[0_8px_24px_rgba(15,42,48,.04)]" aria-label="Filters">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="inline-flex items-center gap-2 text-[15px] font-bold text-[#16313d]">
+                            <Filter className="h-4 w-4 text-[#0e7d74]" />
+                            Advanced Filters
+                            {activeFilterCount > 0 ? (
+                                <span className="rounded-full bg-[#e8f8f1] px-2 py-0.5 text-[11px] font-black text-[#0f6b4a]">
+                                    {activeFilterCount}
+                                </span>
+                            ) : null}
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={() => setFiltersOpen((open) => !open)}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#e4eeec] px-3 py-1.5 text-[12px] font-semibold text-[#5d7278] hover:bg-slate-50"
+                        >
+                            {filtersOpen ? "Hide Filters" : "Show Filters"}
+                            <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
+                        </button>
+                    </div>
+
+                    {filtersOpen ? (
+                        <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Keyword Search
+                                    <span className="relative mt-1 block">
+                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                        <input
+                                            type="search"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Search by title, partner, skills…"
+                                            className="h-10 w-full rounded-xl border border-[#e4eeec] bg-white pl-9 pr-3 text-sm text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none"
+                                        />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    SDG(s)
+                                    <span className="relative mt-1 block">
+                                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={filterSelectClass}>
+                                            <option value="all">Select SDGs</option>
+                                            {sdgOptions.map((sdg) => (
+                                                <option key={sdg} value={sdg}>
+                                                    {sdg}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Location
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={locationFilter}
+                                            onChange={(e) => setLocationFilter(e.target.value)}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">All Locations</option>
+                                            {locationOptions.map((loc) => (
+                                                <option key={loc} value={loc}>
+                                                    {loc}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Mode
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={modeFilter}
+                                            onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">All Modes</option>
+                                            {(["on-site", "hybrid", "remote"] as const).map((b) => (
+                                                <option key={b} value={b}>
+                                                    {modeMenuLabel(b)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Department
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={departmentFilter}
+                                            onChange={(e) => setDepartmentFilter(e.target.value)}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">All Departments</option>
+                                            {departmentOptions.map((d) => (
+                                                <option key={d} value={d}>
+                                                    {d}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    University
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={universityFilter}
+                                            onChange={(e) => setUniversityFilter(e.target.value)}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">All Universities</option>
+                                            {universityOptions.map((u) => (
+                                                <option key={u} value={u}>
+                                                    {u}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Partner / NGO
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={partnerFilter}
+                                            onChange={(e) => setPartnerFilter(e.target.value)}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">All Partners</option>
+                                            {partnerOptions.map((p) => (
+                                                <option key={p} value={p}>
+                                                    {p}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278]">
+                                    Time Commitment
+                                    <span className="relative mt-1 block">
+                                        <select
+                                            value={timeCommitment}
+                                            onChange={(e) => setTimeCommitment(e.target.value as "all" | "8" | "16" | "17")}
+                                            className={filterSelectClass}
+                                        >
+                                            <option value="all">Any Hours</option>
+                                            <option value="8">Up to 8 hrs</option>
+                                            <option value="16">9–16 hrs</option>
+                                            <option value="17">17+ hrs</option>
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    </span>
+                                </label>
+                                <label className="block text-[11px] font-bold text-[#5d7278] xl:col-span-2">
+                                    Date Range
+                                    <span className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                        <input
+                                            type="date"
+                                            value={dateFrom}
+                                            onChange={(e) => setDateFrom(e.target.value)}
+                                            className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]"
+                                        />
+                                        <span className="text-[#8aa0a6]">→</span>
+                                        <input
+                                            type="date"
+                                            value={dateTo}
+                                            onChange={(e) => setDateTo(e.target.value)}
+                                            className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]"
+                                        />
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div className="grid gap-3 border-t border-[#eef4f3] pt-3 lg:grid-cols-[1fr_1.2fr_auto] lg:items-end">
+                                <div>
+                                    <p className="text-[11px] font-bold text-[#5d7278]">Created By</p>
+                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
+                                        <label className="inline-flex items-center gap-1.5">
+                                            <input
+                                                type="checkbox"
+                                                checked={creatorFilter === "all"}
+                                                onChange={() => setCreatorFilter("all")}
+                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
+                                            />
+                                            All
+                                        </label>
+                                        {([
+                                            ["student", "Student"],
+                                            ["faculty", "Faculty"],
+                                            ["partner", "Partner / NGO"],
+                                            ["admin", "Admin"],
+                                        ] as const).map(([value, label]) => (
+                                            <label key={value} className="inline-flex items-center gap-1.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={creatorFilter === value}
+                                                    onChange={() => setCreatorFilter(creatorFilter === value ? "all" : value)}
+                                                    className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
+                                                />
+                                                {label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-[#5d7278]">Special Filters</p>
+                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
+                                        <label className="inline-flex items-center gap-1.5">
+                                            <input
+                                                type="checkbox"
+                                                checked={onlyOpenSeats}
+                                                onChange={(e) => setOnlyOpenSeats(e.target.checked)}
+                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
+                                            />
+                                            With Available Seats Only
+                                        </label>
+                                        <label className="inline-flex items-center gap-1.5">
+                                            <input
+                                                type="checkbox"
+                                                checked={virtualOnly}
+                                                onChange={(e) => setVirtualOnly(e.target.checked)}
+                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
+                                            />
+                                            Virtual Opportunities
+                                        </label>
+                                        <label className="inline-flex items-center gap-1.5">
+                                            <input
+                                                type="checkbox"
+                                                checked={urgentOnly}
+                                                onChange={(e) => setUrgentOnly(e.target.checked)}
+                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
+                                            />
+                                            Urgent Opportunities
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={resetFilters}
+                                        className="rounded-full border border-[#e4eeec] px-4 py-2 text-[13px] font-semibold text-[#5d7278] hover:bg-slate-50"
+                                    >
+                                        Clear All
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={scrollToResults}
+                                        className="rounded-full bg-[#174b43] px-5 py-2 text-[13px] font-bold text-white hover:bg-[#123c36]"
+                                    >
+                                        Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+
+                <div ref={resultsRef} className="mt-6 flex flex-col gap-3 scroll-mt-28 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[15px] font-black text-[#16313d]">
+                            {filteredProjects.length} {filteredProjects.length === 1 ? "Opportunity Found" : "Opportunities Found"}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setPathTab("all")}
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
+                                pathTab === "all" ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f]"
+                            }`}
+                        >
+                            All {pathTab === "all" ? filteredPathCounts.all : pathCounts.all}
+                        </button>
+                        {BROWSE_PATHS.map((path) => (
+                            <button
+                                key={path.key}
+                                type="button"
+                                onClick={() => setPathTab(path.key)}
+                                className="rounded-full px-2.5 py-1 text-[11px] font-black"
+                                style={
+                                    pathTab === path.key
+                                        ? { background: path.accent, color: "#fff" }
+                                        : { background: path.accentSoft, color: path.accentText }
+                                }
+                            >
+                                {path.shortLabel} {pathTab === path.key ? filteredPathCounts[path.key] : pathCounts[path.key]}
                             </button>
                         ))}
                     </div>
-
-                    <div className="flex items-center gap-2 self-end lg:self-auto">
-                        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <select
+                                value={sortNewest ? "newest" : "oldest"}
+                                onChange={(e) => setSortNewest(e.target.value === "newest")}
+                                className={`${filterSelectClass} min-w-[9rem]`}
+                                title="Sort"
+                            >
+                                <option value="newest">Most Recent</option>
+                                <option value="oldest">Oldest first</option>
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                        </div>
+                        <div className="flex rounded-xl border border-[#e4eeec] p-0.5">
                             <button
                                 type="button"
                                 onClick={() => setViewMode("grid")}
-                                className={clsx(
-                                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                                    viewMode === "grid"
-                                        ? "bg-[#0F8F83] text-white"
-                                        : "text-slate-600 hover:bg-slate-50",
-                                )}
+                                className={`rounded-lg p-1.5 ${viewMode === "grid" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`}
+                                title="Grid view"
                             >
-                                <LayoutGrid className="h-3.5 w-3.5" />
-                                Card View
+                                <LayoutGrid className="h-4 w-4" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("list")}
+                                className={`rounded-lg p-1.5 ${viewMode === "list" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`}
+                                title="List view"
+                            >
+                                <List className="h-4 w-4" />
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setViewMode("map")}
-                                className={clsx(
-                                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                                    viewMode === "map"
-                                        ? "bg-[#0F8F83] text-white"
-                                        : "text-slate-600 hover:bg-slate-50",
-                                )}
+                                className={`rounded-lg p-1.5 ${viewMode === "map" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`}
+                                title="Map view"
                             >
-                                <MapIcon className="h-3.5 w-3.5" />
-                                Map View
+                                <MapIcon className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-                    {/* Sidebar filters */}
-                    <aside className="w-full shrink-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-28 lg:w-72">
-                        <div className="mb-5 flex items-center justify-between gap-2">
-                            <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Filters</h2>
-                            {activeFilterCount > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="text-xs font-semibold text-[#0F8F83] hover:underline"
-                                >
-                                    Clear all ({activeFilterCount})
-                                </button>
-                            ) : null}
+                <div className="mt-4 min-w-0">
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white py-24 text-slate-400">
+                            <Loader2 className="h-10 w-10 animate-spin text-[#0F8F83]" />
+                            <p className="text-sm font-bold uppercase tracking-widest">Loading opportunities…</p>
                         </div>
-
-                        <div className="space-y-6">
-                            <div>
-                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    Find by Interest
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {oppTypeOptions
-                                        .filter((t) => t !== "all")
-                                        .slice(0, 8)
-                                        .map((type) => (
-                                            <FilterPill
-                                                key={type}
-                                                active={oppTypeFilter === type}
-                                                onClick={() => toggleOppType(type)}
-                                            >
-                                                {type}
-                                            </FilterPill>
-                                        ))}
-                                    {oppTypeOptions.length <= 1 ? (
-                                        <p className="text-xs text-slate-400">No type tags yet</p>
-                                    ) : null}
-                                </div>
-                            </div>
-
-                            <div>
-                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    Find by Practical Need
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {(["remote", "hybrid", "on-site"] as const).map((bucket) => (
-                                        <FilterPill
-                                            key={bucket}
-                                            active={modeFilter === bucket}
-                                            onClick={() => toggleMode(bucket)}
-                                        >
-                                            {modeMenuLabel(bucket)}
-                                        </FilterPill>
-                                    ))}
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {locationOptions
-                                        .filter((l) => l !== "all")
-                                        .slice(0, 4)
-                                        .map((loc) => (
-                                            <FilterPill
-                                                key={loc}
-                                                active={locationFilter === loc}
-                                                onClick={() => toggleLocation(loc)}
-                                                className="max-w-full truncate"
-                                            >
-                                                {extractCityLabel(loc)}
-                                            </FilterPill>
-                                        ))}
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {(["1", "5", "10"] as const).map((min) => (
-                                        <FilterPill
-                                            key={min}
-                                            active={seatsFilter === min}
-                                            onClick={() =>
-                                                setSeatsFilter((prev) => (prev === min ? "all" : min))
-                                            }
-                                        >
-                                            {min}+ seats
-                                        </FilterPill>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
-                                    <GraduationCap className="h-3.5 w-3.5" />
-                                    Find by Eligibility
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <FilterPill
-                                        active={visibilityFilter === "open"}
-                                        onClick={() => toggleVisibility("open")}
-                                    >
-                                        Open to All Universities
-                                    </FilterPill>
-                                    <FilterPill
-                                        active={visibilityFilter === "restricted"}
-                                        onClick={() => toggleVisibility("restricted")}
-                                    >
-                                        Selected Universities
-                                    </FilterPill>
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {universityOptions
-                                        .filter((u) => u !== "all")
-                                        .slice(0, 5)
-                                        .map((uni) => (
-                                            <FilterPill
-                                                key={uni}
-                                                active={universityFilter === uni}
-                                                onClick={() => toggleUniversity(uni)}
-                                                className="max-w-full truncate"
-                                            >
-                                                {uni.length > 28 ? `${uni.slice(0, 28)}…` : uni}
-                                            </FilterPill>
-                                        ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">
-                                    SDG Focus
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {sdgOptions
-                                        .filter((s) => s !== "all" && s !== "Unspecified SDG")
-                                        .slice(0, 6)
-                                        .map((sdg) => {
-                                            const num = parseSdgNumber(sdg);
-                                            return (
-                                                <FilterPill
-                                                    key={sdg}
-                                                    active={sdgFilter === sdg}
-                                                    onClick={() => toggleSdg(sdg)}
-                                                >
-                                                    {num ? `SDG ${num}` : sdg.slice(0, 18)}
-                                                </FilterPill>
-                                            );
-                                        })}
-                                </div>
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* Results */}
-                    <div className="min-w-0 flex-1">
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-                            <p>
-                                Showing{" "}
-                                <span className="font-bold text-slate-900">{tabFilteredProjects.length}</span>{" "}
-                                {tabFilteredProjects.length === 1 ? "opportunity" : "opportunities"}
+                    ) : fetchError ? (
+                        <div className="rounded-2xl border border-dashed border-red-200 bg-white px-6 py-20 text-center">
+                            <p className="font-semibold text-slate-700">
+                                Something went wrong loading opportunities — please try again.
                             </p>
-                            {activeFilterCount > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="font-semibold text-[#0F8F83] hover:underline"
-                                >
-                                    Reset filters
-                                </button>
-                            ) : null}
+                            <p className="mt-2 text-sm text-slate-500">
+                                This is a connection problem on our side, not an empty search.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setReloadNonce((n) => n + 1)}
+                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
+                            >
+                                Retry
+                            </button>
                         </div>
-
-                        {isLoading ? (
-                            <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white py-24 text-slate-400">
-                                <Loader2 className="h-10 w-10 animate-spin text-[#0F8F83]" />
-                                <p className="text-sm font-bold uppercase tracking-widest">Loading opportunities…</p>
-                            </div>
-                        ) : fetchError ? (
-                            <div className="rounded-2xl border border-dashed border-red-200 bg-white px-6 py-20 text-center">
-                                <p className="font-semibold text-slate-700">
-                                    Something went wrong loading opportunities — please try again.
-                                </p>
-                                <p className="mt-2 text-sm text-slate-500">
-                                    This is a connection problem on our side, not an empty search.
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setReloadNonce((n) => n + 1)}
-                                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
-                                >
-                                    Retry
-                                </button>
-                            </div>
-                        ) : tabFilteredProjects.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-20 text-center">
-                                <p className="font-semibold text-slate-700">No opportunities match your filters.</p>
-                                <p className="mt-2 text-sm text-slate-500">
-                                    Try another tab or clear filters to see more results.
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        resetFilters();
-                                        setActiveTab("open");
-                                    }}
-                                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
-                                >
-                                    Clear filters
-                                </button>
-                            </div>
-                        ) : viewMode === "map" ? (
-                            <OpportunitiesMapView points={mapPoints} />
-                        ) : (
-                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-2">
-                                {tabFilteredProjects.map((project) => {
-                                    const sdgNum = parseSdgNumber(project.sdgLabel);
-                                    const sdg = sdgNum ? findSdgById(sdgNum) : null;
-                                    const orgInitial = (project.org || "P").charAt(0).toUpperCase();
-
-                                    return (
-                                        <article
-                                            key={project.id}
-                                            className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#0F8F83]/30 hover:shadow-md"
-                                        >
-                                            <div className="mb-4 flex items-start justify-between gap-3">
-                                                <div className="flex min-w-0 items-start gap-3">
-                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0F8F83]/10 text-sm font-black text-[#065f46]">
-                                                        {orgInitial}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-xs font-bold uppercase tracking-wide text-[#0F8F83]">
-                                                            {project.org}
-                                                        </p>
-                                                        <h3 className="mt-1 line-clamp-2 text-lg font-black leading-snug text-slate-900 group-hover:text-[#065f46]">
-                                                            {project.title}
-                                                        </h3>
-                                                    </div>
-                                                </div>
-                                                <span
-                                                    className={clsx(
-                                                        "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide",
-                                                        !project.applicationsOpen
-                                                            ? "border-amber-200 bg-amber-50 text-amber-900"
-                                                            : statusBadgeClass(project.status),
-                                                    )}
-                                                    title={project.applyClosedMessage || undefined}
-                                                >
-                                                    {!project.applicationsOpen
-                                                        ? applyClosedCtaLabel(project.applyBlockedReason)
-                                                        : statusDisplayLabel(project.status)}
-                                                </span>
-                                            </div>
-
-                                            <p className="mb-4 line-clamp-2 flex-1 text-sm leading-relaxed text-slate-600">
-                                                {project.description}
-                                            </p>
-
-                                            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                                                    {extractCityLabel(project.location)}
-                                                </span>
-                                                <span className="text-slate-300">|</span>
-                                                <span>{modeMenuLabel(project.modeBucket)}</span>
-                                            </div>
-
-                                            <div className="mb-4 flex flex-wrap gap-2">
-                                                {sdg ? (
-                                                    <span
-                                                        className="rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-wide text-white"
-                                                        style={{ backgroundColor: sdg.color }}
-                                                    >
-                                                        SDG {sdg.number}
-                                                    </span>
-                                                ) : project.sdgLabel !== "Unspecified SDG" ? (
-                                                    <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
-                                                        {project.sdgLabel.slice(0, 24)}
-                                                    </span>
-                                                ) : null}
-                                                {(project.opportunityTypes ?? []).slice(0, 2).map((type) => (
-                                                    <span
-                                                        key={type}
-                                                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600"
-                                                    >
-                                                        {type}
-                                                    </span>
-                                                ))}
-                                            </div>
-
-                                            <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs">
-                                                <div>
-                                                    <p className="font-bold uppercase tracking-wide text-slate-400">
-                                                        Participants
-                                                    </p>
-                                                    <p className="mt-0.5 flex items-center gap-1 font-black text-slate-800">
-                                                        <Users className="h-3.5 w-3.5" />
-                                                        {project.volunteers ?? 0}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold uppercase tracking-wide text-slate-400">
-                                                        Seats
-                                                    </p>
-                                                    <p className="mt-0.5 font-black text-slate-800">
-                                                        {project.seatsRemaining != null
-                                                            ? `${project.seatsRemaining} left`
-                                                            : "Open"}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <p className="mb-4 flex items-start gap-1.5 text-[11px] font-semibold leading-snug text-slate-500">
-                                                <GraduationCap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                {project.universityLabel}
-                                            </p>
-
-                                            <div className="mt-auto flex items-center gap-2">
-                                                <Link
-                                                    href={`/projects/${project.id}`}
-                                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F8F83] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
-                                                >
-                                                    {isArchivedStatus(project.status) ? "View Summary" : "View Details"}
-                                                    <ArrowRight className="h-4 w-4" />
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50"
-                                                    aria-label="Copy share link"
-                                                    title="Copy share link"
-                                                    onClick={() => void copyPublicProjectShareLink(project.id)}
-                                                >
-                                                    <Share2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </article>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    ) : filteredProjects.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-20 text-center">
+                            <p className="font-semibold text-slate-700">No opportunities match your filters.</p>
+                            <p className="mt-2 text-sm text-slate-500">Try another path or clear filters to see more results.</p>
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
+                            >
+                                Clear filters
+                            </button>
+                        </div>
+                    ) : viewMode === "map" ? (
+                        <OpportunitiesMapView points={mapPoints} />
+                    ) : (
+                        <div
+                            className={
+                                viewMode === "grid"
+                                    ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+                                    : "space-y-4"
+                            }
+                        >
+                            {filteredProjects.map((project) => {
+                                const hoursLabel = `${project.hours ?? 0} hrs`;
+                                const seatsLeft = project.seatsRemaining ?? 0;
+                                return (
+                                    <BrowseOpportunityCard
+                                        key={project.id}
+                                        id={project.id}
+                                        title={project.title}
+                                        description={
+                                            project.description && project.description !== "No description"
+                                                ? project.description
+                                                : undefined
+                                        }
+                                        pathKey={project.path_key}
+                                        pathLabel={project.path_label}
+                                        organizationName={project.partner_name || project.org}
+                                        city={project.city}
+                                        modeLabel={
+                                            project.modeBucket !== "unspecified"
+                                                ? modeMenuLabel(project.modeBucket)
+                                                : "On-site"
+                                        }
+                                        hoursLabel={hoursLabel}
+                                        seatsLabel={`${seatsLeft} seats`}
+                                        deadline={project.end_date}
+                                        coverUrl={project.cover_url}
+                                        isFull={project.is_full}
+                                        isExpired={
+                                            project.applyBlockedReason === "catalog_closed" ||
+                                            project.applyBlockedReason === "opportunity_expired"
+                                        }
+                                        sdgs={sdgsForBrowseCard(project.sdg_ids, project.sdgNumber, project.sdgTitle)}
+                                        visibilityTag={
+                                            project.visibilityBucket === "open"
+                                                ? "Open to all"
+                                                : project.universityLabel || null
+                                        }
+                                        visibilityWarn={project.visibilityBucket === "restricted"}
+                                        appliedPending={false}
+                                        appliedRejected={false}
+                                        showTeam={false}
+                                        showWithdraw={false}
+                                        withdrawing={false}
+                                        canApplyNow={false}
+                                        showJoin={false}
+                                        joinButtonLabel="Join Opportunity"
+                                        detailsHref={`/projects/${project.id}`}
+                                        viewMode={viewMode}
+                                        onShare={() => void copyPublicProjectShareLink(project.id)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </section>
 
-            {/* Browse by partner */}
             {!isLoading && partnerHighlights.length > 0 ? (
                 <section className="border-t border-slate-200 bg-white py-12">
                     <div className="mx-auto max-w-7xl px-6">
@@ -1004,7 +1178,11 @@ export default function ProjectsPage() {
                                 <button
                                     key={org}
                                     type="button"
-                                    onClick={() => setSearchQuery(org)}
+                                    onClick={() => {
+                                        setPartnerFilter(org);
+                                        setSearchQuery("");
+                                        scrollToResults();
+                                    }}
                                     className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-[#f4f7f6] p-4 text-left transition hover:border-[#0F8F83]/40 hover:bg-white hover:shadow-sm"
                                 >
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0F8F83]/10 text-lg font-black text-[#065f46]">

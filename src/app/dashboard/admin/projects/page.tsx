@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, EyeOff, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send, RotateCcw, History, Bug, CalendarClock, Settings } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
@@ -38,6 +38,12 @@ type AdminProjectRow = {
     raw: Record<string, unknown>;
     /** Present when listing is scoped with `student_email` query — role on that opportunity. */
     studentMatch: { role: string; matchSource: "enrollment" | "application_pipeline" } | null;
+    adminHidden: boolean;
+    adminExpired: boolean;
+    directoryVisible: boolean;
+    adminApproved: boolean;
+    applicationsOpen: boolean;
+    applyBlockedReason: string | null;
 };
 
 function lower(v: unknown): string {
@@ -181,6 +187,12 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
         remainingHours,
         raw,
         studentMatch,
+        adminHidden: raw.admin_hidden === true,
+        adminExpired: raw.admin_expired === true,
+        directoryVisible: raw.directory_visible !== false && raw.admin_hidden !== true,
+        adminApproved: raw.admin_approved === true,
+        applicationsOpen: raw.applications_open !== false,
+        applyBlockedReason: typeof raw.apply_blocked_reason === "string" ? raw.apply_blocked_reason : null,
     };
 }
 
@@ -789,6 +801,35 @@ function errorMessage(body: unknown, fallback: string): string {
     return fallback;
 }
 
+function debugText(value: unknown): string {
+    if (value == null || value === "") return "—";
+    if (typeof value === "boolean") return value ? "yes" : "no";
+    return String(value);
+}
+
+function defaultReportingUntil(raw: Record<string, unknown>): string {
+    const t = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : {};
+    const existing = String(t.reporting_window_reopened_until || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(existing)) {
+        const bump = new Date(`${existing}T00:00:00Z`);
+        if (!Number.isNaN(bump.getTime())) {
+            bump.setUTCDate(bump.getUTCDate() + 30);
+            return bump.toISOString().slice(0, 10);
+        }
+    }
+    const end = String(t.end_date || t.project_end || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        const close = new Date(`${end}T00:00:00Z`);
+        if (!Number.isNaN(close.getTime())) {
+            close.setUTCDate(close.getUTCDate() + 90);
+            return close.toISOString().slice(0, 10);
+        }
+    }
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 90);
+    return d.toISOString().slice(0, 10);
+}
+
 export default function AdminProjectsPage() {
     const [rows, setRows] = useState<AdminProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -799,6 +840,7 @@ export default function AdminProjectsPage() {
     const [studentEmailInput, setStudentEmailInput] = useState("");
     const [studentEmailApplied, setStudentEmailApplied] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [directoryFilter, setDirectoryFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
     const [degreeFilter, setDegreeFilter] = useState("all");
     const [facultyEmailFilter, setFacultyEmailFilter] = useState("all");
@@ -1516,6 +1558,9 @@ export default function AdminProjectsPage() {
         const q = searchQuery.trim().toLowerCase();
         return rows.filter((r) => {
             if (statusFilter !== "all" && r.statusKey !== statusFilter) return false;
+            if (directoryFilter === "hidden" && !r.adminHidden) return false;
+            if (directoryFilter === "expired" && !r.adminExpired) return false;
+            if (directoryFilter === "visible" && (r.adminHidden || !r.directoryVisible)) return false;
             if (locationFilter !== "all" && r.locationLabel !== locationFilter) return false;
             if (degreeFilter !== "all") {
                 const raw = r.raw;
@@ -1538,7 +1583,7 @@ export default function AdminProjectsPage() {
                 r.displayStatus.toLowerCase().includes(q)
             );
         });
-    }, [rows, searchQuery, statusFilter, locationFilter, degreeFilter, facultyEmailFilter]);
+    }, [rows, searchQuery, statusFilter, directoryFilter, locationFilter, degreeFilter, facultyEmailFilter]);
 
     const filteredTeamOverviewRows = useMemo(() => {
         if (teamOverviewParticipationFilter === "all") return teamOverviewRows;
@@ -1834,9 +1879,28 @@ export default function AdminProjectsPage() {
     };
 
     type WorkflowAction =
-        | { kind: "approve" | "reject" | "revise" | "close" | "draft" | "delete"; id: string; title: string };
+        | {
+              kind:
+                  | "approve"
+                  | "reject"
+                  | "revise"
+                  | "close"
+                  | "draft"
+                  | "delete"
+                  | "expire"
+                  | "unexpire"
+                  | "hide"
+                  | "unhide"
+                  | "reopen"
+                  | "republish";
+              id: string;
+              title: string;
+          };
     const [workflowAction, setWorkflowAction] = useState<WorkflowAction | null>(null);
     const [workflowBusy, setWorkflowBusy] = useState(false);
+    const [debugInspector, setDebugInspector] = useState<AdminProjectRow | null>(null);
+    const [reportingReopen, setReportingReopen] = useState<{ id: string; title: string; until: string } | null>(null);
+    const [reportingBusy, setReportingBusy] = useState(false);
 
     const requestWorkflowAction = (kind: WorkflowAction["kind"], row: AdminProjectRow) => {
         setActiveMenu(null);
@@ -1864,13 +1928,43 @@ export default function AdminProjectsPage() {
                 });
                 okMsg = kind === "reject" ? "Opportunity rejected" : "Revision requested";
                 failMsg = kind === "reject" ? "Could not reject opportunity" : "Could not request revision";
-            } else if (kind === "close" || kind === "draft") {
+            } else if (kind === "close" || kind === "draft" || kind === "reopen" || kind === "republish") {
+                const status = kind === "close" ? "closed" : kind === "draft" ? "draft" : "active";
                 res = await authenticatedFetch(`${base}/status`, {
                     method: "PUT",
-                    body: JSON.stringify({ status: kind === "close" ? "closed" : "draft" }),
+                    body: JSON.stringify({ status }),
                 });
-                okMsg = kind === "close" ? "Opportunity closed" : "Moved to draft";
+                okMsg =
+                    kind === "close"
+                        ? "Opportunity closed"
+                        : kind === "draft"
+                          ? "Moved to draft"
+                          : kind === "reopen"
+                            ? "Listing reopened without re-approval"
+                            : "Draft republished without re-approval";
                 failMsg = "Could not update status";
+            } else if (kind === "expire" || kind === "unexpire" || kind === "hide" || kind === "unhide") {
+                const body =
+                    kind === "expire"
+                        ? { expired: true }
+                        : kind === "unexpire"
+                          ? { expired: false }
+                          : kind === "hide"
+                            ? { hidden: true }
+                            : { hidden: false };
+                res = await authenticatedFetch(`${base}/directory-control`, {
+                    method: "PATCH",
+                    body: JSON.stringify(body),
+                });
+                okMsg =
+                    kind === "expire"
+                        ? "Opportunity expired — new applications closed"
+                        : kind === "unexpire"
+                          ? "Opportunity unexpired"
+                          : kind === "hide"
+                            ? "Opportunity hidden from directory"
+                            : "Opportunity visible in directory again";
+                failMsg = "Could not update directory control";
             } else {
                 res = await authenticatedFetch(base, { method: "DELETE" });
                 okMsg = "Opportunity deleted successfully";
@@ -1944,11 +2038,28 @@ export default function AdminProjectsPage() {
                 sortable: true,
                 selector: (r) => r.displayStatus,
                 cell: (r) => (
+                    <div className="flex flex-col items-start gap-1 py-1">
                     <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass(r.statusKey)}`}
                     >
                         {r.displayStatus}
                     </span>
+                    {r.adminHidden ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-white">
+                            Hidden
+                        </span>
+                    ) : null}
+                    {r.adminExpired ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200">
+                            Expired
+                        </span>
+                    ) : null}
+                    {!r.applicationsOpen ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100">
+                            Apply closed
+                        </span>
+                    ) : null}
+                    </div>
                 ),
             },
             {
@@ -2060,7 +2171,14 @@ export default function AdminProjectsPage() {
                     <h1 className="mt-1 text-[22px] font-[950] tracking-tight text-[#16313d] sm:text-[28px]">Projects Overview</h1>
                     <p className="mt-1 text-sm text-[#70808a]">Monitor all active and past social impact projects.</p>
                 </div>
-                <button
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <Link
+                        href="/dashboard/admin/settings"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dde5ea] bg-white px-5 py-2.5 text-sm font-bold text-[#16313d] transition-all hover:bg-slate-50 sm:w-auto"
+                    >
+                        <Settings className="w-4 h-4" /> Apply pause &amp; expiry
+                    </Link>
+                    <button
                     type="button"
                     onClick={handleExport}
                     disabled={!filteredRows.length}
@@ -2068,6 +2186,7 @@ export default function AdminProjectsPage() {
                 >
                     <FileDown className="w-4 h-4" /> Export report
                 </button>
+                </div>
             </div>
 
             {showZeroHoursBanner ? (
@@ -2161,6 +2280,20 @@ export default function AdminProjectsPage() {
                                         {opt === "all" ? "All statuses" : opt.replace(/_/g, " ")}
                                     </option>
                                 ))}
+                            </select>
+                        </div>
+                        <div className="relative min-w-0 sm:min-w-[160px]">
+                            <EyeOff className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                            <select
+                                value={directoryFilter}
+                                onChange={(e) => setDirectoryFilter(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-[#15988b]/20 focus:border-[#15988b] outline-none appearance-none cursor-pointer"
+                                aria-label="Filter by directory visibility"
+                            >
+                                <option value="all">All directory</option>
+                                <option value="visible">Visible</option>
+                                <option value="hidden">Hidden</option>
+                                <option value="expired">Expired</option>
                             </select>
                         </div>
                         <div className="relative min-w-0 sm:min-w-[160px]">
@@ -2275,6 +2408,25 @@ export default function AdminProjectsPage() {
                                                 {r.displayStatus}
                                             </span>
                                         </div>
+                                        {r.adminHidden || r.adminExpired || !r.applicationsOpen ? (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {r.adminHidden ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-white">
+                                                        Hidden
+                                                    </span>
+                                                ) : null}
+                                                {r.adminExpired ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200">
+                                                        Expired
+                                                    </span>
+                                                ) : null}
+                                                {!r.applicationsOpen ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100">
+                                                        Apply closed
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
                                             <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-slate-400" />{r.locationLabel}</span>
                                             <span>
@@ -2298,7 +2450,7 @@ export default function AdminProjectsPage() {
                                                 onClick={(e) => {
                                                     const rect = e.currentTarget.getBoundingClientRect();
                                                     setActiveMenu((prev) =>
-                                                        prev?.id === r.id ? null : { id: r.id, top: Math.min(rect.bottom + 6, window.innerHeight - 320), right: Math.max(8, window.innerWidth - rect.right) },
+                                                        prev?.id === r.id ? null : { id: r.id, top: Math.min(rect.bottom + 6, window.innerHeight - 420), right: Math.max(8, window.innerWidth - rect.right) },
                                                     );
                                                 }}
                                                 className="admin-project-menu-trigger rounded-full p-2.5 text-slate-400 hover:bg-slate-200"
@@ -2360,9 +2512,28 @@ export default function AdminProjectsPage() {
                         <div className="fixed inset-0 z-40" aria-hidden onClick={() => setActiveMenu(null)} />
                         <div
                             role="menu"
-                            className="admin-project-menu-panel fixed w-52 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden text-left py-0.5"
+                            className="admin-project-menu-panel fixed w-60 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-y-auto max-h-[min(72vh,32rem)] text-left py-0.5"
                             style={{ top: activeMenu.top, right: activeMenu.right }}
                         >
+                            {(() => {
+                                const raw = activeMenuRow.raw;
+                                const stage = String(raw.workflow_stage ?? "").trim() || "—";
+                                const status = String(raw.status ?? "").trim() || "—";
+                                const approved = raw.admin_approved === true ? "yes" : "no";
+                                return (
+                                    <div className="px-3 py-2 text-[10px] leading-relaxed font-mono text-slate-500 bg-slate-50 border-b border-slate-100">
+                                        <div>status={status}</div>
+                                        <div>stage={stage} approved={approved}</div>
+                                        <div>
+                                            dir={activeMenuRow.adminHidden ? "hidden" : "listed"} apply=
+                                            {activeMenuRow.applicationsOpen ? "open" : activeMenuRow.applyBlockedReason || "closed"}
+                                        </div>
+                                        {typeof raw.public_code === "string" && raw.public_code ? (
+                                            <div>code={raw.public_code}</div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })()}
                             <Link
                                 href={`/dashboard/student/browse/${encodeURIComponent(activeMenuRow.id)}`}
                                 className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -2495,6 +2666,78 @@ export default function AdminProjectsPage() {
                                                 Move to draft
                                             </button>
                                         ) : null}
+                                        {r.adminApproved && k === "closed" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestWorkflowAction("reopen", r)}
+                                                className={`${item} text-emerald-800 hover:bg-emerald-50`}
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
+                                                Reopen listing
+                                            </button>
+                                        ) : null}
+                                        {r.adminApproved && k === "draft" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => requestWorkflowAction("republish", r)}
+                                                className={`${item} text-emerald-800 hover:bg-emerald-50`}
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
+                                                Republish from draft
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => requestWorkflowAction(r.adminExpired ? "unexpire" : "expire", r)}
+                                            className={`${item} text-amber-800 hover:bg-amber-50`}
+                                        >
+                                            <Clock className="w-4 h-4" />
+                                            {r.adminExpired ? "Unexpire applications" : "Expire applications"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => requestWorkflowAction(r.adminHidden ? "unhide" : "hide", r)}
+                                            className={`${item} text-slate-800 hover:bg-slate-50`}
+                                        >
+                                            {r.adminHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                            {r.adminHidden ? "Unhide in directory" : "Hide from directory"}
+                                        </button>
+                                        {r.adminApproved && (k === "active" || k === "live" || k === "closed" || k === "completed") ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveMenu(null);
+                                                    setReportingReopen({
+                                                        id: r.id,
+                                                        title: r.title,
+                                                        until: defaultReportingUntil(r.raw),
+                                                    });
+                                                }}
+                                                className={`${item} text-slate-800 hover:bg-slate-50`}
+                                            >
+                                                <CalendarClock className="w-4 h-4" />
+                                                Reopen reporting window
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveMenu(null);
+                                                setDebugInspector(r);
+                                            }}
+                                            className={`${item} text-slate-800 hover:bg-slate-50`}
+                                        >
+                                            <Bug className="w-4 h-4" />
+                                            Debug inspect
+                                        </button>
+                                        <Link
+                                            href={`/dashboard/admin/audit-logs?path=${encodeURIComponent(r.id)}`}
+                                            className={`${item} text-slate-800 hover:bg-slate-50`}
+                                            onClick={() => setActiveMenu(null)}
+                                        >
+                                            <History className="w-4 h-4" />
+                                            Audit log for this project
+                                        </Link>
                                     </>
                                 );
                             })()}
@@ -2522,8 +2765,14 @@ export default function AdminProjectsPage() {
                     approve: { title: "Approve opportunity", label: "Approve", danger: false, reason: false, text: "This gives final CIEL approval and publishes the opportunity." },
                     reject: { title: "Reject opportunity", label: "Reject", danger: true, reason: true, text: "Rejecting is permanent: the creator can no longer edit this opportunity. The reason is emailed to the creator." },
                     revise: { title: "Request revision", label: "Send for revision", danger: false, reason: true, text: "The creator is asked to update and resubmit. The reason is shared with them." },
-                    close: { title: "Close opportunity", label: "Close", danger: false, reason: false, text: "Closing stops new applications. Existing participants are kept." },
-                    draft: { title: "Move to draft", label: "Move to draft", danger: false, reason: false, text: "The opportunity is hidden from the public listing until it is published again." },
+                    close: { title: "Close opportunity", label: "Close", danger: false, reason: false, text: "Closing stops new applications and removes the listing from live Explore/Browse. Existing participants are kept." },
+                    draft: { title: "Move to draft", label: "Move to draft", danger: false, reason: false, text: "The opportunity is unpublished until it is approved/published again." },
+                    expire: { title: "Expire applications", label: "Expire", danger: false, reason: false, text: "Stops new applications. The card stays on Explore and Browse as expired. Enrolled students keep reports and attendance." },
+                    unexpire: { title: "Unexpire applications", label: "Unexpire", danger: false, reason: false, text: "Allows new applications again, unless a global apply pause or the project dates still block them." },
+                    hide: { title: "Hide from directory", label: "Hide", danger: false, reason: false, text: "Removes this opportunity from public Explore and student Browse. Admin list, enrollments, reports, and attendance stay." },
+                    unhide: { title: "Unhide in directory", label: "Unhide", danger: false, reason: false, text: "Puts the opportunity back on public Explore and student Browse if it is still live and approved." },
+                    reopen: { title: "Reopen listing", label: "Reopen", danger: false, reason: false, text: "Puts this CIEL-approved listing back on Explore and Browse without re-running faculty, partner, or admin approval. Reports and attendance stay as they are." },
+                    republish: { title: "Republish from draft", label: "Republish", danger: false, reason: false, text: "Publishes this approved draft again. Approval is unchanged — this is not a new review." },
                     delete: { title: "Delete opportunity", label: "Delete permanently", danger: true, reason: false, text: "This permanently deletes the opportunity and related records. It cannot be undone." },
                 };
                 const c = cfg[wa.kind];
@@ -2554,6 +2803,129 @@ export default function AdminProjectsPage() {
                     </ConfirmModal>
                 );
             })() : null}
+
+            {reportingReopen ? (
+                <ConfirmModal
+                    open
+                    title="Reopen reporting window"
+                    confirmLabel="Reopen window"
+                    busy={reportingBusy}
+                    onConfirm={async () => {
+                        const target = reportingReopen;
+                        if (!target?.until) return;
+                        setReportingBusy(true);
+                        try {
+                            const res = await authenticatedFetch(
+                                `/api/v1/admin/community-service/opportunities/${encodeURIComponent(target.id)}/reopen-reporting-window`,
+                                {
+                                    method: "POST",
+                                    body: JSON.stringify({ until: target.until }),
+                                },
+                            );
+                            if (res && (res.ok || res.status === 204)) {
+                                toast.success("Reporting window reopened");
+                                setReportingReopen(null);
+                                void loadProjects(true);
+                                return;
+                            }
+                            const body = res ? await res.json().catch(() => ({})) : {};
+                            toast.error(errorMessage(body, "Could not reopen reporting window"));
+                        } catch {
+                            toast.error("Could not reopen reporting window");
+                        } finally {
+                            setReportingBusy(false);
+                        }
+                    }}
+                    onCancel={() => !reportingBusy && setReportingReopen(null)}
+                >
+                    <p className="break-words font-semibold text-gray-800">&ldquo;{reportingReopen.title}&rdquo;</p>
+                    <p className="mt-1">
+                        Extends the 60-day reporting window past project end. Enrolled students can keep submitting reports until this date. Apply, attendance, and approval stay unchanged.
+                    </p>
+                    <label className="mt-3 block text-sm font-medium text-gray-700">
+                        New reporting close date
+                        <input
+                            type="date"
+                            value={reportingReopen.until}
+                            onChange={(e) =>
+                                setReportingReopen((prev) => (prev ? { ...prev, until: e.target.value } : prev))
+                            }
+                            className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-sm"
+                        />
+                    </label>
+                </ConfirmModal>
+            ) : null}
+
+            {debugInspector ? (
+                <>
+                    <div className="fixed inset-0 z-[60] bg-slate-900/40" aria-hidden onClick={() => setDebugInspector(null)} />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="project-debug-title"
+                        className="fixed left-1/2 top-1/2 z-[70] flex max-h-[min(85vh,36rem)] w-[calc(100vw-1.5rem)] max-w-[32rem] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    >
+                        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+                            <div className="min-w-0">
+                                <h2 id="project-debug-title" className="text-lg font-extrabold text-slate-900 tracking-tight">
+                                    Debug inspect
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{debugInspector.title}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setDebugInspector(null)}
+                                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0"
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 text-sm">
+                            <dl className="grid grid-cols-1 gap-2">
+                                {(
+                                    [
+                                        ["public_code", debugInspector.raw.public_code],
+                                        ["status", debugInspector.raw.status ?? debugInspector.statusKey],
+                                        ["workflow_stage", debugInspector.raw.workflow_stage],
+                                        ["admin_approved", debugInspector.raw.admin_approved],
+                                        ["faculty_approval_status", debugInspector.raw.faculty_approval_status],
+                                        ["partner_approval_status", debugInspector.raw.partner_approval_status],
+                                        ["admin_approval_status", debugInspector.raw.admin_approval_status],
+                                        ["faculty_verified", debugInspector.raw.faculty_verified],
+                                        ["execution_verified", debugInspector.raw.execution_verified],
+                                        ["directory_visible", debugInspector.raw.directory_visible],
+                                        ["admin_hidden", debugInspector.raw.admin_hidden],
+                                        ["admin_expired", debugInspector.raw.admin_expired],
+                                        ["applications_open", debugInspector.raw.applications_open],
+                                        ["apply_blocked_reason", debugInspector.raw.apply_blocked_reason],
+                                        ["created_by_role", debugInspector.raw.created_by_role],
+                                        ["path_key", debugInspector.raw.path_key],
+                                        ["is_student_created", debugInspector.raw.is_student_created],
+                                        ["currently_with", debugInspector.raw.currently_with],
+                                        ["next_step", debugInspector.raw.next_step],
+                                        ["remaining_seats", debugInspector.raw.remaining_seats ?? debugInspector.remainingSeats],
+                                        ["attendance_routing_override", debugInspector.raw.attendance_routing_override],
+                                        ["faculty_token_expires_at", debugInspector.raw.faculty_token_expires_at],
+                                        ["partner_token_expires_at", debugInspector.raw.partner_token_expires_at],
+                                        ["reporting_window_reopened_until", debugInspector.raw.reporting_window_reopened_until],
+                                    ] as Array<[string, unknown]>
+                                ).map(([label, value]) => (
+                                    <div key={label} className="flex items-start justify-between gap-3 border-b border-slate-50 py-1.5">
+                                        <dt className="shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                            {label}
+                                        </dt>
+                                        <dd className="min-w-0 break-words text-right font-medium text-slate-800">{debugText(value)}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                            <p className="mt-3 text-xs text-slate-500">
+                                Verification tokens are never shown. Contacts and attendance routing live in Project tracker. Global apply pause is in Settings.
+                            </p>
+                        </div>
+                    </div>
+                </>
+            ) : null}
 
             <ConfirmModal
                 open={zeroHoursPreview !== null}

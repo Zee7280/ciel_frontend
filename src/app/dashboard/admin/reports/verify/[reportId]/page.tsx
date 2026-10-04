@@ -1153,7 +1153,7 @@ function AdminReportDetailPage() {
                     <h2 className="mb-2 text-2xl font-bold text-slate-900">Report Not Found</h2>
                     <button
                         type="button"
-                        onClick={() => router.back()}
+                        onClick={() => router.push("/dashboard/admin/reports/verify")}
                         className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
                     >
                         Go Back
@@ -1174,7 +1174,8 @@ function AdminReportDetailPage() {
                 <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
                     <div className="flex flex-wrap items-center gap-2">
                         <button
-                            onClick={() => router.back()}
+                            type="button"
+                            onClick={() => router.push("/dashboard/admin/reports/verify")}
                             className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
                         >
                             <ArrowLeft className="w-4 h-4" />
@@ -1235,7 +1236,10 @@ function AdminReportDetailPage() {
                     fallbackFiles={evidenceFiles}
                     highlight={packageView}
                     initialDoc={
-                        packageDoc === "flashcard" || packageDoc === "report" || packageDoc === "evidence"
+                        packageDoc === "flashcard" ||
+                        packageDoc === "report" ||
+                        packageDoc === "evidence" ||
+                        packageDoc === "analysis"
                             ? packageDoc
                             : null
                     }

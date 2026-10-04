@@ -139,8 +139,10 @@ export default function CommunityCiiAnalyser({
     const approvePath = isCielPk
         ? `/api/v1/admin/community-service/reports/${reportId}/cii-v2/approve`
         : `/api/v1/faculty/reports/${reportId}/cii-v2/approve`;
-    const inboxHref = isCielPk ? "/dashboard/admin/community-service" : "/dashboard/faculty/reports";
-    const inboxLabel = isCielPk ? "Back to CIEL PK community service" : "Back to student reports";
+    const inboxHref = isCielPk
+        ? "/dashboard/admin/reports/verify"
+        : "/dashboard/faculty/community-service";
+    const inboxLabel = isCielPk ? "Back to student reports" : "Back to Community Service";
 
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<Record<string, unknown> | null>(null);
@@ -197,14 +199,50 @@ export default function CommunityCiiAnalyser({
             );
             if (!ok) return;
         }
+        const previousAt = String(ciiV2?.computedAt || "");
+        const pollForFreshCii = async (): Promise<boolean> => {
+            for (let i = 0; i < 12; i++) {
+                await new Promise((r) => setTimeout(r, 4000));
+                const check = await authenticatedFetch(reportPath, {}, { timeoutMs: 20000 });
+                if (!check?.ok) continue;
+                const data = await check.json().catch(() => null);
+                const next = ((data as { data?: Record<string, unknown> } | null)?.data || data) as Record<string, unknown> | null;
+                const nextCii = next?.ciiV2 as CiiV2Result | undefined;
+                if (nextCii?.computedAt && String(nextCii.computedAt) !== previousAt) {
+                    setReport(next);
+                    if (nextCii.sections?.length) {
+                        const scores: Record<number, number> = {};
+                        for (const section of nextCii.sections) scores[section.id] = section.score;
+                        setFacultySectionScores(scores);
+                    }
+                    return true;
+                }
+            }
+            return false;
+        };
         try {
             setAnalysing(true);
-            const res = await authenticatedFetch(analysePath, {
-                method: "POST",
-            });
-            if (!res?.ok) {
-                const payload = res ? await res.json().catch(() => ({})) : {};
+            let res: Response | null = null;
+            try {
+                res = await authenticatedFetch(analysePath, { method: "POST" }, { timeoutMs: 180000 });
+            } catch (err) {
+                const aborted =
+                    (err instanceof DOMException && err.name === "AbortError") ||
+                    (err instanceof Error && err.name === "AbortError");
+                if (!aborted) throw err;
+            }
+            if (res && !res.ok) {
+                const payload = await res.json().catch(() => ({}));
                 toast.error((payload as { error?: string; message?: string }).error || (payload as { message?: string }).message || "CII analysis failed");
+                return;
+            }
+            if (!res?.ok) {
+                const appeared = await pollForFreshCii();
+                if (!appeared) {
+                    toast.error("Analyzer is still running. Refresh this page in a minute.");
+                    return;
+                }
+                toast.success("CII analysis complete");
                 return;
             }
             toast.success("CII analysis complete");
@@ -390,7 +428,7 @@ export default function CommunityCiiAnalyser({
                     </p>
                 </div>
                 <div>
-                    <Link href={inboxHref}>{isCielPk ? "Back to community service" : "Back to reports"}</Link>
+                    <Link href={inboxHref}>{inboxLabel}</Link>
                     {!isCielPk ? <Link href={`/dashboard/faculty/reports/${reportId}`}>Standard console</Link> : <Link href={`/dashboard/admin/reports/verify/${reportId}`}>Review dossier</Link>}
                 </div>
             </div>
@@ -419,10 +457,10 @@ export default function CommunityCiiAnalyser({
 
             <div className="fx23-aintro">
                 <div>
-                    <small>SYSTEM ASSESSMENT · {isCielPk ? "ADMIN AI ANALYZER" : "FACULTY-TRIGGERED"}</small>
+                    <small>SYSTEM ASSESSMENT · gpt-5.6-sol · HIGH REASONING</small>
                     <h2>CIEL PK CII Analyzer</h2>
                     <p>
-                        Balanced CII v3.1 reads the locked 10-section report and evidence package. Faculty can view results; CIEL PK Admin moderates and decides.
+                        Balanced CII v3.1 with structured JSON scoring and multimodal evidence ingestion. Faculty can view results; CIEL PK Admin moderates and decides.
                     </p>
                 </div>
                 {readOnly ? (
@@ -431,7 +469,7 @@ export default function CommunityCiiAnalyser({
                     </span>
                 ) : (
                     <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || (locked && !isCielPk)}>
-                        {analysing ? "Analysing…" : locked && !isCielPk ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
+                        {analysing ? "Analysing evidence & scoring…" : locked && !isCielPk ? "Locked" : ciiV2 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
                     </button>
                 )}
             </div>
@@ -470,7 +508,7 @@ export default function CommunityCiiAnalyser({
             <details className="fx23-method">
                 <summary>How the Analyzer scores this report</summary>
                 <p>
-                    100-point core across 10 weighted sections (Balanced CII v3.1), 0–4 analytic anchors ({CII_V2_ANCHORS.join(" · ")}), plus up to +5 verified Extra-Mile uplift and an integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak.
+                    gpt-5.6-sol reads the locked 10-section report and inspects attached evidence images (multimodal). Scoring returns structured JSON on Balanced CII v3.1: 100-point core, 0–4 analytic anchors ({CII_V2_ANCHORS.join(" · ")}), plus up to +5 verified Extra-Mile uplift and an integrity penalty. Extra hours, money or partners cannot buy a high badge if outcomes, evidence or core quality are weak.
                 </p>
                 <ul>
                     {CII_V2_SECTIONS.map((section) => (
@@ -720,7 +758,7 @@ export default function CommunityCiiAnalyser({
 
             <div className="fx23-workfoot">
                 <span>{locked && ciiV2Lock ? `Locked ${new Date(ciiV2Lock.lockedAt).toLocaleString()}` : "Analysis open"}</span>
-                <span>CIEL PK Balanced CII v3.1</span>
+                <span>gpt-5.6-sol · high reasoning · structured JSON · multimodal evidence</span>
             </div>
         </div>
     );

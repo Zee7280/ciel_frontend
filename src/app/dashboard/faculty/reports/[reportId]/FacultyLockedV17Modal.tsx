@@ -45,7 +45,7 @@ function evIcon(kind: string, name: string): string {
     return "DOC";
 }
 
-function V16Flashcard({ model }: { model: LockedV17PackageModel }) {
+function LockedImpactFlashcard({ model }: { model: LockedV17PackageModel }) {
     const provisional = !model.ciiLocked && model.ciiScore != null;
     const verified = model.ciiLocked && model.ciiScore != null;
     return (
@@ -153,7 +153,7 @@ function V16Flashcard({ model }: { model: LockedV17PackageModel }) {
                 <div className="v16FootText">
                     <b>{verified ? model.badgeLabel : provisional ? `SYSTEM CII ${model.ciiScore}/100 · AWAITING FACULTY VERIFICATION` : "HOLD CII · REQUIRED CORRECTIONS"}</b>
                     {" · "}
-                    Flashcard = concise summary of all nine V17 report areas. The Detailed Report remains the complete narrative and evidence record.
+                    Flashcard = concise summary of all nine report areas. The Detailed Report remains the complete narrative and evidence record.
                 </div>
                 <span className="hold">
                     {verified
@@ -226,7 +226,7 @@ function DetailedReport({ model }: { model: LockedV17PackageModel }) {
     return (
         <div className="reportWrap">
             <div className="reportHead">
-                <h2>V17 Detailed Institutional Report</h2>
+                <h2>Detailed Institutional Report</h2>
                 <p>
                     Locked student-source record for {model.title}. CII is calculated mainly from this Detailed Report because it carries the complete section/sub-section narrative, source facts, evidence status and traceability. No student-source text is rewritten.
                 </p>
@@ -479,10 +479,10 @@ function AnalyzerPane({
                     <div className="flv17-analyzerTitle">
                         <span className="flv17-analyzerIcon">AI</span>
                         <div>
-                            <small>CIEL PK · CII ANALYZER</small>
+                            <small>CIEL PK · gpt-5.6-sol CII ANALYZER</small>
                             <h2>Evaluate the locked Report Package</h2>
                             <p>
-                                v9.0 Hybrid scoring uses the Detailed Report, verified Attendance/Hours and a Claim ↔ Evidence Verification Layer. Actual evidence files must be supplied to the multimodal evaluator; filenames alone are never treated as proof.
+                                gpt-5.6-sol with high reasoning scores Balanced CII v3.1 as structured JSON. It ingests the Detailed Report, verified attendance/hours, and actual evidence files (multimodal). Filenames alone are never treated as proof.
                             </p>
                         </div>
                     </div>
@@ -502,7 +502,7 @@ function AnalyzerPane({
                 <div className="flv17-analyzerTitle">
                     <span className="flv17-analyzerIcon">{model.ciiLocked ? "✓" : "AI"}</span>
                     <div>
-                        <small>CIEL PK · v9.0 HYBRID CII ANALYZER</small>
+                        <small>CIEL PK · gpt-5.6-sol · HIGH REASONING</small>
                         <h2>{model.ciiLocked ? "Faculty-Verified CII" : "System assessment ready"}</h2>
                         <p>
                             Review the score, claim-evidence findings, reasoning and evidence confidence. Faculty can inspect mismatches before final approval. The Analyzer never rewrites student-entered facts.
@@ -753,7 +753,7 @@ export default function FacultyLockedV17Modal({
         authenticatedFetch(`/api/v1/faculty/reports/${reportId}`)
             .then(async (response) => {
                 if (!response?.ok) {
-                    toast.error("Locked V17 package is not available for this report.");
+                    toast.error("Locked Impact Package is not available for this report.");
                     return null;
                 }
                 return response.json();
@@ -774,7 +774,7 @@ export default function FacultyLockedV17Modal({
             .catch(() => {
                 if (!cancelled) {
                     setLoadError(true);
-                    toast.error("Failed to open the locked V17 package.");
+                    toast.error("Failed to open the locked Impact Package.");
                 }
             })
             .finally(() => {
@@ -859,7 +859,7 @@ export default function FacultyLockedV17Modal({
                             <div className="topbar assessmentOnlyHide">
                                 <div className="brand">
                                     <b>CIEL PK · Community Engagement</b>
-                                    <span>Locked V17 outputs + Faculty/System assessment layer</span>
+                                    <span>Locked flashcard + detailed report + Faculty/System assessment layer</span>
                                 </div>
                                 <div className="tabs">
                                     {TABS.map((item) => {
@@ -899,7 +899,7 @@ export default function FacultyLockedV17Modal({
                             ) : (
                                 <>
                                     <section className={`view ${tab === "flashView" ? "on" : ""}`}>
-                                        <V16Flashcard model={model} />
+                                        <LockedImpactFlashcard model={model} />
                                     </section>
                                     <section className={`view ${tab === "reportView" ? "on" : ""}`}>
                                         <DetailedReport model={model} />
@@ -964,7 +964,7 @@ export default function FacultyLockedV17Modal({
                                                 </div>
                                             </div>
                                         )}
-                                        <V16Flashcard model={model} />
+                                        <LockedImpactFlashcard model={model} />
                                     </section>
                                 </>
                             )}

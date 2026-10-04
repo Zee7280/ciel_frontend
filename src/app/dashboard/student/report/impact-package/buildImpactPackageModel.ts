@@ -39,6 +39,8 @@ export type ImpactPackageTile = {
     title: string;
     text: string;
     chips: ImpactPackageChip[];
+    /** True when the tile's text reflects real submitted content, not its "not supplied" fallback. */
+    hasContent: boolean;
 };
 
 export type ImpactPackageMetric = {
@@ -471,6 +473,7 @@ export function buildImpactPackageModel(
                     ? { text: `${row.name} ${hoursLabel(row.hours)} / ${row.required} h` }
                     : { text: `${row.name} ${hoursLabel(row.hours)} / ${row.required} h · remaining`, cls: "warn" },
             ),
+            hasContent: logs.length > 0,
         },
         {
             n: 2,
@@ -484,6 +487,7 @@ export function buildImpactPackageModel(
                     ? { text: pickString(data.section2?.primary_beneficiary, data.section2?.affected_group) }
                     : null,
             ].filter(Boolean) as ImpactPackageChip[],
+            hasContent: Boolean(firstSentence(pickString(data.section2?.problem_statement, data.section2?.summary_text, data.section2?.affected_group))),
         },
         {
             n: 3,
@@ -499,6 +503,9 @@ export function buildImpactPackageModel(
                     cls: Number.isFinite(goal) ? sdgChipClass(goal) : "goal",
                 };
             }),
+            hasContent:
+                Boolean(firstSentence(pickString(data.section3?.student_contribution_intent_statement, data.section3?.contribution_intent_statement))) ||
+                sdgs.length > 0,
         },
         {
             n: 4,
@@ -510,6 +517,7 @@ export function buildImpactPackageModel(
                 acts[0]?.title ? { text: acts[0].title } : null,
                 numericChange ? { text: `${fmtNum(numericChange.before)} → ${fmtNum(numericChange.after)}` } : { text: "Before–after not quantified", cls: "warn" },
             ].filter(Boolean) as ImpactPackageChip[],
+            hasContent: Boolean(firstSentence(pickString(data.section5?.observed_change, data.section4?.summary_text, acts[0]?.title))),
         },
         {
             n: 5,
@@ -525,6 +533,7 @@ export function buildImpactPackageModel(
                 .filter(Boolean)
                 .slice(0, 3)
                 .map((src) => ({ text: nice(src) })),
+            hasContent: data.section6?.use_resources === "no" || pkr > 0 || Boolean(firstSentence(pickString(data.section6?.summary_text))),
         },
         {
             n: 6,
@@ -543,6 +552,7 @@ export function buildImpactPackageModel(
                 const roles = Array.isArray((p as { roles?: unknown }).roles) ? ((p as { roles?: string[] }).roles || []) : [];
                 return [p.type ? { text: nice(p.type) } : null, ...roles.slice(0, 2).map((role) => ({ text: nice(role) }))].filter(Boolean) as ImpactPackageChip[];
             }),
+            hasContent: partners.length > 0 || data.section7?.has_partners === "no",
         },
         {
             n: 7,
@@ -558,6 +568,7 @@ export function buildImpactPackageModel(
                         ? { text: "Approval-gated internal view" }
                         : { text: "Public permission confirmed" },
             ],
+            hasContent: files.length > 0,
         },
         {
             n: 8,
@@ -569,12 +580,19 @@ export function buildImpactPackageModel(
                 ...skills.slice(0, 3).map((s) => ({ text: s })),
                 competencyAvg ? { text: `${competencyAvg} / 5 average` } : null,
             ].filter(Boolean) as ImpactPackageChip[],
+            hasContent:
+                Boolean(
+                    firstSentence(
+                        pickString(data.section9?.reflection_biggest_learning, data.section9?.personal_learning, data.section9?.summary_text, data.section9?.academic_application),
+                    ),
+                ) || Boolean(competencyAvg),
         },
         {
             n: 9,
             title: "Sustainability",
             text: firstSentence(continuation) || "Sustainability / continuation answer was not supplied.",
             chips: [continuationChip ? { text: continuationChip } : { text: "Continuation not classified", cls: "warn" }],
+            hasContent: Boolean(firstSentence(continuation)),
         },
     ];
 
@@ -611,7 +629,7 @@ export function buildImpactPackageModel(
         submitted,
         ciiLabel: cii.source === "faculty_locked" && cii.totalScore != null ? `CII ${cii.totalScore}/100` : "CII: not issued",
         ciiPending: cii.source !== "faculty_locked",
-        sectionsComplete: 0,
+        sectionsComplete: tiles.filter((t) => t.hasContent).length,
         sectionsTotal: 9,
     };
 }

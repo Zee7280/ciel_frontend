@@ -25,6 +25,12 @@ import {
     Mail,
     Download,
     Loader2,
+    Eye,
+    EyeOff,
+    Copy,
+    Lock,
+    Info,
+    SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import DataTable from "react-data-table-component";
@@ -90,6 +96,8 @@ interface User {
     status: string;
     joinDate: string;
     orgName?: string;
+    /** Super-admin only: decrypted password copy from backend */
+    stored_password?: string | null;
     /** Raw ISO timestamp, used for sorting */
     createdAt: string;
     /** From backend `findAllForAdmin`; absent on older APIs */
@@ -124,6 +132,14 @@ export default function AdminUsersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [profileFilter, setProfileFilter] = useState("all");
+    const [joinedFrom, setJoinedFrom] = useState("");
+    const [joinedTo, setJoinedTo] = useState("");
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [showPasswordColumn, setShowPasswordColumn] = useState(false);
+    const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
+    const [showFormPassword, setShowFormPassword] = useState(false);
     // Sorting runs on the server so it covers every page, not just the 20 rows on screen.
     const [sort, setSort] = useState<{ by: string; dir: "asc" | "desc" }>({ by: "createdAt", dir: "desc" });
 
@@ -213,6 +229,11 @@ export default function AdminUsersPage() {
             });
             if (debouncedSearch) params.set("search", debouncedSearch);
             if (roleFilter !== "all") params.set("role", roleFilter);
+            if (statusFilter !== "all") params.set("status", statusFilter);
+            if (profileFilter !== "all") params.set("profile", profileFilter);
+            if (joinedFrom) params.set("joined_from", joinedFrom);
+            if (joinedTo) params.set("joined_to", joinedTo);
+            if (showPasswordColumn) params.set("reveal_passwords", "1");
             params.set("sortBy", sort.by);
             params.set("sortDir", sort.dir);
 
@@ -238,6 +259,10 @@ export default function AdminUsersPage() {
                 status: u.status || "active",
                 joinDate: formatJoinDate(u.createdAt),
                 createdAt: u.createdAt || "",
+                stored_password:
+                    typeof u.stored_password === "string" && u.stored_password.trim()
+                        ? u.stored_password
+                        : null,
                 profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
             }));
@@ -250,7 +275,7 @@ export default function AdminUsersPage() {
         } finally {
             if (run.isCurrent()) setIsLoading(false);
         }
-    }, [begin, currentPage, itemsPerPage, debouncedSearch, roleFilter, sort]);
+    }, [begin, currentPage, itemsPerPage, debouncedSearch, roleFilter, statusFilter, profileFilter, joinedFrom, joinedTo, showPasswordColumn, sort]);
 
     useEffect(() => {
         void fetchUsers();
@@ -258,6 +283,29 @@ export default function AdminUsersPage() {
 
     const changeRoleFilter = (v: string) => {
         setRoleFilter(v);
+        setCurrentPage(1);
+    };
+    const changeStatusFilter = (v: string) => {
+        setStatusFilter(v);
+        setCurrentPage(1);
+    };
+    const changeProfileFilter = (v: string) => {
+        setProfileFilter(v);
+        setCurrentPage(1);
+    };
+    const changeJoinedFrom = (v: string) => {
+        setJoinedFrom(v);
+        setCurrentPage(1);
+    };
+    const changeJoinedTo = (v: string) => {
+        setJoinedTo(v);
+        setCurrentPage(1);
+    };
+    const clearAdvancedFilters = () => {
+        setStatusFilter("all");
+        setProfileFilter("all");
+        setJoinedFrom("");
+        setJoinedTo("");
         setCurrentPage(1);
     };
     const changeItemsPerPage = (n: number) => {
@@ -356,6 +404,7 @@ export default function AdminUsersPage() {
         setSelectedUser(user);
         setFormData({ name: user.name, email: user.email, password: "", role: user.role, status: user.status });
         setFormError(null);
+        setShowFormPassword(false);
         setIsEditModalOpen(true);
         setActionMenu(null);
     };
@@ -452,6 +501,27 @@ export default function AdminUsersPage() {
         }
     };
 
+    const storedPasswordCount = users.filter((u) => u.stored_password).length;
+    const advancedFilterCount =
+        (statusFilter !== "all" ? 1 : 0) +
+        (profileFilter !== "all" ? 1 : 0) +
+        (joinedFrom ? 1 : 0) +
+        (joinedTo ? 1 : 0);
+
+    const togglePasswordReveal = (userId: string | number) => {
+        const key = String(userId);
+        setRevealedPasswordIds((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const copyStoredPassword = async (password: string) => {
+        try {
+            await navigator.clipboard.writeText(password);
+            toast.success("Password copied");
+        } catch {
+            toast.error("Could not copy password");
+        }
+    };
+
     const toolbarControlClass =
         "h-10 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 outline-none transition-shadow focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400";
 
@@ -465,6 +535,8 @@ export default function AdminUsersPage() {
                     <p className="mt-2 text-xs font-medium text-slate-500">
                         {isLoading ? "Loading…" : `${totalUsers} user${totalUsers === 1 ? "" : "s"} total`}
                         {roleFilter !== "all" ? ` · ${formatRoleLabel(roleFilter)}` : ""}
+                        {statusFilter !== "all" ? ` · ${statusOptionLabel(statusFilter)}` : ""}
+                        {profileFilter !== "all" ? ` · ${profileFilter}` : ""}
                     </p>
                 </div>
 
@@ -474,7 +546,7 @@ export default function AdminUsersPage() {
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search name or email…"
+                            placeholder="Search name, email, university…"
                             className={`${toolbarControlClass} w-full pl-9 pr-3`}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -502,6 +574,48 @@ export default function AdminUsersPage() {
 
                     <button
                         type="button"
+                        onClick={() => setShowAdvancedFilters((v) => !v)}
+                        className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:px-4 ${
+                            showAdvancedFilters || advancedFilterCount > 0
+                                ? "border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                    >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Advanced
+                        {advancedFilterCount > 0 ? (
+                            <span className="rounded-full bg-teal-200/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-teal-900">
+                                {advancedFilterCount}
+                            </span>
+                        ) : null}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowPasswordColumn((v) => {
+                                if (v) setRevealedPasswordIds({});
+                                return !v;
+                            });
+                        }}
+                        className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:px-4 ${
+                            showPasswordColumn
+                                ? "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                        title="Show stored password column (super admin)"
+                    >
+                        {showPasswordColumn ? <EyeOff className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        Passwords
+                        {storedPasswordCount > 0 && (
+                            <span className="rounded-full bg-violet-200/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-violet-900">
+                                {storedPasswordCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={exportCsv}
                         disabled={isLoading || users.length === 0}
                         className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:px-4"
@@ -515,6 +629,7 @@ export default function AdminUsersPage() {
                         onClick={() => {
                             setFormData({ name: "", email: "", password: "", role: "student", status: "active" });
                             setFormError(null);
+                            setShowFormPassword(false);
                             setIsAddModalOpen(true);
                         }}
                         className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -525,6 +640,76 @@ export default function AdminUsersPage() {
                 </div>
                 </div>
 
+                {showAdvancedFilters ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:p-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <div>
+                                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Status</label>
+                                <select
+                                    className={`${toolbarControlClass} w-full appearance-none px-3`}
+                                    value={statusFilter}
+                                    onChange={(e) => changeStatusFilter(e.target.value)}
+                                >
+                                    <option value="all">All statuses</option>
+                                    {STATUS_OPTIONS.map((st) => (
+                                        <option key={st} value={st}>
+                                            {statusOptionLabel(st)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Profile</label>
+                                <select
+                                    className={`${toolbarControlClass} w-full appearance-none px-3`}
+                                    value={profileFilter}
+                                    onChange={(e) => changeProfileFilter(e.target.value)}
+                                >
+                                    <option value="all">All profiles</option>
+                                    <option value="complete">Complete</option>
+                                    <option value="incomplete">Incomplete</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Joined from</label>
+                                <input
+                                    type="date"
+                                    className={`${toolbarControlClass} w-full px-3`}
+                                    value={joinedFrom}
+                                    onChange={(e) => changeJoinedFrom(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Joined to</label>
+                                <input
+                                    type="date"
+                                    className={`${toolbarControlClass} w-full px-3`}
+                                    value={joinedTo}
+                                    onChange={(e) => changeJoinedTo(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        {advancedFilterCount > 0 ? (
+                            <button
+                                type="button"
+                                onClick={clearAdvancedFilters}
+                                className="mt-3 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                            >
+                                Clear advanced filters
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                {showPasswordColumn && (
+                    <div className="flex gap-3 rounded-xl border border-violet-200/80 bg-violet-50/80 px-4 py-3 text-sm text-violet-950">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
+                        <p className="leading-relaxed">
+                            Passwords appear after signup, when you set a new password in <strong>Edit</strong>, or when the user logs in again.
+                            Empty rows need a login or an admin password reset.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
@@ -558,6 +743,58 @@ export default function AdminUsersPage() {
                             ),
                             grow: 2
                         },
+                        ...(showPasswordColumn
+                            ? [
+                                  {
+                                      name: "Password",
+                                      cell: (user: User) => {
+                                          const key = String(user.id);
+                                          const stored = user.stored_password;
+                                          if (!stored) {
+                                              return (
+                                                  <span
+                                                      className="text-xs text-slate-400"
+                                                      title="Set via Edit, or captured on next login"
+                                                  >
+                                                      Not stored yet
+                                                  </span>
+                                              );
+                                          }
+                                          const revealed = revealedPasswordIds[key];
+                                          return (
+                                              <div className="flex items-center gap-1 py-1">
+                                                  <code className="max-w-[140px] truncate rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800">
+                                                      {revealed ? stored : "••••••••"}
+                                                  </code>
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => togglePasswordReveal(user.id)}
+                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      title={revealed ? "Hide password" : "Show password"}
+                                                      aria-label={revealed ? "Hide password" : "Show password"}
+                                                  >
+                                                      {revealed ? (
+                                                          <EyeOff className="h-3.5 w-3.5" />
+                                                      ) : (
+                                                          <Eye className="h-3.5 w-3.5" />
+                                                      )}
+                                                  </button>
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => void copyStoredPassword(stored)}
+                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      title="Copy password"
+                                                      aria-label="Copy password"
+                                                  >
+                                                      <Copy className="h-3.5 w-3.5" />
+                                                  </button>
+                                              </div>
+                                          );
+                                      },
+                                      minWidth: "200px",
+                                  },
+                              ]
+                            : []),
                         {
                             name: "Role",
                             cell: (user: User) => (
@@ -884,15 +1121,26 @@ export default function AdminUsersPage() {
                                 <label className="block text-sm font-bold text-slate-700 mb-1">
                                     {isAddModalOpen ? "Password" : "New Password (Optional)"}
                                 </label>
-                                <input
-                                    type="password"
-                                    required={isAddModalOpen}
-                                    minLength={8}
-                                    autoComplete="new-password"
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showFormPassword ? "text" : "password"}
+                                        required={isAddModalOpen}
+                                        minLength={8}
+                                        autoComplete="new-password"
+                                        className="w-full px-4 py-2 pr-11 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowFormPassword((v) => !v)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                        title={showFormPassword ? "Hide password" : "Show password"}
+                                        aria-label={showFormPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
 
                             <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2 inline-flex items-center justify-center gap-2 disabled:opacity-60">

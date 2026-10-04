@@ -183,7 +183,7 @@ export default function FacultyAiEvaluationConsole() {
                 <div className="fae-wrap">
                     <p className="fae-sub">Executive evaluation unavailable.</p>
                     <div className="fae-nav">
-                        <Link href="/dashboard/faculty/reports">Back to student reports</Link>
+                        <Link href="/dashboard/faculty/community-service">Back to Community Service</Link>
                     </div>
                 </div>
             </div>
@@ -211,7 +211,7 @@ export default function FacultyAiEvaluationConsole() {
                     Faculty read-only view. Open the locked package and scores. Analysis, Approve, Request revision and Reject stay with CIEL PK Admin.
                 </div>
                 <div className="fae-nav">
-                    <Link href="/dashboard/faculty/reports">Back to student reports</Link>
+                    <Link href="/dashboard/faculty/community-service">Back to Community Service</Link>
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
                         Open full dossier
                     </Link>

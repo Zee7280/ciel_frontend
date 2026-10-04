@@ -37,6 +37,7 @@ import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
+import { calculateCII } from './utils/calculateCII';
 import { pickReportStatusFromCheckRow } from '@/utils/studentBrowseReportCta';
 import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
 import { buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, sumNonRejectedLoggedHours } from './utils/engagementMetrics';
@@ -183,7 +184,11 @@ function shouldSkipPreReportGuide(reportForState: Record<string, unknown>): bool
 function ReportFormContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const projectId = searchParams.get('project') || searchParams.get('projectId');
+    const projectId =
+        searchParams.get('project') ||
+        searchParams.get('projectId') ||
+        searchParams.get('id');
+    const fromSurface = (searchParams.get('from') || '').trim().toLowerCase();
     const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
     const packageView = searchParams.get('view');
     const wantsPackageView = isStudentImpactPackageView(packageView);
@@ -224,6 +229,14 @@ function ReportFormContent() {
     const [opportunityFlashOpen, setOpportunityFlashOpen] = React.useState(false);
 
     const goBackToPreviousPage = React.useCallback(() => {
+        if (fromSurface === 'wall') {
+            router.push('/dashboard/student/paths/community-service?view=wall');
+            return;
+        }
+        if (fromSurface === 'files') {
+            router.push('/dashboard/student/paths/community-service?view=files');
+            return;
+        }
         const st = String(data?.status || "").toLowerCase();
         const rs = String(data?.report_status || "").toLowerCase();
         const adm = String(data?.admin_status || data?.admin_approval_status || "").toLowerCase();
@@ -246,7 +259,7 @@ function ReportFormContent() {
             filter = "review";
         }
         router.push(`/dashboard/student/paths/community-service?view=workspace&filter=${filter}`);
-    }, [router, data, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route, data?.is_editable]);
+    }, [router, fromSurface, data, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route, data?.is_editable]);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -751,42 +764,33 @@ function ReportFormContent() {
         try {
             let submitData = data;
 
+            // Local CII snapshot only — do not block submit on ChatGPT. The OpenAI
+            // section11 audit can take up to 3 minutes and is not a submit gate.
+            // Admin CII v3.1 analyser still runs later from the review package.
             try {
-                setAiStatus('Generating ChatGPT CII audit...');
-                const [{ generateAISummary }, { calculateCII }] = await Promise.all([
-                    import('./utils/aiSummarizer'),
-                    import('./utils/calculateCII'),
-                ]);
+                setAiStatus('Preparing report...');
                 const ciiResult = calculateCII(data);
+                // section11.summary_text is only ever written by the (removed-from-submit) OpenAI
+                // audit call, so on a resubmit-after-revision it's still the PREVIOUS cycle's prose
+                // — nothing clears it when the student edits sections 1-10 and resubmits.
+                // readPersistedCiiSnapshot regex-parses a "Final Adjusted CII Score" line out of
+                // that text and would silently overwrite the freshly calculated score with the old
+                // one. Strip it here so only the just-computed ciiResult can win.
+                const snapshot = readPersistedCiiSnapshot({
+                    ...data,
+                    cii_index: ciiResult,
+                    section11: { ...data.section11, summary_text: undefined, cii_index: ciiResult },
+                }) ?? ciiResult;
                 submitData = {
                     ...data,
-                    cii_index: ciiResult,
+                    cii_index: snapshot,
+                    section11: {
+                        ...data.section11,
+                        cii_index: snapshot,
+                    },
                 };
-                const section11Res = await generateAISummary('section11', {
-                    ...data,
-                    cii_index: ciiResult,
-                });
-
-                if (section11Res.summary) {
-                    submitData = {
-                        ...submitData,
-                        section11: {
-                            ...data.section11,
-                            summary_text: section11Res.summary,
-                            is_ai_generated: true,
-                            audit_meta: section11Res.auditMeta ?? null,
-                            cii_index: readPersistedCiiSnapshot(submitData) ?? ciiResult,
-                        },
-                    };
-                    submitData = {
-                        ...submitData,
-                        cii_index: readPersistedCiiSnapshot(submitData) ?? ciiResult,
-                    };
-                    updateSection('section11', submitData.section11);
-                }
-            } catch (aiError) {
-                console.error('Failed to generate ChatGPT CII audit', aiError);
-                toast.info('Report will submit with the current CII summary.');
+            } catch (ciiError) {
+                console.error('Failed to attach local CII snapshot', ciiError);
             }
 
             setAiStatus('Uploading Evidence...');
@@ -807,7 +811,7 @@ function ReportFormContent() {
                     project_id: projectId || submitData.project_id,
                 })
             }, {
-                timeoutMs: 45000
+                timeoutMs: 120000
             });
 
             if (!res) {
@@ -1208,16 +1212,6 @@ function ReportFormContent() {
                 {activeStep >= 1 && activeStep < FLASH_CARD_STEP && activeStep !== 3 ? (
                     <LiveBannerView step={activeStep} data={deferredData} projectData={projectDetails} />
                 ) : null}
-
-            {onFlash ? null : (
-            <button
-                type="button"
-                className="cer-back cer-back-below"
-                onClick={goBackToPreviousPage}
-            >
-                ← Back to my reports
-            </button>
-            )}
 
             {!ciiVerifiedSummaryLock &&
                 activeStep !== 1 &&

@@ -1146,9 +1146,9 @@ export function AdminCommunityServiceHub() {
                                     href={reportHref(c.id)}
                                     viewer="admin"
                                     packageHrefs={{
-                                        detailedPdf: reportHref(c.id),
-                                        combinedPdf: reportHref(c.id),
-                                        certificate: reportHref(c.id),
+                                        detailedPdf: `${reportHref(c.id)}?package=1&doc=report`,
+                                        combinedPdf: `${reportHref(c.id)}?package=1`,
+                                        certificate: `${reportHref(c.id)}?package=1&doc=flashcard`,
                                         verify: c.impact_verify_url || undefined,
                                     }}
                                     actions={

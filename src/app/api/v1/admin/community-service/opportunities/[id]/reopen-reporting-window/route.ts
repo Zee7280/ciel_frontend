@@ -1,20 +1,14 @@
 import { NextRequest } from "next/server";
 import { proxyToNest } from "@/lib/bff-nest-proxy";
 
-/** Analyzer waits on OpenAI + evidence. Keep this function alive for the Nest round-trip. */
-export const maxDuration = 300;
-
 type RouteContext = { params: Promise<{ id: string }> };
 
-/**
- * POST /api/v1/faculty/reports/[id]/cii-v2/analyse
- * Proxies to Nest: POST /faculty/reports/:id/cii-v2/analyse
- */
+/** POST /api/v1/admin/community-service/opportunities/:id/reopen-reporting-window */
 export async function POST(req: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     return proxyToNest(
         req,
-        `faculty/reports/${encodeURIComponent(id)}/cii-v2/analyse`,
+        `admin/community-service/opportunities/${encodeURIComponent(id)}/reopen-reporting-window`,
         { tryAlternatePaths: false },
     );
 }

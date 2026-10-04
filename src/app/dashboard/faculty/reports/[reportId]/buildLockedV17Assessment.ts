@@ -789,7 +789,7 @@ export function v19OverallCopy(detailBlocks: LockedV17DetailBlock[], locked: boo
         return feedback || `Provisional System CII ${score}/100. The badge updates on the flashcard only after Faculty verification.`;
     }
     if (gaps) {
-        return `The current V17 record cannot receive a defensible CII because required source data and evidence are materially incomplete. The Detailed Report itself confirms ${gaps} required gap${gaps === 1 ? "" : "s"} and instructs that CII must evaluate structured source facts, evidence and verification alongside generated summaries.`;
+        return `The current locked report cannot receive a defensible CII because required source data and evidence are materially incomplete. The Detailed Report itself confirms ${gaps} required gap${gaps === 1 ? "" : "s"} and instructs that CII must evaluate structured source facts, evidence and verification alongside generated summaries.`;
     }
     return "A provisional CII is available only after Faculty runs the Analyzer. The badge updates on the flashcard only after Faculty verification.";
 }

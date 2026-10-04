@@ -47,7 +47,13 @@ type WallRow = {
     hours?: number;
     created_at?: string;
     impact_verify_url?: string | null;
-    actions?: { certificate_url?: string | null; pdf_url?: string | null; v17_url?: string | null; evidence_url?: string | null };
+    actions?: {
+        certificate_url?: string | null;
+        pdf_url?: string | null;
+        report_url?: string | null;
+        v17_url?: string | null;
+        evidence_url?: string | null;
+    };
     // Phase 3: CII v2 AI Analysis data for two-column display
     ciiV2?: {
         final?: number;
@@ -104,8 +110,13 @@ type WallRow = {
     }> | null;
 };
 
-function studentV17Href(r: Pick<WallRow, "project_id" | "opportunity_id" | "actions">): string | null {
-    return studentImpactPackageHref(r.project_id || r.opportunity_id, "v17") || r.actions?.v17_url || null;
+function studentDetailedReportHref(r: Pick<WallRow, "project_id" | "opportunity_id" | "actions">): string | null {
+    return (
+        studentImpactPackageHref(r.project_id || r.opportunity_id, "report") ||
+        r.actions?.report_url ||
+        r.actions?.v17_url ||
+        null
+    );
 }
 
 function WallAction({
@@ -997,27 +1008,31 @@ export default function CommunityImpactWall(_props: {
                                     <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-2.5">
                                         <WallAction
                                             solid
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "flash")}
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "flash", { from: "wall" })}
                                             label="Open Flashcard"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "v17") || studentV17Href(r)}
-                                            label="V17 Detailed Report"
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "report", { from: "wall" }) || studentDetailedReportHref(r)}
+                                            label="Detailed report"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "print")}
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "print", { from: "wall" })}
                                             label="PDF Report"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "package")}
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "package", { from: "wall" })}
                                             label="Combined package"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "evidence")}
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "evidence", { from: "wall" })}
                                             label="JPEG Evidence"
                                         />
                                         <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "certificate")}
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "analysis", { from: "wall" })}
+                                            label="Analysis report"
+                                        />
+                                        <WallAction
+                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "certificate", { from: "wall" })}
                                             label="Certificate"
                                         />
                                         <WallAction href={r.impact_verify_url || null} label="QR Code" external={Boolean(r.impact_verify_url)} />

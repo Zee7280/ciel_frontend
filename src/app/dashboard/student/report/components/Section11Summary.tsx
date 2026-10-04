@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "../utils/mediaVisibility";
 import CertificateView from "./CertificateView";
-import { openImpactPackageTab } from "../impact-package/impactPackageTabs";
+import { openImpactPackageTab, tabFromPackageQuery } from "../impact-package/impactPackageTabs";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
@@ -293,43 +293,20 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
     const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
 
-    // Wall / listing deep-links (?view=certificate | print | v17 | evidence | flash | package).
+    // Wall / listing deep-links (?view=certificate | print | report | evidence | flash | package).
     // Certificate and detailed report wait for Super Admin approval. Do not mark the auto-open
-    // as done while scores are still loading — otherwise print/v17/certificate stay on Flash.
+    // as done while scores are still loading — otherwise print/report/certificate stay on Flash.
     const autoOpenView = searchParams.get("view");
     const autoOpenedViewRef = useRef(false);
+    // Snapshot the hash once on mount — this effect reruns when `showVerifiedImpactScores`
+    // flips (scores finish loading), and by then `openImpactPackageTab` may have already
+    // rewritten `window.location.hash` to "#flash" on an earlier run. Re-reading the live hash
+    // on that second run would read back our own prior write instead of the original deep-link,
+    // permanently stranding a `?view=report` link on Flash even after scores verify.
+    const initialHashRef = useRef(typeof window !== "undefined" ? window.location.hash : "");
     useEffect(() => {
         if (!autoOpenView) return;
         const view = autoOpenView.trim().toLowerCase();
-        if (view === "v17" || view === "package" || view === "flash" || view === "evidence" || view === "analysis") {
-            if (view === "v17") {
-                if (!showVerifiedImpactScores) {
-                    openImpactPackageTab("flash");
-                    return;
-                }
-                if (!autoOpenedViewRef.current) {
-                    autoOpenedViewRef.current = true;
-                    openImpactPackageTab("report");
-                }
-                return;
-            }
-            if (!autoOpenedViewRef.current) {
-                autoOpenedViewRef.current = true;
-                openImpactPackageTab(view === "evidence" ? "evidence" : view === "analysis" ? "analysis" : "flash");
-            }
-            return;
-        }
-        if (view === "print" || view === "report") {
-            if (!showVerifiedImpactScores) {
-                openImpactPackageTab("flash");
-                return;
-            }
-            if (!autoOpenedViewRef.current) {
-                autoOpenedViewRef.current = true;
-                openImpactPackageTab("report");
-            }
-            return;
-        }
         if (view === "certificate") {
             if (!showVerifiedImpactScores) {
                 openImpactPackageTab("flash");
@@ -339,6 +316,16 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 autoOpenedViewRef.current = true;
                 setShowCertificate(true);
             }
+            return;
+        }
+        const tab = tabFromPackageQuery(view, initialHashRef.current);
+        if (tab === "report" && !showVerifiedImpactScores) {
+            openImpactPackageTab("flash");
+            return;
+        }
+        if (!autoOpenedViewRef.current) {
+            autoOpenedViewRef.current = true;
+            openImpactPackageTab(tab);
         }
     }, [autoOpenView, showVerifiedImpactScores]);
 

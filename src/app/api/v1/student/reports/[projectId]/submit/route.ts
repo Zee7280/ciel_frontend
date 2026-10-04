@@ -24,14 +24,15 @@ export async function POST(
             "Content-Type": "application/json",
         };
 
-        let response = await fetch(`${base}/student/reports/${encoded}/submit`, {
+        // Canonical Nest route first so a large JSON body is not posted twice on a 404.
+        let response = await fetch(`${base}/students/reports/${encoded}/submit`, {
             method: "POST",
             headers,
             body: bodyText || "{}",
         });
 
         if (response.status === 404) {
-            response = await fetch(`${base}/students/reports/${encoded}/submit`, {
+            response = await fetch(`${base}/student/reports/${encoded}/submit`, {
                 method: "POST",
                 headers,
                 body: bodyText || "{}",

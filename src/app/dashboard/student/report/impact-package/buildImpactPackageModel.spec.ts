@@ -122,10 +122,42 @@ test("clampImpactPackageTab falls back to flash when the requested tab is hidden
 
 test("wall deep-links map onto Impact Package tabs", () => {
     assert.equal(tabFromPackageQuery("v17"), "report");
+    assert.equal(tabFromPackageQuery("report"), "report");
     assert.equal(tabFromPackageQuery("print"), "report");
     assert.equal(tabFromPackageQuery("evidence"), "evidence");
     assert.equal(tabFromPackageQuery("package"), "flash");
     assert.equal(tabFromPackageQuery("flash"), "flash");
     assert.equal(tabFromPackageQuery("certificate"), "flash");
     assert.equal(tabFromPackageQuery(null, "#report"), "report");
+});
+
+test("sectionsComplete reflects real content instead of always reading 0 / 9", () => {
+    const empty = buildImpactPackageModel({ project_id: "p-empty", required_hours: 16 } as never);
+    assert.equal(empty.sectionsTotal, 9);
+    assert.equal(empty.sectionsComplete, 0);
+
+    const full = buildImpactPackageModel(
+        {
+            project_id: "p-full",
+            required_hours: 16,
+            section1: {
+                participation_type: "individual",
+                attendance_logs: [{ date: "2026-09-01", hours: 4, participantId: "lead:u1" }],
+            },
+            section2: { problem_statement: "Clean water access is limited in the target community." },
+            section3: { student_contribution_intent_statement: "We mapped the gap against SDG 6." },
+            section4: {
+                activity_blocks: [{ title: "Well repair", primary_category: "infrastructure" }],
+            },
+            section5: { observed_change: "Access improved for 40 households." },
+            section6: { use_resources: "no" },
+            section7: { has_partners: "no" },
+            section9: { reflection_biggest_learning: "Coordination with the community took longer than planned." },
+            section10: { continuation_details: "The local committee will maintain the well going forward." },
+        } as never,
+        undefined,
+        [{ url: "https://example.com/evidence.jpg", name: "Evidence.jpg" }],
+    );
+    assert.equal(full.sectionsTotal, 9);
+    assert.equal(full.sectionsComplete, 9);
 });

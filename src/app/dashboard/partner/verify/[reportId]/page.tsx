@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
@@ -264,9 +265,16 @@ function buildPartnerProjectBlueprintRows(report: ReportDetail | null): PartnerB
     ].filter((row) => !partnerValueIsEmpty(row.value));
 }
 
-export default function ReportDetailPage() {
+function ReportDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const packageView = (searchParams.get("package") || "").trim() === "1";
+    const packageDoc = (searchParams.get("doc") || "").trim().toLowerCase();
+    const reportsInboxHref =
+        getStoredCurrentUserRole() === "university"
+            ? "/dashboard/partner/community-service?view=reports"
+            : "/dashboard/partner/reports";
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
@@ -442,9 +450,9 @@ export default function ReportDetailPage() {
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-slate-900 mb-2">Report Not Found</h2>
-                    <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+                    <Link href={reportsInboxHref} className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
                         Go Back
-                    </button>
+                    </Link>
                 </div>
             </div>
         );
@@ -471,13 +479,13 @@ export default function ReportDetailPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-                    <button
-                        onClick={() => router.back()}
+                    <Link
+                        href={reportsInboxHref}
                         className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         Back to impact reports
-                    </button>
+                    </Link>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black border border-indigo-200 uppercase tracking-widest">
                             Single-Page Dossier Mode
@@ -497,6 +505,15 @@ export default function ReportDetailPage() {
                     }))}
                     variant="published"
                     audience={getStoredCurrentUserRole() === "university" ? "university" : "partner"}
+                    highlight={packageView || Boolean(packageDoc)}
+                    initialDoc={
+                        packageDoc === "flashcard" ||
+                        packageDoc === "report" ||
+                        packageDoc === "evidence" ||
+                        packageDoc === "analysis"
+                            ? packageDoc
+                            : null
+                    }
                 />
 
                 {/* Quality Insight Banner — university only; partner/NGO do not receive the analysis report */}
@@ -1449,5 +1466,19 @@ export default function ReportDetailPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function PartnerReportVerifyPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+                </div>
+            }
+        >
+            <ReportDetailPage />
+        </Suspense>
     );
 }

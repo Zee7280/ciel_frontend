@@ -137,7 +137,7 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
     const evidence = agg.evidence;
     const story =
         firstSentence(txt(s2?.summary_text, s2?.problem_statement, agg.context.projectLocation)) ||
-        "The student submission is locked in the V17 template received by Faculty.";
+        "The student submission is locked in the Impact Package received by Faculty.";
     const partner = txt(agg.context.partnerOrganization) || "Partner not named";
     const location = txt(agg.context.projectLocation);
     const faculty = txt(asRecord(s1).faculty_supervisor_name, s1?.faculty_supervisor_email);

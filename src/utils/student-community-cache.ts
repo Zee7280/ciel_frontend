@@ -15,6 +15,13 @@ export type StudentBrowsePayload = {
     success?: boolean;
     data?: unknown[];
     apply_maintenance?: { enabled?: boolean; message?: string };
+    path_counts?: {
+        all?: number;
+        community_service?: number;
+        coursework?: number;
+        fyp?: number;
+        startup?: number;
+    };
 };
 
 const FRESH_MS = 20_000;

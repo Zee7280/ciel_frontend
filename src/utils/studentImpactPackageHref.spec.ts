@@ -15,8 +15,12 @@ test("builds same-tab Impact Package hrefs from project id", () => {
         "/dashboard/student/report?projectId=opp-1&view=flash#flash",
     );
     assert.equal(
+        studentImpactPackageHref("opp-1", "report"),
+        "/dashboard/student/report?projectId=opp-1&view=report#report",
+    );
+    assert.equal(
         studentImpactPackageHref("opp-1", "v17"),
-        "/dashboard/student/report?projectId=opp-1&view=v17#report",
+        "/dashboard/student/report?projectId=opp-1&view=report#report",
     );
     assert.equal(
         studentImpactPackageHref("opp-1", "print"),
@@ -31,6 +35,22 @@ test("builds same-tab Impact Package hrefs from project id", () => {
         "/dashboard/student/report?projectId=opp-1&view=certificate#flash",
     );
     assert.equal(studentImpactPackageHref("  ", "flash"), null);
+});
+
+test("appends the from surface so back-navigation knows where a wall link came from", () => {
+    assert.equal(
+        studentImpactPackageHref("opp-1", "flash", { from: "wall" }),
+        "/dashboard/student/report?projectId=opp-1&view=flash&from=wall#flash",
+    );
+    assert.equal(
+        studentImpactPackageHref("opp-1", "report", { from: "files" }),
+        "/dashboard/student/report?projectId=opp-1&view=report&from=files#report",
+    );
+    assert.equal(
+        studentImpactPackageHref("opp-1", "flash"),
+        "/dashboard/student/report?projectId=opp-1&view=flash#flash",
+        "from stays absent when not passed",
+    );
 });
 
 test("report page treats every wall view as an Impact Package deep-link", () => {
@@ -54,13 +74,14 @@ test("verified student wall buttons land on the matching package tab", () => {
     assert.equal(landingTab(studentImpactPackageHref(id, "flash")!, true), "flash");
     assert.equal(landingTab(studentImpactPackageHref(id, "package")!, true), "flash");
     assert.equal(landingTab(studentImpactPackageHref(id, "certificate")!, true), "flash");
+    assert.equal(landingTab(studentImpactPackageHref(id, "report")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "v17")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "print")!, true), "report");
     assert.equal(landingTab(studentImpactPackageHref(id, "evidence")!, true), "evidence");
 });
 
 test("student detailed-report links stay on flash until Super Admin approval", () => {
-    const href = studentImpactPackageHref("opp-1", "v17")!;
+    const href = studentImpactPackageHref("opp-1", "report")!;
     assert.equal(landingTab(href, false), "flash");
     assert.equal(landingTab(href, true), "report");
     assert.equal(landingTab(studentImpactPackageHref("opp-1", "evidence")!, false), "evidence");

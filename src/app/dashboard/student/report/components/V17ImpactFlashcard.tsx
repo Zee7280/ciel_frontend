@@ -580,7 +580,7 @@ export function V17ImpactFlashcard({
     const nextStep = studentNextStepCopy({ status, canSend, missingLabels, reviewer, sendCta, requiresFee });
 
     return (
-        <div className="cer-c22-flash" id="cer-v17-flash">
+        <div className="cer-c22-flash" id="cer-impact-flash">
             {!isFaculty ? (
                 <div className={`c22-next ${nextStep.tone}`}>
                     <p>{nextStep.text}</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
 import { resolveAttendanceApproverType, type AttendanceApproverType } from "@/utils/attendanceApproverRouting";
@@ -16,7 +16,6 @@ import {
     pickOpportunityTypes,
     pickUniversityLabel,
     pickVisibilityBucket,
-    visibilityMenuLabel,
 } from "@/utils/opportunityListing";
 import {
     readStudentInstitutionFromBrowserStorage,
@@ -47,11 +46,20 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
-import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2, Building2, ChevronDown, Search } from "lucide-react";
+import { Loader2, Globe, LayoutGrid, List, Users, Mail, Phone, GraduationCap, ChevronDown, Search, Filter, Leaf, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { fetchStudentBrowsePayload, peekStudentBrowsePayload } from "@/utils/student-community-cache";
+import BrowseOpportunityCard, { sdgsForBrowseCard } from "./BrowseOpportunityCard";
 import ApplicationDialog from "./components/ApplicationDialog";
+import {
+    BROWSE_PATHS,
+    BROWSE_PATH_BY_KEY,
+    classifyBrowseCreator,
+    classifyBrowsePath,
+    isUrgentBrowseDeadline,
+    type BrowsePathKey,
+} from "@/utils/browseOpportunityPath";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 import { ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
 import { fetchImpactSummary, readImpactSummaryCache } from "@/utils/cielImpactSummary";
@@ -59,18 +67,21 @@ import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import ProgressBar from "@/components/ciel/ProgressBar";
 import { findSdgById } from "@/utils/sdgData";
 
-type BrowseCreatorLabel = "Faculty" | "NGO" | "Partner" | "CIEL PK";
+type BrowseCreatorLabel = "Student" | "Faculty" | "NGO" | "Partner" | "CIEL PK";
 
-/** Coarser than `pickCreatorBucket` (which only knows student/faculty/partner) — Browse only ever
- * shows published, non-student opportunities, so this splits the "partner" bucket further into
- * the 4 creator types the design calls for. */
+/** Keep aligned with BE `classifyBrowseCreator`. NGO stays a browse-only split of partner. */
 function pickBrowseCreatorLabel(raw: Record<string, unknown>): BrowseCreatorLabel | null {
     const r = String(raw.created_by_role ?? raw.creator_role ?? raw.creator_type ?? "")
         .trim()
         .toLowerCase();
+    if (r.includes("ngo") && !r.includes("partner")) return "NGO";
+    const key = classifyBrowseCreator(raw);
+    if (key === "student") return "Student";
+    if (key === "faculty") return "Faculty";
+    if (key === "admin") return "CIEL PK";
+    if (key === "partner") return r.includes("ngo") ? "NGO" : "Partner";
     if (!r) return null;
     if (r.includes("faculty")) return "Faculty";
-    if (r.includes("ngo")) return "NGO";
     if (r.includes("admin") || r.includes("ciel")) return "CIEL PK";
     return "Partner";
 }
@@ -130,6 +141,16 @@ interface BrowseOpportunity {
     creatorLabel?: BrowseCreatorLabel | null;
     seatsRemaining?: number | null;
     seatsApproved?: number | null;
+    path_key?: BrowsePathKey;
+    path_label?: string;
+    end_date?: string | null;
+    cover_url?: string | null;
+    department?: string | null;
+    partner_name?: string | null;
+    sdg_ids?: string[];
+    is_full?: boolean;
+    is_virtual?: boolean;
+    is_urgent?: boolean;
     /** True while a join application is pending or approved; false when rejected so student can re-apply. */
     applyLocked?: boolean;
     applications_open?: boolean;
@@ -250,6 +271,24 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         seatsTotal != null && seatsRemaining != null ? Math.max(0, seatsTotal - seatsRemaining) : null;
     const createdRaw = raw.created_at ?? raw.createdAt ?? raw.published_at;
     const createdAt = typeof createdRaw === "string" && createdRaw.trim() ? createdRaw : undefined;
+    const timelineStart = typeof timeline?.start_date === "string" ? timeline.start_date : undefined;
+    const timelineEnd =
+        (typeof raw.end_date === "string" && raw.end_date.trim()
+            ? raw.end_date
+            : typeof timeline?.end_date === "string" && timeline.end_date.trim()
+              ? timeline.end_date
+              : typeof timeline?.application_deadline === "string" && timeline.application_deadline.trim()
+                ? timeline.application_deadline
+                : null);
+    const path_key = classifyBrowsePath(opportunityTypes, raw.path_key);
+    const sdgIds = Array.isArray(raw.sdg_ids)
+        ? raw.sdg_ids.map((id) => String(id))
+        : [sdgIdRaw].filter((id) => id != null && String(id).trim()).map((id) => String(id));
+    const remainingForFull = typeof seatsRemaining === "number" ? seatsRemaining : null;
+    const is_full =
+        typeof raw.is_full === "boolean"
+            ? raw.is_full
+            : Boolean(seatsTotal && remainingForFull != null && remainingForFull <= 0);
 
     return {
         ...op,
@@ -258,6 +297,8 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         city,
         category,
         createdAt,
+        start_date: op.start_date || timelineStart,
+        end_date: timelineEnd,
         seatsTotal,
         hasApplied,
         has_applied: hasApplied,
@@ -272,9 +313,18 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         sdgLabel: buildSdgFilterLabel(raw),
         sdgNumber: sdg?.number ?? null,
         sdgTitle: sdg?.title ?? null,
+        sdg_ids: sdgIds,
         creatorLabel,
         seatsRemaining,
         seatsApproved,
+        path_key,
+        path_label: typeof raw.path_label === "string" && raw.path_label.trim() ? raw.path_label : undefined,
+        cover_url: typeof raw.cover_url === "string" ? raw.cover_url : null,
+        department: typeof raw.department === "string" && raw.department.trim() ? raw.department : null,
+        partner_name: typeof raw.partner_name === "string" && raw.partner_name.trim() ? raw.partner_name : orgName || null,
+        is_full,
+        is_virtual: typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(op.mode ?? raw.mode) === "remote",
+        is_urgent: typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(timelineEnd),
         applications_open: op.applications_open,
         apply_blocked_reason: op.apply_blocked_reason,
         apply_blocked_message: op.apply_blocked_message,
@@ -332,32 +382,6 @@ function mapBrowseFromPayload(payload: { data?: unknown[] } | null): BrowseOppor
     return (payload.data as BrowseOpportunity[]).map((op) => normalizeOpportunity(op)).filter((op) => shouldShowInBrowse(op));
 }
 
-function scheduleLabel(op: BrowseOpportunity): string {
-    if (op.start_date) {
-        const d = new Date(op.start_date);
-        if (!Number.isNaN(d.getTime())) {
-            return `Project date · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-        }
-    }
-    return "Project dates · Flexible";
-}
-
-function hoursCreditLabel(op: BrowseOpportunity): string {
-    const n = typeof op.hours === "number" ? op.hours : Number(op.hours);
-    const shown = Number.isFinite(n) ? n : op.hours || "0";
-    return `${shown} hours credit`;
-}
-
-function seatsLeftLabel(op: BrowseOpportunity): string {
-    const left = op.seatsRemaining ?? op.remaining_seats ?? 0;
-    if (op.seatsTotal && op.seatsTotal > 0) return `${left} of ${op.seatsTotal} seats left`;
-    return `${left} seats left`;
-}
-
-function pathTagLabel(op: BrowseOpportunity): string {
-    return op.opportunityTypes?.[0] || op.category || "Community service";
-}
-
 function isPendingJoin(op: BrowseOpportunity): boolean {
     return isJoinApplicationPendingStatus(op.application_status || "");
 }
@@ -379,8 +403,6 @@ export default function StudentBrowseOpportunitiesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
     const [sortNewest, setSortNewest] = useState(true);
-    const [moreOpen, setMoreOpen] = useState(false);
-    const moreWrapRef = useRef<HTMLDivElement>(null);
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
     const [hoursLogged, setHoursLogged] = useState(0);
     const [hoursTarget, setHoursTarget] = useState(16);
@@ -401,6 +423,17 @@ export default function StudentBrowseOpportunitiesPage() {
     const [seatsFilter, setSeatsFilter] = useState<"all" | "1" | "5" | "10">("all");
     const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
     const [creatorFilter, setCreatorFilter] = useState<"all" | BrowseCreatorLabel>("all");
+    const [pathTab, setPathTab] = useState<"all" | BrowsePathKey>("all");
+    const [filtersOpen, setFiltersOpen] = useState(true);
+    const [statusFilter, setStatusFilter] = useState<"all" | "open" | "full">("all");
+    const [departmentFilter, setDepartmentFilter] = useState("all");
+    const [partnerFilter, setPartnerFilter] = useState("all");
+    const [timeCommitment, setTimeCommitment] = useState<"all" | "8" | "16" | "17">("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [openTo, setOpenTo] = useState<"all" | "university" | "department" | "public">("all");
+    const [virtualOnly, setVirtualOnly] = useState(false);
+    const [urgentOnly, setUrgentOnly] = useState(false);
 
     // Derived Data
     const universityOptions = Array.from(
@@ -415,8 +448,25 @@ export default function StudentBrowseOpportunitiesPage() {
     const locationOptions = Array.from(new Set(opportunities.map((op) => op.city || "Remote"))).sort((a, b) =>
         a.localeCompare(b),
     );
+    const departmentOptions = Array.from(
+        new Set(opportunities.map((op) => op.department).filter((d): d is string => Boolean(d))),
+    ).sort((a, b) => a.localeCompare(b));
+    const partnerOptions = Array.from(
+        new Set(opportunities.map((op) => op.partner_name || op.organization_name).filter((d): d is string => Boolean(d))),
+    ).sort((a, b) => a.localeCompare(b));
+    const computeBrowsePathCounts = (list: typeof opportunities) => ({
+        all: list.length,
+        community_service: list.filter((op) => (op.path_key || "community_service") === "community_service").length,
+        coursework: list.filter((op) => op.path_key === "coursework").length,
+        fyp: list.filter((op) => op.path_key === "fyp").length,
+        startup: list.filter((op) => op.path_key === "startup").length,
+    });
+    const pathCounts = computeBrowsePathCounts(opportunities);
 
     const afterListingFilters = opportunities.filter((op) => {
+        // Defense-in-depth: the backend already excludes admin_hidden rows from this endpoint,
+        // but never render one as a normal "Open" card if it ever slips through.
+        if (op.apply_blocked_reason === "opportunity_hidden") return false;
         if (universityFilter !== "all" && (op.universityLabel || "Unspecified") !== universityFilter) return false;
         if (modeFilter !== "all" && (op.modeBucket || "unspecified") !== modeFilter) return false;
         if (oppTypeFilter !== "all" && !(op.opportunityTypes || []).includes(oppTypeFilter)) return false;
@@ -425,8 +475,28 @@ export default function StudentBrowseOpportunitiesPage() {
         if (!passesSeatsFilter(op.seatsRemaining ?? null, seatsFilter)) return false;
         if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;
         if (creatorFilter !== "all" && op.creatorLabel !== creatorFilter) return false;
+        if (pathTab !== "all" && (op.path_key || "community_service") !== pathTab) return false;
+        if (statusFilter === "open" && op.is_full) return false;
+        if (statusFilter === "full" && !op.is_full) return false;
+        if (departmentFilter !== "all" && op.department !== departmentFilter) return false;
+        if (partnerFilter !== "all" && (op.partner_name || op.organization_name) !== partnerFilter) return false;
+        if (timeCommitment !== "all") {
+            const hours = typeof op.hours === "number" ? op.hours : Number(op.hours);
+            if (!Number.isFinite(hours)) return false;
+            if (timeCommitment === "8" && hours > 8) return false;
+            if (timeCommitment === "16" && (hours <= 8 || hours > 16)) return false;
+            if (timeCommitment === "17" && hours <= 16) return false;
+        }
+        if (dateFrom && op.end_date && String(op.end_date).slice(0, 10) < dateFrom) return false;
+        if (dateTo && (op.start_date || op.end_date) && String(op.start_date || op.end_date).slice(0, 10) > dateTo) return false;
+        if (openTo === "public" && op.visibilityBucket !== "open") return false;
+        if (openTo === "university" && op.visibilityBucket !== "restricted") return false;
+        if (openTo === "department" && !op.department) return false;
+        if (virtualOnly && !op.is_virtual) return false;
+        if (urgentOnly && !op.is_urgent) return false;
         return true;
     });
+    const filteredPathCounts = computeBrowsePathCounts(afterListingFilters);
     const needle = searchQuery.trim().toLowerCase();
     const fullHiddenCount = afterListingFilters.filter((op) => op.seatsRemaining != null && op.seatsRemaining <= 0).length;
     const filteredOpportunities = afterListingFilters
@@ -456,6 +526,16 @@ export default function StudentBrowseOpportunitiesPage() {
         setSearchQuery("");
         setOnlyOpenSeats(false);
         setSortNewest(true);
+        setPathTab("all");
+        setStatusFilter("all");
+        setDepartmentFilter("all");
+        setPartnerFilter("all");
+        setTimeCommitment("all");
+        setDateFrom("");
+        setDateTo("");
+        setOpenTo("all");
+        setVirtualOnly(false);
+        setUrgentOnly(false);
     };
 
     const filterSelectClass =
@@ -470,7 +550,12 @@ export default function StudentBrowseOpportunitiesPage() {
         seatsFilter,
         visibilityFilter,
         creatorFilter,
-    ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0);
+        statusFilter,
+        departmentFilter,
+        partnerFilter,
+        timeCommitment,
+        openTo,
+    ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0) + (pathTab !== "all" ? 1 : 0) + (virtualOnly ? 1 : 0) + (urgentOnly ? 1 : 0) + (dateFrom || dateTo ? 1 : 0);
 
     const pendingApplicationsCount = opportunities.filter((op) => op.applyLocked && isPendingJoin(op)).length;
     const myApplications = opportunities.filter((op) => op.hasApplied || op.has_applied || op.applyLocked);
@@ -558,15 +643,6 @@ export default function StudentBrowseOpportunitiesPage() {
         return () => window.clearInterval(intervalId);
     }, []);
 
-    useEffect(() => {
-        if (!moreOpen) return;
-        const onDoc = (e: MouseEvent) => {
-            if (!moreWrapRef.current?.contains(e.target as Node)) setMoreOpen(false);
-        };
-        document.addEventListener("mousedown", onDoc);
-        return () => document.removeEventListener("mousedown", onDoc);
-    }, [moreOpen]);
-
     const fetchOpportunities = async (options?: { silent?: boolean; force?: boolean }) => {
         if (!options?.silent && !peekStudentBrowsePayload()) {
             setIsLoading(true);
@@ -603,7 +679,7 @@ export default function StudentBrowseOpportunitiesPage() {
 
     if (isLoading && opportunities.length === 0) {
         return (
-            <div className="mx-auto max-w-7xl space-y-5 pb-20">
+            <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
                 <header>
                     <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
                     <p className="mt-1 text-sm text-ciel-text-mid">Published listings from Faculty, NGOs, Partners and CIEL PK.</p>
@@ -617,7 +693,7 @@ export default function StudentBrowseOpportunitiesPage() {
     }
 
     return (
-        <div className="mx-auto max-w-7xl space-y-5 pb-20">
+        <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
@@ -714,171 +790,269 @@ export default function StudentBrowseOpportunitiesPage() {
                 )}
             </section>
 
-            <section className="rounded-xl border border-ciel-border bg-white p-3" aria-label="Filters">
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-                    <div className="relative min-w-0 flex-1">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                        <input
-                            type="search"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search projects or organisations"
-                            className="h-10 w-full rounded-lg border border-ciel-border bg-white pl-9 pr-3 text-sm text-ciel-text placeholder:text-ciel-text-soft focus:border-ciel-green focus:outline-none focus:ring-2 focus:ring-ciel-green/20"
-                        />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative">
-                            <select
-                                value={oppTypeFilter}
-                                onChange={(e) => setOppTypeFilter(e.target.value)}
-                                className={filterSelectClass}
-                                title="Path"
-                            >
-                                <option value="all">All paths</option>
-                                {oppTypeOptions.map((t) => (
-                                    <option key={t} value={t}>
-                                        {t}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                        </div>
-                        <div className="relative">
-                            <select
-                                value={modeFilter}
-                                onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
-                                className={filterSelectClass}
-                                title="Mode"
-                            >
-                                <option value="all">Any mode</option>
-                                {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
-                                    <option key={b} value={b}>
-                                        {modeMenuLabel(b)}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                        </div>
-                        <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-ciel-border bg-white px-3 text-sm text-ciel-text">
-                            <input
-                                type="checkbox"
-                                checked={onlyOpenSeats}
-                                onChange={(e) => setOnlyOpenSeats(e.target.checked)}
-                                className="h-4 w-4 rounded border-ciel-border text-[#0e7d74] focus:ring-[#0e7d74]"
-                            />
-                            Only show projects with seats
-                        </label>
-                        <div className="relative" ref={moreWrapRef}>
-                            <button
-                                type="button"
-                                onClick={() => setMoreOpen((o) => !o)}
-                                className="inline-flex h-10 items-center gap-1 rounded-lg border border-ciel-border bg-white px-3 text-sm text-ciel-text hover:bg-slate-50"
-                            >
-                                More
-                                {activeFilterCount > 0 ? (
-                                    <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ciel-green-soft px-1 text-[11px] font-bold text-ciel-green-deep">
-                                        {activeFilterCount}
-                                    </span>
-                                ) : null}
-                                <ChevronDown className="h-4 w-4 text-ciel-text-soft" />
-                            </button>
-                            {moreOpen ? (
-                                <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-ciel-border bg-white p-3 shadow-lg">
-                                    <div className="relative">
-                                        <select value={universityFilter} onChange={(e) => setUniversityFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="University">
-                                            <option value="all">All universities</option>
-                                            {universityOptions.map((u) => (
-                                                <option key={u} value={u}>{u}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="relative">
-                                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="SDG">
-                                            <option value="all">All SDGs</option>
-                                            {sdgOptions.map((s) => (
-                                                <option key={s} value={s}>{s}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="relative">
-                                        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="Location">
-                                            <option value="all">All locations</option>
-                                            {locationOptions.map((loc) => (
-                                                <option key={loc} value={loc}>{loc}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="relative">
-                                        <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)} className={`${filterSelectClass} w-full`} title="Visibility">
-                                            <option value="all">All visibility</option>
-                                            {(["open", "restricted", "unspecified"] as const).map((b) => (
-                                                <option key={b} value={b}>{visibilityMenuLabel(b)}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="relative">
-                                        <select
-                                            value={creatorFilter}
-                                            onChange={(e) => setCreatorFilter(e.target.value as "all" | BrowseCreatorLabel)}
-                                            className={`${filterSelectClass} w-full`}
-                                            title="Creator"
-                                        >
-                                            <option value="all">All creators</option>
-                                            {(["Faculty", "NGO", "Partner", "CIEL PK"] as const).map((c) => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="relative">
-                                        <select value={seatsFilter} onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")} className={`${filterSelectClass} w-full`} title="Seats available">
-                                            <option value="all">Any seats</option>
-                                            <option value="1">1+ seats</option>
-                                            <option value="5">5+ seats</option>
-                                            <option value="10">10+ seats</option>
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 border-t border-ciel-border pt-2">
-                                        <div className="flex rounded-lg border border-ciel-border p-0.5">
-                                            <button type="button" onClick={() => setViewMode("grid")} className={`rounded-md p-1.5 ${viewMode === "grid" ? "bg-slate-100 text-ciel-text" : "text-ciel-text-soft"}`} title="Grid view">
-                                                <LayoutGrid className="h-4 w-4" />
-                                            </button>
-                                            <button type="button" onClick={() => setViewMode("list")} className={`rounded-md p-1.5 ${viewMode === "list" ? "bg-slate-100 text-ciel-text" : "text-ciel-text-soft"}`} title="List view">
-                                                <List className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <button type="button" onClick={clearListingFilters} className="text-sm font-medium text-ciel-text-mid hover:text-ciel-text">
-                                            Clear filters
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className="relative ml-auto">
-                            <select
-                                value={sortNewest ? "newest" : "oldest"}
-                                onChange={(e) => setSortNewest(e.target.value === "newest")}
-                                className={filterSelectClass}
-                                title="Sort"
-                            >
-                                <option value="newest">Newest first</option>
-                                <option value="oldest">Oldest first</option>
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                        </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {BROWSE_PATHS.map((path) => {
+                    const Icon = path.key === "coursework" ? Leaf : path.key === "startup" ? Lightbulb : path.key === "fyp" ? Search : Users;
+                    const active = pathTab === path.key;
+                    return (
+                        <button
+                            key={path.key}
+                            type="button"
+                            onClick={() => setPathTab(active ? "all" : path.key)}
+                            className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-left shadow-sm transition ${
+                                active ? "border-transparent text-white" : "border-[#e4eeec] bg-white hover:border-[#cfe3de]"
+                            }`}
+                            style={active ? { background: path.accent } : undefined}
+                        >
+                            <span className={`mt-0.5 grid h-10 w-10 place-items-center rounded-xl ${active ? "bg-white/15 text-white" : ""}`} style={!active ? { background: path.accentSoft, color: path.accentText } : undefined}>
+                                <Icon className="h-5 w-5" />
+                            </span>
+                            <span>
+                                <span className="block text-[15px] font-bold leading-tight">{path.label}</span>
+                                <span className={`mt-0.5 block text-[12px] ${active ? "text-white/85" : "text-[#6b7c86]"}`}>{path.tagline}</span>
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            <section className="rounded-2xl border border-[#e4eeec] bg-white p-4 shadow-[0_8px_24px_rgba(15,42,48,.04)]" aria-label="Filters">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="inline-flex items-center gap-2 text-[15px] font-bold text-[#16313d]">
+                        <Filter className="h-4 w-4 text-[#0e7d74]" />
+                        Advanced Filters
+                        {activeFilterCount > 0 ? (
+                            <span className="rounded-full bg-[#e8f8f1] px-2 py-0.5 text-[11px] font-black text-[#0f6b4a]">{activeFilterCount}</span>
+                        ) : null}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={clearListingFilters} className="rounded-full border border-[#e4eeec] px-3 py-1.5 text-[12px] font-semibold text-[#5d7278] hover:bg-slate-50">
+                            Clear All
+                        </button>
+                        <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="inline-flex items-center gap-1 rounded-full border border-[#e4eeec] px-3 py-1.5 text-[12px] font-semibold text-[#5d7278] hover:bg-slate-50">
+                            {filtersOpen ? "Hide Filters" : "Show Filters"}
+                            <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
+                        </button>
                     </div>
                 </div>
+                {filtersOpen ? (
+                    <div className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Keyword Search
+                                <span className="relative mt-1 block">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                    <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by title, partner, skills…" className="h-10 w-full rounded-xl border border-[#e4eeec] bg-white pl-9 pr-3 text-sm text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Opportunity Type
+                                <span className="relative mt-1 block">
+                                    <select value={oppTypeFilter} onChange={(e) => setOppTypeFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Types</option>
+                                        {oppTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Category
+                                <span className="relative mt-1 block">
+                                    <select value={pathTab} onChange={(e) => setPathTab(e.target.value as "all" | BrowsePathKey)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Categories</option>
+                                        {BROWSE_PATHS.map((p) => <option key={p.key} value={p.key}>{p.shortLabel}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Location
+                                <span className="relative mt-1 block">
+                                    <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Locations</option>
+                                        {locationOptions.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Mode
+                                <span className="relative mt-1 block">
+                                    <select value={modeFilter} onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Modes</option>
+                                        {(["on-site", "hybrid", "remote"] as const).map((b) => <option key={b} value={b}>{modeMenuLabel(b)}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Status
+                                <span className="relative mt-1 block">
+                                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | "open" | "full")} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Statuses</option>
+                                        <option value="open">Open</option>
+                                        <option value="full">Full</option>
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                SDG(s)
+                                <span className="relative mt-1 block">
+                                    <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">Select SDGs</option>
+                                        {sdgOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Department
+                                <span className="relative mt-1 block">
+                                    <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Departments</option>
+                                        {departmentOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                University
+                                <span className="relative mt-1 block">
+                                    <select value={universityFilter} onChange={(e) => setUniversityFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Universities</option>
+                                        {universityOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Partner / NGO
+                                <span className="relative mt-1 block">
+                                    <select value={partnerFilter} onChange={(e) => setPartnerFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">All Partners</option>
+                                        {partnerOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Time Commitment
+                                <span className="relative mt-1 block">
+                                    <select value={timeCommitment} onChange={(e) => setTimeCommitment(e.target.value as "all" | "8" | "16" | "17")} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
+                                        <option value="all">Any Hours</option>
+                                        <option value="8">Up to 8 hrs</option>
+                                        <option value="16">9–16 hrs</option>
+                                        <option value="17">17+ hrs</option>
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                </span>
+                            </label>
+                            <label className="block text-[11px] font-bold text-[#5d7278]">
+                                Date Range
+                                <span className="mt-1 grid grid-cols-2 gap-1">
+                                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]" />
+                                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]" />
+                                </span>
+                            </label>
+                        </div>
+                        <div className="grid gap-3 border-t border-[#eef4f3] pt-3 lg:grid-cols-3">
+                            <div>
+                                <p className="text-[11px] font-bold text-[#5d7278]">Open To</p>
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
+                                    {([
+                                        ["all", "All"],
+                                        ["university", studentInstitution ? `${studentInstitution} only` : "My university only"],
+                                        ["department", "Department only"],
+                                        ["public", "Public (all universities)"],
+                                    ] as const).map(([value, label]) => (
+                                        <label key={value} className="inline-flex items-center gap-1.5">
+                                            <input type="checkbox" checked={openTo === value} onChange={() => setOpenTo(value)} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                            {label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-[#5d7278]">Created By</p>
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
+                                    <label className="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" checked={creatorFilter === "all"} onChange={() => setCreatorFilter("all")} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                        All
+                                    </label>
+                                    {(["Student", "Faculty", "NGO", "Partner", "CIEL PK"] as const).map((c) => (
+                                        <label key={c} className="inline-flex items-center gap-1.5">
+                                            <input type="checkbox" checked={creatorFilter === c} onChange={() => setCreatorFilter(creatorFilter === c ? "all" : c)} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                            {c === "CIEL PK" ? "Admin" : c}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-[#5d7278]">Special Filter</p>
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
+                                    <label className="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" checked={onlyOpenSeats} onChange={(e) => setOnlyOpenSeats(e.target.checked)} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                        With Available Seats Only
+                                    </label>
+                                    <label className="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" checked={virtualOnly} onChange={(e) => setVirtualOnly(e.target.checked)} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                        Virtual Opportunities
+                                    </label>
+                                    <label className="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" checked={urgentOnly} onChange={(e) => setUrgentOnly(e.target.checked)} className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]" />
+                                        Urgent Opportunities
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </section>
 
-            <p className="text-sm text-ciel-text-mid">
-                {filteredOpportunities.length} {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}
-                {onlyOpenSeats && fullHiddenCount > 0 ? ` · ${fullHiddenCount} full project${fullHiddenCount === 1 ? "" : "s"} hidden` : ""}
-            </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[15px] font-black text-[#16313d]">{filteredOpportunities.length} Opportunities Found</p>
+                    <button type="button" onClick={() => setPathTab("all")} className={`rounded-full px-2.5 py-1 text-[11px] font-black ${pathTab === "all" ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f]"}`}>
+                        All {pathTab === "all" ? filteredPathCounts.all : pathCounts.all}
+                    </button>
+                    {BROWSE_PATHS.map((path) => (
+                        <button
+                            key={path.key}
+                            type="button"
+                            onClick={() => setPathTab(path.key)}
+                            className="rounded-full px-2.5 py-1 text-[11px] font-black"
+                            style={
+                                pathTab === path.key
+                                    ? { background: path.accent, color: "#fff" }
+                                    : { background: path.accentSoft, color: path.accentText }
+                            }
+                        >
+                            {path.shortLabel} {pathTab === path.key ? filteredPathCounts[path.key] : pathCounts[path.key]}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="relative">
+                        <select value={sortNewest ? "newest" : "oldest"} onChange={(e) => setSortNewest(e.target.value === "newest")} className={`${filterSelectClass} min-w-[9rem] rounded-xl`} title="Sort">
+                            <option value="newest">Most Recent</option>
+                            <option value="oldest">Oldest first</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                    </div>
+                    <div className="flex rounded-xl border border-[#e4eeec] p-0.5">
+                        <button type="button" onClick={() => setViewMode("grid")} className={`rounded-lg p-1.5 ${viewMode === "grid" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`} title="Grid view">
+                            <LayoutGrid className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => setViewMode("list")} className={`rounded-lg p-1.5 ${viewMode === "list" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`} title="List view">
+                            <List className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {onlyOpenSeats && fullHiddenCount > 0 ? (
+                <p className="text-sm text-ciel-text-mid">{fullHiddenCount} full project{fullHiddenCount === 1 ? "" : "s"} hidden</p>
+            ) : null}
 
             {filteredOpportunities.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-ciel-border bg-white py-16 text-center">
@@ -892,7 +1066,7 @@ export default function StudentBrowseOpportunitiesPage() {
                     </Button>
                 </div>
             ) : (
-                <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" : "space-y-4"}>
+                <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "space-y-4"}>
                     {filteredOpportunities.map((op) => {
                         const applyEligibility = resolveStudentUniversityApplyEligibility(
                             op as unknown as Record<string, unknown>,
@@ -929,158 +1103,56 @@ export default function StudentBrowseOpportunitiesPage() {
                             applyEligibility.listingRestrictionLabel ||
                             (op.visibilityBucket === "open" ? "Open to all" : null);
                         const showWithdraw = op.applyLocked && isPendingJoin(op) && !!op.application_id;
+                        const hoursNum = typeof op.hours === "number" ? op.hours : Number(op.hours);
+                        const hoursLabel = `${Number.isFinite(hoursNum) ? hoursNum : op.hours || 0} hrs`;
+                        const seatsLeft = op.seatsRemaining ?? op.remaining_seats ?? 0;
+                        const pathKey = op.path_key || "community_service";
                         return (
-                            <article
+                            <BrowseOpportunityCard
                                 key={op.id}
-                                className="flex h-full flex-col rounded-xl border border-ciel-border bg-white p-5"
-                            >
-                                {op.sdgNumber ? (
-                                    <p className="text-[10px] font-black uppercase tracking-[0.06em] text-[#158272]">
-                                        SDG {op.sdgNumber}
-                                        {op.category ? ` · ${op.category}` : op.sdgTitle ? ` · ${op.sdgTitle}` : ""}
-                                    </p>
-                                ) : null}
-                                <h3 className="mt-0.5 text-lg font-bold leading-snug text-ciel-text">{op.title}</h3>
-                                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ciel-text-mid">
-                                    <Building2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="truncate">
-                                        {op.creatorLabel ? `${op.creatorLabel}: ` : ""}
-                                        {op.organization_name || "Partner Organization"}
-                                    </span>
-                                </p>
-                                {op.description ? (
-                                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ciel-text-mid">{op.description}</p>
-                                ) : null}
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#e7f4f2] px-2 py-1 text-xs font-medium text-[#0e7d74]">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {hoursCreditLabel(op)}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#fff1e6] px-2 py-1 text-xs font-medium text-[#c2410c]">
-                                        <Users className="h-3.5 w-3.5" />
-                                        {seatsLeftLabel(op)}
-                                    </span>
-                                </div>
-
-                                {op.seatsTotal && op.seatsTotal > 0 ? (
-                                    <ProgressBar
-                                        value={Math.min(100, Math.round(((op.seatsApproved ?? 0) / op.seatsTotal) * 100))}
-                                        className="mt-2 h-1.5"
-                                        barClassName={op.seatsRemaining != null && op.seatsRemaining <= 0 ? "bg-[#d7626a]" : "bg-[#15988b]"}
-                                        trackClassName="bg-slate-200"
-                                    />
-                                ) : null}
-
-                                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ciel-text-mid">
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <MapPin className="h-3.5 w-3.5 text-ciel-text-soft" />
-                                        {op.city || "Remote"}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Calendar className="h-3.5 w-3.5 text-ciel-text-soft" />
-                                        {scheduleLabel(op)}
-                                    </span>
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                    <span className="rounded-md bg-[#e7f4f2] px-2 py-0.5 text-xs font-medium text-[#0e7d74]">
-                                        {pathTagLabel(op)}
-                                    </span>
-                                    <span className="rounded-md bg-[#e8f6f8] px-2 py-0.5 text-xs font-medium text-[#0f766e]">
-                                        {modeLabel}
-                                    </span>
-                                    {visibilityTag ? (
-                                        <span
-                                            className={
-                                                applyEligibility.listingRestrictionLabel
-                                                    ? "rounded-md bg-[#fff1e6] px-2 py-0.5 text-xs font-medium text-[#c2410c]"
-                                                    : "rounded-md bg-[#e7f4f2] px-2 py-0.5 text-xs font-medium text-[#0e7d74]"
-                                            }
-                                        >
-                                            {visibilityTag}
-                                        </span>
-                                    ) : null}
-                                </div>
-
-                                <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
-                                    {op.applyLocked && isPendingJoin(op) ? (
-                                        <span className="mr-auto inline-flex items-center gap-1 text-sm font-medium text-[#0e7d74]">
-                                            <CheckCircle2 className="h-4 w-4" /> Applied
-                                        </span>
-                                    ) : op.applyLocked && reportCta ? (
-                                        <Link href={reportCta.href} className="mr-auto text-sm font-medium text-[#0e7d74] hover:underline">
-                                            {reportCta.label}
-                                        </Link>
-                                    ) : op.hasApplied && op.application_status && isJoinApplicationRejectedStatus(op.application_status) ? (
-                                        <span className="mr-auto text-xs font-medium text-rose-700">Application not approved</span>
-                                    ) : null}
-
-                                    {op.teamMembers && op.teamMembers.length > 0 ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => openTeamDialog(op)}
-                                            className="text-sm font-medium text-ciel-text-mid hover:text-ciel-text"
-                                        >
-                                            Team
-                                        </button>
-                                    ) : null}
-
-                                    <Link
-                                        href={`/dashboard/student/browse/${op.id}`}
-                                        className="text-sm font-medium text-[#0e7d74] hover:underline"
-                                    >
-                                        Details
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        className="text-ciel-text-soft hover:text-ciel-text"
-                                        aria-label="Copy share link"
-                                        title="Copy share link"
-                                        onClick={() => void copyBrowseOpportunityShareLink(op.id)}
-                                    >
-                                        <Share2 className="h-4 w-4" />
-                                    </button>
-
-                                    {op.applyLocked ? (
-                                        showWithdraw ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => void handleWithdraw(op)}
-                                                disabled={withdrawingId === op.id}
-                                                className="rounded-md border border-slate-800 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-                                            >
-                                                {withdrawingId === op.id ? "Withdrawing…" : "Withdraw"}
-                                            </button>
-                                        ) : !reportCta && !isPendingJoin(op) ? (
-                                            <span className="inline-flex items-center gap-1 text-sm font-medium text-[#0e7d74]">
-                                                <CheckCircle2 className="h-4 w-4" /> Applied
-                                            </span>
-                                        ) : null
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => canApplyNow && openApplicationDialog(op)}
-                                            disabled={!canApplyNow}
-                                            title={
-                                                !catalogOpen
-                                                    ? applyBlockedMessageFromPayload(rawOp) ||
-                                                      "Applications closed"
-                                                    : !dateAllowsJoin
-                                                    ? lifeLabel || "Applications closed"
-                                                    : applyEligibility.blockedReason || undefined
-                                            }
-                                            className={
-                                                canApplyNow
-                                                    ? "rounded-md bg-[#0e7d74] px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-[#0c6b64]"
-                                                    : "cursor-not-allowed rounded-md bg-slate-200 px-3.5 py-1.5 text-sm font-semibold text-slate-500"
-                                            }
-                                        >
-                                            {joinButtonLabel}
-                                        </button>
-                                    )}
-                                </div>
-                            </article>
+                                id={op.id}
+                                title={op.title}
+                                description={op.description && op.description !== "No description" ? op.description : undefined}
+                                pathKey={pathKey}
+                                pathLabel={op.path_label || BROWSE_PATH_BY_KEY[pathKey].shortLabel}
+                                organizationName={op.partner_name || op.organization_name}
+                                city={op.city}
+                                modeLabel={modeLabel}
+                                hoursLabel={hoursLabel}
+                                seatsLabel={`${seatsLeft} seats`}
+                                deadline={op.end_date}
+                                coverUrl={op.cover_url}
+                                isFull={Boolean(op.is_full)}
+                                isExpired={
+                                    op.apply_blocked_reason === "catalog_closed" ||
+                                    op.apply_blocked_reason === "opportunity_expired"
+                                }
+                                sdgs={sdgsForBrowseCard(op.sdg_ids || [], op.sdgNumber, op.sdgTitle)}
+                                visibilityTag={visibilityTag}
+                                visibilityWarn={Boolean(applyEligibility.listingRestrictionLabel)}
+                                appliedPending={Boolean(op.applyLocked && isPendingJoin(op))}
+                                appliedRejected={Boolean(op.hasApplied && op.application_status && isJoinApplicationRejectedStatus(op.application_status))}
+                                reportHref={reportCta?.href}
+                                reportLabel={reportCta?.label}
+                                showTeam={Boolean(op.teamMembers && op.teamMembers.length > 0)}
+                                showWithdraw={Boolean(showWithdraw)}
+                                withdrawing={withdrawingId === op.id}
+                                canApplyNow={Boolean(canApplyNow)}
+                                showJoin={op.applyLocked !== true}
+                                joinButtonLabel={joinButtonLabel}
+                                joinTitle={
+                                    !catalogOpen
+                                        ? applyBlockedMessageFromPayload(rawOp) || "Applications closed"
+                                        : !dateAllowsJoin
+                                          ? lifeLabel || "Applications closed"
+                                          : applyEligibility.blockedReason || undefined
+                                }
+                                viewMode={viewMode}
+                                onOpenTeam={() => openTeamDialog(op)}
+                                onShare={() => void copyBrowseOpportunityShareLink(op.id)}
+                                onWithdraw={() => void handleWithdraw(op)}
+                                onJoin={() => openApplicationDialog(op)}
+                            />
                         );
                     })}
                 </div>

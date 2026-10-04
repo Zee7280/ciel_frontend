@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     AlertTriangle,
     ChevronDown,
@@ -111,7 +112,26 @@ function summarize(log: AuditLogRow): string {
 
 const EMPTY_FILTERS = { userEmail: "", path: "", dateFrom: "", dateTo: "" };
 
+function filtersFromSearchParams(searchParams: { get: (key: string) => string | null }) {
+    return {
+        userEmail: searchParams.get("userEmail")?.trim() ?? "",
+        path: searchParams.get("path")?.trim() ?? "",
+        dateFrom: searchParams.get("dateFrom")?.trim() ?? "",
+        dateTo: searchParams.get("dateTo")?.trim() ?? "",
+    };
+}
+
 export default function AdminAuditLogsPage() {
+    return (
+        <Suspense fallback={<div className="p-6 text-sm text-slate-500">Loading audit logs…</div>}>
+            <AdminAuditLogsPageInner />
+        </Suspense>
+    );
+}
+
+function AdminAuditLogsPageInner() {
+    const searchParams = useSearchParams();
+    const seeded = filtersFromSearchParams(searchParams);
     const [logs, setLogs] = useState<AuditLogRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
@@ -120,8 +140,8 @@ export default function AdminAuditLogsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
     const [totalItems, setTotalItems] = useState(0);
-    const [draft, setDraft] = useState(EMPTY_FILTERS);
-    const [filters, setFilters] = useState(EMPTY_FILTERS);
+    const [draft, setDraft] = useState(seeded);
+    const [filters, setFilters] = useState(seeded);
     const reqSeq = useRef(0);
 
     const loadLogs = useCallback(async () => {
@@ -180,6 +200,16 @@ export default function AdminAuditLogsPage() {
     useEffect(() => {
         void loadLogs();
     }, [loadLogs]);
+
+    const urlQuery = searchParams.toString();
+    useEffect(() => {
+        const next = filtersFromSearchParams(searchParams);
+        setDraft(next);
+        setFilters(next);
+        setCurrentPage(1);
+        // URL is the source of truth when landing from a project audit link.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [urlQuery]);
 
     const displayedLogs = logs.filter((log) => matchesSearch(log, searchQuery));
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
