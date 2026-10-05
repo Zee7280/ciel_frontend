@@ -725,13 +725,7 @@ export default function CommunityImpactWall(_props: {
         const facultyScore = cii ? pickCiiV45DisplayScore(cii, lock) : null;
         const aiAnalysis = cii
             ? {
-                  aiScore:
-                      lock?.aiRecommendedScore ??
-                      cii.diagnosticCII ??
-                      cii.baseCII ??
-                      cii.knownBasePoints ??
-                      cii.finalCII ??
-                      null,
+                  aiScore: lock?.aiRecommendedScore ?? facultyScore ?? cii.finalCII ?? cii.diagnosticCII ?? null,
                   facultyScore,
                   scoreWasAdjusted: lock?.scoreWasModerated ?? false,
                   levelName: cii.finalBadge?.name || r.level || "Approved",

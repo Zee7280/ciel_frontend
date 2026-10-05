@@ -266,7 +266,7 @@ function mapAdminCsReportRow(
             item.cii_analyser_run === true ||
             item.ciiAnalyserRun === true ||
             ciiProvisional != null ||
-            Boolean(item.ciiV45),
+            (item.ciiV45 != null && typeof item.ciiV45 === "object"),
         cii_provisional: ciiProvisional,
         cii_locked: lockedFromPayload,
         cii_level_name:

@@ -73,6 +73,10 @@ export function pickCiiV45DisplayScore(ciiV45: unknown, lock?: unknown): number 
     if (isCiiV45Locked(lock)) {
         return finiteCii(lockObj?.adminApprovedScore) ?? finiteCii(cii.finalCII) ?? finiteCii(cii.diagnosticCII);
     }
+    const evidence = asCiiRecord(cii.adminEvidenceAssessment);
+    if (evidence?.status === "PENDING") {
+        return finiteCii(cii.diagnosticCII) ?? finiteCii(cii.baseCII) ?? finiteCii(cii.finalCII);
+    }
     return finiteCii(cii.diagnosticCII) ?? finiteCii(cii.baseCII) ?? finiteCii(cii.knownBasePoints) ?? finiteCii(cii.finalCII);
 }
 
@@ -86,6 +90,8 @@ export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): str
     if (isCiiV45Locked(lock)) {
         return nameOf(cii.finalBadge) || nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge);
     }
+    const evidence = asCiiRecord(cii.adminEvidenceAssessment);
+    if (evidence?.status === "PENDING") return null;
     return nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge) || nameOf(cii.finalBadge);
 }
 
@@ -273,14 +279,22 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
     const maxScore = resolveCiiScoreMaxFromReport(report);
 
     const record = report as Record<string, unknown>;
+    const v45Present = record.ciiV45 ?? record.cii_v45;
     const v45 = readCiiV45DisplayFromReport(record);
     if (v45) {
+        const framework =
+            v45Present && typeof v45Present === "object" && !Array.isArray(v45Present)
+                ? String((v45Present as { frameworkVersion?: unknown }).frameworkVersion || "")
+                : "";
         return {
             totalScore: Math.round(v45.score * 10) / 10,
             level: v45.level,
             cii_score_max: 100,
-            evaluation_framework_version: "v4.5",
+            evaluation_framework_version: framework === "5.0" ? "v5.0" : "v4.5",
         };
+    }
+    if (v45Present && typeof v45Present === "object") {
+        return null;
     }
     const section11 = record.section11 && typeof record.section11 === "object"
         ? (record.section11 as Record<string, unknown>)

@@ -13,6 +13,9 @@ export type CiiV45Anchor = 0 | 1 | 2 | 3 | 4 | "P";
 
 export type CiiV45VerificationStatus =
     | "VERIFIED"
+    | "SYSTEM_VERIFIED"
+    | "AI_REPORT"
+    | "ADMIN_VERIFIED"
     | "NARRATIVE_ONLY"
     | "PROCESSING_REQUIRED"
     | "NOT_APPLICABLE"
@@ -39,7 +42,7 @@ export type CiiV45Dimension = "1" | "2" | "3" | "4A" | "4B" | "5" | "6" | "7" | 
 
 export type CiiV45UpliftCategory = "effort" | "resources" | "partnerships" | "outcomes";
 
-export type CiiV45ScoreStatus = "RESUBMISSION_REQUIRED" | "ADMIN_REVIEW_REQUIRED" | "FINAL";
+export type CiiV45ScoreStatus = "RESUBMISSION_REQUIRED" | "ADMIN_REVIEW_REQUIRED" | "ADMIN_EVIDENCE_REQUIRED" | "FINAL";
 
 // --- Evaluator payload / result shapes (mirrors backend CiiV45* interfaces) ---
 
@@ -110,10 +113,11 @@ export interface CiiV45UpliftItem {
     studentId?: string;
     beyondBaseJustification?: string;
     evidenceIds?: string[];
+    adminVerified?: boolean;
 }
 
 export interface CiiV45ExtraMileUplift {
-    assessmentStatus: "ASSESSED" | "PROCESSING_REQUIRED";
+    assessmentStatus: "ASSESSED" | "PROCESSING_REQUIRED" | "PENDING_ADMIN";
     items: CiiV45UpliftItem[];
     total?: number | null;
     knownTotal?: number;
@@ -125,6 +129,7 @@ export interface CiiV45IntegrityIssue {
     claimId?: string;
     evidenceIds: string[];
     reason: string;
+    adminVerified?: boolean;
 }
 
 export interface CiiV45IntegrityPenalty {
@@ -136,13 +141,26 @@ export interface CiiV45ExceptionalFeature {
     verified: boolean;
     explanation?: string;
     evidenceIds?: string[];
+    adminVerified?: boolean;
+}
+
+export interface CiiV45AdminEvidenceAssessment {
+    status: "PENDING" | "ASSESSED";
+    assessorId?: string;
+    assessedAt?: string;
+    criteria?: Array<{
+        criterion: string;
+        anchor: Exclude<CiiV45Anchor, "P">;
+        reasoningSummary: string;
+        evidenceIds: string[];
+    }>;
 }
 
 export type CiiV45DeductionLedgerEntry = Record<string, unknown>;
 
 /** Shape the AI actually returns — anchors/claims/evidence/narrative only, no score fields. */
 export interface CiiV45EvaluatorPayload {
-    frameworkVersion: "4.5";
+    frameworkVersion: "4.5" | "5.0";
     reportId: string;
     inputFingerprint: string;
     inputCompleteness: CiiV45InputCompleteness;
@@ -194,8 +212,11 @@ export interface CiiV45SectionResult {
 export interface CiiV45Result extends Omit<CiiV45EvaluatorPayload, "sectionScores" | "extraMileUplift"> {
     sectionScores: CiiV45SectionResult[];
     knownBasePoints: number;
+    aiReportScore?: number | null;
+    adminEvidenceScore?: number | null;
     baseCII: number | null;
     extraMileUplift: CiiV45ExtraMileUplift;
+    adminEvidenceAssessment?: CiiV45AdminEvidenceAssessment;
     diagnosticCII: number | null;
     scoreStatus: CiiV45ScoreStatus;
     needsAdminReview: boolean;

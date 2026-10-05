@@ -418,7 +418,9 @@ export function useFacultyCommunityServiceData() {
                 meta: `${formatDisplayId(row.id, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · ${
                     typeof row.cii_provisional === "number"
                         ? `System CII ${Math.round(row.cii_provisional)} (Provisional)`
-                        : "Analyzer not run"
+                        : row.cii_analyser_run
+                          ? "AI report quality ready · evidence pending"
+                          : "Analyzer not run"
                 }`,
                 href: `${FACULTY_CS_REPORTS}/${row.id}`,
                 cta: "Open locked package",

@@ -98,9 +98,13 @@ export default function FacultyReportReviewCard({
     let statusText = [
         submitted ? `Submitted ${submitted}` : "Report v1",
         has
-            ? viewer === "admin"
-                ? `System CII ${score ?? "—"} (Provisional)${levelLabel ? ` · ${levelLabel}` : ""}`
-                : `Provisional CII ${score ?? "—"} (view only)${levelLabel ? ` · ${levelLabel}` : ""}`
+            ? score != null
+                ? viewer === "admin"
+                    ? `System CII ${score} (Provisional)${levelLabel ? ` · ${levelLabel}` : ""}`
+                    : `Provisional CII ${score} (view only)${levelLabel ? ` · ${levelLabel}` : ""}`
+                : viewer === "admin"
+                  ? "AI report quality ready · evidence pending"
+                  : "AI report quality ready · evidence pending · view only"
             : viewer === "admin"
               ? "Analyzer not run"
               : "Analysis pending · CIEL PK Admin",
@@ -152,9 +156,13 @@ export default function FacultyReportReviewCard({
         {
             label: viewer === "admin" ? "AI Analyzer" : "Analysis status",
             sub: has
-                ? viewer === "admin"
-                    ? "Run complete · System CII ready"
-                    : "Provisional CII available · view only"
+                ? score != null
+                    ? viewer === "admin"
+                        ? "Run complete · System CII ready"
+                        : "Provisional CII available · view only"
+                    : viewer === "admin"
+                      ? "AI report quality ready · evidence pending"
+                      : "AI report quality ready · evidence pending · view only"
                 : viewer === "admin"
                   ? "Optional independent analysis"
                   : "Not run yet · CIEL PK Admin",
