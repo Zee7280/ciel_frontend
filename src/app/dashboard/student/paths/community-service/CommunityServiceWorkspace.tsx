@@ -23,6 +23,7 @@ import {
     isReviewDraftStatus,
     normalizeReviewStatus,
 } from "@/utils/reviewQueue";
+import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 
 const HUB = "/dashboard/student/paths/community-service";
 const GUIDE = `${HUB}?view=guide`;
@@ -68,6 +69,8 @@ type ReportRow = {
     status?: string;
     faculty_status?: string;
     faculty_remarks?: string | null;
+    admin_feedback?: string | null;
+    feedback?: string | null;
     last_edited_by?: string | null;
     last_edited_at?: string | null;
     admin_status?: string;
@@ -171,6 +174,7 @@ function reportAwaitingFee(row: ReportRow): boolean {
 }
 
 function reportBucket(row: ReportRow): WsFilter {
+    if (isReportReturnedForRevision(row)) return "action";
     if (isCommunityReportRejected(row)) return "archived";
     if (isCommunityReportOnLiveDeck(row)) return "completed";
     const fac = normalizeReviewStatus(row.faculty_status);
@@ -439,20 +443,21 @@ export default function CommunityServiceWorkspace({
                 continue;
             }
             if (bucket === "action") {
-                const remarks = String(report.faculty_remarks || "").trim();
+                const remarks =
+                    String(report.feedback || report.admin_feedback || report.faculty_remarks || "").trim();
                 out.push({
                     id: `rep-${report.id}`,
                     filter: "action",
-                    stageLabel: "Stage 2 — Faculty Report Decision",
+                    stageLabel: "Stage 2 — CIEL PK Report Decision",
                     title,
-                    meta: "Faculty decision received",
+                    meta: "CIEL PK asked for changes",
                     journeyHead: "REVISION REQUIRED",
                     journeySub: "All members can read this shared report. Only the Team Lead can edit and resubmit.",
                     pills: [{ label: "Revision Required", kind: "rev" }],
                     note: {
                         kind: "comment",
-                        title: "Faculty comments",
-                        body: remarks || "Faculty asked for changes. Open the report to see the comments and resubmit.",
+                        title: "CIEL PK comments",
+                        body: remarks || "CIEL PK asked for changes. Open the report to see the comments and resubmit.",
                     },
                     sideTitle: "Your Next Action",
                     sideDetail: "Team Lead resubmits after the marked sections are updated",
@@ -464,10 +469,11 @@ export default function CommunityServiceWorkspace({
                 continue;
             }
             const rejected = isCommunityReportRejected(report);
+            const closedNote = String(report.feedback || report.admin_feedback || report.faculty_remarks || "").trim();
             out.push({
                 id: `rep-${report.id}`,
                 filter: rejected ? "archived" : "completed",
-                stageLabel: "Stage 2 — Faculty Report Decision",
+                stageLabel: "Stage 2 — CIEL PK Report Decision",
                 title,
                 meta: "Final decision received",
                 journeyHead: rejected ? "REPORT REJECTED" : "REPORT APPROVED",
@@ -476,10 +482,8 @@ export default function CommunityServiceWorkspace({
                 note: rejected
                     ? {
                           kind: "comment",
-                          title: "Faculty comments",
-                          body:
-                              String(report.faculty_remarks || "").trim() ||
-                              "This record will not enter the verified impact portfolio.",
+                          title: "CIEL PK comments",
+                          body: closedNote || "This record will not enter the verified impact portfolio.",
                       }
                     : {
                           kind: "success",
@@ -488,7 +492,7 @@ export default function CommunityServiceWorkspace({
                 sideTitle: "Final Status",
                 sideDetail: rejected ? "Rejected — not added to impact portfolio" : "Approved & transferred to portfolio",
                 actions: rejected
-                    ? [{ label: "View Faculty Decision", href, style: "soft" }]
+                    ? [{ label: "View Decision", href, style: "soft" }]
                     : [
                           { label: "View Impact Record", href, style: "primary" },
                           { label: "My Community Impact", href: WALL, style: "soft" },

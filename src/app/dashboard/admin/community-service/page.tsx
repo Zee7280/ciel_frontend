@@ -168,7 +168,7 @@ const VIEW_LABEL: Record<string, string> = {
     projects: "Community Service Projects",
     reports: "Reports for Review",
     approved: "Approved Impact",
-    wall: "Impact Wall",
+    wall: "My Impact Wall",
     run: "AI Ranking Analyzer",
     analytics: "Analytics",
     exports: "Reports / Exports",
@@ -310,6 +310,7 @@ function isAdminCsReportRevision(row: FacultyCsReportRow): boolean {
     if (isFacultyCsReportRevision(row)) return true;
     const key = normalizeReviewStatus(row.status);
     return (
+        key === "revision" ||
         key === "revision_requested" ||
         key === "revisions_requested" ||
         key === "changes_requested" ||
@@ -757,8 +758,8 @@ export function AdminCommunityServiceHub() {
                             href={`${CS_BASE}?view=wall`}
                             emoji="🏆"
                             ghost="🏆"
-                            title="Impact Wall"
-                            subtitle="National showcase of verified Community Service work."
+                            title="My Impact Wall"
+                            subtitle="National showcase of published Community Service work."
                             badge="SHOWCASE"
                             background={MOCKUP_GRADIENTS.orange}
                         />
@@ -1129,7 +1130,7 @@ export function AdminCommunityServiceHub() {
 
             {effectiveView === "wall" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="CIEL PK Impact Wall" subtitle="After faculty and CIEL PK approval: flashcard, badge, ranking + trend, CII, detailed report, PDF and combined package. QR stays on the flashcard." />
+                    <MockupSectionHead title="CIEL PK · My Impact Wall" subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR stays on the flashcard." />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (

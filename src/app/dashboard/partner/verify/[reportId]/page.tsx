@@ -56,38 +56,9 @@ function normalizeKey(value: unknown): string {
         .replace(/\s+/g, "_");
 }
 
-function isPartnerDecisionFinal(value: unknown): boolean {
-    const key = normalizeKey(value);
-    return ["approved", "verified", "rejected", "declined", "partner_verified"].includes(key);
-}
-
-function isReportDecisionFinal(value: unknown): boolean {
-    const key = normalizeKey(value);
-    return ["verified", "finalized", "rejected", "revision", "partner_verified"].includes(key);
-}
-
-/** Faculty is the sole final report approver — a partner/NGO/university reviewer only gets a
- * say once Faculty has signed off (matches the Community Service loop design). */
-function facultyHasApprovedReport(report: ReportDetail): boolean {
-    return normalizeKey(report.faculty_status) === "approved";
-}
-
-/** When to show NGO verify / reject controls. Backend status names vary, so only final decisions should hide the CTA. */
-function partnerCanSubmitDecision(report: ReportDetail): boolean {
-    // Read-only access (e.g. a university dashboard viewing a report on an opportunity owned by
-    // another organisation): the backend refuses the decision, so never offer it.
-    if (report.viewer_can_review === false) return false;
-    const st = normalizeKey(report.status);
-    if (st === "draft") return false;
-    if (isReportDecisionFinal(report.status)) return false;
-    if (isPartnerDecisionFinal(report.admin_status)) return false;
-    if (!facultyHasApprovedReport(report)) return false;
-
-    const ps = normalizeKey(report.partner_status);
-    if (isPartnerDecisionFinal(report.partner_status)) return false;
-    if (ps === "not_required" || ps === "not_applicable" || ps === "n_a") return false;
-
-    return st !== "";
+/** Report approve/reject is CIEL PK Admin only. Partners keep the published package read-only. */
+function partnerCanSubmitDecision(_report: ReportDetail): boolean {
+    return false;
 }
 
 interface ReportDetail {
@@ -463,13 +434,8 @@ function ReportDetailPage() {
     }
 
     // University reviews are read-only: Approve / Reject stay with CIEL PK Admin.
-    const canSubmitDecision = partnerCanSubmitDecision(report) && getStoredCurrentUserRole() !== "university";
-    const waitingOnFaculty =
-        !canSubmitDecision &&
-        !facultyHasApprovedReport(report) &&
-        normalizeKey(report.status) !== "draft" &&
-        !isReportDecisionFinal(report.status) &&
-        !isPartnerDecisionFinal(report.admin_status);
+    const canSubmitDecision = false;
+    const waitingOnFaculty = false;
     const facultyEmail = section1FacultyEmails.primary || report.section1?.faculty_supervisor_email || "";
     const facultyReminderText = facultyEmail
         ? {

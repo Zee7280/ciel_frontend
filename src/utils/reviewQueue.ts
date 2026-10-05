@@ -64,10 +64,14 @@ export function communityReportSendCta(
 }
 
 export function isCommunityReportRejected(row: CommunityReviewRow): boolean {
+    const st = normalizeReviewStatus(row.status);
+    // Admin "request revision" stores admin_status=rejected with status=revision.
+    // That must stay Action Required (editable), not the archive.
+    if (st === "revision" || st.includes("revision")) return false;
+    if (st === "closed") return true;
     return (
         REJECTED_KEYS.has(normalizeReviewStatus(row.faculty_status)) ||
-        REJECTED_KEYS.has(normalizeReviewStatus(row.status)) ||
-        REJECTED_KEYS.has(normalizeReviewStatus(row.admin_status))
+        REJECTED_KEYS.has(st)
     );
 }
 
@@ -83,9 +87,9 @@ export function isCommunityReportAdminSignedOff(row: CommunityReviewRow): boolea
     );
 }
 
-/** Live deck: faculty already signed off, or the overall report is already verified. */
+/** Live / Completed decks: the Admin-published package, not faculty sign-off alone. */
 export function isCommunityReportOnLiveDeck(row: CommunityReviewRow): boolean {
-    return isCommunityReportFacultyApproved(row) || isCommunityReportPipelineComplete(row);
+    return isAdminCommunityLiveCard(row);
 }
 
 export function isCommunityReportFullyApproved(row: CommunityReviewRow): boolean {
@@ -173,13 +177,12 @@ export function isCommunityReportWaitingForFaculty(row: CommunityReviewRow): boo
 
 /**
  * Faculty / admin / partner Community Service live deck — keep in lockstep with
- * backend `isCommunityAwardLiveReport`: faculty signed off or report verified.
- * Hours and reporting-fee “paid” stay in waiting until that sign-off.
+ * backend `isCommunityAwardMedalReport`: Admin must have published (faculty signed
+ * off as well, except private-candidate). Hours and reporting-fee “paid” stay in
+ * waiting until that publish.
  */
 export function isFacultyCommunityLiveCard(row: CommunityReviewRow & { hours?: number }): boolean {
-    if (isCommunityReportRejected(row)) return false;
-    if (normalizeReviewStatus(row.status) === "draft") return false;
-    return isCommunityReportOnLiveDeck(row);
+    return isAdminCommunityLiveCard(row);
 }
 
 export function isFacultyCommunityWaiting(row: CommunityReviewRow & { hours?: number }): boolean {

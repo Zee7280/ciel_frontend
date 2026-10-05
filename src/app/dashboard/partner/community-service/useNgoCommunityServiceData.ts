@@ -25,7 +25,7 @@ export const NGO_CS_CREATE_FORM = "/dashboard/partner/requests/new";
 export const NGO_CS_MY_OPPS = "/dashboard/partner/requests";
 export const NGO_CS_APPROVALS = "/dashboard/partner/verify";
 export const NGO_CS_REPORTS = "/dashboard/partner/reports";
-export const NGO_CS_IMPACT = "/dashboard/partner/impact";
+export const NGO_CS_IMPACT = "/dashboard/partner/community-service?view=impact";
 export const NGO_CS_HOURS = "/dashboard/partner/attendance-review";
 export const NGO_CS_ANALYTICS = "/dashboard/partner/analytics";
 export const NGO_CS_HOME = "/dashboard/partner";

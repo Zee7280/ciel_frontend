@@ -28,7 +28,6 @@ import {
     UNI_CS_BASE as CS_BASE,
     UNI_CS_CREATE_FORM as CREATE_FORM,
     UNI_CS_HOME as HOME,
-    UNI_CS_IMPACT as IMPACT,
     UNI_CS_MY_OPPS as MY_OPPS,
     UNI_CS_REPORTS as REPORTS,
     UNI_CS_REPS,
@@ -90,7 +89,7 @@ const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: 
             ["Opportunity Monitor", "Drafts, Pending Faculty, in-approval, active reports, verified and closed."],
             ["Applications", "Join applications on this institution’s listings. Monitor only."],
         ],
-        rule: "University oversight is institutional; academic report approval remains with Faculty.",
+        rule: "University oversight is institutional; report approval stays with CIEL PK Admin.",
     },
     reports: {
         desc: "Read-only review of submitted Community Service report packages for your institution.",
@@ -519,9 +518,9 @@ export default function UniversityCommunityServiceHub() {
                               : effectiveView === "reports"
                                 ? "Reports for Review"
                               : effectiveView === "approved"
-                                ? "Approved Impact"
+                                ? "Approved Project Record"
                                 : effectiveView === "wall"
-                                  ? "Impact Wall"
+                                  ? "My Impact Wall"
                                   : effectiveView === "run"
                                     ? "AI Ranking Analyzer"
                                     : effectiveView === "analytics"
@@ -580,8 +579,8 @@ export default function UniversityCommunityServiceHub() {
                         <MockupActionCard href={`${CS_BASE}?view=allocation`} emoji="👩‍🏫" ghost="👩‍🏫" title="Faculty Allocation" subtitle="Authorise faculty representatives who publish on behalf of the University." badge="AUTHORITY" background="linear-gradient(135deg,#455a78,#7088ad)" />
                         <MockupActionCard href={`${CS_BASE}?view=projects`} emoji="📈" ghost="📈" title="Community Service Projects" subtitle="Monitor every University Community Service project, progress, faculty, partners and student participation." badge="TRACK" background={MOCKUP_GRADIENTS.blue} />
                         <MockupActionCard href={`${CS_BASE}?view=reports`} emoji="📝" ghost="📝" title="Reports for Review" subtitle="Read-only review of submitted report packages from your institution: score, flashcard, detailed report and evidence (unlocked after super-admin approval)." badge="READ ONLY" background={MOCKUP_GRADIENTS.red} hot={waiting.length > 0} />
-                        <MockupActionCard href={`${CS_BASE}?view=approved`} emoji="✅" ghost="✅" title="Approved Impact" subtitle="Verified reports with CII, badges, certificates and QR verification." badge="VERIFIED" background={MOCKUP_GRADIENTS.green} />
-                        <MockupActionCard href={`${CS_BASE}?view=wall`} emoji="🏆" ghost="🏆" title="Impact Wall" subtitle="Permission-aware University showcase of verified Community Service work." badge="SHOWCASE" background={MOCKUP_GRADIENTS.orange} />
+                        <MockupActionCard href={`${CS_BASE}?view=approved`} emoji="✅" ghost="✅" title="Approved Project Record" subtitle="CIEL PK-published reports with CII, badges and QR verification." badge="VERIFIED" background={MOCKUP_GRADIENTS.green} />
+                        <MockupActionCard href={`${CS_BASE}?view=wall`} emoji="🏆" ghost="🏆" title="My Impact Wall" subtitle="Published flash cards linked to the approved impact package." badge="SHOWCASE" background={MOCKUP_GRADIENTS.orange} />
                         <MockupActionCard href={`${CS_BASE}?view=run`} emoji="🧠" ghost="🧠" title="AI Ranking Analyzer" subtitle="Run University Ruberix Ranking on your institution’s eligible accepted projects only. Preview first; Publish Ranking creates the official run." badge="ANALYZE" background={MOCKUP_GRADIENTS.purple} />
                         <MockupActionCard href={`${CS_BASE}?view=analytics`} emoji="📊" ghost="📊" title="Analytics" subtitle="Institution-wide hours, dividend, reach, SDGs, departments, partners and CII distribution." badge="INSIGHTS" background={MOCKUP_GRADIENTS.gold} />
                         <MockupActionCard href={`${CS_BASE}?view=exports`} emoji="📤" ghost="📤" title="Reports / Exports" subtitle="HEC-ready summaries, department reports, certificate registers and authorised exports." badge="EXPORT" background="linear-gradient(135deg,#455a78,#7088ad)" />
@@ -984,11 +983,11 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "approved" && (
                 <div className="mt-4">
-                    <MockupSectionHead title={`Approved Impact · ${orgName}`} subtitle="Verified reports only. Rejected work never appears here." />
+                    <MockupSectionHead title={`Approved Project Record · ${orgName}`} subtitle="CIEL PK-published reports only. Rejected work never appears here." />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
-                        <EmptyPanel title="None yet" text="Verified cards appear here after Faculty sign-off." />
+                        <EmptyPanel title="None yet" text="Verified cards appear here after CIEL PK Admin publishes the package." />
                     ) : (
                         <div className="overflow-x-auto rounded-2xl border border-[#dde5ea] bg-white">
                             <table className="min-w-[720px] w-full text-left text-[12px]">
@@ -1018,7 +1017,7 @@ export default function UniversityCommunityServiceHub() {
                                             </td>
                                             <td className="px-3 py-3">{c.hours || 0}h</td>
                                             <td className="px-3 py-3">
-                                                <Link href={IMPACT} className="rounded-full bg-[#0e7d74] px-3 py-1.5 text-[11px] font-extrabold text-white">Open</Link>
+                                                <Link href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1`} className="rounded-full bg-[#0e7d74] px-3 py-1.5 text-[11px] font-extrabold text-white">Open</Link>
                                             </td>
                                         </tr>
                                     ))}
@@ -1031,7 +1030,7 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "wall" && (
                 <div className="mt-4">
-                    <MockupSectionHead title={`${orgName} Impact Wall`} subtitle="After faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF and combined package. QR stays on the flashcard. No certificate download." action={<Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">Open Impact Wall →</Link>} />
+                    <MockupSectionHead title={`${orgName} · My Impact Wall`} subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR stays on the flashcard. No certificate download." action={<Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">Open analytics →</Link>} />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (

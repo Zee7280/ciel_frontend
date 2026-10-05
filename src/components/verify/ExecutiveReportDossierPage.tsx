@@ -57,17 +57,8 @@ function isReportDecisionFinal(value: unknown): boolean {
 }
 
 /** When to show NGO verify / reject controls. Backend status names vary, so only final decisions should hide the CTA. */
-function partnerCanSubmitDecision(report: ReportDetail): boolean {
-    const st = normalizeKey(report.status);
-    if (st === "draft") return false;
-    if (isReportDecisionFinal(report.status)) return false;
-    if (isPartnerDecisionFinal(report.admin_status)) return false;
-
-    const ps = normalizeKey(report.partner_status);
-    if (isPartnerDecisionFinal(report.partner_status)) return false;
-    if (ps === "not_required" || ps === "not_applicable" || ps === "n_a") return false;
-
-    return st !== "";
+function partnerCanSubmitDecision(_report: ReportDetail): boolean {
+    return false;
 }
 
 interface ReportDetail {

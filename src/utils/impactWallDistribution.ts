@@ -12,9 +12,9 @@ export const IMPACT_WALL_PACKAGE: Record<ImpactWallViewer, ImpactWallPackage> = 
     student: { detailedPdf: true, combinedPdf: true, certificate: true, qrDownload: true },
     faculty: { detailedPdf: true, combinedPdf: true, certificate: false, qrDownload: false },
     university: { detailedPdf: true, combinedPdf: true, certificate: false, qrDownload: false },
-    ngo: { detailedPdf: false, combinedPdf: false, certificate: false, qrDownload: false },
-    partner: { detailedPdf: false, combinedPdf: false, certificate: false, qrDownload: false },
-    admin: { detailedPdf: true, combinedPdf: true, certificate: true, qrDownload: true },
+    ngo: { detailedPdf: true, combinedPdf: true, certificate: false, qrDownload: false },
+    partner: { detailedPdf: true, combinedPdf: true, certificate: false, qrDownload: false },
+    admin: { detailedPdf: true, combinedPdf: true, certificate: false, qrDownload: true },
 };
 
 export type ImpactWallPackageHrefs = {

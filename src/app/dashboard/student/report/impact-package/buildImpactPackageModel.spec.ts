@@ -117,12 +117,12 @@ test("student detailed report waits for Super Admin approval; reviewers keep it"
     }
 });
 
-test("student certificate waits for Super Admin approval; reviewers keep it", () => {
+test("certificate is student-only after Super Admin approval", () => {
     assert.equal(shouldShowImpactPackageCertificate("student", false), false);
     assert.equal(shouldShowImpactPackageCertificate("student", true), true);
     for (const a of ["faculty", "admin", "university", "partner", "public"] as const) {
-        assert.equal(shouldShowImpactPackageCertificate(a, false), true, a);
-        assert.equal(shouldShowImpactPackageCertificate(a, true), true, a);
+        assert.equal(shouldShowImpactPackageCertificate(a, false), false, a);
+        assert.equal(shouldShowImpactPackageCertificate(a, true), false, a);
     }
 });
 

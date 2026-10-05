@@ -20,7 +20,7 @@ export const UNI_CS_BASE = "/dashboard/partner/community-service";
 export const UNI_CS_CREATE_FORM = "/dashboard/partner/requests/new";
 export const UNI_CS_MY_OPPS = "/dashboard/partner/requests";
 export const UNI_CS_REPORTS = "/dashboard/partner/reports";
-export const UNI_CS_IMPACT = "/dashboard/partner/impact";
+export const UNI_CS_IMPACT = "/dashboard/partner/community-service?view=wall";
 export const UNI_CS_COURSEWORK = "/dashboard/partner/university-showcase?mode=course-project";
 export const UNI_CS_FYP = "/dashboard/partner/university-showcase?mode=fyp-thesis";
 export const UNI_CS_STARTUP = "/dashboard/partner/startup-business";

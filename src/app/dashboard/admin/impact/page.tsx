@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Legacy route; folded into the "Analytics & Impact" page's Impact & SDGs / Stakeholder lens tabs. */
+/** Legacy URL — My Impact Wall is the published Community Service flash deck. */
 export default function AdminImpactPage() {
-    redirect("/dashboard/admin/analytics");
+    redirect("/dashboard/admin/community-service?view=wall");
 }

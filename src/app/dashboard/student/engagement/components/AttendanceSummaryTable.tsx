@@ -199,12 +199,14 @@ function SessionCard({
     onDelete,
     canDelete,
     isLocked,
+    showVerificationStatus = true,
 }: {
     entry: AttendanceEntry;
     participantNames: Record<string, string>;
     onDelete?: (id: string) => void;
     canDelete: boolean;
     isLocked: boolean;
+    showVerificationStatus?: boolean;
 }) {
     const [remarkOpen, setRemarkOpen] = React.useState(false);
     const descText = pickDescription(entry);
@@ -217,11 +219,12 @@ function SessionCard({
     const approvalRaw = (entry.approval_status ?? entry.entryStatus ?? "")
         .toString()
         .toLowerCase();
-    const showApproval =
-        approvalRaw === "pending" ||
-        approvalRaw === "rejected" ||
-        approvalRaw === "flagged" ||
-        approvalRaw === "approved";
+    const showApproval = showVerificationStatus
+        ? approvalRaw === "pending" ||
+          approvalRaw === "rejected" ||
+          approvalRaw === "flagged" ||
+          approvalRaw === "approved"
+        : approvalRaw === "rejected";
 
     let dayNum = "";
     let monthShort = "";
@@ -362,6 +365,7 @@ export default function AttendanceSummaryTable({
     isLocked = false,
     participantNames = {},
     embedded = false,
+    showVerificationStatus = true,
 }: {
     entries: AttendanceEntry[];
     onDelete?: (id: string) => void;
@@ -369,6 +373,7 @@ export default function AttendanceSummaryTable({
     isLocked?: boolean;
     participantNames?: Record<string, string>;
     embedded?: boolean;
+    showVerificationStatus?: boolean;
 }) {
     const rowCanDelete = (entry: AttendanceEntry) =>
         !isLocked && !!onDelete && (canDeleteEntry ? canDeleteEntry(entry) : true);
@@ -403,6 +408,7 @@ export default function AttendanceSummaryTable({
                         onDelete={onDelete}
                         canDelete={rowCanDelete(entry)}
                         isLocked={isLocked}
+                        showVerificationStatus={showVerificationStatus}
                     />
                 ))}
             </div>

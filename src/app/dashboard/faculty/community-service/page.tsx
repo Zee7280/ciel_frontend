@@ -1180,7 +1180,7 @@ function FacultyCommunityServiceHub() {
                 <div>
                     <MockupSectionHead
                         title="My Impact Wall"
-                        subtitle="Approved records after faculty sign-off: flashcard, badge, ranking + trend, CII, detailed report, PDF, combined package. QR sits on the flashcard. No certificate download."
+                        subtitle="Published records after CIEL PK Admin approval: flashcard, CII, detailed report, PDF, combined package. QR sits on the flashcard. No certificate download."
                         action={
                             <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open Impact Wall →
@@ -1191,7 +1191,7 @@ function FacultyCommunityServiceHub() {
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact. Approved cards appear here after sign-off.</p>
+                        <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact. Approved cards appear here after CIEL PK publishes the package.</p>
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (

@@ -33,7 +33,6 @@ import {
     NGO_CS_CREATE_FORM as CREATE_FORM,
     NGO_CS_HOME as HOME,
     NGO_CS_HOURS as HOURS,
-    NGO_CS_IMPACT as IMPACT,
     NGO_CS_MY_OPPS as MY_OPPS,
     NGO_CS_REPORTS as REPORTS,
     ngoMineBucket as mineBucket,
@@ -99,7 +98,7 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
             ["View Progress", "Report %, last activity and authorised member-hour status."],
             ["Send Reminder", "System-generated follow-up without exposing raw private student contact data."],
         ],
-        rule: "The supervising Faculty remains responsible for academic report approval.",
+        rule: "CIEL PK Admin is the only report approver. Partners review opportunities and attendance only.",
     },
     impact: {
         title: "My Impact",
@@ -717,10 +716,10 @@ export default function NgoCommunityServiceHub() {
                 <div className="mt-4">
                     <MockupSectionHead
                         title={`My Impact Wall · ${orgName}`}
-                        subtitle="Approved records: flashcard, badge, ranking + trend, CII and on-screen detailed report. QR stays on the flashcard. No PDF or certificate download."
+                        subtitle="Published records: flashcard, CII and detailed report. QR stays on the flashcard. No certificate download."
                         action={
-                            <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
-                                Open Impact Wall →
+                            <Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">
+                                Open analytics →
                             </Link>
                         }
                     />
@@ -731,7 +730,17 @@ export default function NgoCommunityServiceHub() {
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {deckCards.map((c) => (
-                                <CommunityFlashCard key={c.id} card={c} href={reportHref(c.id)} viewer="ngo" />
+                                <CommunityFlashCard
+                                    key={c.id}
+                                    card={c}
+                                    href={reportHref(c.id)}
+                                    viewer="ngo"
+                                    packageHrefs={{
+                                        detailedPdf: `${reportHref(c.id)}&doc=report`,
+                                        combinedPdf: reportHref(c.id),
+                                        verify: c.impact_verify_url || undefined,
+                                    }}
+                                />
                             ))}
                         </div>
                     )}

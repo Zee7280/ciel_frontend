@@ -589,7 +589,7 @@ export default function Sidebar() {
                     : []),
                 { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
-                ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart }] : []),
+                ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/community-service?view=impact", icon: FileBarChart }] : []),
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 }]
                     : []),
@@ -739,12 +739,12 @@ export default function Sidebar() {
     const impactHref = isFaculty
         ? "/dashboard/faculty/impact"
         : isPartner && isUniversityPartnerOrg
-          ? "/dashboard/partner/impact"
+          ? "/dashboard/partner/community-service?view=wall"
           : isAdmin
-            ? "/dashboard/admin/analytics"
+            ? "/dashboard/admin/community-service?view=wall"
             : null;
-    const impactLabel = isAdmin ? "Impact Intelligence Hub" : isPartner && isUniversityPartnerOrg ? "University Impact Portfolio" : "My Impact Wall";
-    const impactEmoji = isAdmin ? "📊" : isPartner && isUniversityPartnerOrg ? "🏆" : "🏅";
+    const impactLabel = "My Impact Wall";
+    const impactEmoji = isAdmin ? "🏆" : isPartner && isUniversityPartnerOrg ? "🏆" : "🏅";
 
     const footerLinks = useMemo(() => {
         const items: NavItem[] = [];
@@ -870,7 +870,8 @@ export default function Sidebar() {
               {
                   heading: "Intelligence",
                   items: [
-                      { label: impactLabel, href: "/dashboard/admin/analytics", icon: FileBarChart },
+                      { label: impactLabel, href: impactHref!, icon: FileBarChart },
+                      { label: "Impact Intelligence Hub", href: "/dashboard/admin/analytics", icon: BarChart3 },
                       { label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: Users },
                   ],
               },
@@ -1117,6 +1118,15 @@ export default function Sidebar() {
                                             collapsed={collapsed}
                                             impact
                                         />
+                                        {isAdmin ? (
+                                            <NavRow
+                                                href="/dashboard/admin/analytics"
+                                                label="Impact Intelligence Hub"
+                                                emoji="📊"
+                                                active={isNavActive("/dashboard/admin/analytics")}
+                                                collapsed={collapsed}
+                                            />
+                                        ) : null}
                                         {isAdmin ? (
                                             <NavRow
                                                 href="/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work"

@@ -363,7 +363,7 @@ export default function PartnerReportsPage() {
                                         <Link
                                             href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            title="Open Impact Package (review / verify)"
+                                            title="Open published Impact Package (read-only)"
                                         >
                                             <Eye className="w-4 h-4" />
                                         </Link>
@@ -423,7 +423,7 @@ export default function PartnerReportsPage() {
                                     href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
                                     className="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700 mb-3"
                                 >
-                                    Review & verify (Impact Package)
+                                    View Impact Package
                                 </Link>
                             )}
 

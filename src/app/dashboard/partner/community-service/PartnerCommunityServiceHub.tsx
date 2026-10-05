@@ -41,7 +41,6 @@ const CREATE_FORM = "/dashboard/partner/requests/new";
 const MY_OPPS = "/dashboard/partner/requests";
 const APPROVALS = "/dashboard/partner/verify";
 const REPORTS = "/dashboard/partner/reports";
-const IMPACT = "/dashboard/partner/impact";
 const HOURS = "/dashboard/partner/attendance-review";
 const ANALYTICS = "/dashboard/partner/analytics";
 const HOME = "/dashboard/partner";
@@ -50,7 +49,7 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
     create: "Create Opportunity",
     approvals: "Approvals",
     projects: "Community Service Projects",
-    impact: "My Impact",
+    impact: "My Impact Wall",
     analytics: "Analytics",
     pending: "Approvals",
     approved: "My Impact",
@@ -100,7 +99,7 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
             ["View Progress", "Report %, last activity and authorised member-hour status."],
             ["Send Reminder", "System-generated follow-up without exposing raw private student contact data."],
         ],
-        rule: "The supervising Faculty remains responsible for academic report approval.",
+        rule: "CIEL PK Admin is the only report approver. Partners review opportunities and attendance only.",
     },
     impact: {
         title: "My Impact",
@@ -854,10 +853,10 @@ export default function PartnerCommunityServiceHub() {
                 <div className="mt-4">
                     <MockupSectionHead
                         title={`My Impact Wall · ${orgName}`}
-                        subtitle="Approved records: flashcard, badge, ranking + trend, CII and on-screen detailed report. QR stays on the flashcard. No PDF or certificate download."
+                        subtitle="Published records: flashcard, CII and detailed report. QR stays on the flashcard. No certificate download."
                         action={
-                            <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
-                                Open Impact Wall →
+                            <Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">
+                                Open analytics →
                             </Link>
                         }
                     />
@@ -873,6 +872,11 @@ export default function PartnerCommunityServiceHub() {
                                     card={c}
                                     href={reportHref(c.id)}
                                     viewer="partner"
+                                    packageHrefs={{
+                                        detailedPdf: `${reportHref(c.id)}&doc=report`,
+                                        combinedPdf: reportHref(c.id),
+                                        verify: c.impact_verify_url || undefined,
+                                    }}
                                 />
                             ))}
                         </div>

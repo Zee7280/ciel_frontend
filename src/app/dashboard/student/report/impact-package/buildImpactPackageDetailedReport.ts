@@ -315,10 +315,6 @@ export function buildImpactPackageDetailedReport(
                         "Privacy consent",
                         data.section1?.privacy_consent === true ? true : data.section1?.privacy_consent === false ? false : NOT_SUPPLIED,
                     ),
-                    row(
-                        "Live attendance verification",
-                        text(data.section1?.attendance_verification_status) || NOT_SUPPLIED,
-                    ),
                 ],
             },
         ],

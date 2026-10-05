@@ -19,7 +19,6 @@ import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
 import { formTeamFromLead } from "@/utils/participationGuide";
 import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
 import { pickPreferredEngagementSeat } from "@/utils/teamReportSubmitAccess";
-import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
@@ -1690,9 +1689,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         🎉
                                     </span>
                                     <span>
-                                        <b>Tip:</b> sessions save as you go. When everyone has met minimum hours,
-                                        use Step 3 to send for Faculty or Partner approval — they review each
-                                        session on a flash card.
+                                        <b>Tip:</b> sessions save as you go. Log hours and evidence here. CIEL PK
+                                        Admin reviews attendance with the whole report after you submit — there is
+                                        no separate Faculty or Partner session sign-off.
                                     </span>
                                 </div>
 
@@ -1803,8 +1802,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             <div className="mt-5 border-t border-[#dcebee] pt-4">
                                                 <p className="text-xs leading-relaxed text-slate-500">
                                                     Sessions stay editable here until you submit the whole
-                                                    report — no separate verification request needed. Faculty
-                                                    (or CIEL PK) confirms hours when they lock the flash-card score.
+                                                    report. There is no Faculty or Partner attendance
+                                                    verification step — CIEL PK Admin reviews hours with the
+                                                    report.
                                                 </p>
                                             </div>
                                         ) : null}
@@ -1832,6 +1832,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             </div>
                                             <AttendanceSummaryTable
                                                 embedded
+                                                showVerificationStatus={false}
                                                 entries={participantLogs}
                                                 participantNames={participantNamesMap}
                                                 onDelete={handleDeleteEntry}
@@ -1995,14 +1996,14 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </span>
                                 </div>
                                 <p className="mb-3 -mt-1 text-xs text-[#7a919a]">
-                                    No separate attendance sign-off — this declaration replaces it. Your
-                                    whole report is verified once, by faculty, at the end.
+                                    Confirm your logged sessions. There is no Faculty or Partner attendance
+                                    verification in this form — CIEL PK Admin reviews hours with the report.
                                 </p>
                                 <div className="space-y-2">
                                     {[
                                         "I verify that all session entries are authentic.",
                                         "I understand that no further edits are possible after submission.",
-                                        "I understand my whole report — not each session — is verified once by faculty at the end, and I consent to institutional report sharing.",
+                                        "I understand CIEL PK Admin reviews this report next, including attendance hours, and I consent to institutional report sharing.",
                                     ].map((check, i) => (
                                         <label
                                             key={i}

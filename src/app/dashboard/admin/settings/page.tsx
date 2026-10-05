@@ -23,10 +23,6 @@ import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import { isAbortError, readErrorMessage, useAbortableFetch } from "@/components/admin/useAbortableFetch";
 import { formatAdminDateTime } from "@/utils/adminDate";
 import {
-    parseReportPartnerApprovalSettingValue,
-    REPORT_PARTNER_APPROVAL_SETTING_KEY,
-} from "@/utils/reportPartnerApprovalDisplay";
-import {
     FEE_PKR_MAX,
     FEE_PKR_MIN,
     isValidWholeNumberInRange,
@@ -420,10 +416,6 @@ export default function AdminSettingsPage() {
 
     /* ---- toggle values ---- */
     const applyPaused = parseBool(server[STUDENT_APPLY_MAINTENANCE_ENABLED_KEY], false);
-    const reportPartnerApproval = parseReportPartnerApprovalSettingValue(
-        server[REPORT_PARTNER_APPROVAL_SETTING_KEY],
-        true,
-    );
     const partnerMembershipRequired = parsePartnerMembershipRequiredSettingValue(
         server[PARTNER_MEMBERSHIP_REQUIRED_KEY],
         false,
@@ -921,34 +913,11 @@ export default function AdminSettingsPage() {
 
                     {/* --------------------------- Reports & partners --------------------------- */}
                     <Section id="reports" title="Reports & partners" icon={<FileCheck className="h-5 w-5 shrink-0 text-indigo-600" />}>
-                        <ToggleRow
-                            id="report-partner"
-                            title="Require NGO / partner approval on reports"
-                            description={
-                                <>
-                                    When <strong>on</strong>, impact reports that include a partner or NGO may stay in review
-                                    until the linked organization approves, then CIEL Admin can mark them verified. When{" "}
-                                    <strong>off</strong>, admin approval finalizes the report without a partner step. Does not
-                                    change opportunity creation, student join, or attendance approval flows.
-                                </>
-                            }
-                            checked={reportPartnerApproval}
-                            saving={!!saving[REPORT_PARTNER_APPROVAL_SETTING_KEY]}
-                            color="indigo"
-                            tone="bg-indigo-50/40"
-                            meta={meta[REPORT_PARTNER_APPROVAL_SETTING_KEY]}
-                            stateLabel={reportPartnerApproval ? "Enabled" : "Disabled"}
-                            onChange={(next) =>
-                                void saveToggle(
-                                    REPORT_PARTNER_APPROVAL_SETTING_KEY,
-                                    next,
-                                    "report approval setting",
-                                    next
-                                        ? "NGO/partner report approval is ON — reports may need partner sign-off before final verify."
-                                        : "NGO/partner report approval is OFF — admin approve will finalize reports without partner step.",
-                                )
-                            }
-                        />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+                            Impact <strong>report</strong> approval is CIEL PK Admin only. NGO / partner still
+                            review opportunities and attendance. This does not change opportunity creation,
+                            student join, or attendance approval flows.
+                        </div>
                         <ToggleRow
                             id="partner-membership"
                             title="Require membership fee for new NGO / partners"
