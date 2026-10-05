@@ -436,11 +436,12 @@
 }
 
 .cert-signature-img {
-  height: 44px;
+  display: block;
+  height: 28px;
   width: auto;
-  max-width: 200px;
+  max-width: 118px;
   object-fit: contain;
-  object-position: left;
+  object-position: left center;
   background: transparent;
 }
 
@@ -448,7 +449,7 @@
 .cert-date-line {
   margin-top: 4px;
   height: 1px;
-  width: 168px;
+  width: 118px;
   background: var(--cert-gold);
 }
 
@@ -485,7 +486,7 @@
   align-items: flex-end;
   justify-content: flex-end;
   gap: 8px;
-  min-height: 44px;
+  min-height: 28px;
 }
 
 .cert-date-icon {
@@ -656,6 +657,12 @@
 
   .cert-impact-recognition-tagline {
     font-size: 8px !important;
+  }
+
+  .cert-signature-img {
+    height: 28px !important;
+    max-width: 118px !important;
+    width: auto !important;
   }
 
   .cert-participant-table thead th,

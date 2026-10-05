@@ -43,7 +43,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
-import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 
 const CS_VIEWS = [
     "home",
@@ -61,6 +61,7 @@ const CS_VIEWS = [
 const CREATE_FORM = "/dashboard/faculty/create-opportunity";
 const MY_OPPS = "/dashboard/faculty/my-opportunities";
 const IMPACT = "/dashboard/faculty/impact?tab=community";
+const CREATE_PAGE_SIZE = 8;
 
 type CsView = (typeof CS_VIEWS)[number];
 
@@ -570,6 +571,7 @@ function FacultyCommunityServiceHub() {
         const params = new URLSearchParams(searchParams.toString());
         params.set("view", view);
         params.set("tab", id);
+        params.delete("page");
         router.replace(`${CS_BASE}?${params.toString()}`, { scroll: false });
     };
 
@@ -617,6 +619,24 @@ function FacultyCommunityServiceHub() {
         | "action"
         | "published"
         | "closed";
+    const createRows = useMemo(
+        () => mineRows.filter((row) => mineBucket(row) === createTab),
+        [mineRows, createTab],
+    );
+    const createPageCount = Math.max(1, Math.ceil(createRows.length / CREATE_PAGE_SIZE));
+    const createPage = Math.min(Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1), createPageCount);
+    const pagedCreateRows = createRows.slice((createPage - 1) * CREATE_PAGE_SIZE, createPage * CREATE_PAGE_SIZE);
+    const setCreatePage = (next: number) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("view", "create");
+        params.set("tab", createTab);
+        if (next <= 1) params.delete("page");
+        else params.set("page", String(next));
+        router.replace(`${CS_BASE}?${params.toString()}`, { scroll: false });
+        requestAnimationFrame(() => {
+            document.getElementById("faculty-create-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    };
     const reviewTab = ["linked", "opps", "revision", "apps", "done"].includes(innerTab) ? innerTab : "opps";
     const projectTab = ["active", "progress", "verified", "all"].includes(innerTab) ? innerTab : "active";
 
@@ -745,34 +765,67 @@ function FacultyCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading your opportunities…</p>
+                    ) : createRows.length === 0 ? (
+                        <EmptyPanel
+                            title="Nothing here"
+                            text={
+                                createTab === "drafts"
+                                    ? "Faculty drafts are saved on the Create Opportunity form until you submit them to Partner/CIEL PK."
+                                    : `No records under ${createTab}.`
+                            }
+                        />
                     ) : (
-                        <div className="space-y-2.5">
-                            {mineRows.filter((row) => mineBucket(row) === createTab).length === 0 ? (
-                                <EmptyPanel
-                                    title="Nothing here"
-                                    text={
-                                        createTab === "drafts"
-                                            ? "Faculty drafts are saved on the Create Opportunity form until you submit them to Partner/CIEL PK."
-                                            : `No records under ${createTab}.`
-                                    }
-                                />
-                            ) : (
-                                mineRows
-                                    .filter((row) => mineBucket(row) === createTab)
-                                    .map((row) => {
-                                        const href =
-                                            createTab === "drafts" || createTab === "action"
-                                                ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}${createTab === "drafts" ? "&draft=1" : ""}`
-                                                : `${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`;
-                                        return (
+                        <div
+                            id="faculty-create-list"
+                            className="flex min-h-[52vh] flex-col overflow-hidden rounded-[18px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e8edef] px-4 py-3">
+                                <p className="text-[12.5px] font-semibold text-[#16313d]">
+                                    {createRows.length}{" "}
+                                    {createTab === "review"
+                                        ? "under approval"
+                                        : createTab === "action"
+                                          ? "action required"
+                                          : createTab}
+                                </p>
+                                <p className="text-[11.5px] text-[#70808a]">
+                                    Page {createPage} of {createPageCount}
+                                </p>
+                            </div>
+                            <div className="flex-1 divide-y divide-[#e8edef]">
+                                {pagedCreateRows.map((row) => {
+                                    const href =
+                                        createTab === "drafts" || createTab === "action"
+                                            ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}${createTab === "drafts" ? "&draft=1" : ""}`
+                                            : `${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`;
+                                    return (
                                         <Link
                                             key={row.id}
                                             href={href}
-                                            className="block overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] transition hover:border-[#bcd4d8]"
+                                            className="flex min-w-0 gap-0 transition hover:bg-[#f7fafb]"
                                         >
-                                            <OpportunityListFlashHead title={row.title} />
-                                            <div className="px-4 py-3">
-                                                <small className="block text-[11.5px] text-[#6b7c86]">
+                                            <span
+                                                aria-hidden
+                                                className="w-1.5 shrink-0 bg-[linear-gradient(180deg,#102f3d_0%,#126a67_62%,#a67817_150%)]"
+                                            />
+                                            <div className="min-w-0 flex-1 px-4 py-3.5 sm:px-5">
+                                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                                    <h3 className="m-0 min-w-0 flex-1 text-[14.5px] font-extrabold leading-snug tracking-tight text-[#16313d]">
+                                                        {row.title || "Untitled opportunity"}
+                                                    </h3>
+                                                    <span className="shrink-0 rounded-full border border-[#dce6ea] bg-[#f7fafb] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#52636e]">
+                                                        {createTab === "review"
+                                                            ? "Under approval"
+                                                            : createTab === "action"
+                                                              ? "Action required"
+                                                              : createTab === "drafts"
+                                                                ? "Draft"
+                                                                : createTab === "published"
+                                                                  ? "Published"
+                                                                  : "Closed"}
+                                                    </span>
+                                                </div>
+                                                <small className="mt-1 block text-[11.5px] text-[#6b7c86]">
                                                     {formatOpportunityCode(row)} ·{" "}
                                                     {createTab === "review" ? facultyPendingStageLabel(row) : row.status || "in review"}
                                                     {row.workflow_stage ? ` · ${row.workflow_stage.replace(/_/g, " ")}` : ""}
@@ -782,12 +835,20 @@ function FacultyCommunityServiceHub() {
                                                 ) : null}
                                             </div>
                                         </Link>
-                                        );
-                                    })
-                            )}
-                            <Link href={MY_OPPS} className="inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
-                                Open full creator list →
-                            </Link>
+                                    );
+                                })}
+                            </div>
+                            {createPageCount > 1 ? (
+                                <div className="border-t border-[#e8edef] px-4 py-2">
+                                    <PaginationControls
+                                        currentPage={createPage}
+                                        totalPages={createPageCount}
+                                        onPageChange={setCreatePage}
+                                        totalItems={createRows.length}
+                                        itemsPerPage={CREATE_PAGE_SIZE}
+                                    />
+                                </div>
+                            ) : null}
                         </div>
                     )}
                 </div>

@@ -387,8 +387,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                                     src="/ciel-e-signature.png"
                                     alt="Registrar signature"
                                     className="cert-signature-img"
-                                    width={640}
-                                    height={160}
+                                    width={118}
+                                    height={28}
                                 />
                                 <div className="cert-signature-line" />
                                 <p className="cert-registrar-label">Registrar of Impact</p>

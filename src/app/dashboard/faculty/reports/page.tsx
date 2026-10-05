@@ -8,6 +8,7 @@ import { CheckCircle2, Clock, Eye, FileText, Loader2, Search } from "lucide-reac
 import { toast } from "sonner";
 import clsx from "clsx";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 
 interface FacultyReportRow {
     id: string;
@@ -172,6 +173,7 @@ export default function FacultyStudentReportsPage() {
     return (
         <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl space-y-5">
+                <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
                 <div>
                     <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-600">Faculty</p>
                     <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">

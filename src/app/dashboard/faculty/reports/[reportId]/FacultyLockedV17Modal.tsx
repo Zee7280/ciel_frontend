@@ -15,6 +15,7 @@ import { V19_ASSESSMENT_RULE } from "./buildLockedV17Assessment";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
 import "./faculty-locked-v17.css";
 import ReportEvidenceGallery from "@/components/ciel/community-service/ReportEvidenceGallery";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 
 type TabId = "flashView" | "reportView" | "evidenceView" | "attendanceView" | "analyzerView" | "decisionView" | "assessedView" | "badgeView";
 
@@ -858,6 +859,11 @@ export default function FacultyLockedV17Modal({
 
     const shell = (
         <div className={asPage ? "flv17-page" : "flv17-modal-backdrop"} role="dialog" aria-modal={!asPage} aria-labelledby="flv17-title">
+            {asPage ? (
+                <div className="mx-auto max-w-[1180px] px-4 pt-4">
+                    <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
+                </div>
+            ) : null}
             <div className="flv17-modal">
                 <div className="flv17-modal-top flv17-modal-chrome">
                     <button type="button" className="flv17-close" onClick={onClose} aria-label="Close">

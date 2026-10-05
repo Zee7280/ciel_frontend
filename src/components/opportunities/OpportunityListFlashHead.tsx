@@ -2,16 +2,35 @@
 export default function OpportunityListFlashHead({
     title,
     summary,
+    compact,
 }: {
     title: string;
     summary?: string;
+    compact?: boolean;
 }) {
     return (
-        <div className="bg-[linear-gradient(128deg,#102f3d_0%,#126a67_62%,#a67817_150%)] px-4 py-3 text-white sm:px-5">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#f1d97d]">
+        <div
+            className={
+                "bg-[linear-gradient(128deg,#102f3d_0%,#126a67_62%,#a67817_150%)] text-white " +
+                (compact ? "px-4 py-2 sm:px-5" : "px-4 py-3 sm:px-5")
+            }
+        >
+            <p
+                className={
+                    "font-extrabold uppercase tracking-[0.16em] text-[#f1d97d] " +
+                    (compact ? "text-[9px]" : "text-[10px]")
+                }
+            >
                 CIEL PK · Community Service Opportunity
             </p>
-            <h3 className="mt-1 text-base font-extrabold leading-tight tracking-tight">{title || "Untitled opportunity"}</h3>
+            <h3
+                className={
+                    "font-extrabold leading-tight tracking-tight " +
+                    (compact ? "mt-0.5 line-clamp-1 text-sm" : "mt-1 text-base")
+                }
+            >
+                {title || "Untitled opportunity"}
+            </h3>
             {summary ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#d8e9ea]">{summary}</p> : null}
         </div>
     );

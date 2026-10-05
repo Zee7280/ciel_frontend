@@ -15,6 +15,10 @@ import {
 } from "@/utils/opportunityWorkflow";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+
+const PAGE_SIZE = 8;
 
 type Row = {
     id: string;
@@ -172,6 +176,7 @@ export default function FacultyMyOpportunitiesPage() {
     const [search, setSearch] = useState("");
     const [tab, setTab] = useState<StatusTab>("all");
     const [newestFirst, setNewestFirst] = useState(true);
+    const [page, setPage] = useState(1);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [highlightIds, setHighlightIds] = useState<string[]>([]);
     const listRef = useRef<HTMLDivElement>(null);
@@ -310,6 +315,14 @@ export default function FacultyMyOpportunitiesPage() {
             });
     }, [rows, search, tab, newestFirst]);
 
+    useEffect(() => {
+        setPage(1);
+    }, [tab, search, newestFirst]);
+
+    const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+    const safePage = Math.min(page, pageCount);
+    const pagedRows = visibleRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
     const compareDuplicates = () => {
         const group = duplicateGroups[0];
         if (!group) return;
@@ -325,7 +338,8 @@ export default function FacultyMyOpportunitiesPage() {
     };
 
     return (
-        <div className="mx-auto max-w-5xl space-y-5 p-0 pb-20 sm:p-4">
+        <div className="mx-auto max-w-[1500px] space-y-5 p-0 pb-20 sm:p-4">
+            <HubBackButton href="/dashboard/faculty/community-service?view=create" label="← Back to Community Service" />
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Create & manage your opportunities</h1>
@@ -441,8 +455,17 @@ export default function FacultyMyOpportunitiesPage() {
                     No opportunities match this search or filter.
                 </div>
             ) : (
-                <div ref={listRef} className="space-y-3">
-                    {visibleRows.map((row) => {
+                <div ref={listRef} className="overflow-hidden rounded-[18px] border border-[#dde5ea] bg-white shadow-[0_8px_22px_rgba(24,52,64,.05)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e8edef] px-4 py-3">
+                        <p className="text-[12.5px] font-semibold text-[#16313d]">
+                            {visibleRows.length} opportunit{visibleRows.length === 1 ? "y" : "ies"}
+                        </p>
+                        <p className="text-[11.5px] text-[#70808a]">
+                            Page {safePage} of {pageCount}
+                        </p>
+                    </div>
+                    <div className="divide-y divide-[#e8edef]">
+                    {pagedRows.map((row) => {
                         const labels = resolvePartnerOpportunityListLabels(asRecord(row));
                         const live = isMineLive(row);
                         const badgeTone = live ? "live" : labels.badgeTone;
@@ -466,9 +489,9 @@ export default function FacultyMyOpportunitiesPage() {
                             <article
                                 key={row.id}
                                 id={`faculty-opp-${row.id}`}
-                                className={`overflow-hidden rounded-[26px] border border-[#d9e3e7] bg-white shadow-[0_18px_50px_rgba(15,43,54,.08)] ${highlighted ? "ring-2 ring-amber-300" : ""}`}
+                                className={`bg-white ${highlighted ? "ring-2 ring-amber-300" : ""}`}
                             >
-                                <OpportunityListFlashHead title={row.title} />
+                                <OpportunityListFlashHead title={row.title} compact />
                                 <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
                                     <div className="min-w-0 flex-1 space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -496,11 +519,11 @@ export default function FacultyMyOpportunitiesPage() {
                                         {badgeTone === "rejected" && rejectedCopy ? (
                                             <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">
                                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                                                <p>Rejected: {rejectedCopy}</p>
+                                                <p className="line-clamp-3 break-words">Rejected: {rejectedCopy}</p>
                                             </div>
                                         ) : row.review_feedback ? (
                                             <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">
-                                                {row.review_feedback}
+                                                <p className="line-clamp-3 break-words">{row.review_feedback}</p>
                                             </div>
                                         ) : null}
                                     </div>
@@ -567,6 +590,21 @@ export default function FacultyMyOpportunitiesPage() {
                             </article>
                         );
                     })}
+                    </div>
+                    {pageCount > 1 ? (
+                        <div className="border-t border-[#e8edef] px-4 py-2">
+                            <PaginationControls
+                                currentPage={safePage}
+                                totalPages={pageCount}
+                                onPageChange={(next) => {
+                                    setPage(next);
+                                    listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }}
+                                totalItems={visibleRows.length}
+                                itemsPerPage={PAGE_SIZE}
+                            />
+                        </div>
+                    ) : null}
                 </div>
             )}
         </div>

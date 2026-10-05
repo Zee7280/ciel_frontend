@@ -16,6 +16,7 @@ import {
 } from "@/utils/communityCiiAnalyser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import "./community-cii-analyser.css";
 
 const TEAL = "#0e7d74";
@@ -167,7 +168,7 @@ export default function CommunityCiiAnalyser({
     const inboxHref = isCielPk
         ? "/dashboard/admin/reports/verify"
         : "/dashboard/faculty/community-service";
-    const inboxLabel = isCielPk ? "Back to student reports" : "Back to Community Service";
+    const inboxLabel = isCielPk ? "← Back to student reports" : "← Back to Community Service";
 
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<Record<string, unknown> | null>(null);
@@ -416,8 +417,11 @@ export default function CommunityCiiAnalyser({
 
     if (loading) {
         return (
-            <div className="flex min-h-[50vh] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" style={{ color: TEAL }} />
+            <div className="mx-auto max-w-[1180px] p-5">
+                <HubBackButton href={inboxHref} label={inboxLabel} />
+                <div className="flex min-h-[50vh] items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: TEAL }} />
+                </div>
             </div>
         );
     }
@@ -425,10 +429,8 @@ export default function CommunityCiiAnalyser({
     if (!report) {
         return (
             <div className="mx-auto max-w-[1180px] p-5">
+                <HubBackButton href={inboxHref} label={inboxLabel} />
                 <p className="text-[12px] text-[#687d82]">Report unavailable.</p>
-                <Link href={inboxHref} className="text-[12px] underline" style={{ color: TEAL }}>
-                    {inboxLabel}
-                </Link>
             </div>
         );
     }
@@ -469,6 +471,9 @@ export default function CommunityCiiAnalyser({
 
     return (
         <div className="fx23-analyzer">
+            <div className="fx23-backnav">
+                <HubBackButton href={inboxHref} label={inboxLabel} />
+            </div>
             <div className="fx23-workhead">
                 <div>
                     <span>{isCielPk ? "CIEL PK Super Admin review · CII v4.5 Analyzer" : "Faculty review workspace · CII v4.5 Analyzer"}</span>
@@ -478,8 +483,11 @@ export default function CommunityCiiAnalyser({
                     </p>
                 </div>
                 <div>
-                    <Link href={inboxHref}>{inboxLabel}</Link>
-                    {!isCielPk ? <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>Impact Package</Link> : <Link href={`/dashboard/admin/reports/verify/${reportId}?package=1`}>Review package</Link>}
+                    {!isCielPk ? (
+                        <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>Impact Package</Link>
+                    ) : (
+                        <Link href={`/dashboard/admin/reports/verify/${reportId}?package=1`}>Review package</Link>
+                    )}
                 </div>
             </div>
 

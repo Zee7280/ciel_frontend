@@ -129,7 +129,7 @@ export default function FacultyAttendanceReviewPage() {
     return (
         <AttendanceReviewDashboard
             backHref="/dashboard/faculty/community-service?view=projects"
-            backLabel="Back to Community Service"
+            backLabel="← Back to Community Service"
             eyebrow=""
             title="Member hours"
             description="Live hours logged by assigned students. Attendance is confirmed when the flash-card score is locked."

@@ -26,6 +26,7 @@ import {
 } from "@/utils/opportunityApplicationsAdmin";
 import { formatDisplayId } from "@/utils/displayIds";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 
 export default function FacultyJoinApplicationsPage() {
     const [tab, setTab] = useState<"pending" | "history">("pending");
@@ -181,6 +182,7 @@ export default function FacultyJoinApplicationsPage() {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
+            <HubBackButton href="/dashboard/faculty/community-service?view=review" label="← Back to Community Service" />
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Join applications</h1>
                 <p className="text-slate-500 max-w-3xl">

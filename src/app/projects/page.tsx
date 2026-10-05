@@ -1,31 +1,15 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { ChevronDown, LayoutGrid, List, Loader2, Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
 import Footer from "@/components/Footer";
-import BrowseOpportunityCard, { sdgsForBrowseCard } from "@/app/dashboard/student/browse/BrowseOpportunityCard";
-import {
-    Search,
-    Users,
-    Loader2,
-    Boxes,
-    LayoutGrid,
-    List,
-    Map as MapIcon,
-    Clock,
-    CheckCircle2,
-    BarChart3,
-    Leaf,
-    Lightbulb,
-    Filter,
-    ChevronDown,
-    X,
-} from "lucide-react";
-import { useState, useEffect, useMemo, useRef } from "react";
-import dynamic from "next/dynamic";
-import { toast } from "sonner";
-import clsx from "clsx";
+import { sdgsForBrowseCard } from "@/app/dashboard/student/browse/BrowseOpportunityCard";
+import MarketplaceOpportunityCard from "@/components/opportunities/MarketplaceOpportunityCard";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 import type { ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
 import {
     buildSdgFilterLabel,
@@ -37,28 +21,20 @@ import {
     pickVisibilityBucket,
 } from "@/utils/opportunityListing";
 import { findSdgById } from "@/utils/sdgData";
-import { buildOpportunityMapPoints } from "@/utils/opportunityMapCoordinates";
-import { applicationsOpenFromPayload, listingIsExpiredFromPayload } from "@/utils/studentApplyMaintenance";
+import { applicationsOpenFromPayload } from "@/utils/studentApplyMaintenance";
 import {
-    BROWSE_PATHS,
     BROWSE_PATH_BY_KEY,
     classifyBrowseCreator,
     classifyBrowsePath,
     isUrgentBrowseDeadline,
     type BrowsePathKey,
 } from "@/utils/browseOpportunityPath";
-
-const OpportunitiesMapView = dynamic(
-    () => import("@/components/opportunities/OpportunitiesMapView"),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="flex h-[min(70vh,560px)] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white">
-                <Loader2 className="h-8 w-8 animate-spin text-[#0F8F83]" />
-            </div>
-        ),
-    },
-);
+import {
+    classifyMarketplaceStatus,
+    marketplaceDurationDays,
+    marketplaceStatusLabel,
+    type MarketplaceStatus,
+} from "@/utils/marketplaceListingStatus";
 
 type ExploreCreator = "student" | "faculty" | "partner" | "admin";
 
@@ -102,67 +78,15 @@ type ExploreProject = {
     adminExpired: boolean;
 };
 
-type ExploreStats = {
-    total: number;
-    verified: number;
-    partners: number;
-    students_impacted: number;
-};
+const PAGE_SIZE = 12;
 
-type PathCounts = Record<BrowsePathKey | "all", number>;
-
-const EMPTY_PATH_COUNTS: PathCounts = {
-    all: 0,
-    community_service: 0,
-    coursework: 0,
-    fyp: 0,
-    startup: 0,
-};
-
-function buildPublicProjectShareUrl(projectId: string): string {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/projects/${encodeURIComponent(projectId)}`;
-}
-
-async function copyPublicProjectShareLink(projectId: string): Promise<void> {
-    const url = buildPublicProjectShareUrl(projectId);
-    if (!url) return;
-    try {
-        await navigator.clipboard.writeText(url);
-        toast.success("Project link copied");
-    } catch {
-        toast.error("Could not copy link");
-    }
-}
-
-function normalizeStatus(status: string): string {
-    return String(status || "").trim().toLowerCase();
-}
-
-function isArchivedStatus(status: string): boolean {
-    const s = normalizeStatus(status);
-    return ["completed", "archived", "closed", "inactive", "cancelled"].some((x) => s.includes(x));
-}
+const filterSelectClass =
+    "h-10 w-full min-w-0 appearance-none rounded-xl border border-[#e4eeec] bg-white px-3 pr-8 text-sm text-[#16313d] transition-colors hover:border-slate-300 focus:border-[#0e7d74] focus:outline-none focus:ring-2 focus:ring-[#0e7d74]/20";
 
 function extractCityLabel(location?: string): string {
     if (!location) return "Pakistan";
     const first = location.split(",")[0]?.trim();
     return first || location;
-}
-
-function statusDisplayLabel(status: string): string {
-    const s = normalizeStatus(status);
-    if (s.includes("closing")) return "Closing Soon";
-    if (s.includes("full")) return "Full";
-    if (isArchivedStatus(status)) return "Completed";
-    if (s === "active" || s.includes("open")) return "Open";
-    if (s === "recruiting") return "Recruiting";
-    return status || "Open";
-}
-
-function formatStat(value: number): string {
-    if (!Number.isFinite(value) || value <= 0) return "0";
-    return value.toLocaleString("en-US");
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -181,6 +105,16 @@ function pickCity(raw: Record<string, unknown>, fallbackLocation: string): strin
     }
     if (typeof loc === "string" && loc.trim()) return extractCityLabel(loc);
     return extractCityLabel(fallbackLocation) || "Remote";
+}
+
+function listingOf(project: ExploreProject) {
+    return {
+        start_date: project.start_date,
+        end_date: project.end_date,
+        adminExpired: project.adminExpired,
+        applicationsOpen: project.applicationsOpen,
+        applyBlockedReason: project.applyBlockedReason,
+    };
 }
 
 function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
@@ -205,8 +139,7 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
 
     const opportunityTypes = pickOpportunityTypes(raw);
     const sdgLabel = buildSdgFilterLabel(raw);
-    const sdgIdRaw =
-        (asRecord(raw.sdg_info)?.sdg_id as unknown) ?? raw.sdg;
+    const sdgIdRaw = (asRecord(raw.sdg_info)?.sdg_id as unknown) ?? raw.sdg;
     const sdg = findSdgById(sdgIdRaw as string | number | undefined);
     const sdgIds = Array.isArray(raw.sdg_ids)
         ? raw.sdg_ids.map((id) => String(id))
@@ -221,8 +154,7 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
     const hoursRaw = Number(raw.hours);
     const timeline = asRecord(raw.timeline);
     const start_date = str(raw.start_date) || str(timeline?.start_date) || null;
-    const end_date =
-        str(raw.end_date) || str(timeline?.end_date) || str(timeline?.application_deadline) || null;
+    const end_date = str(raw.end_date) || str(timeline?.end_date) || str(timeline?.application_deadline) || null;
     const remainingForFull = typeof seatsRemaining === "number" ? seatsRemaining : null;
     const volunteersNeeded = Number(raw.volunteersNeeded ?? timeline?.volunteers_required);
     const hasSeatCap = Number.isFinite(volunteersNeeded) && volunteersNeeded > 0;
@@ -258,10 +190,8 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
             typeof raw.is_full === "boolean"
                 ? raw.is_full
                 : Boolean(hasSeatCap && remainingForFull != null && remainingForFull <= 0),
-        is_virtual:
-            typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(raw.mode) === "remote",
-        is_urgent:
-            typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(end_date),
+        is_virtual: typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(raw.mode) === "remote",
+        is_urgent: typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(end_date),
         created_by_role: classifyBrowseCreator(raw),
         faculty_verified: raw.faculty_verified === true,
         execution_verified: raw.execution_verified === true,
@@ -273,56 +203,25 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
     };
 }
 
-function computeExploreStats(rows: ExploreProject[]): ExploreStats {
-    const partners = new Set<string>();
-    let studentsImpacted = 0;
-    let verified = 0;
-    for (const row of rows) {
-        if (row.org && row.org.toLowerCase() !== "unknown") partners.add(row.org);
-        if (row.participant_count > 0) studentsImpacted += row.participant_count;
-        if (row.faculty_verified || row.execution_verified || row.admin_approved) verified += 1;
-    }
-    return {
-        total: rows.length,
-        verified: verified || rows.length,
-        partners: partners.size,
-        students_impacted: studentsImpacted,
-    };
-}
-
-function computePathCounts(rows: ExploreProject[]): PathCounts {
-    const counts: PathCounts = { ...EMPTY_PATH_COUNTS, all: rows.length };
-    for (const row of rows) counts[row.path_key] += 1;
-    return counts;
-}
-
-const filterSelectClass =
-    "h-10 w-full min-w-0 appearance-none rounded-xl border border-[#e4eeec] bg-white px-3 pr-8 text-sm text-[#16313d] transition-colors hover:border-slate-300 focus:border-[#0e7d74] focus:outline-none focus:ring-2 focus:ring-[#0e7d74]/20";
-
 export default function ProjectsPage() {
     const [projects, setProjects] = useState<ExploreProject[]>([]);
-    const [apiStats, setApiStats] = useState<ExploreStats | null>(null);
-    const [apiPathCounts, setApiPathCounts] = useState<PathCounts | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [universityFilter, setUniversityFilter] = useState("all");
     const [modeFilter, setModeFilter] = useState<"all" | ModeBucket>("all");
     const [sdgFilter, setSdgFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
-    const [pathTab, setPathTab] = useState<"all" | BrowsePathKey>("all");
-    const [departmentFilter, setDepartmentFilter] = useState("all");
+    const [typeFilter, setTypeFilter] = useState("all");
     const [partnerFilter, setPartnerFilter] = useState("all");
     const [timeCommitment, setTimeCommitment] = useState<"all" | "8" | "16" | "17">("all");
-    const [creatorFilter, setCreatorFilter] = useState<"all" | ExploreCreator>("all");
-    const [dateFrom, setDateFrom] = useState("");
-    const [dateTo, setDateTo] = useState("");
-    const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
-    const [virtualOnly, setVirtualOnly] = useState(false);
-    const [urgentOnly, setUrgentOnly] = useState(false);
+    const [seatsFilter, setSeatsFilter] = useState<"all" | "open">("all");
+    const [startDateFilter, setStartDateFilter] = useState("");
+    const [durationFilter, setDurationFilter] = useState<"all" | "week" | "month" | "long">("all");
+    const [applicationType, setApplicationType] = useState<"all" | "open" | "restricted">("all");
+    const [statusFilter, setStatusFilter] = useState<MarketplaceStatus | "all">("all");
     const [sortNewest, setSortNewest] = useState(true);
-    const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("grid");
-    const [filtersOpen, setFiltersOpen] = useState(true);
-    const [promoOpen, setPromoOpen] = useState(true);
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [page, setPage] = useState(1);
     const [fetchError, setFetchError] = useState(false);
     const [reloadNonce, setReloadNonce] = useState(0);
     const [applyBanner, setApplyBanner] = useState<string | null>(null);
@@ -376,31 +275,7 @@ export default function ProjectsPage() {
                     (data.success === true || (data.success !== false && (Array.isArray(data.data) || list.length > 0)));
 
                 if (shouldLoad) {
-                    const mapped = list.filter((row) => str(row.id)).map(mapPublicOpportunity);
-                    setProjects(mapped);
-                    const stats = asRecord(data.stats);
-                    if (stats) {
-                        setApiStats({
-                            total: Number(stats.total) || mapped.length,
-                            verified: Number(stats.verified) || mapped.length,
-                            partners: Number(stats.partners) || 0,
-                            students_impacted: Number(stats.students_impacted) || 0,
-                        });
-                    } else {
-                        setApiStats(null);
-                    }
-                    const counts = asRecord(data.path_counts);
-                    if (counts) {
-                        setApiPathCounts({
-                            all: Number(counts.all) || mapped.length,
-                            community_service: Number(counts.community_service) || 0,
-                            coursework: Number(counts.coursework) || 0,
-                            fyp: Number(counts.fyp) || 0,
-                            startup: Number(counts.startup) || 0,
-                        });
-                    } else {
-                        setApiPathCounts(null);
-                    }
+                    setProjects(list.filter((row) => str(row.id)).map(mapPublicOpportunity));
                 } else {
                     setProjects([]);
                     setFetchError(true);
@@ -417,47 +292,37 @@ export default function ProjectsPage() {
         fetchProjects();
     }, [reloadNonce]);
 
-    const universityOptions = useMemo(() => {
-        return Array.from(new Set(projects.map((p) => p.universityLabel).filter(Boolean))).sort((a, b) =>
-            a.localeCompare(b),
-        );
-    }, [projects]);
+    const visibleCatalog = useMemo(
+        () => projects.filter((project) => project.applyBlockedReason !== "opportunity_hidden"),
+        [projects],
+    );
 
-    const sdgOptions = useMemo(() => {
-        return Array.from(new Set(projects.map((p) => p.sdgLabel).filter((s) => s && s !== "Unspecified SDG"))).sort(
-            (a, b) => a.localeCompare(b),
-        );
-    }, [projects]);
+    const statusCounts = useMemo(() => {
+        const counts = { live: 0, closing: 0, upcoming: 0, expired: 0, total: visibleCatalog.length };
+        for (const project of visibleCatalog) counts[classifyMarketplaceStatus(listingOf(project))] += 1;
+        return counts;
+    }, [visibleCatalog]);
 
-    const locationOptions = useMemo(() => {
-        return Array.from(new Set(projects.map((p) => p.city || "Remote"))).sort((a, b) => a.localeCompare(b));
-    }, [projects]);
-
-    const departmentOptions = useMemo(() => {
-        return Array.from(new Set(projects.map((p) => p.department).filter((d): d is string => Boolean(d)))).sort(
-            (a, b) => a.localeCompare(b),
-        );
-    }, [projects]);
-
-    const partnerOptions = useMemo(() => {
-        return Array.from(new Set(projects.map((p) => p.partner_name || p.org).filter(Boolean))).sort((a, b) =>
-            a.localeCompare(b),
-        );
-    }, [projects]);
-
-    const liveStats = useMemo(() => apiStats || computeExploreStats(projects), [apiStats, projects]);
-    const pathCounts = useMemo(() => apiPathCounts || computePathCounts(projects), [apiPathCounts, projects]);
-
-    const partnerHighlights = useMemo(() => {
-        const map = new Map<string, number>();
-        projects.forEach((p) => {
-            const org = p.org || "Verified Partner";
-            map.set(org, (map.get(org) || 0) + 1);
-        });
-        return Array.from(map.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 6);
-    }, [projects]);
+    const universityOptions = useMemo(
+        () => Array.from(new Set(visibleCatalog.map((p) => p.universityLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+        [visibleCatalog],
+    );
+    const sdgOptions = useMemo(
+        () => Array.from(new Set(visibleCatalog.map((p) => p.sdgLabel).filter((s) => s && s !== "Unspecified SDG"))).sort((a, b) => a.localeCompare(b)),
+        [visibleCatalog],
+    );
+    const locationOptions = useMemo(
+        () => Array.from(new Set(visibleCatalog.map((p) => p.city || "Remote"))).sort((a, b) => a.localeCompare(b)),
+        [visibleCatalog],
+    );
+    const partnerOptions = useMemo(
+        () => Array.from(new Set(visibleCatalog.map((p) => p.partner_name || p.org).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+        [visibleCatalog],
+    );
+    const typeOptions = useMemo(
+        () => Array.from(new Set(visibleCatalog.flatMap((p) => p.opportunityTypes).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+        [visibleCatalog],
+    );
 
     const resetFilters = () => {
         setSearchQuery("");
@@ -465,27 +330,23 @@ export default function ProjectsPage() {
         setModeFilter("all");
         setSdgFilter("all");
         setLocationFilter("all");
-        setPathTab("all");
-        setDepartmentFilter("all");
+        setTypeFilter("all");
         setPartnerFilter("all");
         setTimeCommitment("all");
-        setCreatorFilter("all");
-        setDateFrom("");
-        setDateTo("");
-        setOnlyOpenSeats(false);
-        setVirtualOnly(false);
-        setUrgentOnly(false);
+        setSeatsFilter("all");
+        setStartDateFilter("");
+        setDurationFilter("all");
+        setApplicationType("all");
+        setStatusFilter("all");
         setSortNewest(true);
+        setPage(1);
     };
 
     const filteredProjects = useMemo(() => {
         const needle = searchQuery.trim().toLowerCase();
-        return projects
+        return visibleCatalog
             .filter((project) => {
-                // Defense-in-depth: the backend already excludes admin_hidden rows from this
-                // endpoint, but never render one as a normal "Open" card if it ever slips through.
-                if (project.applyBlockedReason === "opportunity_hidden") return false;
-                if (pathTab !== "all" && project.path_key !== pathTab) return false;
+                if (statusFilter !== "all" && classifyMarketplaceStatus(listingOf(project)) !== statusFilter) return false;
                 if (needle) {
                     const hay = [
                         project.title,
@@ -497,7 +358,6 @@ export default function ProjectsPage() {
                         project.department,
                         project.city,
                         project.opportunityTypes.join(" "),
-                        project.sdg_ids.join(" "),
                     ]
                         .join(" ")
                         .toLowerCase();
@@ -507,9 +367,9 @@ export default function ProjectsPage() {
                 if (modeFilter !== "all" && project.modeBucket !== modeFilter) return false;
                 if (sdgFilter !== "all" && project.sdgLabel !== sdgFilter) return false;
                 if (locationFilter !== "all" && project.city !== locationFilter) return false;
-                if (departmentFilter !== "all" && project.department !== departmentFilter) return false;
+                if (typeFilter !== "all" && !project.opportunityTypes.includes(typeFilter)) return false;
                 if (partnerFilter !== "all" && (project.partner_name || project.org) !== partnerFilter) return false;
-                if (creatorFilter !== "all" && project.created_by_role !== creatorFilter) return false;
+                if (applicationType !== "all" && project.visibilityBucket !== applicationType) return false;
                 if (timeCommitment !== "all") {
                     const hours = project.hours;
                     if (hours == null) return false;
@@ -517,15 +377,19 @@ export default function ProjectsPage() {
                     if (timeCommitment === "16" && (hours <= 8 || hours > 16)) return false;
                     if (timeCommitment === "17" && hours <= 16) return false;
                 }
-                if (dateFrom && project.end_date && String(project.end_date).slice(0, 10) < dateFrom) return false;
-                if (dateTo && (project.start_date || project.end_date) && String(project.start_date || project.end_date).slice(0, 10) > dateTo) {
+                if (startDateFilter && project.start_date && String(project.start_date).slice(0, 10) < startDateFilter) {
                     return false;
                 }
-                if (onlyOpenSeats && (project.is_full || (project.seatsRemaining != null && project.seatsRemaining <= 0))) {
+                if (durationFilter !== "all") {
+                    const days = marketplaceDurationDays(project.start_date, project.end_date);
+                    if (days == null) return false;
+                    if (durationFilter === "week" && days > 7) return false;
+                    if (durationFilter === "month" && (days <= 7 || days > 31)) return false;
+                    if (durationFilter === "long" && days <= 31) return false;
+                }
+                if (seatsFilter === "open" && (project.is_full || (project.seatsRemaining != null && project.seatsRemaining <= 0))) {
                     return false;
                 }
-                if (virtualOnly && !project.is_virtual) return false;
-                if (urgentOnly && !project.is_urgent) return false;
                 return true;
             })
             .sort((a, b) => {
@@ -536,490 +400,394 @@ export default function ProjectsPage() {
                 return sortNewest ? nb - na : na - nb;
             });
     }, [
-        projects,
-        pathTab,
+        visibleCatalog,
+        statusFilter,
         searchQuery,
         universityFilter,
         modeFilter,
         sdgFilter,
         locationFilter,
-        departmentFilter,
+        typeFilter,
         partnerFilter,
-        creatorFilter,
+        applicationType,
         timeCommitment,
-        dateFrom,
-        dateTo,
-        onlyOpenSeats,
-        virtualOnly,
-        urgentOnly,
+        startDateFilter,
+        durationFilter,
+        seatsFilter,
         sortNewest,
     ]);
 
-    const filteredPathCounts = useMemo(() => computePathCounts(filteredProjects), [filteredProjects]);
+    useEffect(() => {
+        setPage(1);
+    }, [
+        statusFilter,
+        searchQuery,
+        universityFilter,
+        modeFilter,
+        sdgFilter,
+        locationFilter,
+        typeFilter,
+        partnerFilter,
+        applicationType,
+        timeCommitment,
+        startDateFilter,
+        durationFilter,
+        seatsFilter,
+        sortNewest,
+    ]);
 
-    const mapPoints = useMemo(
-        () =>
-            buildOpportunityMapPoints(
-                filteredProjects.map((p) => ({
-                    id: p.id,
-                    title: p.title,
-                    org: p.org,
-                    location: p.location,
-                    modeBucket: p.modeBucket,
-                    status: p.status,
-                    locationPin: p.locationPin,
-                })),
-                statusDisplayLabel,
-            ),
-        [filteredProjects],
-    );
-
-    const activeFilterCount =
-        [
-            universityFilter,
-            modeFilter,
-            sdgFilter,
-            locationFilter,
-            departmentFilter,
-            partnerFilter,
-            timeCommitment,
-            creatorFilter,
-        ].filter((v) => v !== "all").length +
-        (searchQuery.trim() ? 1 : 0) +
-        (pathTab !== "all" ? 1 : 0) +
-        (onlyOpenSeats ? 1 : 0) +
-        (virtualOnly ? 1 : 0) +
-        (urgentOnly ? 1 : 0) +
-        (dateFrom || dateTo ? 1 : 0);
+    const pageCount = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+    const safePage = Math.min(page, pageCount);
+    const pagedProjects = filteredProjects.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
     const scrollToResults = () => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
-    const pathIcon = (key: BrowsePathKey) => {
-        if (key === "coursework") return Leaf;
-        if (key === "startup") return Lightbulb;
-        if (key === "fyp") return Search;
-        return Users;
-    };
+    const chipClass = (active: boolean, tone: string) =>
+        `inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-bold ${
+            active ? tone : "bg-white text-[#5d7278] border border-[#e4eeec]"
+        }`;
 
     return (
-        <main className="min-h-screen bg-[#f7f8f4] font-sans">
+        <main className="min-h-screen bg-[#f3f7f5] font-sans">
             <Navbar />
 
-            <section className="relative overflow-hidden border-b border-slate-200/80 bg-[#f7f8f4] pt-28 pb-8">
-                <div className="relative z-10 mx-auto max-w-7xl px-6">
-                    <div className="mx-auto max-w-3xl text-center">
-                        <h1 className="font-serif text-4xl font-bold tracking-tight text-[#16313d] sm:text-5xl">
-                            Explore Opportunities
-                        </h1>
-                        <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
-                            Discover meaningful community impact opportunities. Gain real-world experience,
-                            develop new skills, and contribute to a more sustainable and inclusive future.
+            <section className="relative overflow-hidden pt-28">
+                <div className="mx-auto max-w-[1600px] px-4 pb-6 sm:px-6">
+                    <div className="relative overflow-hidden rounded-[28px] border border-[#e6eeea] bg-white p-5 shadow-[0_18px_40px_rgba(16,48,54,.06)] sm:p-8 lg:p-10">
+                        <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#1aa36a]">
+                            Community Service Marketplace
                         </p>
-                    </div>
-
-                    <form
-                        className="mx-auto mt-8 flex max-w-3xl flex-col gap-3 sm:flex-row"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            scrollToResults();
-                        }}
-                    >
-                        <div className="relative min-w-0 flex-1">
-                            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="search"
-                                placeholder="Search by title, partner, skills, SDGs, or keywords..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-12 w-full rounded-full border border-slate-200 bg-white pl-12 pr-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-[#0F8F83] focus:ring-4 focus:ring-[#0F8F83]/15"
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-[#174b43] px-8 text-sm font-bold text-white shadow-md transition hover:bg-[#123c36]"
-                        >
-                            Search
-                        </button>
-                    </form>
-
-                    {promoOpen ? (
-                        <div className="relative mx-auto mt-6 max-w-5xl rounded-2xl border border-amber-200 bg-[#fff8e8] px-5 py-4 text-left">
-                            <button
-                                type="button"
-                                aria-label="Dismiss"
-                                className="absolute right-3 top-3 text-amber-700/70 hover:text-amber-900"
-                                onClick={() => setPromoOpen(false)}
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                            <p className="pr-6 text-sm font-bold text-amber-950">
-                                Make a difference with real opportunities
-                            </p>
-                            <p className="mt-1 pr-6 text-sm text-amber-900/90">
-                                Explore community service, sustainability projects, research opportunities and startup
-                                initiatives from our trusted partners.
-                            </p>
-                        </div>
-                    ) : null}
-
-                    {applyBanner ? (
-                        <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                            <p className="font-semibold">Applications temporarily paused</p>
-                            <p className="mt-1 text-amber-900/90">{applyBanner}</p>
-                        </div>
-                    ) : null}
-                </div>
-            </section>
-
-            <section className="mx-auto max-w-7xl px-6 py-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {[
-                        { label: "Total Opportunities", value: liveStats.total, icon: Boxes, tint: "bg-emerald-50 text-emerald-700" },
-                        { label: "Verified Opportunities", value: liveStats.verified, icon: CheckCircle2, tint: "bg-sky-50 text-sky-700" },
-                        { label: "Partner Organizations", value: liveStats.partners, icon: Users, tint: "bg-teal-50 text-teal-700" },
-                        { label: "Student Impacted", value: liveStats.students_impacted, icon: BarChart3, tint: "bg-lime-50 text-lime-700" },
-                    ].map(({ label, value, icon: Icon, tint }) => (
-                        <div key={label} className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-                            <div className={clsx("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", tint)}>
-                                <Icon className="h-5 w-5" />
-                            </div>
+                        <div className="mt-3 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:items-center">
                             <div>
-                                <p className="text-2xl font-black tabular-nums text-slate-900">{formatStat(value)}</p>
-                                <p className="text-xs font-semibold text-slate-500">{label}</p>
+                                <h1 className="max-w-[16ch] text-[clamp(34px,4.4vw,58px)] font-black leading-[0.95] tracking-tight text-[#16313d]">
+                                    Find a cause.
+                                    <br />
+                                    <span className="text-[#1aa36a]">Create real impact.</span>
+                                </h1>
+                                <p className="mt-4 max-w-[54ch] text-[15px] leading-relaxed text-[#5d7278]">
+                                    Discover verified community service opportunities from universities, NGOs and partner
+                                    organizations across Pakistan. Filter by city, SDG, hours, host organization, dates and
+                                    availability — then choose the schedule that fits your interests.
+                                </p>
+                                <div className="mt-6 flex flex-wrap gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStatusFilter("live");
+                                            scrollToResults();
+                                        }}
+                                        className="inline-flex h-11 items-center rounded-full bg-[#16313d] px-5 text-[13px] font-extrabold text-white hover:bg-[#0f242c]"
+                                    >
+                                        Explore Live Opportunities
+                                    </button>
+                                    <Link
+                                        href="/#where-your-impact-lives"
+                                        className="inline-flex h-11 items-center rounded-full border border-[#d7e4e0] bg-white px-5 text-[13px] font-extrabold text-[#16313d] hover:bg-[#f7fafb]"
+                                    >
+                                        How Community Service Works
+                                    </Link>
+                                </div>
+                                <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    {[
+                                        [statusCounts.total, "Community Service Projects"],
+                                        [statusCounts.live, "Live Now"],
+                                        [statusCounts.closing, "Closing Soon"],
+                                        [statusCounts.upcoming, "Upcoming"],
+                                    ].map(([value, label]) => (
+                                        <div key={String(label)} className="rounded-2xl border border-[#e8eeec] bg-[#f7faf8] px-3 py-3">
+                                            <b className="block text-[22px] font-black tabular-nums text-[#16313d]">{value}</b>
+                                            <span className="text-[11px] font-semibold text-[#6b7c86]">{label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="relative mx-auto min-h-[220px] w-full max-w-[420px]">
+                                <div className="absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_20%_20%,#e8f7c8,transparent_42%),radial-gradient(circle_at_80%_0%,#f8d9b0,transparent_40%),radial-gradient(circle_at_80%_80%,#d9c8f4,transparent_45%),linear-gradient(135deg,#f7f3e8,#e7f3ea)]" />
+                                <div className="absolute left-[12%] top-[18%] h-24 w-24 rounded-full bg-white/55 shadow-sm" />
+                                <div className="absolute right-[18%] top-[28%] h-28 w-28 rounded-full bg-white/50" />
+                                <div className="absolute bottom-[16%] left-[28%] h-20 w-20 rounded-full bg-white/45" />
+                                <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-[#16313d] p-4 text-white shadow-lg">
+                                    <p className="text-[15px] font-black leading-snug">One student. 16 verified hours.</p>
+                                    <p className="mt-1 text-[12px] leading-relaxed text-[#cfe3e0]">
+                                        Thousands of students turn individual effort into visible community impact.
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    ))}
+                        <p className="mt-6 text-[11px] font-semibold tracking-wide text-[#8aa0a6]">
+                            Verified opportunities · Real communities · Measurable impact
+                        </p>
+                    </div>
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl px-6 pb-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {BROWSE_PATHS.map((path) => {
-                        const Icon = pathIcon(path.key);
-                        const active = pathTab === path.key;
-                        return (
-                            <button
-                                key={path.key}
-                                type="button"
-                                onClick={() => setPathTab(active ? "all" : path.key)}
-                                className="flex items-start gap-3 rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm transition"
-                                style={
-                                    active
-                                        ? { borderColor: path.accent, boxShadow: `0 0 0 1px ${path.accent}` }
-                                        : { borderColor: "#e4eeec" }
-                                }
-                            >
-                                <span
-                                    className="mt-0.5 grid h-10 w-10 place-items-center rounded-xl"
-                                    style={{ background: path.accentSoft, color: path.accentText }}
+            {applyBanner ? (
+                <div className="mx-auto max-w-[1600px] px-4 sm:px-6">
+                    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                        <p className="font-semibold">Applications temporarily paused</p>
+                        <p className="mt-1 text-amber-900/90">{applyBanner}</p>
+                    </div>
+                </div>
+            ) : null}
+
+            <section className="mx-auto max-w-[1600px] px-4 pb-16 sm:px-6">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-[22px] font-black text-[#16313d]">Community Service Opportunities</h2>
+                        <p className="mt-1 text-[13px] text-[#6b7c86]">
+                            Search, filter and compare verified opportunities across universities and partner organisations.
+                        </p>
+                    </div>
+                    <p className="text-[13px] font-bold text-[#1aa36a]">{filteredProjects.length} Opportunities Found</p>
+                </div>
+
+                <div className="rounded-[22px] border border-[#e4eeec] bg-white p-4 shadow-[0_10px_28px_rgba(16,48,54,.04)]">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86] xl:col-span-1">
+                            Search
+                            <span className="relative mt-1 block">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                                <input
+                                    type="search"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search project, host, skills or keyword"
+                                    className="h-10 w-full rounded-xl border border-[#e4eeec] bg-white pl-9 pr-3 text-sm text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none"
+                                />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            University
+                            <span className="relative mt-1 block">
+                                <select value={universityFilter} onChange={(e) => setUniversityFilter(e.target.value)} className={filterSelectClass}>
+                                    <option value="all">All Universities</option>
+                                    {universityOptions.map((u) => (
+                                        <option key={u} value={u}>
+                                            {u}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            City
+                            <span className="relative mt-1 block">
+                                <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={filterSelectClass}>
+                                    <option value="all">All cities</option>
+                                    {locationOptions.map((loc) => (
+                                        <option key={loc} value={loc}>
+                                            {loc}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Location Type
+                            <span className="relative mt-1 block">
+                                <select
+                                    value={modeFilter}
+                                    onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
+                                    className={filterSelectClass}
                                 >
-                                    <Icon className="h-5 w-5" />
-                                </span>
-                                <span>
-                                    <span className="block text-[15px] font-bold leading-tight" style={{ color: path.accentText }}>
-                                        {path.label}
-                                    </span>
-                                    <span className="mt-0.5 block text-[12px] text-[#6b7c86]">{path.tagline}</span>
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </section>
-
-            <section className="mx-auto max-w-7xl px-6 pb-10">
-                <div className="rounded-2xl border border-[#e4eeec] bg-white p-4 shadow-[0_8px_24px_rgba(15,42,48,.04)]" aria-label="Filters">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="inline-flex items-center gap-2 text-[15px] font-bold text-[#16313d]">
-                            <Filter className="h-4 w-4 text-[#0e7d74]" />
-                            Advanced Filters
-                            {activeFilterCount > 0 ? (
-                                <span className="rounded-full bg-[#e8f8f1] px-2 py-0.5 text-[11px] font-black text-[#0f6b4a]">
-                                    {activeFilterCount}
-                                </span>
-                            ) : null}
-                        </h2>
-                        <button
-                            type="button"
-                            onClick={() => setFiltersOpen((open) => !open)}
-                            className="inline-flex items-center gap-1 rounded-full border border-[#e4eeec] px-3 py-1.5 text-[12px] font-semibold text-[#5d7278] hover:bg-slate-50"
-                        >
-                            {filtersOpen ? "Hide Filters" : "Show Filters"}
-                            <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
-                        </button>
+                                    <option value="all">All types</option>
+                                    {(["on-site", "hybrid", "remote"] as const).map((b) => (
+                                        <option key={b} value={b}>
+                                            {modeMenuLabel(b)}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            SDG
+                            <span className="relative mt-1 block">
+                                <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={filterSelectClass}>
+                                    <option value="all">All SDGs</option>
+                                    {sdgOptions.map((sdg) => (
+                                        <option key={sdg} value={sdg}>
+                                            {sdg}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Skills / Opportunity Type
+                            <span className="relative mt-1 block">
+                                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={filterSelectClass}>
+                                    <option value="all">All Causes</option>
+                                    {typeOptions.map((type) => (
+                                        <option key={type} value={type}>
+                                            {type}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Required Hours
+                            <span className="relative mt-1 block">
+                                <select
+                                    value={timeCommitment}
+                                    onChange={(e) => setTimeCommitment(e.target.value as "all" | "8" | "16" | "17")}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="all">Any Hours</option>
+                                    <option value="8">Up to 8 hrs</option>
+                                    <option value="16">9–16 hrs</option>
+                                    <option value="17">17+ hrs</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Seats Available
+                            <span className="relative mt-1 block">
+                                <select
+                                    value={seatsFilter}
+                                    onChange={(e) => setSeatsFilter(e.target.value as "all" | "open")}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="all">Any Seats</option>
+                                    <option value="open">With open seats</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Host Organization
+                            <span className="relative mt-1 block">
+                                <select value={partnerFilter} onChange={(e) => setPartnerFilter(e.target.value)} className={filterSelectClass}>
+                                    <option value="all">All hosts</option>
+                                    {partnerOptions.map((p) => (
+                                        <option key={p} value={p}>
+                                            {p}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Start Date
+                            <input
+                                type="date"
+                                value={startDateFilter}
+                                onChange={(e) => setStartDateFilter(e.target.value)}
+                                className="mt-1 h-10 w-full rounded-xl border border-[#e4eeec] px-3 text-sm text-[#16313d]"
+                            />
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Duration
+                            <span className="relative mt-1 block">
+                                <select
+                                    value={durationFilter}
+                                    onChange={(e) => setDurationFilter(e.target.value as "all" | "week" | "month" | "long")}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="all">Any Duration</option>
+                                    <option value="week">Up to 7 days</option>
+                                    <option value="month">8–31 days</option>
+                                    <option value="long">Longer than a month</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
+                        <label className="block text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#6b7c86]">
+                            Application Type
+                            <span className="relative mt-1 block">
+                                <select
+                                    value={applicationType}
+                                    onChange={(e) => setApplicationType(e.target.value as "all" | "open" | "restricted")}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="all">All</option>
+                                    <option value="open">Open to all universities</option>
+                                    <option value="restricted">University restricted</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                            </span>
+                        </label>
                     </div>
 
-                    {filtersOpen ? (
-                        <div className="space-y-4">
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Keyword Search
-                                    <span className="relative mt-1 block">
-                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                        <input
-                                            type="search"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search by title, partner, skills…"
-                                            className="h-10 w-full rounded-xl border border-[#e4eeec] bg-white pl-9 pr-3 text-sm text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none"
-                                        />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    SDG(s)
-                                    <span className="relative mt-1 block">
-                                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={filterSelectClass}>
-                                            <option value="all">Select SDGs</option>
-                                            {sdgOptions.map((sdg) => (
-                                                <option key={sdg} value={sdg}>
-                                                    {sdg}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Location
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={locationFilter}
-                                            onChange={(e) => setLocationFilter(e.target.value)}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">All Locations</option>
-                                            {locationOptions.map((loc) => (
-                                                <option key={loc} value={loc}>
-                                                    {loc}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Mode
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={modeFilter}
-                                            onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">All Modes</option>
-                                            {(["on-site", "hybrid", "remote"] as const).map((b) => (
-                                                <option key={b} value={b}>
-                                                    {modeMenuLabel(b)}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Department
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={departmentFilter}
-                                            onChange={(e) => setDepartmentFilter(e.target.value)}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">All Departments</option>
-                                            {departmentOptions.map((d) => (
-                                                <option key={d} value={d}>
-                                                    {d}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    University
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={universityFilter}
-                                            onChange={(e) => setUniversityFilter(e.target.value)}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">All Universities</option>
-                                            {universityOptions.map((u) => (
-                                                <option key={u} value={u}>
-                                                    {u}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Partner / NGO
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={partnerFilter}
-                                            onChange={(e) => setPartnerFilter(e.target.value)}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">All Partners</option>
-                                            {partnerOptions.map((p) => (
-                                                <option key={p} value={p}>
-                                                    {p}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278]">
-                                    Time Commitment
-                                    <span className="relative mt-1 block">
-                                        <select
-                                            value={timeCommitment}
-                                            onChange={(e) => setTimeCommitment(e.target.value as "all" | "8" | "16" | "17")}
-                                            className={filterSelectClass}
-                                        >
-                                            <option value="all">Any Hours</option>
-                                            <option value="8">Up to 8 hrs</option>
-                                            <option value="16">9–16 hrs</option>
-                                            <option value="17">17+ hrs</option>
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    </span>
-                                </label>
-                                <label className="block text-[11px] font-bold text-[#5d7278] xl:col-span-2">
-                                    Date Range
-                                    <span className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                                        <input
-                                            type="date"
-                                            value={dateFrom}
-                                            onChange={(e) => setDateFrom(e.target.value)}
-                                            className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]"
-                                        />
-                                        <span className="text-[#8aa0a6]">→</span>
-                                        <input
-                                            type="date"
-                                            value={dateTo}
-                                            onChange={(e) => setDateTo(e.target.value)}
-                                            className="h-10 rounded-xl border border-[#e4eeec] px-2 text-sm text-[#16313d]"
-                                        />
-                                    </span>
-                                </label>
-                            </div>
-
-                            <div className="grid gap-3 border-t border-[#eef4f3] pt-3 lg:grid-cols-[1fr_1.2fr_auto] lg:items-end">
-                                <div>
-                                    <p className="text-[11px] font-bold text-[#5d7278]">Created By</p>
-                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
-                                        <label className="inline-flex items-center gap-1.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={creatorFilter === "all"}
-                                                onChange={() => setCreatorFilter("all")}
-                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
-                                            />
-                                            All
-                                        </label>
-                                        {([
-                                            ["student", "Student"],
-                                            ["faculty", "Faculty"],
-                                            ["partner", "Partner / NGO"],
-                                            ["admin", "Admin"],
-                                        ] as const).map(([value, label]) => (
-                                            <label key={value} className="inline-flex items-center gap-1.5">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={creatorFilter === value}
-                                                    onChange={() => setCreatorFilter(creatorFilter === value ? "all" : value)}
-                                                    className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
-                                                />
-                                                {label}
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-[11px] font-bold text-[#5d7278]">Special Filters</p>
-                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#16313d]">
-                                        <label className="inline-flex items-center gap-1.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={onlyOpenSeats}
-                                                onChange={(e) => setOnlyOpenSeats(e.target.checked)}
-                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
-                                            />
-                                            With Available Seats Only
-                                        </label>
-                                        <label className="inline-flex items-center gap-1.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={virtualOnly}
-                                                onChange={(e) => setVirtualOnly(e.target.checked)}
-                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
-                                            />
-                                            Virtual Opportunities
-                                        </label>
-                                        <label className="inline-flex items-center gap-1.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={urgentOnly}
-                                                onChange={(e) => setUrgentOnly(e.target.checked)}
-                                                className="h-4 w-4 rounded border-[#cfe3de] text-[#0e7d74] focus:ring-[#0e7d74]"
-                                            />
-                                            Urgent Opportunities
-                                        </label>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={resetFilters}
-                                        className="rounded-full border border-[#e4eeec] px-4 py-2 text-[13px] font-semibold text-[#5d7278] hover:bg-slate-50"
-                                    >
-                                        Clear All
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={scrollToResults}
-                                        className="rounded-full bg-[#174b43] px-5 py-2 text-[13px] font-bold text-white hover:bg-[#123c36]"
-                                    >
-                                        Apply Filters
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eef4f3] pt-3">
+                        <div className="flex flex-wrap gap-2">
+                            {(["live", "closing", "upcoming", "expired"] as const).map((status) => (
+                                <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => setStatusFilter((current) => (current === status ? "all" : status))}
+                                    className={chipClass(
+                                        statusFilter === status,
+                                        status === "live"
+                                            ? "bg-[#e8f8ef] text-[#148a4c]"
+                                            : status === "closing"
+                                              ? "bg-[#fff4d6] text-[#b45309]"
+                                              : status === "upcoming"
+                                                ? "bg-[#eee8ff] text-[#5b21b6]"
+                                                : "bg-[#ffe4ea] text-[#be123c]",
+                                    )}
+                                >
+                                    <span
+                                        className={`h-2 w-2 rounded-full ${
+                                            status === "live"
+                                                ? "bg-[#1aa36a]"
+                                                : status === "closing"
+                                                  ? "bg-[#f2a100]"
+                                                  : status === "upcoming"
+                                                    ? "bg-[#6b4de6]"
+                                                    : "bg-[#e11d48]"
+                                        }`}
+                                    />
+                                    {marketplaceStatusLabel(status)} {statusCounts[status]}
+                                </button>
+                            ))}
                         </div>
-                    ) : null}
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="rounded-full border border-[#e4eeec] px-4 py-2 text-[12px] font-bold text-[#5d7278] hover:bg-slate-50"
+                            >
+                                Clear Filters
+                            </button>
+                            <button
+                                type="button"
+                                onClick={scrollToResults}
+                                className="rounded-full bg-[#16313d] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#0f242c]"
+                            >
+                                More Search
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div ref={resultsRef} className="mt-6 flex flex-col gap-3 scroll-mt-28 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[15px] font-black text-[#16313d]">
-                            {filteredProjects.length} {filteredProjects.length === 1 ? "Opportunity Found" : "Opportunities Found"}
+                <div ref={resultsRef} className="mt-6 flex flex-wrap items-center justify-between gap-3 scroll-mt-28">
+                    <div>
+                        <h3 className="text-[20px] font-black text-[#16313d]">
+                            {filteredProjects.length}{" "}
+                            {statusFilter === "all" ? "" : marketplaceStatusLabel(statusFilter) + " "}
+                            {filteredProjects.length === 1 ? "Opportunity" : "Opportunities"}
+                        </h3>
+                        <p className="text-[12.5px] text-[#6b7c86]">
+                            {statusFilter === "all"
+                                ? "All verified listings. Use the chips to filter Live, Closing Soon, Upcoming or Expired."
+                                : statusFilter === "live"
+                                ? "Projects currently active between approved start and end dates."
+                                : statusFilter === "closing"
+                                  ? "Live now, with 5 or fewer days remaining."
+                                  : statusFilter === "upcoming"
+                                    ? "Approved and ready, start date still in the future."
+                                    : "Ended or expired listings kept for reference."}
                         </p>
-                        <button
-                            type="button"
-                            onClick={() => setPathTab("all")}
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
-                                pathTab === "all" ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f]"
-                            }`}
-                        >
-                            All {pathTab === "all" ? filteredPathCounts.all : pathCounts.all}
-                        </button>
-                        {BROWSE_PATHS.map((path) => (
-                            <button
-                                key={path.key}
-                                type="button"
-                                onClick={() => setPathTab(path.key)}
-                                className="rounded-full px-2.5 py-1 text-[11px] font-black"
-                                style={
-                                    pathTab === path.key
-                                        ? { background: path.accent, color: "#fff" }
-                                        : { background: path.accentSoft, color: path.accentText }
-                                }
-                            >
-                                {path.shortLabel} {pathTab === path.key ? filteredPathCounts[path.key] : pathCounts[path.key]}
-                            </button>
-                        ))}
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="relative">
@@ -1027,14 +795,13 @@ export default function ProjectsPage() {
                                 value={sortNewest ? "newest" : "oldest"}
                                 onChange={(e) => setSortNewest(e.target.value === "newest")}
                                 className={`${filterSelectClass} min-w-[9rem]`}
-                                title="Sort"
                             >
-                                <option value="newest">Most Recent</option>
+                                <option value="newest">Recommended</option>
                                 <option value="oldest">Oldest first</option>
                             </select>
                             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
                         </div>
-                        <div className="flex rounded-xl border border-[#e4eeec] p-0.5">
+                        <div className="flex rounded-xl border border-[#e4eeec] bg-white p-0.5">
                             <button
                                 type="button"
                                 onClick={() => setViewMode("grid")}
@@ -1051,14 +818,6 @@ export default function ProjectsPage() {
                             >
                                 <List className="h-4 w-4" />
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setViewMode("map")}
-                                className={`rounded-lg p-1.5 ${viewMode === "map" ? "bg-slate-100 text-[#16313d]" : "text-[#8aa0a6]"}`}
-                                title="Map view"
-                            >
-                                <MapIcon className="h-4 w-4" />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1074,13 +833,10 @@ export default function ProjectsPage() {
                             <p className="font-semibold text-slate-700">
                                 Something went wrong loading opportunities — please try again.
                             </p>
-                            <p className="mt-2 text-sm text-slate-500">
-                                This is a connection problem on our side, not an empty search.
-                            </p>
                             <button
                                 type="button"
                                 onClick={() => setReloadNonce((n) => n + 1)}
-                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
+                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white"
                             >
                                 Retry
                             </button>
@@ -1088,30 +844,19 @@ export default function ProjectsPage() {
                     ) : filteredProjects.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-20 text-center">
                             <p className="font-semibold text-slate-700">No opportunities match your filters.</p>
-                            <p className="mt-2 text-sm text-slate-500">Try another path or clear filters to see more results.</p>
                             <button
                                 type="button"
                                 onClick={resetFilters}
-                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0d7a70]"
+                                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0F8F83] px-5 py-2.5 text-sm font-bold text-white"
                             >
                                 Clear filters
                             </button>
                         </div>
-                    ) : viewMode === "map" ? (
-                        <OpportunitiesMapView points={mapPoints} />
                     ) : (
-                        <div
-                            className={
-                                viewMode === "grid"
-                                    ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-                                    : "space-y-4"
-                            }
-                        >
-                            {filteredProjects.map((project) => {
-                                const hoursLabel = `${project.hours ?? 0} hrs`;
-                                const seatsLeft = project.seatsRemaining ?? 0;
-                                return (
-                                    <BrowseOpportunityCard
+                        <>
+                            <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" : "grid gap-4"}>
+                                {pagedProjects.map((project) => (
+                                    <MarketplaceOpportunityCard
                                         key={project.id}
                                         id={project.id}
                                         title={project.title}
@@ -1120,90 +865,47 @@ export default function ProjectsPage() {
                                                 ? project.description
                                                 : undefined
                                         }
-                                        pathKey={project.path_key}
                                         pathLabel={project.path_label}
                                         organizationName={project.partner_name || project.org}
                                         city={project.city}
-                                        modeLabel={
-                                            project.modeBucket !== "unspecified"
-                                                ? modeMenuLabel(project.modeBucket)
-                                                : "On-site"
-                                        }
-                                        hoursLabel={hoursLabel}
-                                        seatsLabel={`${seatsLeft} seats`}
-                                        deadline={project.end_date}
+                                        modeLabel={project.modeBucket !== "unspecified" ? modeMenuLabel(project.modeBucket) : "On-site"}
+                                        skillLabel={project.opportunityTypes[0] || null}
+                                        hours={project.hours}
+                                        seatsRemaining={project.seatsRemaining}
+                                        startDate={project.start_date}
+                                        endDate={project.end_date}
                                         coverUrl={project.cover_url}
-                                        isFull={project.is_full}
-                                        isExpired={listingIsExpiredFromPayload({
-                                            admin_expired: project.adminExpired,
-                                            apply_blocked_reason: project.applyBlockedReason,
-                                            applications_open: project.applicationsOpen,
-                                        })}
+                                        universityLabel={project.universityLabel}
+                                        visibilityOpen={project.visibilityBucket === "open"}
                                         sdgs={sdgsForBrowseCard(project.sdg_ids, project.sdgNumber, project.sdgTitle)}
-                                        visibilityTag={
-                                            project.visibilityBucket === "open"
-                                                ? "Open to all"
-                                                : project.universityLabel || null
-                                        }
-                                        visibilityWarn={project.visibilityBucket === "restricted"}
-                                        appliedPending={false}
-                                        appliedRejected={false}
-                                        showTeam={false}
-                                        showWithdraw={false}
-                                        withdrawing={false}
-                                        canApplyNow={false}
-                                        showJoin={false}
-                                        joinButtonLabel="Join Opportunity"
-                                        detailsHref={`/projects/${project.id}`}
-                                        viewMode={viewMode}
-                                        onShare={() => void copyPublicProjectShareLink(project.id)}
+                                        adminExpired={project.adminExpired}
+                                        applicationsOpen={project.applicationsOpen}
+                                        applyBlockedReason={project.applyBlockedReason}
                                     />
-                                );
-                            })}
-                        </div>
+                                ))}
+                            </div>
+                            {pageCount > 1 ? (
+                                <PaginationControls
+                                    currentPage={safePage}
+                                    totalPages={pageCount}
+                                    onPageChange={(next) => {
+                                        setPage(next);
+                                        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    }}
+                                    totalItems={filteredProjects.length}
+                                    itemsPerPage={PAGE_SIZE}
+                                />
+                            ) : null}
+                        </>
                     )}
                 </div>
-            </section>
 
-            {!isLoading && partnerHighlights.length > 0 ? (
-                <section className="border-t border-slate-200 bg-white py-12">
-                    <div className="mx-auto max-w-7xl px-6">
-                        <div className="mb-6 flex items-end justify-between gap-4">
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900">Browse by Partner</h2>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Organizations currently hosting opportunities on CIEL PK.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {partnerHighlights.map(([org, count]) => (
-                                <button
-                                    key={org}
-                                    type="button"
-                                    onClick={() => {
-                                        setPartnerFilter(org);
-                                        setSearchQuery("");
-                                        scrollToResults();
-                                    }}
-                                    className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-[#f4f7f6] p-4 text-left transition hover:border-[#0F8F83]/40 hover:bg-white hover:shadow-sm"
-                                >
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0F8F83]/10 text-lg font-black text-[#065f46]">
-                                        {org.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="truncate font-bold text-slate-900">{org}</p>
-                                        <p className="text-xs font-semibold text-slate-500">
-                                            {count} active {count === 1 ? "project" : "projects"}
-                                        </p>
-                                    </div>
-                                    <Clock className="ml-auto h-4 w-4 shrink-0 text-slate-300" />
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            ) : null}
+                <p className="mt-8 text-[11px] leading-relaxed text-[#8aa0a6]">
+                    Recommended production rule: “Live Now” should be calculated automatically when today falls between the
+                    approved project start and end dates. “Closing Soon” can be triggered when 3–5 days remain. “Upcoming”
+                    means the start date is in the future. Hidden or expired listings never appear as live.
+                </p>
+            </section>
 
             <PartnersFooter />
             <FooterBanner />

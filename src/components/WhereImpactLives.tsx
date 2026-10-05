@@ -13,8 +13,8 @@ const LOOP = [
     { n: "1", title: "Join or create", detail: "an opportunity, connected to faculty from day one" },
     { n: "2", title: "Serve & log", detail: "sessions, hours and locations as you go" },
     { n: "3", title: "Evidence once", detail: "photos, videos, attendance sheets" },
-    { n: "4", title: "Report writes itself", detail: "ten sections, AI-drafted from your answers" },
-    { n: "5", title: "One approval", detail: "faculty verify the whole report once" },
+    { n: "4", title: "Complete Team Report", detail: "Student completes one report per team, briefly filling in all nine sections" },
+    { n: "5", title: "CIEL PK verify", detail: "the whole report once" },
     { n: "6", title: "Published", detail: "flashcard · certificate · QR · CII score · rankings" },
 ];
 
@@ -144,8 +144,8 @@ export default function WhereImpactLives() {
                             Community Service — sixteen hours that become a permanent, verified record.
                         </h3>
                         <p className="relative m-0 max-w-[56ch] text-[15px] leading-relaxed text-[#CFE3E0]">
-                            Log sessions as you work, upload evidence once, submit a report that writes itself. One
-                            faculty approval publishes it to your CV, your university and this page.
+                            Log sessions as you work, upload evidence once, complete one team report across nine
+                            sections. CIEL PK verification publishes it to your CV, your university and this page.
                         </p>
                         <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3">
                             {LOOP.map((step) => (

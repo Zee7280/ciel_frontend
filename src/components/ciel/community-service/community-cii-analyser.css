@@ -21,6 +21,13 @@
     background: #fff;
     border-bottom: 1px solid var(--line);
 }
+.fx23-analyzer .fx23-backnav {
+    padding: 14px 22px 0;
+    background: #eef3f2;
+}
+.fx23-analyzer .fx23-backnav a {
+    margin-bottom: 10px;
+}
 .fx23-analyzer .fx23-workhead > div:first-child > span {
     display: block;
     font-size: 8px;

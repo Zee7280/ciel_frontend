@@ -8,6 +8,7 @@ import ThesisCard from "@/components/ciel/ThesisCard";
 import {
     CourseworkCrumb,
     CourseworkHero,
+    HubBackButton,
     PathFilterBar,
     PathSectionHead,
 } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -139,6 +140,7 @@ export default function FacultyImpactWallPage() {
     return (
         <div className="mx-auto max-w-[1240px]">
             <CourseworkCrumb role="Faculty" pathLabel="My Impact Wall" />
+            <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
             <CourseworkHero
                 kicker="UNIFIED FACULTY IMPACT PORTFOLIO"
                 title="My Impact Wall 🏅"

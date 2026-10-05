@@ -16,6 +16,7 @@ import {
     type FacultyEvidenceItem,
 } from "./facultyAiEvaluation.helpers";
 import ImpactPackage from "@/app/dashboard/student/report/impact-package/ImpactPackage";
+import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 
 const PIPE = [
     { id: 0, label: "STUDENT COMPLETES 9 SECTIONS — FLASH CARD IS 10" },
@@ -170,7 +171,10 @@ export default function FacultyAiEvaluationConsole() {
     if (loading) {
         return (
             <div className="fae">
-                <div className="fae-wrap flex min-h-[50vh] items-center justify-center">
+                <div className="fae-wrap flex min-h-[50vh] flex-col items-center justify-center">
+                    <div className="w-full max-w-[1180px] px-4 pt-4">
+                        <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
+                    </div>
                     <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
                 </div>
             </div>
@@ -181,10 +185,8 @@ export default function FacultyAiEvaluationConsole() {
         return (
             <div className="fae">
                 <div className="fae-wrap">
+                    <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
                     <p className="fae-sub">Executive evaluation unavailable.</p>
-                    <div className="fae-nav">
-                        <Link href="/dashboard/faculty/community-service">Back to Community Service</Link>
-                    </div>
                 </div>
             </div>
         );
@@ -211,7 +213,7 @@ export default function FacultyAiEvaluationConsole() {
                     Faculty read-only view. Open the locked package and scores. Analysis, Approve, Request revision and Reject stay with CIEL PK Admin.
                 </div>
                 <div className="fae-nav">
-                    <Link href="/dashboard/faculty/community-service">Back to Community Service</Link>
+                    <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
                     <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>
                         Open Impact Package
                     </Link>
