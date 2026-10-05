@@ -88,8 +88,23 @@ function text(...values: unknown[]): string {
     for (const value of values) {
         if (typeof value === "string" && value.trim() && value.trim().toLowerCase() !== "undefined") return value.trim();
         if (typeof value === "number" && Number.isFinite(value)) return String(value);
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
     }
     return "";
+}
+
+function formatWhen(...values: unknown[]): string {
+    const raw = text(...values);
+    if (!raw) return "";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
 function nice(value: unknown): string {
@@ -251,16 +266,19 @@ export function buildImpactPackageDetailedReport(
                 rows: [
                     row(
                         "Date, time, location, activity and accomplishment",
-                        logs.map((log) => ({
-                            date: text(log.date),
-                            start: text(log.start_time),
-                            end: text(log.end_time),
-                            hours: log.hours,
-                            location: text(log.location),
-                            activity: text(log.activity_type),
-                            description: text(log.description),
-                            status: attendanceStatusLabel(log.approval_status),
-                        })),
+                        logs.map((log) => {
+                            const item = rec(log);
+                            return {
+                                date: text(item.date, item.dateOfEngagement, item.date_of_engagement),
+                                start: text(item.start_time, item.startTime),
+                                end: text(item.end_time, item.endTime),
+                                hours: text(item.hours, item.sessionHours, item.session_hours),
+                                location: text(item.location, item.organizationName, item.organization_name),
+                                activity: text(item.activity_type, item.activityType),
+                                description: text(item.description),
+                                status: attendanceStatusLabel(item.approval_status ?? item.approvalStatus),
+                            };
+                        }),
                     ),
                 ],
             },
@@ -682,6 +700,16 @@ export function buildImpactPackageDetailedReport(
 
     const flags = Array.isArray(data.section11?.final_declaration) ? data.section11.final_declaration : [];
     const items = declarationItems(data);
+    const root = rec(data);
+    const s11 = rec(data.section11);
+    const signedWhen = formatWhen(
+        s11.signed_at,
+        s11.signedAt,
+        root.reportSubmittedAt,
+        root.report_submitted_at,
+        root.submission_date,
+        root.submitted_at,
+    );
     const s10: DetailedReportSection = {
         id: "10",
         title: "Final check, sign-off & publication",
@@ -695,8 +723,8 @@ export function buildImpactPackageDetailedReport(
                         row(`Declaration ${index + 1}`, flags[index] === true ? item : flags[index] === false ? "Not signed" : item),
                     ),
                     row("Signed declarations in source record", flags.length === 5 && flags.every(Boolean)),
-                    row("Electronic signature", text(data.section11?.signature_name)),
-                    row("Signed date-time", text(data.section11?.signed_at)),
+                    row("Electronic signature", text(s11.signature_name, s11.signatureName)),
+                    row("Signed date-time", signedWhen),
                 ],
             },
             {

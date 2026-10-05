@@ -24,6 +24,7 @@ import CommunityServiceHub from "./CommunityServiceHub";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { fetchImpactSummary, useImpactSummaryCache } from "@/utils/cielImpactSummary";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
 
 const CommunityServiceCreate = dynamic(() => import("./CommunityServiceCreate"));
 const CommunityServiceWorkspace = dynamic(() => import("./CommunityServiceWorkspace"));
@@ -948,7 +949,7 @@ function ReportsTab({ projects }: { projects: ActiveProject[] }) {
                             Open report
                         </Link>
                         {(project.report_status === "verified" || project.report_status === "paid") && (
-                            <Link href={`/dashboard/student/impact?projectId=${project.id}`} className="ciel-transition inline-flex items-center gap-1.5 rounded-ciel-xs bg-ciel-green-soft px-3 py-1.5 text-xs font-bold text-ciel-green-deep hover:bg-ciel-green/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green">
+                            <Link href={studentImpactPackageHref(project.id, "certificate") ?? HUB} className="ciel-transition inline-flex items-center gap-1.5 rounded-ciel-xs bg-ciel-green-soft px-3 py-1.5 text-xs font-bold text-ciel-green-deep hover:bg-ciel-green/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green">
                                 <Award className="h-3 w-3" /> Final letter
                             </Link>
                         )}

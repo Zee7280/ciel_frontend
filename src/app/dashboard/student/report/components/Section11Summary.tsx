@@ -1133,7 +1133,16 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         : {}),
                                 });
                             }}
-                            onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
+                            onSignatureChange={(value) => {
+                                const flags = data.section11?.final_declaration || [false, false, false, false, false];
+                                const allChecked = flags.slice(0, 5).every(Boolean);
+                                updateSection("section11", {
+                                    signature_name: value,
+                                    ...(allChecked && value.trim()
+                                        ? { signed_at: data.section11?.signed_at || new Date().toISOString() }
+                                        : {}),
+                                });
+                            }}
                         />
                         {finalDeclarationComplete ? (
                             <button

@@ -1195,7 +1195,16 @@ function ReportFormContent() {
                                                     : {}),
                                             });
                                         }}
-                                        onSignatureChange={(value) => updateSection("section11", { signature_name: value })}
+                                        onSignatureChange={(value) => {
+                                            const flags = data.section11?.final_declaration || [false, false, false, false, false];
+                                            const allChecked = flags.slice(0, 5).every(Boolean);
+                                            updateSection("section11", {
+                                                signature_name: value,
+                                                ...(allChecked && value.trim()
+                                                    ? { signed_at: data.section11?.signed_at || new Date().toISOString() }
+                                                    : {}),
+                                            });
+                                        }}
                                     />
                                     <p className="mx-auto max-w-lg text-center text-xs text-[#61716c]">
                                         After you submit, this flashcard is the locked package. Score, badge, QR and downloads unlock when CIEL PK Super Admin approves.

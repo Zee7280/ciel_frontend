@@ -18,6 +18,8 @@ import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/
 import "./community-cii-analyser.css";
 
 const TEAL = "#0e7d74";
+/** Nest CII OpenAI call is 120s, plus one empty-content retry (120s). BFF maxDuration is 300s. */
+const ANALYSE_TIMEOUT_MS = 300_000;
 
 function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -155,6 +157,7 @@ export default function CommunityCiiAnalyser({
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<Record<string, unknown> | null>(null);
     const [analysing, setAnalysing] = useState(false);
+    const [analysingElapsedSec, setAnalysingElapsedSec] = useState(0);
     const [approving, setApproving] = useState(false);
     const [deciding, setDeciding] = useState(false);
     const [note, setNote] = useState("");
@@ -195,6 +198,21 @@ export default function CommunityCiiAnalyser({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [reportId]);
 
+    // The analyser call can legitimately take 1-4 minutes (OpenAI call + one internal
+    // empty-content retry) — without a running counter the button just looks hung.
+    useEffect(() => {
+        if (!analysing) {
+            setAnalysingElapsedSec(0);
+            return;
+        }
+        const startedAt = Date.now();
+        setAnalysingElapsedSec(0);
+        const id = setInterval(() => {
+            setAnalysingElapsedSec(Math.round((Date.now() - startedAt) / 1000));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [analysing]);
+
     const runAnalysis = async () => {
         if (readOnly || !reportId || analysing) return;
         if (locked && !isCielPk) return;
@@ -225,7 +243,7 @@ export default function CommunityCiiAnalyser({
             setAnalysing(true);
             let res: Response | null = null;
             try {
-                res = await authenticatedFetch(analysePath, { method: "POST" }, { timeoutMs: 180000 });
+                res = await authenticatedFetch(analysePath, { method: "POST" }, { timeoutMs: ANALYSE_TIMEOUT_MS });
             } catch (err) {
                 const aborted =
                     (err instanceof DOMException && err.name === "AbortError") ||
@@ -288,7 +306,11 @@ export default function CommunityCiiAnalyser({
             });
             if (!res?.ok) {
                 const payload = res ? await res.json().catch(() => ({})) : {};
-                toast.error((payload as { message?: string }).message || "Could not approve CII");
+                toast.error(
+                    (payload as { error?: string; message?: string }).error ||
+                        (payload as { message?: string }).message ||
+                        "Could not approve CII",
+                );
                 return;
             }
             toast.success("CII v4.5 approved and locked — badge issued");
@@ -493,7 +515,13 @@ export default function CommunityCiiAnalyser({
                     </span>
                 ) : (
                     <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || (locked && !isCielPk)}>
-                        {analysing ? "Analysing evidence & scoring…" : locked && !isCielPk ? "Locked" : ciiV45 ? "Re-run AI Analyzer" : "Run AI Analyzer"}
+                        {analysing
+                            ? `Analysing evidence & scoring… ${analysingElapsedSec}s${analysingElapsedSec >= 60 ? " (usually 1–4 min)" : ""}`
+                            : locked && !isCielPk
+                              ? "Locked"
+                              : ciiV45
+                                ? "Re-run AI Analyzer"
+                                : "Run AI Analyzer"}
                     </button>
                 )}
             </div>

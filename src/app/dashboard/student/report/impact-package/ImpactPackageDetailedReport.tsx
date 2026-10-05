@@ -15,14 +15,14 @@ function AnswerView({ value }: { value: DetailedReportValue }) {
         return <span className="empty">Not supplied</span>;
     }
     if (typeof value === "boolean") {
-        return <p>{value ? "Yes (reported)" : "No"}</p>;
+        return <div>{value ? "Yes (reported)" : "No"}</div>;
     }
     if (typeof value === "number") {
-        return <p>{Number.isFinite(value) ? String(value) : "Not supplied"}</p>;
+        return <div>{Number.isFinite(value) ? String(value) : "Not supplied"}</div>;
     }
     if (typeof value === "string") {
         if (value === "Not supplied") return <span className="empty">Not supplied</span>;
-        return <p>{value}</p>;
+        return <div>{value}</div>;
     }
     if (Array.isArray(value)) {
         if (!value.length) return <span className="empty">No entries supplied</span>;
@@ -53,9 +53,9 @@ function AnswerView({ value }: { value: DetailedReportValue }) {
             {entries.map(([key, item]) => (
                 <div key={key}>
                     <b>{niceDetailedReportKey(key)}</b>
-                    <span>
+                    <div>
                         <AnswerView value={item} />
-                    </span>
+                    </div>
                 </div>
             ))}
         </div>

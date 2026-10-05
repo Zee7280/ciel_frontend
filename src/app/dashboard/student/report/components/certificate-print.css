@@ -25,6 +25,12 @@
   }
 }
 
+.certificate-print-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .certificate-one-page {
   --cert-navy: #071b3a;
   --cert-gold: #b67835;
@@ -35,6 +41,7 @@
   color: var(--cert-navy);
   background: var(--cert-cream);
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .certificate-one-page * {
@@ -116,6 +123,8 @@
   align-items: center;
   text-align: center;
   min-height: 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .cert-logo-row {
@@ -243,6 +252,8 @@
   border-top: 1px solid var(--cert-gold);
   border-right: 1px solid rgba(182, 120, 53, 0.45);
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cert-participant-table tbody td:last-child {
@@ -334,7 +345,8 @@
   margin-bottom: 20px;
   border: 1px solid rgba(182, 120, 53, 0.45);
   background: #f8f6f1;
-  text-align: left;
+  text-align: center;
+  overflow: hidden;
 }
 
 .cert-impact-recognition-heading {
@@ -352,22 +364,28 @@
 
 .cert-impact-recognition-body {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  min-width: 0;
 }
 
 .cert-impact-recognition-badge {
-  flex-shrink: 0;
   display: block;
-  height: 6.5rem;
   width: auto;
+  height: auto;
+  max-width: min(200px, 72%);
+  max-height: 200px;
   object-fit: contain;
+  background: transparent;
 }
 
 .cert-impact-recognition-copy {
   min-width: 0;
-  flex: 1;
+  width: 100%;
+  text-align: center;
 }
 
 .cert-impact-recognition-title {
@@ -400,10 +418,17 @@
 .cert-footer-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 12px;
   width: 100%;
   margin-top: auto;
-  align-items: end;
+  align-items: stretch;
+}
+
+.cert-signature-block,
+.cert-date-block {
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(182, 120, 53, 0.45);
+  background: #f8f6f1;
 }
 
 .cert-signature-block {
@@ -411,11 +436,12 @@
 }
 
 .cert-signature-img {
-  height: 34px;
+  height: 44px;
   width: auto;
   max-width: 200px;
   object-fit: contain;
   object-position: left;
+  background: transparent;
 }
 
 .cert-signature-line,
@@ -589,6 +615,13 @@
     box-shadow: none !important;
   }
 
+  .cert-impact-recognition,
+  .cert-signature-block,
+  .cert-date-block {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .cert-metrics {
     display: grid !important;
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -596,12 +629,15 @@
 
   .cert-impact-recognition-body {
     display: flex !important;
+    flex-direction: column !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 8px !important;
   }
 
   .cert-impact-recognition-badge {
-    height: 5rem !important;
+    height: auto !important;
+    max-width: 140px !important;
+    max-height: 140px !important;
   }
 
   .cert-impact-recognition-title {

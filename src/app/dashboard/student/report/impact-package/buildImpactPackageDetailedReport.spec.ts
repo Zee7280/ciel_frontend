@@ -56,6 +56,47 @@ test("detailed report uses the 10-section mockup outline with live answers", () 
     assert.equal(entries[0]?.status, "Logged");
 });
 
+test("signed date-time falls back to reportSubmittedAt when section11.signed_at is missing", () => {
+    const dossier = buildImpactPackageDetailedReport({
+        ...base,
+        reportSubmittedAt: "2026-09-08T15:30:00.000Z",
+        section11: { final_declaration: [true, true, true, true, true], signature_name: "Fatima Khalid" },
+    } as never);
+    const signed = dossier.sections[9].subsections
+        .find((sub) => sub.id === "10.1")
+        ?.rows.find((row) => row.question === "Signed date-time");
+    assert.notEqual(signed?.answer, "Not supplied");
+    assert.match(String(signed?.answer), /2026/);
+});
+
+test("session rows map live attendance field names onto the detailed report", () => {
+    const dossier = buildImpactPackageDetailedReport({
+        ...base,
+        section1: {
+            ...base.section1,
+            attendance_logs: [
+                {
+                    dateOfEngagement: "2026-09-07",
+                    startTime: "11:00:00",
+                    endTime: "18:00:00",
+                    sessionHours: 7,
+                    organizationName: "SOS",
+                    activityType: "Field Visit",
+                    description: "Met the children",
+                    approvalStatus: "pending",
+                },
+            ],
+        },
+    } as never);
+    const sessionRow = dossier.sections[0].subsections.find((sub) => sub.id === "1.3")?.rows[0];
+    const entries = sessionRow?.answer as Array<Record<string, unknown>>;
+    assert.equal(entries[0]?.date, "2026-09-07");
+    assert.equal(entries[0]?.start, "11:00:00");
+    assert.equal(entries[0]?.hours, "7");
+    assert.equal(entries[0]?.location, "SOS");
+    assert.equal(entries[0]?.status, "Logged");
+});
+
 test("partner package redacts CNIC; faculty keeps the identity number", () => {
     const partner = buildImpactPackageDetailedReport(base, undefined, undefined, "partner");
     const cnic = partner.sections[0].subsections[0].rows.find((row) => row.question === "CNIC / identity number");

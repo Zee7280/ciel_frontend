@@ -365,8 +365,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                                     src={ciiBadge.src}
                                     alt={ciiBadge.alt}
                                     className="cert-impact-recognition-badge"
-                                    width={1024}
-                                    height={1024}
+                                    width={240}
+                                    height={240}
                                 />
                                 <div className="cert-impact-recognition-copy">
                                     <p className="cert-impact-recognition-title">{ciiRecognition.title}</p>

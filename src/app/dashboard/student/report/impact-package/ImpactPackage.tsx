@@ -755,7 +755,7 @@ export default function ImpactPackage({
                 ) : null}
 
                 {tab === "certificate" && showCertificate ? (
-                    <div id="certificate" className="view">
+                    <div id="certificate" className="view ipkg-cert-wrap">
                         <ImpactPackageCertificate data={data} projectData={projectData} />
                     </div>
                 ) : null}

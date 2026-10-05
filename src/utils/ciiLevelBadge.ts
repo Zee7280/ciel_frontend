@@ -18,8 +18,8 @@ export type CiiLevelRecognition = {
 
 /** CII v4.5 badge ladder — 6 levels, thresholds 0/50/60/70/80/90. Single source of truth for
  * every consumer (CertificateView, ImpactPackageCertificate, ReportPrintView, CommunityImpactWall,
- * and the admin CII legend). Asset files already live at these exact paths under
- * `public/certificate-badges/` — do not rename them. */
+ * and the admin CII legend). Transparent PNGs live at these paths under
+ * `public/certificate-badges/` (JPEG originals kept as unused fallbacks). */
 export const CII_V45_LEVEL_BANDS: Array<{
     level: number;
     min: number;
@@ -72,7 +72,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
             level: 6,
             rangeLabel: "90–100",
             title: "Transformative Impact Contributor",
-            src: "/certificate-badges/level-6-transformative-impact-contributor.jpg",
+            src: "/certificate-badges/level-6-transformative-impact-contributor.png",
             alt: "Level 6 — Transformative Impact Contributor badge",
             tagline: LEVEL_TAGLINES[6],
             accentClass: "text-emerald-900",
@@ -83,7 +83,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
             level: 5,
             rangeLabel: "80–89",
             title: "Distinguished Impact Contributor",
-            src: "/certificate-badges/level-5-distinguished-impact-contributor.jpg",
+            src: "/certificate-badges/level-5-distinguished-impact-contributor.png",
             alt: "Level 5 — Distinguished Impact Contributor badge",
             tagline: LEVEL_TAGLINES[5],
             accentClass: "text-violet-900",
@@ -94,7 +94,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
             level: 4,
             rangeLabel: "70–79",
             title: "Developing Impact Contributor",
-            src: "/certificate-badges/level-4-developing-impact-contributor.jpg",
+            src: "/certificate-badges/level-4-developing-impact-contributor.png",
             alt: "Level 4 — Developing Impact Contributor badge",
             tagline: LEVEL_TAGLINES[4],
             accentClass: "text-teal-800",
@@ -105,7 +105,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
             level: 3,
             rangeLabel: "60–69",
             title: "Emerging Community Contributor",
-            src: "/certificate-badges/level-3-emerging-community-contributor.jpg",
+            src: "/certificate-badges/level-3-emerging-community-contributor.png",
             alt: "Level 3 — Emerging Community Contributor badge",
             tagline: LEVEL_TAGLINES[3],
             accentClass: "text-amber-900",
@@ -116,7 +116,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
             level: 2,
             rangeLabel: "50–59",
             title: "Foundation Stage Contributor",
-            src: "/certificate-badges/level-2-foundation-stage-contributor.jpg",
+            src: "/certificate-badges/level-2-foundation-stage-contributor.png",
             alt: "Level 2 — Foundation Stage Contributor badge",
             tagline: LEVEL_TAGLINES[2],
             accentClass: "text-[#9a4b25]",
@@ -127,7 +127,7 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
         level: 1,
         rangeLabel: "0–49",
         title: "Participation Acknowledgement",
-        src: "/certificate-badges/level-1-participation-acknowledgement.jpg",
+        src: "/certificate-badges/level-1-participation-acknowledgement.png",
         alt: "Level 1 — Participation Acknowledgement badge",
         tagline: LEVEL_TAGLINES[1],
         accentClass: "text-rose-900",
