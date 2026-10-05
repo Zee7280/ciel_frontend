@@ -104,6 +104,8 @@ test("admin sees the analysis tab once a score exists, even before locking", () 
     const d = { ciiV45: { finalCII: 64 }, ciiV45Lock: null, admin_status: "pending" } as never;
     assert.equal(shouldShowImpactPackageAnalysis("admin", d), true);
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
+    const diagnosticOnly = { ciiV45: { diagnosticCII: null, baseCII: 70 }, ciiV45Lock: null, admin_status: "pending" } as never;
+    assert.equal(shouldShowImpactPackageAnalysis("admin", diagnosticOnly), true);
 });
 
 test("student detailed report waits for Super Admin approval; reviewers keep it", () => {

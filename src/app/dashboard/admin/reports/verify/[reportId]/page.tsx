@@ -746,19 +746,10 @@ function AdminReportDetailPage() {
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
         try {
-            const analyserFinal = Number(report.ciiV45?.finalCII);
-            if (Number.isFinite(analyserFinal)) {
-                const analyserLevel =
-                    (typeof report.ciiV45?.finalBadge?.name === "string" && report.ciiV45.finalBadge.name.trim()) ||
-                    "";
-                return {
-                    totalScore: Math.round(analyserFinal * 10) / 10,
-                    level: analyserLevel || "Analyzer CII",
-                    cii_score_max: 100,
-                    evaluation_framework_version: "v4.5",
-                };
-            }
             const persisted = readPersistedCiiSnapshot(report);
+            if (persisted?.evaluation_framework_version === "v4.5") {
+                return persisted;
+            }
             const reqH =
                 typeof report.required_hours === "number" && report.required_hours > 0
                     ? report.required_hours

@@ -15,6 +15,7 @@ import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -60,6 +61,8 @@ type WallRow = {
     ciiV45?: {
         finalCII?: number;
         diagnosticCII?: number;
+        baseCII?: number;
+        knownBasePoints?: number;
         finalBadge?: { level: number; name: string } | null;
         recommendedBadge?: { level: number; name: string } | null;
         sectionScores?: Array<{
@@ -719,10 +722,16 @@ export default function CommunityImpactWall(_props: {
         // null until an Admin has locked it; no pre-lock provisional release in v4.5).
         const cii = r.ciiV45;
         const lock = r.ciiV45Lock;
-        const facultyScore = cii ? (lock?.adminApprovedScore ?? cii.finalCII ?? null) : null;
+        const facultyScore = cii ? pickCiiV45DisplayScore(cii, lock) : null;
         const aiAnalysis = cii
             ? {
-                  aiScore: lock?.aiRecommendedScore ?? cii.diagnosticCII ?? cii.finalCII ?? null,
+                  aiScore:
+                      lock?.aiRecommendedScore ??
+                      cii.diagnosticCII ??
+                      cii.baseCII ??
+                      cii.knownBasePoints ??
+                      cii.finalCII ??
+                      null,
                   facultyScore,
                   scoreWasAdjusted: lock?.scoreWasModerated ?? false,
                   levelName: cii.finalBadge?.name || r.level || "Approved",

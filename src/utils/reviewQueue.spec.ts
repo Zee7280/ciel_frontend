@@ -39,8 +39,10 @@ const privateFeeHold = {
 assert.equal(isCommunityReportAwaitingFee(privateFeeHold), true);
 assert.equal(isCommunityReportWaitingForFaculty(privateFeeHold), false);
 
-assert.equal(communityReportReviewerName(uniSubmitted), "Faculty");
-assert.equal(communityReportSendCta(uniSubmitted), "Send to Faculty");
+// CIEL PK Admin now owns Analyzer + CII lock for every Community Service report (faculty review is
+// read-only) — the reviewer label is always "CIEL PK", regardless of review_route/private_candidate.
+assert.equal(communityReportReviewerName(uniSubmitted), "CIEL PK");
+assert.equal(communityReportSendCta(uniSubmitted), "Send to CIEL PK");
 assert.equal(communityReportReviewerName(privateFeeHold), "CIEL PK");
 assert.equal(communityReportSendCta(privateFeeHold), "Send to CIEL PK");
 

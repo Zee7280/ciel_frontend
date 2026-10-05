@@ -49,6 +49,60 @@ function pickFrameworkVersion(record: Record<string, unknown> | null): string | 
     return raw || null;
 }
 
+function isCiiV45Locked(lock: unknown): boolean {
+    if (!lock || typeof lock !== "object") return false;
+    const locked = (lock as { locked?: unknown }).locked;
+    return locked === true || locked === "true";
+}
+
+function finiteCii(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+    return null;
+}
+
+function asCiiRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** Locked → published score. Unlocked reviewer payload → diagnostic / base. */
+export function pickCiiV45DisplayScore(ciiV45: unknown, lock?: unknown): number | null {
+    const cii = asCiiRecord(ciiV45);
+    if (!cii) return null;
+    const lockObj = asCiiRecord(lock);
+    if (isCiiV45Locked(lock)) {
+        return finiteCii(lockObj?.adminApprovedScore) ?? finiteCii(cii.finalCII) ?? finiteCii(cii.diagnosticCII);
+    }
+    return finiteCii(cii.diagnosticCII) ?? finiteCii(cii.baseCII) ?? finiteCii(cii.knownBasePoints) ?? finiteCii(cii.finalCII);
+}
+
+export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): string | null {
+    const cii = asCiiRecord(ciiV45);
+    if (!cii) return null;
+    const nameOf = (raw: unknown) => {
+        const b = asCiiRecord(raw);
+        return typeof b?.name === "string" && b.name.trim() ? b.name.trim() : null;
+    };
+    if (isCiiV45Locked(lock)) {
+        return nameOf(cii.finalBadge) || nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge);
+    }
+    return nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge) || nameOf(cii.finalBadge);
+}
+
+export function readCiiV45DisplayFromReport(report: unknown): { score: number; level: string; locked: boolean } | null {
+    if (!report || typeof report !== "object") return null;
+    const record = report as Record<string, unknown>;
+    const cii = record.ciiV45 ?? record.cii_v45;
+    const lock = record.ciiV45Lock ?? record.cii_v45_lock;
+    const score = pickCiiV45DisplayScore(cii, lock);
+    if (score == null) return null;
+    return {
+        score,
+        level: pickCiiV45DisplayBadgeName(cii, lock) || deriveCiiLevel(score),
+        locked: isCiiV45Locked(lock),
+    };
+}
+
 export function deriveCiiLevel(score: number): string {
     if (score >= 91) return "Transformational Engagement";
     if (score >= 76) return "High Impact Engagement";
@@ -219,6 +273,15 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
     const maxScore = resolveCiiScoreMaxFromReport(report);
 
     const record = report as Record<string, unknown>;
+    const v45 = readCiiV45DisplayFromReport(record);
+    if (v45) {
+        return {
+            totalScore: Math.round(v45.score * 10) / 10,
+            level: v45.level,
+            cii_score_max: 100,
+            evaluation_framework_version: "v4.5",
+        };
+    }
     const section11 = record.section11 && typeof record.section11 === "object"
         ? (record.section11 as Record<string, unknown>)
         : {};

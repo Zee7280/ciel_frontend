@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 
 type CiiSection = {
     dimension: string;
@@ -126,7 +127,9 @@ export default function CommunityCiiBreakdownModal({
                         <>
                             <div className="flex items-center gap-4">
                                 <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#0b8278,#3bc3b5)]">
-                                    <span className="text-xl font-black text-white">{Math.round(data.finalCII ?? 0)}</span>
+                                    <span className="text-xl font-black text-white">
+                                        {Math.round(pickCiiV45DisplayScore(data, { locked: true }) ?? data.finalCII ?? 0)}
+                                    </span>
                                 </div>
                                 <div>
                                     <span className="inline-block rounded-full bg-[#eaf8f4] px-2.5 py-1 text-[9px] font-black text-[#176958]">

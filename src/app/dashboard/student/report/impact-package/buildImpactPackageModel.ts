@@ -16,6 +16,7 @@ import {
     type MediaVisibility,
 } from "../utils/mediaVisibility";
 import { resolveReportCii } from "../utils/resolveReportCii";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { classifyEvidenceGalleryKind } from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 export type ImpactPackageAudience = "student" | "faculty" | "university" | "admin" | "partner" | "public";
@@ -659,25 +660,22 @@ export function impactPackageLockLine(adminApproved: boolean): string {
 }
 
 
-function ciiHasFinal(data: ReportData): boolean {
-    const final = (data.ciiV45 as { finalCII?: unknown } | null | undefined)?.finalCII;
-    return typeof final === "number"
-        ? Number.isFinite(final)
-        : typeof final === "string" && final.trim() !== "" && Number.isFinite(Number(final));
+function ciiHasDisplayScore(data: ReportData): boolean {
+    return pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock) != null;
 }
 
 /** Analysis exists and CIEL PK Admin has locked it. */
 export function hasImpactPackageAnalysis(data: ReportData): boolean {
     const lock = data.ciiV45Lock as { locked?: unknown } | null | undefined;
     const locked = lock?.locked === true || lock?.locked === "true";
-    return Boolean(locked && ciiHasFinal(data));
+    return Boolean(locked && ciiHasDisplayScore(data));
 }
 
 /** Partner / NGO never see the analysis report. Student / faculty / university see it after Super Admin approval. Admin sees it when attached. */
 export function shouldShowImpactPackageAnalysis(audience: ImpactPackageAudience, data: ReportData): boolean {
     if (audience === "partner" || audience === "public") return false;
     // Admin can open the analysis as soon as the analyser has produced a score (before locking).
-    if (audience === "admin") return ciiHasFinal(data);
+    if (audience === "admin") return ciiHasDisplayScore(data);
     if (!hasImpactPackageAnalysis(data)) return false;
     const st = String(data.admin_status || data.admin_approval_status || data.status || "").toLowerCase();
     return st === "approved" || st === "verified";

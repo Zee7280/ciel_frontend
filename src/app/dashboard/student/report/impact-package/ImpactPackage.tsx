@@ -28,6 +28,7 @@ import {
     type ImpactPackageEvidenceFile,
     type ImpactPackageEvidenceKind,
 } from "./buildImpactPackageModel";
+import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import "./impact-package.css";
 
 const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: string }> = {
@@ -98,18 +99,19 @@ function asCii(data: ReportData): {
 
 function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyserHref?: string }) {
     const cii = asCii(data);
-    const final = typeof cii.finalCII === "number" ? cii.finalCII : Number(cii.finalCII);
+    const score = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
+    const badgeName = pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
     const sections = Array.isArray(cii.sectionScores) ? cii.sectionScores : [];
     const summary = typeof cii.studentFeedback === "string" ? cii.studentFeedback.trim() : "";
     return (
         <div>
             <div className="evidence-stats">
                 <div className="evidence-stat">
-                    <b>{Number.isFinite(final) ? `${final}` : "—"}</b>
+                    <b>{score != null ? `${Math.round(score * 10) / 10}` : "—"}</b>
                     <span>CII / 100</span>
                 </div>
                 <div className="evidence-stat">
-                    <b>{cii.finalBadge?.name || "Level pending"}</b>
+                    <b>{badgeName || cii.finalBadge?.name || "Level pending"}</b>
                     <span>{cii.finalBadge?.level != null ? `L${cii.finalBadge.level}` : "recognition"}</span>
                 </div>
                 <div className="evidence-stat">

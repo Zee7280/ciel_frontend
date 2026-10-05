@@ -35,6 +35,11 @@ import {
     StudentOpportunityFlashcard,
     type FlashViewer,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import {
+    incompleteWizardSteps,
+    OpportunitySubmitBlockedDialog,
+    type OpportunityIncompleteStep,
+} from "@/components/opportunities/OpportunitySubmitBlockedDialog";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -252,6 +257,8 @@ export default function FacultyOpportunityCreationPage() {
     });
     const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
     const [activeStep, setActiveStep] = useState<string>("A");
+    const [blockedSubmitOpen, setBlockedSubmitOpen] = useState(false);
+    const [incompleteSubmitSteps, setIncompleteSubmitSteps] = useState<OpportunityIncompleteStep[]>([]);
     const activeStepIndex = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
     const goToStep = useCallback((key: string) => {
         setActiveStep(key);
@@ -259,37 +266,13 @@ export default function FacultyOpportunityCreationPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-        if (i >= schedIdx) {
-            const timelineErr = validateTimelineForPersist({
-                start_date: formData.dates.start,
-                end_date: formData.dates.end,
-            });
-            if (timelineErr) {
-                toast.error(timelineErr);
-                goToStep("SCHED");
-                return;
-            }
-            const hoursNum = parseInt(formData.capacity.hours, 10);
-            const volNum = parseInt(formData.capacity.volunteers, 10);
-            if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
-                toast.error("Required hours per student must be between 1 and 500.");
-                goToStep("SCHED");
-                return;
-            }
-            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-                toast.error("Available seats must be between 1 and 5000.");
-                goToStep("SCHED");
-                return;
-            }
-        }
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -330,79 +313,66 @@ export default function FacultyOpportunityCreationPage() {
     );
 
     const validateForm = () => {
+        const A: Record<string, string> = {};
+        const B: Record<string, string> = {};
+        const SCHED: Record<string, string> = {};
+        const C: Record<string, string> = {};
+        const E: Record<string, string> = {};
+        const F: Record<string, string> = {};
+        const VIS: Record<string, string> = {};
+        const SAFE: Record<string, string> = {};
+        const SUBMIT: Record<string, string> = {};
+
         if (!facultyDetails.contact.trim()) {
-            toast.error(
-                isCielAdminForm
-                    ? "Contact No. is missing from your profile. Add it under your admin Profile, then try again."
-                    : "Contact No. is missing from your profile. Add it under Faculty Profile, then try again.",
-            );
-            return false;
+            A.contact = isCielAdminForm
+                ? "Contact No. is missing from your profile. Add it under your admin Profile, then try again."
+                : "Contact No. is missing from your profile. Add it under Faculty Profile, then try again.";
         }
         if (!facultyDetails.email.trim() || !isValidEmail(facultyDetails.email)) {
-            toast.error("A valid profile email is required. Update your faculty profile, then try again.");
-            return false;
+            A.email = "A valid profile email is required. Update your faculty profile, then try again.";
         }
-        if (!formData.title.trim()) {
-            toast.error("Please enter an Opportunity Title");
-            return false;
+        if (!facultyDetails.name.trim()) {
+            A.name = isCielAdminForm
+                ? "Creator name is missing from your profile (Section A)"
+                : "Faculty name is missing from your profile (Section A / F1)";
         }
-        if (formData.title.trim().length > 200) {
-            toast.error("Opportunity Title must be 200 characters or fewer.");
-            return false;
+        if (!facultyDetails.institution.trim()) {
+            A.institution = isCielAdminForm
+                ? "Institution is missing from your profile (Section A)"
+                : "University / institution is missing from your profile (Section A / F1)";
         }
-        if (!formData.hook.trim()) {
-            toast.error("Please add a one-line student hook.");
-            return false;
-        }
+
+        if (!formData.title.trim()) B.title = "Please enter an Opportunity Title";
+        if (formData.title.trim().length > 200) B.titleLength = "Opportunity Title must be 200 characters or fewer.";
+        if (!formData.hook.trim()) B.hook = "Please add a one-line student hook.";
         if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
-            toast.error("Please select at least one Opportunity Type (Section B)");
-            return false;
+            B.opportunityType = "Please select at least one Opportunity Type (Section B)";
         }
         if (formData.isOtherTypeChecked) {
             const specs = formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean);
-            if (specs.length === 0) {
-                toast.error("Please add at least one other opportunity type (Section B)");
-                return false;
-            }
+            if (specs.length === 0) B.otherType = "Please add at least one other opportunity type (Section B)";
         }
-        if (!formData.mode) {
-            toast.error("Please select a Mode of Engagement (Section B)");
-            return false;
-        }
-        if (formData.mode !== 'Remote') {
-            if (!formData.location.city.trim()) {
-                toast.error("Please enter a City/Area (Section B)");
-                return false;
-            }
+        if (!formData.mode) B.mode = "Please select a Mode of Engagement (Section B)";
+        if (formData.mode !== "Remote") {
+            if (!formData.location.city.trim()) B.locationCity = "Please enter a City/Area (Section B)";
             if (!formData.location.pin.trim()) {
-                toast.error("Please pin the exact location on the map (Section B) so it shows up accurately.");
-                return false;
+                B.locationPin = "Please pin the exact location on the map (Section B) so it shows up accurately.";
             }
         }
-        if (!formData.timelineType) {
-            toast.error("Please select a Timeline Type");
-            return false;
-        }
+
+        if (!formData.timelineType) SCHED.timelineType = "Please select a Timeline Type";
         const timelineErr = validateTimelineForPersist({
             start_date: formData.dates.start,
             end_date: formData.dates.end,
         });
-        if (timelineErr) {
-            toast.error(timelineErr);
-            goToStep("SCHED");
-            return false;
-        }
+        if (timelineErr) SCHED.dates = timelineErr;
         const hoursNum = parseInt(formData.capacity.hours, 10);
         if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
-            toast.error("Required hours per student must be between 1 and 500.");
-            goToStep("SCHED");
-            return false;
+            SCHED.hours = "Required hours per student must be between 1 and 500.";
         }
         const volNum = parseInt(formData.capacity.volunteers, 10);
         if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-            toast.error("Available seats must be between 1 and 5000.");
-            goToStep("SCHED");
-            return false;
+            SCHED.seats = "Available seats must be between 1 and 5000.";
         }
         if (
             (TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) &&
@@ -410,155 +380,95 @@ export default function FacultyOpportunityCreationPage() {
             formData.dates.endTime.trim() &&
             formData.dates.fromTime >= formData.dates.endTime
         ) {
-            toast.error("End time must be after start time.");
-            goToStep("SCHED");
-            return false;
+            SCHED.datesTime = "End time must be after start time.";
         }
-        // Section C
-        if (!formData.sdg) {
-            toast.error("Please select a Primary SDG");
-            return false;
-        }
-        if (!formData.sdgWhy.trim()) {
-            toast.error("Please explain why this SDG is genuinely relevant.");
-            return false;
-        }
+
+        if (!formData.sdg) C.sdg = "Please select a Primary SDG";
+        if (!formData.sdgWhy.trim()) C.sdgWhy = "Please explain why this SDG is genuinely relevant.";
         if (formData.secondarySdgs[0] && !formData.secondarySdgs[0].justification.trim()) {
-            toast.error("Please explain why the secondary SDG is genuinely relevant.");
-            return false;
+            C.secondarySdg = "Please explain why the secondary SDG is genuinely relevant.";
         }
-
-        // Section D
-        if (!formData.objectives.description.trim()) {
-            toast.error("Please enter the primary objective");
-            return false;
-        }
-        if (!formData.objectives.outputs.trim()) {
-            toast.error("Please describe expected outputs.");
-            return false;
-        }
-
-        // Section E
-        if (!formData.activity.responsibilities.trim()) {
-            toast.error("Please list Student Responsibilities (Section E)");
-            return false;
-        }
+        if (!formData.objectives.description.trim()) C.objective = "Please enter the primary objective";
+        if (!formData.objectives.outputs.trim()) C.outputs = "Please describe expected outputs.";
         if (formData.objectives.isOtherBeneficiaryChecked) {
             const ob = formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean);
-            if (ob.length === 0) {
-                toast.error("Please add at least one other beneficiary type (Section D)");
-                return false;
-            }
+            if (ob.length === 0) C.otherBeneficiary = "Please add at least one other beneficiary type (Section D)";
+        }
+
+        if (!formData.activity.responsibilities.trim()) {
+            E.responsibilities = "Please list Student Responsibilities (Section E)";
         }
         if (formData.activity.isOtherSkillChecked) {
             const os = formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean);
-            if (os.length === 0) {
-                toast.error("Please add at least one other skill (Section E)");
-                return false;
-            }
+            if (os.length === 0) E.otherSkills = "Please add at least one other skill (Section E)";
         }
 
-        // Section F1 — Academic lead / faculty verification
-        if (!facultyDetails.name.trim()) {
-            toast.error(
-                isCielAdminForm
-                    ? "Creator name is missing from your profile (Section A)"
-                    : "Faculty name is missing from your profile (Section A / F1)",
-            );
-            return false;
-        }
-        if (!facultyDetails.institution.trim()) {
-            toast.error(
-                isCielAdminForm
-                    ? "Institution is missing from your profile (Section A)"
-                    : "University / institution is missing from your profile (Section A / F1)",
-            );
-            return false;
-        }
         if (!formData.academicLead.designation.trim() || !formData.academicLead.department.trim()) {
-            toast.error("Please enter your designation and department so students know the academic owner.");
-            return false;
+            F.lead = "Please enter your designation and department so students know the academic owner.";
         }
         if (!formData.academicLead.officialEmail.trim() || !isValidEmail(formData.academicLead.officialEmail)) {
-            toast.error("Please enter a valid official email address");
-            return false;
+            F.officialEmail = "Please enter a valid official email address";
         }
         const whatsappErr = validateOptionalNationalPhone(
             formData.academicLead.whatsappCountryKey,
             formData.academicLead.whatsappNational,
         );
-        if (whatsappErr) {
-            toast.error(whatsappErr);
-            return false;
-        }
-
-        // Section F2 — External partner (optional; required when Yes)
+        if (whatsappErr) F.whatsapp = whatsappErr;
         if (formData.partnerCollaboration.hasPartner) {
             const p = formData.partnerCollaboration;
             if (!p.orgName.trim() || !p.contactPerson.trim() || !p.email.trim()) {
-                toast.error("Please complete partner organization details (Section F — F2)");
-                return false;
+                F.partner = "Please complete partner organization details (Section F — F2)";
             }
-            if (!isValidEmail(p.email)) {
-                toast.error("Please enter a valid partner organization email (Section F — F2)");
-                return false;
+            if (p.email.trim() && !isValidEmail(p.email)) {
+                F.partnerEmail = "Please enter a valid partner organization email (Section F — F2)";
             }
-        }
-
-        const sd = formData.safetyDeclarations;
-        if (!sd.safeAppropriate || !sd.guidedSupervised || !sd.lawfulEthical || !sd.precautionsInPlace) {
-            toast.error("Please confirm all items in Safety & Supervision Declaration");
-            return false;
-        }
-        if (!formData.extraSafety.communicateChanges || !formData.extraSafety.visibilityIntentional || !formData.extraSafety.cielNotGuarantee || !formData.extraSafety.signatureAck) {
-            toast.error("Please confirm all safety and accountability declarations.");
-            return false;
-        }
-        if (!formData.electronicSignature.trim()) {
-            toast.error("Please type your full name as an electronic signature.");
-            return false;
         }
 
         const applyScope = formData.applyScope;
         const ownUni = facultyDetails.institution.trim();
         const selectedUnis = formData.participationScope.selectedUniversities.map((u) => u.trim()).filter(Boolean);
         if (applyScope === "multi_all" || applyScope === "multi_depts") {
-            if (selectedUnis.length === 0) {
-                toast.error("Please add at least one university for this Apply Now scope.");
-                return false;
-            }
+            if (selectedUnis.length === 0) VIS.universities = "Please add at least one university for this Apply Now scope.";
         }
         if (applyScope === "one_all" || applyScope === "one_depts") {
-            if (selectedUnis.length !== 1) {
-                toast.error("Please select exactly one university for this Apply Now scope.");
-                return false;
-            }
+            if (selectedUnis.length !== 1) VIS.oneUniversity = "Please select exactly one university for this Apply Now scope.";
         }
         if (applyScope === "own_uni_all" || applyScope === "own_dept") {
-            if (!ownUni) {
-                toast.error("Your university is not set in your profile. Complete your profile first.");
-                return false;
-            }
+            if (!ownUni) VIS.ownUni = "Your university is not set in your profile. Complete your profile first.";
         }
         if (applyScope === "multi_depts" || applyScope === "one_depts" || applyScope === "own_dept") {
             const deps = formData.participationScope.departments.map((d) => d.trim()).filter(Boolean);
-            if (deps.length === 0) {
-                toast.error("Please add at least one department or programme.");
-                return false;
-            }
+            if (deps.length === 0) VIS.departments = "Please add at least one department or programme.";
+        }
+
+        const sd = formData.safetyDeclarations;
+        if (!sd.safeAppropriate || !sd.guidedSupervised || !sd.lawfulEthical || !sd.precautionsInPlace) {
+            SAFE.safetyDecls = "Please confirm all items in Safety & Supervision Declaration";
+        }
+        if (
+            !formData.extraSafety.communicateChanges ||
+            !formData.extraSafety.visibilityIntentional ||
+            !formData.extraSafety.cielNotGuarantee ||
+            !formData.extraSafety.signatureAck
+        ) {
+            SAFE.extraSafety = "Please confirm all safety and accountability declarations.";
+        }
+        if (!formData.electronicSignature.trim()) {
+            SAFE.signature = "Please type your full name as an electronic signature.";
         }
 
         const fc = formData.finalConfirmations;
         if (!fc.academicallyValid || !fc.properlySupervised || !fc.safeEnvironment || !fc.correctVerifiable) {
-            toast.error("Please accept all required confirmations");
-            return false;
+            SUBMIT.confirmations = "Please accept all required confirmations";
         }
-        if (!formData.flashApprove) {
-            toast.error("Please review and approve the opportunity flashcard.");
-            return false;
-        }
+        if (!formData.flashApprove) SUBMIT.flashApprove = "Please review and approve the opportunity flashcard.";
 
-        return true;
+        const incomplete = incompleteWizardSteps(WIZARD_STEPS, { A, B, SCHED, C, E, F, VIS, SAFE, SUBMIT });
+        if (incomplete.length === 0) return true;
+        setIncompleteSubmitSteps(incomplete);
+        setBlockedSubmitOpen(true);
+        goToStep(incomplete[0].key);
+        return false;
     };
 
     const buildOpportunityPayload = () => {
@@ -1331,22 +1241,7 @@ export default function FacultyOpportunityCreationPage() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => {
-                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
-                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-                                        if (to > schedIdx) {
-                                            const timelineErr = validateTimelineForPersist({
-                                                start_date: formData.dates.start,
-                                                end_date: formData.dates.end,
-                                            });
-                                            if (timelineErr) {
-                                                toast.error(timelineErr);
-                                                goToStep("SCHED");
-                                                return;
-                                            }
-                                        }
-                                        goToStep(step.key);
-                                    }}
+                                    onClick={() => goToStep(step.key)}
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
@@ -3026,6 +2921,15 @@ export default function FacultyOpportunityCreationPage() {
                     <span className="rounded-full bg-white/18 px-2.5 py-1 text-[7.5px] font-extrabold">● LIVE PREVIEW</span>
                 </div>
             </div>
+            <OpportunitySubmitBlockedDialog
+                open={blockedSubmitOpen}
+                steps={incompleteSubmitSteps}
+                onClose={() => setBlockedSubmitOpen(false)}
+                onOpenStep={(key) => {
+                    goToStep(key);
+                    setBlockedSubmitOpen(false);
+                }}
+            />
         </div>
     );
 }

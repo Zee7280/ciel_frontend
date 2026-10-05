@@ -34,6 +34,11 @@ import {
     StudentOpportunityFlashcard,
     type FlashViewer,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import {
+    incompleteWizardSteps,
+    OpportunitySubmitBlockedDialog,
+    type OpportunityIncompleteStep,
+} from "@/components/opportunities/OpportunitySubmitBlockedDialog";
 
 function isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -298,6 +303,8 @@ export default function OpportunityPostingPage() {
     });
     const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
     const [activeStep, setActiveStep] = useState<string>("A");
+    const [blockedSubmitOpen, setBlockedSubmitOpen] = useState(false);
+    const [incompleteSubmitSteps, setIncompleteSubmitSteps] = useState<OpportunityIncompleteStep[]>([]);
     const activeStepIndex = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
     const goToStep = useCallback((key: string) => {
         setActiveStep(key);
@@ -305,37 +312,13 @@ export default function OpportunityPostingPage() {
     }, []);
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-        if (i >= schedIdx) {
-            const timelineErr = validateTimelineForPersist({
-                start_date: formData.dates.start,
-                end_date: formData.dates.end,
-            });
-            if (timelineErr) {
-                toast.error(timelineErr);
-                goToStep("SCHED");
-                return;
-            }
-            const hoursNum = parseInt(formData.capacity.hours, 10);
-            const volNum = parseInt(formData.capacity.volunteers, 10);
-            if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
-                toast.error("Required hours per student must be between 1 and 500.");
-                goToStep("SCHED");
-                return;
-            }
-            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-                toast.error("Available seats must be between 1 and 5000.");
-                goToStep("SCHED");
-                return;
-            }
-        }
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -357,67 +340,49 @@ export default function OpportunityPostingPage() {
     }, []);
 
     const validateForm = () => {
-        if (!formData.creatorDetailType.trim()) {
-            toast.error("Please select your organization type (Step 1).");
-            return false;
-        }
-        if (!formData.title.trim()) {
-            toast.error("Please enter an Opportunity Title");
-            return false;
-        }
-        if (!formData.hook.trim()) {
-            toast.error("Please add a one-line student hook.");
-            return false;
-        }
+        const A: Record<string, string> = {};
+        const B: Record<string, string> = {};
+        const SCHED: Record<string, string> = {};
+        const C: Record<string, string> = {};
+        const E: Record<string, string> = {};
+        const F: Record<string, string> = {};
+        const VIS: Record<string, string> = {};
+        const SAFE: Record<string, string> = {};
+        const SUBMIT: Record<string, string> = {};
+
+        if (!formData.creatorDetailType.trim()) A.creatorType = "Please select your organization type (Step 1).";
+        if (!formData.title.trim()) B.title = "Please enter an Opportunity Title";
+        if (!formData.hook.trim()) B.hook = "Please add a one-line student hook.";
         if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
-            toast.error("Please select at least one Opportunity Type (Section B)");
-            return false;
+            B.opportunityType = "Please select at least one Opportunity Type (Section B)";
         }
         if (formData.isOtherTypeChecked) {
             const otherSpecs = formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean);
             if (otherSpecs.length === 0) {
-                toast.error("Please add at least one Other opportunity type description (Section B)");
-                return false;
+                B.otherType = "Please add at least one Other opportunity type description (Section B)";
             }
         }
-        if (!formData.mode) {
-            toast.error("Please select a Mode of Engagement (Section B)");
-            return false;
-        }
-        if (formData.mode !== 'Remote') {
-            if (!formData.location.city.trim()) {
-                toast.error("Please enter a City/Area");
-                return false;
-            }
+        if (!formData.mode) B.mode = "Please select a Mode of Engagement (Section B)";
+        if (formData.mode !== "Remote") {
+            if (!formData.location.city.trim()) B.locationCity = "Please enter a City/Area";
             if (!formData.location.pin.trim()) {
-                toast.error("Please pin the exact location on the map so it shows up accurately.");
-                return false;
+                B.locationPin = "Please pin the exact location on the map so it shows up accurately.";
             }
         }
-        if (!formData.timelineType) {
-            toast.error("Please select a Timeline Type");
-            return false;
-        }
+
+        if (!formData.timelineType) SCHED.timelineType = "Please select a Timeline Type";
         const timelineErr = validateTimelineForPersist({
             start_date: formData.dates.start,
             end_date: formData.dates.end,
         });
-        if (timelineErr) {
-            toast.error(timelineErr);
-            goToStep("SCHED");
-            return false;
-        }
+        if (timelineErr) SCHED.dates = timelineErr;
         const hoursNum = parseInt(formData.capacity.hours, 10);
         if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
-            toast.error("Required hours per student must be between 1 and 500.");
-            goToStep("SCHED");
-            return false;
+            SCHED.hours = "Required hours per student must be between 1 and 500.";
         }
         const volNum = parseInt(formData.capacity.volunteers, 10);
         if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-            toast.error("Available seats must be between 1 and 5000.");
-            goToStep("SCHED");
-            return false;
+            SCHED.seats = "Available seats must be between 1 and 5000.";
         }
         if (
             (TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) &&
@@ -425,138 +390,97 @@ export default function OpportunityPostingPage() {
             formData.dates.endTime.trim() &&
             formData.dates.fromTime >= formData.dates.endTime
         ) {
-            toast.error("End time must be after start time.");
-            goToStep("SCHED");
-            return false;
+            SCHED.datesTime = "End time must be after start time.";
         }
-        if (!formData.sdg) {
-            toast.error("Please select a Primary SDG");
-            return false;
-        }
-        if (!formData.sdgWhy.trim()) {
-            toast.error("Please explain why this SDG is genuinely relevant.");
-            return false;
-        }
+
+        if (!formData.sdg) C.sdg = "Please select a Primary SDG";
+        if (!formData.sdgWhy.trim()) C.sdgWhy = "Please explain why this SDG is genuinely relevant.";
         if (formData.secondarySdgs[0] && !formData.secondarySdgs[0].justification.trim()) {
-            toast.error("Please explain why the secondary SDG is genuinely relevant.");
-            return false;
+            C.secondarySdg = "Please explain why the secondary SDG is genuinely relevant.";
         }
+        if (!formData.objectives.description.trim()) C.objective = "Please enter the primary objective";
+        if (!formData.objectives.outputs.trim()) C.outputs = "Please describe expected outputs.";
 
-        // Section D
-        if (!formData.objectives.description.trim()) {
-            toast.error("Please enter the primary objective");
-            return false;
-        }
-        if (!formData.objectives.outputs.trim()) {
-            toast.error("Please describe expected outputs.");
-            return false;
-        }
-
-        // Section E
         if (!formData.activity.responsibilities.trim()) {
-            toast.error("Please list Student Responsibilities (Section E)");
-            return false;
+            E.responsibilities = "Please list Student Responsibilities (Section E)";
         }
 
         const vs = formData.verificationSafety;
         if (!vs.executingOrg.contactPersonName.trim()) {
-            toast.error("Please enter Contact Person Name for the executing organization (Section F1)");
-            return false;
+            F.contactPerson = "Please enter Contact Person Name for the executing organization (Section F1)";
         }
         if (!vs.executingOrg.officialEmail.trim() || !isValidEmail(vs.executingOrg.officialEmail)) {
-            toast.error("Please enter a valid official email for the executing organization (Section F1)");
-            return false;
+            F.officialEmail = "Please enter a valid official email for the executing organization (Section F1)";
         }
         const whatsappErr = validateOptionalNationalPhone(
             vs.executingOrg.whatsappCountryKey,
             vs.executingOrg.whatsappNational,
         );
-        if (whatsappErr) {
-            toast.error(whatsappErr);
-            return false;
-        }
+        if (whatsappErr) F.whatsapp = whatsappErr;
         if (vs.partnerOrg.hasPartner) {
-            if (!vs.partnerOrg.orgName.trim()) {
-                toast.error("Please enter co-host / collaborator organization name");
-                return false;
-            }
-            if (!vs.partnerOrg.contactPerson.trim()) {
-                toast.error("Please enter co-host contact person name");
-                return false;
-            }
+            if (!vs.partnerOrg.orgName.trim()) F.cohostName = "Please enter co-host / collaborator organization name";
+            if (!vs.partnerOrg.contactPerson.trim()) F.cohostContact = "Please enter co-host contact person name";
             if (!vs.partnerOrg.officialEmail.trim() || !isValidEmail(vs.partnerOrg.officialEmail)) {
-                toast.error("Please enter a valid official email for the co-host organization");
-                return false;
+                F.cohostEmail = "Please enter a valid official email for the co-host organization";
             }
-            if (!vs.partnerOrg.designation.trim()) {
-                toast.error("Please enter the co-host designation / role");
-                return false;
-            }
+            if (!vs.partnerOrg.designation.trim()) F.cohostRole = "Please enter the co-host designation / role";
             if (!vs.partnerOrg.functionInOpportunity.trim()) {
-                toast.error("Please describe the co-host’s function in this opportunity");
-                return false;
+                F.cohostFunction = "Please describe the co-host’s function in this opportunity";
             }
         }
         if (formData.restrictedFacultyLinkage.hasFacultyLink) {
             const fl = formData.restrictedFacultyLinkage;
             if (!fl.representativeName.trim() || !fl.university.trim() || !fl.officialEmail.trim()) {
-                toast.error("Please complete the optional academic contact (name, university, and email).");
-                return false;
-            }
-            if (!isValidEmail(fl.officialEmail)) {
-                toast.error("Please enter a valid official email for the academic contact.");
-                return false;
+                F.facultyLink = "Please complete the optional academic contact (name, university, and email).";
+            } else if (!isValidEmail(fl.officialEmail)) {
+                F.facultyEmail = "Please enter a valid official email for the academic contact.";
             }
         }
+
+        const applyScope = formData.applyScope;
+        const selectedUnis = formData.restrictedUniversities.map((u) => u.trim()).filter(Boolean);
+        if (applyScope === "multi_all" || applyScope === "multi_depts") {
+            if (selectedUnis.length === 0) VIS.universities = "Please add at least one university for this Apply Now scope.";
+        }
+        if (applyScope === "one_all" || applyScope === "one_depts") {
+            if (selectedUnis.length !== 1) VIS.oneUniversity = "Please select exactly one university for this Apply Now scope.";
+        }
+        if (applyScope === "multi_depts" || applyScope === "one_depts") {
+            const deps = formData.selectedDepartments.map((d) => d.trim()).filter(Boolean);
+            if (deps.length === 0) VIS.departments = "Please add at least one department or programme.";
+        }
+
         if (!vs.safety.siteSafeSuitable || !vs.safety.lawfulNoHazards || !vs.safety.supervisedThroughout || !vs.safety.basicEmergencyMeasures) {
-            toast.error("Please confirm all safety & supervision declarations");
-            return false;
+            SAFE.safetyDecls = "Please confirm all safety & supervision declarations";
         }
-        if (!formData.extraSafety.communicateChanges || !formData.extraSafety.visibilityIntentional || !formData.extraSafety.cielNotGuarantee || !formData.extraSafety.signatureAck) {
-            toast.error("Please confirm all safety and accountability declarations.");
-            return false;
+        if (
+            !formData.extraSafety.communicateChanges ||
+            !formData.extraSafety.visibilityIntentional ||
+            !formData.extraSafety.cielNotGuarantee ||
+            !formData.extraSafety.signatureAck
+        ) {
+            SAFE.extraSafety = "Please confirm all safety and accountability declarations.";
         }
         if (!formData.electronicSignature.trim()) {
-            toast.error("Please type your full name as an electronic signature.");
-            return false;
+            SAFE.signature = "Please type your full name as an electronic signature.";
         }
+
         if (
             !vs.submissionConfirmations.genuineAccurate ||
             !vs.submissionConfirmations.orgResponsibleExecution ||
             !vs.submissionConfirmations.environmentSafe ||
             !vs.submissionConfirmations.informationVerifiable
         ) {
-            toast.error("Please confirm all required statements before submitting");
-            return false;
+            SUBMIT.confirmations = "Please confirm all required statements before submitting";
         }
+        if (!formData.flashApprove) SUBMIT.flashApprove = "Please review and approve the opportunity flashcard.";
 
-        const applyScope = formData.applyScope;
-        const selectedUnis = formData.restrictedUniversities.map((u) => u.trim()).filter(Boolean);
-        if (applyScope === "multi_all" || applyScope === "multi_depts") {
-            if (selectedUnis.length === 0) {
-                toast.error("Please add at least one university for this Apply Now scope.");
-                return false;
-            }
-        }
-        if (applyScope === "one_all" || applyScope === "one_depts") {
-            if (selectedUnis.length !== 1) {
-                toast.error("Please select exactly one university for this Apply Now scope.");
-                return false;
-            }
-        }
-        if (applyScope === "multi_depts" || applyScope === "one_depts") {
-            const deps = formData.selectedDepartments.map((d) => d.trim()).filter(Boolean);
-            if (deps.length === 0) {
-                toast.error("Please add at least one department or programme.");
-                return false;
-            }
-        }
-        if (!formData.flashApprove) {
-            toast.error("Please review and approve the opportunity flashcard.");
-            return false;
-        }
-
-        return true;
+        const incomplete = incompleteWizardSteps(WIZARD_STEPS, { A, B, SCHED, C, E, F, VIS, SAFE, SUBMIT });
+        if (incomplete.length === 0) return true;
+        setIncompleteSubmitSteps(incomplete);
+        setBlockedSubmitOpen(true);
+        goToStep(incomplete[0].key);
+        return false;
     };
 
     const buildOpportunityPayload = () => {
@@ -1324,22 +1248,7 @@ export default function OpportunityPostingPage() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => {
-                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
-                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-                                        if (to > schedIdx) {
-                                            const timelineErr = validateTimelineForPersist({
-                                                start_date: formData.dates.start,
-                                                end_date: formData.dates.end,
-                                            });
-                                            if (timelineErr) {
-                                                toast.error(timelineErr);
-                                                goToStep("SCHED");
-                                                return;
-                                            }
-                                        }
-                                        goToStep(step.key);
-                                    }}
+                                    onClick={() => goToStep(step.key)}
                                 >
                                     <span className="co-step-ico">{idx === 0 ? creatorCopy.icon : step.icon}</span>
                                     <span className="co-step-copy">
@@ -3102,6 +3011,15 @@ export default function OpportunityPostingPage() {
                     <span className="rounded-full bg-white/18 px-2.5 py-1 text-[7.5px] font-extrabold">● LIVE PREVIEW</span>
                 </div>
             </div>
+            <OpportunitySubmitBlockedDialog
+                open={blockedSubmitOpen}
+                steps={incompleteSubmitSteps}
+                onClose={() => setBlockedSubmitOpen(false)}
+                onOpenStep={(key) => {
+                    goToStep(key);
+                    setBlockedSubmitOpen(false);
+                }}
+            />
         </div>
     );
 }

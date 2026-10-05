@@ -39,10 +39,10 @@ const base = {
     section9: { academic_integration: "coursework", personal_learning: "Patience", academic_application: "Studio", sustainability_reflection: "", competency_scores: { cognitive_systemic: 3 } },
     section10: { continuation_status: "yes", continuation_details: "Teachers keep it", mechanisms: [], scaling_potential: "", policy_influence: "" },
     section11: { final_declaration: [true, true, true, true, true], signature_name: "Zain" },
-} as never;
+};
 
 test("detailed report uses the 10-section mockup outline with live answers", () => {
-    const dossier = buildImpactPackageDetailedReport(base);
+    const dossier = buildImpactPackageDetailedReport(base as never);
     assert.equal(dossier.sections.length, 10);
     assert.equal(dossier.sections[0].title, "Identity, team & participation");
     assert.equal(dossier.sections[9].id, "10");
@@ -98,10 +98,10 @@ test("session rows map live attendance field names onto the detailed report", ()
 });
 
 test("partner package redacts CNIC; faculty keeps the identity number", () => {
-    const partner = buildImpactPackageDetailedReport(base, undefined, undefined, "partner");
+    const partner = buildImpactPackageDetailedReport(base as never, undefined, undefined, "partner");
     const cnic = partner.sections[0].subsections[0].rows.find((row) => row.question === "CNIC / identity number");
     assert.match(String(cnic?.answer), /Private identity/);
-    const faculty = buildImpactPackageDetailedReport(base, undefined, undefined, "faculty");
+    const faculty = buildImpactPackageDetailedReport(base as never, undefined, undefined, "faculty");
     const facCnic = faculty.sections[0].subsections[0].rows.find((row) => row.question === "CNIC / identity number");
     assert.match(String(facCnic?.answer), /35202/);
 });

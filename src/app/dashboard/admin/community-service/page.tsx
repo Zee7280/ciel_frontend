@@ -53,6 +53,7 @@ import {
 } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { csvCell, escapeHtml } from "@/app/dashboard/admin/_shared/csv";
 import { CII_V45_LEVEL_BANDS } from "@/utils/ciiLevelBadge";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 
 const CS_BASE = "/dashboard/admin/community-service";
 const CS_VIEWS = [
@@ -223,11 +224,7 @@ function mapAdminCsReportRow(
         item.cii_score ??
         item.ciiScore ??
         item.cii ??
-        (item.ciiV45 && typeof item.ciiV45 === "object"
-            ? (item.ciiV45 as Record<string, unknown>).diagnosticCII ??
-              (item.ciiV45 as Record<string, unknown>).finalCII ??
-              (item.ciiV45 as Record<string, unknown>).baseCII
-            : null);
+        pickCiiV45DisplayScore(item.ciiV45, item.ciiV45Lock ?? item.cii_v45_lock);
     const ciiProvisional =
         typeof ciiRaw === "number" && Number.isFinite(ciiRaw)
             ? ciiRaw

@@ -30,6 +30,7 @@ import {
     applicationsOpenFromPayload,
     applyBlockedMessageFromPayload,
     applyClosedCtaLabel,
+    listingIsExpiredFromPayload,
 } from "@/utils/studentApplyMaintenance";
 import {
     isJoinApplicationPendingStatus,
@@ -154,6 +155,7 @@ interface BrowseOpportunity {
     /** True while a join application is pending or approved; false when rejected so student can re-apply. */
     applyLocked?: boolean;
     applications_open?: boolean;
+    admin_expired?: boolean;
     apply_blocked_reason?: string | null;
     apply_blocked_message?: string | null;
     apply_maintenance?: { enabled?: boolean; message?: string };
@@ -326,6 +328,7 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         is_virtual: typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(op.mode ?? raw.mode) === "remote",
         is_urgent: typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(timelineEnd),
         applications_open: op.applications_open,
+        admin_expired: raw.admin_expired === true,
         apply_blocked_reason: op.apply_blocked_reason,
         apply_blocked_message: op.apply_blocked_message,
         apply_maintenance: op.apply_maintenance,
@@ -1083,7 +1086,11 @@ export default function StudentBrowseOpportunitiesPage() {
                         const joinButtonLabel = !applyEligibility.canApply
                             ? "Not eligible"
                             : !catalogOpen
-                              ? applyClosedCtaLabel(op.apply_blocked_reason)
+                              ? applyClosedCtaLabel(
+                                    listingIsExpiredFromPayload(rawOp)
+                                        ? "opportunity_expired"
+                                        : op.apply_blocked_reason,
+                                )
                               : !dateAllowsJoin
                               ? lifeLabel || "Closed"
                               : lateRecord && !joinOpen
@@ -1123,10 +1130,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 deadline={op.end_date}
                                 coverUrl={op.cover_url}
                                 isFull={Boolean(op.is_full)}
-                                isExpired={
-                                    op.apply_blocked_reason === "catalog_closed" ||
-                                    op.apply_blocked_reason === "opportunity_expired"
-                                }
+                                isExpired={listingIsExpiredFromPayload(rawOp)}
                                 sdgs={sdgsForBrowseCard(op.sdg_ids || [], op.sdgNumber, op.sdgTitle)}
                                 visibilityTag={visibilityTag}
                                 visibilityWarn={Boolean(applyEligibility.listingRestrictionLabel)}

@@ -38,7 +38,7 @@ import {
 } from "@/utils/opportunityListing";
 import { findSdgById } from "@/utils/sdgData";
 import { buildOpportunityMapPoints } from "@/utils/opportunityMapCoordinates";
-import { applicationsOpenFromPayload } from "@/utils/studentApplyMaintenance";
+import { applicationsOpenFromPayload, listingIsExpiredFromPayload } from "@/utils/studentApplyMaintenance";
 import {
     BROWSE_PATHS,
     BROWSE_PATH_BY_KEY,
@@ -99,6 +99,7 @@ type ExploreProject = {
     participant_count: number;
     applicationsOpen: boolean;
     applyBlockedReason: string | null;
+    adminExpired: boolean;
 };
 
 type ExploreStats = {
@@ -268,6 +269,7 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
         participant_count: Number(raw.participant_count) || 0,
         applicationsOpen: applicationsOpenFromPayload(raw),
         applyBlockedReason: str(raw.apply_blocked_reason) || null,
+        adminExpired: raw.admin_expired === true,
     };
 }
 
@@ -1132,10 +1134,11 @@ export default function ProjectsPage() {
                                         deadline={project.end_date}
                                         coverUrl={project.cover_url}
                                         isFull={project.is_full}
-                                        isExpired={
-                                            project.applyBlockedReason === "catalog_closed" ||
-                                            project.applyBlockedReason === "opportunity_expired"
-                                        }
+                                        isExpired={listingIsExpiredFromPayload({
+                                            admin_expired: project.adminExpired,
+                                            apply_blocked_reason: project.applyBlockedReason,
+                                            applications_open: project.applicationsOpen,
+                                        })}
                                         sdgs={sdgsForBrowseCard(project.sdg_ids, project.sdgNumber, project.sdgTitle)}
                                         visibilityTag={
                                             project.visibilityBucket === "open"

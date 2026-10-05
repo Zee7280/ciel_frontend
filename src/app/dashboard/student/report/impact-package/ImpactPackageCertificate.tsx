@@ -15,7 +15,7 @@ import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/report
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { pickCiiV45DisplayScore, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 
 type TeamMember = ReportData["section1"]["team_members"][number];
@@ -232,8 +232,11 @@ export default function ImpactPackageCertificate({
         // Community Service reports carry an admin-locked CII v4.5 score, which is stricter and
         // more current than the generic v1 formula below — prefer it whenever it's present so the
         // certificate can never show a different score than the record Admin actually approved.
-        if (data.ciiV45Lock?.locked && typeof data.ciiV45?.finalCII === "number") {
-            return Math.min(100, Math.max(0, Math.round(data.ciiV45.finalCII)));
+        const locked =
+            data.ciiV45Lock?.locked === true || (data.ciiV45Lock as { locked?: unknown } | undefined)?.locked === "true";
+        const published = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
+        if (locked && published != null) {
+            return Math.min(100, Math.max(0, Math.round(published)));
         }
         const persisted = readPersistedCiiSnapshot(data);
         if (persisted) {
@@ -403,10 +406,12 @@ export default function ImpactPackageCertificate({
                                 <p className="cert-registrar-sub">Community Impact Lab (CIL)</p>
                             </div>
                             <div className="cert-date-block">
-                                <Calendar className="cert-date-icon" aria-hidden />
+                                <div className="cert-date-mark">
+                                    <p className="cert-dated-value">{certificateDate}</p>
+                                    <Calendar className="cert-date-icon" aria-hidden />
+                                </div>
                                 <div className="cert-date-line" />
                                 <p className="cert-dated-label">Dated</p>
-                                <p className="cert-dated-value">{certificateDate}</p>
                             </div>
                         </div>
 

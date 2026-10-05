@@ -14,6 +14,7 @@ import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommuni
 import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
 
 export const FACULTY_CS_BASE = "/dashboard/faculty/community-service";
@@ -213,7 +214,10 @@ export function useFacultyCommunityServiceData() {
                                     : typeof hoursRaw === "string" && Number.isFinite(Number(hoursRaw))
                                       ? Number(hoursRaw)
                                       : 0;
-                            const ciiRaw = item.cii_provisional ?? item.ciiProvisional;
+                            const ciiRaw =
+                                item.cii_provisional ??
+                                item.ciiProvisional ??
+                                pickCiiV45DisplayScore(item.ciiV45, item.ciiV45Lock ?? item.cii_v45_lock);
                             const ciiProvisional =
                                 typeof ciiRaw === "number" && Number.isFinite(ciiRaw)
                                     ? ciiRaw

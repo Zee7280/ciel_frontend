@@ -1,4 +1,8 @@
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import {
+    pickCiiV45DisplayBadgeName,
+    pickCiiV45DisplayScore,
+    readPersistedCiiSnapshot,
+} from "@/utils/reportCiiSnapshot";
 import type { ReportData } from "../context/ReportContext";
 import { calculateCII, type CIIResult } from "./calculateCII";
 import { CII_BREAKDOWN_ORDER, type CIIBreakdownKey } from "./ciiSectionWeights";
@@ -54,11 +58,9 @@ function isCiiFacultyLocked(lock: { locked?: unknown } | null | undefined): bool
     return lock?.locked === true || lock?.locked === "true";
 }
 
-function readCiiV45Final(data: ReportData): number | null {
-    const raw = (data.ciiV45 as { finalCII?: unknown } | null | undefined)?.finalCII;
-    if (typeof raw === "number" && Number.isFinite(raw)) return clampCii(raw);
-    if (typeof raw === "string" && raw.trim() && Number.isFinite(Number(raw))) return clampCii(Number(raw));
-    return null;
+function readCiiV45Published(data: ReportData): number | null {
+    const score = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
+    return score == null ? null : clampCii(score);
 }
 
 /** Draft / revision (e.g. after admin delete + new start) must not keep an old submit snapshot. */
@@ -80,16 +82,16 @@ export function resolveReportCii(data: ReportData): ResolvedReportCii {
     } catch {
         live = emptyLive();
     }
-    const facultyFinal = isCiiFacultyLocked(data.ciiV45Lock) ? readCiiV45Final(data) : null;
+    const facultyFinal = isCiiFacultyLocked(data.ciiV45Lock) ? readCiiV45Published(data) : null;
 
     if (facultyFinal != null) {
         const persisted = readPersistedCiiSnapshot(data);
         // The locked v4.5 reading owns the badge name; the legacy snapshot level belongs to a
         // different number and would contradict the score shown beside it.
-        const v45Level = (data.ciiV45 as { finalBadge?: { name?: unknown } } | null | undefined)?.finalBadge?.name;
+        const v45Level = pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
         return {
             ...live,
-            level: typeof v45Level === "string" && v45Level.trim() ? v45Level.trim() : persisted?.level || live.level,
+            level: v45Level || persisted?.level || live.level,
             totalScore: facultyFinal,
             breakdown: mergeBreakdown(live.breakdown, persisted?.breakdown),
             suggestions: persisted?.suggestions ?? live.suggestions,

@@ -28,6 +28,11 @@ import { facultyDepartmentOptionsForInstitution } from "@/utils/universityData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 import {
+    incompleteWizardSteps,
+    OpportunitySubmitBlockedDialog,
+    type OpportunityIncompleteStep,
+} from "@/components/opportunities/OpportunitySubmitBlockedDialog";
+import {
     ACTIVITY_TYPE_EMOJI,
     BENEFICIARY_EMOJI,
     CoChip,
@@ -82,10 +87,6 @@ function fieldErrorClass(hasError: boolean): string {
 function FieldError({ message }: { message?: string }) {
     if (!message) return null;
     return <p className="mt-1 text-[11px] font-semibold text-red-600">{message}</p>;
-}
-
-function firstFieldError(errors: Record<string, string | undefined>): string | undefined {
-    return Object.values(errors).find((value): value is string => Boolean(value));
 }
 
 function isScheduleValidationMessage(message: string): boolean {
@@ -271,6 +272,8 @@ function StudentOpportunityCreationPageInner() {
     const [showTeamLeadNotice, setShowTeamLeadNotice] = useState(Boolean(isNewOpportunity && !editFromUrl));
     const [similarMatches, setSimilarMatches] = useState<SimilarOpportunityMatch[]>([]);
     const [similarCheckLoading, setSimilarCheckLoading] = useState(false);
+    const [blockedSubmitOpen, setBlockedSubmitOpen] = useState(false);
+    const [incompleteSubmitSteps, setIncompleteSubmitSteps] = useState<OpportunityIncompleteStep[]>([]);
 
     // Student Details State
     const [studentDetails, setStudentDetails] = useState({
@@ -605,46 +608,44 @@ function StudentOpportunityCreationPageInner() {
         setFieldErrors(errors);
     };
 
-    const validateStep = (step: string): boolean => {
-        const errors = collectStepErrors(step);
-        applyStepErrors(step, errors);
-        const first = firstFieldError(errors);
-        if (first) {
-            toast.error(first);
-            return false;
-        }
-        return true;
-    };
-
     const validateForm = () => {
         const privatePath = formData.privateCandidate;
+        const errorsByStep: Record<string, Record<string, string | undefined>> = {};
         if (!studentDetails.contact.trim() && !privatePath) {
-            toast.error("Contact No. is missing from your profile. Add it under Student Profile, then try again.");
-            return false;
+            errorsByStep.A = {
+                ...(errorsByStep.A || {}),
+                contact: "Contact No. is missing from your profile. Add it under Student Profile, then try again.",
+            };
         }
         if (!isValidEmailFormat(studentDetails.email)) {
-            toast.error("A valid email on your profile is required. Update your profile, then try again.");
-            return false;
+            errorsByStep.A = {
+                ...(errorsByStep.A || {}),
+                email: "A valid email on your profile is required. Update your profile, then try again.",
+            };
         }
         if (!privatePath && !studentDetails.department.trim()) {
-            toast.error("Department is missing from your profile. Update your profile, then try again.");
-            return false;
+            errorsByStep.A = {
+                ...(errorsByStep.A || {}),
+                department: "Department is missing from your profile. Update your profile, then try again.",
+            };
         }
         if (!privatePath && !studentDetails.institution.trim()) {
-            toast.error("Your university/institution is missing from your profile. Complete your profile, then try again.");
-            return false;
+            errorsByStep.A = {
+                ...(errorsByStep.A || {}),
+                institution: "Your university/institution is missing from your profile. Complete your profile, then try again.",
+            };
         }
         for (const step of WIZARD_STEPS) {
-            const errors = collectStepErrors(step.key);
-            const first = firstFieldError(errors);
-            if (first) {
-                applyStepErrors(step.key, errors);
-                toast.error(first);
-                goToStepRef.current(step.key);
-                return false;
-            }
+            errorsByStep[step.key] = { ...(errorsByStep[step.key] || {}), ...collectStepErrors(step.key) };
         }
-        return true;
+        const incomplete = incompleteWizardSteps(WIZARD_STEPS, errorsByStep);
+        if (incomplete.length === 0) return true;
+        const first = incomplete[0];
+        applyStepErrors(first.key, collectStepErrors(first.key));
+        setIncompleteSubmitSteps(incomplete);
+        setBlockedSubmitOpen(true);
+        goToStepRef.current(first.key);
+        return false;
     };
 
     /** Same request-body shape for a real submission and a backend-persisted draft save — the
@@ -1049,19 +1050,13 @@ function StudentOpportunityCreationPageInner() {
     const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-        if (i > schedIdx && !validateStep("SCHED")) {
-            goToStep("SCHED");
-            return;
-        }
-        if (!validateStep(activeStep)) return;
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
             if (!editingOpportunityId || isDraftMode) {
                 void persistDraftRef.current(true);
             }
             goToStep(WIZARD_STEPS[i + 1].key);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode, formData, studentDetails]);
+    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
@@ -1672,25 +1667,7 @@ function StudentOpportunityCreationPageInner() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => {
-                                        const from = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-                                        const to = WIZARD_STEPS.findIndex((s) => s.key === step.key);
-                                        const schedIdx = WIZARD_STEPS.findIndex((s) => s.key === "SCHED");
-                                        if (to > schedIdx && !validateStep("SCHED")) {
-                                            goToStep("SCHED");
-                                            return;
-                                        }
-                                        if (to > from) {
-                                            for (let i = from; i < to; i++) {
-                                                if (WIZARD_STEPS[i].key === "SCHED") continue;
-                                                if (!validateStep(WIZARD_STEPS[i].key)) {
-                                                    if (WIZARD_STEPS[i].key !== activeStep) goToStep(WIZARD_STEPS[i].key);
-                                                    return;
-                                                }
-                                            }
-                                        }
-                                        goToStep(step.key);
-                                    }}
+                                    onClick={() => goToStep(step.key)}
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
@@ -3539,6 +3516,16 @@ function StudentOpportunityCreationPageInner() {
                     <span className="rounded-full bg-white/18 px-2.5 py-1 text-[7.5px] font-extrabold">● LIVE PREVIEW</span>
                 </div>
             </div>
+            <OpportunitySubmitBlockedDialog
+                open={blockedSubmitOpen}
+                steps={incompleteSubmitSteps}
+                onClose={() => setBlockedSubmitOpen(false)}
+                onOpenStep={(key) => {
+                    applyStepErrors(key, collectStepErrors(key));
+                    goToStep(key);
+                    setBlockedSubmitOpen(false);
+                }}
+            />
             <OpportunitySubmittedReviewModal
                 open={showSubmittedReviewModal}
                 opportunityTitle={submittedOpportunityTitle}

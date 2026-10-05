@@ -14,6 +14,7 @@ import {
     type CiiV45Lock,
     type CiiV45Result,
 } from "@/utils/communityCiiAnalyser";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import "./community-cii-analyser.css";
 
@@ -108,17 +109,31 @@ function partnerCount(report: Record<string, unknown>): number {
     return Array.isArray(partners) ? partners.length : 0;
 }
 
-/** Mirrors the exact 400 messages `persistCiiV45Approval` throws (faculty-reports.service.ts),
- * surfaced up-front in the UI instead of only after a failed POST. */
-function approveBlockMessage(stored: CiiV45Result | null, locked: boolean): string | null {
+/** Hard stops only — already locked, or no score to publish. Analysis flags are warnings. */
+function approveHardBlock(
+    stored: CiiV45Result | null,
+    lock: CiiV45Lock | null,
+    locked: boolean,
+): string | null {
     if (locked) return "This report's CII v4.5 score is already locked.";
     if (!stored) return "Run the CII v4.5 analysis before approving.";
+    if (pickCiiV45DisplayScore(stored, lock) == null) {
+        return "Run the CII v4.5 analysis before approving.";
+    }
+    return null;
+}
+
+/** Analyser flags Admin can still override by confirming the displayed score. */
+function approveWarningMessage(stored: CiiV45Result | null, locked: boolean): string | null {
+    if (locked || !stored) return null;
     if (stored.scoreStatus === "RESUBMISSION_REQUIRED") {
-        return "This report cannot be published yet — mandatory hours or student material are incomplete. The student must resubmit.";
+        return "Analysis flagged incomplete hours or student material. Confirming will still publish this score.";
     }
     if (stored.scoreStatus === "ADMIN_REVIEW_REQUIRED") {
         const reasons = Array.isArray(stored.adminReviewReasons) ? stored.adminReviewReasons : [];
-        return `This report cannot be published yet: ${reasons.join("; ") || "the evaluation is still ADMIN_REVIEW_REQUIRED"}. Resolve the blockers, then re-run the analysis.`;
+        return reasons.length
+            ? `Analysis flagged for admin review: ${reasons.join("; ")}. Confirming will still publish this score.`
+            : "Analysis is still marked for admin review. Confirming will still publish this score.";
     }
     return null;
 }
@@ -182,8 +197,9 @@ export default function CommunityCiiAnalyser({
             const next = (data.data || data) as Record<string, unknown>;
             setReport(next);
             const nextCii = next.ciiV45 as unknown as CiiV45Result | undefined;
-            if (nextCii?.diagnosticCII != null) {
-                setAdjustedScoreInput(String(nextCii.diagnosticCII));
+            const nextScore = pickCiiV45DisplayScore(nextCii, next.ciiV45Lock);
+            if (nextScore != null) {
+                setAdjustedScoreInput(String(nextScore));
             }
         } catch {
             toast.error("Failed to load report");
@@ -233,7 +249,8 @@ export default function CommunityCiiAnalyser({
                 const nextCii = next?.ciiV45 as unknown as CiiV45Result | undefined;
                 if (nextCii?.computedAt && String(nextCii.computedAt) !== previousAt) {
                     setReport(next);
-                    if (nextCii.diagnosticCII != null) setAdjustedScoreInput(String(nextCii.diagnosticCII));
+                    const polledScore = pickCiiV45DisplayScore(nextCii, next?.ciiV45Lock);
+                    if (polledScore != null) setAdjustedScoreInput(String(polledScore));
                     return true;
                 }
             }
@@ -273,15 +290,17 @@ export default function CommunityCiiAnalyser({
         }
     };
 
-    const blockMessage = approveBlockMessage(ciiV45, locked);
+    const hardBlock = approveHardBlock(ciiV45, ciiV45Lock, locked);
+    const warningMessage = approveWarningMessage(ciiV45, locked);
+    const bannerMessage = hardBlock || warningMessage;
 
     const approveAndLock = async () => {
         if (readOnly || !reportId || approving || locked || !ciiV45) return;
-        if (blockMessage) {
-            toast.error(blockMessage);
+        if (hardBlock) {
+            toast.error(hardBlock);
             return;
         }
-        const aiScore = ciiV45.diagnosticCII ?? 0;
+        const aiScore = pickCiiV45DisplayScore(ciiV45, ciiV45Lock) ?? 0;
         const parsedAdjusted = adjustedScoreInput.trim() === "" ? null : Number(adjustedScoreInput);
         const hasModeration =
             parsedAdjusted != null &&
@@ -424,7 +443,7 @@ export default function CommunityCiiAnalyser({
     const partners = partnerCount(report);
 
     const scoreStatus = ciiV45?.scoreStatus ?? null;
-    const currentScore = locked ? ciiV45?.finalCII ?? null : ciiV45?.diagnosticCII ?? null;
+    const currentScore = pickCiiV45DisplayScore(ciiV45, ciiV45Lock);
     const currentBadge = locked
         ? ciiV45?.finalBadge ?? null
         : ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null;
@@ -775,15 +794,15 @@ export default function CommunityCiiAnalyser({
                             </div>
                             <div className="fx23-final">
                                 <span>AI recommended</span>
-                                <b>{ciiV45.diagnosticCII != null ? ciiV45.diagnosticCII.toFixed(1) : "—"}</b>
+                                <b>{currentScore != null ? currentScore.toFixed(1) : "—"}</b>
                                 <small>/100</small>
                                 <strong>{badgeLabel(diagnosticBadge)}</strong>
                             </div>
                         </div>
 
-                        {blockMessage ? (
+                        {bannerMessage ? (
                             <div className="fx23-lock" style={{ margin: 0 }}>
-                                {blockMessage}
+                                {bannerMessage}
                             </div>
                         ) : null}
 
@@ -797,7 +816,7 @@ export default function CommunityCiiAnalyser({
                                     min={0}
                                     max={100}
                                     step={0.1}
-                                    disabled={locked || Boolean(blockMessage)}
+                                    disabled={Boolean(hardBlock)}
                                     value={adjustedScoreInput}
                                     onChange={(e) => setAdjustedScoreInput(e.target.value)}
                                     style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
@@ -806,8 +825,8 @@ export default function CommunityCiiAnalyser({
                                     Score moderation reason{" "}
                                     <span>
                                         {adjustedScoreInput.trim() !== "" &&
-                                        ciiV45.diagnosticCII != null &&
-                                        Math.round(Number(adjustedScoreInput) * 10) / 10 !== Math.round(ciiV45.diagnosticCII * 10) / 10
+                                        currentScore != null &&
+                                        Math.round(Number(adjustedScoreInput) * 10) / 10 !== Math.round(currentScore * 10) / 10
                                             ? "required when the score changes"
                                             : "optional — only required if the score changes"}
                                     </span>
@@ -815,7 +834,7 @@ export default function CommunityCiiAnalyser({
                                 <textarea
                                     value={moderationReason}
                                     onChange={(e) => setModerationReason(e.target.value)}
-                                    disabled={locked || Boolean(blockMessage)}
+                                    disabled={Boolean(hardBlock)}
                                     placeholder="Explain why the published score differs from the AI recommendation."
                                 />
                                 <label style={{ marginTop: 10 }}>
@@ -846,7 +865,7 @@ export default function CommunityCiiAnalyser({
                                             Reject
                                         </button>
                                     ) : null}
-                                    <button type="button" className="approve" disabled={locked || approving || Boolean(blockMessage)} onClick={approveAndLock}>
+                                    <button type="button" className="approve" disabled={approving || Boolean(hardBlock)} onClick={approveAndLock}>
                                         {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
                                     </button>
                                 </>

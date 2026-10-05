@@ -778,6 +778,8 @@ function ReportFormContent() {
                 // one. Strip it here so only the just-computed ciiResult can win.
                 const snapshot = readPersistedCiiSnapshot({
                     ...data,
+                    ciiV45: undefined,
+                    ciiV45Lock: undefined,
                     cii_index: ciiResult,
                     section11: { ...data.section11, summary_text: undefined, cii_index: ciiResult },
                 }) ?? ciiResult;

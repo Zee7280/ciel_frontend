@@ -1,6 +1,7 @@
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 import { buildReportFlashAgg } from "@/app/dashboard/student/report/ReportFormChrome";
 import { resolveReportCii } from "@/app/dashboard/student/report/utils/resolveReportCii";
+import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { buildLockedV17DetailAndAssessment, v19OverallCopy } from "./buildLockedV17Assessment";
 import { buildLockedV17SourceTabs, emptyLockedV17SourceTabs, type LockedV17SourceTabs } from "./buildLockedV17SourceTabs";
 
@@ -148,7 +149,7 @@ export function buildLockedV17Package(data: ReportData, projectData?: unknown): 
         .join(" · ");
 
     const ciiV45 = asRecord(data.ciiV45);
-    const finalNumRaw = finiteNum(ciiV45.diagnosticCII ?? ciiV45.finalCII);
+    const finalNumRaw = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
     const finalNum = finalNumRaw == null ? null : Math.round(finalNumRaw * 10) / 10;
     const locked = cii.source === "faculty_locked";
     const gaps: string[] = [];

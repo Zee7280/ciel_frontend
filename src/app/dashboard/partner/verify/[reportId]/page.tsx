@@ -582,25 +582,7 @@ function ReportDetailPage() {
                         </div>
 
                         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                            {typeof report.ciiV45?.finalCII === 'number' ? (
-                                <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
-                                    <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">
-                                            CII index
-                                        </p>
-                                        <p className="text-2xl font-black tabular-nums text-slate-900">
-                                            {Math.round(report.ciiV45.finalCII)}
-                                            <span className="text-base font-semibold text-slate-500">/100</span>
-                                        </p>
-                                        {report.ciiV45.finalBadge?.name ? (
-                                            <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
-                                                {report.ciiV45.finalBadge.name}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            ) : ciiSnapshot ? (
+                            {ciiSnapshot ? (
                                 <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
                                     <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
                                     <div>
@@ -609,9 +591,11 @@ function ReportDetailPage() {
                                             {Math.round(ciiSnapshot.totalScore)}
                                             <span className="text-base font-semibold text-slate-500">/100</span>
                                         </p>
-                                        <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
-                                            {ciiSnapshot.level}
-                                        </p>
+                                        {ciiSnapshot.level ? (
+                                            <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
+                                                {ciiSnapshot.level}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
                             ) : null}

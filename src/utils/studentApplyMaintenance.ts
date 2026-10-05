@@ -49,6 +49,7 @@ export function applyClosedBannerTitle(reason: string | null | undefined): strin
 
 export function applicationsOpenFromPayload(raw: Record<string, unknown> | null | undefined): boolean {
     if (!raw) return true;
+    if (raw.admin_expired === true) return false;
     if (raw.applications_open === false) return false;
     const nested = raw.apply_maintenance;
     if (nested && typeof nested === "object" && !Array.isArray(nested)) {
@@ -56,6 +57,14 @@ export function applicationsOpenFromPayload(raw: Record<string, unknown> | null 
         if (enabled === true) return false;
     }
     return true;
+}
+
+/** Cover badge: Expired when Super Admin expired the row or the catalog cutoff closed it. */
+export function listingIsExpiredFromPayload(raw: Record<string, unknown> | null | undefined): boolean {
+    if (!raw) return false;
+    if (raw.admin_expired === true) return true;
+    const reason = typeof raw.apply_blocked_reason === "string" ? raw.apply_blocked_reason : "";
+    return reason === "catalog_closed" || reason === "opportunity_expired";
 }
 
 export function applyBlockedMessageFromPayload(
