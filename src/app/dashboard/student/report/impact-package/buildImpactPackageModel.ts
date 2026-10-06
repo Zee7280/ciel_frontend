@@ -380,6 +380,11 @@ export function buildImpactPackageModel(
     const adminApproved = isApproved(data.admin_status) || isApproved(data.admin_approval_status) || String(data.status || "").toLowerCase() === "verified";
     const submitted = isSubmitted(data);
     const cii = resolveReportCii(data);
+    const displayScore =
+        pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock) ??
+        (cii.official && cii.totalScore != null ? cii.totalScore : null);
+    const ciiLabel = displayScore != null ? `CII ${Math.round(displayScore)}/100` : "CII: not issued";
+    const ciiPending = displayScore == null;
     const members = memberHours(data);
     const names = members.map((row) => row.name).filter(Boolean);
     const university = pickString(data.section1?.team_lead?.university, asRecord(opportunity).university as string);
@@ -628,22 +633,26 @@ export function buildImpactPackageModel(
         files,
         adminApproved,
         submitted,
-        ciiLabel: cii.source === "faculty_locked" && cii.totalScore != null ? `CII ${cii.totalScore}/100` : "CII: not issued",
-        ciiPending: cii.source !== "faculty_locked",
+        ciiLabel,
+        ciiPending,
         sectionsComplete: tiles.filter((t) => t.hasContent).length,
         sectionsTotal: 9,
     };
 }
 
-export function impactPackageCanViewEvidence(audience: ImpactPackageAudience, visibility: MediaVisibility): boolean {
+export function impactPackageCanViewEvidence(
+    audience: ImpactPackageAudience,
+    visibility: MediaVisibility,
+    adminApproved = false,
+): boolean {
     if (visibility === "public") return true;
     if (audience === "student" || audience === "admin") return true;
-    if (audience === "faculty" || audience === "university") return true;
+    if (audience === "faculty" || audience === "university") return adminApproved;
     return false;
 }
 
 export function impactPackageCanDownload(audience: ImpactPackageAudience, visibility: MediaVisibility, publicConsent: boolean): boolean {
-    return visibility === "public" && publicConsent && impactPackageCanViewEvidence(audience, visibility);
+    return visibility === "public" && publicConsent && impactPackageCanViewEvidence(audience, visibility, true);
 }
 
 export function impactPackageAccessText(audience: ImpactPackageAudience, visibility: MediaVisibility, adminApproved: boolean): string {

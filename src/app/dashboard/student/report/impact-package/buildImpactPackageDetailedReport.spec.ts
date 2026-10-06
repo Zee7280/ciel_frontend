@@ -49,6 +49,7 @@ test("detailed report uses the 10-section mockup outline with live answers", () 
     const name = dossier.sections[0].subsections[0].rows.find((row) => row.question === "Full name");
     assert.equal(name?.answer, "Zain");
     assert.equal(name?.origin, "Source record");
+    assert.match(String(name?.source_path), /student_source\.section_1\./);
     assert.ok(dossier.fieldCount > 30);
     assert.ok(dossier.banner?.htmlTitle.includes("Super Admin"));
     const sessionRow = dossier.sections[0].subsections.find((sub) => sub.id === "1.3")?.rows[0];

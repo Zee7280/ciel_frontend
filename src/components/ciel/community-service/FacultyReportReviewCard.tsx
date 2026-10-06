@@ -117,13 +117,13 @@ export default function FacultyReportReviewCard({
             ? has
                 ? "Review CII · Finalise CIEL PK verification"
                 : "Open locked package · Review evidence"
-            : "View locked package · Read only";
+            : "Open Impact Package · Read only";
     let nextText =
         viewer === "admin"
             ? has
                 ? "CIEL PK can request revision or reject. Faculty CII stays locked after academic sign-off."
                 : "Faculty-approved submissions open here for national verification and independent analysis."
-            : "Faculty access is read-only. View the locked Flashcard + Detailed Report. Analysis, Approve, Revision and Reject stay with CIEL PK Admin.";
+            : "Faculty access is read-only. Open the same Flashcard + Detailed Report Impact Package the student submitted. Analysis, Approve, Revision and Reject stay with CIEL PK Admin.";
     let accent: "act" | "ok" | "rev" = "act";
 
     if (mode === "revision") {

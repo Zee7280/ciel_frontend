@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import {
+    CII_V45_ANCHOR_FACTORS,
     CII_V45_ANCHOR_NAMES,
     CII_V45_DIMENSIONS,
     criterionLabel,
@@ -17,6 +18,7 @@ import {
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/report/impact-package/impactPackagePacket";
 import "./community-cii-analyser.css";
 
 const TEAL = "#0e7d74";
@@ -122,16 +124,10 @@ function approveHardBlock(
     stored: CiiV45Result | null,
     lock: CiiV45Lock | null,
     locked: boolean,
-    dim7Complete: boolean,
+    _dim7Complete: boolean,
 ): string | null {
     if (locked) return "This report's CII v4.5 score is already locked.";
     if (!stored) return "Run the CII v4.5 analysis before approving.";
-    if (evidenceAssessmentPending(stored) && !dim7Complete) {
-        return "Score Dimension 7 (evidence) before confirming the CII.";
-    }
-    if (!evidenceAssessmentPending(stored) && pickCiiV45DisplayScore(stored, lock) == null) {
-        return "Run the CII v4.5 analysis before approving.";
-    }
     return null;
 }
 
@@ -142,7 +138,7 @@ function approveWarningMessage(stored: CiiV45Result | null, locked: boolean): st
         return "Analysis flagged incomplete hours or student material. Confirming will still publish this score.";
     }
     if (stored.scoreStatus === "ADMIN_EVIDENCE_REQUIRED") {
-        return "AI report-quality (/85) is ready. Score Dimension 7 evidence (/15) below, then Confirm.";
+        return "AI report-quality (/85) is ready. Dimension 7 defaults to Sound (2) so Confirm can publish; change any evidence mark first if needed.";
     }
     if (stored.scoreStatus === "ADMIN_REVIEW_REQUIRED") {
         const reasons = Array.isArray(stored.adminReviewReasons) ? stored.adminReviewReasons : [];
@@ -183,6 +179,9 @@ export default function CommunityCiiAnalyser({
         ? "/dashboard/admin/reports/verify"
         : "/dashboard/faculty/community-service";
     const inboxLabel = isCielPk ? "← Back to student reports" : "← Back to Community Service";
+    const packageHref = isCielPk
+        ? `/dashboard/admin/reports/verify/${encodeURIComponent(reportId)}?package=1`
+        : `/dashboard/faculty/reports/${encodeURIComponent(reportId)}?view=dossier`;
 
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<Record<string, unknown> | null>(null);
@@ -191,14 +190,14 @@ export default function CommunityCiiAnalyser({
     const [approving, setApproving] = useState(false);
     const [deciding, setDeciding] = useState(false);
     const [note, setNote] = useState("");
-    const [adjustedScoreInput, setAdjustedScoreInput] = useState("");
-    const [moderationReason, setModerationReason] = useState("");
     const [dim7Anchors, setDim7Anchors] = useState<Record<string, string>>({});
     const [dim7Reasons, setDim7Reasons] = useState<Record<string, string>>({});
 
     const ciiV45 = (report?.ciiV45 as unknown as CiiV45Result | undefined) || null;
     const ciiV45Lock = (report?.ciiV45Lock as unknown as CiiV45Lock | undefined) || null;
     const locked = Boolean(ciiV45Lock?.locked);
+    const packet = resolveImpactPackagePacketIntegrity(report);
+    const packetHold = Boolean(report) && !packet.ok;
 
     const loadReport = async () => {
         if (!reportId) return;
@@ -214,17 +213,20 @@ export default function CommunityCiiAnalyser({
             const next = (data.data || data) as Record<string, unknown>;
             setReport(next);
             const nextCii = next.ciiV45 as unknown as CiiV45Result | undefined;
-            const nextScore = pickCiiV45DisplayScore(nextCii, next.ciiV45Lock);
-            if (nextScore != null) {
-                setAdjustedScoreInput(String(nextScore));
-            }
             if (nextCii) {
                 const d7 = nextCii.sectionScores?.find((s) => s.dimension === "7");
                 const anchors: Record<string, string> = {};
                 const reasons: Record<string, string> = {};
-                for (const c of d7?.criterionScores ?? []) {
-                    if (c.anchor !== "P" && typeof c.anchor === "number") anchors[c.criterion] = String(c.anchor);
-                    if (c.anchor !== "P" && c.reasoningSummary?.trim()) reasons[c.criterion] = c.reasoningSummary;
+                for (const c of DIM7.criteria) {
+                    const saved = d7?.criterionScores?.find((row) => row.criterion === c.key);
+                    if (saved && saved.anchor !== "P" && typeof saved.anchor === "number") {
+                        anchors[c.key] = String(saved.anchor);
+                    } else {
+                        anchors[c.key] = "2";
+                    }
+                    if (saved && saved.anchor !== "P" && saved.reasoningSummary?.trim()) {
+                        reasons[c.key] = saved.reasoningSummary;
+                    }
                 }
                 setDim7Anchors(anchors);
                 setDim7Reasons(reasons);
@@ -259,6 +261,10 @@ export default function CommunityCiiAnalyser({
 
     const runAnalysis = async () => {
         if (readOnly || !reportId || analysing) return;
+        if (packetHold) {
+            toast.error(`Student packet integrity HOLD · ${packet.issues.join(" ")}`);
+            return;
+        }
         if (locked && !isCielPk) return;
         if (locked && isCielPk) {
             const ok = window.confirm(
@@ -277,8 +283,6 @@ export default function CommunityCiiAnalyser({
                 const nextCii = next?.ciiV45 as unknown as CiiV45Result | undefined;
                 if (nextCii?.computedAt && String(nextCii.computedAt) !== previousAt) {
                     setReport(next);
-                    const polledScore = pickCiiV45DisplayScore(nextCii, next?.ciiV45Lock);
-                    if (polledScore != null) setAdjustedScoreInput(String(polledScore));
                     return true;
                 }
             }
@@ -320,8 +324,13 @@ export default function CommunityCiiAnalyser({
 
     const dim7Complete = DIM7.criteria.every((c) => {
         const a = Number(dim7Anchors[c.key]);
-        return Number.isInteger(a) && a >= 0 && a <= 4 && Boolean((dim7Reasons[c.key] || "").trim());
+        return Number.isInteger(a) && a >= 0 && a <= 4;
     });
+    const dim7PreviewPts = DIM7.criteria.reduce((sum, c) => {
+        const a = Number(dim7Anchors[c.key]);
+        if (!Number.isInteger(a) || a < 0 || a > 4) return sum;
+        return sum + c.weight * CII_V45_ANCHOR_FACTORS[a as 0 | 1 | 2 | 3 | 4];
+    }, 0);
     const hardBlock = approveHardBlock(ciiV45, ciiV45Lock, locked, dim7Complete);
     const warningMessage = approveWarningMessage(ciiV45, locked);
     const bannerMessage = hardBlock || warningMessage;
@@ -332,30 +341,15 @@ export default function CommunityCiiAnalyser({
             toast.error(hardBlock);
             return;
         }
-        const aiScore = pickCiiV45DisplayScore(ciiV45, ciiV45Lock);
-        const parsedAdjusted = adjustedScoreInput.trim() === "" ? null : Number(adjustedScoreInput);
-        const hasModeration =
-            aiScore != null &&
-            parsedAdjusted != null &&
-            Number.isFinite(parsedAdjusted) &&
-            Math.round(parsedAdjusted * 10) / 10 !== Math.round(aiScore * 10) / 10;
-        if (hasModeration && !moderationReason.trim()) {
-            toast.error("A reason is required when moderating the AI-recommended score.");
-            return;
-        }
         try {
             setApproving(true);
             const body: Record<string, unknown> = {};
             if (note.trim()) body.note = note.trim();
-            if (hasModeration) {
-                body.adminAdjustedScore = parsedAdjusted;
-                body.scoreModerationReason = moderationReason.trim();
-            }
-            if (evidenceAssessmentPending(ciiV45)) {
+            if (evidenceAssessmentPending(ciiV45) || !dim7Complete) {
                 body.evidenceCriteria = DIM7.criteria.map((c) => ({
                     criterion: c.key,
-                    anchor: Number(dim7Anchors[c.key]),
-                    reasoningSummary: (dim7Reasons[c.key] || "").trim(),
+                    anchor: Number.isInteger(Number(dim7Anchors[c.key])) ? Number(dim7Anchors[c.key]) : 2,
+                    reasoningSummary: (dim7Reasons[c.key] || "").trim() || undefined,
                     evidenceIds: [],
                 }));
             }
@@ -486,6 +480,13 @@ export default function CommunityCiiAnalyser({
 
     const scoreStatus = ciiV45?.scoreStatus ?? null;
     const currentScore = pickCiiV45DisplayScore(ciiV45, ciiV45Lock);
+    const rawAiPts = (ciiV45?.sectionScores ?? [])
+        .filter((s) => s.dimension !== "7")
+        .reduce((sum, s) => sum + (typeof s.score === "number" ? s.score : 0), 0);
+    const previewComposite =
+        dim7Complete && evidenceAssessmentPending(ciiV45)
+            ? Math.round((rawAiPts + dim7PreviewPts + 1e-9) * 10) / 10
+            : currentScore;
     const currentBadge = locked
         ? ciiV45?.finalBadge ?? null
         : currentScore != null
@@ -518,10 +519,10 @@ export default function CommunityCiiAnalyser({
             </div>
             <div className="fx23-workhead">
                 <div>
-                    <span>{isCielPk ? "CIEL PK Super Admin review · CII v5.0 Analyzer" : "Faculty review workspace · CII v5.0 Analyzer"}</span>
+                    <span>{isCielPk ? "CIEL PK Super Admin review · CII v5.0 Analyzer" : "Read-only Impact Package viewer"}</span>
                     <h2>{projectTitle}</h2>
                     <p>
-                        {studentName} · submitted Flashcard + Detailed Report stay locked. The Analyzer runs only when you choose to run it.
+                        {studentName} · submitted Flashcard + Detailed Report stay locked. Packet completeness is checked first. The Analyzer runs only when CIEL PK Admin chooses to run it. There is no Faculty or Partner verification in this approval chain.
                     </p>
                 </div>
                 <div>
@@ -533,6 +534,18 @@ export default function CommunityCiiAnalyser({
                 </div>
             </div>
 
+            {packetHold ? (
+                <div className="fx23-lock" role="alert">
+                    <b>Student packet integrity HOLD</b> — the AI Analyser must not score this package until the missing content is restored.
+                    <ul style={{ margin: "4px 0 8px 14px" }}>
+                        {packet.issues.map((issue) => (
+                            <li key={issue}>{issue}</li>
+                        ))}
+                    </ul>
+                    <Link href={packageHref}>Open Impact Package</Link>
+                </div>
+            ) : null}
+
             {locked ? (
                 <div className="fx23-lock">
                     {isCielPk
@@ -541,7 +554,7 @@ export default function CommunityCiiAnalyser({
                 </div>
             ) : readOnly ? (
                 <div className="fx23-lock">
-                    Faculty access is read-only. You can view the locked package and any diagnostic CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
+                    Faculty access is read-only. You can view the Impact Package and any diagnostic CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
                 </div>
             ) : (
                 <div className="fx23-lock">
@@ -580,7 +593,7 @@ export default function CommunityCiiAnalyser({
                     <small>SYSTEM ASSESSMENT · CII v5.0 HYBRID</small>
                     <h2>CIEL PK CII Analyzer</h2>
                     <p>
-                        Hybrid CII v5.0: AI scores report quality out of 85. CIEL PK Admin scores Dimension 7 evidence out of 15. Arithmetic, bands and L4–L6 gates stay server-side. Faculty can view results; CIEL PK Admin confirms and publishes.
+                        Hybrid CII v5.0: AI scores report quality out of 85. CIEL PK Admin scores Dimension 7 evidence out of 15. Arithmetic, bands and L4–L6 gates stay server-side. There is no Faculty or Partner verification in this final-report approval chain. Faculty may open the published Impact Package after CIEL PK Admin confirms.
                     </p>
                 </div>
                 {readOnly ? (
@@ -588,22 +601,24 @@ export default function CommunityCiiAnalyser({
                         {locked ? "Locked · read only" : ciiV45 ? "Diagnostic CII (view only)" : "Analyzer not run · read only"}
                     </span>
                 ) : (
-                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || (locked && !isCielPk)}>
+                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || packetHold || (locked && !isCielPk)}>
                         {analysing
                             ? `Scoring report quality… ${analysingElapsedSec}s${analysingElapsedSec >= 60 ? " (usually 1–4 min)" : ""}`
-                            : locked && !isCielPk
-                              ? "Locked"
-                              : ciiV45
-                                ? "Re-run AI Analyzer"
-                                : "Run AI Analyzer"}
+                            : packetHold
+                              ? "Packet HOLD"
+                              : locked && !isCielPk
+                                ? "Locked"
+                                : ciiV45
+                                  ? "Re-run AI Analyzer"
+                                  : "Run AI Analyzer"}
                     </button>
                 )}
             </div>
 
             <div className="fx23-ready">
                 <div className="score">
-                    <b>{currentScore != null ? Math.round(currentScore) : "—"}</b>
-                    <span>{locked ? "Final CII / 100" : currentScore != null ? "Diagnostic CII / 100" : "CII / 100 (pending evidence)"}</span>
+                    <b>{previewComposite != null ? Math.round(previewComposite) : "—"}</b>
+                    <span>{locked ? "Final CII / 100" : previewComposite != null ? "Composite CII / 100" : "CII / 100 (pending analysis)"}</span>
                 </div>
                 <div className="grid">
                     {flags.map((flag) => (
@@ -619,7 +634,7 @@ export default function CommunityCiiAnalyser({
             <details className="fx23-method">
                 <summary>How the Analyzer scores this report</summary>
                 <p>
-                    The model reads the locked 10-section report only (no evidence originals). It returns nine report-quality dimensions (85 points). CIEL PK Admin scores Dimension 7 evidence (15 points) from the original files. Anchors 0–4 ({CII_V45_ANCHOR_NAMES.join(" · ")}), up to +5 verified Extra-Mile, and an admin-adjudicated integrity penalty. Levels 4–6 still require cumulative quality gates.
+                    The model reads the locked 9-section Impact Package only (no evidence originals). It returns nine report-quality dimensions (85 points). CIEL PK Admin scores Dimension 7 evidence (15 points) from the original files. Anchors 0–4 ({CII_V45_ANCHOR_NAMES.join(" · ")}), up to +5 verified Extra-Mile, and an admin-adjudicated integrity penalty. Levels 4–6 still require cumulative quality gates.
                 </p>
                 <ul>
                     {CII_V45_DIMENSIONS.map((dim) => (
@@ -634,17 +649,17 @@ export default function CommunityCiiAnalyser({
                 <>
                     <div className="fx23-scorehero">
                         <div>
-                            <small>{locked ? "FINAL CII" : "DIAGNOSTIC CII"}</small>
+                            <small>{locked ? "FINAL CII" : "COMPOSITE CII"}</small>
                             <b>
-                                {currentScore != null ? currentScore.toFixed(1) : "Pending"}
-                                {currentScore != null ? <em>/100</em> : null}
+                                {previewComposite != null ? previewComposite.toFixed(1) : "Pending"}
+                                {previewComposite != null ? <em>/100</em> : null}
                             </b>
                             <strong>{badgeLabel(currentBadge)}</strong>
                             <p>
                                 {ciiV45.analysisSummary ||
-                                    (currentScore == null
-                                        ? "AI report-quality is ready. Overall CII appears after Admin scores Dimension 7 evidence."
-                                        : "Provisional system assessment of the locked submission. Admin moderation below decides the published score.")}
+                                    (previewComposite == null
+                                        ? "Run the Analyzer to generate report-quality marks, then Confirm."
+                                        : "Generated Composite CII from 85 AI report-quality points plus 15 Admin evidence points.")}
                             </p>
                             <p style={{ fontSize: 11, marginTop: 8 }}>
                                 AI report quality{" "}
@@ -688,6 +703,22 @@ export default function CommunityCiiAnalyser({
                             </ul>
                         </div>
                     </div>
+
+                    {Array.isArray(ciiV45.sectionAnalyses) && ciiV45.sectionAnalyses.length ? (
+                        <details className="fx23-method">
+                            <summary>Admin-only section analysis ({ciiV45.sectionAnalyses.length})</summary>
+                            {ciiV45.sectionAnalyses.map((section, i) => (
+                                <div key={`${section.dimension}-${i}`} style={{ marginTop: 8 }}>
+                                    <p>
+                                        <b>D{section.dimension}</b> — {section.summary || "—"}
+                                    </p>
+                                    {section.strengths?.length ? <p>Strengths: {section.strengths.join("; ")}</p> : null}
+                                    {section.limitations?.length ? <p>Limitations: {section.limitations.join("; ")}</p> : null}
+                                    {section.adminFlags?.length ? <p>Admin flags: {section.adminFlags.join("; ")}</p> : null}
+                                </div>
+                            ))}
+                        </details>
+                    ) : null}
 
                     <div className="fx23-ciisections">
                         {ciiV45.sectionScores.map((section) => (
@@ -856,7 +887,8 @@ export default function CommunityCiiAnalyser({
                                     <small>ADMIN EVIDENCE · DIMENSION 7 · /15</small>
                                     <h2>Score original evidence</h2>
                                     <p>
-                                        Look at the uploaded files yourself. Anchors 0–4 × the seven criteria below become the 15 evidence points. This is not scored by AI.
+                                        Look at the uploaded files yourself. Empty marks default to Sound (2). Changing an anchor updates the Composite before Confirm.
+                                        {dim7Complete ? ` Live evidence subtotal: ${dim7PreviewPts.toFixed(2)} / 15.` : ""}
                                     </p>
                                 </div>
                             </div>
@@ -872,14 +904,14 @@ export default function CommunityCiiAnalyser({
                                             <option value="">Select anchor</option>
                                             {CII_V45_ANCHOR_NAMES.map((name, i) => (
                                                 <option key={name} value={String(i)}>
-                                                    {i}/4 · {name}
+                                                    {i}/4 · {name} · {(c.weight * CII_V45_ANCHOR_FACTORS[i]).toFixed(2)} pts
                                                 </option>
                                             ))}
                                         </select>
                                         <textarea
                                             value={dim7Reasons[c.key] ?? ""}
                                             onChange={(e) => setDim7Reasons((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                                            placeholder="Short reason from the originals you reviewed."
+                                            placeholder="Optional note from the originals (the system writes an audit rationale if blank)."
                                             style={{ marginTop: 6 }}
                                         />
                                     </label>
@@ -892,14 +924,14 @@ export default function CommunityCiiAnalyser({
                         <div className="fx23-modhead">
                             <div>
                                 <small>ADMIN ACCEPT &amp; PUBLISH</small>
-                                <h2>Review, moderate, publish</h2>
+                                <h2>Review generated Composite CII</h2>
                                 <p>
-                                    Accept the combined CII (85 AI + 15 evidence) as-is, or moderate the published total. A reason is required only when the published score differs from the computed recommendation.
+                                    Confirm publishes the system Composite (85 AI + 15 evidence). There is no manual final-score override — change Dimension 7 marks if the evidence score should move.
                                 </p>
                             </div>
                             <div className="fx23-final">
-                                <span>AI recommended</span>
-                                <b>{currentScore != null ? currentScore.toFixed(1) : "—"}</b>
+                                <span>{dim7Complete && evidenceAssessmentPending(ciiV45) ? "Generated Composite" : "AI recommended"}</span>
+                                <b>{previewComposite != null ? previewComposite.toFixed(1) : "—"}</b>
                                 <small>/100</small>
                                 <strong>{badgeLabel(diagnosticBadge)}</strong>
                             </div>
@@ -913,35 +945,6 @@ export default function CommunityCiiAnalyser({
 
                         {!readOnly ? (
                             <div className="fx23-comment">
-                                <label>
-                                    Admin approved score <span>defaults to the AI-recommended score</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={0.1}
-                                    disabled={Boolean(hardBlock)}
-                                    value={adjustedScoreInput}
-                                    onChange={(e) => setAdjustedScoreInput(e.target.value)}
-                                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
-                                />
-                                <label style={{ marginTop: 10 }}>
-                                    Score moderation reason{" "}
-                                    <span>
-                                        {adjustedScoreInput.trim() !== "" &&
-                                        currentScore != null &&
-                                        Math.round(Number(adjustedScoreInput) * 10) / 10 !== Math.round(currentScore * 10) / 10
-                                            ? "required when the score changes"
-                                            : "optional — only required if the score changes"}
-                                    </span>
-                                </label>
-                                <textarea
-                                    value={moderationReason}
-                                    onChange={(e) => setModerationReason(e.target.value)}
-                                    disabled={Boolean(hardBlock)}
-                                    placeholder="Explain why the published score differs from the AI recommendation."
-                                />
                                 <label style={{ marginTop: 10 }}>
                                     Admin note <span>optional</span>
                                 </label>
@@ -951,7 +954,7 @@ export default function CommunityCiiAnalyser({
                                     disabled={locked}
                                     placeholder="Optional note for this decision — also used as the reason for Request revision / Reject below."
                                 />
-                                <small>Approve locks the published CII v5.0 score and badge. Revision / reject keep the record unlocked and send the same note to the student.</small>
+                                <small>Confirm locks the generated CII v5.0.2 Composite and badge. Revision / reject keep the record unlocked and send the same note to the student.</small>
                             </div>
                         ) : null}
 

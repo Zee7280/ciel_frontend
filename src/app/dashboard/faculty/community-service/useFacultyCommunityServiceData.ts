@@ -423,7 +423,7 @@ export function useFacultyCommunityServiceData() {
                           : "Analyzer not run"
                 }`,
                 href: `${FACULTY_CS_REPORTS}/${row.id}`,
-                cta: "Open locked package",
+                cta: "Open Impact Package",
                 studentEmail: row.student_email,
             })),
         ],

@@ -25,6 +25,7 @@ export type DetailedReportRow = {
     question: string;
     answer: DetailedReportValue;
     origin: string;
+    source_path: string;
 };
 
 export type DetailedReportSubsection = {
@@ -138,9 +139,14 @@ function originOf(value: DetailedReportValue, fallback = SOURCE): string {
     return isEmpty(value) ? NOT_SUPPLIED : fallback;
 }
 
-function row(question: string, answer: DetailedReportValue, origin?: string): DetailedReportRow {
+function row(question: string, answer: DetailedReportValue, origin?: string, sourcePath?: string): DetailedReportRow {
     const resolved = isEmpty(answer) ? NOT_SUPPLIED : answer;
-    return { question, answer: resolved, origin: origin || originOf(resolved) };
+    return {
+        question,
+        answer: resolved,
+        origin: origin || originOf(resolved),
+        source_path: sourcePath || "",
+    };
 }
 
 function personName(person: { name?: string; fullName?: string } | undefined): string {
@@ -747,7 +753,18 @@ export function buildImpactPackageDetailedReport(
         ],
     };
 
-    const sections = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10];
+    const sections = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10].map((section) => ({
+        ...section,
+        subsections: section.subsections.map((sub) => ({
+            ...sub,
+            rows: sub.rows.map((item, index) => ({
+                ...item,
+                source_path:
+                    item.source_path ||
+                    `student_source.section_${section.id}.${sub.id}.row_${index + 1}`,
+            })),
+        })),
+    }));
     const subsectionCount = sections.reduce((sum, section) => sum + section.subsections.length, 0);
     const fieldCount = sections.reduce(
         (sum, section) => sum + section.subsections.reduce((inner, sub) => inner + sub.rows.length, 0),
@@ -834,7 +851,7 @@ export function detailedReportMatchesQuery(
 ): boolean {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    const blob = `${subsection.id} ${subsection.title} ${row.question} ${row.origin} ${flattenValue(row.answer)}`.toLowerCase();
+    const blob = `${subsection.id} ${subsection.title} ${row.question} ${row.origin} ${row.source_path} ${flattenValue(row.answer)}`.toLowerCase();
     return blob.includes(q);
 }
 

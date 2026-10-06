@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 
 type CiiSection = {
     dimension: string;
@@ -14,8 +14,12 @@ type CiiSection = {
 type CiiBreakdown = {
     finalCII?: number | null;
     diagnosticCII?: number | null;
+    aiReportScore?: number | null;
+    knownBasePoints?: number | null;
+    baseCII?: number | null;
     finalBadge?: { level?: number; name?: string } | null;
     recommendedBadge?: { level?: number; name?: string } | null;
+    diagnosticBadge?: { level?: number; name?: string } | null;
     sectionScores?: CiiSection[];
     extraMileUplift?: { total?: number | null };
     integrityPenalty?: { points?: number };
@@ -35,9 +39,8 @@ function confidenceLabel(score: number | null, weight: number): string {
 
 /**
  * Read-only CII v4.5 breakdown for non-faculty stakeholders (NGO, Partner, University, Super
- * Admin) — same redacted subset the student flashcard shows (section scores + verified
- * highlights), never per-criterion detail or admin moderation. v4.5 has no pre-lock provisional
- * release, so this always reflects the admin-locked score.
+ * Admin) — same redacted subset the student flashcard shows (section scores + highlights),
+ * never per-criterion detail or admin moderation.
  * `fetchUrl` picks the caller's own role-scoped endpoint; this component doesn't know or care
  * which role is viewing it.
  */
@@ -52,6 +55,7 @@ export default function CommunityCiiBreakdownModal({
 }) {
     const [state, setState] = useState<"loading" | "ok" | "error">("loading");
     const [data, setData] = useState<CiiBreakdown | null>(null);
+    const [lock, setLock] = useState<{ locked?: boolean | string } | null>(null);
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
@@ -68,6 +72,7 @@ export default function CommunityCiiBreakdownModal({
                 }
                 const json = await r.json();
                 setData(json?.data?.ciiV45 ?? null);
+                setLock(json?.data?.ciiV45Lock ?? null);
                 setState("ok");
             })
             .catch(() => {
@@ -128,14 +133,16 @@ export default function CommunityCiiBreakdownModal({
                             <div className="flex items-center gap-4">
                                 <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#0b8278,#3bc3b5)]">
                                     <span className="text-xl font-black text-white">
-                                        {Math.round(pickCiiV45DisplayScore(data, { locked: true }) ?? data.finalCII ?? 0)}
+                                        {Math.round(pickCiiV45DisplayScore(data, lock) ?? data.finalCII ?? data.diagnosticCII ?? data.aiReportScore ?? 0)}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="inline-block rounded-full bg-[#eaf8f4] px-2.5 py-1 text-[9px] font-black text-[#176958]">
-                                        VERIFIED
+                                        {lock?.locked === true || lock?.locked === "true" ? "VERIFIED" : "CII"}
                                     </span>
-                                    <div className="mt-1 text-[14px] font-bold text-[#16313d]">{data.finalBadge?.name || "Approved"}</div>
+                                    <div className="mt-1 text-[14px] font-bold text-[#16313d]">
+                                        {pickCiiV45DisplayBadgeName(data, lock) || data.finalBadge?.name || data.diagnosticBadge?.name || "CII"}
+                                    </div>
                                 </div>
                             </div>
 

@@ -107,7 +107,7 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
     reports: {
         desc: "Read-only faculty review and analysis of submitted Community Service Reports.",
         items: [
-            ["Pending Review", "Reports awaiting CIEL PK Admin analysis / decision. Open the locked package to view."],
+            ["Pending Review", "Reports awaiting CIEL PK Admin analysis / decision. Open the Impact Package to view the flashcard and detailed report."],
             ["Revision with Student", "Reports returned for correction."],
             ["Decided", "Approved or rejected report decisions retained for history."],
             ["CII Breakdown", "Review any provisional AI assessment and evidence logic when available."],

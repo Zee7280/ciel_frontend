@@ -65,7 +65,7 @@ function asCiiRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
-/** Locked → published score. Unlocked reviewer payload → diagnostic / base. */
+/** Locked → published score. Unlocked → latest available diagnostic / base / AI score. */
 export function pickCiiV45DisplayScore(ciiV45: unknown, lock?: unknown): number | null {
     const cii = asCiiRecord(ciiV45);
     if (!cii) return null;
@@ -73,11 +73,13 @@ export function pickCiiV45DisplayScore(ciiV45: unknown, lock?: unknown): number 
     if (isCiiV45Locked(lock)) {
         return finiteCii(lockObj?.adminApprovedScore) ?? finiteCii(cii.finalCII) ?? finiteCii(cii.diagnosticCII);
     }
-    const evidence = asCiiRecord(cii.adminEvidenceAssessment);
-    if (evidence?.status === "PENDING") {
-        return finiteCii(cii.diagnosticCII) ?? finiteCii(cii.baseCII) ?? finiteCii(cii.finalCII);
-    }
-    return finiteCii(cii.diagnosticCII) ?? finiteCii(cii.baseCII) ?? finiteCii(cii.knownBasePoints) ?? finiteCii(cii.finalCII);
+    return (
+        finiteCii(cii.diagnosticCII) ??
+        finiteCii(cii.baseCII) ??
+        finiteCii(cii.finalCII) ??
+        finiteCii(cii.knownBasePoints) ??
+        finiteCii(cii.aiReportScore)
+    );
 }
 
 export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): string | null {
@@ -90,8 +92,6 @@ export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): str
     if (isCiiV45Locked(lock)) {
         return nameOf(cii.finalBadge) || nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge);
     }
-    const evidence = asCiiRecord(cii.adminEvidenceAssessment);
-    if (evidence?.status === "PENDING") return null;
     return nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge) || nameOf(cii.finalBadge);
 }
 

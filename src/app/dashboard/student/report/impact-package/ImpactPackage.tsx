@@ -29,6 +29,7 @@ import {
     type ImpactPackageEvidenceKind,
 } from "./buildImpactPackageModel";
 import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
 import "./impact-package.css";
 
 const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: string }> = {
@@ -88,13 +89,24 @@ function asCii(data: ReportData): {
     finalBadge?: { name?: string; level?: number };
     sectionScores?: Array<{ dimension?: string; name?: string; score?: number; maximumPoints?: number }>;
     studentFeedback?: string;
+    strengths?: unknown;
+    developmentPriorities?: unknown;
+    analysisSummary?: string;
 } {
     return (data.ciiV45 && typeof data.ciiV45 === "object" ? data.ciiV45 : {}) as {
         finalCII?: number;
         finalBadge?: { name?: string; level?: number };
         sectionScores?: Array<{ dimension?: string; name?: string; score?: number; maximumPoints?: number }>;
         studentFeedback?: string;
+        strengths?: unknown;
+        developmentPriorities?: unknown;
+        analysisSummary?: string;
     };
+}
+
+function asStringList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
 }
 
 function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyserHref?: string }) {
@@ -103,29 +115,69 @@ function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyse
     const badgeName = pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
     const sections = Array.isArray(cii.sectionScores) ? cii.sectionScores : [];
     const summary = typeof cii.studentFeedback === "string" ? cii.studentFeedback.trim() : "";
+    const overall = typeof cii.analysisSummary === "string" ? cii.analysisSummary.trim() : "";
+    const strengths = asStringList(cii.strengths);
+    const limits = asStringList(cii.developmentPriorities);
+    const adminNote =
+        data.ciiV45Lock && typeof data.ciiV45Lock === "object"
+            ? String((data.ciiV45Lock as { adminNote?: unknown }).adminNote || "").trim()
+            : "";
     return (
         <div>
             <div className="evidence-stats">
                 <div className="evidence-stat">
                     <b>{score != null ? `${Math.round(score * 10) / 10}` : "—"}</b>
-                    <span>CII / 100</span>
+                    <span>Final Composite CII / 100</span>
                 </div>
                 <div className="evidence-stat">
                     <b>{badgeName || cii.finalBadge?.name || "Level pending"}</b>
-                    <span>{cii.finalBadge?.level != null ? `L${cii.finalBadge.level}` : "recognition"}</span>
+                    <span>{cii.finalBadge?.level != null ? `L${cii.finalBadge.level}` : "awarded badge"}</span>
                 </div>
                 <div className="evidence-stat">
                     <b>{sections.length}</b>
                     <span>scored sections</span>
                 </div>
                 <div className="evidence-stat">
-                    <b>Attached</b>
-                    <span>after Super Admin approval</span>
+                    <b>Published</b>
+                    <span>after CIEL PK Admin approval</span>
                 </div>
             </div>
-            {summary ? (
+            {summary || overall ? (
                 <div className="banner" style={{ marginBottom: 18 }}>
-                    <strong>Analyst note.</strong> {summary}
+                    <strong>Your Community Impact Analysis.</strong> {summary || overall}
+                </div>
+            ) : null}
+            {strengths.length ? (
+                <div className="report-section" style={{ display: "block", padding: 0, marginBottom: 12 }}>
+                    <div className="subsection">
+                        <h3>What you did well</h3>
+                        <div className="answer">
+                            <ul>
+                                {strengths.map((item) => (
+                                    <li key={item}>{item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            {limits.length ? (
+                <div className="report-section" style={{ display: "block", padding: 0, marginBottom: 12 }}>
+                    <div className="subsection">
+                        <h3>Limitations & next learning</h3>
+                        <div className="answer">
+                            <ul>
+                                {limits.map((item) => (
+                                    <li key={item}>{item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            {adminNote ? (
+                <div className="banner" style={{ marginBottom: 18 }}>
+                    <strong>CIEL PK Admin comment.</strong> {adminNote}
                 </div>
             ) : null}
             <div className="report-section" style={{ display: "block", padding: 0 }}>
@@ -195,13 +247,15 @@ export default function ImpactPackage({
     const [previewStage, setPreviewStage] = useState<"pending" | "approved">(model.adminApproved ? "approved" : "pending");
 
     const visibility = model.effectiveVisibility;
-    const canView = impactPackageCanViewEvidence(audience, visibility);
+    const evidenceUnlocked = previewStage === "approved" || model.adminApproved;
+    const canView = impactPackageCanViewEvidence(audience, visibility, evidenceUnlocked);
     const partnerLocked = audience === "partner" && visibility !== "public";
     const publicLocked = audience === "public" && visibility !== "public";
     const filesVisible = partnerLocked || publicLocked ? false : canView;
     const canDownload = impactPackageCanDownload(audience, visibility, model.publicConsent);
     const lockLine = impactPackageLockLine(previewStage === "approved" || model.adminApproved);
     const accessText = impactPackageAccessText(audience, visibility, previewStage === "approved" || model.adminApproved);
+    const packetIntegrity = readImpactPackagePacketIntegrity(data);
     const flashChange = model.change && model.change.before != null && model.change.after != null
         ? changeCaption(model.change)
         : null;
@@ -378,12 +432,24 @@ export default function ImpactPackage({
                     {analyserHref ? (
                         <a href={analyserHref} className="primary" style={{ textDecoration: "none" }}>
                             <span className="button-content">
-                                {(data as { ciiV45?: unknown }).ciiV45 ? "Open AI analyser" : "Run AI analyser"}
+                                {audience === "admin" && !(data as { ciiV45?: unknown }).ciiV45
+                                    ? "Run AI analyser"
+                                    : "Open AI analyser"}
                             </span>
                         </a>
                     ) : null}
                 </div>
             </div>
+            {packetIntegrity && !packetIntegrity.ok ? (
+                <div className="banner" role="alert" style={{ margin: "0 24px 16px" }}>
+                    <strong>Student packet integrity HOLD.</strong> The AI Analyser must not score this package until the missing content is restored.{" "}
+                    {packetIntegrity.issues.join(" ")}
+                </div>
+            ) : audience === "admin" && packetIntegrity?.ok ? (
+                <div className="banner" style={{ margin: "0 24px 16px" }}>
+                    <strong>Packet complete.</strong> {packetIntegrity.content_sections}/9 content sections · {packetIntegrity.answer_fields} answer fields · {packetIntegrity.evidence_files} evidence files. Final authority: CIEL PK Super Admin. Scoring: AI /85 + Admin evidence /15. No Faculty or Partner verification in this approval chain.
+                </div>
+            ) : null}
 
             <main className="ipkg-main">
                 {tab === "flash" ? (

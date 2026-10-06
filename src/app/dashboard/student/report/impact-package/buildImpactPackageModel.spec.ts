@@ -31,9 +31,13 @@ test("no analysis tab when CII is not locked", () => {
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
 });
 
-test("evidence: partner locked on restricted, downloads only for public with consent", () => {
+test("evidence: partner locked on restricted, faculty/university wait for Admin approval", () => {
     assert.equal(impactPackageCanViewEvidence("partner", "restricted" as never), false);
-    assert.equal(impactPackageCanViewEvidence("faculty", "restricted" as never), true);
+    assert.equal(impactPackageCanViewEvidence("faculty", "restricted" as never, false), false);
+    assert.equal(impactPackageCanViewEvidence("university", "restricted" as never, false), false);
+    assert.equal(impactPackageCanViewEvidence("faculty", "restricted" as never, true), true);
+    assert.equal(impactPackageCanViewEvidence("student", "restricted" as never, false), true);
+    assert.equal(impactPackageCanViewEvidence("admin", "restricted" as never, false), true);
     assert.equal(impactPackageCanDownload("student", "restricted" as never, true), false);
     assert.equal(impactPackageCanDownload("partner", "public" as never, true), true);
     assert.equal(impactPackageCanDownload("partner", "public" as never, false), false);
@@ -106,6 +110,21 @@ test("admin sees the analysis tab once a score exists, even before locking", () 
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
     const diagnosticOnly = { ciiV45: { diagnosticCII: null, baseCII: 70 }, ciiV45Lock: null, admin_status: "pending" } as never;
     assert.equal(shouldShowImpactPackageAnalysis("admin", diagnosticOnly), true);
+});
+
+test("flashcard CII label shows the display score before Admin lock", () => {
+    const pending = buildImpactPackageModel({
+        project_id: "p-cii",
+        ciiV45: { diagnosticCII: 57.9, baseCII: 57.9 },
+        ciiV45Lock: null,
+        admin_status: "pending",
+    } as never);
+    assert.equal(pending.ciiLabel, "CII 58/100");
+    assert.equal(pending.ciiPending, false);
+
+    const empty = buildImpactPackageModel({ project_id: "p-empty" } as never);
+    assert.equal(empty.ciiLabel, "CII: not issued");
+    assert.equal(empty.ciiPending, true);
 });
 
 test("student detailed report waits for Super Admin approval; reviewers keep it", () => {

@@ -46,7 +46,7 @@ function AnswerView({ value }: { value: DetailedReportValue }) {
             </>
         );
     }
-    const entries = Object.entries(value).filter(([, item]) => item != null && item !== "");
+    const entries = Object.entries(value);
     if (!entries.length) return <span className="empty">Not supplied</span>;
     return (
         <div className="nested">

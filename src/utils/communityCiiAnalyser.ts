@@ -177,6 +177,13 @@ export interface CiiV45EvaluatorPayload {
     analysisSummary: string;
     evidenceSummary: string;
     studentFeedback: string;
+    sectionAnalyses?: Array<{
+        dimension: Exclude<CiiV45Dimension, "7">;
+        summary: string;
+        strengths: string[];
+        limitations: string[];
+        adminFlags: string[];
+    }>;
 }
 
 export interface CiiV45Band {
@@ -275,12 +282,12 @@ export interface CiiV45DimensionDef {
 export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
     {
         id: "1",
-        name: "Participation & Verified Effort",
+        name: "Participation & Individual Effort",
         maxPoints: 10,
         criteria: [
             { key: "role", weight: 2.5, label: "Individual responsibility" },
             { key: "quality", weight: 2.5, label: "Meaningful involvement" },
-            { key: "hoursConsistency", weight: 2.5, label: "Hours log reliability" },
+            { key: "hoursCompletion", weight: 2.5, label: "Hours requirement met" },
             { key: "continuity", weight: 2.5, label: "Regularity & follow-through" },
         ],
     },
@@ -301,9 +308,9 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "SDG Contribution",
         maxPoints: 5,
         criteria: [
-            { key: "alignment", weight: 1.5, label: "SDG goal/target fit" },
+            { key: "alignment", weight: 2.5, label: "Primary SDG fit" },
             { key: "logic", weight: 1.5, label: "Need-to-SDG logic chain" },
-            { key: "coherence", weight: 1.5, label: "Consistency with report" },
+            { key: "coherence", weight: 0.5, label: "Consistency with report" },
             { key: "focus", weight: 0.5, label: "SDG selectivity" },
         ],
     },
@@ -415,7 +422,8 @@ export function dimensionById(id: CiiV45Dimension): CiiV45DimensionDef | undefin
 }
 
 export function criterionLabel(dimensionId: CiiV45Dimension, key: string): string {
-    return dimensionById(dimensionId)?.criteria.find((c) => c.key === key)?.label || key;
+    const resolved = dimensionId === "1" && key === "hoursConsistency" ? "hoursCompletion" : key;
+    return dimensionById(dimensionId)?.criteria.find((c) => c.key === resolved)?.label || key;
 }
 
 /**
