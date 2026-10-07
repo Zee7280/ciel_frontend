@@ -123,6 +123,7 @@ export default function NationalRankingStudio({
         university: p.university,
         pathway: p.pathway,
         version: p.version,
+        parts: p.parts,
         cii: p.cii,
         ciiLocked: p.ciiLocked,
         status: "Ready",
@@ -481,7 +482,7 @@ export default function NationalRankingStudio({
                                     </table>
                                 </div>
                             )}
-                            {inspectTab === "package" && (inspect.parts || inspect.package?.parts || []).map((part) => (
+                            {inspectTab === "package" && ((inspect.parts ?? inspect.package?.parts) || []).map((part) => (
                                 <div className="listitem" key={part}><b>{part}</b><p>Retrieved from the approved Impact Package. Original CII is not rewritten.</p></div>
                             ))}
                         </div>

@@ -252,6 +252,11 @@ export default function ImpactPackage({
     }, [tabs, initialTab]);
 
     const printPackage = () => {
+        if (tab === "report") {
+            document.querySelectorAll("#report-sections details.report-section").forEach((el) => {
+                if (el instanceof HTMLDetailsElement) el.open = true;
+            });
+        }
         document.body.classList.add("ipkg-printing");
         const finish = () => {
             document.body.classList.remove("ipkg-printing");
@@ -562,7 +567,7 @@ export default function ImpactPackage({
                                     </div>
                                 </div>
                                 <div className="footer-id">
-                                    {model.projectId || model.reportId}
+                                    CIEL PK Impact Package
                                     <br />
                                     One opportunity · one report · three views
                                 </div>
@@ -678,7 +683,7 @@ export default function ImpactPackage({
                                                 </span>
                                             </div>
                                             <div className="ev-body">
-                                                <div className="ev-name">{locked ? `${model.visibilityLabel} evidence · ${file.id}` : file.name}</div>
+                                                <div className="ev-name">{locked ? `${model.visibilityLabel} evidence` : file.name}</div>
                                                 <div className="ev-meta">
                                                     <span>{locked ? "Protected" : file.kind.toUpperCase()}</span>
                                                     {locked ? null : <span>Section {file.section.replace("section", "")}</span>}

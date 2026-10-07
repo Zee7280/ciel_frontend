@@ -58,6 +58,11 @@ export function CiiFinalOnePageSheet({
 }) {
     const badgeSrc = badgeLevel && CII_FINAL_BADGE_SRC[badgeLevel] ? CII_FINAL_BADGE_SRC[badgeLevel] : undefined;
     const meta = [studentName, university].filter(Boolean).join(" · ");
+    const publicRef =
+        reportId &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reportId.trim())
+            ? reportId.trim()
+            : "";
     return (
         <div className={[embedded ? "" : "cii-final", "onepage", className].filter(Boolean).join(" ")}>
             {showPrint ? (
@@ -134,7 +139,7 @@ export function CiiFinalOnePageSheet({
                     </div>
                 </div>
                 <div className="sheet-foot">
-                    <span>{reportId ? `Report ${reportId}` : "CIEL PK Impact Package"}</span>
+                    <span>{publicRef ? `Report ${publicRef}` : "CIEL PK Impact Package"}</span>
                     <span>Approved by CIEL PK · Final authority</span>
                 </div>
             </article>

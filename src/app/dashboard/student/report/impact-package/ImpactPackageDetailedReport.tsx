@@ -81,12 +81,29 @@ export default function ImpactPackageDetailedReport({
     const [openIds, setOpenIds] = useState<string[]>(() => dossier.sections.map((section) => section.id));
 
     const setSections = (open: boolean) => {
-        setOpenIds(open ? dossier.sections.map((section) => section.id) : []);
+        const ids = open ? dossier.sections.map((section) => section.id) : [];
+        setOpenIds(ids);
+        window.requestAnimationFrame(() => {
+            dossier.sections.forEach((section) => {
+                const el = document.getElementById(`section-${section.id}`);
+                if (el instanceof HTMLDetailsElement) el.open = open;
+            });
+        });
+    };
+
+    const originLabel = (origin: string) => {
+        const value = origin.trim();
+        if (!value || /^source record$/i.test(value) || /^not supplied$/i.test(value) || /^v13\b/i.test(value)) {
+            return "";
+        }
+        return value;
     };
 
     const scrollTo = (id: string) => {
-        document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        const el = document.getElementById(`section-${id}`);
+        if (el instanceof HTMLDetailsElement) el.open = true;
         setOpenIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
     let visibleFields = 0;
@@ -101,10 +118,7 @@ export default function ImpactPackageDetailedReport({
                     </span>
                 </div>
                 <h1>{dossier.title}</h1>
-                <p>
-                    Every question, every answer, preserved
-                    {dossier.projectId ? ` · ${dossier.projectId}` : ""}. Original V13 subsection references are kept alongside the normalized package numbering.
-                </p>
+                <p>Every question and answer from the submitted report, kept in section order.</p>
             </header>
             {dossier.banner ? (
                 <div className={`banner ${dossier.banner.kind === "warning" ? "warning" : ""}`}>
@@ -172,7 +186,6 @@ export default function ImpactPackageDetailedReport({
                                         <span className="n">{section.id.padStart(2, "0")}</span>
                                         <div>
                                             <h2>{section.title}</h2>
-                                            <div className="source">{section.source}</div>
                                         </div>
                                     </summary>
                                     {subs.map(({ sub, rows }) => (
@@ -185,7 +198,9 @@ export default function ImpactPackageDetailedReport({
                                                 <div className="qa" key={`${sub.id}-${item.question}`}>
                                                     <div className="question">
                                                         {item.question}
-                                                        <span className="origin">{item.origin}</span>
+                                                        {originLabel(item.origin) ? (
+                                                            <span className="origin">{originLabel(item.origin)}</span>
+                                                        ) : null}
                                                     </div>
                                                     <div className="answer">
                                                         <AnswerView value={item.answer} />

@@ -6,6 +6,7 @@ import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 import AttendanceReviewDashboard from "@/components/engagement/AttendanceReviewDashboard";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 function pickOpportunityListId(o: Record<string, unknown>): string {
     const nested =
@@ -42,15 +43,30 @@ function pickOpportunitySubtitle(o: Record<string, unknown>): string | undefined
         o.opportunity && typeof o.opportunity === "object"
             ? (o.opportunity as Record<string, unknown>)
             : null;
+    const nestedOrg =
+        nested?.organization && typeof nested.organization === "object"
+            ? (nested.organization as Record<string, unknown>)
+            : o.organization && typeof o.organization === "object"
+              ? (o.organization as Record<string, unknown>)
+              : null;
     for (const raw of [
+        o.partner_name,
+        o.partnerName,
+        o.partner_organization,
+        o.partnerOrganization,
+        nested?.partner_name,
         o.university_name,
         o.universityName,
         o.university,
-        o.organization_name,
         nested?.university_name,
         nested?.universityName,
+        nested?.organization_name,
+        nestedOrg?.name,
+        nestedOrg?.organization_name,
+        o.organization_name,
     ]) {
-        if (typeof raw === "string" && raw.trim()) return raw.trim();
+        const shown = displayOrganizationName(raw);
+        if (shown) return shown;
     }
     return undefined;
 }

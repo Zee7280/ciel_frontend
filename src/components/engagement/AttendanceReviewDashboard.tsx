@@ -462,7 +462,7 @@ export default function AttendanceReviewDashboard({
                 <div
                     className={clsx(
                         stretchViewport && !isPartner
-                            ? "flex min-h-[calc(100dvh-11rem)] flex-col gap-4"
+                            ? "grid min-h-[calc(100dvh-11rem)] grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start"
                             : "grid gap-6 lg:grid-cols-12 lg:gap-8",
                         stretchViewport && isPartner && "min-h-[calc(100dvh-11rem)] lg:items-stretch",
                     )}
@@ -470,7 +470,7 @@ export default function AttendanceReviewDashboard({
                     <div
                         className={clsx(
                             stretchViewport && !isPartner
-                                ? "flex w-full min-h-[min(24rem,calc(100dvh-20rem))] max-h-[min(36rem,calc(100dvh-14rem))] shrink-0 flex-col gap-4"
+                                ? "flex w-full min-h-[18rem] flex-col gap-4 lg:col-span-5 lg:max-h-[calc(100dvh-12rem)]"
                                 : "space-y-4 lg:col-span-4",
                             stretchViewport &&
                                 isPartner &&
@@ -739,10 +739,11 @@ export default function AttendanceReviewDashboard({
                                                     type="button"
                                                     onClick={() => handleRowSelect(p.id)}
                                                     className={clsx(
-                                                        "relative w-full overflow-hidden border text-left transition shadow-sm",
+                                                        "relative w-full border text-left transition shadow-sm",
                                                         facultyWide
                                                             ? "min-h-[4.75rem] rounded-xl px-5 py-4 text-sm"
                                                             : "rounded-[10px] px-4 py-3.5 text-sm",
+                                                        sel && "pl-6",
                                                         sel
                                                             ? clsx(
                                                                   "border-[#0056B3]/35 bg-[#0056B3]/[0.07] shadow-md ring-2",
@@ -762,20 +763,20 @@ export default function AttendanceReviewDashboard({
                                                         />
                                                     ) : null}
                                                     <div className="flex items-start justify-between gap-3 pl-0.5">
-                                                        <div className="min-w-0">
+                                                        <div className="min-w-0 overflow-visible">
                                                             <p
                                                                 className={clsx(
-                                                                    "font-semibold text-slate-900",
-                                                                    facultyWide && "line-clamp-2 leading-snug",
+                                                                    "break-words font-semibold text-slate-900",
+                                                                    facultyWide && "leading-snug",
                                                                 )}
                                                             >
                                                                 {p.title}
                                                             </p>
                                                             {p.subtitle ? (
-                                                                <p className="mt-1 text-xs text-slate-500">{p.subtitle}</p>
+                                                                <p className="mt-1 break-words text-xs text-slate-500">{p.subtitle}</p>
                                                             ) : null}
                                                         </div>
-                                                        <PendingCountBadge n={n} partner />
+                                                        {liveHoursMonitor ? null : <PendingCountBadge n={n} partner />}
                                                     </div>
                                                 </button>
                                             );
@@ -789,7 +790,7 @@ export default function AttendanceReviewDashboard({
                     <div
                         className={clsx(
                             stretchViewport && !isPartner
-                                ? "flex min-h-0 w-full flex-1 flex-col"
+                                ? "flex min-h-0 w-full flex-col lg:col-span-7"
                                 : stretchViewport
                                   ? "flex min-h-0 flex-col lg:col-span-9"
                                   : "lg:col-span-8",
@@ -1013,7 +1014,7 @@ export default function AttendanceReviewDashboard({
                                         </div>
                                     </div>
                                 ) : stretchViewport ? (
-                                    <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50/40 to-white px-4 py-3.5 shadow-sm">
+                                    <div className="flex shrink-0 items-center gap-4 overflow-visible rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50/40 to-white px-4 py-3.5 shadow-sm">
                                         <div
                                             className={clsx(
                                                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
@@ -1023,12 +1024,12 @@ export default function AttendanceReviewDashboard({
                                         >
                                             <BookOpen className={clsx("h-5 w-5", accent)} aria-hidden />
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                                        <div className="min-w-0 flex-1 overflow-visible">
+                                            <p className="break-words text-sm font-bold leading-snug text-slate-900 sm:text-base">
                                                 {selected.title}
                                             </p>
                                             {selected.subtitle ? (
-                                                <p className="mt-0.5 text-xs text-slate-500">{selected.subtitle}</p>
+                                                <p className="mt-0.5 break-words text-xs text-slate-500">{selected.subtitle}</p>
                                             ) : null}
                                         </div>
                                         {liveHoursMonitor ? null : (

@@ -204,7 +204,7 @@ export function buildImpactPackageDetailedReport(
     const s1: DetailedReportSection = {
         id: "1",
         title: "Identity, team & participation",
-        source: "V13 §1",
+        source: "",
         subsections: [
             {
                 id: "1.1",
@@ -329,7 +329,7 @@ export function buildImpactPackageDetailedReport(
     const s2: DetailedReportSection = {
         id: "2",
         title: "Project context & baseline",
-        source: "V13 §2",
+        source: "",
         subsections: [
             {
                 id: "2.1",
@@ -366,7 +366,7 @@ export function buildImpactPackageDetailedReport(
     const s3: DetailedReportSection = {
         id: "3",
         title: "SDGs & contribution pathways",
-        source: "V13 §3",
+        source: "",
         subsections: [
             {
                 id: "3.1",
@@ -418,7 +418,7 @@ export function buildImpactPackageDetailedReport(
     const s4: DetailedReportSection = {
         id: "4",
         title: "Activities, outputs & measured change",
-        source: "V13 §4 (merged activities + outcomes)",
+        source: "",
         subsections: [
             {
                 id: "4.1",
@@ -508,7 +508,7 @@ export function buildImpactPackageDetailedReport(
     const s5: DetailedReportSection = {
         id: "5",
         title: "Resources & funding",
-        source: "V13 §5 · form state s6",
+        source: "",
         subsections: [
             {
                 id: "5.1",
@@ -549,7 +549,7 @@ export function buildImpactPackageDetailedReport(
     const s6: DetailedReportSection = {
         id: "6",
         title: "Partners & collaboration",
-        source: "V13 §6 · form state s7",
+        source: "",
         subsections: [
             {
                 id: "6.1",
@@ -593,7 +593,7 @@ export function buildImpactPackageDetailedReport(
     const s7: DetailedReportSection = {
         id: "7",
         title: "Evidence & consent",
-        source: "V13 §7 · form state s8",
+        source: "",
         subsections: [
             {
                 id: "7.1",
@@ -636,7 +636,7 @@ export function buildImpactPackageDetailedReport(
     const s8: DetailedReportSection = {
         id: "8",
         title: "Reflection & learning",
-        source: "V13 §8 · form state s9",
+        source: "",
         subsections: [
             {
                 id: "8.1",
@@ -667,7 +667,7 @@ export function buildImpactPackageDetailedReport(
     const s9: DetailedReportSection = {
         id: "9",
         title: "Sustainability & continuation",
-        source: "V13 §9.1–9.4 · form state s10",
+        source: "",
         subsections: [
             {
                 id: "9.1",
@@ -715,7 +715,7 @@ export function buildImpactPackageDetailedReport(
     const s10: DetailedReportSection = {
         id: "10",
         title: "Final check, sign-off & publication",
-        source: "V13 final review · package §10",
+        source: "",
         subsections: [
             {
                 id: "10.1",
@@ -724,7 +724,7 @@ export function buildImpactPackageDetailedReport(
                     ...items.map((item, index) =>
                         row(`Declaration ${index + 1}`, flags[index] === true ? item : flags[index] === false ? "Not signed" : item),
                     ),
-                    row("Signed declarations in source record", flags.length === 5 && flags.every(Boolean)),
+                    row("Signed declarations", flags.length === 5 && flags.every(Boolean)),
                     row("Electronic signature", text(s11.signature_name, s11.signatureName)),
                     row("Signed date-time", signedWhen),
                 ],
@@ -835,7 +835,6 @@ function evidenceInventoryRow(
         };
     }
     return {
-        id: file.id,
         name: file.name,
         kind: file.kind,
         section: file.section,

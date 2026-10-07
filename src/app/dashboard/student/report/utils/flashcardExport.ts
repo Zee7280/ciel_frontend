@@ -105,6 +105,38 @@ function triggerPngDownload(dataUrl: string, title: string) {
     a.remove();
 }
 
+function revealHiddenFlashHost(source: HTMLElement): () => void {
+    const view = source.closest(".view");
+    if (!(view instanceof HTMLElement) || !view.hasAttribute("hidden")) return () => undefined;
+    const prev = {
+        position: view.style.position,
+        left: view.style.left,
+        top: view.style.top,
+        width: view.style.width,
+        zIndex: view.style.zIndex,
+        pointerEvents: view.style.pointerEvents,
+        visibility: view.style.visibility,
+    };
+    view.removeAttribute("hidden");
+    view.style.position = "fixed";
+    view.style.left = "0";
+    view.style.top = "0";
+    view.style.width = "1100px";
+    view.style.zIndex = "-1";
+    view.style.pointerEvents = "none";
+    view.style.visibility = "hidden";
+    return () => {
+        view.setAttribute("hidden", "");
+        view.style.position = prev.position;
+        view.style.left = prev.left;
+        view.style.top = prev.top;
+        view.style.width = prev.width;
+        view.style.zIndex = prev.zIndex;
+        view.style.pointerEvents = prev.pointerEvents;
+        view.style.visibility = prev.visibility;
+    };
+}
+
 async function exportIsolatedFlashcard(mode: ExportMode, title: string): Promise<void> {
     const source = findFlashcard();
     if (!source) {
@@ -112,7 +144,13 @@ async function exportIsolatedFlashcard(mode: ExportMode, title: string): Promise
         return;
     }
 
-    const wrap = mountFlashClone(source);
+    const restoreHost = revealHiddenFlashHost(source);
+    let wrap: HTMLElement;
+    try {
+        wrap = mountFlashClone(source);
+    } finally {
+        restoreHost();
+    }
     const card = (wrap.querySelector("#flashcard-capture, .flash, .c22-card") as HTMLElement | null) || wrap;
 
     const previousTitle = document.title;

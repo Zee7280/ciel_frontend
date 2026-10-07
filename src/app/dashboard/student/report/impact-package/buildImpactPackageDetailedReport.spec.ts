@@ -98,6 +98,18 @@ test("session rows map live attendance field names onto the detailed report", ()
     assert.equal(entries[0]?.status, "Logged");
 });
 
+test("detailed report does not expose V13 labels or project ids in section sources", () => {
+    const dossier = buildImpactPackageDetailedReport(base as never);
+    for (const section of dossier.sections) {
+        assert.equal(section.source.includes("V13"), false);
+        assert.equal(/v13/i.test(section.source), false);
+    }
+    const signed = dossier.sections[9].subsections
+        .find((sub) => sub.id === "10.1")
+        ?.rows.find((row) => row.question === "Signed declarations");
+    assert.ok(signed);
+});
+
 test("partner package redacts CNIC; faculty keeps the identity number", () => {
     const partner = buildImpactPackageDetailedReport(base as never, undefined, undefined, "partner");
     const cnic = partner.sections[0].subsections[0].rows.find((row) => row.question === "CNIC / identity number");
