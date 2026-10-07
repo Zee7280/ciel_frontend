@@ -81,6 +81,15 @@ export type CommunityAwardCard = {
     awardBadges?: CommunityAwardBadge[];
     awardBadgeHistory?: CommunityAwardBadge[];
     impact_verify_url?: string | null;
+    /** Published NPE-1.1 standing. Does not replace CII or RUBERIX total. */
+    npeStanding?: {
+        snapshotId: string;
+        scope: string;
+        excellenceScore: number;
+        nationalRank: number | null;
+        universityRank: number | null;
+        publishedAt: string;
+    };
 };
 
 export function awardTier(ratio: number) {

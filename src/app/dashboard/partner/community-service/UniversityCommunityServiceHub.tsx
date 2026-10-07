@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
+import NationalRankingStudio from "@/components/ciel/community-service/national-ranking/NationalRankingStudio";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
@@ -1057,14 +1057,14 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "run" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="AI Ranking Analyzer" subtitle={`${orgName} University Cohort only — other universities never enter this pool. Preview freely; Publish Ranking creates a dated official run. Avoid #1 of 1.`} />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading…</p>
-                    ) : deckCards.length === 0 ? (
-                        <EmptyPanel title="No live cards to rank yet" text="Faculty-approved Community Service fills this run." />
-                    ) : (
-                        <CommunityAwardPanel cards={deckCards} kind="uni" scopeName={`${orgName} University Cohort`} notifyEndpoint="/api/v1/partners/community-service/award-notify" filters={{ department: true, faculty: true }} />
-                    )}
+                    <MockupSectionHead title="AI Ranking Analyzer" subtitle={`${orgName} University Cohort only — NPE-1.1. Locked CII is preserved. Other universities never enter this pool.`} />
+                    <NationalRankingStudio
+                        role="university"
+                        packagesEndpoint="/api/v1/partners/community-service/ranking/packages"
+                        analyzeEndpoint="/api/v1/partners/community-service/ranking/analyze"
+                        publishEndpoint="/api/v1/partners/community-service/ranking/publish"
+                        reviewsEndpoint="/api/v1/partners/community-service/ranking/reviews"
+                    />
                 </div>
             )}
 

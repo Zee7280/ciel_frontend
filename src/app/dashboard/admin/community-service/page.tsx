@@ -21,7 +21,7 @@ import {
     MockupHero,
     MockupSectionHead,
 } from "@/components/ciel/dashboard/MockupChrome";
-import AdminNationalRankingStudio from "@/components/ciel/community-service/AdminNationalRankingStudio";
+import NationalRankingStudio from "@/components/ciel/community-service/national-ranking/NationalRankingStudio";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
@@ -1177,23 +1177,14 @@ export function AdminCommunityServiceHub() {
 
             {effectiveView === "run" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="AI Ranking Analyzer" subtitle="CIEL PK National Ruberix Ranking. Filter the authorized eligible pool, preview freely, then Publish Ranking. Faculty CII stays locked. Preview does not update Impact Walls." />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading…</p>
-                    ) : cards.length === 0 ? (
-                        <EmptyPanel
-                            title="No verified cards to rank yet"
-                            text="Faculty and admin both have to sign off before a project enters this cohort."
-                        />
-                    ) : (
-                        <AdminNationalRankingStudio
-                            cards={cards}
-                            notifyEndpoint="/api/v1/admin/community-service/award-notify"
-                            onPublished={() => {
-                                void loadHub();
-                            }}
-                        />
-                    )}
+                    <MockupSectionHead title="AI Ranking Analyzer" subtitle="NPE-1.1 National Ranking Studio. Approved packages only. Locked CII is preserved. RUBERIX medals stay on award-notify." />
+                    <NationalRankingStudio
+                        role="ciel_admin"
+                        packagesEndpoint="/api/v1/admin/community-service/ranking/packages"
+                        analyzeEndpoint="/api/v1/admin/community-service/ranking/analyze"
+                        publishEndpoint="/api/v1/admin/community-service/ranking/publish"
+                        reviewsEndpoint="/api/v1/admin/community-service/ranking/reviews"
+                    />
                 </div>
             )}
 

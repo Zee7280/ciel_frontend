@@ -16,12 +16,11 @@ import {
     type CiiV45Result,
 } from "@/utils/communityCiiAnalyser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
-import { sumNonRejectedLoggedHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/report/impact-package/impactPackagePacket";
+import { CiiFinalOnePageSheet, CII_FINAL_BADGE_SRC, CII_FINAL_LOGO_SRC } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import "./community-cii-analyser.css";
 
-const TEAL = "#0e7d74";
 /** Nest CII OpenAI call is 120s, plus one empty-content retry (120s). BFF maxDuration is 300s. */
 const ANALYSE_TIMEOUT_MS = 300_000;
 
@@ -33,86 +32,67 @@ function asArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
-function pickNumber(value: unknown): number {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-        const n = Number(value.replace(/,/g, "").trim());
-        return Number.isFinite(n) ? n : 0;
+const DIM7 = CII_V45_DIMENSIONS.find((d) => d.id === "7")!;
+
+const LOGO_SRC = CII_FINAL_LOGO_SRC;
+const BADGE_SRC = CII_FINAL_BADGE_SRC;
+
+const EVIDENCE_HELP: Record<string, string> = {
+    participation: "Does the evidence reasonably support the student's recorded participation and individual presence?",
+    activities: "Do the originals support the reported activities and tangible outputs?",
+    reach: "Is the reported reach/counting method reasonably supported?",
+    outcomes: "Does the evidence support the reported before/after change without overclaiming?",
+    resourcesPartners: "Do originals support the resource use, receipts, handover or partner claims?",
+    ethics: "Is consent, privacy and no-harm handling acceptable in the originals reviewed?",
+    coverage: "Does the evidence package proportionately cover the main project claims?",
+};
+
+function fileNameOf(value: unknown, fallback: string): string {
+    if (typeof value === "string" && value.trim()) {
+        const cut = value.split("?")[0];
+        return cut.split("/").pop() || fallback;
     }
-    return 0;
+    return fallback;
 }
 
-function reportHours(report: Record<string, unknown>): number {
-    const s1 = asRecord(report.section1);
-    const metrics = asRecord(s1.metrics);
-    const metricHours = pickNumber(metrics.total_verified_hours);
-    const logs = asArray(s1.attendance_logs);
-    const logHours = sumNonRejectedLoggedHours(
-        logs.map((log) => {
-            const row = asRecord(log);
-            return {
-                date: String(row.date || ""),
-                hours: pickNumber(row.hours),
-                start_time: typeof row.start_time === "string" ? row.start_time : undefined,
-                end_time: typeof row.end_time === "string" ? row.end_time : undefined,
-                approval_status: typeof row.approval_status === "string" ? row.approval_status : null,
-            };
-        }),
-    );
-    const rosterHours =
-        pickNumber(asRecord(s1.team_lead).hours) +
-        asArray(s1.team_members).reduce((sum: number, member) => sum + pickNumber(asRecord(member).hours), 0);
-    const individualHours = asArray(metrics.individual_metrics).reduce(
-        (sum: number, row) => sum + pickNumber(asRecord(row).individual_hours),
-        0,
-    );
-    if (metricHours > 0) return metricHours;
-    if (logHours > 0) return logHours;
-    if (individualHours > 0) return individualHours;
-    return rosterHours;
-}
-
-function evidenceCount(report: Record<string, unknown>): number {
+function collectEvidenceFiles(report: Record<string, unknown>): Array<{
+    id: string;
+    name: string;
+    url: string;
+    visibility: string;
+    section: string;
+    claim: string;
+}> {
+    const files: Array<{ id: string; name: string; url: string; visibility: string; section: string; claim: string }> = [];
+    const seen = new Set<string>();
+    const push = (raw: unknown, section: string, claim: string) => {
+        const rec = asRecord(raw);
+        const url = String(rec.url || rec.file_url || (typeof raw === "string" ? raw : "")).trim();
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        files.push({
+            id: String(rec.id || url),
+            name: String(rec.name || rec.file_name || fileNameOf(url, `Evidence ${files.length + 1}`)),
+            url,
+            visibility: String(rec.visibility || rec.media_visible || asRecord(report.section8).media_visible || "Restricted"),
+            section,
+            claim,
+        });
+    };
+    const pkgFiles = asArray(asRecord(asRecord(asRecord(report.review_package).documents).evidence).files);
+    if (pkgFiles.length) {
+        pkgFiles.forEach((file) => push(file, String(asRecord(file).source || "packet"), "Submitted evidence original."));
+        return files;
+    }
     const keys = ["section1", "section2", "section3", "section4", "section5", "section6", "section7", "section8", "section9", "section10"];
-    let files = 0;
     for (const key of keys) {
         const section = asRecord(report[key]);
-        if (Array.isArray(section.media_urls)) files += section.media_urls.length;
-        if (Array.isArray(section.evidence_files)) files += section.evidence_files.length;
+        asArray(section.evidence_files).forEach((file) => push(file, key, "Section evidence file."));
+        asArray(section.media_urls).forEach((file) => push(file, key, "Section media file."));
     }
-    if (Array.isArray(report.evidence_urls)) files += report.evidence_urls.length;
-    const logs = Array.isArray(asRecord(report.section1).attendance_logs)
-        ? (asRecord(report.section1).attendance_logs as unknown[])
-        : [];
-    const logEvidence = logs.filter((log) => {
-        const row = asRecord(log);
-        return Boolean(row.evidence_file || (typeof row.evidence_url === "string" && row.evidence_url.trim()));
-    }).length;
-    return Math.max(files, logEvidence);
+    asArray(report.evidence_urls).forEach((file) => push(file, "report", "Report evidence file."));
+    return files;
 }
-
-function outcomeCount(report: Record<string, unknown>): number {
-    const s5 = asRecord(report.section5);
-    const rows = Array.isArray(s5.measurable_outcomes) ? s5.measurable_outcomes : [];
-    return rows.filter((row) => {
-        const rec = asRecord(row);
-        return String(rec.metric || rec.outcome_area || "").trim() && (rec.baseline || rec.endline);
-    }).length;
-}
-
-function sessionCount(report: Record<string, unknown>): number {
-    const logs = Array.isArray(asRecord(report.section1).attendance_logs)
-        ? (asRecord(report.section1).attendance_logs as unknown[])
-        : [];
-    return logs.length;
-}
-
-function partnerCount(report: Record<string, unknown>): number {
-    const partners = asRecord(report.section7).partners;
-    return Array.isArray(partners) ? partners.length : 0;
-}
-
-const DIM7 = CII_V45_DIMENSIONS.find((d) => d.id === "7")!;
 
 function evidenceAssessmentPending(stored: CiiV45Result | null): boolean {
     if (!stored) return false;
@@ -192,6 +172,8 @@ export default function CommunityCiiAnalyser({
     const [note, setNote] = useState("");
     const [dim7Anchors, setDim7Anchors] = useState<Record<string, string>>({});
     const [dim7Reasons, setDim7Reasons] = useState<Record<string, string>>({});
+    const [openSection, setOpenSection] = useState<string>("1");
+    const [confirmAuthority, setConfirmAuthority] = useState(false);
 
     const ciiV45 = (report?.ciiV45 as unknown as CiiV45Result | undefined) || null;
     const ciiV45Lock = (report?.ciiV45Lock as unknown as CiiV45Lock | undefined) || null;
@@ -341,6 +323,10 @@ export default function CommunityCiiAnalyser({
             toast.error(hardBlock);
             return;
         }
+        if (!confirmAuthority) {
+            toast.error("Confirm these evidence marks are your final Admin assessment.");
+            return;
+        }
         try {
             setApproving(true);
             const body: Record<string, unknown> = {};
@@ -451,10 +437,14 @@ export default function CommunityCiiAnalyser({
 
     if (loading) {
         return (
-            <div className="mx-auto max-w-[1180px] p-5">
-                <HubBackButton href={inboxHref} label={inboxLabel} />
-                <div className="flex min-h-[50vh] items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: TEAL }} />
+            <div className="cii-final">
+                <div className="backnav">
+                    <div className="wrap">
+                        <HubBackButton href={inboxHref} label={inboxLabel} />
+                    </div>
+                </div>
+                <div className="wrap" style={{ padding: "80px 28px", display: "flex", justifyContent: "center" }}>
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#286b60" }} />
                 </div>
             </div>
         );
@@ -462,23 +452,34 @@ export default function CommunityCiiAnalyser({
 
     if (!report) {
         return (
-            <div className="mx-auto max-w-[1180px] p-5">
-                <HubBackButton href={inboxHref} label={inboxLabel} />
-                <p className="text-[12px] text-[#687d82]">Report unavailable.</p>
+            <div className="cii-final">
+                <div className="backnav">
+                    <div className="wrap">
+                        <HubBackButton href={inboxHref} label={inboxLabel} />
+                    </div>
+                </div>
+                <main className="wrap">
+                    <p>Report unavailable.</p>
+                </main>
             </div>
         );
     }
 
-    const studentName = (report.student as { name?: string } | undefined)?.name || "Student";
-    const projectTitle =
-        (report.opportunity as { title?: string } | undefined)?.title || String(report.project_id || "Community Service Project");
-    const hours = reportHours(report);
-    const evidence = evidenceCount(report);
-    const outcomes = outcomeCount(report);
-    const sessions = sessionCount(report);
-    const partners = partnerCount(report);
-
-    const scoreStatus = ciiV45?.scoreStatus ?? null;
+    const student = asRecord(report.student);
+    const opportunity = asRecord(report.opportunity);
+    const studentName = String(student.name || "Student");
+    const university = String(student.university || student.institution || "");
+    const projectTitle = String(opportunity.title || report.project_id || "Community Service Project");
+    const evidenceFiles = collectEvidenceFiles(report);
+    const flashOk = Boolean(report.id);
+    const detailOk = packet.ok;
+    const inventoryOk = true;
+    const originalsOk = isCielPk || Boolean(report.id);
+    const connectionLabel = analysing ? "RUNNING" : locked ? "LOCKED" : ciiV45 ? "ANALYSED" : packetHold ? "HOLD" : "READY";
+    const step1 = ciiV45 ? "done" : analysing ? "active" : "active";
+    const step2 = locked || (ciiV45 && !evidenceAssessmentPending(ciiV45)) ? "done" : ciiV45 ? "active" : "";
+    const step3 = locked ? "done" : ciiV45 ? "active" : "";
+    const step4 = locked ? "done" : "";
     const currentScore = pickCiiV45DisplayScore(ciiV45, ciiV45Lock);
     const rawAiPts = (ciiV45?.sectionScores ?? [])
         .filter((s) => s.dimension !== "7")
@@ -492,507 +493,464 @@ export default function CommunityCiiAnalyser({
         : currentScore != null
           ? ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null
           : null;
-    const diagnosticBadge = ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null;
-
-    const flags: Array<{ label: string; value: string; note: string; warn?: boolean }> = [
-        { label: "HOURS", value: hours > 0 ? `${hours}h` : "Not recorded", note: "Logged service time", warn: hours <= 0 },
-        { label: "EVIDENCE", value: String(evidence), note: "Files and session proof", warn: evidence <= 0 },
-        { label: "SESSIONS", value: String(sessions), note: "Attendance records", warn: sessions <= 0 },
-        { label: "OUTCOMES", value: String(outcomes), note: "Measured change rows", warn: outcomes <= 0 },
-        { label: "PARTNERS", value: String(partners), note: "Named collaborators" },
-        {
-            label: "INTEGRITY",
-            value: ciiV45
-                ? ciiV45.integrityPenalty?.issues?.length
-                    ? `${ciiV45.integrityPenalty.issues.length} issue${ciiV45.integrityPenalty.issues.length === 1 ? "" : "s"}`
-                    : "Clear"
-                : "Pending run",
-            note: "Confirmed student-origin issues",
-            warn: Boolean(ciiV45?.integrityPenalty?.issues?.length),
-        },
-    ];
+    const aiPts = ciiV45?.aiReportScore != null ? ciiV45.aiReportScore : rawAiPts || null;
+    const evPts = locked
+        ? ciiV45?.adminEvidenceScore ?? null
+        : dim7Complete
+          ? dim7PreviewPts
+          : ciiV45?.adminEvidenceScore ?? null;
+    const aiSections = (ciiV45?.sectionScores ?? []).filter((s) => s.dimension !== "7");
+    const badgeSrc = currentBadge?.numericLevel ? BADGE_SRC[currentBadge.numericLevel] : undefined;
+    const analysisByDim = new Map((ciiV45?.sectionAnalyses ?? []).map((row) => [row.dimension, row]));
+    const packetFlashLabel = flashOk ? "Read" : "Waiting";
+    const packetDetailLabel = detailOk ? `${packet.content_sections}/9` : "HOLD";
+    const packetInventoryLabel = `${evidenceFiles.length}`;
+    const packetOriginalsLabel = originalsOk ? "Admin access" : "Waiting";
 
     return (
-        <div className="fx23-analyzer">
-            <div className="fx23-backnav">
-                <HubBackButton href={inboxHref} label={inboxLabel} />
-            </div>
-            <div className="fx23-workhead">
-                <div>
-                    <span>{isCielPk ? "CIEL PK Super Admin review · CII v5.0 Analyzer" : "Read-only Impact Package viewer"}</span>
-                    <h2>{projectTitle}</h2>
-                    <p>
-                        {studentName} · submitted Flashcard + Detailed Report stay locked. Packet completeness is checked first. The Analyzer runs only when CIEL PK Admin chooses to run it. There is no Faculty or Partner verification in this approval chain.
-                    </p>
+        <div className="cii-final">
+            <div className="backnav">
+                <div className="wrap">
+                    <HubBackButton href={inboxHref} label={inboxLabel} />
                 </div>
-                <div>
-                    {!isCielPk ? (
-                        <Link href={`/dashboard/faculty/reports/${reportId}?view=dossier`}>Impact Package</Link>
+            </div>
+            <header className="mast">
+                <div className="wrap">
+                    <div className="brand">
+                        <img src={LOGO_SRC} className="brand-logo" alt="Official locked CIEL PK logo" draggable={false} />
+                        <div className="brand-copy">
+                            <div>
+                                CIEL <span>PK</span> · Final AI Analyser
+                            </div>
+                            <div className="brand-lock">Official CIEL PK identity · locked artwork</div>
+                        </div>
+                    </div>
+                    <div className="mode">{isCielPk ? "PRODUCTION · CIEL PK SUPER ADMIN" : "READ ONLY · FACULTY VIEWER"}</div>
+                    <p className="sub">
+                        One connected Admin workflow: AI scores report quality /85 using the locked multiples-of-five section model →
+                        Admin reviews every evidence file and manually scores /15 → <strong>Approve Score</strong> locks the CII →
+                        CIEL PK awards the score-band badge → the student receives a polished one-page analysis. No Faculty or Partner
+                        verification is required at final report stage.
+                    </p>
+                    <div className="source-proof">
+                        Source contract: the analyser must receive and read the student-submitted <strong>Impact Flashcard + complete Detailed Report (Sections 1–9) + complete Evidence Package</strong>. Production analysis is blocked if the packet is incomplete.
+                        {" · "}
+                        <Link href={packageHref} style={{ color: "#d9ed93" }}>
+                            Open Impact Package
+                        </Link>
+                    </div>
+                </div>
+            </header>
+
+            <div className="stepbar">
+                <div className="wrap steps">
+                    <div className={`step ${step1}`}>
+                        <b>1</b>
+                        <span>Run AI Analyser</span>
+                    </div>
+                    <div className={`step ${step2}`}>
+                        <b>2</b>
+                        <span>Admin Evidence /15</span>
+                    </div>
+                    <div className={`step ${step3}`}>
+                        <b>3</b>
+                        <span>Approve Score</span>
+                    </div>
+                    <div className={`step ${step4}`}>
+                        <b>4</b>
+                        <span>1-Page Final Report</span>
+                    </div>
+                </div>
+            </div>
+
+            <main className="wrap">
+                <div className="toolbar">
+                    <div className="left">
+                        <input className="report-id" readOnly value={reportId} aria-label="Report ID" />
+                        {readOnly ? (
+                            <button type="button" className="primary" disabled>
+                                {locked ? "Locked · read only" : ciiV45 ? "Diagnostic CII (view only)" : "Analyzer not run · read only"}
+                            </button>
+                        ) : (
+                            <button type="button" className="primary" onClick={runAnalysis} disabled={analysing || packetHold || (locked && !isCielPk)}>
+                                {analysing
+                                    ? `Scoring report quality… ${analysingElapsedSec}s`
+                                    : packetHold
+                                      ? "Packet HOLD"
+                                      : ciiV45
+                                        ? "Re-run AI Analyser"
+                                        : "Run AI Analyser"}
+                            </button>
+                        )}
+                        <button type="button" className="secondary" onClick={() => void loadReport()}>
+                            Reset
+                        </button>
+                    </div>
+                    <div className="right">
+                        <span className="eyebrow">{connectionLabel}</span>
+                    </div>
+                </div>
+
+                <div className="card pre-run">
+                    <div className="eyebrow">ADMIN ACTION · FULL STUDENT PACKET REQUIRED</div>
+                    <h2 style={{ margin: "5px 0 8px", font: "27px Georgia, serif" }}>{projectTitle}</h2>
+                    <p style={{ margin: 0, maxWidth: 900 }}>
+                        {studentName}
+                        {university ? ` · ${university}` : ""}. Before the /85 score is accepted, this analyser checks and reads the
+                        student-submitted <strong>Flashcard</strong>, all <strong>9 Detailed Report sections</strong>, the complete{" "}
+                        <strong>Evidence inventory</strong>, and Admin originals. Evidence marks remain strictly Admin-scored /15.
+                    </p>
+                    <div className="packet-gate">
+                        <div className={`packet-item ${flashOk ? "ok" : "bad"}`}>
+                            <small>Student Flashcard</small>
+                            <b>{packetFlashLabel}</b>
+                            <span>{flashOk ? "Locked student source" : "Not loaded"}</span>
+                        </div>
+                        <div className={`packet-item ${detailOk ? "ok" : "bad"}`}>
+                            <small>Detailed Report</small>
+                            <b>{packetDetailLabel}</b>
+                            <span>{detailOk ? "Sections 1–9 present" : packet.issues[0] || "Sections 1–9 required"}</span>
+                        </div>
+                        <div className={`packet-item ${inventoryOk ? "ok" : "bad"}`}>
+                            <small>Evidence Inventory</small>
+                            <b>{packetInventoryLabel}</b>
+                            <span>Complete file list</span>
+                        </div>
+                        <div className={`packet-item ${originalsOk ? "ok" : "bad"}`}>
+                            <small>Evidence Originals</small>
+                            <b>{packetOriginalsLabel}</b>
+                            <span>Admin / AI advisory pre-read</span>
+                        </div>
+                    </div>
+                    {packetHold ? (
+                        <div className="banner red" style={{ marginTop: 12 }} role="alert">
+                            <strong>Student packet integrity HOLD.</strong> Run AI Analyser will not proceed until the submitted packet
+                            is complete. {packet.issues.join(" ")}
+                        </div>
                     ) : (
-                        <Link href={`/dashboard/admin/reports/verify/${reportId}?package=1`}>Review package</Link>
+                        <div className="banner" style={{ marginTop: 12 }}>
+                            <strong>100% Packet Read Gate:</strong> Run AI Analyser will not proceed until the submitted packet passes
+                            the connectivity checks. Locked final scoring: Section maxima 10, 10, 5, 30, 10, 10, 15, 5, 5 = 100. AI
+                            scores 85 points; CIEL PK Admin manually scores Evidence /15.
+                        </div>
                     )}
                 </div>
-            </div>
 
-            {packetHold ? (
-                <div className="fx23-lock" role="alert">
-                    <b>Student packet integrity HOLD</b> — the AI Analyser must not score this package until the missing content is restored.
-                    <ul style={{ margin: "4px 0 8px 14px" }}>
-                        {packet.issues.map((issue) => (
-                            <li key={issue}>{issue}</li>
-                        ))}
-                    </ul>
-                    <Link href={packageHref}>Open Impact Package</Link>
-                </div>
-            ) : null}
-
-            {locked ? (
-                <div className="fx23-lock">
-                    {isCielPk
-                        ? "CII v5.0 is locked. Super Admin can re-run the Analyzer if this score needs to be recomputed."
-                        : "CII + badge are locked. The approved score cannot be silently rewritten. Any later correction should create a new version."}
-                </div>
-            ) : readOnly ? (
-                <div className="fx23-lock">
-                    Faculty access is read-only. You can view the Impact Package and any diagnostic CII. Analysis, Approve, Request revision and Reject are handled by CIEL PK Admin.
-                </div>
-            ) : (
-                <div className="fx23-lock">
-                    Locked flow: review the submitted record first. Running the Analyzer generates a provisional diagnostic CII. Student-source text is not rewritten.
-                </div>
-            )}
-
-            {!locked && ciiV45 && scoreStatus === "RESUBMISSION_REQUIRED" ? (
-                <div className="fx23-lock">
-                    <b>Resubmission required</b> — mandatory hours or student material are incomplete. The student must resubmit before this can be scored.
-                </div>
-            ) : null}
-            {!locked && ciiV45 && scoreStatus === "ADMIN_EVIDENCE_REQUIRED" ? (
-                <div className="fx23-lock">
-                    <b>Admin evidence required</b> — AI scored report quality out of 85. Score Dimension 7 (evidence, ethics &amp; verification) below to complete the CII.
-                </div>
-            ) : null}
-            {!locked && ciiV45 && scoreStatus === "ADMIN_REVIEW_REQUIRED" ? (
-                <div className="fx23-lock">
-                    <b>Admin review required</b> — the evaluation is pending resolution:
-                    <ul style={{ margin: "4px 0 0 14px" }}>
-                        {(ciiV45.adminReviewReasons?.length ? ciiV45.adminReviewReasons : ["Material input is still pending processing."]).map((r, i) => (
-                            <li key={i}>{r}</li>
-                        ))}
-                    </ul>
-                </div>
-            ) : null}
-            {!locked && ciiV45 && scoreStatus === "FINAL" ? (
-                <div className="fx23-lock" style={{ background: "#e8f7ef", borderColor: "#bfe3cf", color: "#176b47" }}>
-                    <b>Ready to approve</b> — the evaluation is complete and eligible for publication.
-                </div>
-            ) : null}
-
-            <div className="fx23-aintro">
-                <div>
-                    <small>SYSTEM ASSESSMENT · CII v5.0 HYBRID</small>
-                    <h2>CIEL PK CII Analyzer</h2>
-                    <p>
-                        Hybrid CII v5.0: AI scores report quality out of 85. CIEL PK Admin scores Dimension 7 evidence out of 15. Arithmetic, bands and L4–L6 gates stay server-side. There is no Faculty or Partner verification in this final-report approval chain. Faculty may open the published Impact Package after CIEL PK Admin confirms.
-                    </p>
-                </div>
-                {readOnly ? (
-                    <span className="fx23-run" style={{ opacity: 0.75, cursor: "default" }}>
-                        {locked ? "Locked · read only" : ciiV45 ? "Diagnostic CII (view only)" : "Analyzer not run · read only"}
-                    </span>
-                ) : (
-                    <button type="button" className="fx23-run" onClick={runAnalysis} disabled={analysing || packetHold || (locked && !isCielPk)}>
-                        {analysing
-                            ? `Scoring report quality… ${analysingElapsedSec}s${analysingElapsedSec >= 60 ? " (usually 1–4 min)" : ""}`
-                            : packetHold
-                              ? "Packet HOLD"
-                              : locked && !isCielPk
-                                ? "Locked"
-                                : ciiV45
-                                  ? "Re-run AI Analyzer"
-                                  : "Run AI Analyzer"}
-                    </button>
-                )}
-            </div>
-
-            <div className="fx23-ready">
-                <div className="score">
-                    <b>{previewComposite != null ? Math.round(previewComposite) : "—"}</b>
-                    <span>{locked ? "Final CII / 100" : previewComposite != null ? "Composite CII / 100" : "CII / 100 (pending analysis)"}</span>
-                </div>
-                <div className="grid">
-                    {flags.map((flag) => (
-                        <div key={flag.label} className={flag.warn ? "flag" : undefined}>
-                            <small>{flag.label}</small>
-                            <b>{flag.value}</b>
-                            <span>{flag.note}</span>
+                {ciiV45 ? (
+                    <section className="analyser-work">
+                        <div className="banner green">
+                            <strong>Student Source Packet:</strong> Flashcard {flashOk ? "read" : "missing"} · Detailed report{" "}
+                            {packet.content_sections}/9 · Evidence files {evidenceFiles.length}. AI scored report quality /85. Admin
+                            evidence /15 remains manual.
                         </div>
-                    ))}
-                </div>
-            </div>
+                        {bannerMessage ? <div className={locked ? "banner green" : "banner"}>{bannerMessage}</div> : null}
 
-            <details className="fx23-method">
-                <summary>How the Analyzer scores this report</summary>
-                <p>
-                    The model reads the locked 9-section Impact Package only (no evidence originals). It returns nine report-quality dimensions (85 points). CIEL PK Admin scores Dimension 7 evidence (15 points) from the original files. Anchors 0–4 ({CII_V45_ANCHOR_NAMES.join(" · ")}), up to +5 verified Extra-Mile, and an admin-adjudicated integrity penalty. Levels 4–6 still require cumulative quality gates.
-                </p>
-                <ul>
-                    {CII_V45_DIMENSIONS.map((dim) => (
-                        <li key={dim.id}>
-                            D{dim.id} {dim.name} · {dim.maxPoints} pts
-                        </li>
-                    ))}
-                </ul>
-            </details>
-
-            {ciiV45 ? (
-                <>
-                    <div className="fx23-scorehero">
-                        <div>
-                            <small>{locked ? "FINAL CII" : "COMPOSITE CII"}</small>
-                            <b>
-                                {previewComposite != null ? previewComposite.toFixed(1) : "Pending"}
-                                {previewComposite != null ? <em>/100</em> : null}
-                            </b>
-                            <strong>{badgeLabel(currentBadge)}</strong>
-                            <p>
-                                {ciiV45.analysisSummary ||
-                                    (previewComposite == null
-                                        ? "Run the Analyzer to generate report-quality marks, then Confirm."
-                                        : "Generated Composite CII from 85 AI report-quality points plus 15 Admin evidence points.")}
-                            </p>
-                            <p style={{ fontSize: 11, marginTop: 8 }}>
-                                AI report quality{" "}
-                                <b>
-                                    {ciiV45.aiReportScore != null ? ciiV45.aiReportScore.toFixed(1) : "—"}
-                                </b>
-                                /85 · Admin evidence{" "}
-                                <b>
-                                    {ciiV45.adminEvidenceScore != null ? ciiV45.adminEvidenceScore.toFixed(1) : "Pending"}
-                                </b>
-                                /15
-                            </p>
+                        <div className="grid">
+                            <div className="card kpi">
+                                <small>AI Report Quality</small>
+                                <b>{aiPts != null ? `${aiPts.toFixed(1)} / 85` : "— / 85"}</b>
+                                <p>AI-scored report quality only.</p>
+                            </div>
+                            <div className="card kpi">
+                                <small>Admin Evidence</small>
+                                <b>{evPts != null ? `${evPts.toFixed(1)} / 15` : "Pending / 15"}</b>
+                                <p>Manually awarded by CIEL PK Admin.</p>
+                            </div>
+                            <div className="card kpi">
+                                <small>Composite CII</small>
+                                <b>{previewComposite != null ? previewComposite.toFixed(1) : "Pending"}</b>
+                                <p>{locked ? "Locked after Approve Score." : "Generated after evidence marks are complete."}</p>
+                            </div>
+                            <div className="card kpi">
+                                <small>Final Badge</small>
+                                <b style={{ fontSize: 16 }}>{locked ? currentBadge?.name || "Pending" : "Pending"}</b>
+                                <p>Locked only after Approve Score.</p>
+                            </div>
                         </div>
-                        <div className="fx23-confidence">
-                            <span>Quality gates (L4–L6)</span>
-                            <b>
-                                {[ciiV45.qualityGates?.L4, ciiV45.qualityGates?.L5, ciiV45.qualityGates?.L6].filter(Boolean).length}/3
-                            </b>
-                            <small>
-                                L4 {ciiV45.qualityGates?.L4 ? "pass" : "not met"} · L5 {ciiV45.qualityGates?.L5 ? "pass" : "not met"} · L6{" "}
-                                {ciiV45.qualityGates?.L6 ? "pass" : "not met"}
-                            </small>
-                        </div>
-                    </div>
 
-                    <div className="fx23-a2">
-                        <div>
-                            <h3>Strengths</h3>
-                            <ul>
-                                {(ciiV45.strengths?.length ? ciiV45.strengths : ["—"]).map((s, i) => (
-                                    <li key={`st-${i}`}>{s}</li>
-                                ))}
-                            </ul>
+                        <div className="section-title">
+                            <div>
+                                <div className="eyebrow">AI ANALYSIS · ADMIN ONLY</div>
+                                <h2>Report-quality analysis</h2>
+                            </div>
+                            <p>Admin sees the detailed strengths, limitations and internal inconsistencies. The student does not receive this full technical view.</p>
                         </div>
-                        <div>
-                            <h3>Development priorities</h3>
-                            <ul>
-                                {(ciiV45.developmentPriorities?.length ? ciiV45.developmentPriorities : ["—"]).map((s, i) => (
-                                    <li key={`dp-${i}`}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
 
-                    {Array.isArray(ciiV45.sectionAnalyses) && ciiV45.sectionAnalyses.length ? (
-                        <details className="fx23-method">
-                            <summary>Admin-only section analysis ({ciiV45.sectionAnalyses.length})</summary>
-                            {ciiV45.sectionAnalyses.map((section, i) => (
-                                <div key={`${section.dimension}-${i}`} style={{ marginTop: 8 }}>
-                                    <p>
-                                        <b>D{section.dimension}</b> — {section.summary || "—"}
-                                    </p>
-                                    {section.strengths?.length ? <p>Strengths: {section.strengths.join("; ")}</p> : null}
-                                    {section.limitations?.length ? <p>Limitations: {section.limitations.join("; ")}</p> : null}
-                                    {section.adminFlags?.length ? <p>Admin flags: {section.adminFlags.join("; ")}</p> : null}
-                                </div>
-                            ))}
-                        </details>
-                    ) : null}
-
-                    <div className="fx23-ciisections">
-                        {ciiV45.sectionScores.map((section) => (
-                            <article key={section.dimension} className="fx23-ciisec">
-                                <header>
-                                    <span>D{section.dimension}</span>
-                                    <div>
-                                        <h3>{section.name}</h3>
-                                        <small>{section.criterionScores.length} criteria</small>
-                                    </div>
-                                    <b>
-                                        {section.score != null ? section.score.toFixed(1) : `${section.knownPoints.toFixed(1)}*`}/{section.maximumPoints}
-                                    </b>
-                                </header>
-                                <div className="fx23-ciibody">
-                                    <p>
-                                        {section.score == null
-                                            ? `Pending — ${section.knownPoints.toFixed(1)} of ${section.maximumPoints} known so far.`
-                                            : `Scored from the locked report record.`}
-                                    </p>
-                                    <div className="fx23-subrub">
-                                        {section.criterionScores.map((criterion) => (
-                                            <div key={criterion.criterion}>
-                                                <span>{criterionLabel(section.dimension, criterion.criterion)}</span>
-                                                <b>
-                                                    {criterion.anchor === "P" ? "Pending" : `${criterion.anchor}/4`} ·{" "}
-                                                    {criterion.score == null ? "—" : criterion.score.toFixed(2)}
-                                                </b>
+                        {aiSections.map((section) => {
+                            const analysis = analysisByDim.get(section.dimension as "1" | "2" | "3" | "4A" | "4B" | "5" | "6" | "8" | "9");
+                            const max = section.maximumPoints || 1;
+                            const score = section.score;
+                            const pct = score != null ? Math.max(0, Math.min(100, (score / max) * 100)) : 0;
+                            const open = openSection === section.dimension;
+                            return (
+                                <article key={section.dimension} className={`section-card${open ? " open" : ""}`}>
+                                    <button type="button" className="section-head" onClick={() => setOpenSection(open ? "" : section.dimension)}>
+                                        <div className="num">{section.dimension}</div>
+                                        <div>
+                                            <h3>{section.name}</h3>
+                                            <p>{analysis?.summary || section.criterionScores.length + " criteria"}</p>
+                                            <div className="bar">
+                                                <i style={{ width: `${pct}%` }} />
                                             </div>
-                                        ))}
-                                    </div>
-                                    <details style={{ marginTop: 7 }}>
-                                        <summary style={{ fontSize: "7.5px", fontWeight: 900, color: "#0b6e67", cursor: "pointer" }}>
-                                            Criterion detail &amp; evidence
-                                        </summary>
-                                        {section.criterionScores.map((criterion) => (
-                                            <div
-                                                key={`detail-${criterion.criterion}`}
-                                                style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #e4ecea" }}
-                                            >
-                                                <b style={{ fontSize: "7.5px" }}>{criterionLabel(section.dimension, criterion.criterion)}</b>
-                                                <div style={{ fontSize: "7px", color: "#5d7377", margin: "2px 0" }}>
-                                                    Quality anchor {criterion.qualityAnchor === "P" ? "Pending" : `${criterion.qualityAnchor}/4`} · Verification{" "}
-                                                    {criterion.verificationStatus}
+                                        </div>
+                                        <div className="score">{score != null ? `${score.toFixed(1)}/${max}` : `—/${max}`}</div>
+                                        <div className={score != null && score / max < 0.7 ? "tag warn" : "tag"}>
+                                            {score == null ? "Pending" : score / max >= 0.85 ? "Strong" : score / max >= 0.7 ? "Sound" : "Review"}
+                                        </div>
+                                    </button>
+                                    <div className="section-body">
+                                        <div className="cols">
+                                            <div>
+                                                <h4>Strengths</h4>
+                                                <ul>
+                                                    {(analysis?.strengths?.length ? analysis.strengths : ["—"]).map((item) => (
+                                                        <li key={item}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4>Limitations</h4>
+                                                <ul>
+                                                    {(analysis?.limitations?.length ? analysis.limitations : ["—"]).map((item) => (
+                                                        <li key={item}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: 12, fontSize: 11.5, color: "#61716c" }}>
+                                            {section.criterionScores.map((criterion) => (
+                                                <div key={criterion.criterion} style={{ marginTop: 6 }}>
+                                                    <strong>{criterionLabel(section.dimension, criterion.criterion)}</strong>
+                                                    {" · "}
+                                                    {criterion.anchor === "P" ? "Pending" : `${criterion.anchor}/4`}
+                                                    {criterion.reasoningSummary ? ` — ${criterion.reasoningSummary}` : ""}
                                                 </div>
-                                                <p style={{ fontSize: "7.3px", margin: "3px 0", color: "#425a5e" }}>{criterion.reasoningSummary}</p>
-                                                {criterion.sourceRefs.length ? (
-                                                    <div style={{ fontSize: "6.5px", color: "#788" }}>Sources: {criterion.sourceRefs.join("; ")}</div>
-                                                ) : null}
-                                                {criterion.evidenceIds.length ? (
-                                                    <div style={{ fontSize: "6.5px", color: "#788" }}>Evidence: {criterion.evidenceIds.join(", ")}</div>
-                                                ) : null}
-                                            </div>
-                                        ))}
-                                    </details>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </article>
+                            );
+                        })}
+
+                        <div className="section-title">
+                            <div>
+                                <div className="eyebrow">ADMIN MANUAL LAYER</div>
+                                <h2>Evidence review &amp; scoring · 15 points</h2>
+                            </div>
+                            <p>For Admin, every evidence file is viewable regardless of whether the student selected Public, Restricted or Private. The visibility label is retained for downstream sharing.</p>
+                        </div>
+
+                        <div className="banner green">
+                            <strong>Admin Full Evidence Access:</strong> Public / Restricted / Private affects stakeholder publication—not CIEL PK Admin review. AI may provide an evidence idea, but <strong>AI never awards these 15 marks</strong>.
+                        </div>
+
+                        <div className="evidence-summary">
+                            <div className="evs">
+                                <b>{evidenceFiles.length}</b>
+                                <small>evidence files</small>
+                            </div>
+                            <div className="evs">
+                                <b>ALL</b>
+                                <small>visible to Admin</small>
+                            </div>
+                            <div className="evs">
+                                <b>{evPts != null ? evPts.toFixed(1) : "—"}</b>
+                                <small>Admin evidence /15</small>
+                            </div>
+                            <div className="evs">
+                                <b>Optional</b>
+                                <small>Admin comments</small>
+                            </div>
+                        </div>
+
+                        <div className="evidence-grid">
+                            {evidenceFiles.length ? (
+                                evidenceFiles.map((file) => (
+                                    <div key={file.id} className="file-card">
+                                        <div className="top">
+                                            <b>{file.name}</b>
+                                            <span className="pill">{file.visibility}</span>
+                                        </div>
+                                        <div className="admin-full">ADMIN FULL ACCESS</div>
+                                        <p>
+                                            {file.section} · {file.claim}
+                                        </p>
+                                        <div className="actions">
+                                            {file.url ? (
+                                                <a className="secondary" href={file.url} target="_blank" rel="noreferrer">
+                                                    View original
+                                                </a>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="file-card">
+                                    <b>No evidence files listed</b>
+                                    <p>The inventory is empty. Admin can still complete the seven evidence marks from the written report.</p>
                                 </div>
-                            </article>
-                        ))}
-                    </div>
-
-                    <details className="fx23-method">
-                        <summary>
-                            Claim inventory &amp; evidence audit ({ciiV45.claimInventory?.length ?? 0} claims · {ciiV45.evidenceAudit?.length ?? 0} files)
-                        </summary>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
-                            <div>
-                                <b style={{ fontSize: "7.5px" }}>Claims</b>
-                                <ul style={{ paddingLeft: 12, margin: "4px 0" }}>
-                                    {(ciiV45.claimInventory?.length ? ciiV45.claimInventory : []).map((c) => (
-                                        <li key={c.claimId} style={{ fontSize: "7px", margin: "2px 0" }}>
-                                            {c.claimId} — {c.supportStatus}
-                                            {c.material ? "" : " (non-material)"}
-                                        </li>
-                                    ))}
-                                    {!ciiV45.claimInventory?.length ? <li style={{ fontSize: "7px" }}>—</li> : null}
-                                </ul>
-                            </div>
-                            <div>
-                                <b style={{ fontSize: "7.5px" }}>Evidence files</b>
-                                <ul style={{ paddingLeft: 12, margin: "4px 0" }}>
-                                    {(ciiV45.evidenceAudit?.length ? ciiV45.evidenceAudit : []).map((e) => (
-                                        <li key={e.evidenceId} style={{ fontSize: "7px", margin: "2px 0" }}>
-                                            {e.fileName || e.evidenceId} — {e.processingStatus} / {e.supportStatus}
-                                            {e.actualContentSummary ? `: ${e.actualContentSummary}` : ""}
-                                        </li>
-                                    ))}
-                                    {!ciiV45.evidenceAudit?.length ? <li style={{ fontSize: "7px" }}>—</li> : null}
-                                </ul>
-                            </div>
-                        </div>
-                    </details>
-
-                    <div className="fx23-a2">
-                        <div>
-                            <h3>Extra-mile uplift</h3>
-                            {ciiV45.extraMileUplift?.assessmentStatus === "PROCESSING_REQUIRED" ||
-                            ciiV45.extraMileUplift?.assessmentStatus === "PENDING_ADMIN" ? (
-                                <p>Pending Admin extra-mile confirmation — not awarded until Confirm.</p>
-                            ) : ciiV45.extraMileUplift?.items?.length ? (
-                                <ul>
-                                    {ciiV45.extraMileUplift.items.map((it, i) => (
-                                        <li key={`${it.category}-${i}`}>
-                                            {it.category}: +{it.points.toFixed(2)} — {it.beyondBaseJustification || "—"}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p>No extra-mile uplift awarded.</p>
-                            )}
-                            <p>
-                                <b>Total: {ciiV45.extraMileUplift?.total == null ? "Pending" : `+${ciiV45.extraMileUplift.total.toFixed(2)}`}</b>
-                            </p>
-                        </div>
-                        <div>
-                            <h3>Integrity penalty</h3>
-                            <p>
-                                <b>{(ciiV45.integrityPenalty?.points ?? 0).toFixed(1)} pts</b>
-                            </p>
-                            {ciiV45.integrityPenalty?.issues?.length ? (
-                                <ul>
-                                    {ciiV45.integrityPenalty.issues.map((iss, i) => (
-                                        <li key={i}>{iss.reason}</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p>No confirmed integrity issues.</p>
                             )}
                         </div>
-                    </div>
 
-                    {ciiV45.exceptionalFeature ? (
-                        <div className="fx23-method">
-                            <p>
-                                <b>Exceptional feature</b> — {ciiV45.exceptionalFeature.verified ? "Verified" : "Not verified"}
-                            </p>
-                            {ciiV45.exceptionalFeature.explanation ? <p>{ciiV45.exceptionalFeature.explanation}</p> : null}
-                        </div>
-                    ) : null}
-
-                    {ciiV45.deductionLedger?.length ? (
-                        <details className="fx23-method">
-                            <summary>Deduction ledger ({ciiV45.deductionLedger.length})</summary>
-                            <ul>
-                                {ciiV45.deductionLedger.map((entry, i) => (
-                                    <li key={i} style={{ fontSize: "7px" }}>
-                                        {JSON.stringify(entry)}
-                                    </li>
-                                ))}
-                            </ul>
-                        </details>
-                    ) : null}
-
-                    <div className="fx23-method">
-                        <p>
-                            <b>Evidence summary</b> — {ciiV45.evidenceSummary || "—"}
-                        </p>
-                        <p>
-                            <b>Student feedback</b> — {ciiV45.studentFeedback || "—"}
-                        </p>
-                    </div>
-
-                    {!readOnly && !locked && evidenceAssessmentPending(ciiV45) ? (
-                        <div className="fx23-moderation" style={{ marginTop: 12 }}>
-                            <div className="fx23-modhead">
-                                <div>
-                                    <small>ADMIN EVIDENCE · DIMENSION 7 · /15</small>
-                                    <h2>Score original evidence</h2>
-                                    <p>
-                                        Look at the uploaded files yourself. Empty marks default to Sound (2). Changing an anchor updates the Composite before Confirm.
-                                        {dim7Complete ? ` Live evidence subtotal: ${dim7PreviewPts.toFixed(2)} / 15.` : ""}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="fx23-comment">
-                                {DIM7.criteria.map((c) => (
-                                    <label key={c.key} style={{ display: "block", marginTop: 10 }}>
-                                        {criterionLabel("7", c.key)} <span>{c.weight} pts</span>
+                        <div className={`evidence-form${locked || readOnly ? " locked-form" : ""}`}>
+                            {DIM7.criteria.map((c) => {
+                                const a = Number(dim7Anchors[c.key]);
+                                const pts = Number.isInteger(a) && a >= 0 && a <= 4 ? c.weight * CII_V45_ANCHOR_FACTORS[a as 0 | 1 | 2 | 3 | 4] : 0;
+                                return (
+                                    <div key={c.key} className="ev-row">
+                                        <div>
+                                            <strong>{criterionLabel("7", c.key)}</strong>
+                                            <div className="ev-help">{EVIDENCE_HELP[c.key] || `${c.weight} pts`}</div>
+                                        </div>
                                         <select
-                                            value={dim7Anchors[c.key] ?? ""}
+                                            value={dim7Anchors[c.key] ?? "2"}
+                                            disabled={locked || readOnly}
                                             onChange={(e) => setDim7Anchors((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                                            style={{ width: "100%", marginTop: 6, padding: "8px 10px", border: "1px solid #d7e5e8", borderRadius: 8 }}
                                         >
-                                            <option value="">Select anchor</option>
                                             {CII_V45_ANCHOR_NAMES.map((name, i) => (
                                                 <option key={name} value={String(i)}>
-                                                    {i}/4 · {name} · {(c.weight * CII_V45_ANCHOR_FACTORS[i]).toFixed(2)} pts
+                                                    {i}/4 · {name}
                                                 </option>
                                             ))}
                                         </select>
+                                        <div className="points">{pts.toFixed(2)}</div>
                                         <textarea
                                             value={dim7Reasons[c.key] ?? ""}
+                                            disabled={locked || readOnly}
                                             onChange={(e) => setDim7Reasons((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                                            placeholder="Optional note from the originals (the system writes an audit rationale if blank)."
-                                            style={{ marginTop: 6 }}
+                                            placeholder="Optional comment"
                                         />
-                                    </label>
-                                ))}
-                            </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    ) : null}
-
-                    <div className="fx23-moderation">
-                        <div className="fx23-modhead">
+                        <div className="evidence-total">
                             <div>
-                                <small>ADMIN ACCEPT &amp; PUBLISH</small>
-                                <h2>Review generated Composite CII</h2>
-                                <p>
-                                    Confirm publishes the system Composite (85 AI + 15 evidence). There is no manual final-score override — change Dimension 7 marks if the evidence score should move.
-                                </p>
+                                <strong>Evidence Score</strong>
+                                <div className="optional">Complete all seven marks. Comments remain optional.</div>
                             </div>
-                            <div className="fx23-final">
-                                <span>{dim7Complete && evidenceAssessmentPending(ciiV45) ? "Generated Composite" : "AI recommended"}</span>
-                                <b>{previewComposite != null ? previewComposite.toFixed(1) : "—"}</b>
-                                <small>/100</small>
-                                <strong>{badgeLabel(diagnosticBadge)}</strong>
+                            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                <strong>{dim7Complete ? `${dim7PreviewPts.toFixed(2)} / 15` : "Pending / 15"}</strong>
+                                <a className="secondary" href="#approvalAnchor">
+                                    Continue
+                                </a>
                             </div>
                         </div>
 
-                        {bannerMessage ? (
-                            <div className="fx23-lock" style={{ margin: 0 }}>
-                                {bannerMessage}
+                        <div className="section-title" id="approvalAnchor">
+                            <div>
+                                <div className="eyebrow">CIEL PK FINAL AUTHORITY</div>
+                                <h2>Approve Score</h2>
                             </div>
-                        ) : null}
+                            <p>Once approved, evidence marks are locked, the Composite CII becomes final, the badge is awarded, and the student one-page analysis is generated.</p>
+                        </div>
 
-                        {!readOnly ? (
-                            <div className="fx23-comment">
-                                <label style={{ marginTop: 10 }}>
-                                    Admin note <span>optional</span>
+                        <div className="card approve-wrap">
+                            <div className="full bigcalc">
+                                <div className="calc">
+                                    <small>AI /85</small>
+                                    <b>{aiPts != null ? aiPts.toFixed(1) : "—"}</b>
+                                </div>
+                                <div className="calc">
+                                    <small>Admin Evidence /15</small>
+                                    <b>{evPts != null ? evPts.toFixed(1) : "Pending"}</b>
+                                </div>
+                                <div className="calc">
+                                    <small>Composite CII /100</small>
+                                    <b>{previewComposite != null ? previewComposite.toFixed(1) : "Pending"}</b>
+                                </div>
+                                <div className="calc">
+                                    <small>Badge Preview</small>
+                                    <b style={{ fontSize: 16 }}>{badgeLabel(currentBadge)}</b>
+                                </div>
+                            </div>
+                            <div className="full badge-preview">
+                                {badgeSrc ? (
+                                    <img src={badgeSrc} alt={currentBadge?.name || "CIEL PK badge"} />
+                                ) : (
+                                    <div className="badge-placeholder">BADGE</div>
+                                )}
+                                <div>
+                                    <div className="eyebrow">{locked ? "AWARDED BADGE" : "AWAITING APPROVE SCORE"}</div>
+                                    <h3>{currentBadge?.name || "Badge will appear here"}</h3>
+                                    <div className="final-status">The backend-approved CII is the authoritative score. The client preview cannot override it.</div>
+                                </div>
+                            </div>
+                            <div className="full">
+                                <label>
+                                    <strong>CIEL PK Admin overall comment</strong> <span className="optional">Optional</span>
                                 </label>
                                 <textarea
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
-                                    disabled={locked}
-                                    placeholder="Optional note for this decision — also used as the reason for Request revision / Reject below."
+                                    disabled={locked || readOnly}
+                                    style={{ width: "100%", minHeight: 90, border: "1px solid var(--line)", borderRadius: 8, padding: 10, marginTop: 6 }}
+                                    placeholder="Optional overall comment for the student"
                                 />
-                                <small>Confirm locks the generated CII v5.0.2 Composite and badge. Revision / reject keep the record unlocked and send the same note to the student.</small>
                             </div>
-                        ) : null}
-
-                        <div className="fx23-decision">
-                            {readOnly ? (
-                                <p style={{ margin: 0, fontSize: 11, color: "#617579", fontWeight: 700 }}>
-                                    Read-only — Approve, Request revision and Reject are not available on Faculty login.
-                                </p>
-                            ) : (
-                                <>
-                                    <button type="button" className="rev" disabled={locked || deciding} onClick={returnForRevision}>
-                                        Request revision
-                                    </button>
-                                    {!isCielPk ? (
-                                        <button type="button" className="rej" disabled={locked || deciding} onClick={rejectReport}>
-                                            Reject
+                            <div>
+                                <label className="confirm-box">
+                                    <input
+                                        type="checkbox"
+                                        checked={confirmAuthority || locked}
+                                        disabled={locked || readOnly}
+                                        onChange={(e) => setConfirmAuthority(e.target.checked)}
+                                        style={{ marginTop: 3 }}
+                                    />
+                                    <span>
+                                        <strong>I confirm these evidence marks are my final Admin assessment.</strong>
+                                        <br />
+                                        <small>CIEL PK becomes final authority for this approved CII.</small>
+                                    </span>
+                                </label>
+                            </div>
+                            <div className="approve-actions">
+                                {!readOnly ? (
+                                    <>
+                                        <button type="button" className="rev" disabled={locked || deciding} onClick={returnForRevision}>
+                                            Request revision
                                         </button>
-                                    ) : null}
-                                    <button type="button" className="approve" disabled={approving || Boolean(hardBlock)} onClick={approveAndLock}>
-                                        {approving ? "Locking…" : isCielPk ? "Confirm final score" : "Approve & lock"}
-                                    </button>
-                                </>
-                            )}
+                                        <button
+                                            type="button"
+                                            className="primary"
+                                            disabled={approving || Boolean(hardBlock) || (!confirmAuthority && !locked)}
+                                            onClick={approveAndLock}
+                                        >
+                                            {approving ? "Locking…" : "Approve Score & Generate Final Report"}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <p className="final-status">Read-only — Approve stays with CIEL PK Admin.</p>
+                                )}
+                            </div>
+                            {bannerMessage ? <div className="full banner">{bannerMessage}</div> : null}
                         </div>
-                    </div>
-                </>
-            ) : (
-                <div className="fx23-moderation" style={{ padding: 22 }}>
-                    <p style={{ fontSize: 10, color: "#617579", margin: 0 }}>
-                        Analyzer not run yet. Faculty view is read-only — CIEL PK Admin runs analysis and final decisions.
-                    </p>
-                </div>
-            )}
+                    </section>
+                ) : null}
 
-            <div className="fx23-workfoot">
-                <span>{locked && ciiV45Lock ? `Locked ${new Date(ciiV45Lock.lockedAt).toLocaleString()}` : "Analysis open"}</span>
-                <span>CII v5.0 Hybrid · 85 AI report quality + 15 Admin evidence</span>
-            </div>
+                {locked ? (
+                    <CiiFinalOnePageSheet
+                        embedded
+                        title={projectTitle}
+                        studentName={studentName}
+                        university={university}
+                        reportId={reportId}
+                        score={previewComposite}
+                        badgeName={currentBadge?.name || null}
+                        badgeLevel={currentBadge?.numericLevel ?? null}
+                        lockedAt={ciiV45Lock?.lockedAt || null}
+                        sections={aiSections.concat(
+                            ciiV45?.sectionScores?.find((s) => s.dimension === "7")
+                                ? [ciiV45.sectionScores.find((s) => s.dimension === "7")!]
+                                : [],
+                        )}
+                        analysis={ciiV45?.studentFeedback || ciiV45?.analysisSummary || ""}
+                        strengths={ciiV45?.strengths || []}
+                        limitations={ciiV45?.developmentPriorities || []}
+                        adminComment={note || ciiV45Lock?.adminNote || ""}
+                    />
+                ) : null}
+            </main>
         </div>
     );
 }

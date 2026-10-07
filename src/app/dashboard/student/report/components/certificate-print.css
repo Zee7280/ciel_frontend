@@ -435,19 +435,22 @@
   text-align: left;
 }
 
-.cert-signature-img {
+/* Beat `.dashboard-shell img { height: auto; max-width: 100% }` so the mark sits on the gold line. */
+.dashboard-shell .certificate-one-page .cert-signature-img,
+.certificate-one-page .cert-signature-img {
   display: block;
-  height: 28px;
+  height: 34px;
+  max-height: 34px;
   width: auto;
   max-width: 118px;
   object-fit: contain;
-  object-position: left center;
+  object-position: left bottom;
   background: transparent;
 }
 
 .cert-signature-line,
 .cert-date-line {
-  margin-top: 4px;
+  margin-top: 2px;
   height: 1px;
   width: 118px;
   background: var(--cert-gold);
@@ -659,8 +662,10 @@
     font-size: 8px !important;
   }
 
-  .cert-signature-img {
-    height: 28px !important;
+  .dashboard-shell .certificate-one-page .cert-signature-img,
+  .certificate-one-page .cert-signature-img {
+    height: 34px !important;
+    max-height: 34px !important;
     max-width: 118px !important;
     width: auto !important;
   }

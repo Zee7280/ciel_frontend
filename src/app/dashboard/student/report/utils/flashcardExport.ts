@@ -24,6 +24,10 @@ function findFlashcard(): HTMLElement | null {
     return card instanceof HTMLElement ? card : host;
 }
 
+function isImpactPackageFlash(source: HTMLElement): boolean {
+    return source.id === "flashcard-capture" || source.classList.contains("flash");
+}
+
 function stripExportChrome(root: HTMLElement) {
     root.querySelectorAll(".c22-actions, .c22-file-actions, .c22-missing, .c22-vault, .c22-btn").forEach((node) => {
         node.remove();
@@ -53,6 +57,54 @@ function cleanupPrintRoot() {
     document.getElementById(FLASH_PRINT_ROOT_ID)?.remove();
 }
 
+function mountFlashClone(source: HTMLElement): HTMLElement {
+    cleanupPrintRoot();
+    const wrap = document.createElement("div");
+    wrap.id = FLASH_PRINT_ROOT_ID;
+    if (isImpactPackageFlash(source)) {
+        wrap.className = "ipkg";
+        wrap.style.width = "1100px";
+        wrap.style.background = "#f0efe8";
+        wrap.style.padding = "0";
+    } else {
+        wrap.className = "cer cer-scope";
+    }
+    const clone = source.cloneNode(true) as HTMLElement;
+    clone.removeAttribute("hidden");
+    clone.style.display = "block";
+    clone.style.maxWidth = "1100px";
+    stripExportChrome(clone);
+    wrap.appendChild(clone);
+    document.body.appendChild(wrap);
+    return wrap;
+}
+
+async function rasterizeFlashPng(node: HTMLElement): Promise<string> {
+    const { toPng } = await import("html-to-image");
+    const width = Math.max(1, Math.ceil(node.scrollWidth || node.offsetWidth || 1100));
+    const height = Math.max(1, Math.ceil(node.scrollHeight || node.offsetHeight || 1));
+    return toPng(node, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: "#fffef9",
+        width,
+        height,
+        style: {
+            transform: "none",
+            margin: "0",
+        },
+    });
+}
+
+function triggerPngDownload(dataUrl: string, title: string) {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `${flashcardExportFilename(title)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
 async function exportIsolatedFlashcard(mode: ExportMode, title: string): Promise<void> {
     const source = findFlashcard();
     if (!source) {
@@ -60,31 +112,35 @@ async function exportIsolatedFlashcard(mode: ExportMode, title: string): Promise
         return;
     }
 
-    cleanupPrintRoot();
-    const wrap = document.createElement("div");
-    wrap.id = FLASH_PRINT_ROOT_ID;
-    wrap.className = "cer cer-scope";
-    const clone = source.cloneNode(true) as HTMLElement;
-    stripExportChrome(clone);
-    wrap.appendChild(clone);
-    document.body.appendChild(wrap);
+    const wrap = mountFlashClone(source);
+    const card = (wrap.querySelector("#flashcard-capture, .flash, .c22-card") as HTMLElement | null) || wrap;
 
     const previousTitle = document.title;
     document.title = flashcardExportFilename(title);
-    document.body.classList.add(FLASH_PRINT_BODY_CLASS);
 
     const finish = () => {
         cleanupPrintRoot();
         document.title = previousTitle;
         window.removeEventListener("afterprint", finish);
     };
-    window.addEventListener("afterprint", finish);
 
     await waitForCloneAssets(wrap);
+
     if (mode === "download") {
-        toast.message("In the print dialog, choose Save as PDF to download the flash card.");
+        try {
+            const dataUrl = await rasterizeFlashPng(card);
+            triggerPngDownload(dataUrl, title);
+            toast.success("Flashcard PNG saved.");
+        } catch {
+            toast.error("Could not save flashcard PNG. Try Print / Save PDF instead.");
+        } finally {
+            finish();
+        }
+        return;
     }
 
+    document.body.classList.add(FLASH_PRINT_BODY_CLASS);
+    window.addEventListener("afterprint", finish);
     window.setTimeout(finish, 60000);
     window.print();
 }

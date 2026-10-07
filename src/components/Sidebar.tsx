@@ -700,7 +700,7 @@ export default function Sidebar() {
 
     const investorPaths = useMemo(
         () => [
-            { label: "Overview", href: "/dashboard/investor?view=overview", emoji: "⌂" },
+            { label: "Dashboard", href: "/dashboard/investor?view=overview", emoji: "🏠" },
             { label: "Inbox & Messages", href: "/dashboard/investor?view=inbox", emoji: "✉" },
             { label: "Discover Ventures", href: "/dashboard/investor?view=discover", emoji: "🚀" },
             { label: "AI Deal Match", href: "/dashboard/investor?view=match", emoji: "✦" },
@@ -862,7 +862,7 @@ export default function Sidebar() {
     const adminPathIcons: ComponentType<LucideProps>[] = [Tent, BookOpen, GraduationCap, Rocket];
     const adminMenuSections: MenuSection[] | undefined = isAdmin
         ? [
-              { heading: "Super Admin", items: [{ label: "Overview", href: dashboardHref, icon: LayoutDashboard }] },
+              { heading: "My Dashboard", items: [{ label: "Dashboard", href: dashboardHref, icon: LayoutDashboard }] },
               {
                   heading: "Impact Areas",
                   items: adminPaths.map((p, i) => ({ label: p.label, href: p.href, icon: adminPathIcons[i] ?? BookOpen })),
@@ -927,12 +927,12 @@ export default function Sidebar() {
                                         : isInvestor
                                           ? "CIEL Investor Hub"
                                           : isAdmin
-                                            ? "Youth Empowered Community Impact"
+                                            ? "Super Admin Dashboard"
                                             : isPartner
                                               ? partnerOrgKind === "ngo"
-                                                ? "NGO / Nonprofit"
-                                                : "Partner Organization"
-                                            : "Youth Empowered Community Impact"}
+                                                ? "NGO Dashboard"
+                                                : "Partner Dashboard"
+                                            : "Dashboard"}
                             </span>
                         </div>
                     )}
@@ -1068,10 +1068,8 @@ export default function Sidebar() {
                     </>
                 ) : (
                     <>
-                        <NavSectionLabel collapsed={collapsed}>
-                            {isUniversityPartnerOrg ? "University" : isFaculty ? "My Paths" : isAdmin ? "Super Admin" : isInvestor ? "CIEL Investor Hub" : isPartner ? "Organization dashboard" : "Dashboard"}
-                        </NavSectionLabel>
-                        <NavRow href={dashboardHref} label={isFaculty ? "Overview" : isUniversityPartnerOrg || isAdmin ? "Overview" : isInvestor ? "Home" : isPartner ? "Home" : "Dashboard"} emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
+                        <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
+                        <NavRow href={dashboardHref} label="Dashboard" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
                         {rolePaths.length > 0 ? (
                             <>
                                 <NavSectionLabel collapsed={collapsed}>

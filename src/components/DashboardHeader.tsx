@@ -24,7 +24,7 @@ import { useHasDashboardPageChrome } from "@/components/ciel/dashboard/Dashboard
 import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
 function facultyPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
-    if (p === "/dashboard/faculty") return "Overview";
+    if (p === "/dashboard/faculty") return "Dashboard";
     if (p.startsWith("/dashboard/faculty/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/faculty/coursework-projects")) return "Coursework Project";
     if (p.startsWith("/dashboard/faculty/fyp-thesis")) return "Final Year Project (FYP)";
@@ -48,7 +48,7 @@ function facultyPageKicker(pathname: string): string {
 
 function universityPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
-    if (p === "/dashboard/partner") return "Overview";
+    if (p === "/dashboard/partner") return "Dashboard";
     if (p.startsWith("/dashboard/partner/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/partner/university-showcase")) return "Coursework / FYP";
     if (p.startsWith("/dashboard/partner/startup-business")) return "Startup / Venture";
@@ -68,7 +68,7 @@ function universityPageKicker(pathname: string): string {
 
 function studentPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
-    if (p === "/dashboard/student") return "Home";
+    if (p === "/dashboard/student") return "Dashboard";
     if (p.startsWith("/dashboard/student/browse")) return "Browse Opportunities";
     if (p.startsWith("/dashboard/student/impact")) return "My Impact Portfolio";
     if (p.startsWith("/dashboard/student/payments") || p.startsWith("/dashboard/student/payment")) return "Payments";
@@ -91,7 +91,7 @@ function studentPageKicker(pathname: string): string {
 
 function adminPageKicker(pathname: string, searchParams: { get(name: string): string | null }): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
-    if (p === "/dashboard/admin") return "Overview";
+    if (p === "/dashboard/admin") return "Dashboard";
     if (p.startsWith("/dashboard/admin/community-service")) return "Community Service";
     if (p.startsWith("/dashboard/admin/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/admin/path-submissions")) {
@@ -227,7 +227,7 @@ function DashboardHeaderInner() {
                   ? adminPageKicker(pathname, searchParams)
                   : navRole === "investor"
                     ? investorPageKicker(pathname)
-                  : "Overview";
+                  : "Dashboard";
 
     const hasPageChrome = useHasDashboardPageChrome();
 

@@ -29,6 +29,7 @@ import {
     type ImpactPackageEvidenceKind,
 } from "./buildImpactPackageModel";
 import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
 import "./impact-package.css";
 
@@ -109,96 +110,46 @@ function asStringList(value: unknown): string[] {
     return value.map((item) => String(item || "").trim()).filter(Boolean);
 }
 
-function ImpactAnalysisPanel({ data, analyserHref }: { data: ReportData; analyserHref?: string }) {
+function ImpactAnalysisPanel({
+    data,
+    analyserHref,
+    title,
+    reportId,
+}: {
+    data: ReportData;
+    analyserHref?: string;
+    title: string;
+    reportId?: string;
+}) {
     const cii = asCii(data);
     const score = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
     const badgeName = pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
     const sections = Array.isArray(cii.sectionScores) ? cii.sectionScores : [];
     const summary = typeof cii.studentFeedback === "string" ? cii.studentFeedback.trim() : "";
     const overall = typeof cii.analysisSummary === "string" ? cii.analysisSummary.trim() : "";
-    const strengths = asStringList(cii.strengths);
-    const limits = asStringList(cii.developmentPriorities);
-    const adminNote =
+    const lead = data.section1?.team_lead;
+    const lock =
         data.ciiV45Lock && typeof data.ciiV45Lock === "object"
-            ? String((data.ciiV45Lock as { adminNote?: unknown }).adminNote || "").trim()
-            : "";
+            ? (data.ciiV45Lock as { adminNote?: unknown; lockedAt?: unknown })
+            : null;
+    const badgeLevelRaw = Number((cii.finalBadge as { numericLevel?: unknown } | undefined)?.numericLevel ?? cii.finalBadge?.level);
     return (
         <div>
-            <div className="evidence-stats">
-                <div className="evidence-stat">
-                    <b>{score != null ? `${Math.round(score * 10) / 10}` : "—"}</b>
-                    <span>Final Composite CII / 100</span>
-                </div>
-                <div className="evidence-stat">
-                    <b>{badgeName || cii.finalBadge?.name || "Level pending"}</b>
-                    <span>{cii.finalBadge?.level != null ? `L${cii.finalBadge.level}` : "awarded badge"}</span>
-                </div>
-                <div className="evidence-stat">
-                    <b>{sections.length}</b>
-                    <span>scored sections</span>
-                </div>
-                <div className="evidence-stat">
-                    <b>Published</b>
-                    <span>after CIEL PK Admin approval</span>
-                </div>
-            </div>
-            {summary || overall ? (
-                <div className="banner" style={{ marginBottom: 18 }}>
-                    <strong>Your Community Impact Analysis.</strong> {summary || overall}
-                </div>
-            ) : null}
-            {strengths.length ? (
-                <div className="report-section" style={{ display: "block", padding: 0, marginBottom: 12 }}>
-                    <div className="subsection">
-                        <h3>What you did well</h3>
-                        <div className="answer">
-                            <ul>
-                                {strengths.map((item) => (
-                                    <li key={item}>{item}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-            {limits.length ? (
-                <div className="report-section" style={{ display: "block", padding: 0, marginBottom: 12 }}>
-                    <div className="subsection">
-                        <h3>Limitations & next learning</h3>
-                        <div className="answer">
-                            <ul>
-                                {limits.map((item) => (
-                                    <li key={item}>{item}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-            {adminNote ? (
-                <div className="banner" style={{ marginBottom: 18 }}>
-                    <strong>CIEL PK Admin comment.</strong> {adminNote}
-                </div>
-            ) : null}
-            <div className="report-section" style={{ display: "block", padding: 0 }}>
-                {sections.map((section) => (
-                    <div key={String(section.dimension || section.name)} className="subsection">
-                        <h3>
-                            <span>{String(section.dimension || "")}</span>
-                            {section.name || "Section"}
-                        </h3>
-                        <div className="qa">
-                            <div className="question">Score</div>
-                            <div className="answer">
-                                <p>
-                                    {section.score ?? "—"}
-                                    {section.maximumPoints != null ? ` / ${section.maximumPoints}` : ""}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <CiiFinalOnePageSheet
+                title={title}
+                studentName={lead?.fullName || lead?.name || "Student"}
+                university={lead?.university}
+                reportId={reportId || data.report_id || data.id}
+                score={score}
+                badgeName={badgeName || cii.finalBadge?.name || null}
+                badgeLevel={Number.isFinite(badgeLevelRaw) ? badgeLevelRaw : null}
+                lockedAt={typeof lock?.lockedAt === "string" ? lock.lockedAt : null}
+                sections={sections}
+                analysis={summary || overall}
+                strengths={asStringList(cii.strengths)}
+                limitations={asStringList(cii.developmentPriorities)}
+                adminComment={String(lock?.adminNote || "").trim()}
+            />
             {analyserHref ? (
                 <p className="below-flash">
                     <a href={analyserHref}>Open full AI analyser →</a>
@@ -363,6 +314,10 @@ export default function ImpactPackage({
                     CIEL<span>PK</span>
                     <small>THE IMPACT PACKAGE</small>
                 </div>
+                <div className="mast-project">
+                    <div className="eyebrow">Opportunity</div>
+                    <strong>{model.title}</strong>
+                </div>
                 <div className="viewer">
                     <span>
                         {audience === "admin" ? "CIEL PK Super Admin" : audience === "faculty" ? "Faculty review" : audience === "partner" ? "Partner / NGO" : audience === "university" ? "University" : "Student record"}
@@ -452,8 +407,7 @@ export default function ImpactPackage({
             ) : null}
 
             <main className="ipkg-main">
-                {tab === "flash" ? (
-                    <div id="flash" className="view">
+                <div id="flash" className="view" hidden={tab !== "flash"}>
                         <article className="flash" id="flashcard-capture" aria-label="One-page project impact flashcard">
                             <header className="flash-head">
                                 <div className="fh-top">
@@ -627,7 +581,6 @@ export default function ImpactPackage({
                             ) : null}
                         </div>
                     </div>
-                ) : null}
 
                 {tab === "report" && showDetailedReport ? (
                     <ImpactPackageDetailedReport
@@ -649,12 +602,8 @@ export default function ImpactPackage({
                                     </span>
                                 </button>
                             </div>
-                            <h1>
-                                One project.
-                                <br />
-                                One evidence-sharing choice.
-                            </h1>
-                            <p>All pictures, videos, documents, audio and archives use the same setting: Public, Restricted or Private. Restricted is the default.</p>
+                            <h1>{model.title}</h1>
+                            <p>One evidence-sharing choice for this opportunity. All pictures, videos, documents, audio and archives use the same setting: Public, Restricted or Private. Restricted is the default.</p>
                         </header>
                         {audience === "admin" ? (
                             <div className="approval-preview no-print">
@@ -811,14 +760,15 @@ export default function ImpactPackage({
                                 <div className="eyebrow">04 / Analysis report</div>
                                 <span className="pill">CIEL PK CII analysis</span>
                             </div>
-                            <h1>
-                                The analysis behind
-                                <br />
-                                this published package.
-                            </h1>
-                            <p>Faculty, the student and the university receive this report after Super Admin approval. Partner / NGO copies of the package do not include it.</p>
+                            <h1>{model.title}</h1>
+                            <p>The analysis behind this published package. Faculty, the student and the university receive this report after Super Admin approval. Partner / NGO copies of the package do not include it.</p>
                         </header>
-                        <ImpactAnalysisPanel data={data} analyserHref={audience === "admin" ? analyserHref : undefined} />
+                        <ImpactAnalysisPanel
+                            data={data}
+                            analyserHref={audience === "admin" ? analyserHref : undefined}
+                            title={model.title}
+                            reportId={model.reportId}
+                        />
                     </div>
                 ) : null}
 

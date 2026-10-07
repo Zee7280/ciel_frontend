@@ -100,13 +100,9 @@ export default function ImpactPackageDetailedReport({
                         {dossier.sections.length} sections · {dossier.subsectionCount} subsections · {dossier.fieldCount} answer fields
                     </span>
                 </div>
-                <h1>
-                    Every question.
-                    <br />
-                    Every answer, preserved.
-                </h1>
+                <h1>{dossier.title}</h1>
                 <p>
-                    {dossier.title}
+                    Every question, every answer, preserved
                     {dossier.projectId ? ` · ${dossier.projectId}` : ""}. Original V13 subsection references are kept alongside the normalized package numbering.
                 </p>
             </header>

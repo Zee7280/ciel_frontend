@@ -139,5 +139,34 @@
   .ipkg .tools .right button,.ipkg .tools .right a.primary{flex:1 1 100%}
 }
 .ipkg .nested>div>div{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.ipkg .mast{flex-wrap:wrap}
+.ipkg .mast-project{
+  min-width:0;
+  flex:1 1 180px;
+  text-align:center;
+}
+.ipkg .mast-project .eyebrow{
+  color:var(--muted);
+  margin-bottom:3px;
+}
+.ipkg .mast-project strong{
+  display:block;
+  font:17px/1.25 Georgia,"Times New Roman",serif;
+  font-weight:400;
+  color:var(--ink);
+  letter-spacing:-.3px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+@media(max-width:600px){
+  .ipkg .mast-project{
+    flex:1 1 100%;
+    order:3;
+    text-align:left;
+    padding-top:8px;
+  }
+  .ipkg .mast-project strong{white-space:normal}
+}
 
 

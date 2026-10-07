@@ -64,6 +64,15 @@ export default function CommunityFlashCard({
                 {card.cii != null ? (
                     <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII {card.cii}</span>
                 ) : null}
+                {card.npeStanding?.nationalRank != null ? (
+                    <span className="rounded-full bg-[#f6edda] px-2 py-0.5 text-[7px] font-extrabold text-[#976e2b]">
+                        National #{card.npeStanding.nationalRank} · {card.npeStanding.excellenceScore.toFixed(1)}
+                    </span>
+                ) : card.npeStanding?.universityRank != null ? (
+                    <span className="rounded-full bg-[#f6edda] px-2 py-0.5 text-[7px] font-extrabold text-[#976e2b]">
+                        University #{card.npeStanding.universityRank} · {card.npeStanding.excellenceScore.toFixed(1)}
+                    </span>
+                ) : null}
                 <span className="rounded-full bg-[#e3f4fa] px-2 py-0.5 text-[7px] font-extrabold text-[#0891b2]">📸 {card.evidenceCount} EVIDENCE</span>
             </div>
         </div>

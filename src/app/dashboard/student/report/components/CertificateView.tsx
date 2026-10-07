@@ -388,7 +388,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                                     alt="Registrar signature"
                                     className="cert-signature-img"
                                     width={118}
-                                    height={28}
+                                    height={34}
                                 />
                                 <div className="cert-signature-line" />
                                 <p className="cert-registrar-label">Registrar of Impact</p>
