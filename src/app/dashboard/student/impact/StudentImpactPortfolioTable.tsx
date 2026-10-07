@@ -14,6 +14,7 @@ import { sdgData } from "@/utils/sdgData";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
 import CourseworkImpactListCard from "@/components/ciel/coursework/CourseworkImpactListCard";
 import type { CommunityAwardBadge, CommunityServiceLevel } from "@/utils/communityAwardModel";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 const AREAS = ["All Impact", "Community Service", "Coursework", "FYP", "Startup"] as const;
 type Area = (typeof AREAS)[number];
@@ -247,11 +248,12 @@ export default function StudentImpactPortfolioTable() {
                 const hours = Number(r.section1?.metrics?.total_verified_hours || r.hours || 0);
                 const year = yearOf(r.created_at);
                 const sdgs = sdgNumbers(r.sdgs);
-                const uni = r.university || r.organization_name || "Community Service";
+                const partner = displayOrganizationName(r.organization_name);
+                const uni = r.university || partner || "Community Service";
                 out.push({
                     id: `community-${r.id}`,
                     title: r.project_title || "Community service",
-                    meta: r.organization_name || r.university || "Community Service",
+                    meta: partner || r.university || "Community Service",
                     area: "Community Service",
                     areaLabel: "Community Service",
                     score: r.cii_score != null ? `Composite ${r.cii_score}` : "Approved ✓",

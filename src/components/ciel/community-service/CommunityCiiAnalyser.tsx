@@ -32,6 +32,14 @@ function asArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
+function reportDisplayTitle(report: Record<string, unknown> | null): string {
+    if (!report) return "";
+    const opportunity = asRecord(report.opportunity);
+    return String(
+        report.project_title || report.projectTitle || report.title || opportunity.title || "",
+    ).trim();
+}
+
 const DIM7 = CII_V45_DIMENSIONS.find((d) => d.id === "7")!;
 
 const LOGO_SRC = CII_FINAL_LOGO_SRC;
@@ -566,7 +574,7 @@ export default function CommunityCiiAnalyser({
             <main className="wrap">
                 <div className="toolbar">
                     <div className="left">
-                        <input className="report-id" readOnly value={reportId} aria-label="Report ID" />
+                        <input className="report-id" readOnly value={reportDisplayTitle(report) || "Impact Package"} aria-label="Project" />
                         {readOnly ? (
                             <button type="button" className="primary" disabled>
                                 {locked ? "Locked · read only" : ciiV45 ? "Diagnostic CII (view only)" : "Analyzer not run · read only"}

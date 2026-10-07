@@ -24,6 +24,7 @@ import {
     normalizeReviewStatus,
 } from "@/utils/reviewQueue";
 import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 const HUB = "/dashboard/student/paths/community-service";
 const GUIDE = `${HUB}?view=guide`;
@@ -392,7 +393,7 @@ export default function CommunityServiceWorkspace({
                     filter: "reports",
                     stageLabel: "Stage 2 — Community Service Report",
                     title,
-                    meta: report.organization_name && report.organization_name !== "N/A" ? report.organization_name : "Draft auto-saved",
+                    meta: displayOrganizationName(report.organization_name) || "Draft auto-saved",
                     journeyHead: "REPORT IN PROGRESS",
                     journeySub: "Draft — not submitted",
                     note: {

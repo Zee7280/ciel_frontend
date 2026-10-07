@@ -443,13 +443,6 @@ function StudentOpportunityCreationPageInner() {
             if (!formData.title.trim()) errors.title = "Enter an opportunity title.";
             if (!formData.hook.trim()) errors.hook = "Add a one-line student hook.";
             if (!formData.opportunitySummary.trim()) errors.opportunitySummary = "Add an opportunity summary.";
-            // Older listings only picked predefined chips / "Other" specs, so a group label is optional then.
-            const hasBeneficiaryChoice =
-                formData.objectives.beneficiariesType.length > 0 ||
-                formData.objectives.otherBeneficiarySpecs.some((s) => s.trim());
-            if (!formData.objectives.beneficiaryGroup.trim() && !hasBeneficiaryChoice) {
-                errors.beneficiaryGroup = "Describe the community / beneficiary group.";
-            }
             if (formData.opportunityType.length === 0) errors.opportunityType = "Select at least one activity type.";
             if (formData.opportunityType.includes("Other")) {
                 const specs = formData.otherActivitySpecs.map((s) => s.trim()).filter(Boolean);
@@ -1143,7 +1136,7 @@ function StudentOpportunityCreationPageInner() {
             end: formData.dates.end,
             deadline: formData.dates.end,
             beneficiariesCount: formData.objectives.beneficiariesCount || "—",
-            beneficiaryType: formData.objectives.beneficiaryGroup.trim() || bens || "Community",
+            beneficiaryType: bens || "Community",
             responsibilities: formData.activity.responsibilities,
             scheduleNotes: formData.scheduleNotes,
             skills,
@@ -1982,24 +1975,6 @@ function StudentOpportunityCreationPageInner() {
                             }}
                         />
                         <FieldError message={fieldErrors.opportunitySummary} />
-                    </div>
-                    <div>
-                        <label className="co-label">Community / beneficiary group *</label>
-                        <input
-                            type="text"
-                            placeholder="e.g. public-school students, local residents"
-                            value={formData.objectives.beneficiaryGroup}
-                            aria-invalid={fieldErrors.beneficiaryGroup ? true : undefined}
-                            className={fieldErrorClass(!!fieldErrors.beneficiaryGroup)}
-                            onChange={(e) => {
-                                clearFieldError("beneficiaryGroup");
-                                setFormData({
-                                    ...formData,
-                                    objectives: { ...formData.objectives, beneficiaryGroup: e.target.value },
-                                });
-                            }}
-                        />
-                        <FieldError message={fieldErrors.beneficiaryGroup} />
                     </div>
                     {/* B2. Type */}
                     <div>

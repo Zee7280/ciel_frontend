@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import {
     AWARD_PHRASE,
     COMMUNITY_AWARD_CRITERIA,
     COMMUNITY_LEVEL_CLASS,
     COMMUNITY_LEVEL_LABEL,
+    awardPartnerLabel,
     awardTier,
     awardTopN,
     whyThisCommunityRank,
@@ -48,7 +50,7 @@ export default function CommunityAwardPanel({
         return cards.filter((c) => {
             if (filters?.university && uni !== "all" && c.university !== uni) return false;
             if (filters?.department && dept !== "all" && c.department !== dept) return false;
-            if (filters?.org && org !== "all" && c.organization_name !== org) return false;
+            if (filters?.org && org !== "all" && (displayOrganizationName(c.organization_name) || "") !== org) return false;
             if (filters?.faculty && fac !== "all" && c.faculty_name !== fac) return false;
             if (year !== "all" && c.year !== year) return false;
             if (dfrom && c.month && c.month < dfrom) return false;
@@ -69,7 +71,17 @@ export default function CommunityAwardPanel({
     const selectClass = "min-w-[118px] rounded-[10px] border border-[#dcebee] bg-[#f5fbfa] px-2.5 py-1.5 text-[10px] font-bold text-[#0d2b33]";
 
     const unique = (key: keyof CommunityAwardCard) =>
-        Array.from(new Set(cards.map((c) => String(c[key] || "")).filter((v) => v && v !== "—"))).sort();
+        Array.from(
+            new Set(
+                cards
+                    .map((c) =>
+                        key === "organization_name"
+                            ? displayOrganizationName(String(c[key] || "")) || ""
+                            : String(c[key] || ""),
+                    )
+                    .filter((v) => v && v !== "—"),
+            ),
+        ).sort();
 
     // Running the model is a free, unlimited preview — nothing is sent to students until the
     // faculty explicitly taps "Publish & notify" below. This used to fire automatically the
@@ -285,7 +297,7 @@ export default function CommunityAwardPanel({
                                     )}
                                 </div>
                                 <p className="mt-0.5 text-[9px] text-[#7a919a]">
-                                    {c.student_name} · {c.university} · {c.organization_name} · {c.semester} {c.year}
+                                    {c.student_name} · {c.university} · {awardPartnerLabel(c.organization_name)} · {c.semester} {c.year}
                                 </p>
                                 <p className="mt-2.5 text-[8.5px] font-extrabold tracking-[0.1em] text-[#6d28d9]">📐 SCORED ON THE CRITERIA</p>
                                 {(Array.isArray(c.pts) ? c.pts : []).map((p, j) => {

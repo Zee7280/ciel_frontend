@@ -86,8 +86,7 @@ function NavRow({
                 "ciel-transition relative mb-[5px] flex items-center gap-[13px] rounded-[14px] py-3.5 text-left text-[14px] font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]",
                 collapsed ? "mx-1 w-[calc(100%-8px)] justify-center px-0" : "mx-[10px] w-[calc(100%-20px)] px-3.5",
                 active ? "bg-[#22515b] text-white shadow-[inset_4px_0_0_#42ddb2]" : "text-[#c8d4da] hover:bg-white/[0.055] hover:text-white",
-                impact && !active && "mt-2 border border-[rgba(62,218,157,.18)] bg-[rgba(43,202,139,.10)]",
-                impact && active && "mt-2",
+                impact && "mt-2",
                 indent && !collapsed && "mb-1 ml-5 w-[calc(100%-40px)] py-2.5 text-[13px] font-bold",
             )}
             title={collapsed ? label : undefined}
@@ -834,7 +833,19 @@ export default function Sidebar() {
         ) {
             return true;
         }
-        if (pathname === hrefPath) return true;
+        if (pathname === hrefPath) {
+            const currentView = searchParams.get("view");
+            if (currentView && !hrefView) {
+                const siblingOwnsView = allRoleHrefs.some((other) => {
+                    if (other === href) return false;
+                    const [otherPath, otherQuery] = other.split("?");
+                    if (otherPath !== hrefPath || !otherQuery) return false;
+                    return new URLSearchParams(otherQuery).get("view") === currentView;
+                });
+                if (siblingOwnsView) return false;
+            }
+            return true;
+        }
         const longerChild = allRoleHrefs.some(
             (other) => other !== hrefPath && other.startsWith(`${hrefPath}/`) && (pathname === other || pathname.startsWith(`${other}/`)),
         );

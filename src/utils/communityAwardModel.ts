@@ -1,3 +1,5 @@
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
+
 /** PKR value of one verified volunteer hour in the Community Dividend formula — must match
  * ciel_backend's DIVIDEND_HOURLY_RATE_PKR (platform-stats.ledger.util.ts) exactly. A prior drift
  * (this file hardcoded 500/hr while the backend used 192/hr) showed a different dividend figure
@@ -92,6 +94,10 @@ export type CommunityAwardCard = {
     };
 };
 
+export function awardPartnerLabel(name?: string | null): string {
+    return displayOrganizationName(name) || "Partner";
+}
+
 export function awardTier(ratio: number) {
     return ratio >= 0.85 ? 0 : ratio >= 0.62 ? 1 : 2;
 }
@@ -112,7 +118,7 @@ export function whyThisCommunityRank(card: CommunityAwardCard, i: number, arr: C
     const wk = order[order.length - 1][1];
     const parts = [
         `Why #${i + 1} of ${arr.length}: ${AWARD_PHRASE[t1][awardTier(ratios[t1])]} (${card.pts[t1]}/${COMMUNITY_AWARD_CRITERIA[t1].max}), reinforced by ${COMMUNITY_AWARD_CRITERIA[t2].title.toLowerCase()}: ${AWARD_PHRASE[t2][awardTier(ratios[t2])]}.`,
-        card.change ? `The community record: ${card.change} — over ${card.hours} verified hours with ${card.organization_name}.` : `${card.hours} verified hours with ${card.organization_name}.`,
+        card.change ? `The community record: ${card.change} — over ${card.hours} verified hours with ${awardPartnerLabel(card.organization_name)}.` : `${card.hours} verified hours with ${awardPartnerLabel(card.organization_name)}.`,
         `Against the cohort: ${card.total - avg >= 0 ? "+" : ""}${card.total - avg} vs the scoped average of ${avg}.`,
         `What holds it at #${i + 1}: ${AWARD_PHRASE[wk][awardTier(ratios[wk])]}.`,
     ];
@@ -177,7 +183,7 @@ export function reportRowToAwardCard(row: {
         id: row.id,
         student_name: row.student_name || "Student",
         project_title: row.project_title || "Community service",
-        organization_name: row.organization_name || "Partner",
+        organization_name: awardPartnerLabel(row.organization_name),
         university: "—",
         department: "—",
         faculty_name: "Faculty",

@@ -8,6 +8,7 @@ import {
     type CommunityAwardBadge,
     type CommunityAwardCard,
 } from "@/utils/communityAwardModel";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 const BANDS = [
     "National Showcase Ready",
@@ -101,7 +102,7 @@ export default function AdminNationalRankingStudio({
     const universities = unique(cards, (card) => card.university);
     const departments = unique(cards, (card) => card.department);
     const faculties = unique(cards, (card) => card.faculty_name);
-    const partners = unique(cards, (card) => card.organization_name);
+    const partners = unique(cards, (card) => displayOrganizationName(card.organization_name) || "");
     const sdgs = unique(cards, (card) => card.sdg);
 
     const filtered = useMemo(() => {
@@ -115,7 +116,7 @@ export default function AdminNationalRankingStudio({
             if (filters.university && card.university !== filters.university) return false;
             if (filters.department && card.department !== filters.department) return false;
             if (filters.faculty && card.faculty_name !== filters.faculty) return false;
-            if (filters.partner && card.organization_name !== filters.partner) return false;
+            if (filters.partner && (displayOrganizationName(card.organization_name) || "") !== filters.partner) return false;
             if (filters.sdg && card.sdg !== filters.sdg) return false;
             if (filters.cii && ciiBand(card.cii) !== filters.cii) return false;
             if (filters.band && nationalBand(card.total) !== filters.band) return false;

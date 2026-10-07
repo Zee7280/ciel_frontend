@@ -16,6 +16,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -715,7 +716,7 @@ export default function CommunityImpactWall(_props: {
         const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
         const year = yearOf(r.created_at);
         const sdgs = sdgNumbers(r.sdgs);
-        const uni = r.university || r.organization_name || "Community Service";
+        const uni = r.university || displayOrganizationName(r.organization_name) || "Community Service";
         const reportHref = r.project_id || r.opportunity_id ? `/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id))}` : null;
 
         // Phase 3: Build AI Analysis data from ciiV45 + ciiV45Lock (redacted student shape —
@@ -804,7 +805,7 @@ export default function CommunityImpactWall(_props: {
                         const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
                         const year = yearOf(r.created_at);
                         const sdgs = sdgNumbers(r.sdgs);
-                        const uni = r.university || r.organization_name || "Community Service";
+                        const uni = r.university || displayOrganizationName(r.organization_name) || "Community Service";
                         const extraBadges = r.awardBadges || [];
                         return (
                             <article key={r.id} className="overflow-hidden rounded-[20px] border border-[#dde5ea] bg-white shadow-[0_7px_18px_rgba(23,49,57,.05)]">

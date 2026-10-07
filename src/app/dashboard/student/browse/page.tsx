@@ -17,6 +17,7 @@ import {
     pickUniversityLabel,
     pickVisibilityBucket,
 } from "@/utils/opportunityListing";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
@@ -259,9 +260,10 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
 
     const org = raw.organization;
     const orgName =
-        op.organization_name ||
-        (org && typeof org === "object" && typeof (org as { name?: unknown }).name === "string"
-            ? (org as { name: string }).name
+        displayOrganizationName(op.partner_name) ||
+        displayOrganizationName(op.organization_name) ||
+        (org && typeof org === "object"
+            ? displayOrganizationName((org as { name?: unknown }).name)
             : undefined);
 
     const timeline = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : null;
@@ -1122,7 +1124,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 description={op.description && op.description !== "No description" ? op.description : undefined}
                                 pathKey={pathKey}
                                 pathLabel={op.path_label || BROWSE_PATH_BY_KEY[pathKey].shortLabel}
-                                organizationName={op.partner_name || op.organization_name}
+                                organizationName={displayOrganizationName(op.partner_name) || displayOrganizationName(op.organization_name)}
                                 city={op.city}
                                 modeLabel={modeLabel}
                                 hoursLabel={hoursLabel}

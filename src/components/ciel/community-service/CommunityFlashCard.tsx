@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { COMMUNITY_LEVEL_CLASS, COMMUNITY_LEVEL_LABEL, type CommunityAwardCard } from "@/utils/communityAwardModel";
+import { awardPartnerLabel, COMMUNITY_LEVEL_CLASS, COMMUNITY_LEVEL_LABEL, type CommunityAwardCard } from "@/utils/communityAwardModel";
 import { IMPACT_WALL_PACKAGE, type ImpactWallPackageHrefs, type ImpactWallViewer } from "@/utils/impactWallDistribution";
 import RankingBadgeTrendInsights from "@/components/ciel/community-service/RankingBadgeTrendInsights";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
@@ -38,7 +38,7 @@ export default function CommunityFlashCard({
                     {card.total}/100
                 </span>
                 <div className="pr-16 text-[7px] font-extrabold tracking-[0.13em] text-[#99f6e4]">
-                    {card.university} · {(card.organization_name || "Partner").toUpperCase()} · {card.semester} {card.year}
+                    {card.university} · {awardPartnerLabel(card.organization_name).toUpperCase()} · {card.semester} {card.year}
                 </div>
                 <b className="mt-1 block text-[11.5px] leading-snug">{card.project_title}</b>
                 <div className="mt-0.5 text-[9px] text-[#cdf5f0]">

@@ -7,6 +7,7 @@ import {
     applyBlockedMessageFromPayload,
 } from "@/utils/studentApplyMaintenance";
 import "@/components/opportunities/create-opportunity.css";
+import { flowSteps } from "./opportunityFlashcardSteps";
 
 export type FlashViewer = "eligible" | "wrongdept" | "otheruni";
 
@@ -90,16 +91,6 @@ function splitBits(raw: string): string[] {
         .split(/[\n,;]+/)
         .map((s) => s.replace(/^[\s•\-*]+/, "").replace(/^step\s*\d+\s*[:.)-]?\s*/i, "").trim())
         .filter(Boolean);
-}
-
-function flowSteps(raw: string): string[] {
-    const lines = raw
-        .split(/\n+/)
-        .map((s) => s.replace(/^[\s•\-*]+/, "").replace(/^step\s*\d+\s*[:.)-]?\s*/i, "").trim())
-        .filter(Boolean);
-    if (lines.length === 0) return ["Responsibilities will be confirmed with selected students."];
-    if (lines.length <= 4) return lines;
-    return [...lines.slice(0, 3), lines.slice(3).join(" ")];
 }
 
 function icsDay(iso: string, plusDays = 0): string {

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 interface FacultyReportRow {
     id: string;
@@ -43,10 +44,10 @@ function reportMatchesTab(report: FacultyReportRow, tab: ReportStatusFilter): bo
 }
 
 function formatOrganizationLabel(name?: string): string {
-    if (!name?.trim()) return "—";
-    const trimmed = name.trim();
-    if (trimmed.length <= 56) return trimmed;
-    return `${trimmed.slice(0, 53)}…`;
+    const shown = displayOrganizationName(name);
+    if (!shown) return "—";
+    if (shown.length <= 56) return shown;
+    return `${shown.slice(0, 53)}…`;
 }
 
 export default function FacultyStudentReportsPage() {
@@ -279,7 +280,7 @@ export default function FacultyStudentReportsPage() {
                                                 <td className="max-w-[200px] px-4 py-3 align-top">
                                                     <p
                                                         className="line-clamp-2 text-xs leading-snug text-slate-600"
-                                                        title={report.organization_name || undefined}
+                                                        title={orgLabel === "—" ? undefined : orgLabel}
                                                     >
                                                         {orgLabel}
                                                     </p>

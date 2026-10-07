@@ -13,4 +13,5 @@ test("hides create-form helper copy and N/A", () => {
     );
     assert.equal(displayOrganizationName("N/A"), undefined);
     assert.equal(displayOrganizationName(""), undefined);
+    assert.equal(displayOrganizationName("Student opportunity — Aabpashi — 9f84bc1f"), undefined);
 });

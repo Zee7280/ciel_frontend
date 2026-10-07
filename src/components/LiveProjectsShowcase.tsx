@@ -9,6 +9,7 @@ import {
     normalizeModeBucket,
 } from "@/utils/opportunityListing";
 import { HomeHeader, homeBtnGhost, homeBtnPrimary, homeCard, homeSectionWhite, homeWrap } from "@/components/home/HomeChrome";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
 type OppCard = {
     id: string;
@@ -90,8 +91,8 @@ function mapOpportunity(raw: Record<string, unknown>): OppCard | null {
         id,
         title,
         partner:
-            (typeof raw.partner_name === "string" && raw.partner_name.trim()) ||
-            (typeof raw.organization_name === "string" && raw.organization_name.trim()) ||
+            displayOrganizationName(raw.partner_name) ||
+            displayOrganizationName(raw.organization_name) ||
             "Verified partner",
         city: pickCity(raw),
         hours: pickHours(raw),

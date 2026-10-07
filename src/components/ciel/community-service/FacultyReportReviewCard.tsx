@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatDisplayId } from "@/utils/displayIds";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { DIVIDEND_HOURLY_RATE_PKR } from "@/utils/communityAwardModel";
 import { approvalActionClass } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import type { FacultyCsReportRow } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
@@ -78,7 +78,6 @@ export default function FacultyReportReviewCard({
     const recordHref = `${base}/${row.id}`;
     const packageHref = viewer === "faculty" ? `${recordHref}?view=dossier` : recordHref;
     const analyserHref = `${recordHref}?view=cii-v4-5`;
-    const idLabel = formatDisplayId(row.id, "RPT");
     const score = typeof row.cii_provisional === "number" ? Math.round(row.cii_provisional * 10) / 10 : null;
     const levelLabel = row.cii_level_name
         ? row.cii_numeric_level
@@ -152,7 +151,7 @@ export default function FacultyReportReviewCard({
         { label: "Flashcard", sub: "Locked impact flashcard", state: "done" },
         { label: "Detailed Report", sub: "Full section + sub-section record", state: "done" },
         { label: "Evidence", sub: `${evidenceCount} items · full access`, state: "done" },
-        { label: "Full PDF", sub: `${idLabel}-R01.pdf`, state: "done" },
+        { label: "Full PDF", sub: "Impact Package.pdf", state: "done" },
         {
             label: viewer === "admin" ? "AI Analyzer" : "Analysis status",
             sub: has
@@ -184,12 +183,11 @@ export default function FacultyReportReviewCard({
         },
     ];
 
+    const partnerName = displayOrganizationName(row.organization_name);
     const people = [
         { name: row.student_name, role: participation, tone: "student" },
         row.faculty_name ? { name: row.faculty_name, role: "Faculty", tone: "faculty" } : null,
-        row.organization_name && row.organization_name !== "N/A"
-            ? { name: row.organization_name, role: "NGO", tone: "partner" }
-            : null,
+        partnerName ? { name: partnerName, role: "NGO", tone: "partner" } : null,
         row.university ? { name: row.university, role: "University", tone: "university" } : null,
         { name: "CIEL PK", role: "Verification", tone: "ciel" },
     ].filter(Boolean) as Array<{ name: string; role: string; tone: string }>;
@@ -224,7 +222,6 @@ export default function FacultyReportReviewCard({
                 <div className="min-w-0">
                     <h4 className="m-0 text-[15.5px] font-semibold text-[#16313d]">{row.project_title || "Report"}</h4>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-[#6b7c86]">
-                        <span className="rounded-lg bg-[#eef3f5] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#3f5661]">{idLabel}</span>
                         <span className="rounded-lg bg-[#f1eef8] px-1.5 py-0.5 text-[10px] font-black text-[#6b2bd9]">Report v1</span>
                         <span className="rounded-[18px] bg-[#fff3dc] px-2 py-0.5 text-[10.5px] font-black text-[#9a6410]">{statusTitle}</span>
                         {lastActivity ? <span>Last activity {lastActivity}</span> : null}
