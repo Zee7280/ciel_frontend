@@ -25,8 +25,8 @@ export default function OpportunityListFlashHead({
             </p>
             <h3
                 className={
-                    "font-extrabold leading-tight tracking-tight " +
-                    (compact ? "mt-0.5 line-clamp-1 text-sm" : "mt-1 text-base")
+                    "break-words font-extrabold leading-tight tracking-tight [overflow-wrap:anywhere] " +
+                    (compact ? "mt-0.5 text-sm" : "mt-1 text-base")
                 }
             >
                 {title || "Untitled opportunity"}

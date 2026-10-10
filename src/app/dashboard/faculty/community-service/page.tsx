@@ -119,7 +119,7 @@ const FACULTY_CS_GUIDES: Record<string, { desc: string; items?: [string, string]
         desc: "Verified impact from projects you supervised.",
         items: [
             ["Impact Wall", "Verified visible records under the permitted visibility setting."],
-            ["Flashcard & package", "Open the verified flashcard, CII, badge, ranking + trend, detailed report and PDF. QR stays on the flashcard."],
+            ["Flashcard & package", "Open the verified flashcard, CII, badge, ranking + trend, detailed report and PDF. QR is on the Impact Package."],
         ],
         rule: "Rejected work never appears as verified impact.",
     },
@@ -1180,7 +1180,7 @@ function FacultyCommunityServiceHub() {
                 <div>
                     <MockupSectionHead
                         title="My Impact Wall"
-                        subtitle="Published records after CIEL PK Admin approval: flashcard, CII, detailed report, PDF, combined package. QR sits on the flashcard. No certificate download."
+                        subtitle="Published records after CIEL PK Admin approval: flashcard, CII, detailed report, PDF, combined package. QR is on the Impact Package. No certificate download."
                         action={
                             <Link href={IMPACT} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open Impact Wall →
@@ -1193,7 +1193,7 @@ function FacultyCommunityServiceHub() {
                     ) : deckCards.length === 0 ? (
                         <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact. Approved cards appear here after CIEL PK publishes the package.</p>
                     ) : (
-                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {deckCards.map((c) => (
                                             <CommunityFlashCard
                                                 key={c.id}

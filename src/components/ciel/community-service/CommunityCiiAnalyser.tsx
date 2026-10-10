@@ -55,6 +55,16 @@ const EVIDENCE_HELP: Record<string, string> = {
     coverage: "Does the evidence package proportionately cover the main project claims?",
 };
 
+const EVIDENCE_LABEL: Record<string, string> = {
+    participation: "Participation evidence",
+    activities: "Activities / outputs",
+    reach: "Reach",
+    outcomes: "Outcomes / change",
+    resourcesPartners: "Resources & partnerships",
+    ethics: "Ethics / consent",
+    coverage: "Evidence coverage",
+};
+
 function fileNameOf(value: unknown, fallback: string): string {
     if (typeof value === "string" && value.trim()) {
         const cut = value.split("?")[0];
@@ -126,7 +136,7 @@ function approveWarningMessage(stored: CiiV45Result | null, locked: boolean): st
         return "Analysis flagged incomplete hours or student material. Confirming will still publish this score.";
     }
     if (stored.scoreStatus === "ADMIN_EVIDENCE_REQUIRED") {
-        return "AI report-quality (/85) is ready. Dimension 7 defaults to Sound (2) so Confirm can publish; change any evidence mark first if needed.";
+        return "AI report-quality (/85) is ready. Complete all seven evidence marks, then Approve.";
     }
     if (stored.scoreStatus === "ADMIN_REVIEW_REQUIRED") {
         const reasons = Array.isArray(stored.adminReviewReasons) ? stored.adminReviewReasons : [];
@@ -211,8 +221,6 @@ export default function CommunityCiiAnalyser({
                     const saved = d7?.criterionScores?.find((row) => row.criterion === c.key);
                     if (saved && saved.anchor !== "P" && typeof saved.anchor === "number") {
                         anchors[c.key] = String(saved.anchor);
-                    } else {
-                        anchors[c.key] = "2";
                     }
                     if (saved && saved.anchor !== "P" && saved.reasoningSummary?.trim()) {
                         reasons[c.key] = saved.reasoningSummary;
@@ -233,6 +241,14 @@ export default function CommunityCiiAnalyser({
         void loadReport();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [reportId]);
+
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, []);
 
     // The analyser call can legitimately take 1-4 minutes (OpenAI call + one internal
     // empty-content retry) — without a running counter the button just looks hung.
@@ -331,6 +347,10 @@ export default function CommunityCiiAnalyser({
             toast.error(hardBlock);
             return;
         }
+        if (!dim7Complete) {
+            toast.error("Complete all seven evidence marks first.");
+            return;
+        }
         if (!confirmAuthority) {
             toast.error("Confirm these evidence marks are your final Admin assessment.");
             return;
@@ -339,14 +359,12 @@ export default function CommunityCiiAnalyser({
             setApproving(true);
             const body: Record<string, unknown> = {};
             if (note.trim()) body.note = note.trim();
-            if (evidenceAssessmentPending(ciiV45) || !dim7Complete) {
-                body.evidenceCriteria = DIM7.criteria.map((c) => ({
-                    criterion: c.key,
-                    anchor: Number.isInteger(Number(dim7Anchors[c.key])) ? Number(dim7Anchors[c.key]) : 2,
-                    reasoningSummary: (dim7Reasons[c.key] || "").trim() || undefined,
-                    evidenceIds: [],
-                }));
-            }
+            body.evidenceCriteria = DIM7.criteria.map((c) => ({
+                criterion: c.key,
+                anchor: Number(dim7Anchors[c.key]),
+                reasoningSummary: (dim7Reasons[c.key] || "").trim() || undefined,
+                evidenceIds: [],
+            }));
             const res = await authenticatedFetch(approvePath, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -445,7 +463,7 @@ export default function CommunityCiiAnalyser({
 
     if (loading) {
         return (
-            <div className="cii-final">
+            <div className="cii-final cii-final-page">
                 <div className="backnav">
                     <div className="wrap">
                         <HubBackButton href={inboxHref} label={inboxLabel} />
@@ -460,7 +478,7 @@ export default function CommunityCiiAnalyser({
 
     if (!report) {
         return (
-            <div className="cii-final">
+            <div className="cii-final cii-final-page">
                 <div className="backnav">
                     <div className="wrap">
                         <HubBackButton href={inboxHref} label={inboxLabel} />
@@ -516,7 +534,7 @@ export default function CommunityCiiAnalyser({
     const packetOriginalsLabel = originalsOk ? "Admin access" : "Waiting";
 
     return (
-        <div className="cii-final">
+        <div className="cii-final cii-final-page">
             <div className="backnav">
                 <div className="wrap">
                     <HubBackButton href={inboxHref} label={inboxLabel} />
@@ -779,7 +797,7 @@ export default function CommunityCiiAnalyser({
                                             <b>{file.name}</b>
                                             <span className="pill">{file.visibility}</span>
                                         </div>
-                                        <div className="admin-full">ADMIN FULL ACCESS</div>
+                                        <div className="admin-full">CIEL PK ADMIN ACCESS · FULL</div>
                                         <p>
                                             {file.section} · {file.claim}
                                         </p>
@@ -807,27 +825,35 @@ export default function CommunityCiiAnalyser({
                                 return (
                                     <div key={c.key} className="ev-row">
                                         <div>
-                                            <strong>{criterionLabel("7", c.key)}</strong>
+                                            <strong>{EVIDENCE_LABEL[c.key] || criterionLabel("7", c.key)}</strong>
                                             <div className="ev-help">{EVIDENCE_HELP[c.key] || `${c.weight} pts`}</div>
                                         </div>
                                         <select
-                                            value={dim7Anchors[c.key] ?? "2"}
+                                            value={dim7Anchors[c.key] ?? ""}
                                             disabled={locked || readOnly}
                                             onChange={(e) => setDim7Anchors((prev) => ({ ...prev, [c.key]: e.target.value }))}
                                         >
+                                            <option value="">Select mark level</option>
                                             {CII_V45_ANCHOR_NAMES.map((name, i) => (
                                                 <option key={name} value={String(i)}>
-                                                    {i}/4 · {name}
+                                                    {i} · {name}
                                                 </option>
                                             ))}
                                         </select>
-                                        <div className="points">{pts.toFixed(2)}</div>
-                                        <textarea
-                                            value={dim7Reasons[c.key] ?? ""}
-                                            disabled={locked || readOnly}
-                                            onChange={(e) => setDim7Reasons((prev) => ({ ...prev, [c.key]: e.target.value }))}
-                                            placeholder="Optional comment"
-                                        />
+                                        <div className="points">
+                                            {Number.isInteger(a) && a >= 0 && a <= 4
+                                                ? `${pts.toFixed(2)} / ${c.weight}`
+                                                : `— / ${c.weight}`}
+                                        </div>
+                                        <div>
+                                            <textarea
+                                                value={dim7Reasons[c.key] ?? ""}
+                                                disabled={locked || readOnly}
+                                                onChange={(e) => setDim7Reasons((prev) => ({ ...prev, [c.key]: e.target.value }))}
+                                                placeholder="Optional Admin comment"
+                                            />
+                                            <span className="optional">Optional — not required to approve the score.</span>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -921,7 +947,7 @@ export default function CommunityCiiAnalyser({
                                         <button
                                             type="button"
                                             className="primary"
-                                            disabled={approving || Boolean(hardBlock) || (!confirmAuthority && !locked)}
+                                            disabled={approving || Boolean(hardBlock) || !dim7Complete || (!confirmAuthority && !locked)}
                                             onClick={approveAndLock}
                                         >
                                             {approving ? "Locking…" : "Approve Score & Generate Final Report"}

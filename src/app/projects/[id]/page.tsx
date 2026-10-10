@@ -21,6 +21,7 @@ import {
     readSupervisionStakeholders,
 } from "@/utils/opportunityDetailView";
 import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import {
     applicationsOpenFromPayload,
     applyBlockedMessageFromPayload,
@@ -248,12 +249,12 @@ export default function ProjectDetailsPage() {
     const status = project.status || "Active";
     const displayLocation = getDisplayLocation(project.location);
     const partnerName =
-        stakeholders.partner?.organization ||
-        project.organization?.name ||
-        project.organization_name ||
-        project.partner_name ||
-        project.org ||
-        "Verified Organization";
+        displayOrganizationName(stakeholders.partner?.organization) ||
+        displayOrganizationName(project.partner_name) ||
+        displayOrganizationName(project.organization_name) ||
+        displayOrganizationName(project.organization?.name) ||
+        displayOrganizationName(project.org) ||
+        "Partner";
     const skills = activityPlan.skills.length > 0 ? activityPlan.skills : normalizeTextList(project.activity_details?.skills_gained);
     const verificationMethods = normalizeTextList(project.verification_method);
     const beneficiaryTypes = normalizeTextList(project.objectives?.beneficiaries_type);
@@ -333,9 +334,15 @@ export default function ProjectDetailsPage() {
                     
                     <StudentOpportunityFlashcard
                         model={buildOpportunityRecordFlashcard(projectRecord, {
-                            partnerOrg: partnerName,
-                            university: stakeholders.faculty?.university || project.organization?.name,
-                            facultyName: stakeholders.faculty?.name || project.supervision?.supervisor_name,
+                            partnerOrg:
+                                project.partner_name ||
+                                stakeholders.partner?.organization ||
+                                undefined,
+                            university: stakeholders.faculty?.university || undefined,
+                            facultyName:
+                                stakeholders.faculty?.name ||
+                                project.supervision?.supervisor_name ||
+                                undefined,
                         })}
                     />
 

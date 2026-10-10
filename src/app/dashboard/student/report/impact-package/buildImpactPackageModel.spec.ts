@@ -8,6 +8,7 @@ import {
     shouldShowImpactPackageAnalysis,
     shouldShowImpactPackageCertificate,
     shouldShowImpactPackageDetailedReport,
+    shouldShowImpactPackageSectionScores,
 } from "./buildImpactPackageModel";
 
 const locked = (admin_status: string) =>
@@ -21,6 +22,13 @@ test("analysis report goes to student, faculty, university and admin after appro
     assert.equal(shouldShowImpactPackageAnalysis("admin", locked("pending")), true);
 });
 
+test("student analysis hides section-wise CII; admin faculty university keep the grid", () => {
+    assert.equal(shouldShowImpactPackageSectionScores("student"), false);
+    for (const a of ["admin", "faculty", "university"] as const) {
+        assert.equal(shouldShowImpactPackageSectionScores(a), true, a);
+    }
+});
+
 test("partner / NGO and public never get the analysis report", () => {
     assert.equal(shouldShowImpactPackageAnalysis("partner", locked("approved")), false);
     assert.equal(shouldShowImpactPackageAnalysis("public", locked("approved")), false);
@@ -31,16 +39,19 @@ test("no analysis tab when CII is not locked", () => {
     assert.equal(shouldShowImpactPackageAnalysis("faculty", d), false);
 });
 
-test("evidence: partner locked on restricted, faculty/university wait for Admin approval", () => {
-    assert.equal(impactPackageCanViewEvidence("partner", "restricted" as never), false);
-    assert.equal(impactPackageCanViewEvidence("faculty", "restricted" as never, false), false);
-    assert.equal(impactPackageCanViewEvidence("university", "restricted" as never, false), false);
-    assert.equal(impactPackageCanViewEvidence("faculty", "restricted" as never, true), true);
-    assert.equal(impactPackageCanViewEvidence("student", "restricted" as never, false), true);
-    assert.equal(impactPackageCanViewEvidence("admin", "restricted" as never, false), true);
-    assert.equal(impactPackageCanDownload("student", "restricted" as never, true), false);
-    assert.equal(impactPackageCanDownload("partner", "public" as never, true), true);
-    assert.equal(impactPackageCanDownload("partner", "public" as never, false), false);
+test("evidence matrix matches backend: restricted is view-only for student/admin/faculty/university", () => {
+    for (const role of ["student", "admin", "faculty", "university"] as const) {
+        assert.equal(impactPackageCanViewEvidence(role, "restricted" as never, false), true, role);
+        assert.equal(impactPackageCanViewEvidence(role, "restricted" as never, true), true, role);
+        assert.equal(impactPackageCanDownload(role, "restricted" as never, true), false, role);
+    }
+    assert.equal(impactPackageCanViewEvidence("partner", "restricted" as never, true), false);
+    assert.equal(impactPackageCanViewEvidence("public", "restricted" as never, true), false);
+    for (const role of ["student", "admin", "faculty", "university", "partner", "public"] as const) {
+        assert.equal(impactPackageCanViewEvidence(role, "public" as never, false), true, role);
+        assert.equal(impactPackageCanDownload(role, "public" as never, true), true, role);
+        assert.equal(impactPackageCanDownload(role, "public" as never, false), false, `${role} needs consent`);
+    }
 });
 
 test("flash Participation chips split live attendance logs per teammate", () => {

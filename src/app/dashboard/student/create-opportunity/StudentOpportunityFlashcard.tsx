@@ -7,7 +7,18 @@ import {
     applyBlockedMessageFromPayload,
 } from "@/utils/studentApplyMaintenance";
 import "@/components/opportunities/create-opportunity.css";
+import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { flowSteps } from "./opportunityFlashcardSteps";
+
+function flashOrgLabel(value: unknown): string {
+    return displayOrganizationName(value) || "CIEL PK";
+}
+
+function flashHost(value: unknown): string {
+    const raw = typeof value === "string" ? value.trim() : "";
+    if (!raw) return "No external partner";
+    return displayOrganizationName(raw) || "Partner";
+}
 
 export type FlashViewer = "eligible" | "wrongdept" | "otheruni";
 
@@ -170,9 +181,9 @@ export function buildOpportunityRecordFlashcard(
     const sdgInfo = asRecord(raw.sdg_info);
     const secondary = Array.isArray(raw.secondary_sdgs) ? asRecord(raw.secondary_sdgs[0]) : {};
     const types = Array.isArray(raw.types) ? raw.types.map((t) => String(t)).filter(Boolean) : [];
-    const host =
-        pickStr(people?.partnerOrg, supervision.partner_org_name, supervision.external_partner_org_name) ||
-        "No external partner";
+    const host = flashHost(
+        pickStr(people?.partnerOrg, supervision.partner_org_name, supervision.external_partner_org_name),
+    );
     return {
         title: pickStr(raw.title),
         hook: pickStr(objectives.hook, objectives.summary),
@@ -200,7 +211,7 @@ export function buildOpportunityRecordFlashcard(
         objective: pickStr(objectives.description, sdgInfo.why_relevant),
         outputs: pickStr(objectives.outputs, objectives.outcome),
         creatorName: pickStr(people?.studentName, supervision.supervisor_name) || "Creator",
-        orgLabel: pickStr(people?.university, supervision.faculty_university_name) || "CIEL PK",
+        orgLabel: flashOrgLabel(pickStr(people?.university, supervision.faculty_university_name)),
         unitLabel: pickStr(supervision.faculty_department, supervision.role),
         badgeLabel: "Student created",
         privateCandidate: supervision.private_candidate === true,
@@ -351,6 +362,8 @@ export function StudentOpportunityFlashcard({
     const span = daySpan(String(model.start || ""), String(model.end || ""));
     const steps = flowSteps(String(model.responsibilities || ""));
     const skillChips = splitBits(String(model.skills || ""));
+    const orgLabel = flashOrgLabel(model.orgLabel);
+    const host = flashHost(model.host);
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
     const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
     const canApply = model.eligible && !closed;
@@ -405,7 +418,7 @@ export function StudentOpportunityFlashcard({
                     <span>{esc(model.activityType || "Community Service")}</span>
                     <span>{esc(model.mode || "On-site")}</span>
                     {String(model.city || "").trim() ? <span>{esc(model.city)}</span> : null}
-                    <span>{esc(model.orgLabel)}</span>
+                    <span>{esc(orgLabel)}</span>
                 </div>
             </section>
             <div className={`co-flash-ribbon ${ribbon}`}>
@@ -599,7 +612,7 @@ export function StudentOpportunityFlashcard({
                         <div className="co-flash-chain-item">
                             <small>Created by</small>
                             <b>{esc(model.creatorName)}</b>
-                            <em>{esc(model.orgLabel)}</em>
+                            <em>{esc(orgLabel)}</em>
                         </div>
                         <div className="co-flash-chain-item">
                             <small>{model.privateCandidate ? "Verification" : "Faculty"}</small>
@@ -608,8 +621,8 @@ export function StudentOpportunityFlashcard({
                         </div>
                         <div className="co-flash-chain-item">
                             <small>Host</small>
-                            <b>{esc(model.host)}</b>
-                            <em>{model.host !== "No external partner" ? esc(model.partnerEmail) : "No partner on this card"}</em>
+                            <b>{esc(host)}</b>
+                            <em>{host !== "No external partner" && host !== "Partner" ? esc(model.partnerEmail) : "No partner on this card"}</em>
                         </div>
                         <div className="co-flash-chain-item">
                             <small>CIEL PK</small>

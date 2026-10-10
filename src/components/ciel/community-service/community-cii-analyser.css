@@ -23,6 +23,15 @@
     font: 14px/1.55 Arial, Helvetica, sans-serif;
     min-height: 75vh;
 }
+/* Standalone analyser page — same full-bleed canvas as FINAL-110 HTML, over dashboard chrome. */
+.cii-final.cii-final-page {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    overflow: auto;
+    min-height: 100dvh;
+    background: var(--bg);
+}
 .cii-final *,
 .cii-final *::before,
 .cii-final *::after {
@@ -53,11 +62,16 @@
 .cii-final .backnav a,
 .cii-final .backnav button {
     color: #d5e5df !important;
+    background: transparent;
+    border: 0;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 0 0 10px;
 }
 .cii-final .mast {
     background: var(--deep);
     color: #fff;
-    padding: 12px 0 19px;
+    padding: 22px 0 19px;
 }
 .cii-final .brand {
     display: flex;

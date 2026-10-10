@@ -35,6 +35,7 @@ export function CiiFinalOnePageSheet({
     limitations,
     adminComment,
     showPrint = true,
+    showSectionScores = true,
     className,
     embedded = false,
 }: {
@@ -52,6 +53,8 @@ export function CiiFinalOnePageSheet({
     limitations: string[];
     adminComment?: string;
     showPrint?: boolean;
+    /** Student package/wall show overall CII only; Admin analyser keeps the dim 1–9 grid. */
+    showSectionScores?: boolean;
     className?: string;
     /** Parent already provides `.cii-final` (Admin/Faculty analyser). */
     embedded?: boolean;
@@ -99,6 +102,7 @@ export function CiiFinalOnePageSheet({
                             </div>
                         </div>
                     </div>
+                    {showSectionScores ? (
                     <div className="section-score-grid">
                         {(sections.length ? sections : [{ name: "Sections pending", score: null, maximumPoints: null }]).map((section, index) => (
                             <div key={`${section.dimension || section.name}-${index}`} className="sscore">
@@ -113,6 +117,7 @@ export function CiiFinalOnePageSheet({
                             </div>
                         ))}
                     </div>
+                    ) : null}
                     <h3>Overall Analysis</h3>
                     <p className="analysis-copy">{analysis || "—"}</p>
                     <div className="sheet-cols">

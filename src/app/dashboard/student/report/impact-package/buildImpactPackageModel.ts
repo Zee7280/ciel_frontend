@@ -643,11 +643,12 @@ export function buildImpactPackageModel(
 export function impactPackageCanViewEvidence(
     audience: ImpactPackageAudience,
     visibility: MediaVisibility,
-    adminApproved = false,
+    _adminApproved = false,
 ): boolean {
     if (visibility === "public") return true;
-    if (audience === "student" || audience === "admin") return true;
-    if (audience === "faculty" || audience === "university") return adminApproved;
+    if (audience === "student" || audience === "admin" || audience === "faculty" || audience === "university") {
+        return true;
+    }
     return false;
 }
 
@@ -655,13 +656,11 @@ export function impactPackageCanDownload(audience: ImpactPackageAudience, visibi
     return visibility === "public" && publicConsent && impactPackageCanViewEvidence(audience, visibility, true);
 }
 
-export function impactPackageAccessText(audience: ImpactPackageAudience, visibility: MediaVisibility, adminApproved: boolean): string {
+export function impactPackageAccessText(audience: ImpactPackageAudience, visibility: MediaVisibility, _adminApproved: boolean): string {
     if (visibility === "public") return "Anyone viewing the published project can see the evidence.";
-    const internal = adminApproved
-        ? "Student, Super Admin, Faculty and University · view only"
-        : "Student and Super Admin · view only. Faculty and University unlock after super-admin approval";
+    const internal = "Student, Super Admin, Faculty and University · view only. Partner / NGO never";
     if (visibility === "private") return `${internal}. Internal verification only; never published. Downloads are blocked for everyone.`;
-    return `${internal}. Not shown publicly. Partner / NGO stay locked and all downloads are blocked.`;
+    return `${internal}. Not shown publicly. Downloads are blocked for everyone.`;
 }
 
 export function impactPackageLockLine(adminApproved: boolean): string {
@@ -678,6 +677,11 @@ export function hasImpactPackageAnalysis(data: ReportData): boolean {
     const lock = data.ciiV45Lock as { locked?: unknown } | null | undefined;
     const locked = lock?.locked === true || lock?.locked === "true";
     return Boolean(locked && ciiHasDisplayScore(data));
+}
+
+/** Student analysis shows overall CII only. Admin / faculty / university keep the dim 1–9 grid. */
+export function shouldShowImpactPackageSectionScores(audience: ImpactPackageAudience): boolean {
+    return audience !== "student";
 }
 
 /** Partner / NGO never see the analysis report. Student / faculty / university see it after Super Admin approval. Admin sees it when attached. */

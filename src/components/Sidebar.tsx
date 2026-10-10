@@ -174,7 +174,7 @@ function RoleMenuSheet({
     return (
         <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label={title}>
             <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ciel-text/40" />
-            <div className="ciel-crossfade-enter absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto overscroll-contain rounded-t-ciel-xl bg-white p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)]">
+            <div className="ciel-crossfade-enter custom-scrollbar absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto overscroll-contain rounded-t-ciel-xl bg-white p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)]">
                 <div className="flex items-center justify-between">
                     <h2 className="text-base font-black text-ciel-text">{title}</h2>
                     <button
@@ -907,7 +907,7 @@ export default function Sidebar() {
         <>
         <aside
             className={clsx(
-                "fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] flex-col text-white lg:flex ciel-transition",
+                "fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] flex-col overflow-hidden text-white [color-scheme:dark] lg:flex ciel-transition",
                 collapsed ? "w-[64px]" : "w-[280px]",
             )}
             style={{ background: "linear-gradient(180deg,#133747,#0f2d3a)" }}
@@ -961,7 +961,7 @@ export default function Sidebar() {
                 </button>
             </div>
 
-            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
+            <div className="sidebar-scroll custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain py-2 pr-1">
                 {isInvestor ? (
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
@@ -1035,28 +1035,11 @@ export default function Sidebar() {
                             href="/dashboard/student/impact"
                             label="My Impact Portfolio"
                             emoji="🏆"
-                            active={isNavActive("/dashboard/student/impact") && !searchParams.get("area")}
+                            active={isNavActive("/dashboard/student/impact")}
                             countPill={impactHistoryBadge}
                             collapsed={collapsed}
                             onPrefetch={() => prefetchStudentImpactPortfolio()}
                         />
-                        {!collapsed &&
-                            [
-                                { label: "Community Service", area: "Community Service", emoji: "🏕️" },
-                                { label: "Coursework", area: "Coursework", emoji: "📚" },
-                                { label: "FYP", area: "FYP", emoji: "🎓" },
-                                { label: "Startup", area: "Startup", emoji: "💼" },
-                            ].map((sub) => (
-                                <NavRow
-                                    key={sub.area}
-                                    href={`/dashboard/student/impact?area=${encodeURIComponent(sub.area)}`}
-                                    label={sub.label}
-                                    emoji={sub.emoji}
-                                    active={isNavActive(`/dashboard/student/impact?area=${encodeURIComponent(sub.area)}`)}
-                                    collapsed={collapsed}
-                                    indent
-                                />
-                            ))}
                         <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
                         {studentMoreLinks.filter((link) => link.href !== "/dashboard/student/impact").map((link) => (
                             <NavRow

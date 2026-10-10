@@ -33,7 +33,7 @@ import {
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 import { CepExperienceFeedbackPrompt } from '@/components/feedback/CepExperienceFeedbackPrompt';
 import { CIEL_OFFICIAL_BANK } from '@/config/cielBankDetails';
-import { reportRequiresReportingFee } from '@/utils/reviewQueue';
+import { reportRequiresReportingFee, COMMUNITY_REPORTS_IN_PROGRESS_HREF } from '@/utils/reviewQueue';
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -257,8 +257,8 @@ function PaymentContent() {
                         />
                     </div>
                     <div className="pt-8">
-                        <Button onClick={() => router.push('/dashboard/student/projects')} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
-                            Back to My Projects
+                        <Button onClick={() => router.push(COMMUNITY_REPORTS_IN_PROGRESS_HREF)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
+                            Back to My Reports
                         </Button>
                     </div>
                 </div>

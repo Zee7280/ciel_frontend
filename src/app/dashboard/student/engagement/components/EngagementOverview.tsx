@@ -195,8 +195,8 @@ export default function EngagementOverview({
     /** Report Section 1 / Metrics dashboard — match Review & submit calm card. */
     if (hideIntensityHero) {
         return (
-            <div className="mx-auto max-w-2xl space-y-4">
-                <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="cer-metrics space-y-4">
+                <div className="cer-metrics-card space-y-5">
                     <HoursStatusBanner
                         hoursMet={hoursMet}
                         totalHours={metrics.totalHours}

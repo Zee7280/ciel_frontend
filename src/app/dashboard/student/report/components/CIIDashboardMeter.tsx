@@ -3,29 +3,17 @@
 import React, { useMemo } from 'react';
 import { useReportForm } from '../context/ReportContext';
 import { resolveReportCii } from '../utils/resolveReportCii';
-import {
-    CII_APPROVED_LABELS,
-    CII_BREAKDOWN_ORDER,
-    CII_SECTION_MAX,
-    ciiContributorBand,
-} from '../utils/ciiSectionWeights';
-import clsx from 'clsx';
+import { ciiContributorBand } from '../utils/ciiSectionWeights';
 
 export default function CIIDashboardMeter() {
     const { data } = useReportForm();
 
     const ciiResult = useMemo(() => resolveReportCii(data), [data]);
 
-    const { totalScore, breakdown } = ciiResult;
+    const { totalScore } = ciiResult;
     const band = ciiContributorBand(totalScore);
     const dash = 251.2;
     const filled = dash * Math.min(1, Math.max(0, totalScore / 100));
-
-    const scoreItems = CII_BREAKDOWN_ORDER.map((key) => ({
-        label: CII_APPROVED_LABELS[key],
-        score: breakdown[key],
-        max: CII_SECTION_MAX[key],
-    }));
 
     return (
         <div className="cer-cii">
@@ -49,27 +37,6 @@ export default function CIIDashboardMeter() {
                 </div>
                 <p className="cer-cii-band">{band.title}</p>
                 <p className="cer-cii-band-sub">{band.detail}</p>
-            </div>
-            <div className="cer-cii-bars">
-                {scoreItems.map((item) => {
-                    const pct = item.max > 0 ? Math.min(100, (Number(item.score) / item.max) * 100) : 0;
-                    const weak = pct < 99;
-                    const display =
-                        typeof item.score === "number" && !Number.isInteger(item.score)
-                            ? item.score.toFixed(1)
-                            : item.score;
-                    return (
-                        <div key={item.label} className={clsx("cer-cii-row", weak && "weak")}>
-                            <span className="cer-cii-lab">{item.label}</span>
-                            <div className="cer-cii-track">
-                                <i style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="cer-cii-n">
-                                {display} / {item.max}
-                            </span>
-                        </div>
-                    );
-                })}
             </div>
         </div>
     );

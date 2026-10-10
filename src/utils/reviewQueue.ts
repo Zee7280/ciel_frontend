@@ -1,5 +1,28 @@
 /** Shared waiting-vs-approved buckets for faculty / admin / partner / university review lists. */
 
+/** My Reports → Reports Under Review. Not My Projects, not opportunity `view=create`. */
+export const COMMUNITY_REPORTS_UNDER_REVIEW_HREF =
+    "/dashboard/student/paths/community-service?view=workspace&filter=review";
+
+/** My Reports → Reports in Progress (fee due / payment proof waiting). */
+export const COMMUNITY_REPORTS_IN_PROGRESS_HREF =
+    "/dashboard/student/paths/community-service?view=workspace&filter=reports";
+
+/** After a successful report submit: payment for fee reports, otherwise Reports Under Review. */
+export function studentReportPostSubmitHref(args: {
+    feeRequired: boolean;
+    projectId?: string | null;
+}): string {
+    if (args.feeRequired) {
+        const id = String(args.projectId || "").trim();
+        return id
+            ? `/dashboard/student/payment?projectId=${encodeURIComponent(id)}`
+            : COMMUNITY_REPORTS_IN_PROGRESS_HREF;
+    }
+    return COMMUNITY_REPORTS_UNDER_REVIEW_HREF;
+}
+
+
 export function normalizeReviewStatus(value: unknown): string {
     return String(value ?? "")
         .trim()

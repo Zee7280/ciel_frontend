@@ -45,7 +45,7 @@ test("missing mapped section HOLDs the analyser", () => {
     assert.ok(v.issues.some((issue) => /section 3/i.test(issue)));
 });
 
-test("stored review_package.packet_integrity wins over live sections", () => {
+test("stored review_package.packet_integrity is readable even when live sections are complete", () => {
     const stored = readImpactPackagePacketIntegrity({
         section1: {},
         section2: {},
@@ -63,4 +63,24 @@ test("stored review_package.packet_integrity wins over live sections", () => {
     });
     assert.equal(stored?.ok, false);
     assert.equal(resolveImpactPackagePacketIntegrity({ section1: {} }).ok, false);
+});
+
+test("live complete sections clear a stale stored packet HOLD", () => {
+    const v = resolveImpactPackagePacketIntegrity({
+        section1: {},
+        section2: {},
+        section3: {},
+        section4: {},
+        section5: {},
+        section6: {},
+        section7: {},
+        section8: {},
+        section9: {},
+        section10: {},
+        review_package: {
+            packet_integrity: { ok: false, issues: ["Missing Detailed Report content section 3 (SDG Contribution)."] },
+        },
+    });
+    assert.equal(v.ok, true);
+    assert.equal(v.content_sections, 9);
 });

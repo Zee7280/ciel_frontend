@@ -849,7 +849,9 @@ export default function VerifyWorkPage() {
                                 </div>
                             </div>
                             <StudentOpportunityFlashcard
-                                model={buildOpportunityRecordFlashcard(detailRecord)}
+                                model={buildOpportunityRecordFlashcard(detailRecord, {
+                                    partnerOrg: String(detailRecord.partner_name || ""),
+                                })}
                             />
                             {needsExecDialog && detailOppId ? (
                                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">

@@ -1130,13 +1130,13 @@ export function AdminCommunityServiceHub() {
 
             {effectiveView === "wall" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="CIEL PK · My Impact Wall" subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR stays on the flashcard." />
+                    <MockupSectionHead title="CIEL PK · My Impact Wall" subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR is on the Impact Package." />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
                         <EmptyPanel title="No verified records yet" text="Rejected work never appears as verified impact." />
                     ) : (
-                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {deckCards.map((c) => (
                                 <CommunityFlashCard
                                     key={c.id}

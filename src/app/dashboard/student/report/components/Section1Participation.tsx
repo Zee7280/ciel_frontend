@@ -424,7 +424,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
-    const [leadStatus, setLeadStatus] = React.useState<string>('pending_approval');
+    const [leadStatus, setLeadStatus] = React.useState<string>(
+        String((team_lead as { status?: string } | undefined)?.status || "").trim() ||
+            (team_lead?.verified ? "approved" : ""),
+    );
     const [isVerified, setIsVerified] = React.useState(!!team_lead?.verified);
     const [participantId, setParticipantId] = React.useState<string | null>(team_lead?.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
@@ -1572,15 +1575,20 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 participation_type: newType
                                             });
 
-                                            const hasVerified = newMembers.some((m: any) => m.verified && (m.id || m.participantId));
-                                            if (hasVerified) {
-                                                const verifiedIds = newMembers
+                                            const previouslyVerified = new Set(
+                                                (Array.isArray(team_members) ? team_members : [])
                                                     .filter((m: any) => m.verified && (m.id || m.participantId))
-                                                    .map((m: any) => String(m.id || m.participantId));
+                                                    .map((m: any) => String(m.id || m.participantId)),
+                                            );
+                                            const newlyVerifiedIds = newMembers
+                                                .filter((m: any) => m.verified && (m.id || m.participantId))
+                                                .map((m: any) => String(m.id || m.participantId))
+                                                .filter((id: string) => !previouslyVerified.has(id));
+                                            if (newlyVerifiedIds.length) {
                                                 try {
                                                     const projectId = data.project_id || projectIdFromUrl || '';
-                                                    if (projectId && verifiedIds.length) {
-                                                        const formRes = await formTeamFromLead(projectId, verifiedIds);
+                                                    if (projectId) {
+                                                        const formRes = await formTeamFromLead(projectId, newlyVerifiedIds);
                                                         if (formRes?.ok) {
                                                             const formJson = await formRes.json().catch(() => ({}));
                                                             if (formJson?.data?.formed) {

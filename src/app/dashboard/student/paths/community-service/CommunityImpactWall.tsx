@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { fetchStudentReportsList, peekStudentReportsList } from "@/utils/student-community-cache";
 import type { ActiveProject } from "@/app/dashboard/student/types";
-import { MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
-import RankingBadgeTrendInsights from "@/components/ciel/community-service/RankingBadgeTrendInsights";
-import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { resolveCiiLevelBadge } from "@/utils/ciiLevelBadge";
 import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/reviewQueue";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
-import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
+import ImpactWallCiiRing from "@/components/ciel/community-service/ImpactWallCiiRing";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -236,6 +234,25 @@ function sdgShort(nums: number[]): string {
     return nums.map((n) => `SDG ${n}`).join(" + ");
 }
 
+function wallCiiScore(r: WallRow): number | null {
+    return pickCiiV45DisplayScore(r.ciiV45, r.ciiV45Lock) ?? (typeof r.cii_score === "number" ? r.cii_score : null);
+}
+
+function wallBadgeName(r: WallRow, score: number | null): string {
+    return (
+        pickCiiV45DisplayBadgeName(r.ciiV45, r.ciiV45Lock) ||
+        r.ciiV45?.finalBadge?.name ||
+        (score != null ? resolveCiiLevelBadge(score).title : "") ||
+        r.level ||
+        "Verified"
+    );
+}
+
+function nationalBadge(r: WallRow): CommunityAwardBadge | undefined {
+    return (r.awardBadges || []).find((b) => b.kind === "ciel");
+}
+
+
 function sdgLine(nums: number[]): string {
     if (!nums.length) return "No SDG mapping recorded.";
     return nums
@@ -281,7 +298,6 @@ function buildFlashcardExtras(
     hours: number,
     facultyScore: number | null,
 ): NonNullable<FlashState["flashcard"]> {
-    const sections = cii.sectionScores || [];
     const badge = resolveCiiLevelBadge(facultyScore ?? cii.finalCII ?? 0);
     const reach = r.section4?.project_summary?.distinct_total_beneficiaries;
     const sdgCount = sdgNumbers(r.sdgs).length;
@@ -324,15 +340,6 @@ function buildFlashcardExtras(
         quality: { strongest, limitations, nextStep },
         skills: competencySkills(r.section9?.competency_scores),
     };
-}
-
-function confidenceLabel(score: number, weight: number): string {
-    if (!weight) return "—";
-    const ratio = score / weight;
-    if (ratio >= 0.85) return "High";
-    if (ratio >= 0.65) return "Med-High";
-    if (ratio >= 0.45) return "Developing";
-    return "Needs work";
 }
 
 /**
@@ -430,7 +437,7 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                 <WallAction href={studentImpactPackageHref(flash.projectId, "print") || flash.pdf || null} label="PDF Report" />
                                 <WallAction href={studentImpactPackageHref(flash.projectId, "evidence") || flash.evidence || null} label="Evidence" />
                                 <WallAction href={studentImpactPackageHref(flash.projectId, "certificate") || flash.certificate || null} label="Certificate" />
-                                <WallAction href={flash.qr || null} label="QR Code" external={Boolean(flash.qr)} />
+                                <WallAction href={studentImpactPackageHref(flash.projectId, "package") || null} label="View package" />
                             </div>
                         </div>
                     </div>
@@ -461,21 +468,6 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Section Scores */}
-                                {ai.sections.length > 0 && (
-                                    <div className="mt-4 border-t border-[#e0daf0] pt-3">
-                                        <span className="text-[9px] font-black text-[#8b82a6]">SECTION SCORES</span>
-                                        <div className="mt-2 space-y-1.5">
-                                            {ai.sections.map((s) => (
-                                                <div key={s.dimension} className="flex items-center justify-between gap-2 text-[10px]">
-                                                    <span className="text-[#5d5775]">S{s.dimension}. {s.name.slice(0, 30)}{s.name.length > 30 ? "…" : ""}</span>
-                                                    <span className="font-bold text-[#6d28d9]">{(s.score ?? 0).toFixed(1)}/{s.maximumPoints}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* Uplift & Penalty */}
                                 <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#e0daf0] pt-3">
@@ -520,7 +512,7 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                     )}
                 </div>
 
-                {/* Verified Impact Flashcard: badge, checklist, metric rail, path, section grid,
+                {/* Verified Impact Flashcard: badge, checklist, metric rail, path,
                     quality judgement and skills — all built from the same admin-locked CII v4.5
                     record shown in the AI Analysis column above. */}
                 {fc && ai && (
@@ -565,24 +557,6 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                             ))}
                         </div>
 
-                        {ai.sections.length > 0 && (
-                            <>
-                                <h4 className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-[#70808a]">Section-by-section summary</h4>
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    {ai.sections.map((s) => (
-                                        <div key={s.dimension} className="rounded-[14px] border border-[#dde5ea] bg-white p-3">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <b className="text-[10.5px] leading-tight text-[#16313d]">{s.dimension}. {s.name}</b>
-                                                <span className="whitespace-nowrap rounded-full border border-[#efdfb6] bg-[#fff9e9] px-1.5 py-0.5 text-[8.5px] font-black text-[#875f16]">{s.score ?? "—"}/{s.maximumPoints}</span>
-                                            </div>
-                                            <div className="mt-1.5 text-[8px] font-black text-[#70808a]">
-                                                <span className="rounded-full bg-[#edf9f5] px-1.5 py-0.5 text-[#287565]">{confidenceLabel(s.score ?? 0, s.maximumPoints)} confidence</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
 
                         {(fc.quality.strongest.length > 0 || fc.quality.limitations.length > 0 || fc.quality.nextStep) && (
                             <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -693,6 +667,10 @@ export default function CommunityImpactWall(_props: {
     );
     const [loading, setLoading] = useState(!cachedReports);
     const [flash, setFlash] = useState<FlashState | null>(null);
+    const [query, setQuery] = useState("");
+    const [filter, setFilter] = useState<"all" | "ranked">("all");
+    const [sort, setSort] = useState<"recent" | "cii">("recent");
+    const [yearFilter, setYearFilter] = useState("all");
 
     useEffect(() => {
         let cancelled = false;
@@ -711,6 +689,43 @@ export default function CommunityImpactWall(_props: {
             cancelled = true;
         };
     }, []);
+
+    const years = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of rows) {
+            const y = yearOf(r.created_at);
+            if (y) set.add(y);
+        }
+        return [...set].sort((a, b) => Number(b) - Number(a));
+    }, [rows]);
+
+    const stats = useMemo(() => {
+        const hours = rows.reduce((sum, r) => sum + Number(r.hours || r.section1?.metrics?.total_verified_hours || 0), 0);
+        const scores = rows.map((r) => wallCiiScore(r)).filter((n): n is number => n != null && Number.isFinite(n));
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+        const national = rows.filter((r) => nationalBadge(r)).length;
+        return {
+            published: rows.length,
+            hours: Math.round(hours),
+            avg,
+            national,
+        };
+    }, [rows]);
+
+    const visible = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const next = rows.filter((r) => {
+            if (q && !String(r.project_title || "").toLowerCase().includes(q)) return false;
+            if (filter === "ranked" && !(r.awardBadges || []).length) return false;
+            if (yearFilter !== "all" && yearOf(r.created_at) !== yearFilter) return false;
+            return true;
+        });
+        next.sort((a, b) => {
+            if (sort === "cii") return (wallCiiScore(b) ?? -1) - (wallCiiScore(a) ?? -1);
+            return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        });
+        return next;
+    }, [rows, query, filter, yearFilter, sort]);
 
     const openFlash = (r: WallRow) => {
         const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
@@ -779,19 +794,67 @@ export default function CommunityImpactWall(_props: {
         });
     };
 
+    const avgLabel =
+        stats.avg == null ? "—" : Number.isInteger(stats.avg) ? String(Math.round(stats.avg)) : stats.avg.toFixed(1);
+
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
             <CommunityCrumb role="Student" view="My Impact" />
             <HubBackButton href={HUB} label="← Back to Community Service" />
-            <MockupSectionHead
-                title="My Impact"
-                subtitle="After faculty approval: flashcard, badge, ranking + trend, CII, detailed report, PDF, combined package, certificate and QR."
-                action={
-                    <Link href="/dashboard/student/impact?area=Community%20Service" className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
-                        Open full portfolio →
+
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 max-w-3xl">
+                    <h1 className="text-[32px] font-semibold tracking-tight text-[#143f3b]">My Impact Wall.</h1>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b7c86]">
+                        A curated record of your published community service projects — verified outcomes, composite scores,
+                        institutional recognition and supporting documentation, all in one place.
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="rounded-full border border-[#cfe0dc] bg-white px-4 py-2 text-[12px] font-bold text-[#174b43]"
+                    >
+                        Print portfolio
+                    </button>
+                    <Link
+                        href="/dashboard/student/impact?area=Community%20Service"
+                        className="rounded-full bg-[#0e4d4e] px-4 py-2 text-[12px] font-bold text-white"
+                    >
+                        View full portfolio →
                     </Link>
-                }
-            />
+                </div>
+            </div>
+
+            <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-2xl border border-[#e4eeec] bg-white px-5 py-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Published projects</p>
+                    <p className="mt-2 text-[28px] font-semibold tracking-tight text-[#143f3b]">{stats.published}</p>
+                    <p className="text-[11px] text-[#7a919a]">Accepted and published</p>
+                </div>
+                <div className="rounded-2xl border border-[#e4eeec] bg-white px-5 py-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Verified hours</p>
+                    <p className="mt-2 text-[28px] font-semibold tracking-tight text-[#143f3b]">
+                        {stats.hours}
+                        <span className="text-[14px] font-semibold text-[#7a919a]">h</span>
+                    </p>
+                    <p className="text-[11px] text-[#7a919a]">Across these records</p>
+                </div>
+                <div className="rounded-2xl border border-[#e4eeec] bg-[#f3faf7] px-5 py-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Average CII</p>
+                    <p className="mt-2 text-[28px] font-semibold tracking-tight text-[#143f3b]">
+                        {avgLabel}
+                        <span className="text-[14px] font-semibold text-[#7a919a]">/100</span>
+                    </p>
+                    <p className="text-[11px] text-[#7a919a]">Composite Impact Index</p>
+                </div>
+                <div className="rounded-2xl border border-[#efe6d4] bg-[#fbf6ee] px-5 py-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#7a919a]">National recognitions</p>
+                    <p className="mt-2 text-[28px] font-semibold tracking-tight text-[#143f3b]">{stats.national}</p>
+                    <p className="text-[11px] text-[#7a919a]">Projects with rankings</p>
+                </div>
+            </div>
 
             {loading ? (
                 <p className="py-10 text-center text-sm text-[#7a919a]">Loading verified records…</p>
@@ -800,87 +863,171 @@ export default function CommunityImpactWall(_props: {
                     Only approved records appear here. When Faculty signs off a Community Service report, its flashcard lands here and in My Impact Portfolio.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-                    {rows.map((r) => {
-                        const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
-                        const year = yearOf(r.created_at);
-                        const sdgs = sdgNumbers(r.sdgs);
-                        const uni = r.university || displayOrganizationName(r.organization_name) || "Community Service";
-                        const extraBadges = r.awardBadges || [];
-                        return (
-                            <article key={r.id} className="overflow-hidden rounded-[20px] border border-[#dde5ea] bg-white shadow-[0_7px_18px_rgba(23,49,57,.05)]">
-                                <div className="relative bg-[linear-gradient(135deg,#0e4d4e,#117669)] px-[18px] py-[17px] text-white">
-                                    <span className="absolute right-3.5 top-3.5 rounded-[14px] border border-white/25 bg-white/12 px-2 py-1 text-[8.5px] font-[950]">
-                                        ✓ VERIFIED
-                                    </span>
-                                    <p className="text-[8.5px] font-black tracking-[0.08em] text-[#9fe2d7]">COMMUNITY SERVICE IMPACT</p>
-                                    <h4 className="mt-1.5 text-[17px] font-semibold leading-tight">{r.project_title || "Community service"}</h4>
-                                    <p className="mt-1 text-[10px] text-[#d7eeea]">
-                                        {[uni, year, hours ? `${Math.round(hours)} verified hours` : null].filter(Boolean).join(" • ")}
-                                    </p>
-                                </div>
-                                <div className="px-[18px] py-[15px]">
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        <div className="rounded-[11px] border border-[#dde5ea] p-2">
-                                            <span className="block text-[7.8px] font-black uppercase text-[#70808a]">Composite Score</span>
-                                            <strong className="mt-0.5 block text-sm text-[#16313d]">{r.cii_score != null ? r.cii_score : "Approved"}</strong>
+                <>
+                    <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                        <div>
+                            <h2 className="text-[18px] font-semibold text-[#143f3b]">Published impact projects</h2>
+                            <p className="text-[12px] text-[#7a919a]">Only accepted and published projects appear on your Impact Wall.</p>
+                        </div>
+                        <p className="text-[12px] text-[#7a919a]">
+                            Showing {visible.length} of {rows.length} {rows.length === 1 ? "project" : "projects"}
+                        </p>
+                    </div>
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search your project titles..."
+                            className="min-w-[220px] flex-1 rounded-full border border-[#d7e4e1] bg-white px-4 py-2 text-[13px] text-[#16313d] outline-none placeholder:text-[#9aadb3]"
+                        />
+                        <div className="flex flex-wrap gap-1 rounded-full bg-[#eef4f2] p-1">
+                            {(
+                                [
+                                    ["all", "All projects"],
+                                    ["ranked", "Ranked"],
+                                ] as const
+                            ).map(([id, label]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => setFilter(id)}
+                                    className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${
+                                        filter === id ? "bg-white text-[#143f3b] shadow-sm" : "text-[#5f737b]"
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <select
+                            value={sort}
+                            onChange={(e) => setSort(e.target.value === "cii" ? "cii" : "recent")}
+                            className="rounded-full border border-[#d7e4e1] bg-white px-3 py-2 text-[12px] font-semibold text-[#174b43]"
+                        >
+                            <option value="recent">Most recent</option>
+                            <option value="cii">Highest CII</option>
+                        </select>
+                        <select
+                            value={yearFilter}
+                            onChange={(e) => setYearFilter(e.target.value)}
+                            className="rounded-full border border-[#d7e4e1] bg-white px-3 py-2 text-[12px] font-semibold text-[#174b43]"
+                        >
+                            <option value="all">All years</option>
+                            {years.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {visible.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-[#cbe7e3] bg-[#fbfefd] px-5 py-10 text-center text-[12px] text-[#7a919a]">
+                            No published projects match this search.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {visible.map((r) => {
+                                const hours = Number(r.hours || r.section1?.metrics?.total_verified_hours || 0);
+                                const year = yearOf(r.created_at);
+                                const sdgs = sdgNumbers(r.sdgs);
+                                const uni = r.university || displayOrganizationName(r.organization_name) || "Community Service";
+                                const score = wallCiiScore(r);
+                                const badge = wallBadgeName(r, score);
+                                const national = nationalBadge(r);
+                                const packageHref = studentImpactPackageHref(r.project_id || r.opportunity_id, "package", { from: "wall" });
+                                const reportHref = studentImpactPackageHref(r.project_id || r.opportunity_id, "report", { from: "wall" }) || studentDetailedReportHref(r);
+                                return (
+                                    <article key={r.id} className="flex flex-col overflow-hidden rounded-[22px] border border-[#dde8e5] bg-white shadow-[0_8px_24px_rgba(20,63,59,.06)]">
+                                        <div className="relative bg-[linear-gradient(135deg,#0e4d4e,#117669)] px-5 py-4 text-white">
+                                            <span className="absolute right-3.5 top-3.5 rounded-full border border-white/25 bg-white/12 px-2.5 py-1 text-[8px] font-black tracking-wide">
+                                                ✓ VERIFIED & PUBLISHED
+                                            </span>
+                                            <p className="pr-28 text-[8.5px] font-black tracking-[0.1em] text-[#9fe2d7]">
+                                                COMMUNITY SERVICE · {year || "—"}
+                                            </p>
+                                            <h4 className="mt-1.5 break-words text-[17px] font-semibold leading-tight [overflow-wrap:anywhere]">
+                                                {r.project_title || "Community service"}
+                                            </h4>
+                                            <p className="mt-1 text-[11px] text-[#d7eeea]">
+                                                {uni}
+                                                {hours ? ` · ${Math.round(hours)} verified hours` : ""}
+                                            </p>
                                         </div>
-                                        <div className="rounded-[11px] border border-[#dde5ea] p-2">
-                                            <span className="block text-[7.8px] font-black uppercase text-[#70808a]">CIEL PK Level</span>
-                                            <strong className="mt-0.5 block text-sm text-[#16313d]">{r.level || "Approved"}</strong>
+                                        <div className="flex flex-1 flex-col px-5 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <ImpactWallCiiRing score={score} />
+                                                <div className="min-w-0">
+                                                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Composite Impact Index</p>
+                                                    <p className="mt-0.5 text-[15px] font-semibold leading-tight text-[#16313d]">{badge}</p>
+                                                    <p className="mt-0.5 text-[11px] text-[#7a919a]">Verified CII score</p>
+                                                </div>
+                                                {national ? (
+                                                    <div className="ml-auto rounded-xl border border-[#efdfb6] bg-[#fff9e9] px-2.5 py-2 text-center">
+                                                        <p className="text-[7.5px] font-black uppercase tracking-wide text-[#875f16]">National rank</p>
+                                                        <p className="text-[16px] font-black text-[#875f16]">#{national.rank}</p>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#eef2f1] pt-3 text-center">
+                                                <div>
+                                                    <p className="text-[8px] font-black uppercase tracking-wide text-[#7a919a]">Hours</p>
+                                                    <p className="mt-1 text-[13px] font-semibold text-[#16313d]">{hours ? `${Math.round(hours)} verified` : "—"}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-black uppercase tracking-wide text-[#7a919a]">Year</p>
+                                                    <p className="mt-1 text-[13px] font-semibold text-[#16313d]">{year || "—"}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-black uppercase tracking-wide text-[#7a919a]">SDG link</p>
+                                                    <p className="mt-1 text-[13px] font-semibold text-[#16313d]">{sdgs.length ? sdgShort(sdgs) : "—"}</p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                                <span className="rounded-full bg-[#e8f5ef] px-2.5 py-1 text-[10px] font-bold text-[#1d765d]">✓ Accepted</span>
+                                            </div>
+                                            <div className="mt-auto flex gap-2 border-t border-[#eef2f1] pt-3">
+                                                {packageHref ? (
+                                                    <Link
+                                                        href={packageHref}
+                                                        className="flex-1 rounded-full bg-[#0e4d4e] px-4 py-2.5 text-center text-[12px] font-bold text-white"
+                                                    >
+                                                        View package →
+                                                    </Link>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toast.message("Package is not available yet")}
+                                                        className="flex-1 rounded-full bg-[#0e4d4e] px-4 py-2.5 text-[12px] font-bold text-white"
+                                                    >
+                                                        View package →
+                                                    </button>
+                                                )}
+                                                {reportHref ? (
+                                                    <Link
+                                                        href={reportHref}
+                                                        className="rounded-full border border-[#d7e4e1] bg-white px-4 py-2.5 text-[12px] font-bold text-[#174b43]"
+                                                        title="Detailed report"
+                                                    >
+                                                        Report
+                                                    </Link>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toast.message("Detailed report is not available yet")}
+                                                        className="rounded-full border border-[#d7e4e1] bg-white px-4 py-2.5 text-[12px] font-bold text-[#174b43]"
+                                                    >
+                                                        Report
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="rounded-[11px] border border-[#dde5ea] p-2">
-                                            <span className="block text-[7.8px] font-black uppercase text-[#70808a]">SDG Link</span>
-                                            <strong className="mt-0.5 block text-[11px] text-[#16313d]">{sdgShort(sdgs)}</strong>
-                                        </div>
-                                    </div>
-                                    <p className="my-2.5 text-[10px] leading-[1.48] text-[#63747c]">
-                                        {r.story ||
-                                            r.executive_summary ||
-                                            "Approved Community Service report with verified field activity."}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <span className="rounded-xl bg-[#e8f5ef] px-2 py-1 text-[8.5px] font-black text-[#1d765d]">✓ Faculty Approved</span>
-                                        <span className="rounded-xl bg-[#edf4fb] px-2 py-1 text-[8.5px] font-black text-[#376d9f]">
-                                            {r.impact_verify_url ? "QR Verified" : "Verified"}
-                                        </span>
-                                        <span className="rounded-xl bg-[#f8f2e7] px-2 py-1 text-[8.5px] font-black text-[#765b25]">
-                                            {extraBadges[0]?.label || r.level || "Verified Impact"}
-                                        </span>
-                                    </div>
-                                    <div className="mt-2">
-                                        <RankingBadgeTrendInsights badges={extraBadges} history={r.awardBadgeHistory} />
-                                    </div>
-                                    {r.impact_verify_url ? (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <ReportVerificationQr impactVerifyUrl={r.impact_verify_url} size={56} caption="Verify" />
-                                        </div>
-                                    ) : null}
-                                    <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[#dde5ea] pt-2.5">
-                                        <WallAction
-                                            solid
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "flash", { from: "wall" })}
-                                            label="Open Flashcard"
-                                        />
-                                        <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "report", { from: "wall" }) || studentDetailedReportHref(r)}
-                                            label="Detailed report"
-                                        />
-                                        <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "package", { from: "wall" })}
-                                            label="Combined package"
-                                        />
-                                        <WallAction
-                                            href={studentImpactPackageHref(r.project_id || r.opportunity_id, "certificate", { from: "wall" })}
-                                            label="Certificate"
-                                        />
-                                        <WallAction href={r.impact_verify_url || null} label="QR Code" external={Boolean(r.impact_verify_url)} />
-                                    </div>
-                                </div>
-                            </article>
-                        );
-                    })}
-                </div>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
             )}
 
             {flash ? <CommunityFlashModal flash={flash} onClose={() => setFlash(null)} /> : null}

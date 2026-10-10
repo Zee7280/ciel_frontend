@@ -59,6 +59,7 @@ type OpportunityDetail = Record<string, unknown> & {
     isStudentOwner?: boolean;
     report_status?: string;
     organization_name?: string;
+    partner_name?: string;
     organization?: { name?: string; city?: string };
     location?: { city?: string; venue?: string };
     timeline?: {
@@ -581,8 +582,7 @@ export default function OpportunityDetailsPage() {
                     model={{
                         ...buildOpportunityRecordFlashcard(opportunity as Record<string, unknown>, {
                             studentName: opportunity.isStudentOwner ? "You" : undefined,
-                            university: opportunity.organization?.name || opportunity.organization_name,
-                            partnerOrg: opportunity.organization?.name || opportunity.organization_name,
+                            partnerOrg: opportunity.partner_name || opportunity.organization_name,
                         }),
                         eligible: applyEligibility.canApply,
                         eligibilityWhy:

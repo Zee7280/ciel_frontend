@@ -1997,6 +1997,13 @@ export default function AdminApprovalsPage() {
                                             <StudentOpportunityFlashcard
                                                 model={buildOpportunityRecordFlashcard(
                                                     adminDetailView as Record<string, unknown>,
+                                                    {
+                                                        partnerOrg: String(
+                                                            adminDetailView.partner_name ||
+                                                                selectedOpportunity.partner_name ||
+                                                                "",
+                                                        ),
+                                                    },
                                                 )}
                                             />
                                         );

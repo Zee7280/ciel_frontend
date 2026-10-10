@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { isReportReturnedForRevision } from "./reportRevisionState";
 import {
+    COMMUNITY_REPORTS_IN_PROGRESS_HREF,
+    COMMUNITY_REPORTS_UNDER_REVIEW_HREF,
     communityReportReviewerName,
     communityReportSendCta,
     isAdminCommunityLiveCard,
@@ -12,6 +14,7 @@ import {
     isFacultyCommunityWaiting,
     isStudentReportAwaitingReview,
     reportRequiresReportingFee,
+    studentReportPostSubmitHref,
 } from "./reviewQueue";
 
 assert.equal(reportRequiresReportingFee({ private_candidate: true }), true);
@@ -92,5 +95,30 @@ assert.equal(isCommunityReportRejected(adminClosed), true, "closed reports belon
 assert.equal(isReportReturnedForRevision(adminClosed), false);
 assert.equal(isAdminCommunityLiveCard(adminClosed), false);
 assert.equal(isCommunityReportOnLiveDeck(adminClosed), false);
+
+assert.equal(
+    COMMUNITY_REPORTS_UNDER_REVIEW_HREF,
+    "/dashboard/student/paths/community-service?view=workspace&filter=review",
+);
+assert.equal(
+    COMMUNITY_REPORTS_IN_PROGRESS_HREF,
+    "/dashboard/student/paths/community-service?view=workspace&filter=reports",
+);
+assert.equal(
+    studentReportPostSubmitHref({ feeRequired: false, projectId: "abc" }),
+    COMMUNITY_REPORTS_UNDER_REVIEW_HREF,
+    "university submit must land on Reports Under Review, not My Projects",
+);
+assert.equal(
+    studentReportPostSubmitHref({ feeRequired: true, projectId: "abc" }),
+    "/dashboard/student/payment?projectId=abc",
+    "fee submit must still open payment",
+);
+assert.equal(
+    studentReportPostSubmitHref({ feeRequired: true, projectId: "" }),
+    COMMUNITY_REPORTS_IN_PROGRESS_HREF,
+    "fee submit without project id must not send the student to My Projects",
+);
+assert.equal(COMMUNITY_REPORTS_UNDER_REVIEW_HREF.includes("view=create"), false);
 
 console.log("reviewQueue student/faculty/admin buckets ok");

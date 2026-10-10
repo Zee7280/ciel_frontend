@@ -20,10 +20,11 @@
 }
 
 .cer .cer-wrap {
-    max-width: 1000px;
+    max-width: 1080px;
     margin: 0 auto;
     min-width: 0;
     width: 100%;
+    padding: 4px 20px 0;
 }
 
 .cer .cer-sticky-head {
@@ -53,11 +54,11 @@
 .cer .cer-apph-actions {
     justify-content: space-between;
     align-items: center;
-    background: var(--bg);
-    border: 1px solid #dcebed;
-    border-radius: 18px;
-    padding: 13px 15px;
-    box-shadow: 0 10px 30px rgba(4, 37, 43, 0.06);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: 0 4px 18px rgba(4, 37, 43, 0.05);
 }
 
 .cer .cer-back {
@@ -175,6 +176,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.cer .cer-ghost:hover:not(:disabled) {
+    border-color: #bfe6e2;
+    background: var(--teal-soft);
+    color: var(--teal);
+}
+
+.cer .cer-ghost:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .cer .cer-tabs {
@@ -414,10 +427,10 @@
 }
 
 .cer .cer-bp .kk {
-    font-size: 7px;
+    font-size: 8px;
     font-weight: 800;
-    letter-spacing: 0.13em;
-    color: #a5e8de;
+    letter-spacing: 0.1em;
+    color: #b7e4dc;
     margin-top: 2px;
 }
 
@@ -425,34 +438,34 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: 6px;
-    background: linear-gradient(125deg, #163d61 0%, #335dc4 48%, #7657d7 100%);
+    background: linear-gradient(125deg, #0c312d 0%, #0e5f63 58%, #0e7d74 100%);
     color: #fff;
     border-radius: 16px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
-    box-shadow: 0 10px 26px rgba(54, 74, 167, 0.16);
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 10px 26px rgba(14, 95, 99, 0.16);
     position: relative;
     overflow: hidden;
 }
 
 .cer .cer-mission .ey {
-    font-size: 7px;
-    font-weight: 900;
-    letter-spacing: 0.16em;
-    color: #dce6ff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #b7e4dc;
 }
 
 .cer .cer-mission h1 {
-    font-size: 15px;
-    margin: 2px 0;
-    line-height: 1.2;
+    font-size: 18px;
+    margin: 4px 0 2px;
+    line-height: 1.25;
     font-weight: 800;
 }
 
 .cer .cer-mission p {
-    font-size: 10px;
-    line-height: 1.35;
-    color: #e8edff;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d5eee8;
 }
 
 .cer .cer-achievement {
@@ -553,13 +566,14 @@
     margin-top: 16px;
     border: 1px solid var(--line);
     background: #fff;
-    border-radius: 18px;
-    padding: 12px 14px;
+    border-radius: 14px;
+    padding: 10px 12px;
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
     justify-content: space-between;
+    box-shadow: 0 4px 16px rgba(4, 37, 43, 0.04);
 }
 
 .cer .cer-foot > div {
@@ -592,6 +606,10 @@
     border: 0;
     background: var(--teal);
     color: #fff;
+}
+
+.cer .cer-foot .cer-next:hover:not(:disabled) {
+    background: #0f5e57;
 }
 
 .cer .cer-foot button:disabled {
@@ -825,12 +843,12 @@
 }
 
 .cer .cer-s1sum {
-    margin-top: 14px;
-    border: 1px solid #d5ebe4;
-    border-radius: 20px;
-    background: linear-gradient(180deg, #f7fcfa, #fff);
-    box-shadow: 0 11px 28px rgba(21, 49, 61, 0.06);
-    padding: 16px 18px 14px;
+    margin-top: 16px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(21, 49, 61, 0.05);
+    padding: 18px 20px 16px;
 }
 
 .cer .cer-s1sum .head {
@@ -972,6 +990,85 @@
     font-weight: 800;
     background: #eef3f5;
     color: #2f4650;
+}
+
+.cer .cer-metrics {
+    width: 100%;
+    margin: 0 0 16px;
+}
+
+.cer .cer-metrics h3 {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+}
+
+.cer .cer-metrics-card {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 8px 24px rgba(13, 43, 51, 0.05);
+}
+
+.cer .cer-metrics .text-indigo-600 {
+    color: var(--teal) !important;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap {
+    margin-top: 2px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #b7cdc8 transparent;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap::-webkit-scrollbar {
+    height: 6px;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap::-webkit-scrollbar-thumb {
+    background: #b7cdc8;
+    border-radius: 99px;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap table {
+    min-width: 920px;
+    width: 100%;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap th,
+.cer .cer-metrics .dossier-wide-table-wrap td {
+    padding: 10px 12px;
+    vertical-align: top;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap th {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: #f7fbfa;
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap td {
+    font-size: 12.5px;
+    color: var(--ink);
+}
+
+.cer .cer-metrics .dossier-wide-table-wrap td:nth-child(8) {
+    white-space: normal;
+    max-width: 180px;
+    line-height: 1.35;
 }
 
 @media (max-width: 720px) {
@@ -1986,8 +2083,9 @@
 
 .cer .cer-cii {
     display: grid;
-    grid-template-columns: minmax(200px, 0.9fr) 1.4fr;
-    gap: 28px;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0;
     align-items: center;
     background: #fff;
     border: 1px solid var(--line);
@@ -2417,12 +2515,12 @@
     /* Below the mobile dashboard header and the Save draft bar. */
     top: calc(56px + 92px);
     z-index: 28;
-    margin: 0 0 8px;
-    padding: 10px 14px 12px;
+    margin: 0 0 12px;
+    padding: 14px 16px 16px;
     border-radius: 16px;
-    background: linear-gradient(135deg, #fff, #f5f8ff);
-    border: 1px solid #e3eaf3;
-    box-shadow: 0 8px 20px rgba(31, 55, 70, 0.06);
+    background: #fff;
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 20px rgba(13, 43, 51, 0.05);
 }
 
 @media (min-width: 1024px) {
@@ -2442,33 +2540,34 @@
 }
 
 .cer .cer-journey-map .head b {
-    font-size: 12.5px;
-    color: #17323d;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--ink);
 }
 
 .cer .cer-journey-map .head span {
-    font-size: 11px;
-    color: #6b7c86;
-    line-height: 1.35;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
 }
 
 .cer .cer-journey-path {
     display: grid;
     grid-template-columns: repeat(9, minmax(0, 1fr));
-    gap: 4px;
+    gap: 6px;
     position: relative;
 }
 
 .cer .cer-journey-path::before {
     content: "";
     position: absolute;
-    left: 5%;
-    right: 5%;
+    left: 4%;
+    right: 4%;
     top: 18px;
-    height: 4px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #3ddc84, #5b7cfa, #c86dd7, #ff7a59, #ffc247, #e86bb5, #25b8d8, #6f62d9, #0f9d79);
-    opacity: 0.28;
+    height: 2px;
+    border-radius: 99px;
+    background: #d5e6e2;
     pointer-events: none;
 }
 
@@ -2492,66 +2591,59 @@
     margin: 0 auto;
     display: grid;
     place-items: center;
-    font-size: 15px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--teal);
     background: #fff;
-    border: 2px solid var(--c);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.07);
-    transition: 0.18s;
+    border: 1.5px solid #cfe3df;
+    box-shadow: 0 1px 2px rgba(13, 43, 51, 0.04);
+    transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
 .cer .cer-journey-stop:hover .orb {
-    transform: translateY(-2px) scale(1.05);
+    transform: translateY(-1px);
+    border-color: var(--teal);
 }
 
 .cer .cer-journey-stop.on .orb {
-    background: var(--c);
+    background: var(--teal);
     color: #fff;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
+    border-color: var(--teal);
+    box-shadow: 0 6px 14px rgba(14, 125, 116, 0.22);
 }
 
 .cer .cer-journey-stop.done .orb {
-    background: color-mix(in srgb, var(--c) 16%, #fff);
+    background: var(--teal-soft);
+    color: var(--teal);
+    border-color: #9fd0c8;
 }
 
 .cer .cer-journey-stop.on .orb,
 .cer .cer-journey-stop.on.done .orb {
-    background: var(--c);
+    background: var(--teal);
     color: #fff;
-}
-
-.cer .cer-journey-stop.done .orb::after {
-    content: "★";
-    position: absolute;
-    top: -5px;
-    right: -3px;
-    background: #ffc247;
-    color: #5a3d00;
-    border-radius: 50%;
-    width: 14px;
-    height: 14px;
-    font-size: 9px;
-    display: grid;
-    place-items: center;
-    border: 1.5px solid #fff;
+    border-color: var(--teal);
 }
 
 .cer .cer-journey-stop b {
     display: block;
-    font-size: 10px;
-    margin-top: 4px;
-    color: #2f4650;
-    line-height: 1.15;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 6px;
+    color: var(--ink);
+    line-height: 1.2;
     overflow-wrap: anywhere;
 }
 
 .cer .cer-journey-grade {
     display: inline-block;
-    margin-top: 2px;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: 8px;
-    font-weight: 900;
-    letter-spacing: 0.03em;
+    margin-top: 4px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
 }
 
 .cer .cer-grade-bronze {
@@ -2572,6 +2664,11 @@
 .cer .cer-grade-none {
     background: #f1f4f6;
     color: #98a5ab;
+}
+
+.cer .cer-grade-current {
+    background: var(--teal-soft);
+    color: var(--teal);
 }
 
 .cer .cer-grade-done {
@@ -3026,7 +3123,7 @@
     .cer .cer-journey-stop .orb {
         width: 32px;
         height: 32px;
-        font-size: 13px;
+        font-size: 10px;
     }
     .cer .cer-journey-stop b {
         font-size: 9px;

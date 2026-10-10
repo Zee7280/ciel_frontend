@@ -73,6 +73,60 @@ body {
   overflow-x: clip;
 }
 
+/* Thin overlay scrollbars. `.custom-scrollbar` was used without CSS, so Windows
+   drew the classic thick arrow bar on the shared dashboard sidebar. */
+.custom-scrollbar,
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(22, 49, 61, 0.32) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar,
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(22, 49, 61, 0.28);
+  border-radius: 999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(22, 49, 61, 0.45);
+}
+
+.custom-scrollbar::-webkit-scrollbar-button,
+.sidebar-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner,
+.sidebar-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.sidebar-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.32) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
 /* Dashboard: stop sideways scroll, keep tables swipeable, avoid iOS input zoom */
 .dashboard-shell img,
 .dashboard-shell video {

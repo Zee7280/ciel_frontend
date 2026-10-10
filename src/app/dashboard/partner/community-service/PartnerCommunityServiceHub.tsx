@@ -853,7 +853,7 @@ export default function PartnerCommunityServiceHub() {
                 <div className="mt-4">
                     <MockupSectionHead
                         title={`My Impact Wall · ${orgName}`}
-                        subtitle="Published records: flashcard, CII and detailed report. QR stays on the flashcard. No certificate download."
+                        subtitle="Published records: flashcard, CII and detailed report. QR is on the Impact Package. No certificate download."
                         action={
                             <Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open analytics →
@@ -865,7 +865,7 @@ export default function PartnerCommunityServiceHub() {
                     ) : deckCards.length === 0 ? (
                         <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact.</p>
                     ) : (
-                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {deckCards.map((c) => (
                                 <CommunityFlashCard
                                     key={c.id}

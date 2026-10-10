@@ -94,6 +94,14 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
                     ? (d.supervision as { contact?: string }).contact
                     : undefined,
             university: studentRow.university,
+            partnerOrg:
+                pickNestedStr(d, "partner_name") ||
+                pickNestedStr(
+                    d.organization && typeof d.organization === "object"
+                        ? (d.organization as Record<string, unknown>)
+                        : null,
+                    "name",
+                ),
         });
     } catch (err) {
         console.error("FacultyOpportunityDetailBody flashcard failed", err);

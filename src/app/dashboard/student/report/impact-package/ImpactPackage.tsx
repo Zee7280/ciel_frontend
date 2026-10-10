@@ -23,6 +23,7 @@ import {
     shouldShowImpactPackageAnalysis,
     shouldShowImpactPackageCertificate,
     shouldShowImpactPackageDetailedReport,
+    shouldShowImpactPackageSectionScores,
     type ImpactPackageAudience,
     type ImpactPackageChange,
     type ImpactPackageEvidenceFile,
@@ -31,6 +32,7 @@ import {
 import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
 import "./impact-package.css";
 
 const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: string }> = {
@@ -115,11 +117,13 @@ function ImpactAnalysisPanel({
     analyserHref,
     title,
     reportId,
+    audience,
 }: {
     data: ReportData;
     analyserHref?: string;
     title: string;
     reportId?: string;
+    audience?: ImpactPackageAudience;
 }) {
     const cii = asCii(data);
     const score = pickCiiV45DisplayScore(data.ciiV45, data.ciiV45Lock);
@@ -145,6 +149,7 @@ function ImpactAnalysisPanel({
                 badgeLevel={Number.isFinite(badgeLevelRaw) ? badgeLevelRaw : null}
                 lockedAt={typeof lock?.lockedAt === "string" ? lock.lockedAt : null}
                 sections={sections}
+                showSectionScores={shouldShowImpactPackageSectionScores(audience ?? "student")}
                 analysis={summary || overall}
                 strengths={asStringList(cii.strengths)}
                 limitations={asStringList(cii.developmentPriorities)}
@@ -207,6 +212,7 @@ export default function ImpactPackage({
     const lockLine = impactPackageLockLine(previewStage === "approved" || model.adminApproved);
     const accessText = impactPackageAccessText(audience, visibility, previewStage === "approved" || model.adminApproved);
     const packetIntegrity = readImpactPackagePacketIntegrity(data);
+    const verifyUrl = data.impact_verify_url || data.impactVerifyUrl;
     const flashChange = model.change && model.change.before != null && model.change.after != null
         ? changeCaption(model.change)
         : null;
@@ -523,9 +529,7 @@ export default function ImpactPackage({
                                             ? "Public permission confirmed"
                                             : visibility === "private"
                                               ? "Verification only · no downloads"
-                                              : model.adminApproved
-                                                ? "Faculty & University unlocked · view only"
-                                                : "Faculty & University await admin approval"}
+                                              : "Admin, faculty & university · view only · no downloads"}
                                     </p>
                                 </div>
                                 <div className="evidence-thumbs">
@@ -563,10 +567,17 @@ export default function ImpactPackage({
                                         <span>CIEL PK acceptance: {model.adminApproved ? "accepted" : "pending"}</span>
                                         <span>{model.ciiLabel}</span>
                                         <span>Badge / rank: {model.ciiPending ? "pending" : "issued"}</span>
-                                        <span>QR: {model.adminApproved ? "issued" : "not issued"}</span>
+                                        <span>QR: {verifyUrl ? "issued" : "not issued"}</span>
                                     </div>
                                 </div>
                                 <div className="footer-id">
+                                    {verifyUrl ? (
+                                        <ReportVerificationQr
+                                            impactVerifyUrl={verifyUrl}
+                                            size={72}
+                                            caption="Scan to verify"
+                                        />
+                                    ) : null}
                                     CIEL PK Impact Package
                                     <br />
                                     One opportunity · one report · three views
@@ -741,13 +752,13 @@ export default function ImpactPackage({
                                         </tr>
                                         <tr>
                                             <td>Restricted · Default</td>
-                                            <td>Student + Super Admin before approval; Faculty + University added after approval. Partner / NGO never.</td>
+                                            <td>Student, Super Admin, Faculty, University · view only. Partner / NGO never.</td>
                                             <td>Not allowed</td>
                                             <td className="block">Blocked for all roles, including Super Admin</td>
                                         </tr>
                                         <tr>
                                             <td>Private</td>
-                                            <td>Student + Super Admin before approval; Faculty + University added after approval. Internal verification only. Partner / NGO never.</td>
+                                            <td>Student, Super Admin, Faculty, University · view only. Internal verification only. Partner / NGO never.</td>
                                             <td>Never</td>
                                             <td className="block">Blocked for all roles, including Super Admin</td>
                                         </tr>
@@ -773,6 +784,7 @@ export default function ImpactPackage({
                             analyserHref={audience === "admin" ? analyserHref : undefined}
                             title={model.title}
                             reportId={model.reportId}
+                            audience={audience}
                         />
                     </div>
                 ) : null}

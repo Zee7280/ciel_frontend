@@ -6,7 +6,7 @@ import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, tabIsComplete, wizardStepToDataSections } from "./utils/reportWizardNav";
-import { JOURNEY_STOPS, STRENGTH_CLASS, STRENGTH_LABEL, sectionStrength } from "./utils/impactJourney";
+import { JOURNEY_STOPS } from "./utils/impactJourney";
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import ImpactPackage from "./impact-package/ImpactPackage";
@@ -272,7 +272,7 @@ export function ReportMissionHero({ data, projectData }: { data: ReportData; pro
 /** Top-of-wizard "Impact Journey" HUD — completion + 9-stop map. Purely
  * derived from data the real form already collects; never affects CII, validation or submit. */
 export function ReportImpactJourney({
-    data,
+    data: _data,
     activeStep,
     incompleteStepNums,
     sectionsCompleteCount,
@@ -284,31 +284,32 @@ export function ReportImpactJourney({
     sectionsCompleteCount: number;
     onGo: (step: number) => void;
 }) {
+    void _data;
     return (
         <div className="cer-journey">
             <div className="cer-journey-map">
                 <div className="head">
-                    <b>🗺️ Your Impact Journey — {REPORT_UI_SECTION_TOTAL} stops, one story</b>
+                    <b>Report progress</b>
                     <span>
-                        {sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL} stops complete · tap any stop to jump there · Gold / Silver / Bronze show how strong each section reads (fun only, not CII)
+                        {sectionsCompleteCount} of {REPORT_UI_SECTION_TOTAL} sections complete · click a section to open it
                     </span>
                 </div>
                 <div className="cer-journey-path">
                     {JOURNEY_STOPS.map((s) => {
                         const stepDone = tabIsComplete(s.step, incompleteStepNums);
-                        const grade = sectionStrength(s.step, data);
+                        const isOn = activeStep === s.step;
+                        const status = stepDone ? "Complete" : isOn ? "Current" : "To do";
                         return (
                             <button
                                 key={s.step}
                                 type="button"
-                                className={["cer-journey-stop", activeStep === s.step ? "on" : "", stepDone ? "done" : ""].filter(Boolean).join(" ")}
-                                style={{ ["--c" as string]: s.color }}
+                                className={["cer-journey-stop", isOn ? "on" : "", stepDone ? "done" : ""].filter(Boolean).join(" ")}
                                 onClick={() => onGo(s.step)}
                             >
-                                <span className="orb">{s.icon}</span>
+                                <span className="orb">{String(s.step).padStart(2, "0")}</span>
                                 <b>{s.label}</b>
-                                <span className={`cer-journey-grade ${STRENGTH_CLASS[grade]}`}>
-                                    {grade ? STRENGTH_LABEL[grade] : "Not started"}
+                                <span className={`cer-journey-grade ${stepDone ? "cer-grade-done" : isOn ? "cer-grade-current" : "cer-grade-none"}`}>
+                                    {status}
                                 </span>
                             </button>
                         );
@@ -1187,31 +1188,31 @@ function Section1ExecutiveSummary({ data }: { data: ReportData }) {
     return (
         <div className="cer-s1sum">
             <div className="head">
-                <b>SECTION 01 · PARTICIPATION INTELLIGENCE</b>
-                <span>● LIVE · FLASHCARD + PDF SOURCE</span>
+                <b>Section 1 · Participation</b>
+                <span>Live · flashcard + PDF source</span>
             </div>
             <div className="top">
                 <div>
                     <h3>{isTeam ? "Team participation, without duplicate reporting" : "Individual participation record"}</h3>
                     <p>{line}</p>
                     <div className="facts">
-                        <span>👑 {leadName} · Master Student</span>
-                        <span>👥 {roster.length} member{roster.length === 1 ? "" : "s"}</span>
-                        <span>⏱ {totalHours.toFixed(1)} {isTeam ? "team-hours" : "hours"}</span>
-                        <span>✅ {met}/{roster.length} minimum met</span>
-                        <span>📍 {locations.length} location{locations.length === 1 ? "" : "s"}</span>
-                        <span>📎 {evidenceCount} session evidence</span>
+                        <span>{leadName} · Lead</span>
+                        <span>{roster.length} member{roster.length === 1 ? "" : "s"}</span>
+                        <span>{totalHours.toFixed(1)} {isTeam ? "team-hours" : "hours"}</span>
+                        <span>{met}/{roster.length} minimum met</span>
+                        <span>{locations.length} location{locations.length === 1 ? "" : "s"}</span>
+                        <span>{evidenceCount} session evidence</span>
                     </div>
                 </div>
                 <div className="score">
                     <b>
                         {met}/{roster.length}
                     </b>
-                    <small>HOURS-READY</small>
+                    <small>Hours ready</small>
                 </div>
             </div>
             <div className="stat">
-                <div className="t">📊 HOURS PER MEMBER VS THE {required}H MINIMUM</div>
+                <div className="t">Hours per member vs the {required}h minimum</div>
                 {rows.map((row) => (
                     <div className="bar" key={row.id}>
                         <span>{row.name}</span>

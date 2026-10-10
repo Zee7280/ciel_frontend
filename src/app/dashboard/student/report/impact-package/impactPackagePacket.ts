@@ -69,5 +69,8 @@ export function readImpactPackagePacketIntegrity(data: unknown): ImpactPackagePa
 }
 
 export function resolveImpactPackagePacketIntegrity(data: unknown): ImpactPackagePacketIntegrity {
-    return readImpactPackagePacketIntegrity(data) || validateImpactPackagePacketClient(data);
+    const stored = readImpactPackagePacketIntegrity(data);
+    const live = validateImpactPackagePacketClient(data);
+    if (live.ok) return live;
+    return stored || live;
 }

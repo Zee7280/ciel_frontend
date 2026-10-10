@@ -15,13 +15,14 @@ import {
     DialogTitle,
 } from "./components/ui/dialog";
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
-import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from '@/utils/reviewQueue';
+import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview, studentReportPostSubmitHref } from '@/utils/reviewQueue';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
 import { isStudentImpactPackageView } from '@/utils/studentImpactPackageHref';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
     dataSectionsToSummarize,
+    dataSectionToWizardStep,
     FLASH_CARD_STEP,
     formatIncompleteSectionHeading,
     isFlashCardStep,
@@ -221,6 +222,7 @@ function ReportFormContent() {
     // enough, since it resets in `finally` well before the 2s setTimeout actually navigates away,
     // leaving a window where the Submit button re-enables and a second click can double-POST.
     const [submitSucceeded, setSubmitSucceeded] = React.useState(false);
+    const postSubmitNavTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const [aiStatus, setAiStatus] = React.useState<string | null>(null);
     const [projectDetails, setProjectDetails] = React.useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -255,11 +257,17 @@ function ReportFormContent() {
                 ["pending_payment", "payment_under_review"].includes(rs))
         ) {
             filter = "reports";
-        } else if (isStudentReportAwaitingReview(data)) {
+        } else if (isStudentReportAwaitingReview(data) || submitSucceeded) {
             filter = "review";
         }
         router.push(`/dashboard/student/paths/community-service?view=workspace&filter=${filter}`);
-    }, [router, fromSurface, data, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route, data?.is_editable]);
+    }, [router, fromSurface, submitSucceeded, data, data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.faculty_status, data?.private_candidate, data?.review_route, data?.is_editable]);
+
+    React.useEffect(() => {
+        return () => {
+            if (postSubmitNavTimerRef.current) clearTimeout(postSubmitNavTimerRef.current);
+        };
+    }, []);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -727,6 +735,11 @@ function ReportFormContent() {
     const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
     const [blockedSubmitOpen, setBlockedSubmitOpen] = React.useState(false);
 
+    const goFixIncomplete = React.useCallback((dataSection: number) => {
+        setBlockedSubmitOpen(false);
+        setStep(dataSectionToWizardStep(dataSection));
+    }, [setStep]);
+
     const handleSubmit = async (e?: React.MouseEvent) => {
         if (e) {
             e.preventDefault();
@@ -861,12 +874,15 @@ function ReportFormContent() {
             });
             if (feeRequired) {
                 toast.success("Report submitted! Redirecting to payment...");
-                setTimeout(() => {
-                    window.location.href = `/dashboard/student/payment?projectId=${projectId}`;
-                }, 2000);
             } else {
                 toast.success(`Report submitted. ${communityReportReviewerName(routeFlags)} will review it next.`);
             }
+            postSubmitNavTimerRef.current = setTimeout(() => {
+                window.location.href = studentReportPostSubmitHref({
+                    feeRequired,
+                    projectId: submitProjectId,
+                });
+            }, feeRequired ? 2000 : 1200);
         } catch (error) {
             console.error(error);
             toast.error(formatSaveCatchError(error, "submit"));
@@ -1328,7 +1344,11 @@ function ReportFormContent() {
                     </DialogHeader>
                     <div className="space-y-3 text-left text-sm text-slate-600">
                         {!isEligibleForSubmission && (
-                            <p>
+                            <button
+                                type="button"
+                                onClick={() => goFixIncomplete(1)}
+                                className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]"
+                            >
                                 Logged hours:{" "}
                                 <span className="font-semibold text-slate-900">
                                     {sumNonRejectedLoggedHours(data.section1?.attendance_logs || [])} / {data.required_hours || 16}
@@ -1340,22 +1360,29 @@ function ReportFormContent() {
                                         The team total meets the goal, but every teammate needs their own hours logged — hours can&apos;t be pooled from one member to cover another.
                                     </>
                                 ) : null}
-                            </p>
+                                <span className="mt-1.5 block text-xs font-bold text-[#0e7d74]">Open Section 1 →</span>
+                            </button>
                         )}
                         {incompleteSectionsSummary.length > 0 && (
                             <div className="space-y-3">
-                                <p className="font-medium text-slate-800">Steps that still need attention:</p>
+                                <p className="font-medium text-slate-800">Steps that still need attention — tap a step to open it:</p>
                                 <ul className="space-y-3 border border-slate-200 rounded-xl p-3 bg-slate-50/80">
                                     {incompleteSectionsSummary.map((block) => (
                                         <li key={block.section} className="text-sm">
-                                            <span className="font-bold text-slate-900">
-                                                {formatIncompleteSectionHeading(block.section, block.label)}
-                                            </span>
-                                            <ul className="mt-1.5 ml-3 list-disc text-slate-600 space-y-1">
-                                                {block.errors.map((err, i) => (
-                                                    <li key={`${err.field}-${i}`}>{err.message}</li>
-                                                ))}
-                                            </ul>
+                                            <button
+                                                type="button"
+                                                onClick={() => goFixIncomplete(block.section)}
+                                                className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]"
+                                            >
+                                                <span className="font-bold text-[#0e7d74] underline underline-offset-2">
+                                                    {formatIncompleteSectionHeading(block.section, block.label)}
+                                                </span>
+                                                <ul className="mt-1.5 ml-3 list-disc text-slate-600 space-y-1">
+                                                    {block.errors.map((err, i) => (
+                                                        <li key={`${err.field}-${i}`}>{err.message}</li>
+                                                    ))}
+                                                </ul>
+                                            </button>
                                         </li>
                                     ))}
                                 </ul>
