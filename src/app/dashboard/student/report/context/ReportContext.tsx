@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { hydrateSection8Visibility } from "../utils/mediaVisibility";
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar } from '../utils/engagementMetrics';
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, resolveRequiredHoursPerStudent } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
@@ -749,7 +749,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         );
         return loggedHoursClearSubmitBar({
             logs: s1.attendance_logs || [],
-            requiredHours: data.required_hours || 16,
+            requiredHours: resolveRequiredHoursPerStudent(data),
             rosterIds,
         });
     }, [
@@ -991,6 +991,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             if (verifyPick) {
                 merged.impact_verify_url = verifyPick;
             }
+            // Resolve from the incoming payload only — merged already has the default 16,
+            // which would hide timeline.expected_hours on a fresh load.
+            merged.required_hours = resolveRequiredHoursPerStudent(newData);
             // Saved rows sometimes store null instead of [] . A later .map/.length would blank the report.
             coerceReportArrays(merged);
             // Section 6: resource verification is multi-select (string[]); normalize legacy string values

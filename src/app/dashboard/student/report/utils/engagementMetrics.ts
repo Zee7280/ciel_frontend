@@ -20,11 +20,51 @@ export interface AttendanceLog {
     approvalStatus?: string | null;
 }
 
-function parseClockToMinutes(t: string | undefined): number | null {
-    if (!t || typeof t !== "string") return null;
-    const m = t.trim().match(/^(\d{1,2}):(\d{2})/);
+function parseClockToMinutes(t: unknown): number | null {
+    if (t == null) return null;
+    const raw = typeof t === "string" ? t : String(t);
+    const m = raw.trim().match(/^(\d{1,2}):(\d{2})/);
     if (!m) return null;
     return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/**
+ * Same per-student bar the backend submit gate uses: timeline expected_hours,
+ * then requiredHours / aliases, then 16.
+ */
+export function resolveRequiredHoursPerStudent(source: unknown, fallback = 16): number {
+    const rec = source && typeof source === "object" ? (source as Record<string, unknown>) : {};
+    const timeline =
+        rec.timeline && typeof rec.timeline === "object"
+            ? (rec.timeline as Record<string, unknown>)
+            : {};
+    const opportunity =
+        rec.opportunity && typeof rec.opportunity === "object"
+            ? (rec.opportunity as Record<string, unknown>)
+            : {};
+    const opportunityTimeline =
+        opportunity.timeline && typeof opportunity.timeline === "object"
+            ? (opportunity.timeline as Record<string, unknown>)
+            : {};
+    const candidates = [
+        rec.required_hours,
+        timeline.expected_hours,
+        timeline.expectedHours,
+        timeline.required_hours,
+        opportunity.expected_hours,
+        opportunity.required_hours,
+        opportunityTimeline.expected_hours,
+        opportunityTimeline.expectedHours,
+        rec.requiredHours,
+        rec.hours_requirement,
+        rec.engagement_hours,
+        opportunity.requiredHours,
+    ];
+    for (const value of candidates) {
+        const n = Number(value);
+        if (Number.isFinite(n) && n > 0) return n;
+    }
+    return fallback;
 }
 
 /** Same prefix/compare rules as Section1 participation — aligns log rows with roster cards. */

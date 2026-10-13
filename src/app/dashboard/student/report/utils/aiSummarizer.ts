@@ -4,8 +4,18 @@ import { authenticatedFetch } from "@/utils/api";
 export interface AISummaryResponse {
     summary?: string;
     error?: string;
+    skipped?: boolean;
     auditMeta?: ReportCIIauditMeta | null;
 }
+
+/** Infra / missing-key failures must not block or toast the student wizard. */
+export function isOptionalAiSummaryUnavailable(message: string | null | undefined): boolean {
+    const text = String(message || "").toLowerCase();
+    if (!text.trim()) return false;
+    return text.includes("api key is not configured") || text.includes("openai api key");
+}
+
+let studentSummariesUnavailable = false;
 
 const SUMMARY_ROUTE_BY_SECTION: Record<string, string> = {
     section5: "section5_summary",
@@ -28,6 +38,9 @@ const isNativeFile = (value: unknown): value is File => (
 );
 
 export async function generateAISummary(section: string, data: unknown): Promise<AISummaryResponse> {
+    if (studentSummariesUnavailable && section !== "section11" && section !== "section11_master_rubric") {
+        return { skipped: true };
+    }
     try {
         // Clean data: remove non-serializable objects (like File arrays) before sending to AI
         const cleanData = JSON.parse(JSON.stringify(data, (_key, value: unknown) => {
@@ -55,12 +68,31 @@ export async function generateAISummary(section: string, data: unknown): Promise
         }
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || "Failed to generate summary");
+            const errorData = await response.json().catch(() => ({} as Record<string, unknown>));
+            const message = String(
+                (errorData as { error?: unknown }).error ||
+                    (errorData as { message?: unknown }).message ||
+                    "Failed to generate summary",
+            );
+            if (isOptionalAiSummaryUnavailable(message)) {
+                studentSummariesUnavailable = true;
+                return { skipped: true };
+            }
+            throw new Error(message);
         }
 
-        return await response.json();
+        const payload = (await response.json()) as AISummaryResponse;
+        if (payload?.skipped) {
+            studentSummariesUnavailable = true;
+            return { skipped: true };
+        }
+        return payload;
     } catch (error: unknown) {
-        return { error: error instanceof Error ? error.message : "Failed to generate summary" };
+        const message = error instanceof Error ? error.message : "Failed to generate summary";
+        if (isOptionalAiSummaryUnavailable(message)) {
+            studentSummariesUnavailable = true;
+            return { skipped: true };
+        }
+        return { error: message };
     }
 }

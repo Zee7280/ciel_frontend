@@ -17,7 +17,7 @@ import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
 import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
 import { formTeamFromLead } from "@/utils/participationGuide";
-import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
+import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview, resolveRequiredHoursPerStudent } from "../utils/engagementMetrics";
 import { pickPreferredEngagementSeat } from "@/utils/teamReportSubmitAccess";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
@@ -381,7 +381,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const seatCapRaw = Math.floor(Number(projectData?.timeline?.volunteers_required ?? projectData?.volunteers_needed ?? projectData?.volunteersNeeded));
     // The lead takes one seat, so members are capped at seats − 1. No cap when it has no seat count.
     const maxTeammates = Number.isFinite(seatCapRaw) && seatCapRaw > 0 ? Math.max(0, seatCapRaw - 1) : undefined;
-    const requiredHoursPerStudent = projectData?.required_hours || projectData?.hours_requirement || projectData?.engagement_hours || 16;
+    const requiredHoursPerStudent = resolveRequiredHoursPerStudent(projectData, data.required_hours || 16);
 
 
     // Wizard State

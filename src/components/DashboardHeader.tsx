@@ -85,7 +85,7 @@ function studentPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "Final Year Project (FYP)";
     if (p.startsWith("/dashboard/student/paths/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/student/engagement")) return "Engagement";
-    if (p.startsWith("/dashboard/student/projects")) return "My projects";
+    if (p.startsWith("/dashboard/student/projects")) return "Participation";
     return "Student";
 }
 

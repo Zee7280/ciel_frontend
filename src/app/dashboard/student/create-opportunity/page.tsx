@@ -268,6 +268,7 @@ function StudentOpportunityCreationPageInner() {
     );
     const [showSubmittedReviewModal, setShowSubmittedReviewModal] = useState(false);
     const [submittedOpportunityTitle, setSubmittedOpportunityTitle] = useState("");
+    const [submittedOpportunityId, setSubmittedOpportunityId] = useState("");
     /** One lead per project: show notice before the create form (skipped when ?edit= is present). */
     const [showTeamLeadNotice, setShowTeamLeadNotice] = useState(Boolean(isNewOpportunity && !editFromUrl));
     const [similarMatches, setSimilarMatches] = useState<SimilarOpportunityMatch[]>([]);
@@ -951,7 +952,7 @@ function StudentOpportunityCreationPageInner() {
                 }
                 if (isEdit) {
                     toast.success("Opportunity updated successfully!");
-                    router.push("/dashboard/student/projects");
+                    router.push("/dashboard/student/paths/community-service?view=create");
                 } else {
                     if (isDraftMode && editingOpportunityId) {
                         // Best-effort cleanup of the now-superseded draft row; the real submission above already succeeded.
@@ -961,6 +962,9 @@ function StudentOpportunityCreationPageInner() {
                             /* ignore — orphan draft is harmless, just won't be cleaned up */
                         });
                     }
+                    const createdId =
+                        String((data as { data?: { id?: string } }).data?.id || (data as { id?: string }).id || "").trim();
+                    setSubmittedOpportunityId(createdId);
                     setSubmittedOpportunityTitle(formData.title.trim());
                     setShowSubmittedReviewModal(true);
                 }
@@ -3506,7 +3510,9 @@ function StudentOpportunityCreationPageInner() {
                 opportunityTitle={submittedOpportunityTitle}
                 onClose={() => {
                     setShowSubmittedReviewModal(false);
-                    router.push("/dashboard/student/projects");
+                    const qs = new URLSearchParams({ view: "create", filter: "review" });
+                    if (submittedOpportunityId) qs.set("opportunity", submittedOpportunityId);
+                    router.push(`/dashboard/student/paths/community-service?${qs.toString()}`);
                 }}
             />
         </div>

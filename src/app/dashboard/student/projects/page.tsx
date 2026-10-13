@@ -1,19 +1,6 @@
-import { Suspense } from "react";
-import { Loader2 } from "lucide-react";
-import MyProjectsPage from "./MyProjectsClient";
+import { redirect } from "next/navigation";
 
-function ProjectsPageFallback() {
-    return (
-        <div className="flex min-h-[40vh] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-    );
-}
-
+/** Legacy My Projects listing — Community Service now lives in My Opportunities. */
 export default function StudentProjectsPage() {
-    return (
-        <Suspense fallback={<ProjectsPageFallback />}>
-            <MyProjectsPage />
-        </Suspense>
-    );
+    redirect("/dashboard/student/paths/community-service?view=create");
 }

@@ -498,7 +498,7 @@ function ApprovalJourney({ opportunity }: { opportunity: CreatedOpportunity }) {
     if (opportunity.status === "live") {
         return (
             <div className="mt-3 rounded-ciel-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                ✓ All approvals complete — this opportunity is live. Log hours and start your report from My Projects.
+                ✓ All approvals complete — this opportunity is live. Log hours and start your report from My Reports.
             </div>
         );
     }
@@ -552,7 +552,7 @@ function EngagementsTab({
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">My Opportunities · Opportunity approval</h3>
-                    <Link href="/dashboard/student/projects" className="text-xs font-semibold text-ciel-green-deep hover:underline">
+                    <Link href="/dashboard/student/paths/community-service?view=create" className="text-xs font-semibold text-ciel-green-deep hover:underline">
                         Manage all →
                     </Link>
                 </div>

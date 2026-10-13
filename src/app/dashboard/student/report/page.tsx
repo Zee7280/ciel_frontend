@@ -41,7 +41,7 @@ import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import { calculateCII } from './utils/calculateCII';
 import { pickReportStatusFromCheckRow } from '@/utils/studentBrowseReportCta';
 import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
-import { buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, sumNonRejectedLoggedHours } from './utils/engagementMetrics';
+import { buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, resolveRequiredHoursPerStudent, sumNonRejectedLoggedHours } from './utils/engagementMetrics';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -387,6 +387,10 @@ function ReportFormContent() {
                             ).trim() || projectId,
                         ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
                         ...(impactVerifyNormalized ? { impact_verify_url: impactVerifyNormalized } : {}),
+                        required_hours: resolveRequiredHoursPerStudent({
+                            ...actualReportData,
+                            ...(projectPayload || {}),
+                        }),
                     };
 
                     let reportForState: Record<string, unknown> = mergedReport as Record<string, unknown>;
@@ -541,6 +545,7 @@ function ReportFormContent() {
                         project_id: projectId,
                         project_title: pickOpportunityTitle(projectPayload),
                         status: "none",
+                        required_hours: resolveRequiredHoursPerStudent(projectPayload),
                     } as typeof data);
                     setReadOnly(false);
                 }
@@ -550,6 +555,7 @@ function ReportFormContent() {
                     project_id: projectId,
                     project_title: pickOpportunityTitle(projectPayload),
                     status: "none",
+                    required_hours: resolveRequiredHoursPerStudent(projectPayload),
                 } as typeof data);
                 setReadOnly(false);
             }
@@ -589,10 +595,11 @@ function ReportFormContent() {
                 if (n === 5) return validateSection5(data.section5).isValid;
                 return isValid;
             });
+            let skipOptionalAiToast = false;
             if (stepsForAi.length) {
                 setAiStatus('Analyzing Data & Writing Summary...');
                 try {
-                    const { generateAISummary } = await import('./utils/aiSummarizer');
+                    const { generateAISummary, isOptionalAiSummaryUnavailable } = await import('./utils/aiSummarizer');
                     for (const stepNum of stepsForAi) {
                         const sectionKey = `section${stepNum}` as Exclude<keyof typeof data, 'project_id'>;
                         try {
@@ -606,13 +613,24 @@ function ReportFormContent() {
                                     }
                                 };
                                 updateSection(sectionKey, { summary_text: summaryRes.summary });
+                            } else if (summaryRes.skipped) {
+                                skipOptionalAiToast = true;
                             } else if (summaryRes.error) {
-                                aiSummaryIssue = summaryRes.error;
+                                if (isOptionalAiSummaryUnavailable(summaryRes.error)) {
+                                    skipOptionalAiToast = true;
+                                } else {
+                                    aiSummaryIssue = summaryRes.error;
+                                }
                             }
                         } catch (error) {
                             console.error('Failed to auto-generate summary', error);
-                            aiSummaryIssue =
+                            const message =
                                 error instanceof Error ? error.message : 'Auto-summary request failed.';
+                            if (isOptionalAiSummaryUnavailable(message)) {
+                                skipOptionalAiToast = true;
+                            } else {
+                                aiSummaryIssue = message;
+                            }
                         }
                     }
                 } catch (error) {
@@ -631,7 +649,7 @@ function ReportFormContent() {
                 }
             }
 
-            if (aiSummaryIssue) {
+            if (aiSummaryIssue && !skipOptionalAiToast) {
                 toast.warning(
                     `Step saved, but the auto-summary did not complete: ${aiSummaryIssue} You can edit the summary field on this step or try Next again.`,
                 );
@@ -758,14 +776,14 @@ function ReportFormContent() {
         if (submitSucceeded) return;
         const hoursOk = loggedHoursClearSubmitBar({
             logs: data.section1?.attendance_logs || [],
-            requiredHours: data.required_hours || 16,
+            requiredHours: resolveRequiredHoursPerStudent(data),
             rosterIds: buildIndividualRosterFromSection1(
                 data.section1,
                 data.section1?.team_lead?.id,
             ),
         });
         const stillIncomplete = getIncompleteSectionsSummary(data);
-        if (!hoursOk || stillIncomplete.length > 0) {
+        if (!hoursOk || stillIncomplete.length > 0 || !finalDeclarationComplete) {
             toast.error('Report is not ready to submit. Fix the items below and try again.');
             setIsConfirmOpen(false);
             setBlockedSubmitOpen(true);
@@ -1362,6 +1380,11 @@ function ReportFormContent() {
                                 ) : null}
                                 <span className="mt-1.5 block text-xs font-bold text-[#0e7d74]">Open Section 1 →</span>
                             </button>
+                        )}
+                        {finalDeclarationComplete ? null : (
+                            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-slate-700">
+                                Tick all five declaration boxes and type your full name on the flash card before submitting.
+                            </p>
                         )}
                         {incompleteSectionsSummary.length > 0 && (
                             <div className="space-y-3">

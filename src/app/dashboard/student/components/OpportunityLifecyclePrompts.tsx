@@ -217,8 +217,8 @@ export function OpportunitySubmittedReviewModal({
                         </PromptRow>
                         <PromptRow icon={<FolderOpen className="h-4 w-4" />} iconClass="bg-emerald-50 text-emerald-600">
                             You can check your opportunity&apos;s status by clicking{" "}
-                            <Link href="/dashboard/student/projects" className="font-black text-emerald-700 underline underline-offset-2">
-                                View My Projects
+                            <Link href="/dashboard/student/paths/community-service?view=create&filter=review" className="font-black text-emerald-700 underline underline-offset-2">
+                                My Opportunities
                             </Link>
                             .
                         </PromptRow>
@@ -238,8 +238,8 @@ export function OpportunitySubmittedReviewModal({
                         <ActionLink href="/dashboard/student" variant="outline">
                             <Grid2X2 className="h-4 w-4" /> Go to Dashboard
                         </ActionLink>
-                        <ActionLink href="/dashboard/student/projects" variant="primary">
-                            <FolderOpen className="h-4 w-4" /> View My Projects
+                        <ActionLink href="/dashboard/student/paths/community-service?view=create&filter=review" variant="primary">
+                            <FolderOpen className="h-4 w-4" /> My Opportunities
                         </ActionLink>
                     </div>
                 </div>
@@ -289,7 +289,7 @@ export function OpportunityLiveApplyModal({
                             Your opportunity has been <strong className="text-emerald-700">approved and is now live</strong> on the dashboard.
                         </PromptRow>
                         <PromptRow icon={<UserCheck className="h-4 w-4" />} iconClass="bg-blue-50 text-blue-600">
-                            As the creator, go to <strong>My Projects</strong> and click <strong>Start Report</strong> to record service hours, evidence, and submit your report.
+                            As the creator, go to <strong>My Reports</strong> and click <strong>Start Report</strong> to record service hours, evidence, and submit your report.
                         </PromptRow>
                         <PromptRow icon={<Users className="h-4 w-4" />} iconClass="bg-orange-50 text-orange-600">
                             Other students still join via <strong className="text-orange-700">Join Opportunity / Apply</strong> on the listing. Your report unlocks on live approval — you do not need a separate Apply step.
@@ -306,7 +306,7 @@ export function OpportunityLiveApplyModal({
                         <ActionLink href={applyHref} variant="outline" onClick={onClose}>
                             <FolderOpen className="h-4 w-4" /> Open listing
                         </ActionLink>
-                        <ActionLink href="/dashboard/student/projects" variant="success" onClick={onClose}>
+                        <ActionLink href={`/dashboard/student/report?projectId=${encodeURIComponent(project.id)}`} variant="success" onClick={onClose}>
                             <FileText className="h-4 w-4" /> Start Report
                         </ActionLink>
                     </div>
@@ -345,12 +345,12 @@ export function OpportunityLiveApplyBanner({
                         <h3 className="text-base font-black text-violet-900">Your Opportunity is Now Live!</h3>
                         <p className="mt-1 max-w-2xl text-sm font-medium leading-relaxed text-slate-700">
                             <span className="font-bold text-slate-900">{project.title}</span> has been approved and is live. Open{" "}
-                            <strong>My Projects</strong> and click <strong>Start Report</strong> to begin. Other students can still Join / Apply on the listing.
+                            <strong>My Reports</strong> and click <strong>Start Report</strong> to begin. Other students can still Join / Apply on the listing.
                         </p>
                     </div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                    <Link href="/dashboard/student/projects" className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-700 px-8 text-sm font-black text-white shadow-sm transition hover:bg-violet-800">
+                    <Link href={`/dashboard/student/report?projectId=${encodeURIComponent(project.id)}`} className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-700 px-8 text-sm font-black text-white shadow-sm transition hover:bg-violet-800">
                         Start Report
                     </Link>
                     <Link href={applyHref} className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-300 bg-white px-6 text-sm font-bold text-violet-800 transition hover:bg-violet-50">
