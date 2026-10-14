@@ -7,6 +7,7 @@ import { CheckCircle2, UploadCloud, X, ChevronDown, Star } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { remindCourseworkFaculty } from "@/utils/courseworkReminder";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
@@ -74,6 +75,53 @@ function chapterIndexForStep(step: number): number {
     const idx = CHAPTERS.findIndex((c) => c.steps.includes(step));
     return idx === -1 ? 0 : idx;
 }
+/** Per-step required answers — mirrors the backend "Ready to Submit" gate
+ * (ciel_backend paths/course-project-readiness.util.ts) so a chapter only earns its ✓ once its
+ * mandatory fields exist, "Save & continue" cannot skip an empty step, and the submit page shows the
+ * same list the server would otherwise reject with. Modules the Format step switched off are not
+ * required, exactly as the server treats them. */
+function courseworkStepMissing(step: number, entry: CourseProjectEntry): string[] {
+    const inc: CourseProjectModuleInclusion = entry.moduleInclusion || {};
+    const has = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+    const missing: string[] = [];
+    switch (step) {
+        case 0:
+            if (!has(entry.course)) missing.push("Course name");
+            if (!has(entry.studentInfo?.studentName)) missing.push("Your name");
+            if (!has(entry.studentInfo?.universityName)) missing.push("University");
+            if (!has(entry.studentInfo?.teacherEmail)) missing.push("Faculty / teacher email");
+            break;
+        case 1:
+            if (!has(entry.projectTitle)) missing.push("Project title");
+            if (!has(entry.assignmentInfo?.format) && !entry.assignmentInfo?.formats?.length) missing.push("Assignment format");
+            break;
+        case 2:
+            if (inc.aim !== false && !has(entry.aimsInfo?.aimStatement)) missing.push("Aim statement");
+            break;
+        case 3:
+            if ((inc.act !== false || inc.meth !== false) && !entry.processInfo?.activities?.length && !entry.processInfo?.methods?.length) {
+                missing.push("At least one activity or method");
+            }
+            break;
+        case 4: {
+            const r = entry.resultsInfo;
+            if (!(inc.find === false && inc.res === false) && !has(r?.measured) && !has(r?.resultsSummary) && !r?.metrics?.length) {
+                missing.push("Results summary or at least one result");
+            }
+            break;
+        }
+        case 5:
+            if (!entry.sdgMapping?.notApplicable && !entry.sdgMapping?.entries?.length) missing.push("SDG mapping — pick a goal or mark “not applicable”");
+            break;
+        case 6:
+            if (!has(entry.reflectionInfo?.lessonLearned)) missing.push("What this work taught you");
+            if (!has(entry.reflectionInfo?.integrationLevel) && !has(entry.reflectionInfo?.sdgLinkHonesty)) missing.push("Sustainability integration level");
+            break;
+        default:
+            break;
+    }
+    return missing;
+}
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 /** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
 function semesterSelectValue(raw?: string): string {
@@ -106,12 +154,12 @@ const FORMAT_OPTIONS = [
 ];
 
 const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label: string; idleClass: string; onClass: string }[] = [
-    { key: "aim", emoji: "🎯", label: "Aim & objectives", idleClass: "border-ciel-green/35 bg-ciel-green-soft/50 text-ciel-green-deep", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
-    { key: "act", emoji: "🛠️", label: "Activities", idleClass: "border-ciel-purple/35 bg-ciel-purple-soft/70 text-ciel-purple-deep", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
-    { key: "meth", emoji: "🔬", label: "Method / research", idleClass: "border-ciel-indigo/35 bg-ciel-indigo-soft/70 text-ciel-indigo", onClass: "border-ciel-indigo bg-ciel-indigo-soft text-ciel-indigo" },
-    { key: "find", emoji: "📊", label: "Findings", idleClass: "border-ciel-green/35 bg-ciel-green-soft/50 text-ciel-green-deep", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
-    { key: "res", emoji: "📏", label: "Results & evidence", idleClass: "border-ciel-purple/35 bg-ciel-purple-soft/70 text-ciel-purple-deep", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
-    { key: "lim", emoji: "⚠️", label: "Limitations", idleClass: "border-ciel-gold/40 bg-ciel-gold-soft/70 text-ciel-gold-deep", onClass: "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" },
+    { key: "aim", emoji: "🎯", label: "Aim & objectives", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
+    { key: "act", emoji: "🛠️", label: "Activities", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
+    { key: "meth", emoji: "🔬", label: "Method / research", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-indigo bg-ciel-indigo-soft text-ciel-indigo" },
+    { key: "find", emoji: "📊", label: "Findings", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
+    { key: "res", emoji: "📏", label: "Results & evidence", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
+    { key: "lim", emoji: "⚠️", label: "Limitations", idleClass: "border-ciel-border bg-white text-ciel-text-soft hover:border-ciel-gold/40", onClass: "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" },
 ];
 
 const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧩 Ideation / concepts", "🧪 Testing / experimenting", "🧱 Building / making", "🖥 Coding / development", "👀 Observation / site visit", "🤝 Working with an organisation", "📣 Running a campaign / event", "🎤 Presenting / pitching", "✍️ Drafting & editing", "🎬 Filming / recording", "📐 Modelling / simulation", "🔬 Lab / practical work", "👥 Stakeholder engagement", "🎭 Performance / exhibition", "📚 Teaching / facilitating", "🧠 Analysis / evaluation"];
@@ -789,12 +837,11 @@ export default function CourseProjectWizardPage() {
 
     const acceptedCount = activeStepIdx.filter((k) => review[k]?.accepted).length;
     const allAccepted = activeStepIdx.length > 0 && acceptedCount === activeStepIdx.length;
-    // Accepting a section's summary doesn't itself validate its underlying fields — a few load-bearing
-    // ones are checked explicitly so a card can't reach faculty missing its title, its SDG stance, or
-    // any honest read of how integrated the sustainability angle actually was.
-    const hasSdgStance = !!(entry.sdgMapping?.entries?.length || entry.sdgMapping?.notApplicable);
-    const hasIntegrationLevel = !!(entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty);
-    const missingRequiredFields = !entry.course?.trim() || !entry.projectTitle?.trim() || !hasSdgStance || !hasIntegrationLevel;
+    // Accepting a section's summary doesn't itself validate its underlying fields — every step's
+    // required answers are re-checked here (same list as the server's submit gate) so a card can't
+    // reach faculty with blank chapters behind a row of ✓ marks.
+    const readinessMissing = STEPS.flatMap((_, s) => courseworkStepMissing(s, entry).map((label) => ({ step: s, label })));
+    const missingRequiredFields = readinessMissing.length > 0;
     const finalSectionSummaries = (): CourseProjectSectionSummaries => {
         const out: CourseProjectSectionSummaries = {};
         for (const key of activeStepIdx) out[key] = review[key]?.text ?? stripBoldMarkup(sums[key] || "");
@@ -832,7 +879,9 @@ export default function CourseProjectWizardPage() {
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
     const blended = routesIn.length > 1;
     const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
-    const chaptersComplete = CHAPTERS.filter((c) => c.steps.every((s) => s < entry.stepCompleted)).length;
+    /** A step is "done" only when the student has moved past it AND its required answers exist. */
+    const stepDone = (s: number) => s < entry.stepCompleted && courseworkStepMissing(s, entry).length === 0;
+    const chaptersComplete = CHAPTERS.filter((c) => c.steps.every(stepDone)).length;
 
     const primarySdg = entry.sdgMapping?.entries?.[0];
     const supportingSdgs = entry.sdgMapping?.entries?.slice(1) ?? [];
@@ -895,7 +944,13 @@ export default function CourseProjectWizardPage() {
                             Team report led by {entry.studentInfo?.studentName || "a teammate"} — you can view and edit the same file.
                         </div>
                     )}
-                    <CourseworkCard entry={entry} defaultOpen studentReminder={entry.status === "submitted" ? "faculty" : "team"} hideScore />
+                    <CourseworkCard
+                        entry={entry}
+                        defaultOpen
+                        studentReminder={entry.status === "submitted" ? "faculty" : "team"}
+                        hideScore
+                        onRemindFaculty={() => remindCourseworkFaculty(id)}
+                    />
                     <button
                         type="button"
                         onClick={() => {
@@ -945,15 +1000,23 @@ export default function CourseProjectWizardPage() {
                     <div className="flex gap-1.5 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
                         {CHAPTERS.map((chapter, ci) => {
                             const isCurrent = chapter.steps.includes(step);
-                            const isDone = !isCurrent && chapter.steps.every((s) => s < entry.stepCompleted);
+                            const isDone = !isCurrent && chapter.steps.every(stepDone);
+                            // Chapters beyond the furthest step reached stay locked — "Save & continue" is
+                            // the only way forward, and it refuses to advance past an incomplete step.
+                            const locked = chapter.steps[0] > entry.stepCompleted;
                             return (
                                 <button
                                     key={chapter.title}
                                     type="button"
-                                    onClick={() => setStep(isCurrent ? step : chapter.steps[0])}
-                                    title={chapter.title}
+                                    disabled={locked}
+                                    onClick={() => {
+                                        if (locked) return;
+                                        setStep(isCurrent ? step : chapter.steps[0]);
+                                    }}
+                                    title={locked ? "Complete the earlier chapters first" : chapter.title}
                                     className={clsx(
                                         "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 pb-[7px] pt-2.5 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                        locked && "cursor-not-allowed opacity-60",
                                         isCurrent
                                             ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep shadow-[0_2px_8px_rgba(213,170,70,.25)]"
                                             : isDone
@@ -981,14 +1044,20 @@ export default function CourseProjectWizardPage() {
                         <div className="mt-1.5 flex gap-1.5 pl-1">
                             {CHAPTERS[chapterIndexForStep(step)].steps.map((s) => {
                                 const isCurrent = s === step;
-                                const isDone = s < entry.stepCompleted && !isCurrent;
+                                const isDone = !isCurrent && stepDone(s);
+                                const locked = s > entry.stepCompleted;
                                 return (
                                     <button
                                         key={s}
                                         type="button"
-                                        onClick={() => setStep(s)}
+                                        disabled={locked}
+                                        title={locked ? "Complete the earlier step first" : undefined}
+                                        onClick={() => {
+                                            if (!locked) setStep(s);
+                                        }}
                                         className={clsx(
                                             "ciel-transition rounded-full border-2 px-3 py-1 text-[10.5px] font-bold",
+                                            locked && "cursor-not-allowed opacity-60",
                                             isCurrent
                                                 ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep"
                                                 : isDone
@@ -1045,6 +1114,28 @@ export default function CourseProjectWizardPage() {
                             </Field>
                             <Field label="Instructor's email">
                                 <input type="email" value={entry.studentInfo?.teacherEmail ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherEmail: e.target.value })} placeholder="name@uni.edu.pk" className={fieldClass} />
+                            </Field>
+                            <Field label="Instructor's WhatsApp (optional)" hint="Lets the “WhatsApp” reminder on your submitted card open a direct chat with your instructor.">
+                                <div className="grid grid-cols-[88px_1fr] gap-2">
+                                    <input
+                                        type="tel"
+                                        inputMode="tel"
+                                        maxLength={5}
+                                        value={entry.studentInfo?.teacherWhatsappCode ?? "+92"}
+                                        onChange={(e) => patchGroup("studentInfo", { teacherWhatsappCode: e.target.value })}
+                                        placeholder="+92"
+                                        className={clsx(fieldClass, "text-center font-extrabold")}
+                                    />
+                                    <input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        maxLength={15}
+                                        value={entry.studentInfo?.teacherWhatsappNumber ?? ""}
+                                        onChange={(e) => patchGroup("studentInfo", { teacherWhatsappNumber: e.target.value })}
+                                        placeholder="3001234567"
+                                        className={fieldClass}
+                                    />
+                                </div>
                             </Field>
                             <Field label="How was this coursework completed?">
                                 <ChipSingle options={TEAM_MODE_OPTIONS} value={teamMode} onChange={(v) => patchGroup("studentInfo", { teamMode: v })} />
@@ -1205,20 +1296,34 @@ export default function CourseProjectWizardPage() {
                             )}
                             <Field label="Which sections apply to your work?" hint="Pre-set from your format — tap to adjust.">
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                    {INC_TILES.map((t) => (
+                                    {INC_TILES.map((t) => {
+                                        // Same rule the section renderers and the submit gate use: only an explicit `false` excludes a module.
+                                        const on = inc[t.key] !== false;
+                                        return (
                                         <button
                                             key={t.key}
                                             type="button"
-                                            onClick={() => setEntry((e) => ({ ...e, moduleInclusion: { ...e.moduleInclusion, [t.key]: !e.moduleInclusion?.[t.key] } }))}
+                                            onClick={() => setEntry((e) => ({ ...e, moduleInclusion: { ...e.moduleInclusion, [t.key]: !on } }))}
+                                            aria-pressed={on}
                                             className={clsx(
-                                                "ciel-transition rounded-[11px] border-[1.5px] px-3 py-3 text-center",
-                                                inc[t.key] ? `${t.onClass} shadow-sm ring-2 ring-current/15` : t.idleClass,
+                                                "relative ciel-transition rounded-[11px] border-2 px-3 py-3 text-center",
+                                                on ? `${t.onClass} shadow-sm` : `${t.idleClass} opacity-80`,
                                             )}
                                         >
+                                            <span
+                                                className={clsx(
+                                                    "absolute right-1.5 top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-black ring-2 ring-white",
+                                                    on ? "bg-current text-white" : "border border-ciel-border bg-white text-transparent",
+                                                )}
+                                            >
+                                                <span className={on ? "text-white" : ""}>✓</span>
+                                            </span>
                                             <span className="block text-[15px] leading-none">{t.emoji}</span>
                                             <span className="mt-1.5 block text-[11px] font-extrabold leading-snug">{t.label}</span>
+                                            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide opacity-70">{on ? "Included" : "Not included"}</span>
                                         </button>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </Field>
                             <Field label="What were you asked to do? (one line)">
@@ -1246,19 +1351,31 @@ export default function CourseProjectWizardPage() {
                                 </Field>
                                 <Field label="Objectives">
                                     <div className="space-y-2">
-                                        {(entry.aimsInfo?.objectives ?? [""]).map((o, i) => (
-                                            <input
-                                                key={i}
-                                                type="text"
-                                                value={o}
-                                                onChange={(e) => {
-                                                    const next = [...(entry.aimsInfo?.objectives ?? [""])];
-                                                    next[i] = e.target.value;
-                                                    patchGroup("aimsInfo", { objectives: next });
-                                                }}
-                                                placeholder={i === 0 ? "e.g. Identify major sources of waste" : "Start with a verb…"}
-                                                className={fieldClass}
-                                            />
+                                        {(entry.aimsInfo?.objectives ?? [""]).map((o, i, all) => (
+                                            <div key={i} className="flex items-stretch gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={o}
+                                                    onChange={(e) => {
+                                                        const next = [...(entry.aimsInfo?.objectives ?? [""])];
+                                                        next[i] = e.target.value;
+                                                        patchGroup("aimsInfo", { objectives: next });
+                                                    }}
+                                                    placeholder={i === 0 ? "e.g. Identify major sources of waste" : "Start with a verb…"}
+                                                    className={fieldClass}
+                                                />
+                                                {all.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label="Remove this objective"
+                                                        title="Remove this objective"
+                                                        onClick={() => patchGroup("aimsInfo", { objectives: all.filter((_, j) => j !== i) })}
+                                                        className="shrink-0 rounded-ciel-xs border border-red-200 bg-red-50 px-2.5 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                )}
+                                            </div>
                                         ))}
                                         <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
                                             + Add another objective
@@ -1376,19 +1493,31 @@ export default function CourseProjectWizardPage() {
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">B · What you found <span className="normal-case font-semibold text-ciel-text-soft/80">(up to 5 — a finding doesn&apos;t have to be numerical)</span></p>
                                     <Field label={routeMode?.fndL ?? "Most important findings, conclusions or insights"}>
                                         <div className="space-y-2">
-                                            {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
-                                                <input
-                                                    key={i}
-                                                    type="text"
-                                                    value={f}
-                                                    onChange={(e) => {
-                                                        const next = [...(entry.resultsInfo?.findings ?? [""])];
-                                                        next[i] = e.target.value;
-                                                        patchGroup("resultsInfo", { findings: next });
-                                                    }}
-                                                    placeholder={i === 0 ? "e.g. Convenience was the main reason students kept using single-use plastic" : "Another…"}
-                                                    className={fieldClass}
-                                                />
+                                            {(entry.resultsInfo?.findings ?? [""]).map((f, i, all) => (
+                                                <div key={i} className="flex items-stretch gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={f}
+                                                        onChange={(e) => {
+                                                            const next = [...(entry.resultsInfo?.findings ?? [""])];
+                                                            next[i] = e.target.value;
+                                                            patchGroup("resultsInfo", { findings: next });
+                                                        }}
+                                                        placeholder={i === 0 ? "e.g. Convenience was the main reason students kept using single-use plastic" : "Another…"}
+                                                        className={fieldClass}
+                                                    />
+                                                    {all.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Remove this finding"
+                                                            title="Remove this finding"
+                                                            onClick={() => patchGroup("resultsInfo", { findings: all.filter((_, j) => j !== i) })}
+                                                            className="shrink-0 rounded-ciel-xs border border-red-200 bg-red-50 px-2.5 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
+                                                </div>
                                             ))}
                                             {(entry.resultsInfo?.findings?.length ?? 0) < 5 && (
                                                 <button type="button" onClick={() => patchGroup("resultsInfo", { findings: [...(entry.resultsInfo?.findings ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
@@ -1441,19 +1570,31 @@ export default function CourseProjectWizardPage() {
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">E · Recommendations — what should happen next? <span className="normal-case font-semibold text-ciel-text-soft/80">(optional, up to 3)</span></p>
                                 <div className="space-y-2">
-                                    {(entry.resultsInfo?.recommendations ?? [""]).map((r, i) => (
-                                        <input
-                                            key={i}
-                                            type="text"
-                                            value={r}
-                                            onChange={(e) => {
-                                                const next = [...(entry.resultsInfo?.recommendations ?? [""])];
-                                                next[i] = e.target.value;
-                                                patchGroup("resultsInfo", { recommendations: next });
-                                            }}
-                                            placeholder={i === 0 ? "e.g. Install refill stations at high-traffic campus locations" : "Another recommendation…"}
-                                            className={fieldClass}
-                                        />
+                                    {(entry.resultsInfo?.recommendations ?? [""]).map((r, i, all) => (
+                                        <div key={i} className="flex items-stretch gap-2">
+                                            <input
+                                                type="text"
+                                                value={r}
+                                                onChange={(e) => {
+                                                    const next = [...(entry.resultsInfo?.recommendations ?? [""])];
+                                                    next[i] = e.target.value;
+                                                    patchGroup("resultsInfo", { recommendations: next });
+                                                }}
+                                                placeholder={i === 0 ? "e.g. Install refill stations at high-traffic campus locations" : "Another recommendation…"}
+                                                className={fieldClass}
+                                            />
+                                            {all.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    aria-label="Remove this recommendation"
+                                                    title="Remove this recommendation"
+                                                    onClick={() => patchGroup("resultsInfo", { recommendations: all.filter((_, j) => j !== i) })}
+                                                    className="shrink-0 rounded-ciel-xs border border-red-200 bg-red-50 px-2.5 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
                                     ))}
                                     {(entry.resultsInfo?.recommendations?.length ?? 0) < 3 && (
                                         <button type="button" onClick={() => patchGroup("resultsInfo", { recommendations: [...(entry.resultsInfo?.recommendations ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
@@ -1702,6 +1843,23 @@ export default function CourseProjectWizardPage() {
                                 </p>
                             </div>
 
+                            {readinessMissing.length > 0 && (
+                                <div className="rounded-ciel-sm border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                                    <p className="font-black">
+                                        Not ready to submit yet — {readinessMissing.length} required answer{readinessMissing.length === 1 ? "" : "s"} missing:
+                                    </p>
+                                    <ul className="mt-1.5 space-y-1">
+                                        {readinessMissing.map((m) => (
+                                            <li key={`${m.step}-${m.label}`} className="flex flex-wrap items-center justify-between gap-2">
+                                                <span>{m.label}</span>
+                                                <button type="button" onClick={() => setStep(m.step)} className="font-bold underline underline-offset-2 hover:text-red-900">
+                                                    Go to {STEPS[m.step].emoji} {stepLabels[m.step]} →
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                             <label className="flex items-start gap-3 rounded-ciel-sm border border-ciel-gold/40 bg-ciel-gold-soft/50 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
                                 <input
                                     type="checkbox"
@@ -1734,7 +1892,16 @@ export default function CourseProjectWizardPage() {
                             <button
                                 type="button"
                                 disabled={saving || uploading}
-                                onClick={() => save(saveAllFields(), step + 1)}
+                                onClick={async () => {
+                                    const missing = courseworkStepMissing(step, entry);
+                                    if (missing.length) {
+                                        // Keep what was typed, but do not mark the step complete.
+                                        await save(saveAllFields());
+                                        setError(`Complete this step before continuing — missing: ${missing.join(", ")}.`);
+                                        return;
+                                    }
+                                    await save(saveAllFields(), step + 1);
+                                }}
                                 className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
                             >
                                 {saving ? "Saving..." : "Save & continue"}
@@ -1749,7 +1916,7 @@ export default function CourseProjectWizardPage() {
                                         : !allAccepted
                                         ? "Accept every section above first"
                                         : missingRequiredFields
-                                          ? "Go back and fill in the course name, title, SDG stance and sustainability integration level first"
+                                          ? `Go back and complete: ${readinessMissing.map((m) => m.label).join(", ")}`
                                           : !declarationChecked
                                             ? "Confirm the final declaration first"
                                             : undefined

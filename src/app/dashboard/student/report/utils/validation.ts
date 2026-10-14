@@ -21,22 +21,22 @@ const CNIC_REGEX = /^(\d{13}|\d{5}-\d{7}-\d{1})$/;
 const MOBILE_REGEX = /^03\d{9}$/;
 
 /** Community report narrative textareas — default rule; specific fields can tighten it below. */
-export const REPORT_TEXT_MIN_WORDS = 20;
+export const REPORT_TEXT_MIN_WORDS = 10;
 export const REPORT_TEXT_MAX_WORDS = 200;
-export const REPORT_TEXT_RANGE_LABEL = "20–200 words";
+export const REPORT_TEXT_RANGE_LABEL = "10–200 words";
 
 /** Per-field word-count overrides for narrative fields with a tighter, field-specific target. */
 export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
-    problem_statement: { min: 20, max: 60 },
+    problem_statement: { min: 10, max: 60 },
     discipline_contribution: { min: 15, max: 50 },
     contribution_intent_statement: { min: 30, max: 80 },
-    student_contribution_intent_statement: { min: 20, max: 60 },
-    justification_text: { min: 20, max: 60 },
+    student_contribution_intent_statement: { min: 10, max: 60 },
+    justification_text: { min: 10, max: 60 },
     observed_change: { min: 40, max: 100 },
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
     description: { min: 15, max: 60 },
-    /** Confidence / proof note — 20 words is enough; keep it short. */
+    /** Confidence / proof note — 10 words is enough; keep it short. */
     measurement_explanation: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
     /** Overlap note when the same people appear in another activity. */
     overlap_note: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },

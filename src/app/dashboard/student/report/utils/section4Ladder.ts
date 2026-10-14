@@ -215,8 +215,8 @@ export function matchedProjectSdgs(activity: Record<string, unknown>, projectSdg
     return projectSdgs.filter((n) => sug.includes(n));
 }
 
-/** Short notes (overlap + measurement explanation) — 20 words is enough. */
-export const SHORT_NOTE_MIN_WORDS = 20;
+/** Short notes (overlap + measurement explanation) — 10 words is enough. */
+export const SHORT_NOTE_MIN_WORDS = 10;
 export const SHORT_NOTE_MAX_WORDS = 80;
 export const PROOF_MIN_WORDS = SHORT_NOTE_MIN_WORDS;
 

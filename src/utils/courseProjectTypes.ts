@@ -44,6 +44,9 @@ export interface CourseProjectStudentInfo {
     courseworkType?: string;
     teacherName?: string;
     teacherEmail?: string;
+    /** Instructor's WhatsApp (optional) — same code+number split as groupMembers; powers the direct "WhatsApp <teacher>" reminder. */
+    teacherWhatsappCode?: string;
+    teacherWhatsappNumber?: string;
     notes?: string;
 }
 

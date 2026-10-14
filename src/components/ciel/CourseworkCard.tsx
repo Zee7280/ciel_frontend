@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { CourseworkReminderResult } from "@/utils/courseworkReminder";
 import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock, Share2, Mail, MessageCircle } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ export default function CourseworkCard({
     remindDraftOwner = false,
     studentEmail,
     hideScore = true,
+    onRemindFaculty,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -55,6 +57,10 @@ export default function CourseworkCard({
     remindDraftOwner?: boolean;
     /** The draft owner's email — needed for remindDraftOwner (a plain CourseProjectEntry has no joined student record of its own). */
     studentEmail?: string;
+    /** studentReminder="faculty" only: when supplied, "Email <teacher>" sends the reminder through CIEL PK
+     * (server-side, once per 24h) and reports the outcome, instead of relying on a bare mailto: that does
+     * nothing on devices without a mail client. The mailto: stays available as a secondary "open in my mail app". */
+    onRemindFaculty?: () => Promise<CourseworkReminderResult>;
     /** The raw /100 quality score is faculty/university/CIEL-only by design — a student sees their
      * rank badge (and, once published, the downloadable report) but never the number itself.
      * Defaults to hidden (safe-by-default) — pass false explicitly on every faculty/university/CIEL
@@ -63,6 +69,7 @@ export default function CourseworkCard({
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [shareOpen, setShareOpen] = useState(false);
+    const [remindingFaculty, setRemindingFaculty] = useState(false);
 
     const si = entry.studentInfo || {};
     const ai = entry.assignmentInfo || {};
@@ -98,6 +105,15 @@ export default function CourseworkCard({
                   body: `Hi ${si.teacherName || "there"},\n\nJust a friendly reminder that my coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) has been submitted and is waiting for your approval on CIEL PK.\n\nThank you,\n${displayName}`,
               }
             : null;
+    // Direct chat when the instructor's number is on the record; otherwise the generic share sheet
+    // (and the button says so — "WhatsApp <name>" must not promise a chat it cannot open).
+    const facultyWhatsappDigits = String(si.teacherWhatsappNumber || "").replace(/\D/g, "").replace(/^0+/, "");
+    const facultyWhatsappDirect = !!facultyReminder && facultyWhatsappDigits.length >= 6;
+    const facultyWhatsappHref = facultyReminder
+        ? facultyWhatsappDirect
+            ? whatsappTargetedHref(si.teacherWhatsappCode, si.teacherWhatsappNumber, `${facultyReminder.subject}\n\n${facultyReminder.body}`)
+            : whatsappShareHref(`${facultyReminder.subject}\n\n${facultyReminder.body}`)
+        : "";
     // One Email + WhatsApp pair per named teammate, each targeting that member's own number —
     // matches FYP's ThesisCard reminder pattern instead of one combined nudge to the whole team.
     const teamReminders = studentReminder === "team"
@@ -393,21 +409,52 @@ export default function CourseworkCard({
                     <div className="flex flex-wrap gap-2">
                         {facultyReminder ? (
                             <>
+                                {onRemindFaculty ? (
+                                    <button
+                                        type="button"
+                                        disabled={remindingFaculty}
+                                        title={`CIEL PK emails a reminder to ${facultyReminder.to}`}
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (remindingFaculty) return;
+                                            setRemindingFaculty(true);
+                                            try {
+                                                const result = await onRemindFaculty();
+                                                if (result.ok) toast.success(`Reminder emailed to ${result.to}`);
+                                                else toast.error(result.message);
+                                            } finally {
+                                                setRemindingFaculty(false);
+                                            }
+                                        }}
+                                        className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40 disabled:opacity-60"
+                                    >
+                                        <Mail className="h-3.5 w-3.5" /> {remindingFaculty ? "Sending…" : `Email ${facultyReminder.name}`}
+                                    </button>
+                                ) : null}
                                 <a
                                     href={mailtoHref(facultyReminder.to, facultyReminder.subject, facultyReminder.body)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    title={onRemindFaculty ? "Open a prefilled email in your own mail app instead" : `Email ${facultyReminder.to}`}
+                                    className={clsx(
+                                        "ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40",
+                                        onRemindFaculty && "border-dashed",
+                                    )}
                                 >
-                                    <Mail className="h-3.5 w-3.5" /> Email {facultyReminder.name}
+                                    <Mail className="h-3.5 w-3.5" /> {onRemindFaculty ? "Open in my mail app" : `Email ${facultyReminder.name}`}
                                 </a>
                                 <a
-                                    href={whatsappShareHref(`${facultyReminder.subject}\n\n${facultyReminder.body}`)}
+                                    href={facultyWhatsappHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
+                                    title={
+                                        facultyWhatsappDirect
+                                            ? `Opens a WhatsApp chat with ${facultyReminder.name}`
+                                            : "No instructor WhatsApp number saved — this opens WhatsApp so you can pick the contact. Add the number in Step 1 for a direct chat."
+                                    }
                                     className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
                                 >
-                                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {facultyReminder.name}
+                                    <MessageCircle className="h-3.5 w-3.5" /> {facultyWhatsappDirect ? `WhatsApp ${facultyReminder.name}` : "Share on WhatsApp"}
                                 </a>
                             </>
                         ) : null}

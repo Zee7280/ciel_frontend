@@ -424,6 +424,8 @@ export interface ReportData {
         signed_at?: string;
     };
     required_hours?: number;
+    /** Universities the opportunity is open to (from participation_scope / restricted_universities). Empty = any. */
+    university_allowlist?: string[];
     /** Report owner from API — used to align dossier with the filing student (may be a team member, not the lead). */
     student?: { id?: string; name?: string; email?: string };
 }

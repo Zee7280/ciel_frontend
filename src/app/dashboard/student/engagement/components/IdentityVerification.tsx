@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { School, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { BNU_DEGREE_PROGRAMS, isBnuUniversity, pakistaniUniversities, sanitizeReportAcademicDepartment } from "@/utils/universityData";
+import { BNU_DEGREE_PROGRAMS, canonicalUniversityAllowlist, isBnuUniversity, pakistaniUniversities, sanitizeReportAcademicDepartment } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay, validateNationalPhone } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
@@ -94,6 +94,7 @@ export default function IdentityVerification({
     showSemester = false,
     reservedEmails = [],
     enforceUniqueOnProject = false,
+    allowedUniversities,
 }: {
     projectId: string;
     onSuccess: (p: Participant) => void;
@@ -109,6 +110,9 @@ export default function IdentityVerification({
     reservedEmails?: string[];
     /** Teammate-add only. Leave false for lead / self-verify so existing seats can still OTP. */
     enforceUniqueOnProject?: boolean;
+    /** The opportunity's university scope (e.g. ["BNU"]). One entry → the picker is pre-filled and
+     * locked to it; several → only those are offered; empty/undefined → the full Pakistan list. */
+    allowedUniversities?: string[];
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'academic'>('personal');
@@ -117,6 +121,9 @@ export default function IdentityVerification({
     const [otpVerified, setOtpVerified] = useState({ email: !!initialData.verified });
     const [showUniDropdown, setShowUniDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const universityAllowlist = canonicalUniversityAllowlist(allowedUniversities);
+    const universityLocked = universityAllowlist.length === 1;
+    const universityOptions = universityAllowlist.length > 0 ? universityAllowlist : pakistaniUniversities;
 
     const initialPhone = parsePhoneForDisplay(String(initialData.mobile ?? ""));
     const [phoneCountryKey, setPhoneCountryKey] = useState(initialPhone.phoneCountryKey);
@@ -194,6 +201,16 @@ export default function IdentityVerification({
         }
     };
 
+    // Scoped opportunity with exactly one allowed university: pre-select it and keep it there,
+    // whatever the profile or an older draft said.
+    useEffect(() => {
+        if (!universityLocked) return;
+        const want = universityAllowlist[0];
+        setFormData((prev) => (prev.universityName === want ? prev : { ...prev, universityName: want }));
+        setShowUniDropdown(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [universityLocked, universityAllowlist[0]]);
+
     // Pre-fill profile fields for team lead when the name row is still empty
     useEffect(() => {
         if (isTeamLead && !formData.fullName) {
@@ -211,7 +228,7 @@ export default function IdentityVerification({
                         ...prev,
                         fullName: u.name || prev.fullName,
                         email: u.email || prev.email,
-                        universityName: u.university || u.institution || prev.universityName
+                        universityName: universityLocked ? universityAllowlist[0] : u.university || u.institution || prev.universityName
                     }));
                     if (u.email) {
                         setOtpVerified({ email: true });
@@ -416,7 +433,12 @@ export default function IdentityVerification({
     const phoneOk = !validateNationalPhone(phoneCountryKey, phoneNational);
     const isPersonalValid =
         !!formData.fullName.trim() && cnicNormalized.length === 13 && phoneOk && otpVerified.email;
-    const isAcademicValid = !!(formData.universityId && formData.universityName && formData.academicProgram && (!showSemester || formData.semester));
+    // A scoped opportunity (e.g. BNU only) must never record a seat at another university — the
+    // picker only offers the allowed names, and this check refuses anything typed around it.
+    const universityWithinScope =
+        universityAllowlist.length === 0 ||
+        universityAllowlist.some((u) => u.toLowerCase() === String(formData.universityName || "").trim().toLowerCase());
+    const isAcademicValid = !!(formData.universityId && formData.universityName && universityWithinScope && formData.academicProgram && (!showSemester || formData.semester));
 
     /** Verified / email-linked records can still lack CNIC (e.g. individual apply). Keep CNIC editable until 13 digits are saved. */
     const cnicDigitsLen = cnicNormalized.length;
@@ -586,19 +608,31 @@ export default function IdentityVerification({
                                     )}
                                 </span>
                                 <input
-                                    placeholder="Search and select your university..."
+                                    placeholder={universityAllowlist.length > 1 ? "Select one of the allowed universities..." : "Search and select your university..."}
                                     value={formData.universityName}
-                                    onFocus={() => setShowUniDropdown(true)}
+                                    readOnly={universityLocked}
+                                    title={universityLocked ? `This opportunity is open to ${universityAllowlist[0]} only` : undefined}
+                                    onFocus={() => {
+                                        if (!universityLocked) setShowUniDropdown(true);
+                                    }}
                                     onChange={(e) => {
+                                        if (universityLocked) return;
                                         setFormData({ ...formData, universityName: e.target.value });
                                         setShowUniDropdown(true);
                                     }}
-                                    className="cer-input min-w-0"
+                                    className={clsx("cer-input min-w-0", universityLocked && "cursor-not-allowed bg-[var(--teal-soft)]/40 font-bold")}
                                 />
                             </div>
-                            {showUniDropdown && (
+                            {universityAllowlist.length > 0 && (
+                                <p className="mt-1 text-[10.5px] font-semibold text-[var(--muted)]">
+                                    {universityLocked
+                                        ? `Set by the opportunity — open to ${universityAllowlist[0]} students only.`
+                                        : `This opportunity is open to: ${universityAllowlist.join(", ")}.`}
+                                </p>
+                            )}
+                            {showUniDropdown && !universityLocked && (
                                 <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl shadow-xl border border-[var(--line)] z-[100] max-h-[260px] overflow-y-auto p-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    {pakistaniUniversities
+                                    {universityOptions
                                         .filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase()))
                                         .map((uni, idx) => (
                                             <button
@@ -617,9 +651,9 @@ export default function IdentityVerification({
                                                 {uni}
                                             </button>
                                         ))}
-                                    {pakistaniUniversities.filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase())).length === 0 && (
+                                    {universityOptions.filter(u => u.toLowerCase().includes(formData.universityName.toLowerCase())).length === 0 && (
                                         <div className="p-3 text-center text-[11px] text-[var(--muted)] font-bold">
-                                            No university found within Pakistan list.
+                                            {universityAllowlist.length > 0 ? "Only the universities this opportunity is open to can be selected." : "No university found within Pakistan list."}
                                         </div>
                                     )}
                                 </div>

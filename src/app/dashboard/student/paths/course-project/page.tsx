@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import EmptyState from "@/components/ciel/EmptyState";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
+import { remindCourseworkFaculty } from "@/utils/courseworkReminder";
 import Tabs, { type CielTab } from "@/components/ciel/Tabs";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
@@ -292,6 +293,7 @@ function CourseProjectHub() {
                                                     entry={entry}
                                                     studentReminder={entry.status !== "submitted" ? "team" : "faculty"}
                                                     hideScore
+                                                    onRemindFaculty={entry.id ? () => remindCourseworkFaculty(entry.id!) : undefined}
                                                 />
                                             </CardOpenTarget>
                                             {entry.status !== "submitted" && entry.isOwner !== false && (

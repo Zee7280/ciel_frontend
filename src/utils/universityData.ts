@@ -311,3 +311,41 @@ export function sanitizeReportAcademicDepartment(
     }
     return rest;
 }
+
+function foldUniversityName(name: string | null | undefined): string {
+    return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+/** Maps a free-text university name from an opportunity's scope ("BNU", "Beaconhouse National
+ * University", "beaconhouse national university (bnu)") onto the canonical entry of
+ * `pakistaniUniversities`, so the identity picker can lock to it. Unknown names come back as typed. */
+export function canonicalPakistaniUniversity(name: string | null | undefined): string {
+    const raw = String(name || "").trim();
+    if (!raw) return "";
+    if (isBnuUniversity(raw)) return BNU_UNIVERSITY_NAME;
+    const folded = foldUniversityName(raw);
+    const exact = pakistaniUniversities.find((u) => foldUniversityName(u) === folded);
+    if (exact) return exact;
+    const partial = pakistaniUniversities.find((u) => {
+        const f = foldUniversityName(u);
+        return f.includes(folded) || folded.includes(f);
+    });
+    return partial || raw;
+}
+
+/** Canonical, deduped version of an opportunity's university allowlist (empty = any university). */
+export function canonicalUniversityAllowlist(names: ReadonlyArray<string> | null | undefined): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const n of names || []) {
+        const c = canonicalPakistaniUniversity(n);
+        const key = foldUniversityName(c);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(c);
+    }
+    return out;
+}

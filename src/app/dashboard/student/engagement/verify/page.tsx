@@ -1,5 +1,6 @@
 "use client";
 
+import { collectUniversityParticipationAllowlist } from "@/utils/studentOpportunityApplyEligibility";
 import { useState, useEffect } from "react";
 import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -82,6 +83,7 @@ function VerifyContent() {
 
             <IdentityVerification
                 projectId={project.id}
+                allowedUniversities={collectUniversityParticipationAllowlist(project as Record<string, unknown>)}
                 onSuccess={() => window.location.href = '/dashboard/student/engagement'}
             />
         </div>

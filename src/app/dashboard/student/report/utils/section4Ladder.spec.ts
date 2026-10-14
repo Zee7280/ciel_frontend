@@ -68,23 +68,26 @@ test("every mapped output unit exists in the unit list", () => {
     }
 });
 
-test("proof needs 20 words minimum", () => {
+test("proof needs 10 words minimum", () => {
     const o = { metric: "Other", metric_other: "Attendance", outcome_area: "x", baseline: "55", endline: "82", sure: 1, confidence_level: ["Directly Measured"] };
     const twenty = "Counted from the daily attendance register kept across twelve tutoring sessions before and after the programme started in the community.";
     assert.equal(twenty.trim().split(/\s+/).length >= 20, true);
     assert.equal(outcomeLadderOk({ ...o, measurement_explanation: twenty }), true);
+    assert.equal(outcomeLadderOk({ ...o, measurement_explanation: words(10) }), true);
+    assert.equal(outcomeLadderOk({ ...o, measurement_explanation: words(9) }), false);
     assert.equal(outcomeLadderOk({ ...o, measurement_explanation: "attendance register, 4 weeks" }), false);
     assert.equal(outcomeLadderOk({ ...o, measurement_explanation: "" }), false);
     assert.equal(outcomeLadderOk({ ...o, measurement_explanation: Array.from({ length: 81 }, (_, i) => `w${i}`).join(" ") }), false);
 });
 
-test("overlap note needs 20 words when people overlap", () => {
+test("overlap note needs 10 words when people overlap", () => {
     const base = {
         ...goodActivity(),
         overlap_status: "Mostly the Same Beneficiaries as Another Activity",
     };
     assert.equal(step3Ok({ ...base, overlap_note: "same children" }), false);
-    assert.equal(step3Ok({ ...base, overlap_note: words(20) }), true);
+    assert.equal(step3Ok({ ...base, overlap_note: words(10) }), true);
+    assert.equal(step3Ok({ ...base, overlap_note: words(9) }), false);
     assert.equal(step3Ok({ ...base, overlap_note: words(81) }), false);
 });
 

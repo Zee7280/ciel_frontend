@@ -17,6 +17,7 @@ export default function TeamVerification({
     secondaryFacultyEmail = "",
     teamLeadEmail = "",
     maxMembers,
+    allowedUniversities,
 }: {
     projectId: string;
     members: any[];
@@ -29,6 +30,8 @@ export default function TeamVerification({
     teamLeadEmail?: string;
     /** Max members besides the lead (opportunity seats − 1). Undefined = no cap known. */
     maxMembers?: number;
+    /** Opportunity university scope — forwarded to each member's IdentityVerification. */
+    allowedUniversities?: string[];
 }) {
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
@@ -219,6 +222,7 @@ export default function TeamVerification({
                         reservedEmails={reservedEmails}
                         enforceUniqueOnProject
                         showSemester
+                        allowedUniversities={allowedUniversities}
                         onSuccess={(p) => handleMemberSuccess(expandedIndex as number, p)}
                     />
                 </div>

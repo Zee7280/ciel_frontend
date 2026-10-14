@@ -60,9 +60,9 @@ export function sectionStrength(step: number, data: ReportData): JourneyGrade {
             }
             case 3: {
                 const w = wc(data.section3.contribution_intent_statement || data.section3.student_contribution_intent_statement);
-                if (w < 20) return w ? 1 : 0;
+                if (w < 10) return w ? 1 : 0;
                 const secondary = data.section3.secondary_sdgs || [];
-                const secondaryOk = secondary.length === 0 || secondary.every((s) => !!s.target_id && wc(s.justification_text) >= 20);
+                const secondaryOk = secondary.length === 0 || secondary.every((s) => !!s.target_id && wc(s.justification_text) >= 10);
                 if (w >= 30 && !!data.section3.primary_sdg?.target_id && secondaryOk) return 3;
                 return 2;
             }
