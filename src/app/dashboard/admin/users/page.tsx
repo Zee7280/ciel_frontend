@@ -43,6 +43,7 @@ const STATUS_OPTIONS = [
     "approved",
     "pending",
     "pending_membership_payment",
+    "pending_subscription_payment",
     "inactive",
     "rejected",
     "suspended",

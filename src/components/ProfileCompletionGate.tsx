@@ -12,6 +12,11 @@ import {
     partnerNeedsMembershipPayment,
     partnerPathAllowedDuringMembershipPending,
 } from "@/utils/membershipPayment";
+import {
+    STUDENT_SUBSCRIPTION_PATH,
+    studentNeedsSubscriptionPayment,
+    studentPathAllowedDuringSubscriptionPending,
+} from "@/utils/studentSubscription";
 
 /**
  * Redirects student/partner/faculty to their profile until required fields exist on the cached user
@@ -36,6 +41,11 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
         }
 
         if (pathname.startsWith("/dashboard/student")) {
+            // Non-member-university students pay the subscription fee before anything else unlocks.
+            if (studentNeedsSubscriptionPayment(user) && !studentPathAllowedDuringSubscriptionPending(pathname)) {
+                router.replace(STUDENT_SUBSCRIPTION_PATH);
+                return;
+            }
             if (pathname.startsWith("/dashboard/student/profile")) return;
             // Create-opportunity re-checks /user/me itself and preserves a `next=` return URL.
             if (pathname.startsWith("/dashboard/student/create-opportunity")) return;

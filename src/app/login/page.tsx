@@ -20,6 +20,7 @@ import {
 import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
 import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { partnerNeedsMembershipPayment, notifyCielUserUpdated } from "@/utils/membershipPayment";
+import { STUDENT_SUBSCRIPTION_PATH, studentNeedsSubscriptionPayment } from "@/utils/studentSubscription";
 import {
     clearStudentDashboardCache,
     fetchStudentDashboardData,
@@ -361,6 +362,8 @@ function LoginContent() {
                                         ? "/dashboard/partner/organization"
                                         : null;
                             }
+                        } else if (String(role).toLowerCase() === "student" && studentNeedsSubscriptionPayment(u)) {
+                            profilePath = STUDENT_SUBSCRIPTION_PATH;
                         } else {
                             profilePath = profileCompletionRedirectPath(String(role), u);
                         }
@@ -476,6 +479,15 @@ function LoginContent() {
                                         <span>
                                             Your university or corporate account was created. After you sign in, you will
                                             complete the one-time membership fee (or wait for an admin to activate you).
+                                        </span>
+                                    </div>
+                                )}
+                                {searchParams.get("signup") === "subscription" && (
+                                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50/90 p-4 text-left text-xs font-semibold text-teal-900">
+                                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
+                                        <span>
+                                            Your student account was created. After you sign in, pay the one-time subscription fee
+                                            and upload the bank proof to unlock your portal.
                                         </span>
                                     </div>
                                 )}

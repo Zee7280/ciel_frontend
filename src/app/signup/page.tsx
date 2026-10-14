@@ -10,6 +10,8 @@ import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey, validateNationalPhone } from "@/utils/countryCallingCodes";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { usePublicPlatformConfig } from "@/utils/publicPlatformConfig";
+import { PENDING_SUBSCRIPTION_STATUS } from "@/utils/studentSubscription";
 import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
@@ -90,6 +92,7 @@ function SignUpContent() {
     const [consent, setConsent] = useState(false);
     const [dismissedEmailWarning, setDismissedEmailWarning] = useState(false);
     const [orgKind, setOrgKind] = useState<(typeof ORG_KIND_OPTIONS)[number]["kind"]>("university");
+    const platformCfg = usePublicPlatformConfig();
     const [investorStep, setInvestorStep] = useState<InvestorWizardStep>(1);
     const [investor, setInvestor] = useState<InvestorSignupState>(EMPTY_INVESTOR_SIGNUP);
     const [proofMethod, setProofMethod] = useState<"upload" | "link">("upload");
@@ -442,8 +445,17 @@ function SignUpContent() {
             const needsMembershipFlow =
                 createdUser?.requires_membership_payment === true ||
                 String(createdUser?.account_status ?? "").trim().toLowerCase() === "pending_membership_payment";
+            const needsSubscriptionFlow =
+                createdUser?.requires_subscription_payment === true ||
+                String(createdUser?.account_status ?? "").trim().toLowerCase() === PENDING_SUBSCRIPTION_STATUS;
             const loginQs = new URLSearchParams();
-            const su = needsMembershipFlow ? "membership" : createdUser?.account_status === "pending" || createdUser?.status === "pending" ? "pending" : "success";
+            const su = needsMembershipFlow
+                ? "membership"
+                : needsSubscriptionFlow
+                  ? "subscription"
+                  : createdUser?.account_status === "pending" || createdUser?.status === "pending"
+                    ? "pending"
+                    : "success";
             loginQs.set("signup", su);
             if (postAuthRedirectNext) loginQs.set("next", postAuthRedirectNext);
             router.push(`/login?${loginQs.toString()}`);
@@ -726,6 +738,12 @@ function SignUpContent() {
                                                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
                                                 </div>
                                                 {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
+                                                {role === "student" && platformCfg.student_subscription_required ? (
+                                                    <p className="mt-1 text-[11px] leading-relaxed text-ciel-text-soft">
+                                                        Students of CIEL member universities join free. If your university is not a CIEL member, a one-time PKR{" "}
+                                                        {platformCfg.student_subscription_fee_pkr.toLocaleString("en-PK")} subscription is paid after signup to unlock the portal.
+                                                    </p>
+                                                ) : null}
                                             </div>
                                             <div className="relative z-20 min-w-0">
                                                 <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>

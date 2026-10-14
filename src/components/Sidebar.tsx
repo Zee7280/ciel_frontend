@@ -1,4 +1,5 @@
 "use client";
+import { STUDENT_SUBSCRIPTION_PATH, studentNeedsSubscriptionPayment } from "@/utils/studentSubscription";
 
 import Link from "next/link";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
@@ -396,6 +397,26 @@ export default function Sidebar() {
         return () => window.removeEventListener("ciel_user_updated", read);
     }, [isPartner, pathname]);
 
+    const [studentSubscriptionNav, setStudentSubscriptionNav] = useState(false);
+    useEffect(() => {
+        if (!isStudent) {
+            setStudentSubscriptionNav(false);
+            return;
+        }
+        const read = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+                setStudentSubscriptionNav(studentNeedsSubscriptionPayment(u));
+            } catch {
+                setStudentSubscriptionNav(false);
+            }
+        };
+        read();
+        window.addEventListener("ciel_user_updated", read);
+        return () => window.removeEventListener("ciel_user_updated", read);
+    }, [isStudent, pathname]);
+
     const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
     const [partnerOrgKind, setPartnerOrgKind] = useState<PartnerOrgKind>("partner");
     useEffect(() => {
@@ -671,6 +692,7 @@ export default function Sidebar() {
                 { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
                 { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
                 { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
+                { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
                 { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
                 { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
@@ -1013,6 +1035,15 @@ export default function Sidebar() {
                                 void fetchImpactSummary({ redirectToLogin: false });
                             }}
                         />
+                        {studentSubscriptionNav ? (
+                            <NavRow
+                                href={STUDENT_SUBSCRIPTION_PATH}
+                                label="Subscription fee"
+                                emoji="💳"
+                                active={isNavActive(STUDENT_SUBSCRIPTION_PATH)}
+                                collapsed={collapsed}
+                            />
+                        ) : null}
                         <NavSectionLabel collapsed={collapsed}>My Impact Areas</NavSectionLabel>
                         {CIEL_PATHS.map((path) => (
                             <NavRow

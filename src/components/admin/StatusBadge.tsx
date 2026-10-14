@@ -19,6 +19,7 @@ const STATUS_TONE: Record<string, Tone> = {
     completed: "green",
     pending: "amber",
     pending_membership_payment: "amber",
+    pending_subscription_payment: "amber",
     pending_approval: "amber",
     pending_review: "amber",
     revision_requested: "amber",

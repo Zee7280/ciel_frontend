@@ -16,6 +16,12 @@ import {
     AlertTriangle,
     Bell,
     RefreshCw,
+    MessageSquareText,
+    Layers,
+    Users,
+    Settings2,
+    CircleDollarSign,
+    ShieldCheck,
 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
@@ -34,6 +40,12 @@ import {
     PARTNER_MEMBERSHIP_REQUIRED_KEY,
     REPORTING_FEE_PKR_KEY,
 } from "@/utils/partnerMembershipDisplay";
+import {
+    parseStudentSubscriptionRequiredSettingValue,
+    STUDENT_SUBSCRIPTION_DEFAULT_FEE_PKR,
+    STUDENT_SUBSCRIPTION_FEE_PKR_KEY,
+    STUDENT_SUBSCRIPTION_REQUIRED_KEY,
+} from "@/utils/studentSubscription";
 import {
     DEFAULT_STUDENT_APPLY_EXPIRED_MESSAGE,
     DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
@@ -121,11 +133,12 @@ type ConfirmState = {
 };
 
 const SECTIONS = [
-    { id: "apps", label: "Applications & expiry" },
+    { id: "apps", label: "Applications" },
+    { id: "messages", label: "Student messages" },
     { id: "reports", label: "Reports & partners" },
     { id: "fees", label: "Fees & payments" },
     { id: "notify", label: "Notifications" },
-    { id: "platform", label: "Platform" },
+    { id: "platform", label: "Platform access" },
 ] as const;
 
 /* --------------------------------- UI pieces --------------------------------- */
@@ -137,38 +150,70 @@ function Spinner({ className = "h-4 w-4" }: { className?: string }) {
 function Section({
     id,
     title,
+    subtitle,
+    badge,
     icon,
+    tone = "bg-teal-50 text-teal-700",
     children,
 }: {
     id: string;
     title: string;
+    subtitle?: string;
+    badge?: string;
     icon: ReactNode;
+    tone?: string;
     children: ReactNode;
 }) {
     const [open, setOpen] = useState(true);
     const bodyId = `${id}-body`;
     return (
-        <section id={id} data-settings-section className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-            <h2 className="m-0">
+        <section id={id} data-settings-section className="scroll-mt-32 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <h2 className="m-0 border-b border-slate-100 px-4 py-4 sm:px-5">
                 <button
                     type="button"
                     onClick={() => setOpen((o) => !o)}
                     aria-expanded={open}
                     aria-controls={bodyId}
-                    className="flex w-full items-center gap-2 text-left text-lg font-bold text-slate-900 lg:pointer-events-none lg:cursor-default"
+                    className="flex w-full items-center gap-3 text-left lg:pointer-events-none lg:cursor-default"
                 >
-                    {icon}
-                    <span className="min-w-0 flex-1">{title}</span>
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`} aria-hidden="true">
+                        {icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-base font-bold text-slate-900">{title}</span>
+                        {subtitle ? <span className="block text-xs text-slate-500">{subtitle}</span> : null}
+                    </span>
+                    {badge ? (
+                        <span className="hidden shrink-0 rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-teal-700 ring-1 ring-teal-100 sm:inline-flex">
+                            {badge}
+                        </span>
+                    ) : null}
                     <ChevronDown
                         className={`h-5 w-5 shrink-0 text-slate-400 transition-transform lg:hidden ${open ? "rotate-180" : ""}`}
                         aria-hidden="true"
                     />
                 </button>
             </h2>
-            <div id={bodyId} className={`${open ? "block" : "hidden"} mt-5 space-y-5 lg:block`}>
+            <div id={bodyId} className={`${open ? "block" : "hidden"} space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:block`}>
                 {children}
             </div>
         </section>
+    );
+}
+
+/** Small summary tile above the tabs: one live value per headline switch / fee. */
+function StatCard({ label, value, sub, icon, tone }: { label: string; value: string; sub: string; icon: ReactNode; tone: string }) {
+    return (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-xs font-semibold text-slate-500">{label}</p>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone}`} aria-hidden="true">
+                    {icon}
+                </span>
+            </div>
+            <p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{value}</p>
+            <p className="mt-1 text-xs text-slate-500">{sub}</p>
+        </div>
     );
 }
 
@@ -225,7 +270,7 @@ function ToggleRow({
 }) {
     const titleId = `${id}-title`;
     return (
-        <div className={`rounded-xl border border-slate-100 p-4 ${tone}`}>
+        <div className={`rounded-xl border border-slate-200/70 p-4 ${tone}`}>
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <div id={titleId} className="font-bold text-slate-900">
@@ -257,7 +302,14 @@ function ToggleRow({
                         <Spinner className="h-3.5 w-3.5" /> Saving…
                     </p>
                 ) : (
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current: {stateLabel}</p>
+                    <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+                            checked ? "bg-teal-50 text-teal-800 ring-teal-100" : "bg-slate-100 text-slate-600 ring-slate-200"
+                        }`}
+                    >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                        {stateLabel}
+                    </span>
                 )}
             </div>
             <UpdatedMeta meta={meta} />
@@ -330,7 +382,9 @@ export default function AdminSettingsPage() {
     const baselineOf = (key: string): string =>
         key === MEMBERSHIP_FEE_PARTNER_PKR_KEY
             ? String(parseMembershipFeePkrSettingValue(server[key], 1000))
-            : (server[key] ?? "");
+            : key === STUDENT_SUBSCRIPTION_FEE_PKR_KEY
+              ? String(parseMembershipFeePkrSettingValue(server[key], STUDENT_SUBSCRIPTION_DEFAULT_FEE_PKR))
+              : (server[key] ?? "");
     const draftOf = (key: string): string => drafts[key] ?? baselineOf(key);
     const isDirty = (key: string): boolean => drafts[key] !== undefined && drafts[key] !== baselineOf(key);
     const setDraft = (key: string, value: string) => setDrafts((d) => ({ ...d, [key]: value }));
@@ -420,6 +474,10 @@ export default function AdminSettingsPage() {
         server[PARTNER_MEMBERSHIP_REQUIRED_KEY],
         false,
     );
+    const studentSubscriptionRequired = parseStudentSubscriptionRequiredSettingValue(
+        server[STUDENT_SUBSCRIPTION_REQUIRED_KEY],
+        true,
+    );
     const maintenanceMode = parseBool(server[MAINTENANCE_MODE_KEY], false);
     const allowRegistrations = parseBool(server[ALLOW_REGISTRATIONS_KEY], true);
     const closedBefore = parseStudentApplyClosedBefore(server[STUDENT_APPLY_CLOSED_BEFORE_KEY]);
@@ -446,6 +504,32 @@ export default function AdminSettingsPage() {
                     false,
                     "partner membership setting",
                     "Partner membership is no longer required. Pending NGOs are being activated.",
+                ),
+        });
+    };
+
+    const onStudentSubscriptionToggle = (next: boolean) => {
+        if (next) {
+            void saveToggle(
+                STUDENT_SUBSCRIPTION_REQUIRED_KEY,
+                true,
+                "student subscription setting",
+                "Student subscription is now required — new students from non-member universities pay before the portal unlocks.",
+            );
+            return;
+        }
+        askConfirm({
+            title: "Stop requiring the student subscription fee?",
+            description:
+                "Turning this OFF activates every student account currently waiting on the subscription fee, so they get the portal without paying. New students from non-member universities will also register without a payment step.",
+            confirmLabel: "Turn off and activate pending students",
+            variant: "warning",
+            run: () =>
+                saveToggle(
+                    STUDENT_SUBSCRIPTION_REQUIRED_KEY,
+                    false,
+                    "student subscription setting",
+                    "Student subscription is no longer required. Pending students are being activated.",
                 ),
         });
     };
@@ -639,14 +723,14 @@ export default function AdminSettingsPage() {
         const fieldId = `field-${key}`;
         const showError = dirty && !valid;
         return (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <label htmlFor={fieldId} className="mb-2 block text-sm font-bold text-slate-700">
+            <div className="rounded-xl border border-slate-200/70 bg-slate-50/70 p-3.5">
+                <label htmlFor={fieldId} className="mb-2 block text-xs font-bold text-slate-700">
                     {label}
                     <DirtyDot show={dirty} />
                 </label>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <div className="flex flex-col gap-3">
                     <div className="min-w-0 flex-1">
-                        <div className="relative max-w-xs">
+                        <div className="relative">
                             {prefix && (
                                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                                     {prefix}
@@ -682,9 +766,9 @@ export default function AdminSettingsPage() {
                             if (await saveKey(key, String(n), label)) toast.success(success(n));
                         }}
                         disabled={busy || !dirty || !valid}
-                        className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-60 ${btn}`}
+                        className={`inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-lg px-3.5 py-2 text-xs font-bold text-white transition-all disabled:opacity-60 ${btn}`}
                     >
-                        {busy ? <Spinner /> : <Save className="h-4 w-4" aria-hidden="true" />}
+                        {busy ? <Spinner className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" aria-hidden="true" />}
                         {saveLabel}
                     </button>
                 </div>
@@ -729,7 +813,7 @@ export default function AdminSettingsPage() {
                     <button
                         type="button"
                         onClick={() => void fetchSettings()}
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                        className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
                     >
                         <RefreshCw className="h-4 w-4" aria-hidden="true" /> Retry
                     </button>
@@ -738,68 +822,127 @@ export default function AdminSettingsPage() {
         }
         return (
             <div className="flex h-[60vh] items-center justify-center" role="status" aria-label="Loading settings">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
             </div>
         );
     }
 
+    const reportingFeeSet = /^\d+$/.test((server[REPORTING_FEE_PKR_KEY] ?? "").trim());
+    const reportingFeeValue = reportingFeeSet ? Number(server[REPORTING_FEE_PKR_KEY]) : null;
+    const unsavedCount = dirtyKeys.length;
+
     return (
         <div className="mx-auto max-w-6xl p-0 lg:p-8">
-            <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="mb-5 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-start">
                 <div className="min-w-0">
-                    <h1 className="mb-2 text-2xl font-bold text-slate-900 sm:text-3xl">System Settings</h1>
-                    <p className="text-slate-500">
-                        Configure global platform settings. Switches and most fields save on their own; site name and
-                        support email use the Save button.
+                    <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-teal-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-500" aria-hidden="true" />
+                        Platform governance / Central control
+                    </p>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">System settings</h1>
+                    <p className="mt-1 text-slate-500">
+                        Manage access, application windows, fees, approvals and platform communications in one secure workspace.
                     </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-stretch gap-1 sm:items-end">
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                    <span
+                        className={`text-xs font-semibold ${unsavedCount > 0 ? "text-amber-700" : "text-slate-500"}`}
+                        aria-live="polite"
+                    >
+                        {unsavedCount === 0
+                            ? "No unsaved changes"
+                            : generalDirtyKeys.length > 0
+                              ? `${unsavedCount} unsaved change${unsavedCount === 1 ? "" : "s"}`
+                              : `${unsavedCount} unsaved change${unsavedCount === 1 ? "" : "s"} — use the field's own Save button`}
+                    </span>
                     <button
                         type="button"
                         onClick={() => void handleSaveGeneral()}
                         disabled={isSavingGeneral || generalDirtyKeys.length === 0}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-700 disabled:opacity-60"
+                        title="Saves site name and support email. Switches and fees save on their own."
+                        className="flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-teal-800 disabled:opacity-60"
                     >
                         {isSavingGeneral ? <Spinner /> : <Save className="h-4 w-4" aria-hidden="true" />}
                         Save changes
                     </button>
-                    {generalDirtyKeys.length > 0 && (
-                        <span className="text-xs font-semibold text-amber-700">
-                            {generalDirtyKeys.length} unsaved change{generalDirtyKeys.length === 1 ? "" : "s"}
-                        </span>
-                    )}
                 </div>
             </div>
 
-            <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
-                <nav aria-label="Settings sections" className="hidden lg:block">
-                    <ul className="sticky top-24 space-y-1">
-                        {SECTIONS.map((s) => (
-                            <li key={s.id}>
-                                <a
-                                    href={`#${s.id}`}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                        setActiveSection(s.id);
-                                    }}
-                                    aria-current={activeSection === s.id ? "true" : undefined}
-                                    className={`block rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                                        activeSection === s.id
-                                            ? "bg-blue-50 text-blue-700"
-                                            : "text-slate-600 hover:bg-slate-100"
-                                    }`}
-                                >
-                                    {s.label}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
+            <div className="mb-5 flex items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm text-teal-900">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" aria-hidden="true" />
+                <p>
+                    <strong>Live configuration.</strong> Switches and fees apply to the platform the moment they save, and every
+                    change is recorded in the audit log. Site name and support email use the Save button.
+                </p>
+            </div>
 
-                <div className="min-w-0 space-y-6">
+            <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                    label="Applications"
+                    value={applyPaused ? "Paused" : "Open"}
+                    sub={applyPaused ? "Join / Apply is paused for students" : "Students can join or apply"}
+                    icon={<Layers className="h-4 w-4" />}
+                    tone="bg-teal-50 text-teal-700"
+                />
+                <StatCard
+                    label="Registrations"
+                    value={allowRegistrations ? "Open" : "Closed"}
+                    sub={allowRegistrations ? "New accounts accepted" : "Signup is closed to new users"}
+                    icon={<Users className="h-4 w-4" />}
+                    tone="bg-sky-50 text-sky-700"
+                />
+                <StatCard
+                    label="Maintenance mode"
+                    value={maintenanceMode ? "On" : "Off"}
+                    sub={maintenanceMode ? "Non-admin users are blocked" : "Platform operating normally"}
+                    icon={<Settings2 className="h-4 w-4" />}
+                    tone={maintenanceMode ? "bg-red-50 text-red-700" : "bg-indigo-50 text-indigo-700"}
+                />
+                <StatCard
+                    label="Reporting fee"
+                    value={reportingFeeValue != null ? `PKR ${reportingFeeValue.toLocaleString()}` : "Not set"}
+                    sub={reportingFeeValue != null ? "Charged per student at report submit" : "Default PKR 200 applies until set"}
+                    icon={<CircleDollarSign className="h-4 w-4" />}
+                    tone="bg-amber-50 text-amber-700"
+                />
+            </div>
+
+            <nav
+                aria-label="Settings sections"
+                className="sticky top-16 z-20 -mx-4 mb-5 overflow-x-auto border-y border-slate-200/80 bg-white/95 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border"
+            >
+                <ul className="flex min-w-max items-center gap-1">
+                    {SECTIONS.map((s) => (
+                        <li key={s.id}>
+                            <a
+                                href={`#${s.id}`}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    setActiveSection(s.id);
+                                }}
+                                aria-current={activeSection === s.id ? "true" : undefined}
+                                className={`block whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+                                    activeSection === s.id ? "bg-teal-50 text-teal-800" : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                            >
+                                {s.label}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+                <div className="min-w-0 space-y-5">
                     {/* ------------------------- Applications & expiry ------------------------- */}
-                    <Section id="apps" title="Applications & expiry" icon={<PauseCircle className="h-5 w-5 shrink-0 text-amber-600" />}>
+                    <Section
+                        id="apps"
+                        title="Applications & expiry"
+                        subtitle="Control new applications without disrupting existing projects"
+                        badge="Access policy"
+                        icon={<PauseCircle className="h-5 w-5" />}
+                    >
                         <ToggleRow
                             id="apply-pause"
                             title="Pause Join / Apply (temporary maintenance)"
@@ -826,13 +969,6 @@ export default function AdminSettingsPage() {
                                 )
                             }
                         />
-                        {renderMessageField(
-                            STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY,
-                            "Message students see while paused",
-                            DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
-                            "focus:border-amber-500",
-                            "bg-amber-600 hover:bg-amber-700",
-                        )}
 
                         <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
                             <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -902,6 +1038,24 @@ export default function AdminSettingsPage() {
                                 </button>
                             </div>
                         </div>
+                    </Section>
+
+                    {/* ---------------------------- Student messages ---------------------------- */}
+                    <Section
+                        id="messages"
+                        title="Student messages"
+                        subtitle="What students read on Browse while applications are paused or expired"
+                        badge="Copy"
+                        icon={<MessageSquareText className="h-5 w-5" />}
+                        tone="bg-amber-50 text-amber-700"
+                    >
+                        {renderMessageField(
+                            STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY,
+                            "Message students see while paused",
+                            DEFAULT_STUDENT_APPLY_MAINTENANCE_MESSAGE,
+                            "focus:border-amber-500",
+                            "bg-amber-600 hover:bg-amber-700",
+                        )}
                         {renderMessageField(
                             STUDENT_APPLY_EXPIRED_MESSAGE_KEY,
                             "Expired message students see",
@@ -912,7 +1066,14 @@ export default function AdminSettingsPage() {
                     </Section>
 
                     {/* --------------------------- Reports & partners --------------------------- */}
-                    <Section id="reports" title="Reports & partners" icon={<FileCheck className="h-5 w-5 shrink-0 text-indigo-600" />}>
+                    <Section
+                        id="reports"
+                        title="Reports & partners"
+                        subtitle="Partner approvals and membership enforcement"
+                        badge="Approvals"
+                        icon={<FileCheck className="h-5 w-5" />}
+                        tone="bg-indigo-50 text-indigo-700"
+                    >
                         <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
                             Impact <strong>report</strong> approval is CIEL PK Admin only. NGO / partner still
                             review opportunities and attendance. This does not change opportunity creation,
@@ -938,12 +1099,22 @@ export default function AdminSettingsPage() {
                             onChange={onPartnerMembershipToggle}
                         />
                     </Section>
+                </div>
 
+                <div className="min-w-0 space-y-5">
                     {/* --------------------------- Fees & payments --------------------------- */}
-                    <Section id="fees" title="Fees & payments" icon={<CreditCard className="h-5 w-5 shrink-0 text-emerald-600" />}>
-                        <p className="text-sm text-slate-600">
+                    <Section
+                        id="fees"
+                        title="Fees & payments"
+                        subtitle="Configure PKR amounts for each stakeholder category"
+                        badge="PKR · Whole numbers"
+                        icon={<CreditCard className="h-5 w-5" />}
+                        tone="bg-amber-50 text-amber-700"
+                    >
+                        <p className="text-xs text-slate-500">
                             Whole PKR amounts from {FEE_PKR_MIN.toLocaleString()} to {FEE_PKR_MAX.toLocaleString()}. No decimals.
                         </p>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {renderIntegerField({
                             key: MEMBERSHIP_FEE_PARTNER_PKR_KEY,
                             label: "Partner membership fee (PKR)",
@@ -988,10 +1159,48 @@ export default function AdminSettingsPage() {
                             success: (n) => `Reporting fee updated to PKR ${n.toLocaleString()}`,
                             btn: "bg-emerald-600 hover:bg-emerald-700",
                         })}
+                        </div>
+                        <ToggleRow
+                            id="student-subscription"
+                            title="Require subscription fee from students of non-member universities"
+                            description={
+                                <>
+                                    When <strong>on</strong>, a student whose university is not a CIEL member organization signs up
+                                    as pending subscription payment and must submit bank proof before the student portal unlocks.
+                                    Students of member universities are never charged. When <strong>off</strong>, students register
+                                    without this step and any pending students are activated.
+                                </>
+                            }
+                            checked={studentSubscriptionRequired}
+                            saving={!!saving[STUDENT_SUBSCRIPTION_REQUIRED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[STUDENT_SUBSCRIPTION_REQUIRED_KEY]}
+                            stateLabel={studentSubscriptionRequired ? "Required on signup" : "Not required on signup"}
+                            onChange={onStudentSubscriptionToggle}
+                        />
+                        {renderIntegerField({
+                            key: STUDENT_SUBSCRIPTION_FEE_PKR_KEY,
+                            label: "Student subscription fee (PKR)",
+                            help: "One-time fee shown to students from non-member universities on the subscription screen.",
+                            min: FEE_PKR_MIN,
+                            max: FEE_PKR_MAX,
+                            prefix: "PKR",
+                            saveLabel: "Save fee",
+                            success: (n) => `Student subscription fee updated to PKR ${n.toLocaleString()}`,
+                            btn: "bg-emerald-600 hover:bg-emerald-700",
+                        })}
                     </Section>
 
                     {/* --------------------------- Notifications --------------------------- */}
-                    <Section id="notify" title="Notifications & review" icon={<Bell className="h-5 w-5 shrink-0 text-violet-600" />}>
+                    <Section
+                        id="notify"
+                        title="Notifications & review"
+                        subtitle="Who gets review alerts and how fast reviews are due"
+                        badge="Review SLA"
+                        icon={<Bell className="h-5 w-5" />}
+                        tone="bg-violet-50 text-violet-700"
+                    >
                         <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
                             <label htmlFor="field-review-emails" className="block text-sm font-bold text-slate-700">
                                 Admin review notification emails
@@ -1100,7 +1309,14 @@ export default function AdminSettingsPage() {
                     </Section>
 
                     {/* ------------------------------- Platform ------------------------------- */}
-                    <Section id="platform" title="Platform" icon={<Globe className="h-5 w-5 shrink-0 text-blue-500" />}>
+                    <Section
+                        id="platform"
+                        title="Platform access"
+                        subtitle="Site identity, maintenance mode and new registrations"
+                        badge="System control"
+                        icon={<Globe className="h-5 w-5" />}
+                        tone="bg-sky-50 text-sky-700"
+                    >
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                             <div>
                                 <label htmlFor="field-site-name" className="mb-2 block text-sm font-bold text-slate-700">

@@ -110,6 +110,7 @@ function adminPageKicker(pathname: string, searchParams: { get(name: string): st
     if (p.startsWith("/dashboard/admin/reports")) return "Reports & Moderation";
     if (p.startsWith("/dashboard/admin/payments")) return "Payments";
     if (p.startsWith("/dashboard/admin/org-membership")) return "Org membership fees";
+    if (p.startsWith("/dashboard/admin/student-subscriptions")) return "Student subscriptions";
     if (p.startsWith("/dashboard/admin/projects")) return "All projects";
     if (p.startsWith("/dashboard/admin/issue-logs")) return "Issue Logs";
     if (p.startsWith("/dashboard/admin/support")) return "Support";

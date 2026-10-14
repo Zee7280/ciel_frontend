@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
@@ -24,12 +24,12 @@ import {
     type StudentManualPaymentHistoryRow,
 } from '@/lib/student-manual-payment-history';
 import {
-    REPORTING_FEE_DISPLAY,
     REPORTING_FEE_PKR,
     computeReportingFeeTotalPkr,
     formatPkrAmount,
     resolveReportPaymentHeadcountMerged,
 } from '@/config/reportingFee';
+import { useReportingFeePkr } from '@/utils/publicPlatformConfig';
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 import { CepExperienceFeedbackPrompt } from '@/components/feedback/CepExperienceFeedbackPrompt';
 import { CIEL_OFFICIAL_BANK } from '@/config/cielBankDetails';
@@ -44,6 +44,9 @@ function PaymentContent() {
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
     const bankInfo = CIEL_OFFICIAL_BANK;
+    /** Admin-set reporting fee per student (Settings → Fees & payments); falls back to the build-time constant. */
+    const feePkr = useReportingFeePkr();
+    const feeDisplay = formatPkrAmount(feePkr);
 
 
     const [proofFile, setProofFile] = useState<File | null>(null);
@@ -55,11 +58,19 @@ function PaymentContent() {
     /** Billable students: project API + report Section 1 roster (max of both). */
     const [feeHeadcount, setFeeHeadcount] = useState(1);
 
-    const reportingFeeTotalPkr = useMemo(() => computeReportingFeeTotalPkr(feeHeadcount), [feeHeadcount]);
+    const reportingFeeTotalPkr = useMemo(() => computeReportingFeeTotalPkr(feeHeadcount, feePkr), [feeHeadcount, feePkr]);
     const reportingFeeTotalDisplay = useMemo(
         () => formatPkrAmount(reportingFeeTotalPkr),
         [reportingFeeTotalPkr],
     );
+
+    /** Keep the prefilled "amount paid" in step with headcount × live fee until the student edits it. */
+    const defaultPaidRef = useRef(String(REPORTING_FEE_PKR));
+    useEffect(() => {
+        const next = String(computeReportingFeeTotalPkr(feeHeadcount, feePkr));
+        setPaidAmountPkr((prev) => (prev === defaultPaidRef.current ? next : prev));
+        defaultPaidRef.current = next;
+    }, [feeHeadcount, feePkr]);
 
     useEffect(() => {
         if (!projectId) {
@@ -109,7 +120,6 @@ function PaymentContent() {
                 }
                 const headcount = resolveReportPaymentHeadcountMerged(project, reportPayload);
                 setFeeHeadcount(headcount);
-                setPaidAmountPkr(String(computeReportingFeeTotalPkr(headcount)));
 
                 const reportRow =
                     reportPayload && typeof reportPayload === "object"
@@ -275,7 +285,7 @@ function PaymentContent() {
                     </Button>
                     <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Complete Payment</h1>
                     <p className="text-slate-500 font-medium">
-                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_DISPLAY}</span> per
+                        Please transfer <span className="font-semibold text-slate-700">{feeDisplay}</span> per
                         student
                         {feeHeadcount > 1 ? (
                             <>
@@ -340,7 +350,7 @@ function PaymentContent() {
                                 <p className="text-xl font-black text-slate-900">{reportingFeeTotalDisplay}</p>
                                 {feeHeadcount > 1 ? (
                                     <p className="text-xs font-semibold text-slate-500">
-                                        {feeHeadcount} students × {REPORTING_FEE_DISPLAY}
+                                        {feeHeadcount} students × {feeDisplay}
                                     </p>
                                 ) : null}
                             </div>

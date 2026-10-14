@@ -14,7 +14,8 @@ import {
     pickReportCheckOpportunityKey,
     pickReportStatusFromCheckRow,
 } from "@/utils/studentBrowseReportCta";
-import { REPORTING_FEE_DISPLAY, REPORTING_FEE_PKR } from "@/config/reportingFee";
+import { formatPkrAmount, REPORTING_FEE_PKR } from "@/config/reportingFee";
+import { useReportingFeePkr } from "@/utils/publicPlatformConfig";
 import { CIEL_OFFICIAL_BANK } from "@/config/cielBankDetails";
 import {
     Dialog,
@@ -109,6 +110,8 @@ function latestSlipForProject(
 }
 
 export default function StudentPaymentsHistoryPage() {
+    /** Admin-set reporting fee (Settings → Fees & payments). */
+    const feePkr = useReportingFeePkr();
     const [rows, setRows] = useState<StudentManualPaymentHistoryRow[]>([]);
     const [dueItems, setDueItems] = useState<DueItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -163,7 +166,7 @@ export default function StudentPaymentsHistoryPage() {
                     title: pickTitle(row) || sample?.title || "Project",
                     organizationName: pickOrg(row),
                     hoursVerifiedAt: pickWhen(row),
-                    amountLabel: rsLabel(REPORTING_FEE_PKR),
+                    amountLabel: "", // filled at render from the live fee (see dueItemsPriced)
                 });
             }
 
@@ -177,7 +180,7 @@ export default function StudentPaymentsHistoryPage() {
                         title: sample.title,
                         organizationName: null,
                         hoursVerifiedAt: null,
-                        amountLabel: rsLabel(REPORTING_FEE_PKR),
+                        amountLabel: "", // filled at render from the live fee (see dueItemsPriced)
                     });
                 }
                 const qp = dashboard?.quickActions?.viewPayment;
@@ -189,7 +192,7 @@ export default function StudentPaymentsHistoryPage() {
                             title: qp.title,
                             organizationName: null,
                             hoursVerifiedAt: null,
-                            amountLabel: rsLabel(REPORTING_FEE_PKR),
+                            amountLabel: "", // filled at render from the live fee (see dueItemsPriced)
                         });
                     }
                 }
@@ -204,8 +207,13 @@ export default function StudentPaymentsHistoryPage() {
     }, []);
 
     const approvedCount = rows.filter((row) => row.payment.status === "approved").length;
-    const dueNow = dueItems[0] ?? null;
-    const defaultFee = rsLabel(REPORTING_FEE_PKR);
+    /** Outstanding items priced with the admin-set fee at render time, so the loader never re-runs for a fee change. */
+    const dueItemsPriced = useMemo(
+        () => dueItems.map((d) => (d.amountLabel ? d : { ...d, amountLabel: rsLabel(feePkr) })),
+        [dueItems, feePkr],
+    );
+    const dueNow = dueItemsPriced[0] ?? null;
+    const defaultFee = rsLabel(feePkr);
 
     const statusDot = (status: StudentManualPaymentHistoryRow["payment"]["status"]) => {
         if (status === "approved") return { color: "text-emerald-700", label: "Approved" };
@@ -290,13 +298,13 @@ export default function StudentPaymentsHistoryPage() {
                 <p className="mt-0.5 text-sm text-ciel-text-mid">
                     Hours are verified. The reporting fee still needs a slip before they count.
                 </p>
-                {dueItems.length === 0 ? (
+                {dueItemsPriced.length === 0 ? (
                     <p className="mt-4 rounded-xl border border-dashed border-ciel-border bg-white px-4 py-8 text-center text-sm text-ciel-text-mid">
                         Nothing waiting — you&apos;re up to date.
                     </p>
                 ) : (
                     <ul className="mt-4 space-y-2">
-                        {dueItems.map((item) => {
+                        {dueItemsPriced.map((item) => {
                             const verified = formatShortDate(item.hoursVerifiedAt);
                             return (
                                 <li
@@ -437,7 +445,7 @@ export default function StudentPaymentsHistoryPage() {
                         <p>
                             <span className="text-ciel-text-mid">Amount: </span>
                             <span className="font-bold text-ciel-text">{defaultFee}</span>
-                            <span className="text-ciel-text-mid"> ({REPORTING_FEE_DISPLAY})</span>
+                            <span className="text-ciel-text-mid"> ({formatPkrAmount(feePkr)})</span>
                         </p>
                         <div className="space-y-1 rounded-lg border border-ciel-border bg-slate-50 px-3 py-2.5 text-ciel-text">
                             <p>

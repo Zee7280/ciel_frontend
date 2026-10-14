@@ -64,9 +64,11 @@ export function resolveReportPaymentHeadcountFromProject(project: unknown): numb
     return 1;
 }
 
-export function computeReportingFeeTotalPkr(headcount: number): number {
+/** `feePkr` defaults to the build-time constant; pass the admin-set fee (see `useReportingFeePkr`) when available. */
+export function computeReportingFeeTotalPkr(headcount: number, feePkr: number = REPORTING_FEE_PKR): number {
     const n = Number.isFinite(headcount) && headcount >= 1 ? Math.floor(headcount) : 1;
-    return REPORTING_FEE_PKR * n;
+    const fee = Number.isFinite(feePkr) && feePkr > 0 ? Math.round(feePkr) : REPORTING_FEE_PKR;
+    return fee * n;
 }
 
 /** Roster size from saved report Section 1 (when project payload omits team fields). */
