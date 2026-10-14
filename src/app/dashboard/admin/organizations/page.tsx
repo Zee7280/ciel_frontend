@@ -585,7 +585,7 @@ export default function AdminOrganizationsPage() {
                                     value={formData.type}
                                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                 >
-                                    <option value="ngo">NGO</option>
+                                    <option value="ngo">NGO / Partner</option>
                                     <option value="corporate">Corporate</option>
                                     <option value="university">University</option>
                                 </select>

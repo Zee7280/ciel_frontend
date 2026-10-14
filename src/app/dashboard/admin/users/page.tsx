@@ -81,7 +81,7 @@ function formatRoleLabel(role: string): string {
         student: "Student",
         faculty: "Faculty",
         university: "University",
-        ngo: "Ngo",
+        ngo: "NGO / Partner",
         corporate: "Corporate",
         organization_admin: "Org Admin",
         admin: "Admin",
@@ -568,7 +568,7 @@ export default function AdminUsersPage() {
                             <option value="student">Student</option>
                             <option value="faculty">Faculty</option>
                             <option value="university">University</option>
-                            <option value="ngo">NGO</option>
+                            <option value="ngo">NGO / Partner</option>
                             <option value="corporate">Corporate</option>
                             <option value="investor">Investor / VC</option>
                             <option value="organization_admin">Org Admin</option>
@@ -1095,7 +1095,7 @@ export default function AdminUsersPage() {
                                         <option value="student">Student</option>
                                         <option value="faculty">Faculty</option>
                                         <option value="university">University</option>
-                                        <option value="ngo">NGO</option>
+                                        <option value="ngo">NGO / Partner</option>
                                         <option value="corporate">Corporate</option>
                                         <option value="investor">Investor / VC</option>
                                         <option value="organization_admin">Org Admin</option>

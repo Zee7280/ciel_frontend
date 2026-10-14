@@ -28,7 +28,7 @@ const ROLES = [
     { id: "faculty", label: "Faculty", emoji: "👤", desc: "Quick registration. Review coursework and verify student impact.", formTitle: "Faculty Registration", formSub: "Quick and easy registration.", submitLabel: "Create Faculty Account" },
     { id: "university", label: "University", emoji: "🏛️", desc: "Institutional account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
     { id: "ngo", label: "NGO / Partner", emoji: "🤝", desc: "Partner account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
-    { id: "corporate", label: "Company", emoji: "💼", desc: "Corporate / CSR account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
+    { id: "corporate", label: "Organization", emoji: "💼", desc: "Corporate / CSR account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
     { id: "investor", label: "Investor / VC", emoji: "📈", desc: "KYC-verified deal flow from faculty-approved university ventures.", formTitle: "Investor / VC Registration", formSub: "Requires KYC verification by CIEL PK Admin.", submitLabel: "Submit for verification" },
     { id: "government", label: "HEC / Government", emoji: "🏢", desc: "Official representative account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
 ] as const;
@@ -36,7 +36,7 @@ const ROLES = [
 const ORG_KIND_OPTIONS = [
     { kind: "university", label: "University", role: "university", category: "Educational Institution", legal: "Educational Institution" },
     { kind: "ngo", label: "NGO / Partner Organization", role: "ngo", category: "Nonprofit Organization (NGO)", legal: "Nonprofit Organization (NGO)" },
-    { kind: "corporate", label: "Company / Corporate Partner", role: "corporate", category: "Corporate Organization", legal: "Private Limited Company" },
+    { kind: "corporate", label: "Organization / Corporate Partner", role: "corporate", category: "Corporate Organization", legal: "Private Limited Company" },
     { kind: "government", label: "HEC / Government", role: "ngo", category: "Government Organization", legal: "Government Department" },
     { kind: "international", label: "UN / International Organization", role: "ngo", category: "Development Organization", legal: "International Organization" },
 ] as const;
@@ -531,7 +531,7 @@ function SignUpContent() {
     const orgButtons = [
         { id: "university", label: "University", icon: Building2 },
         { id: "ngo", label: "NGO", icon: Handshake },
-        { id: "corporate", label: "Company", icon: Briefcase },
+        { id: "corporate", label: "Organization", icon: Briefcase },
         { id: "government", label: "HEC / Gov", icon: Landmark },
     ] as const;
 
