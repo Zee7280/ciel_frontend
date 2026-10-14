@@ -36,7 +36,11 @@ type RankingRow = {
     networkRank: RankBand;
     awardBadges: CommunityAwardBadge[];
     awardBadgeHistory: CommunityAwardBadge[];
+    /** Published NPE ranking (official). Present once CIEL PK / the university has published. */
+    official?: { national: OfficialBand | null; university: OfficialBand | null };
 };
+
+type OfficialBand = { rank: number; of: number; score: number; publishedAt: string };
 
 function reportHref(row: { id: string; project_id?: string | null; opportunity_id?: string | null; opportunityId?: string | null }): string {
     const id = row.project_id || row.opportunity_id || row.opportunityId || row.id;
@@ -203,6 +207,20 @@ function HistoryModal({ title, history, onClose }: { title: string; history: Com
     );
 }
 
+function OfficialRankCard({ label, band }: { label: string; band: OfficialBand }) {
+    return (
+        <div className="rounded-2xl border border-[#bfe3dc] bg-[#f1fbf8] px-4 py-3.5">
+            <p className="text-[9.5px] font-black uppercase tracking-[0.06em] text-[#0e7d74]">{label}</p>
+            <p className="mt-1 text-lg font-extrabold text-[#16313d]">
+                #{band.rank} <span className="text-[11px] font-semibold text-[#70808a]">of {band.of}</span>
+            </p>
+            <p className="mt-0.5 text-[10.5px] font-semibold text-[#3f5661]">
+                Excellence {Math.round(band.score * 10) / 10}/100 · published {new Date(band.publishedAt).toLocaleDateString()}
+            </p>
+        </div>
+    );
+}
+
 function RankCard({ label, band }: { label: string; band: RankBand }) {
     return (
         <div className="rounded-2xl border border-[#dde5ea] bg-[#fbfcfd] px-4 py-3.5">
@@ -324,6 +342,16 @@ export default function CommunityServiceRankings() {
                                     No published University or National ranking badge yet — it appears after University or CIEL PK Super Admin publishes a ranking for this project.
                                 </p>
                             )}
+
+                            {r.official && (r.official.national || r.official.university) ? (
+                                <>
+                                    <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.06em] text-[#0e7d74]">Official published ranking</p>
+                                    <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                        {r.official.national ? <OfficialRankCard label="National ranking · CIEL PK" band={r.official.national} /> : null}
+                                        {r.official.university ? <OfficialRankCard label="University ranking" band={r.official.university} /> : null}
+                                    </div>
+                                </>
+                            ) : null}
 
                             <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.06em] text-[#70808a]">Current position</p>
                             <p className="mt-1 text-[11px] text-[#6b7c86]">Live-computed — may still move; it does not overwrite official awards above.</p>

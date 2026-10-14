@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { hecPrograms } from "@/utils/hecProgramsData";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -26,6 +28,10 @@ export default function StudentProfilePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [user, setUser] = useState<any>(null);
     const isMounted = useRef(false);
+
+    // Institution / programme are set once: editable only while empty, locked after they are saved.
+    const [institutionLocked, setInstitutionLocked] = useState(true);
+    const [departmentLocked, setDepartmentLocked] = useState(true);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -77,15 +83,16 @@ export default function StudentProfilePage() {
                         phoneParts.phoneCountryKey,
                         phoneParts.national
                     );
+                    const loadedInstitution = parsedUser.institution || parsedUser.university || "";
+                    const loadedDepartment = parsedUser.department || parsedUser.faculty_department || "";
+                    setInstitutionLocked(!!String(loadedInstitution).trim());
+                    setDepartmentLocked(!!String(loadedDepartment).trim());
                     setFormData({
                         name: parsedUser.name || "",
                         email: parsedUser.email || "",
                         contact: contactE164,
-                        institution: parsedUser.institution || parsedUser.university || "",
-                        department:
-                            parsedUser.department ||
-                            parsedUser.faculty_department ||
-                            "",
+                        institution: loadedInstitution,
+                        department: loadedDepartment,
                         city: parsedUser.city || "",
                         bio: parsedUser.bio || ""
                     });
@@ -192,6 +199,9 @@ export default function StudentProfilePage() {
                 if (data.success) {
                     toast.success("Profile updated successfully!");
                     setUser(data.data); // Update local user preview
+                    // What was just saved is now fixed; further changes go through support.
+                    if (formData.institution.trim()) setInstitutionLocked(true);
+                    if (formData.department.trim()) setDepartmentLocked(true);
 
                     // Update local storage with all fields
                     const storedUserStr = localStorage.getItem("user");
@@ -418,8 +428,15 @@ export default function StudentProfilePage() {
                                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10 pointer-events-none" />
                                     <select
                                         value={formData.institution}
-                                        disabled
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 bg-slate-50/50 outline-none transition-all font-bold text-slate-800 appearance-none cursor-not-allowed border-slate-100 opacity-95"
+                                        disabled={institutionLocked}
+                                        onChange={(e) =>
+                                            setFormData((f) => ({ ...f, institution: e.target.value }))
+                                        }
+                                        className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 outline-none transition-all font-bold text-slate-800 appearance-none ${
+                                            institutionLocked
+                                                ? "bg-slate-50/50 cursor-not-allowed border-slate-100 opacity-95"
+                                                : "bg-white border-slate-200 focus:border-blue-500"
+                                        }`}
                                     >
                                         <option value="">Select Institution</option>
                                         {formData.institution && !institutionInList ? (
@@ -432,22 +449,43 @@ export default function StudentProfilePage() {
                                         ))}
                                     </select>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-2 pl-1">Same list as signup; cannot be changed here.</p>
+                                <p className="text-xs text-slate-400 mt-2 pl-1">
+                                    {institutionLocked
+                                        ? "Same list as signup; cannot be changed here."
+                                        : "Not set yet. Choose your university once; it cannot be changed after saving."}
+                                </p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Program / Department</label>
                                 <div className="relative group">
-                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        value={formData.department}
-                                        readOnly
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 text-slate-500 font-medium outline-none cursor-not-allowed"
-                                        placeholder="—"
-                                    />
+                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-30 pointer-events-none" />
+                                    {departmentLocked ? (
+                                        <input
+                                            type="text"
+                                            value={formData.department}
+                                            readOnly
+                                            className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 text-slate-500 font-medium outline-none cursor-not-allowed"
+                                            placeholder="—"
+                                        />
+                                    ) : (
+                                        <div className="[&_button]:pl-12">
+                                            <SearchableSelect
+                                                value={formData.department}
+                                                onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
+                                                options={hecPrograms}
+                                                placeholder="Select programme"
+                                                searchPlaceholder="Search HEC programs..."
+                                                ariaLabel="Programme"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                                <p className="text-xs text-slate-400 mt-2 pl-1">Filled at registration; contact support to update.</p>
+                                <p className="text-xs text-slate-400 mt-2 pl-1">
+                                    {departmentLocked
+                                        ? "Filled at registration; contact support to update."
+                                        : "Not set yet. Choose your programme once; it cannot be changed after saving."}
+                                </p>
                             </div>
 
                             <div>

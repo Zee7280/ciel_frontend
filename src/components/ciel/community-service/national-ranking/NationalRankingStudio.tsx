@@ -47,6 +47,8 @@ type ReviewItem = { id: string; title: string; reason: string; type: string; cle
 
 type RunPayload = {
     runId: string;
+    /** Server-side analysis progress; `remaining` > 0 means call analyze again with the same runId. */
+    progress?: { total: number; analyzed: number; remaining: number };
     rubricVersion: string;
     createdAt: string;
     published: boolean;
@@ -154,25 +156,50 @@ export default function NationalRankingStudio({
         setBusy(true);
         setLog("");
         appendLog("Eligibility checks started.");
-        appendLog(`${packages.length} packages sent. Backend holds any that fail approval, hours, packet or CII lock.`);
+        appendLog(`${packages.length} locked packages sent. Backend holds any that fail approval, hours or packet checks.`);
         try {
-            const res = await authenticatedFetch(
-                analyzeEndpoint,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        rubricVersion: "NPE-1.1",
-                        projects: packages.map((p) => ({ id: p.id, version: p.version })),
-                    }),
-                },
-                { timeoutMs: 180_000 },
-            );
-            const json = await res?.json().catch(() => null);
-            if (!res?.ok) throw new Error(json?.message || "Analysis failed.");
-            setRun(json.data);
-            appendLog(`Validated ${json.data?.rows?.filter((r: RunRow) => r.status === "Ranked").length || 0} ranked evaluations.`);
-            toast.success("Draft ranking ready. Review flags before publish.");
+            // The server reads a few packages per call (so no request outlives the hosting limit) and
+            // reports what is left. Keep continuing the SAME run until nothing is left or no progress.
+            let runId: string | undefined;
+            let lastAnalyzed = -1;
+            let finalRun: RunPayload | null = null;
+            for (let call = 1; call <= 40; call += 1) {
+                const res = await authenticatedFetch(
+                    analyzeEndpoint,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            rubricVersion: "NPE-1.1",
+                            ...(runId ? { runId } : {}),
+                            projects: packages.map((p) => ({ id: p.id, version: p.version })),
+                        }),
+                    },
+                    { timeoutMs: 295_000 },
+                );
+                const json = await res?.json().catch(() => null);
+                if (!res?.ok) throw new Error(json?.message || "Analysis failed.");
+                const data = json.data as RunPayload;
+                finalRun = data;
+                runId = data.runId;
+                setRun(data);
+                const progress = data.progress;
+                if (!progress || progress.remaining <= 0) break;
+                appendLog(`Read ${progress.analyzed} of ${progress.total}. Continuing with ${progress.remaining} left…`);
+                if (progress.analyzed <= lastAnalyzed) {
+                    appendLog("No further progress. Press Run AI Analysis again to retry the rest.");
+                    break;
+                }
+                lastAnalyzed = progress.analyzed;
+            }
+            const rankedCount = finalRun?.rows?.filter((r: RunRow) => r.status === "Ranked").length || 0;
+            const left = finalRun?.progress?.remaining ?? 0;
+            appendLog(`Validated ${rankedCount} ranked evaluations.`);
+            if (left > 0) {
+                toast.warning(`${left} package(s) still unread. Run AI Analysis again to continue.`);
+            } else {
+                toast.success("Draft ranking ready. Review flags before publish.");
+            }
         } catch (err) {
             appendLog(err instanceof Error ? err.message : "Analysis failed.");
             toast.error(err instanceof Error ? err.message : "Analysis failed.");

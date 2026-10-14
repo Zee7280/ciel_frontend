@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { pakistaniUniversities } from "@/utils/universityData";
+import { hecPrograms } from "@/utils/hecProgramsData";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import {
     composeInternationalPhone,
     DEFAULT_PHONE_COUNTRY_KEY,
@@ -384,14 +387,22 @@ export default function FacultyProfilePage() {
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Institution</label>
                                 <div className="relative group">
-                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
-                                    <input
-                                        type="text"
+                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors z-10 pointer-events-none" />
+                                    <select
                                         value={formData.institution}
                                         onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="University / college"
-                                    />
+                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 appearance-none"
+                                    >
+                                        <option value="">Select Institution</option>
+                                        {formData.institution && !pakistaniUniversities.includes(formData.institution) ? (
+                                            <option value={formData.institution}>{formData.institution}</option>
+                                        ) : null}
+                                        {pakistaniUniversities.map((u) => (
+                                            <option key={u} value={u}>
+                                                {u}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -400,14 +411,17 @@ export default function FacultyProfilePage() {
                                     Department <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative group">
-                                    <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
-                                    <input
-                                        type="text"
-                                        value={formData.department}
-                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="e.g. Electrical Engineering"
-                                    />
+                                    <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors z-30 pointer-events-none" />
+                                    <div className="[&_button]:pl-12">
+                                        <SearchableSelect
+                                            value={formData.department}
+                                            onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
+                                            options={hecPrograms}
+                                            placeholder="Select or type department"
+                                            searchPlaceholder="Search departments / programs..."
+                                            ariaLabel="Department"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

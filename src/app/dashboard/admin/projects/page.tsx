@@ -253,6 +253,10 @@ type TeamMemberRow = {
     reportStatus: string;
     reportAvailable: boolean;
     supportsAdminPatch: boolean;
+    /** `pending_application` rows are not enrolled seats (their id can be an application id). */
+    memberSource?: string;
+    /** Pending-application rows: the application they belong to (not an enrolment id). */
+    applicationId?: string;
     phoneNumber: string;
     cnicDisplay: string;
     universityId: string;
@@ -318,6 +322,9 @@ const PARTICIPATION_UUID_RE =
 function isMergeableTeamMember(member: TeamMemberRow): boolean {
     if (!member.supportsAdminPatch) return false;
     if (/^pending:/i.test(member.id.trim())) return false;
+    // A pending team lead is listed with the APPLICATION id as its id; the merge endpoint only
+    // accepts enrolled participation ids and answers "Enrollment not found on this project".
+    if (member.memberSource === "pending_application") return false;
     return PARTICIPATION_UUID_RE.test(member.id.trim());
 }
 
@@ -607,6 +614,8 @@ function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
         reportStatus: pickString(raw, ["report_status", "reportStatus", "status"], "not_started").replace(/_/g, " "),
         reportAvailable: pickBoolean(raw, ["report_available", "reportAvailable", "is_report_available", "isReportAvailable"]),
         supportsAdminPatch,
+        memberSource: pickLooseString(raw, ["member_source", "memberSource"]) || undefined,
+        applicationId: pickLooseString(raw, ["application_id", "applicationId"]) || undefined,
         phoneNumber: pickLooseString(raw, ["phone_number", "phoneNumber", "mobile", "phone"]),
         cnicDisplay: pickLooseString(raw, ["cnic_display", "cnicDisplay", "cnic"]),
         universityId: pickLooseString(raw, ["university_id", "universityId"]),
@@ -868,6 +877,7 @@ export default function AdminProjectsPage() {
     const [dedupeSeatsStudentUserId, setDedupeSeatsStudentUserId] = useState<string | null>(null);
     const [reconcileEnrollmentsLoading, setReconcileEnrollmentsLoading] = useState(false);
     const [healEnrollmentsLoading, setHealEnrollmentsLoading] = useState(false);
+    const [enrollPendingLoading, setEnrollPendingLoading] = useState(false);
     const [incompleteApplicantStatusFilter, setIncompleteApplicantStatusFilter] = useState<IncompleteApplicantStatusFilter>("all");
     /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
     const incompleteApplicantsLoadSeq = useRef(0);
@@ -1265,6 +1275,37 @@ export default function AdminProjectsPage() {
         }
     };
 
+    const handleEnrollPendingApplications = async () => {
+        if (!teamOverviewModal) return;
+        if (
+            !confirm(
+                "Approve and enroll every application still waiting for admin approval on this project?\n\nEach student/team gets a real enrollment so they can log hours and start their report. This is the same as approving them on the Applications page.",
+            )
+        ) {
+            return;
+        }
+        setEnrollPendingLoading(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/projects/${encodeURIComponent(teamOverviewModal.opportunityId)}/enroll-pending`,
+                { method: "POST" },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            const message = typeof (data as { message?: string }).message === "string" ? (data as { message: string }).message : "";
+            if (res?.ok && (data as { success?: boolean }).success !== false) {
+                toast.success(message || "Applications approved and enrolled");
+            } else {
+                toast.error(message || "Could not enroll pending applications");
+            }
+            await loadTeamOverview(teamOverviewModal.opportunityId);
+            void loadProjects(true);
+        } catch {
+            toast.error("Could not enroll pending applications");
+        } finally {
+            setEnrollPendingLoading(false);
+        }
+    };
+
     const handleHealTeamEnrollments = async () => {
         if (!teamOverviewModal) return;
         if (
@@ -1591,6 +1632,17 @@ export default function AdminProjectsPage() {
             teamOverviewParticipationFilter === "individual" ? t.participationMode === "individual" : t.participationMode === "team",
         );
     }, [teamOverviewRows, teamOverviewParticipationFilter]);
+
+    /** Applications that exist but have no enrollment yet (waiting on admin approval). */
+    const pendingApplicationCount = useMemo(() => {
+        const ids = new Set<string>();
+        for (const team of teamOverviewRows) {
+            for (const member of team.members) {
+                if (member.memberSource === "pending_application") ids.add(member.applicationId || member.id);
+            }
+        }
+        return ids.size;
+    }, [teamOverviewRows]);
 
     const mergeableEnrollments = useMemo(
         () => flattenMergeableEnrollments(teamOverviewRows),
@@ -3117,6 +3169,26 @@ export default function AdminProjectsPage() {
                                 <div className="mt-1 text-2xl font-black text-blue-800">{teamOverviewSummary.reportsAvailable}</div>
                             </div>
                         </div>
+                        {!teamOverviewLoading && pendingApplicationCount > 0 ? (
+                            <div className="flex flex-col gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+                                <p className="max-w-2xl text-xs leading-relaxed text-amber-900">
+                                    <span className="font-semibold">
+                                        {pendingApplicationCount} application{pendingApplicationCount === 1 ? "" : "s"} not enrolled yet.
+                                    </span>{" "}
+                                    These students applied but have no enrollment, so they cannot log hours, start a report, or be merged until
+                                    approved.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => void handleEnrollPendingApplications()}
+                                    disabled={enrollPendingLoading || healEnrollmentsLoading || reconcileEnrollmentsLoading}
+                                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                    {enrollPendingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    Approve &amp; enroll {pendingApplicationCount}
+                                </button>
+                            </div>
+                        ) : null}
                         {!teamOverviewLoading ? (
                             <div className="px-5 py-3 border-b border-slate-100 shrink-0 bg-amber-50/30">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3561,7 +3633,7 @@ export default function AdminProjectsPage() {
                                                                                     </button>
                                                                                 ) : (
                                                                                     <span className="block text-[10px] text-slate-400">
-                                                                                        Pending pipeline only
+                                                                                        Not enrolled yet · awaiting approval
                                                                                     </span>
                                                                                 )}
                                                                             </div>
