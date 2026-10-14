@@ -126,6 +126,9 @@ function collectPrivateCandidateErrors(form: {
     return errors;
 }
 
+/** Options for a draft save: which step to reopen on resume, and whether to suppress toasts. */
+type DraftSaveOptions = { resumeStep?: string; silent?: boolean };
+
 /** Left-rail wizard steps — 9-step Opportunity Builder (private-candidate pathway included). */
 const WIZARD_STEPS = [
     { key: "A", label: "Creator", sub: "Profile & accountability", icon: "🎓", color: "#0d2b33" },
@@ -192,6 +195,27 @@ function readCachedStudentUser(): unknown | null {
 }
 
 const STUDENT_OPPORTUNITY_DRAFT_KEY = "ciel_student_create_opportunity_draft_v1";
+
+const WIZARD_STEP_KEYS: readonly string[] = ["A", "B", "SCHED", "C", "E", "F", "VIS", "SAFE", "SUBMIT"];
+
+/** Resume step for a draft: the server marker first, else the on-device copy if it belongs to the same draft. */
+function resolveDraftResumeStep(record: Record<string, unknown>, draftId: string | null): string | null {
+    const wp = record.wizard_progress;
+    const fromServer =
+        wp && typeof wp === "object" ? (wp as { resume_step?: unknown }).resume_step : undefined;
+    if (typeof fromServer === "string" && WIZARD_STEP_KEYS.includes(fromServer)) return fromServer;
+    try {
+        const raw = localStorage.getItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
+        if (!raw) return null;
+        const local = JSON.parse(raw) as { draftId?: unknown; resumeStep?: unknown };
+        if (draftId && local.draftId === draftId && typeof local.resumeStep === "string" && WIZARD_STEP_KEYS.includes(local.resumeStep)) {
+            return local.resumeStep;
+        }
+    } catch {
+        /* ignore */
+    }
+    return null;
+}
 
 type SimilarOpportunityMatch = {
     id: string;
@@ -274,6 +298,9 @@ function StudentOpportunityCreationPageInner() {
     const [similarMatches, setSimilarMatches] = useState<SimilarOpportunityMatch[]>([]);
     const [similarCheckLoading, setSimilarCheckLoading] = useState(false);
     const [blockedSubmitOpen, setBlockedSubmitOpen] = useState(false);
+    /** "Are these emails right?" check before leaving the Verification step — faculty / partner
+     * approval mails go to exactly these addresses, so a typo silently stalls the whole workflow. */
+    const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
     const [incompleteSubmitSteps, setIncompleteSubmitSteps] = useState<OpportunityIncompleteStep[]>([]);
 
     // Student Details State
@@ -399,6 +426,8 @@ function StudentOpportunityCreationPageInner() {
     const [creatorFieldErrors, setCreatorFieldErrors] = useState<CreatorFieldErrors>({});
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const goToStepRef = useRef<(key: string) => void>(() => {});
+    /** True once the student clicks Next / Back / a rail step — the draft-resume jump must not override that. */
+    const userNavigatedRef = useRef(false);
 
     const clearFieldError = (key: string) => {
         setFieldErrors((prev) => {
@@ -1044,20 +1073,56 @@ function StudentOpportunityCreationPageInner() {
         if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     }, []);
     goToStepRef.current = goToStep;
-    const persistDraftRef = useRef<(quiet?: boolean) => Promise<void>>(async () => {});
+    const persistDraftRef = useRef<(quiet?: boolean, opts?: DraftSaveOptions) => Promise<void>>(async () => {});
+    const canPersistDraft = !editingOpportunityId || isDraftMode;
     const goNextStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
         if (i >= 0 && i < WIZARD_STEPS.length - 1) {
-            if (!editingOpportunityId || isDraftMode) {
-                void persistDraftRef.current(true);
+            const nextKey = WIZARD_STEPS[i + 1].key;
+            userNavigatedRef.current = true;
+            if (canPersistDraft) {
+                // Record the step the student is moving to, so "Continue Existing" reopens there.
+                void persistDraftRef.current(true, { resumeStep: nextKey });
             }
-            goToStep(WIZARD_STEPS[i + 1].key);
+            goToStep(nextKey);
         }
-    }, [activeStep, goToStep, editingOpportunityId, isDraftMode]);
+    }, [activeStep, goToStep, canPersistDraft]);
+    /** Back / left-rail navigation on an already-saved draft: move the resume marker silently (no toast). */
+    const jumpToStep = useCallback(
+        (key: string) => {
+            userNavigatedRef.current = true;
+            if (canPersistDraft && draftIdRef.current && key !== activeStep) {
+                void persistDraftRef.current(true, { resumeStep: key, silent: true });
+            }
+            goToStep(key);
+        },
+        [activeStep, goToStep, canPersistDraft],
+    );
     const goBackStep = useCallback(() => {
         const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
-        if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
-    }, [activeStep, goToStep]);
+        if (i > 0) jumpToStep(WIZARD_STEPS[i - 1].key);
+    }, [activeStep, jumpToStep]);
+
+    const facultyEmailForConfirm = formData.privateCandidate ? "" : formData.supervision.facultyOfficialEmail.trim();
+    const partnerEmailForConfirm =
+        formData.supervision.executingContext === "partner" ? formData.supervision.partnerEmail.trim() : "";
+    /** Next on the Verification step: emails must be well-formed, then the student confirms them in a dialog. */
+    const handleNextFromVerification = () => {
+        const errors = collectStepErrors("F");
+        const emailErrors: Record<string, string> = {};
+        if (errors.facultyEmail) emailErrors.facultyEmail = errors.facultyEmail;
+        if (errors.partnerEmail) emailErrors.partnerEmail = errors.partnerEmail;
+        if (Object.keys(emailErrors).length > 0) {
+            applyStepErrors("F", { ...fieldErrors, ...emailErrors });
+            toast.error("Fix the highlighted email address before continuing.");
+            return;
+        }
+        if (!facultyEmailForConfirm && !partnerEmailForConfirm) {
+            goNextStep();
+            return;
+        }
+        setEmailConfirmOpen(true);
+    };
 
     const setPrivateCandidate = (on: boolean) => {
         if (!on) setCreatorFieldErrors({});
@@ -1172,8 +1237,11 @@ function StudentOpportunityCreationPageInner() {
         };
     }, [formData, studentDetails, flashViewer]);
 
-    const handleSaveDraft = async (quiet = false) => {
+    const handleSaveDraft = async (quiet = false, opts: DraftSaveOptions = {}) => {
         if (editingOpportunityId && !isDraftMode) return;
+        // Step to reopen on "Continue Existing": the step being navigated to, else the one on screen.
+        const resumeStep = opts.resumeStep && WIZARD_STEP_KEYS.includes(opts.resumeStep) ? opts.resumeStep : activeStep;
+        const silent = opts.silent === true;
         const job = draftSaveChain.current.then(async () => {
             try {
                 localStorage.setItem(
@@ -1181,6 +1249,8 @@ function StudentOpportunityCreationPageInner() {
                     JSON.stringify({
                         v: 1,
                         savedAt: Date.now(),
+                        draftId: draftIdRef.current,
+                        resumeStep,
                         formData,
                         studentDetails,
                         expandedSections,
@@ -1198,6 +1268,7 @@ function StudentOpportunityCreationPageInner() {
                     ...buildOpportunityPayload(),
                     draft: true,
                     title: formData.title.trim() || "Untitled opportunity",
+                    wizard_progress: { resume_step: resumeStep, updated_at: new Date().toISOString() },
                 };
                 const existingId = draftIdRef.current;
                 const res = await authenticatedFetch(
@@ -1214,6 +1285,16 @@ function StudentOpportunityCreationPageInner() {
                 const newId = (data as { data?: { id?: string } } | null)?.data?.id;
                 if (res.ok && newId && !existingId) {
                     draftIdRef.current = newId;
+                    // Tag the on-device copy with the new id so it can act as a resume fallback for this draft.
+                    try {
+                        const raw = localStorage.getItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
+                        if (raw) {
+                            const local = JSON.parse(raw) as Record<string, unknown>;
+                            localStorage.setItem(STUDENT_OPPORTUNITY_DRAFT_KEY, JSON.stringify({ ...local, draftId: newId }));
+                        }
+                    } catch {
+                        /* ignore */
+                    }
                     skipDraftHydrateRef.current = true;
                     setEditingOpportunityId(newId);
                     setIsDraftMode(true);
@@ -1230,18 +1311,18 @@ function StudentOpportunityCreationPageInner() {
                         (Array.isArray(raw) && typeof raw[0] === "string" && raw[0].trim()) ||
                         (typeof err === "string" && err.trim()) ||
                         "Could not sync this draft to your account.";
-                    toast.warning(quiet ? msg : `Saved on this device. ${msg}`);
+                    if (!silent) toast.warning(quiet ? msg : `Saved on this device. ${msg}`);
                     return;
                 }
             } catch (e) {
                 console.error("Backend draft sync failed", e);
-                toast.warning("Saved on this device. Could not sync this draft to your account yet.");
+                if (!silent) toast.warning("Saved on this device. Could not sync this draft to your account yet.");
                 return;
             } finally {
                 setIsSavingDraft(false);
             }
 
-            toast.success(quiet ? "Saved to drafts." : "Draft saved.", { id: "student-opp-draft" });
+            if (!silent) toast.success(quiet ? "Saved to drafts." : "Draft saved.", { id: "student-opp-draft" });
         });
         draftSaveChain.current = job.then(
             () => undefined,
@@ -1481,6 +1562,12 @@ function StudentOpportunityCreationPageInner() {
                     };
                     return normalizeSupervisionIndependentPhone(merged);
                 });
+                // Drafts reopen on the step the student left (Next / Back / rail / Save draft all move
+                // the marker). Submitted records being edited always open on the first step.
+                if (String(d.status || "").toLowerCase() === "draft" && !userNavigatedRef.current) {
+                    const resumeStep = resolveDraftResumeStep(d, editingOpportunityId);
+                    if (resumeStep && resumeStep !== "A") goToStepRef.current(resumeStep);
+                }
             } catch {
                 if (!cancelled) toast.error("Could not load this opportunity");
             } finally {
@@ -1601,6 +1688,66 @@ function StudentOpportunityCreationPageInner() {
                 </div>
             ) : null}
 
+            {emailConfirmOpen ? (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(4,37,43,0.6)] p-5"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-labelledby="email-confirm-title"
+                >
+                    <div className="w-full max-w-[460px] rounded-[24px] bg-white p-[26px] text-left">
+                        <div className="mb-3 flex h-[46px] w-[46px] items-center justify-center rounded-[14px] bg-[#fdf3e3] text-[22px]">📧</div>
+                        <p className="mb-2 block text-base font-extrabold text-[#0d2b33]" id="email-confirm-title">
+                            Double-check these email addresses
+                        </p>
+                        <p className="mb-3 text-[11.5px] leading-relaxed text-[#3c5a5c]">
+                            Approval requests go to <strong>exactly</strong> these addresses. A typo means the verification email never arrives and your opportunity cannot move forward.
+                        </p>
+                        <div className="mb-4 flex flex-col gap-2">
+                            {facultyEmailForConfirm ? (
+                                <div className="rounded-[14px] border border-[#dcebee] bg-[#f6fbfb] px-3.5 py-2.5">
+                                    <div className="text-[8.5px] font-black tracking-[0.12em] text-[#18755f]">FACULTY OFFICIAL EMAIL</div>
+                                    <b className="block break-all text-[13px] text-[#0d2b33]">{facultyEmailForConfirm}</b>
+                                    {formData.supervision.facultyName.trim() ? (
+                                        <span className="text-[10.5px] text-[#70808a]">{formData.supervision.facultyName.trim()}</span>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            {partnerEmailForConfirm ? (
+                                <div className="rounded-[14px] border border-[#dcebee] bg-[#f6fbfb] px-3.5 py-2.5">
+                                    <div className="text-[8.5px] font-black tracking-[0.12em] text-[#b24f85]">PARTNER ORGANIZATION EMAIL</div>
+                                    <b className="block break-all text-[13px] text-[#0d2b33]">{partnerEmailForConfirm}</b>
+                                    {formData.supervision.partnerOrgName.trim() || formData.supervision.partnerContactPerson.trim() ? (
+                                        <span className="text-[10.5px] text-[#70808a]">
+                                            {[formData.supervision.partnerContactPerson.trim(), formData.supervision.partnerOrgName.trim()].filter(Boolean).join(" · ")}
+                                        </span>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                                type="button"
+                                className="w-full rounded-[13px] border border-[#dcebee] bg-white py-3 text-[12.5px] font-extrabold text-[#3c5968]"
+                                onClick={() => setEmailConfirmOpen(false)}
+                            >
+                                Go back & edit
+                            </button>
+                            <button
+                                type="button"
+                                className="w-full rounded-[13px] bg-[#0e7d74] py-3 text-[12.5px] font-extrabold text-white"
+                                onClick={() => {
+                                    setEmailConfirmOpen(false);
+                                    goNextStep();
+                                }}
+                            >
+                                Yes, the emails are correct →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             <div className="mb-3.5 flex min-w-0 flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-[#7a919a]">
@@ -1664,7 +1811,7 @@ function StudentOpportunityCreationPageInner() {
                                     key={step.key}
                                     type="button"
                                     className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
-                                    onClick={() => goToStep(step.key)}
+                                    onClick={() => jumpToStep(step.key)}
                                 >
                                     <span className="co-step-ico">{step.icon}</span>
                                     <span className="co-step-copy">
@@ -3056,15 +3203,21 @@ function StudentOpportunityCreationPageInner() {
                                         value={formData.supervision.partnerContactPerson}
                                         onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, partnerContactPerson: e.target.value } })}
                                     />
-                                    <input
-                                        type="email"
-                                        placeholder="Official email *"
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                        value={formData.supervision.partnerEmail}
-                                        onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, partnerEmail: e.target.value } })}
-                                    />
+                                    <div>
+                                        <input
+                                            type="email"
+                                            placeholder="Official email *"
+                                            className={fieldErrorClass(!!fieldErrors.partnerEmail)}
+                                            value={formData.supervision.partnerEmail}
+                                            onChange={(e) => {
+                                                clearFieldError("partnerEmail");
+                                                setFormData({ ...formData, supervision: { ...formData.supervision, partnerEmail: e.target.value } });
+                                            }}
+                                        />
+                                        <FieldError message={fieldErrors.partnerEmail} />
+                                    </div>
                                 </div>
-                                <p className="text-xs text-slate-500">A verification email may be sent to the partner contact.</p>
+                                <p className="text-xs text-slate-500">The partner contact gets a heads-up email when you submit. Their approval link is sent separately once your faculty supervisor approves (Step 1 → Step 2).</p>
                             </div>
                         )}
                     </div>
@@ -3461,7 +3614,7 @@ function StudentOpportunityCreationPageInner() {
                                 <button
                                     type="button"
                                     className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
-                                    onClick={goNextStep}
+                                    onClick={activeStep === "F" ? handleNextFromVerification : goNextStep}
                                 >
                                     {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
                                 </button>

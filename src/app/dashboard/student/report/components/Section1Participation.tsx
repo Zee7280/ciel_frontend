@@ -249,9 +249,13 @@ const QUEST_MISSIONS = [
     { icon: "🏁", title: "Finish Section 1", small: "Declaration" },
 ] as const;
 
+/** DOM anchors for each mission's block inside its wizard step — tapping a mission scrolls here. */
+const QUEST_MISSION_ANCHORS = ["s1-mission-verify", "s1-mission-crew", "s1-mission-session", "s1-mission-ledger", "s1-mission-declare"] as const;
+
 function ParticipationQuest({
     internalStep,
     setInternalStep,
+    missionGate,
     isVerified,
     teamVerified,
     hasSession,
@@ -260,6 +264,8 @@ function ParticipationQuest({
 }: {
     internalStep: number;
     setInternalStep: (n: number) => void;
+    /** Same forward gate as the footer "Next step": returns why a step cannot be entered yet, or null. */
+    missionGate: (step: number) => string | null;
     isVerified: boolean;
     teamVerified: boolean;
     hasSession: boolean;
@@ -269,7 +275,15 @@ function ParticipationQuest({
     const missionSteps = [1, 1, 2, 2, 3];
     const missionDone = [isVerified, teamVerified, hasSession, hoursMet, declared];
     const starsFilled = missionDone.filter(Boolean).length;
-    const currentMission = (() => {
+    // Two missions share one wizard step (Verify Me + Build My Crew on step 1, Log + Watch on step 2),
+    // so the step alone cannot say which mission the student picked — remember the pick explicitly.
+    // Without this, "Next mission" from mission 1 to 2 re-set the same step and nothing changed.
+    const [picked, setPicked] = React.useState<number | null>(null);
+    React.useEffect(() => {
+        if (picked !== null && missionSteps[picked] !== internalStep) setPicked(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [internalStep]);
+    const derivedMission = (() => {
         const firstOpenAtStep = missionSteps.findIndex((step, i) => step === internalStep && !missionDone[i]);
         if (firstOpenAtStep >= 0) return firstOpenAtStep;
         const lastAtStep = missionSteps.reduce((found, step, i) => (step === internalStep ? i : found), -1);
@@ -278,7 +292,26 @@ function ParticipationQuest({
         // by that point every mission should already be complete, so show the final one.
         return missionSteps.length - 1;
     })();
+    const currentMission = picked !== null && missionSteps[picked] === internalStep ? picked : derivedMission;
     const mission = QUEST_MISSIONS[currentMission];
+
+    const goToMission = (i: number) => {
+        const target = Math.max(0, Math.min(QUEST_MISSIONS.length - 1, i));
+        const step = missionSteps[target];
+        if (step > internalStep) {
+            const blocked = missionGate(step);
+            if (blocked) {
+                toast.error(blocked);
+                return;
+            }
+        }
+        setPicked(target);
+        if (step !== internalStep) setInternalStep(step);
+        // Let the step render first, then bring the mission's own block into view.
+        window.setTimeout(() => {
+            document.getElementById(QUEST_MISSION_ANCHORS[target])?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, step !== internalStep ? 120 : 0);
+    };
 
     return (
         <div className="cer-quest-shell">
@@ -307,7 +340,7 @@ function ParticipationQuest({
                         <button
                             key={m.title}
                             type="button"
-                            onClick={() => setInternalStep(missionSteps[i])}
+                            onClick={() => goToMission(i)}
                             className={clsx("cer-quest-step", isActive && "active", done && "done")}
                         >
                             <span className="ico">{m.icon}</span>
@@ -331,7 +364,7 @@ function ParticipationQuest({
                     type="button"
                     className="cer-quest-btn back"
                     disabled={currentMission === 0}
-                    onClick={() => setInternalStep(missionSteps[Math.max(0, currentMission - 1)])}
+                    onClick={() => goToMission(currentMission - 1)}
                 >
                     ← Previous mission
                 </button>
@@ -342,7 +375,7 @@ function ParticipationQuest({
                     type="button"
                     className="cer-quest-btn next"
                     disabled={currentMission === QUEST_MISSIONS.length - 1}
-                    onClick={() => setInternalStep(missionSteps[Math.min(QUEST_MISSIONS.length - 1, currentMission + 1)])}
+                    onClick={() => goToMission(currentMission + 1)}
                 >
                     Next mission →
                 </button>
@@ -916,6 +949,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
         setInternalStep(prev => Math.min(prev + 1, 4));
     };
     const handleBack = () => setInternalStep(prev => Math.max(prev - 1, 1));
+    /** "Skip & continue" on Review & Submit: leave Section 1 without finalizing, and without
+     * passing through the Metrics dashboard (step 4) — that view is for a finalized record. */
+    const handleSkipToNextSection = () => {
+        nextStep(); // Context next step
+    };
 
     const handleFinalSubmit = async () => {
         if (!participantId) return;
@@ -1397,6 +1435,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     <ParticipationQuest
                         internalStep={internalStep}
                         setInternalStep={setInternalStep}
+                        missionGate={(step) => {
+                            // Mirrors the footer "Next step" disabled rule — missions must not bypass it.
+                            if (isTeamMemberAttendanceOnly && step !== 2) return "As a team member you only log your own attendance here.";
+                            if (step >= 2 && !isVerified) return "Complete Verify Me first — your identity must be verified before logging sessions.";
+                            if (step >= 4 && !isMinimumHoursMet) return "Log the required hours before moving on.";
+                            return null;
+                        }}
                         isVerified={isVerified}
                         teamVerified={canMoveToStep4}
                         hasSession={attendanceLogs.length > 0}
@@ -1413,7 +1458,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {/* 1. Identity Verification */}
-                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                            <div id="s1-mission-verify" className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                 <div className="mb-3 flex items-center gap-2">
                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                         1.1
@@ -1506,6 +1551,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     ) : (
                                         <IdentityVerification
                                             projectId={data.project_id || projectIdFromUrl || ""}
+                                            allowedUniversities={data.university_allowlist}
                                             participationMode={participation_type as any}
                                             initialData={{
                                                 ...team_lead,
@@ -1541,7 +1587,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {/* 2. Team Members */}
-                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                            <div id="s1-mission-crew" className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                 <div className="mb-3 flex items-center gap-2">
                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                         1.2
@@ -1554,6 +1600,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 <div>
                                     <TeamVerification
                                         projectId={data.project_id || projectIdFromUrl || ""}
+                                        allowedUniversities={data.university_allowlist}
                                         members={team_members}
                                         lockAddMembers={lockTeamMemberAdd}
                                         maxMembers={maxTeammates}
@@ -1777,7 +1824,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </div>
                                 </div>
 
-                                <div>
+                                <div id="s1-mission-session" className="scroll-mt-24">
                                     <div className="mb-3 flex flex-wrap items-center gap-2">
                                         <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                             1.2
@@ -1820,7 +1867,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                                     {/* Right: logged sessions + hours progress */}
                                     <div className="min-w-0 space-y-4">
-                                        <div className="overflow-hidden rounded-[18px] border border-[#dcebee] bg-white shadow-sm">
+                                        <div id="s1-mission-ledger" className="scroll-mt-24 overflow-hidden rounded-[18px] border border-[#dcebee] bg-white shadow-sm">
                                             <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#dcebee] px-4 py-4 sm:px-5">
                                                 <div className="flex items-center gap-2">
                                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
@@ -1991,7 +2038,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             ) : null}
 
-                            <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                            <div id="s1-mission-declare" className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                 <div className="mb-3 flex items-center gap-2">
                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                         1.6
@@ -2155,7 +2202,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </Button>
                                 ) : null}
                                 <Button
-                                    onClick={handleNext}
+                                    onClick={internalStep === 3 ? handleSkipToNextSection : handleNext}
                                     disabled={
                                         (internalStep === 1 && !isVerified) ||
                                         (internalStep === 3 && !isMinimumHoursMet) ||
