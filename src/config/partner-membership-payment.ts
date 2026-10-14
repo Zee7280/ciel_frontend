@@ -17,10 +17,11 @@ export const partnerMembershipPaymentConfig = {
         "Transfer the amount below to the bank account, then attach your receipt or bank app screenshot (PDF/image). Admin will verify or activate your account manually.",
 
     /**
-     * Set to `REPORTING_FEE_DISPLAY` to lock UI + submit amount here.
-     * Set to `null` to use only API `/organization-membership/fee`.
+     * `null` = show and submit the admin-set fee from API `/organization-membership/fee`
+     * (Admin → Settings → Fees & payments). Set to `REPORTING_FEE_DISPLAY` only to hard-lock a
+     * fixed amount on this screen regardless of the setting.
      */
-    feePkrOverride: REPORTING_FEE_DISPLAY as number | null,
+    feePkrOverride: null as number | null,
 
     /** Bank “report” section (label + value rows) */
     bankSectionTitle: "Bank details — use for your transfer",
