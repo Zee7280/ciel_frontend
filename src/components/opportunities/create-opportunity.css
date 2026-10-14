@@ -873,7 +873,7 @@
         linear-gradient(135deg, #0d3b45 0%, #0f6e68 52%, #1a8a7a 100%);
 }
 .co-flash-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
-.co-flash-kicker { font-size: 11px; font-weight: 800; letter-spacing: .14em; color: #e8d48a; text-transform: uppercase; }
+.co-flash-kicker { font-size: 10px; font-weight: 800; letter-spacing: .12em; color: #e8d48a; text-transform: uppercase; }
 .co-flash-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .co-flash-chip {
     padding: 5px 11px;
@@ -910,7 +910,7 @@
     background: rgba(0,0,0,.18);
     border: 1px solid rgba(255,255,255,.16);
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 600;
     max-width: 100%;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -943,7 +943,7 @@
 .co-flash-ribbon.hot .co-flash-ribbon-copy b { color: #b45309; }
 .co-flash-ribbon.soon .co-flash-ribbon-copy b { color: #92600a; }
 .co-flash-ribbon.closed .co-flash-ribbon-copy b { color: #52646c; }
-.co-flash-ribbon-copy span { display: block; margin-top: 3px; font-size: 13px; color: #3e5960; line-height: 1.4; }
+.co-flash-ribbon-copy span { display: block; margin-top: 3px; font-size: 13.5px; color: #3e5960; line-height: 1.5; }
 .co-flash-count {
     min-width: 68px;
     text-align: center;
@@ -955,7 +955,7 @@
 }
 .co-flash-ribbon.hot .co-flash-count { border-color: #f0c9a0; animation: co-flash-pulse 1.6s ease-in-out infinite; }
 .co-flash-count strong { display: block; font-size: 20px; line-height: 1; color: #102f3d; }
-.co-flash-count small { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #6d8086; }
+.co-flash-count small { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6d8086; }
 .co-flash-ribbon-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .co-flash-ghost, .co-flash-btn.ghost {
     border: 1px solid #c9d7dc;
@@ -1000,7 +1000,7 @@
     margin-top: 4px;
     font-size: 14px;
     line-height: 1.35;
-    font-weight: 750;
+    font-weight: 700;
     color: #12323c;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -1011,7 +1011,7 @@
     margin-top: auto;
     padding-top: 6px;
     font-style: normal;
-    font-size: 11.5px;
+    font-size: 12px;
     color: #5d727a;
     line-height: 1.35;
 }
@@ -1019,7 +1019,6 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    font-size: 13px;
 }
 .co-flash-date-sep {
     font-size: 10px;
@@ -1036,16 +1035,17 @@
 .co-flash-need .co-flash-tag { background: #e8eef4; color: #3d5568; }
 .co-flash-who .co-flash-tag { background: #def3ea; color: #1f7a61; }
 .co-flash-need h2 {
-    font-size: clamp(14px, 1.7vw, 17px);
-    line-height: 1.4;
-    margin: 8px 0 0;
-    font-weight: 750;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 10px 0 0;
+    font-weight: 700;
+    color: #12323c;
     overflow-wrap: anywhere;
     word-break: break-word;
 }
 .co-flash-need p, .co-flash-sdg-why, .co-flash-skills p {
     margin: 8px 0 0;
-    font-size: 14px;
+    font-size: 13.5px;
     line-height: 1.55;
     color: #3d5560;
     overflow-wrap: anywhere;
@@ -1053,20 +1053,20 @@
 }
 .co-flash-who .co-flash-row:first-of-type { margin-top: 8px; padding-top: 0; border-top: 0; }
 .co-flash-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e4efe9; }
-.co-flash-row b { display: block; font-size: 13px; }
+.co-flash-row b { display: block; font-size: 14px; font-weight: 700; line-height: 1.35; }
 .co-flash-row.yes b { color: #0f7a62; }
 .co-flash-row.no b { color: #9a4d3a; }
 .co-flash-row span, .co-flash-row small {
     display: block;
-    font-size: 13px;
+    font-size: 13.5px;
     color: #4c636c;
-    line-height: 1.45;
+    line-height: 1.55;
     overflow-wrap: anywhere;
     word-break: break-word;
 }
 .co-flash-flow { margin: 12px 16px 0; background: #f8fbfb; border: 1px solid #e1eaec; }
 .co-flash-flow-head, .co-flash-sdg-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 10px; }
-.co-flash-flow-head b, .co-flash-sdg-head b, .co-flash-skills > b, .co-flash-account > b { font-size: 15px; }
+.co-flash-flow-head b, .co-flash-sdg-head b, .co-flash-skills > b, .co-flash-account > b { font-size: 15px; font-weight: 800; color: #16313a; }
 .co-flash-flow-head span, .co-flash-sdg-head span { font-size: 12px; color: #6d8086; font-weight: 700; }
 .co-flash-steps {
     display: grid;
@@ -1086,8 +1086,8 @@
 .co-flash-step-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #102f3d; color: #fff; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
 .co-flash-step p {
     margin: 0;
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 13.5px;
+    line-height: 1.55;
     color: #314850;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -1096,8 +1096,10 @@
 .co-flash-sdg-row, .co-flash-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .co-flash-sdg-card, .co-flash-metric { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.75); border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(232,216,168,.45); }
 .co-flash-sdg-badge { width: 34px; height: 34px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; font-size: 13px; }
-.co-flash-sdg-card small, .co-flash-metric span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #8a6a22; }
-.co-flash-sdg-card b { display: block; font-size: 13.5px; margin-top: 2px; line-height: 1.35; }
+.co-flash-sdg-card small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #8a6a22; }
+/* Metric labels carry free-text beneficiary lists, so they stay sentence case instead of shouting in caps. */
+.co-flash-metric span { display: block; margin-top: 6px; font-size: 12px; font-weight: 600; line-height: 1.4; color: #8a6a22; }
+.co-flash-sdg-card b { display: block; font-size: 14px; font-weight: 700; margin-top: 2px; line-height: 1.35; }
 .co-flash-sdg-why { margin-top: 12px; }
 .co-flash-metrics { margin-top: 12px; }
 .co-flash-metric { flex-direction: column; align-items: flex-start; }
@@ -1113,7 +1115,7 @@
     background: #fff;
     border: 1px solid #e4d4a4;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 600;
     color: #6d5414;
     line-height: 1.3;
 }
@@ -1124,9 +1126,9 @@
 }
 .co-flash-detail strong {
     display: block;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
-    letter-spacing: .06em;
+    letter-spacing: .08em;
     text-transform: uppercase;
     color: #8a6a22;
     margin-bottom: 4px;
@@ -1156,16 +1158,18 @@
     display: block;
     font-size: 10px;
     font-weight: 800;
-    letter-spacing: .06em;
+    letter-spacing: .08em;
     text-transform: uppercase;
     color: #6d9086;
 }
 .co-flash-chain-item b,
 .co-flash-chain b {
     display: block;
-    font-size: 13.5px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #12323c;
     margin-top: 3px;
-    line-height: 1.3;
+    line-height: 1.35;
     word-break: break-word;
 }
 .co-flash-chain-item em,
@@ -1196,8 +1200,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
 }
 .co-flash-cta-copy { min-width: 0; }
-.co-flash-cta h3 { margin: 0 0 4px; font-size: 16px; font-weight: 750; letter-spacing: -.01em; }
-.co-flash-cta p { margin: 0; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.82); }
+.co-flash-cta h3 { margin: 0 0 4px; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.co-flash-cta p { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(255,255,255,.82); }
 .co-flash-btns { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
 .co-flash-btn { border: 0; border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; }
 .co-flash-btn.apply { background: linear-gradient(90deg, #f0cf68, #f6dc8a); color: #18313a; }
@@ -1210,7 +1214,7 @@
     background: rgba(255,255,255,.12);
     border: 1px solid rgba(255,255,255,.18);
     font-size: 12px;
-    font-weight: 750;
+    font-weight: 700;
     letter-spacing: .04em;
     text-transform: uppercase;
     color: rgba(255,255,255,.92);

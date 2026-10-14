@@ -252,38 +252,6 @@
     cursor: not-allowed;
 }
 
-.cer .cer-bridge {
-    background: linear-gradient(115deg, #04252b, #0e5f63 60%, #12a5a0 115%);
-    border-radius: 22px;
-    color: #fff;
-    padding: 20px 24px;
-    margin-bottom: 13px;
-}
-
-.cer .cer-bridge-s1,
-.cer .cer-bridge-s2,
-.cer .cer-bridge-s3,
-.cer .cer-bridge-s4,
-.cer .cer-bridge-s5,
-.cer .cer-bridge-s6,
-.cer .cer-bridge-s7,
-.cer .cer-bridge-s8,
-.cer .cer-bridge-s9 {
-    border-radius: 23px;
-    background: linear-gradient(125deg, #16394d 0%, var(--pane, #12a5a0) 160%);
-    box-shadow: 0 14px 35px rgba(22, 57, 77, 0.12);
-}
-
-.cer .cer-bridge-s1 { --pane: #34a853; }
-.cer .cer-bridge-s2 { --pane: #4285f4; }
-.cer .cer-bridge-s3 { --pane: #7c5cff; }
-.cer .cer-bridge-s4 { --pane: #ff766f; }
-.cer .cer-bridge-s5 { --pane: #f4b400; }
-.cer .cer-bridge-s6 { --pane: #e86bb5; }
-.cer .cer-bridge-s7 { --pane: #25b8d8; }
-.cer .cer-bridge-s8 { --pane: #6f62d9; }
-.cer .cer-bridge-s9 { --pane: #0f9d79; }
-
 .cer .cer-wordguide {
     border: 1px solid #dce7e9;
     background: #fbfdfd;
@@ -352,27 +320,6 @@
 .cer .cer-s4 > section,
 .cer .cer-s4 section.space-y-4 {
     border-top: 4px solid #ff766f;
-}
-
-.cer .cer-bridge .k {
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    font-weight: 800;
-    color: #99f6e4;
-}
-
-.cer .cer-bridge h1 {
-    font-size: 24px;
-    margin: 5px 0 3px;
-    font-weight: 800;
-    line-height: 1.25;
-}
-
-.cer .cer-bridge p {
-    font-size: 13px;
-    color: #cdf5f0;
-    line-height: 1.6;
-    max-width: 660px;
 }
 
 .cer .cer-sdgrow {
@@ -466,6 +413,16 @@
     font-size: 13px;
     line-height: 1.5;
     color: #d5eee8;
+}
+
+/* Section help button sits in the pills row of the mission card. */
+.cer .cer-mission .cer-bpills .cer-hchip {
+    margin-top: 0;
+    align-self: center;
+}
+
+.cer .cer-mission .cer-sdgrow {
+    margin-top: 10px;
 }
 
 .cer .cer-achievement {
@@ -3092,17 +3049,6 @@
     }
     .cer .cer-htitle {
         font-size: 22px;
-    }
-    .cer .cer-bridge {
-        padding: 16px;
-        border-radius: 18px;
-    }
-    .cer .cer-bridge h1 {
-        font-size: 18px;
-    }
-    .cer .cer-bridge .k {
-        font-size: 10px;
-        letter-spacing: 0.12em;
     }
     .cer .cer-foot {
         flex-direction: column;

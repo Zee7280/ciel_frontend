@@ -900,12 +900,17 @@ function ActivityLadderCard({
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <Label className={fieldLabel}>Partner / host involved <span className="optional">OPTIONAL</span></Label>
-                                                    <Input
-                                                        placeholder="Organization / department / community group"
-                                                        value={activity.partner_host || ''}
-                                                        onChange={(e) => update('partner_host', e.target.value)}
-                                                        className={inputClasses}
-                                                    />
+                                                    {/* Same sub-label row as From / To so this input lines up with the date inputs. */}
+                                                    <div className="space-y-1">
+                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Name</p>
+                                                        <Input
+                                                            placeholder="Organization / department / community group"
+                                                            value={activity.partner_host || ''}
+                                                            onChange={(e) => update('partner_host', e.target.value)}
+                                                            className={inputClasses}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-400">Leave blank if no separate organization was involved.</p>
                                                 </div>
                                             </div>
                                         </>

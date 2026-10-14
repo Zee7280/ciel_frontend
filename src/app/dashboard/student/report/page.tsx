@@ -1,4 +1,5 @@
 "use client"
+import { collectUniversityParticipationAllowlist } from "@/utils/studentOpportunityApplyEligibility";
 import React, { Suspense } from 'react';
 import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -61,13 +62,12 @@ import {
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+import { ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
 const MissionHeroView = React.memo(ReportMissionHero);
 const JourneyView = React.memo(ReportImpactJourney);
-const BridgeView = React.memo(ReportSectionBridge);
 const SectionModelView = React.memo(ReportSectionModel);
 const LiveBannerView = React.memo(ReportLiveBanner);
 
@@ -391,6 +391,10 @@ function ReportFormContent() {
                             ...actualReportData,
                             ...(projectPayload || {}),
                         }),
+                        university_allowlist: collectUniversityParticipationAllowlist({
+                            ...((actualReportData as { opportunity?: Record<string, unknown> }).opportunity || {}),
+                            ...(projectPayload || {}),
+                        }),
                     };
 
                     let reportForState: Record<string, unknown> = mergedReport as Record<string, unknown>;
@@ -546,6 +550,7 @@ function ReportFormContent() {
                         project_title: pickOpportunityTitle(projectPayload),
                         status: "none",
                         required_hours: resolveRequiredHoursPerStudent(projectPayload),
+                        university_allowlist: collectUniversityParticipationAllowlist(projectPayload || {}),
                     } as typeof data);
                     setReadOnly(false);
                 }
@@ -556,6 +561,7 @@ function ReportFormContent() {
                     project_title: pickOpportunityTitle(projectPayload),
                     status: "none",
                     required_hours: resolveRequiredHoursPerStudent(projectPayload),
+                    university_allowlist: collectUniversityParticipationAllowlist(projectPayload || {}),
                 } as typeof data);
                 setReadOnly(false);
             }
@@ -1116,7 +1122,9 @@ function ReportFormContent() {
                     </div>
                 ) : null}
 
-                {!onFlash ? <MissionHeroView data={deferredData} projectData={projectDetails} /> : null}
+                {!onFlash ? (
+                    <MissionHeroView data={deferredData} projectData={projectDetails} step={activeStep} onOpenHelp={openSectionHelp} />
+                ) : null}
 
                 {!onFlash && !stepperLockedToSummaryOnly ? (
                     <JourneyView
@@ -1130,12 +1138,6 @@ function ReportFormContent() {
 
                 {!onFlash ? (
                     <>
-                        <BridgeView
-                            step={activeStep}
-                            data={deferredData}
-                            projectData={projectDetails}
-                            onOpenHelp={openSectionHelp}
-                        />
                         {activeStep === 1 ? (
                             <div className="cer-own">
                                 <div>

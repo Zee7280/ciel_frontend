@@ -26,38 +26,6 @@ export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: bool
     { step: 10, label: "Flash card", flash: true },
 ];
 
-const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: string }> = {
-    1: {
-        kicker: "START HERE · APPROVAL COMES ONCE, AT THE END",
-        title: "Your crew, your hours, your proof",
-        note: "No separate attendance sign-off any more — you log, you declare, and the whole report is verified once at the end from your flash card.",
-    },
-    2: {
-        kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "What was the situation before you started?",
-        note: "Describe things before the project — activities and results stay in Section 4.",
-    },
-    3: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Pick your goals off the wall" },
-    4: {
-        kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "What we did — and what changed because of it",
-        note: "One section, two parts: Part A is what you did (counts). Part B is what changed (before → after). Both still save as their own fields.",
-    },
-    5: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What the project ran on" },
-    6: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Who stood with us" },
-    7: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Every claim, backed by evidence" },
-    8: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What it did to you" },
-    9: {
-        kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "The last mile — what survives, and where it all travels",
-        note: "Not all projects continue — a candid answer is stronger than an optimistic one. The consistency review below is what the CII score reads.",
-    },
-    10: {
-        kicker: "SUMMARY CARD · ONE RECORD",
-        title: "Your accumulated report — summary, CII, and submit",
-    },
-};
-
 function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" && !Array.isArray(value)
         ? (value as Record<string, unknown>)
@@ -228,10 +196,37 @@ export function buildReportFlashAgg(data: ReportData, projectData?: unknown) {
     return chromeAgg(data, projectData);
 }
 
-/** Top-of-wizard hero — shown once, above the tab bar, for the life of the report. */
-export function ReportMissionHero({ data, projectData }: { data: ReportData; projectData?: unknown }) {
+/** Top-of-wizard hero — shown once, above the tab bar, for the life of the report. Also carries the
+ * running totals and the section help button (previously a second card below the progress bar). */
+export function ReportMissionHero({
+    data,
+    projectData,
+    step,
+    onOpenHelp,
+}: {
+    data: ReportData;
+    projectData?: unknown;
+    step?: number;
+    onOpenHelp?: () => void;
+}) {
     const a = chromeAgg(data, projectData);
     const requiredHours = data.required_hours || 16;
+    const uiStep = step != null ? canonicalReportStep(step) : null;
+    const { sdgs, acts, reach, evidence, competency, bestPct, pkr } = a;
+    const loggedHours = sumNonRejectedLoggedHours(data.section1?.attendance_logs || []);
+    // Running totals that unlock as sections fill in. Team size is already shown as CURRENT TEAM.
+    const progressPills: Array<[string, string]> = [];
+    if (uiStep != null) {
+        if (uiStep > 1 && loggedHours) progressPills.push([`${Math.round(loggedHours * 10) / 10}h`, "TEAM-HOURS LOGGED"]);
+        if (uiStep > 2 && data.section2?.problem_statement) progressPills.push(["📍", "BASELINE SET"]);
+        if (uiStep > 3 && sdgs.length) progressPills.push([String(sdgs.length), "SDGs MAPPED"]);
+        if (uiStep > 4 && acts.length) progressPills.push([String(acts.length), "ACTIVITIES"]);
+        if (uiStep > 4 && reach) progressPills.push([reach, "REACHED"]);
+        if (uiStep > 4 && bestPct != null) progressPills.push([`${bestPct >= 0 ? "+" : ""}${bestPct}%`, "BEST MEASURED CHANGE"]);
+        if (uiStep > 5 && pkr) progressPills.push([`PKR ${pkr.toLocaleString()}`, "RESOURCES TRACED"]);
+        if (uiStep > 7 && evidence) progressPills.push([String(evidence), "EVIDENCE FILES"]);
+        if (uiStep > 8 && competency) progressPills.push([`${competency}/5`, "COMPETENCY"]);
+    }
     const sdgLabel = a.sdgs.length
         ? a.sdgs
               .filter((row) => row.role === "primary")
@@ -263,7 +258,36 @@ export function ReportMissionHero({ data, projectData }: { data: ReportData; pro
                         <div className="v">{sdgLabel}</div>
                         <div className="kk">REGISTERED SDGs</div>
                     </div>
+                    {progressPills.map(([value, label]) => (
+                        <div key={label} className="cer-bp">
+                            <div className="v">{value}</div>
+                            <div className="kk">{label}</div>
+                        </div>
+                    ))}
+                    {onOpenHelp && uiStep != null && uiStep < FLASH_CARD_STEP ? (
+                        <button type="button" className="cer-hchip" onClick={onOpenHelp}>
+                            How to fill this section — with examples
+                        </button>
+                    ) : null}
                 </div>
+                {uiStep != null && uiStep > 3 && sdgs.length ? (
+                    <div className="cer-sdgrow">
+                        {sdgs.map((row) => {
+                            const sdg = findSdgById(row.goalNumber);
+                            return (
+                                <span
+                                    key={`${row.goalNumber}-${row.targetId}`}
+                                    className="cer-sdgc"
+                                    style={{ background: sdg?.color || "#0e7d74" }}
+                                >
+                                    {row.role === "primary" ? "★ " : ""}
+                                    SDG {row.goalNumber}
+                                    {row.targetId ? ` · ${row.targetId}` : ""}
+                                </span>
+                            );
+                        })}
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -421,94 +445,9 @@ export function ReportAchievementBanner({
     );
 }
 
-export function ReportSectionBridge({
-    step,
-    data,
-    projectData,
-    onOpenHelp,
-}: {
-    step: number;
-    data: ReportData;
-    projectData?: unknown;
-    onOpenHelp?: () => void;
-}) {
-    const uiStep = canonicalReportStep(step);
-    const meta = SECTION_BRIDGES[uiStep];
-    if (!meta) return null;
-
-    const a = chromeAgg(data, projectData);
-    const { context, title, sdgs, members, acts, reach, evidence, competency, bestPct, pkr } = a;
-    const loggedHours = sumNonRejectedLoggedHours(data.section1?.attendance_logs || []);
-
-    const pills: Array<[string, string]> = [];
-    if (uiStep > 1 && loggedHours) pills.push([`${Math.round(loggedHours * 10) / 10}h`, "TEAM-HOURS LOGGED"]);
-    if (uiStep > 1) pills.push([String(members), "MEMBERS"]);
-    if (uiStep > 2 && data.section2?.problem_statement) pills.push(["📍", "BASELINE SET"]);
-    if (uiStep > 3 && sdgs.length) pills.push([String(sdgs.length), "SDGs MAPPED"]);
-    if (uiStep > 4 && acts.length) pills.push([String(acts.length), "ACTIVITIES"]);
-    if (uiStep > 4 && reach) pills.push([reach, "REACHED"]);
-    if (uiStep > 4 && bestPct != null) pills.push([`${bestPct >= 0 ? "+" : ""}${bestPct}%`, "BEST MEASURED CHANGE"]);
-    if (uiStep > 5 && pkr) pills.push([`PKR ${pkr.toLocaleString()}`, "RESOURCES TRACED"]);
-    if (uiStep > 7 && evidence) pills.push([String(evidence), "EVIDENCE FILES"]);
-    if (uiStep > 8 && competency) pills.push([`${competency}/5`, "COMPETENCY"]);
-
-    return (
-        <>
-            <div className={`cer-bridge cer-bridge-s${uiStep}`}>
-                <div className="k">{meta.kicker}</div>
-                <h1>{meta.title}</h1>
-                <p>
-                    {title}
-                    {context.partnerOrganization ? ` · ${context.partnerOrganization}` : ""}
-                    {context.projectLocation && context.projectLocation !== "N/A"
-                        ? ` · ${context.projectLocation}`
-                        : ""}
-                    {context.timelineLabel && context.timelineLabel !== "—"
-                        ? ` · ${context.timelineLabel}`
-                        : ""}
-                </p>
-                {uiStep > 3 && sdgs.length ? (
-                    <div className="cer-sdgrow">
-                        {sdgs.map((row) => {
-                            const sdg = findSdgById(row.goalNumber);
-                            return (
-                                <span
-                                    key={`${row.goalNumber}-${row.targetId}`}
-                                    className="cer-sdgc"
-                                    style={{ background: sdg?.color || "#0e7d74" }}
-                                >
-                                    {row.role === "primary" ? "★ " : ""}
-                                    SDG {row.goalNumber}
-                                    {row.targetId ? ` · ${row.targetId}` : ""}
-                                </span>
-                            );
-                        })}
-                    </div>
-                ) : null}
-                {pills.length ? (
-                    <div className="cer-bpills">
-                        {pills.map(([value, label]) => (
-                            <div key={label} className="cer-bp">
-                                <div className="v">{value}</div>
-                                <div className="kk">{label}</div>
-                            </div>
-                        ))}
-                    </div>
-                ) : null}
-                {onOpenHelp && uiStep < FLASH_CARD_STEP ? (
-                    <button type="button" className="cer-hchip" onClick={onOpenHelp}>
-                        How to fill this section — with examples
-                    </button>
-                ) : null}
-            </div>
-            {meta.note && uiStep !== 4 ? <div className="cer-note">{meta.note}</div> : null}
-        </>
-    );
-}
-
 const WRITING_GUIDES: Record<number, string[]> = {
-    2: ["Short factual answers", "20–60 words for the main problem", "15–50 words for your academic lens"],
-    3: ["Evidence-backed SDG logic", "30–80 words for registered contribution", "20–60 words per student-added SDG"],
+    2: ["Short factual answers", "10–60 words for the main problem", "15–50 words for your academic lens"],
+    3: ["Evidence-backed SDG logic", "30–80 words for registered contribution", "10–60 words per student-added SDG"],
     4: ["Impact over essays", "15–60 words for activity responsibilities", "40–100 words for the before→after story"],
     6: ["Partnership evidence", "15–60 words for partner contribution"],
     7: ["Evidence captions", "10–45 words is enough to explain what the evidence proves"],
