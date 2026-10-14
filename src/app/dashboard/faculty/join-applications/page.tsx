@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, Clock, Loader2, Users, XCircle } from "lucide-react";
+import { CheckCircle, Clock, Eye, Loader2, Users, XCircle } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
@@ -285,7 +285,21 @@ export default function FacultyJoinApplicationsPage() {
                                     </p>
                                 </div>
                                 <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-52 md:flex-col md:border-l md:border-t-0 md:p-6">
-                                    {tab === "pending" ? (
+                                    {tab === "pending" && row.canDecide === false ? (
+                                        <div
+                                            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600"
+                                            title="Approval requests go to the primary faculty supervisor only."
+                                        >
+                                            <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+                                                <Eye className="h-3.5 w-3.5" aria-hidden /> View only
+                                            </p>
+                                            <p className="mt-1 leading-snug">
+                                                {row.viewerSupervisorRole === "secondary"
+                                                    ? "You are the secondary supervisor. Only the primary supervisor can approve or reject."
+                                                    : "Only the primary supervisor can approve or reject this application."}
+                                            </p>
+                                        </div>
+                                    ) : tab === "pending" ? (
                                         <>
                                             <Button
                                                 className="w-full bg-green-600 hover:bg-green-700"

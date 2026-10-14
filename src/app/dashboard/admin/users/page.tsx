@@ -417,10 +417,6 @@ export default function AdminUsersPage() {
         try {
             const payload: any = { ...formData, name: formData.name.trim(), email: formData.email.trim() };
             if (!payload.password) delete payload.password; // Don't send empty password
-            else if (payload.password.length < 8) {
-                setFormError("Password must be at least 8 characters.");
-                return;
-            }
             if (isSelf(selectedUser)) {
                 // Never let an admin change their own role/status from here.
                 payload.role = selectedUser.role;
@@ -452,6 +448,13 @@ export default function AdminUsersPage() {
     const handleEditUser = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedUser || isSubmitting) return;
+        // Validate before the role/status confirm opens, so a short password never leaves the
+        // confirm dialog stuck open over the error (the backend enforces the full policy).
+        if (formData.password && formData.password.length < 8) {
+            setFormError("Password must be at least 8 characters.");
+            return;
+        }
+        setFormError(null);
         if (!isSelf(selectedUser) && (formData.status !== selectedUser.status || formData.role !== selectedUser.role)) {
             setStatusConfirm({ user: selectedUser, from: selectedUser.status, to: formData.status, role: formData.role });
             return;

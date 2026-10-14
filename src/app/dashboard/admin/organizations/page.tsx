@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus } from "lucide-react";
+import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
@@ -36,6 +36,49 @@ function computeMenuPosition(trigger: DOMRect) {
 
 const orgStatusOf = (org: any): string =>
     String(org?.status || org?.verification_status || "unknown").toLowerCase();
+
+function DetailCard({
+    label,
+    value,
+    strong,
+    breakAll,
+    upper,
+    capitalize,
+    wide,
+}: {
+    label: string;
+    value: string;
+    strong?: boolean;
+    breakAll?: boolean;
+    upper?: boolean;
+    capitalize?: boolean;
+    wide?: boolean;
+}) {
+    return (
+        <div className={`rounded-xl border border-slate-100 bg-slate-50/60 p-4 ${wide ? "md:col-span-2" : ""}`}>
+            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">{label}</p>
+            <p
+                className={`mt-1 text-slate-900 ${strong ? "font-bold" : ""} ${breakAll ? "break-all" : "whitespace-pre-wrap"} ${
+                    upper ? "uppercase" : ""
+                } ${capitalize ? "capitalize" : ""}`}
+            >
+                {value}
+            </p>
+        </div>
+    );
+}
+
+function PolicyFlag({ label, on, neutral }: { label: string; on: boolean; neutral?: boolean }) {
+    const Icon = on ? CheckCircle2 : XCircle;
+    const tone = on ? (neutral ? "text-amber-700" : "text-emerald-700") : "text-slate-400";
+    return (
+        <span className={`inline-flex items-center gap-1.5 text-sm ${tone}`}>
+            <Icon className="h-4 w-4" aria-hidden />
+            {label}
+            <span className="sr-only">{on ? "yes" : "no"}</span>
+        </span>
+    );
+}
 
 export default function AdminOrganizationsPage() {
     const [orgs, setOrgs] = useState<any[]>([]);
@@ -91,6 +134,12 @@ export default function AdminOrganizationsPage() {
         );
     });
 
+    const statusCounts = orgs.reduce<Record<string, number>>((acc, org) => {
+        const st = orgStatusOf(org);
+        acc[st] = (acc[st] ?? 0) + 1;
+        return acc;
+    }, {});
+
     const totalPages = Math.max(1, Math.ceil(filteredOrgs.length / itemsPerPage));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedOrgs = filteredOrgs.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
@@ -99,7 +148,8 @@ export default function AdminOrganizationsPage() {
     const [actionMenu, setActionMenu] = useState<{ orgId: number | string; x: number; y: number } | null>(null);
     const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
     const [isDetailsLoading, setIsDetailsLoading] = useState(false);
-    const [formData, setFormData] = useState({ name: "", email: "", contact: "", type: "ngo", password: "" });
+    const EMPTY_ORG_FORM = { name: "", email: "", contact: "", phone: "", type: "ngo", password: "" };
+    const [formData, setFormData] = useState({ ...EMPTY_ORG_FORM });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirm, setConfirm] = useState<{ action: OrgAction; org: any } | null>(null);
     const [rejectNotes, setRejectNotes] = useState("");
@@ -136,12 +186,19 @@ export default function AdminOrganizationsPage() {
         try {
             const res = await authenticatedFetch(`/api/v1/admin/organizations/create`, {
                 method: "POST",
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    name: formData.name.trim(),
+                    email: formData.email.trim(),
+                    contact: formData.contact.trim(),
+                    type: formData.type,
+                    password: formData.password,
+                    ...(formData.phone.trim() ? { phone: formData.phone.trim() } : {}),
+                }),
             });
             if (res && res.ok) {
                 toast.success("Organization onboarded successfully");
                 setIsAddModalOpen(false);
-                setFormData({ name: "", email: "", contact: "", type: "ngo", password: "" });
+                setFormData({ ...EMPTY_ORG_FORM });
                 void fetchOrganizations();
             } else {
                 toast.error(await readErrorMessage(res, "Failed to onboard organization"));
@@ -314,6 +371,9 @@ export default function AdminOrganizationsPage() {
             toast.success("University staff account created");
             setIsMemberModalOpen(false);
             setMemberForm({ name: "", email: "", password: "", role: "university" });
+            // The details modal lists members and the table shows a member count — resync both.
+            void openOrganizationDetails({ id: orgId, ...selectedOrg });
+            void fetchOrganizations();
         } catch (err) {
             console.error(err);
             toast.error("Failed to add staff account");
@@ -369,6 +429,11 @@ export default function AdminOrganizationsPage() {
                             }`}
                         >
                             {f.label}
+                            {!isLoading ? (
+                                <span className={`ml-1.5 tabular-nums ${statusFilter === f.value ? "text-blue-100" : "text-slate-400"}`}>
+                                    {f.value === "all" ? orgs.length : statusCounts[f.value] ?? 0}
+                                </span>
+                            ) : null}
                         </button>
                     ))}
                 </div>
@@ -388,13 +453,14 @@ export default function AdminOrganizationsPage() {
                 ) : (
                     <>
                         <div className="overflow-x-auto">
-                        <table className="min-w-[760px] w-full text-left">
+                        <table className="min-w-[860px] w-full text-left">
                             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                                 <tr>
                                     <th className="p-4 sm:p-6">Organization</th>
                                     <th className="p-4 sm:p-6">Type</th>
                                     <th className="p-4 sm:p-6">Contact Person</th>
                                     <th className="p-4 sm:p-6">Status</th>
+                                    <th className="p-4 sm:p-6">Members</th>
                                     <th className="p-4 sm:p-6">Active Projects</th>
                                     <th className="p-4 sm:p-6 text-right">Actions</th>
                                 </tr>
@@ -427,6 +493,12 @@ export default function AdminOrganizationsPage() {
                                                 {orgStatusOf(org) === "suspended" && <AlertCircle className="w-3 h-3" />}
                                                 {orgStatusOf(org).replace(/_/g, " ")}
                                             </StatusBadge>
+                                        </td>
+                                        <td className="p-4 sm:p-6 text-sm font-bold text-slate-900">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Users className="h-4 w-4 text-slate-400" aria-hidden />
+                                                {org.members_count ?? 0}
+                                            </span>
                                         </td>
                                         <td className="p-4 sm:p-6 font-bold text-slate-900">{org.active_projects_count || org.projects || 0}</td>
                                         <td className="p-4 sm:p-6 text-right">
@@ -473,8 +545,8 @@ export default function AdminOrganizationsPage() {
                     <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-6">
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <h2 className="text-xl font-bold text-slate-900">Onboard New Organization</h2>
-                            <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                                <AlertCircle className="w-6 h-6 rotate-45" />
+                            <button type="button" aria-label="Close" onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
@@ -516,17 +588,26 @@ export default function AdminOrganizationsPage() {
                                     <option value="ngo">NGO</option>
                                     <option value="corporate">Corporate</option>
                                     <option value="university">University</option>
-                                    <option value="school">Educational Institute</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Contact Phone <span className="font-normal text-slate-400">(optional)</span></label>
+                                <input
+                                    type="tel"
+                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={formData.phone}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Temporary Password</label>
                                 <input
-                                    type="password" required
+                                    type="password" required minLength={8} autoComplete="new-password"
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />
+                                <p className="mt-1 text-xs text-slate-500">Creates the organization (already verified) and an Org Admin login for the contact person.</p>
                             </div>
 
                             <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors mt-2 disabled:opacity-60">
@@ -543,8 +624,8 @@ export default function AdminOrganizationsPage() {
                     <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-6">
                         <div className="mb-2 flex items-start justify-between gap-4">
                             <h2 className="text-xl font-bold text-slate-900">Organization Details</h2>
-                            <button onClick={() => setSelectedOrg(null)} className="text-slate-400 hover:text-slate-600">
-                                <AlertCircle className="w-6 h-6 rotate-45" />
+                            <button type="button" aria-label="Close" onClick={() => setSelectedOrg(null)} className="text-slate-400 hover:text-slate-600">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
                         <p className="text-sm text-slate-500 mb-6">Review organization profile and verification metadata.</p>
@@ -554,80 +635,102 @@ export default function AdminOrganizationsPage() {
                                 <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Organization Name</p>
-                                    <p className="text-slate-900 font-bold mt-1">{readOrgValue(selectedOrg, ["name", "organization_name"])}</p>
+                            <>
+                                {orgStatusOf(selectedOrg) === "rejected" || selectedOrg?.verification_notes ? (
+                                    <div
+                                        className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                                            orgStatusOf(selectedOrg) === "rejected"
+                                                ? "border-red-200 bg-red-50 text-red-900"
+                                                : "border-slate-200 bg-slate-50 text-slate-800"
+                                        }`}
+                                    >
+                                        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                                            {orgStatusOf(selectedOrg) === "rejected" ? "Rejection reason" : "Verification notes"}
+                                        </p>
+                                        <p className="mt-1 whitespace-pre-wrap">{readOrgValue(selectedOrg, ["verification_notes"], "No reason recorded.")}</p>
+                                    </div>
+                                ) : null}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <DetailCard label="Organization Name" value={readOrgValue(selectedOrg, ["name", "organization_name"])} strong />
+                                    <DetailCard label="Email" value={readOrgValue(selectedOrg, ["email"])} breakAll />
+                                    <DetailCard label="Contact Person" value={readOrgValue(selectedOrg, ["contact_person", "contact", "contact_name"])} />
+                                    <DetailCard label="Phone" value={readOrgValue(selectedOrg, ["phone", "phone_number", "mobile"])} />
+                                    <DetailCard label="Type" value={readOrgValue(selectedOrg, ["organization_type", "type"])} upper />
+                                    <DetailCard label="Category" value={readOrgValue(selectedOrg, ["organization_category"])} />
+                                    <DetailCard label="Legal Registration" value={readOrgValue(selectedOrg, ["legal_registration_type"])} />
+                                    <DetailCard label="Status" value={readOrgValue(selectedOrg, ["status", "verification_status"], "Unknown").replace(/_/g, " ")} capitalize />
+                                    <DetailCard label="Members" value={readOrgValue(selectedOrg, ["members_count"], "0")} />
+                                    <DetailCard
+                                        label="Opportunities"
+                                        value={`${readOrgValue(selectedOrg, ["active_projects_count", "projects"], "0")} active · ${readOrgValue(selectedOrg, ["opportunities_count"], "0")} total`}
+                                    />
+                                    <DetailCard label="Website" value={readOrgValue(selectedOrg, ["website", "website_url"])} breakAll />
+                                    <DetailCard label="City" value={readOrgValue(selectedOrg, ["city"])} />
+                                    <DetailCard label="State / Province" value={readOrgValue(selectedOrg, ["state", "province"])} />
+                                    <DetailCard label="Country" value={readOrgValue(selectedOrg, ["country"])} />
+                                    <DetailCard label="Address" value={readOrgValue(selectedOrg, ["address", "full_address", "street_address"])} wide />
+                                    <DetailCard label="Description" value={readOrgValue(selectedOrg, ["description"])} wide />
+                                    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:col-span-2">
+                                        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Policy acknowledgements</p>
+                                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                                            <PolicyFlag label="Safeguarding" on={selectedOrg?.safeguarding_acknowledged === true} />
+                                            <PolicyFlag label="Data policy" on={selectedOrg?.data_policy_acknowledged === true} />
+                                            <PolicyFlag label="Works with minors" on={selectedOrg?.works_with_minors === true} neutral />
+                                        </div>
+                                    </div>
+                                    <DetailCard label="Created At" value={formatDateValue(selectedOrg?.created_at || selectedOrg?.createdAt)} />
+                                    <DetailCard label="Updated At" value={formatDateValue(selectedOrg?.updated_at || selectedOrg?.updatedAt)} />
+                                    <DetailCard label="Verified At" value={formatDateValue(selectedOrg?.verified_at || selectedOrg?.verifiedAt)} />
+                                    <DetailCard
+                                        label="Verified By"
+                                        value={
+                                            selectedOrg?.verified_by
+                                                ? selectedOrg.verified_by.name || selectedOrg.verified_by.email || selectedOrg.verified_by.id || "N/A"
+                                                : "N/A"
+                                        }
+                                    />
                                 </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Email</p>
-                                    <p className="text-slate-900 mt-1 break-all">{readOrgValue(selectedOrg, ["email"])}</p>
+
+                                <div className="mt-6">
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <h3 className="text-sm font-bold text-slate-900">
+                                            Linked user accounts
+                                            <span className="ml-1.5 font-normal text-slate-500">({Array.isArray(selectedOrg?.members) ? selectedOrg.members.length : 0})</span>
+                                        </h3>
+                                    </div>
+                                    {Array.isArray(selectedOrg?.members) && selectedOrg.members.length > 0 ? (
+                                        <div className="overflow-x-auto rounded-xl border border-slate-100">
+                                            <table className="w-full min-w-[520px] text-left text-sm">
+                                                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                                    <tr>
+                                                        <th className="px-3 py-2">User</th>
+                                                        <th className="px-3 py-2">Role</th>
+                                                        <th className="px-3 py-2">Status</th>
+                                                        <th className="px-3 py-2">Joined</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {selectedOrg.members.map((m: any) => (
+                                                        <tr key={m.id}>
+                                                            <td className="px-3 py-2">
+                                                                <div className="font-semibold text-slate-900">{m.name || "—"}</div>
+                                                                <div className="text-xs text-slate-500 break-all">{m.email}</div>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-slate-700">{String(m.role || "").replace(/_/g, " ")}</td>
+                                                            <td className="px-3 py-2"><StatusBadge status={m.status} /></td>
+                                                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{formatDateValue(m.created_at).split(",")[0]}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <p className="rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                                            No user account is linked to this organization yet.
+                                        </p>
+                                    )}
                                 </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Contact Person</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["contact_person", "contact", "contact_name"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Type</p>
-                                    <p className="text-slate-900 uppercase mt-1">{readOrgValue(selectedOrg, ["organization_type", "type"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Status</p>
-                                    <p className="text-slate-900 capitalize mt-1">{readOrgValue(selectedOrg, ["status", "verification_status"], "Unknown")}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Active Projects</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["active_projects_count", "projects"], "0")}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Phone</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["phone", "phone_number", "mobile"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Website</p>
-                                    <p className="text-slate-900 mt-1 break-all">{readOrgValue(selectedOrg, ["website", "website_url"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:col-span-2">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Address</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["address", "full_address", "street_address"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">City</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["city"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">State / Province</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["state", "province"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Country</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["country"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Postal Code</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["postal_code", "zip_code"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Registration Number</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["registration_number", "reg_no", "license_number"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Tax Number</p>
-                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["tax_number", "ntn", "tax_id"])}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Created At</p>
-                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.created_at || selectedOrg?.createdAt)}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Updated At</p>
-                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.updated_at || selectedOrg?.updatedAt)}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:col-span-2">
-                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Verified At</p>
-                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.verified_at || selectedOrg?.verifiedAt)}</p>
-                                </div>
-                            </div>
+                            </>
                         )}
 
                         {selectedOrg && isUniversityOrganization(selectedOrg) && (
@@ -660,7 +763,7 @@ export default function AdminOrganizationsPage() {
                                 className="text-slate-400 hover:text-slate-600"
                                 aria-label="Close"
                             >
-                                <AlertCircle className="h-6 w-6 rotate-45" />
+                                <X className="h-6 w-6" />
                             </button>
                         </div>
                         <p className="mb-4 text-sm text-slate-500">
@@ -691,6 +794,8 @@ export default function AdminOrganizationsPage() {
                                 <input
                                     required
                                     type="password"
+                                    minLength={8}
+                                    autoComplete="new-password"
                                     className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
                                     value={memberForm.password}
                                     onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
@@ -810,7 +915,7 @@ export default function AdminOrganizationsPage() {
                               suspend: "The organization will be blocked and all its users will be signed out.",
                               unsuspend: "The block will be lifted so the organization's users can sign in again.",
                               reject: "The organization will be marked as rejected. The reason is stored with the verification record.",
-                              delete: "This permanently deletes the organization. This cannot be undone.",
+                              delete: `This permanently deletes the organization together with its ${confirm.org.members_count ?? 0} linked user account${(confirm.org.members_count ?? 0) === 1 ? "" : "s"} and ${confirm.org.opportunities_count ?? 0} opportunit${(confirm.org.opportunities_count ?? 0) === 1 ? "y" : "ies"}. This cannot be undone.`,
                           }[confirm.action]
                         : undefined
                 }

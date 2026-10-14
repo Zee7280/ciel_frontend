@@ -24,6 +24,9 @@ export type OpportunityApplicationListRow = {
     /** From apply payload — applicant/lead is shown separately as studentName/studentEmail. */
     participationType?: string;
     teamMembers?: { name: string; email: string }[];
+    /** Faculty list only: false when the viewer is the secondary (visibility-only) supervisor. */
+    canDecide?: boolean;
+    viewerSupervisorRole?: "primary" | "secondary" | "delegate" | null;
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -103,6 +106,11 @@ export function mapOpportunityApplicationListRow(raw: unknown): OpportunityAppli
         participationType:
             pickStr(r, "participation_type", "participationType") || undefined,
         teamMembers: pickTeamMembers(r),
+        canDecide: typeof r["can_decide"] === "boolean" ? (r["can_decide"] as boolean) : undefined,
+        viewerSupervisorRole: (() => {
+            const v = pickStr(r, "viewer_supervisor_role", "viewerSupervisorRole");
+            return v === "primary" || v === "secondary" || v === "delegate" ? v : null;
+        })(),
     };
 }
 
