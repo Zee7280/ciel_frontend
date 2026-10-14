@@ -683,13 +683,7 @@ function SignUpContent() {
                                             <div>
                                                 <label className={labelClass}>Organization name</label>
                                                 {orgKind === "university" ? (
-                                                    <div className="relative">
-                                                        <select value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} aria-invalid={!!errors.orgName} aria-label="Organization name" className={selectClass(!!errors.orgName)}>
-                                                            <option value="">Select organization name</option>
-                                                            {pakistaniUniversities.map((u) => <option key={u} value={u}>{u}</option>)}
-                                                        </select>
-                                                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
-                                                    </div>
+                                                    <SearchableSelect value={formData.orgName} onChange={(v) => handleGenericChange("orgName", v)} options={pakistaniUniversities} placeholder="Select organization name" searchPlaceholder="Search universities..." hasError={!!errors.orgName} ariaLabel="Organization name" allowCustomValue={false} />
                                                 ) : (
                                                     <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder={orgHints.orgName} aria-label="Organization name" />
                                                 )}
@@ -730,13 +724,7 @@ function SignUpContent() {
                                         <div key={`${role}-inst`} className="ciel-crossfade-enter relative z-30 grid grid-cols-1 items-start gap-4 overflow-visible sm:grid-cols-2">
                                             <div>
                                                 <label className={labelClass}>University</label>
-                                                <div className="relative">
-                                                    <select value={formData.institution} onChange={(e) => handleGenericChange("institution", e.target.value)} aria-invalid={!!errors.institution} aria-label="University" className={selectClass(!!errors.institution)}>
-                                                        <option value="">Select university</option>
-                                                        {pakistaniUniversities.map((u) => <option key={u} value={u}>{u}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
-                                                </div>
+                                                <SearchableSelect value={formData.institution} onChange={(v) => handleGenericChange("institution", v)} options={pakistaniUniversities} placeholder="Select university" searchPlaceholder="Search universities..." hasError={!!errors.institution} ariaLabel="University" allowCustomValue={false} />
                                                 {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
                                                 {role === "student" && platformCfg.student_subscription_required ? (
                                                     <p className="mt-1 text-[11px] leading-relaxed text-ciel-text-soft">

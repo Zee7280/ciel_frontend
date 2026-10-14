@@ -1,5 +1,6 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -2503,11 +2504,9 @@ export default function FacultyOpportunityCreationPage() {
                                 <Plus className="w-4 h-4 text-pink-600" />
                                 <span className="text-xs font-black text-pink-600 uppercase tracking-widest">Add universities</span>
                             </div>
-                            <select
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm font-bold bg-white"
+                            <SearchableSelect
                                 value=""
-                                onChange={(e) => {
-                                    const val = e.target.value;
+                                onChange={(val) => {
                                     if (val && !formData.participationScope.selectedUniversities.includes(val)) {
                                         const oneOnly = formData.applyScope === "one_all" || formData.applyScope === "one_depts";
                                         setFormData({
@@ -2520,18 +2519,14 @@ export default function FacultyOpportunityCreationPage() {
                                             },
                                         });
                                     }
-                                    e.target.value = "";
                                 }}
-                            >
-                                <option value="">Add university…</option>
-                                {pakistaniUniversities
-                                    .filter((u) => !formData.participationScope.selectedUniversities.includes(u))
-                                    .map((u) => (
-                                        <option key={u} value={u}>
-                                            {u}
-                                        </option>
-                                    ))}
-                            </select>
+                                options={pakistaniUniversities.filter((u) => !formData.participationScope.selectedUniversities.includes(u))}
+                                placeholder="Add university…"
+                                searchPlaceholder="Search universities..."
+                                ariaLabel="Add university"
+                                accent="pink"
+                                allowCustomValue={false}
+                            />
                             <div className="flex flex-wrap gap-2">
                                 {formData.participationScope.selectedUniversities.map((u) => (
                                     <div

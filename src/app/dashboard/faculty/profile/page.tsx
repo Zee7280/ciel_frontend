@@ -388,21 +388,18 @@ export default function FacultyProfilePage() {
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Institution</label>
                                 <div className="relative group">
                                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors z-10 pointer-events-none" />
-                                    <select
-                                        value={formData.institution}
-                                        onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 appearance-none"
-                                    >
-                                        <option value="">Select Institution</option>
-                                        {formData.institution && !pakistaniUniversities.includes(formData.institution) ? (
-                                            <option value={formData.institution}>{formData.institution}</option>
-                                        ) : null}
-                                        {pakistaniUniversities.map((u) => (
-                                            <option key={u} value={u}>
-                                                {u}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div>
+                                        <SearchableSelect
+                                            value={formData.institution}
+                                            onChange={(v) => setFormData((f) => ({ ...f, institution: v }))}
+                                            options={pakistaniUniversities}
+                                            placeholder="Select institution"
+                                            searchPlaceholder="Search universities..."
+                                            ariaLabel="Institution"
+                                            accent="violet"
+                                            hasLeftIcon
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -412,8 +409,10 @@ export default function FacultyProfilePage() {
                                 </label>
                                 <div className="relative group">
                                     <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-violet-600 transition-colors z-30 pointer-events-none" />
-                                    <div className="[&_button]:pl-12">
+                                    <div>
                                         <SearchableSelect
+                                            accent="violet"
+                                            hasLeftIcon
                                             value={formData.department}
                                             onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
                                             options={hecPrograms}

@@ -5,6 +5,28 @@ function normUni(value: unknown): string {
     return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function foldUni(value: unknown): string {
+    if (typeof value !== "string") return "";
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Same institution despite spelling/punctuation or an abbreviation ("BNU" ↔ "Beaconhouse National
+ * University (BNU)"). Mirrors ciel_backend's universityNamesMatch so the page never blocks a student the
+ * API would accept, or vice versa. */
+export function universityNamesMatch(a: unknown, b: unknown): boolean {
+    const fa = foldUni(a);
+    const fb = foldUni(b);
+    if (!fa || !fb) return false;
+    if (fa === fb) return true;
+    const abbr = (v: unknown) => {
+        const m = typeof v === "string" ? v.match(/\(([^()]{2,12})\)\s*$/) : null;
+        return m ? foldUni(m[1]) : "";
+    };
+    const abbrA = abbr(a);
+    const abbrB = abbr(b);
+    return (!!abbrA && abbrA === fb) || (!!abbrB && abbrB === fa);
+}
+
 function participationScope(raw: Record<string, unknown>): Record<string, unknown> | null {
     const ps = raw.participation_scope;
     return ps && typeof ps === "object" ? (ps as Record<string, unknown>) : null;
@@ -59,13 +81,16 @@ export function collectUniversityParticipationAllowlist(raw: Record<string, unkn
 
     const ps = participationScope(raw);
     if (ps) {
+        const rule = String(ps.rule ?? "").toLowerCase();
+        // Same derivation as ciel_backend collectOpportunityUniversityAllowlist: a multi-university
+        // rule reads `university_names`; an own-university rule reads only the creator (stale
+        // `university_names` on such a listing must not widen what the API will accept).
         const arr = ps.university_names;
-        if (Array.isArray(arr)) {
+        if (Array.isArray(arr) && rule !== "own_university_only" && rule !== "own_university_departments") {
             for (const x of arr) {
                 if (typeof x === "string" && x.trim()) names.push(x.trim());
             }
         }
-        const rule = String(ps.rule ?? "").toLowerCase();
         if (rule === "own_university_only" || rule === "own_university_departments") {
             const creator = ps.creator_university_name;
             if (typeof creator === "string" && creator.trim()) names.push(creator.trim());
@@ -150,7 +175,7 @@ function uniBlocked(
             allowedUniversities,
         };
     }
-    const ok = allowedUniversities.some((a) => normUni(a) === st);
+    const ok = allowedUniversities.some((a) => universityNamesMatch(a, studentInstitution));
     if (!ok) {
         return {
             canApply: false,

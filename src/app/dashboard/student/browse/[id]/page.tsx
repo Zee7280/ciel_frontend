@@ -25,6 +25,7 @@ import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
 } from "@/utils/studentOpportunityApplyEligibility";
+import { computeSeatsRemaining } from "@/utils/opportunityListing";
 import {
     joinApplicationPendingLabel,
     pickJoinApplicationId,
@@ -595,6 +596,8 @@ export default function OpportunityDetailsPage() {
             <ApplicationDialog
                 opportunityId={isPopupOpen ? id : null}
                 opportunityTitle={opportunity.title ?? "Opportunity"}
+                allowedUniversities={applyEligibility.allowedUniversities}
+                seatsRemaining={computeSeatsRemaining(opportunity as Record<string, unknown>)}
                 attendanceApproverType={resolveAttendanceApproverType(opportunity)}
                 open={isPopupOpen}
                 onOpenChange={setIsPopupOpen}

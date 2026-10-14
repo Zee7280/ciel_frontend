@@ -15,7 +15,18 @@ export type SearchableSelectProps = {
     /** Allow committing a value that isn't in `options` (defaults to true). */
     allowCustomValue?: boolean;
     disabled?: boolean;
+    /** Colour used for focus ring / highlighted row. Defaults to emerald. */
+    accent?: "emerald" | "violet" | "blue" | "pink";
+    /** Reserve space on the left when the parent overlays an icon. */
+    hasLeftIcon?: boolean;
 };
+
+const ACCENTS = {
+    emerald: { border: "border-emerald-600", row: "bg-emerald-50 text-emerald-700", focus: "focus:border-emerald-600" },
+    violet: { border: "border-violet-500", row: "bg-violet-50 text-violet-700", focus: "focus:border-violet-500" },
+    pink: { border: "border-pink-500", row: "bg-pink-50 text-pink-700", focus: "focus:border-pink-500" },
+    blue: { border: "border-blue-500", row: "bg-blue-50 text-blue-700", focus: "focus:border-blue-500" },
+} as const;
 
 /**
  * Searchable dropdown ("combobox"): a text input with a search bar that
@@ -32,7 +43,11 @@ export default function SearchableSelect({
     ariaLabel,
     allowCustomValue = true,
     disabled = false,
+    accent = "emerald",
+    hasLeftIcon = false,
 }: SearchableSelectProps) {
+    const a = ACCENTS[accent];
+    const listRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [isOpen, setIsOpen] = useState(false);
@@ -56,6 +71,12 @@ export default function SearchableSelect({
         if (!q) return options;
         return options.filter((option) => option.toLowerCase().includes(q));
     }, [options, query]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${highlightedIndex}"]`);
+        el?.scrollIntoView({ block: "nearest" });
+    }, [highlightedIndex, isOpen]);
 
     const updateQuery = (nextQuery: string) => {
         setQuery(nextQuery);
@@ -120,9 +141,10 @@ export default function SearchableSelect({
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
                 className={clsx(
-                    "w-full cursor-pointer truncate whitespace-nowrap px-5 py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-left disabled:cursor-not-allowed disabled:opacity-60",
+                    "w-full cursor-pointer truncate whitespace-nowrap py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-left disabled:cursor-not-allowed disabled:opacity-60",
+                    hasLeftIcon ? "pl-12" : "pl-5",
                     value ? "text-slate-800" : "text-slate-300",
-                    hasError ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600",
+                    hasError ? "border-red-500 focus:border-red-500" : `border-slate-100 ${a.focus}`,
                     isOpen && "hidden",
                 )}
             >
@@ -137,7 +159,9 @@ export default function SearchableSelect({
 
             {isOpen && (
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                    {!hasLeftIcon && (
+                        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                    )}
                     <input
                         ref={inputRef}
                         type="text"
@@ -147,22 +171,31 @@ export default function SearchableSelect({
                         placeholder={searchPlaceholder}
                         aria-label={ariaLabel}
                         className={clsx(
-                            "w-full pl-11 pr-5 py-4 rounded-2xl border-2 bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                            hasError ? "border-red-500 focus:border-red-500" : "border-emerald-600",
+                            "w-full pr-5 py-4 rounded-2xl border-2 bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                            hasLeftIcon ? "pl-12" : "pl-11",
+                            hasError ? "border-red-500 focus:border-red-500" : a.border,
                         )}
                     />
 
-                    <div className="relative z-10 mt-2 max-h-64 overflow-y-auto rounded-2xl border-2 border-slate-100 bg-white shadow-lg">
+                    <div
+                        ref={listRef}
+                        role="listbox"
+                        className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto overscroll-contain rounded-2xl border-2 border-slate-100 bg-white shadow-xl sm:max-h-64"
+                    >
                         {filteredOptions.length > 0 ? (
                             filteredOptions.map((option, index) => (
                                 <button
                                     key={option}
                                     type="button"
+                                    role="option"
+                                    aria-selected={option === value}
+                                    data-idx={index}
                                     onMouseEnter={() => setHighlightedIndex(index)}
                                     onClick={() => commitValue(option)}
                                     className={clsx(
-                                        "block w-full truncate px-5 py-3 text-left text-sm font-bold transition-colors",
-                                        index === highlightedIndex ? "bg-emerald-50 text-emerald-700" : "text-slate-700 hover:bg-slate-50",
+                                        "block w-full break-words px-4 py-3 text-left text-sm font-bold leading-snug transition-colors sm:px-5",
+                                        index === highlightedIndex ? a.row : "text-slate-700 hover:bg-slate-50",
+                                        option === value && "underline decoration-dotted underline-offset-4",
                                     )}
                                 >
                                     {option}

@@ -34,12 +34,33 @@ export default function TeamVerification({
     allowedUniversities?: string[];
 }) {
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+    // A teammate being added lives here until their OTP is confirmed. Only then do they join
+    // `members` — so closing the panel halfway never leaves a "Pending" ghost seat in the draft
+    // (which used to flip the report to "team" with nobody actually verified).
+    const [draftOpen, setDraftOpen] = useState(false);
 
     const handleMemberSuccess = (index: number, participant: Participant) => {
         const newMembers = [...members];
         newMembers[index] = { ...newMembers[index], ...participant, verified: true };
         onUpdateMembers(newMembers);
         setExpandedIndex(null);
+    };
+
+    const handleDraftSuccess = (participant: Participant) => {
+        onUpdateMembers([
+            ...members,
+            {
+                ...participant,
+                // Roster rows use the report's field names alongside the Participant shape.
+                name: participant.fullName,
+                university: participant.universityName,
+                program: participant.academicProgram,
+                semester: participant.semester ?? "",
+                role: "Member",
+                verified: true,
+            },
+        ]);
+        setDraftOpen(false);
     };
 
     const removeMember = async (index: number) => {
@@ -81,18 +102,8 @@ export default function TeamVerification({
             alert(`This opportunity has ${maxMembers! + 1} seats (team lead + ${maxMembers} member${maxMembers === 1 ? "" : "s"}).`);
             return;
         }
-        onUpdateMembers([...members, {
-            name: '',
-            email: '',
-            mobile: '',
-            cnic: '',
-            university: '',
-            program: '',
-            semester: '',
-            role: 'Member',
-            verified: false
-        }]);
-        setExpandedIndex(members.length);
+        setExpandedIndex(null);
+        setDraftOpen(true);
     };
 
     const expandedMember = expandedIndex != null ? members[expandedIndex] : null;
@@ -102,6 +113,7 @@ export default function TeamVerification({
             .map((member, idx) => (idx === expandedIndex ? "" : String(member?.email || "")))
             .filter(Boolean),
     ];
+    const panelMember = draftOpen ? {} : expandedMember;
 
     return (
         <div className="space-y-2">
@@ -128,7 +140,10 @@ export default function TeamVerification({
                             <div key={idx} className="inline-flex items-center gap-1">
                                 <button
                                     type="button"
-                                    onClick={() => setExpandedIndex(isOpen ? null : idx)}
+                                    onClick={() => {
+                                        setDraftOpen(false);
+                                        setExpandedIndex(isOpen ? null : idx);
+                                    }}
                                     title={`${member.role || "Member"} · ${member.university || "Pending university"}`}
                                     className={clsx(
                                         "inline-flex items-center gap-2 rounded-full border bg-white py-1.5 pl-1.5 pr-3.5 text-sm font-semibold transition-colors",
@@ -178,7 +193,7 @@ export default function TeamVerification({
                 </div>
             )}
 
-            {!lockAddMembers && !atCapacity ? (
+            {!lockAddMembers && !atCapacity && !draftOpen ? (
                 <button
                     type="button"
                     onClick={handleAddMember}
@@ -195,25 +210,31 @@ export default function TeamVerification({
                 </div>
             ) : null}
 
-            {/* Expanded configure panel */}
-            {expandedMember ? (
+            {/* Expanded configure panel (existing member) or the new-teammate draft */}
+            {panelMember ? (
                 <div className="space-y-3 rounded-[13px] border-[1.5px] border-dashed border-[#cbe7e3] bg-[#fbfefd] p-3.5 sm:p-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
                             <Shield className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
-                            Enter registered details, then send and confirm the email OTP.
+                            {draftOpen
+                                ? "New teammate: enter their registered details, then send and confirm the email OTP. They join the team only once verified."
+                                : "Enter registered details, then send and confirm the email OTP."}
                         </div>
                         <button
                             type="button"
-                            onClick={() => setExpandedIndex(null)}
+                            onClick={() => {
+                                setExpandedIndex(null);
+                                setDraftOpen(false);
+                            }}
                             className="shrink-0 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)]"
                         >
-                            Close
+                            {draftOpen ? "Cancel" : "Close"}
                         </button>
                     </div>
                     <IdentityVerification
+                        key={draftOpen ? "draft" : `member-${expandedIndex}`}
                         projectId={projectId}
-                        initialData={expandedMember}
+                        initialData={panelMember}
                         participationMode="team"
                         isTeamLead={false}
                         teamId={teamId}
@@ -223,7 +244,7 @@ export default function TeamVerification({
                         enforceUniqueOnProject
                         showSemester
                         allowedUniversities={allowedUniversities}
-                        onSuccess={(p) => handleMemberSuccess(expandedIndex as number, p)}
+                        onSuccess={(p) => (draftOpen ? handleDraftSuccess(p) : handleMemberSuccess(expandedIndex as number, p))}
                     />
                 </div>
             ) : null}

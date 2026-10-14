@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { collectUniversityParticipationAllowlist } from "./studentOpportunityApplyEligibility";
+import {
+    collectUniversityParticipationAllowlist,
+    resolveStudentUniversityApplyEligibility,
+    universityNamesMatch,
+} from "./studentOpportunityApplyEligibility";
 import { BNU_UNIVERSITY_NAME, canonicalUniversityAllowlist } from "./universityData";
 
 // Exactly what ciel_backend createStudentOpportunity / updateStudentOpportunity persist for a
@@ -52,4 +56,13 @@ test("a faculty/partner listing restricted to several universities offers only t
         }),
     );
     assert.deepEqual(allow, [BNU_UNIVERSITY_NAME, "COMSATS University Islamabad"]);
+});
+
+test("profile spelling tolerant like the API: \"BNU\" profile may apply to a BNU-only listing, LUMS may not", () => {
+    assert.equal(universityNamesMatch("BNU", BNU_UNIVERSITY_NAME), true);
+    assert.equal(universityNamesMatch("UET", "UET Taxila"), false);
+    assert.equal(universityNamesMatch("LUMS", BNU_UNIVERSITY_NAME), false);
+    const bnuOnly = { participation_scope: { rule: "own_university_only", creator_university_name: BNU_UNIVERSITY_NAME, university_names: [BNU_UNIVERSITY_NAME] } };
+    assert.equal(resolveStudentUniversityApplyEligibility(bnuOnly, "BNU", "CS").canApply, true);
+    assert.equal(resolveStudentUniversityApplyEligibility(bnuOnly, "LUMS", "CS").canApply, false);
 });

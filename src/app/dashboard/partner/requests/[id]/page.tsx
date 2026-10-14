@@ -1,5 +1,6 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Info, MapPin, Calendar, Clock, CheckCircle, Circle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Printer, Share2, Search, Plus } from "lucide-react";
@@ -1532,30 +1533,23 @@ function OpportunityDetailsContent() {
                     {formData.visibility === 'restricted' && (
                         <div className="animate-in fade-in slide-in-from-top-4 space-y-4 pt-4 border-t border-slate-100">
                             <label className="block text-sm font-bold text-slate-900 mb-2">Select Targeted Universities <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <select
-                                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none font-medium text-sm appearance-none bg-white"
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val && !formData.restrictedUniversities.includes(val)) {
-                                            setFormData({
-                                                ...formData,
-                                                restrictedUniversities: [...formData.restrictedUniversities, val]
-                                            });
-                                        }
-                                        e.target.value = "";
-                                    }}
-                                >
-                                    <option value="">Search & Select Universities...</option>
-                                    {pakistaniUniversities
-                                        .filter(uni => !formData.restrictedUniversities.includes(uni))
-                                        .map((uni) => (
-                                            <option key={uni} value={uni}>{uni}</option>
-                                        ))
+                            <SearchableSelect
+                                value=""
+                                onChange={(val) => {
+                                    if (val && !formData.restrictedUniversities.includes(val)) {
+                                        setFormData({
+                                            ...formData,
+                                            restrictedUniversities: [...formData.restrictedUniversities, val]
+                                        });
                                     }
-                                </select>
-                            </div>
+                                }}
+                                options={pakistaniUniversities.filter((uni) => !formData.restrictedUniversities.includes(uni))}
+                                placeholder="Search & Select Universities..."
+                                searchPlaceholder="Search universities..."
+                                ariaLabel="Add university"
+                                accent="pink"
+                                allowCustomValue={false}
+                            />
 
                             <div className="flex flex-wrap gap-2">
                                 {formData.restrictedUniversities.map((uni) => (

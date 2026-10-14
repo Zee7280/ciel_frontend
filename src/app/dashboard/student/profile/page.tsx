@@ -288,11 +288,6 @@ export default function StudentProfilePage() {
 
     const missingProfile = missingProfileFieldsForRole("student", profileGateUser);
 
-    const institutionInList = useMemo(
-        () => pakistaniUniversities.includes(formData.institution),
-        [formData.institution]
-    );
-
     const cityInList = useMemo(
         () => (PAKISTAN_REGION_OPTIONS as readonly string[]).includes(formData.city.trim()),
         [formData.city]
@@ -426,28 +421,19 @@ export default function StudentProfilePage() {
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Institution</label>
                                 <div className="relative group">
                                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10 pointer-events-none" />
-                                    <select
-                                        value={formData.institution}
-                                        disabled={institutionLocked}
-                                        onChange={(e) =>
-                                            setFormData((f) => ({ ...f, institution: e.target.value }))
-                                        }
-                                        className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 outline-none transition-all font-bold text-slate-800 appearance-none ${
-                                            institutionLocked
-                                                ? "bg-slate-50/50 cursor-not-allowed border-slate-100 opacity-95"
-                                                : "bg-white border-slate-200 focus:border-blue-500"
-                                        }`}
-                                    >
-                                        <option value="">Select Institution</option>
-                                        {formData.institution && !institutionInList ? (
-                                            <option value={formData.institution}>{formData.institution}</option>
-                                        ) : null}
-                                        {pakistaniUniversities.map((u) => (
-                                            <option key={u} value={u}>
-                                                {u}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div>
+                                        <SearchableSelect
+                                            value={formData.institution}
+                                            onChange={(v) => setFormData((f) => ({ ...f, institution: v }))}
+                                            options={pakistaniUniversities}
+                                            placeholder="Select institution"
+                                            searchPlaceholder="Search universities..."
+                                            ariaLabel="Institution"
+                                            accent="blue"
+                                            hasLeftIcon
+                                            disabled={institutionLocked}
+                                        />
+                                    </div>
                                 </div>
                                 <p className="text-xs text-slate-400 mt-2 pl-1">
                                     {institutionLocked
@@ -469,8 +455,10 @@ export default function StudentProfilePage() {
                                             placeholder="—"
                                         />
                                     ) : (
-                                        <div className="[&_button]:pl-12">
+                                        <div>
                                             <SearchableSelect
+                                                accent="blue"
+                                                hasLeftIcon
                                                 value={formData.department}
                                                 onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
                                                 options={hecPrograms}

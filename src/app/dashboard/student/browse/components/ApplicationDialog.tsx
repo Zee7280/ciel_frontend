@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../report/components/ui/dialog";
 import { Button } from "../../report/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "../../report/components/ui/radio-group";
@@ -9,7 +10,7 @@ import { Input } from "../../report/components/ui/input";
 import { Plus, Trash2, Loader2, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
-import { pakistaniUniversities } from "@/utils/universityData";
+import { canonicalPakistaniUniversity, canonicalUniversityAllowlist, pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuidance";
 import type { AttendanceApproverType } from "@/utils/attendanceApproverRouting";
@@ -18,7 +19,6 @@ import {
     composeInternationalPhone,
     parsePhoneForDisplay,
     validateNationalPhone,
-    validateOptionalNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicInput, pakistaniCnicDigits } from "@/utils/section1ParticipantDossierFields";
 import {
@@ -41,6 +41,10 @@ interface ApplicationDialogProps {
     onSuccess: (id: string, meta?: ApplySuccessMeta) => void;
     opportunityTitle?: string;
     attendanceApproverType?: AttendanceApproverType;
+    /** Opportunity university scope (same list Section 1 / IdentityVerification use). Empty → full Pakistan list. */
+    allowedUniversities?: string[];
+    /** Seats still open on the listing (lead + members must fit). null/undefined → no cap known. */
+    seatsRemaining?: number | null;
 }
 
 interface TeamMember {
@@ -59,11 +63,21 @@ interface TeamMember {
     showOtpInput?: boolean;
 }
 
-function defaultPakistaniUniversity(profileValue: string): string {
+/** Profile spelling → picker entry ("BNU" → "Beaconhouse National University (BNU)"). Unknown names stay as typed. */
+function profileUniversityForPicker(profileValue: string): string {
     const t = (profileValue || "").trim();
-    if (t === "Other") return "Other";
-    if (pakistaniUniversities.includes(t)) return t;
-    return pakistaniUniversities[0] ?? "";
+    if (!t || t === "Other") return t;
+    return canonicalPakistaniUniversity(t) || t;
+}
+
+function universityKey(value: unknown): string {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isUniversityWithinScope(university: string, allowlist: string[]): boolean {
+    if (allowlist.length === 0) return true;
+    const key = universityKey(canonicalPakistaniUniversity(university) || university);
+    return allowlist.some((u) => universityKey(u) === key);
 }
 
 /** Backend requires non-empty unique `team_id` for every team application. */
@@ -80,8 +94,8 @@ function teamMemberRowForApplyApi(m: TeamMember) {
         name: m.name,
         cnic: m.cnic,
         mobile: composeInternationalPhone(m.phoneCountryKey, m.phoneNational),
-        email: m.email,
-        university: m.university,
+        email: m.email.trim(),
+        university: canonicalPakistaniUniversity(m.university) || m.university,
         program: m.program,
         role: m.role,
     };
@@ -100,6 +114,14 @@ function isDuplicateTeamMemberEmail(email: string, members: TeamMember[], selfIn
     return members.some((member, idx) => idx !== selfIndex && emailKey(member.email) === next);
 }
 
+const DUPLICATE_TEAM_CNIC_MESSAGE = "This CNIC is already used by another member of this team.";
+
+function isDuplicateTeamMemberCnic(cnic: string, members: TeamMember[], selfIndex: number): boolean {
+    const next = pakistaniCnicDigits(cnic);
+    if (next.length !== 13) return false;
+    return members.some((member, idx) => idx !== selfIndex && pakistaniCnicDigits(member.cnic) === next);
+}
+
 export default function ApplicationDialog({
     opportunityId,
     open,
@@ -107,8 +129,22 @@ export default function ApplicationDialog({
     onSuccess,
     opportunityTitle,
     attendanceApproverType = "faculty",
+    allowedUniversities,
+    seatsRemaining,
 }: ApplicationDialogProps) {
     const submitLockRef = useRef(false);
+    const universityAllowlist = useMemo(() => canonicalUniversityAllowlist(allowedUniversities), [allowedUniversities]);
+    const universityLocked = universityAllowlist.length === 1;
+    const universityOptions = useMemo(
+        () => (universityAllowlist.length > 0 ? universityAllowlist : [...pakistaniUniversities, "Other"]),
+        [universityAllowlist],
+    );
+    /** University a fresh member row starts with: the single allowed one, otherwise nothing (never a silent list default). */
+    const blankMemberUniversity = universityLocked ? universityAllowlist[0] : "";
+    const maxTeamSize =
+        typeof seatsRemaining === "number" && Number.isFinite(seatsRemaining) && seatsRemaining > 0
+            ? Math.floor(seatsRemaining)
+            : null;
     const [participationType, setParticipationType] = useState<"individual" | "team">("individual");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = useState("");
@@ -122,7 +158,7 @@ export default function ApplicationDialog({
             phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
             phoneNational: "",
             email: "",
-            university: defaultPakistaniUniversity(""),
+            university: "",
             program: "",
             role: "Member",
             verificationStatus: "unverified",
@@ -156,7 +192,7 @@ export default function ApplicationDialog({
                 phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
                 phoneNational: "",
                 email: "",
-                university: defaultPakistaniUniversity(""),
+                university: blankMemberUniversity,
                 program: "",
                 role: "Member",
                 verificationStatus: "unverified",
@@ -174,8 +210,11 @@ export default function ApplicationDialog({
                         phoneCountryKey: parsedMember.phoneCountryKey,
                         phoneNational: parsedMember.national,
                         email: u.email || "",
-                        university: defaultPakistaniUniversity(u.university || u.institution || ""),
-                        program: u.program || "",
+                        // Lead's seat is their profile university; a single-university scope wins over any profile spelling.
+                        university: universityLocked
+                            ? universityAllowlist[0]
+                            : profileUniversityForPicker(u.university || u.institution || ""),
+                        program: u.program || u.department || "",
                         role: "Lead",
                         verificationStatus: 'verified'
                     };
@@ -189,7 +228,27 @@ export default function ApplicationDialog({
             setApplicantPhoneCountryKey(parsed.phoneCountryKey);
             setApplicantPhoneNational(parsed.national);
         }
-    }, [open, opportunityId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, opportunityId, universityLocked, universityAllowlist[0]]);
+
+    // "Your mobile number" is the lead's contact in both modes — keep the lead row in sync so the
+    // team payload never carries a stale/empty profile phone while the field above is filled.
+    useEffect(() => {
+        setTeamMembers((prev) => {
+            const idx = prev.findIndex((m) => m.role === "Lead");
+            if (idx < 0) return prev;
+            const lead = prev[idx];
+            if (lead.phoneCountryKey === applicantPhoneCountryKey && lead.phoneNational === applicantPhoneNational) return prev;
+            const next = [...prev];
+            next[idx] = {
+                ...lead,
+                phoneCountryKey: applicantPhoneCountryKey,
+                phoneNational: applicantPhoneNational,
+                mobile: composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational),
+            };
+            return next;
+        });
+    }, [applicantPhoneCountryKey, applicantPhoneNational]);
 
     // Backend rejects empty team_id — keep a trimmed value whenever user is in team mode
     useEffect(() => {
@@ -198,7 +257,17 @@ export default function ApplicationDialog({
         }
     }, [participationType, teamId]);
 
+    const teamIsFull = maxTeamSize != null && teamMembers.length >= maxTeamSize;
+
     const handleAddMember = () => {
+        if (teamIsFull) {
+            toast.error(
+                maxTeamSize === 1
+                    ? "Only 1 seat is left on this opportunity, so a team cannot be formed — apply as an individual."
+                    : `Only ${maxTeamSize} seats are left on this opportunity (you + ${maxTeamSize - 1} member${maxTeamSize - 1 === 1 ? "" : "s"}).`,
+            );
+            return;
+        }
         setTeamMembers([
             ...teamMembers,
             {
@@ -208,7 +277,7 @@ export default function ApplicationDialog({
                 phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
                 phoneNational: "",
                 email: "",
-                university: defaultPakistaniUniversity(""),
+                university: blankMemberUniversity,
                 program: "",
                 role: "Member",
                 verificationStatus: "unverified",
@@ -217,13 +286,13 @@ export default function ApplicationDialog({
     };
 
     const handleRemoveMember = (index: number) => {
-        if (teamMembers.length > 1) {
-            const newMembers = [...teamMembers];
-            newMembers.splice(index, 1);
-            setTeamMembers(newMembers);
-        } else {
-            toast.error("A team must have at least one member (other than you).");
+        if (teamMembers[index]?.role === "Lead") {
+            toast.error("You are the team lead — your own row cannot be removed. Switch to Individual instead.");
+            return;
         }
+        const newMembers = [...teamMembers];
+        newMembers.splice(index, 1);
+        setTeamMembers(newMembers);
     };
 
     const updateMemberPhone = (index: number, patch: { phoneCountryKey?: string; phoneNational?: string }) => {
@@ -249,7 +318,7 @@ export default function ApplicationDialog({
             value = pakistaniCnicDigits(value);
         }
 
-        if (field === "university" && teamMembers[index]?.role === "Lead") {
+        if (field === "university" && (teamMembers[index]?.role === "Lead" || universityLocked)) {
             return;
         }
 
@@ -377,18 +446,19 @@ export default function ApplicationDialog({
         }
 
         const applicantPhoneE164 = composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
-        if (participationType === "individual") {
-            const phoneErr = validateNationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
-            if (phoneErr) {
-                toast.error(phoneErr);
-                return;
-            }
-        } else {
-            const optionalErr = validateOptionalNationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
-            if (optionalErr) {
-                toast.error(optionalErr);
-                return;
-            }
+        // Lead contact is required in both modes: individual seat, or the lead row of the team payload.
+        const phoneErr = validateNationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
+        if (phoneErr) {
+            toast.error(phoneErr);
+            return;
+        }
+
+        const lead = teamMembers.find((m) => m.role === "Lead");
+        if (lead && !isUniversityWithinScope(lead.university, universityAllowlist)) {
+            toast.error(
+                `This opportunity is open to ${universityAllowlist.join(", ")} students only. Your profile university (${lead.university || "not set"}) does not match.`,
+            );
+            return;
         }
 
         // Team apply: always send a non-empty team_id string (never rely on JSON omitting undefined)
@@ -397,23 +467,50 @@ export default function ApplicationDialog({
 
         // Validation for team
         if (participationType === "team") {
+            if (!teamMembers.some((m) => m.role !== "Lead")) {
+                toast.error("Add at least one verified team member, or apply as an individual.");
+                return;
+            }
+            if (maxTeamSize != null && teamMembers.length > maxTeamSize) {
+                toast.error(`Only ${maxTeamSize} seat${maxTeamSize === 1 ? " is" : "s are"} left on this opportunity — your team has ${teamMembers.length} people.`);
+                return;
+            }
             for (let i = 0; i < teamMembers.length; i++) {
                 const member = teamMembers[i];
+                const label = member.role === "Lead" ? "you (team lead)" : `Member ${i + 1}`;
                 const memberPhoneErr = validateNationalPhone(member.phoneCountryKey, member.phoneNational);
-                if (!member.name || !member.cnic || memberPhoneErr) {
-                    toast.error(memberPhoneErr || `Please fill in all required fields for Member ${i + 1}.`);
+                if (!member.name.trim() || !member.cnic || memberPhoneErr) {
+                    toast.error(memberPhoneErr ? `${memberPhoneErr} (${label})` : `Please fill in all required fields for ${label}.`);
                     return;
                 }
                 if (member.cnic.length !== 13) {
-                    toast.error(`CNIC for Member ${i + 1} must be exactly 13 digits.`);
+                    toast.error(`CNIC for ${label} must be exactly 13 digits.`);
+                    return;
+                }
+                if (isDuplicateTeamMemberCnic(member.cnic, teamMembers, i)) {
+                    toast.error(`${DUPLICATE_TEAM_CNIC_MESSAGE} (${label})`);
+                    return;
+                }
+                if (!member.email.trim() || !member.email.includes("@")) {
+                    toast.error(`A valid email is required for ${label}.`);
                     return;
                 }
                 if (member.verificationStatus !== 'verified') {
-                    toast.error(`Please verify the email for Member ${i + 1} before submitting.`);
+                    toast.error(`Please verify the email for ${label} before submitting.`);
                     return;
                 }
                 if (isDuplicateTeamMemberEmail(member.email, teamMembers, i)) {
                     toast.error(DUPLICATE_TEAM_EMAIL_MESSAGE);
+                    return;
+                }
+                if (!member.university.trim()) {
+                    toast.error(`Select the university for ${label}.`);
+                    return;
+                }
+                if (!isUniversityWithinScope(member.university, universityAllowlist)) {
+                    toast.error(
+                        `${member.university} is not allowed on this opportunity (${label}). Open to: ${universityAllowlist.join(", ")}.`,
+                    );
                     return;
                 }
             }
@@ -627,12 +724,10 @@ export default function ApplicationDialog({
                             <div className="flex items-center justify-between gap-2">
                                 <Label className="text-xs font-black text-slate-700 uppercase tracking-widest">
                                     Your mobile number
-                                    {participationType === "individual" ? (
-                                        <span className="text-red-500 ml-1">*</span>
-                                    ) : null}
+                                    <span className="text-red-500 ml-1">*</span>
                                 </Label>
                                 <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
-                                    {participationType === "individual" ? "Required" : "Optional"}
+                                    Required
                                 </span>
                             </div>
                             <PhoneConnectivityRow
@@ -721,9 +816,19 @@ export default function ApplicationDialog({
                             <div className="flex justify-between items-center border-b pb-2">
                                 <div className="space-y-1">
                                     <Label className="text-lg font-bold text-slate-800">Team Members</Label>
-                                    <p className="text-sm text-slate-500">Provide details for all students in your team.</p>
+                                    <p className="text-sm text-slate-500">
+                                        You are the team lead (row 1). Add every teammate and verify their email by OTP.
+                                        {maxTeamSize != null ? ` Seats left: ${maxTeamSize} (team of ${teamMembers.length}).` : ""}
+                                    </p>
+                                    {universityAllowlist.length > 0 ? (
+                                        <p className="text-xs font-semibold text-indigo-600">
+                                            {universityLocked
+                                                ? `Open to ${universityAllowlist[0]} students only — every member must be from there.`
+                                                : `Open to: ${universityAllowlist.join(", ")}. Every member must be from one of these.`}
+                                        </p>
+                                    ) : null}
                                 </div>
-                                <Button size="sm" onClick={handleAddMember} className="bg-slate-900 text-white hover:bg-slate-800">
+                                <Button size="sm" onClick={handleAddMember} disabled={teamIsFull} className="bg-slate-900 text-white hover:bg-slate-800 shrink-0">
                                     <Plus className="w-4 h-4 mr-2" /> Add Member
                                 </Button>
                             </div>
@@ -731,21 +836,31 @@ export default function ApplicationDialog({
                             <div className="space-y-4">
                                 {teamMembers.map((member, index) => (
                                     <div key={index} className="p-6 border rounded-xl bg-slate-50/50 relative group transition-all hover:bg-slate-100/50">
-                                        <div className="absolute right-3 top-3">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleRemoveMember(index)}
-                                                className="h-8 w-8 text-slate-400 hover:text-red-500"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                                        {member.role !== "Lead" ? (
+                                            <div className="absolute right-3 top-3">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRemoveMember(index)}
+                                                    aria-label={`Remove member ${index + 1}`}
+                                                    className="h-8 w-8 text-slate-400 hover:text-red-500"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ) : null}
                                         <div className="mb-4 flex items-center gap-2">
                                             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-600 text-xs font-bold">
                                                 {index + 1}
                                             </span>
-                                            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Member Details</h4>
+                                            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                                                {member.role === "Lead" ? "Team Lead (you)" : "Member Details"}
+                                            </h4>
+                                            {member.role === "Lead" ? (
+                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                                                    From your profile
+                                                </span>
+                                            ) : null}
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:gap-x-5 lg:gap-y-4 lg:items-start">
@@ -767,8 +882,11 @@ export default function ApplicationDialog({
                                                     placeholder="35202-1234567-1"
                                                     inputMode="numeric"
                                                     maxLength={15}
-                                                    className="h-10 bg-white"
+                                                    className={`h-10 bg-white ${isDuplicateTeamMemberCnic(member.cnic, teamMembers, index) ? "border-red-500" : ""}`}
                                                 />
+                                                {isDuplicateTeamMemberCnic(member.cnic, teamMembers, index) ? (
+                                                    <p className="text-[10px] text-red-600 font-medium">{DUPLICATE_TEAM_CNIC_MESSAGE}</p>
+                                                ) : null}
                                             </div>
                                             <div className="space-y-1.5 md:col-span-2 lg:col-span-6">
                                                 <Label className="text-xs font-medium text-slate-600">Mobile Number *</Label>
@@ -785,22 +903,33 @@ export default function ApplicationDialog({
                                                     inputClassName="border-slate-200 h-10 min-h-10 rounded-md text-sm py-0 box-border"
                                                     rowClassName="items-center gap-2"
                                                 />
+                                                {member.role === "Lead" ? (
+                                                    <p className="text-[10px] text-slate-400">Edit this under “Your mobile number” above.</p>
+                                                ) : null}
                                             </div>
 
                                             <div className="space-y-1.5 md:col-span-1 lg:col-span-3">
                                                 <Label className="text-xs font-medium text-slate-600">University *</Label>
-                                                <select
-                                                    className={`flex h-10 w-full rounded-md border border-input px-3 py-0 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-100 box-border leading-normal ${member.role === "Lead" ? "bg-slate-50" : "bg-white"}`}
+                                                <SearchableSelect
                                                     value={member.university}
-                                                    onChange={(e) => updateMember(index, 'university', e.target.value)}
-                                                    disabled={member.role === "Lead"}
-                                                >
-                                                    <option value="">Select University</option>
-                                                    {pakistaniUniversities.map(uni => (
-                                                        <option key={uni} value={uni}>{uni}</option>
-                                                    ))}
-                                                    <option value="Other">Other / Not Listed</option>
-                                                </select>
+                                                    onChange={(v) => updateMember(index, 'university', v)}
+                                                    options={
+                                                        member.university && !universityOptions.includes(member.university)
+                                                            ? [member.university, ...universityOptions]
+                                                            : universityOptions
+                                                    }
+                                                    placeholder={universityAllowlist.length > 1 ? "Select an allowed university" : "Select University"}
+                                                    searchPlaceholder="Search universities..."
+                                                    ariaLabel={`University for member ${index + 1}`}
+                                                    accent="blue"
+                                                    allowCustomValue={false}
+                                                    disabled={member.role === "Lead" || universityLocked}
+                                                />
+                                                {member.role === "Lead" ? (
+                                                    <p className="text-[10px] text-slate-400">Taken from your profile.</p>
+                                                ) : member.university && !isUniversityWithinScope(member.university, universityAllowlist) ? (
+                                                    <p className="text-[10px] text-red-600 font-medium">Not allowed on this opportunity.</p>
+                                                ) : null}
                                             </div>
 
                                             <div className="space-y-1.5 md:col-span-2 lg:col-span-9">
