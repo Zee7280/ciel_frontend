@@ -76,9 +76,9 @@ function chapterIndexForStep(step: number): number {
     return idx === -1 ? 0 : idx;
 }
 /** Per-step required answers — mirrors the backend "Ready to Submit" gate
- * (ciel_backend paths/course-project-readiness.util.ts) so a chapter only earns its ✓ once its
- * mandatory fields exist, "Save & continue" cannot skip an empty step, and the submit page shows the
- * same list the server would otherwise reject with. Modules the Format step switched off are not
+ * (ciel_backend paths/course-project-readiness.util.ts). Every chapter stays open while drafting;
+ * this list only drives the chapter ✓ marks and the Submit page, which shows the same missing
+ * answers the server would otherwise reject with. Modules the Format step switched off are not
  * required, exactly as the server treats them. */
 function courseworkStepMissing(step: number, entry: CourseProjectEntry): string[] {
     const inc: CourseProjectModuleInclusion = entry.moduleInclusion || {};
@@ -879,8 +879,8 @@ export default function CourseProjectWizardPage() {
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
     const blended = routesIn.length > 1;
     const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
-    /** A step is "done" only when the student has moved past it AND its required answers exist. */
-    const stepDone = (s: number) => s < entry.stepCompleted && courseworkStepMissing(s, entry).length === 0;
+    /** A step is "done" once its required answers exist — order of filling does not matter. */
+    const stepDone = (s: number) => courseworkStepMissing(s, entry).length === 0;
     const chaptersComplete = CHAPTERS.filter((c) => c.steps.every(stepDone)).length;
 
     const primarySdg = entry.sdgMapping?.entries?.[0];
@@ -1001,22 +1001,16 @@ export default function CourseProjectWizardPage() {
                         {CHAPTERS.map((chapter, ci) => {
                             const isCurrent = chapter.steps.includes(step);
                             const isDone = !isCurrent && chapter.steps.every(stepDone);
-                            // Chapters beyond the furthest step reached stay locked — "Save & continue" is
-                            // the only way forward, and it refuses to advance past an incomplete step.
-                            const locked = chapter.steps[0] > entry.stepCompleted;
+                            // Every chapter is open while drafting — students fill details in any order;
+                            // required answers are only enforced on the Submit page.
                             return (
                                 <button
                                     key={chapter.title}
                                     type="button"
-                                    disabled={locked}
-                                    onClick={() => {
-                                        if (locked) return;
-                                        setStep(isCurrent ? step : chapter.steps[0]);
-                                    }}
-                                    title={locked ? "Complete the earlier chapters first" : chapter.title}
+                                    onClick={() => setStep(isCurrent ? step : chapter.steps[0])}
+                                    title={chapter.title}
                                     className={clsx(
                                         "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 pb-[7px] pt-2.5 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
-                                        locked && "cursor-not-allowed opacity-60",
                                         isCurrent
                                             ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep shadow-[0_2px_8px_rgba(213,170,70,.25)]"
                                             : isDone
@@ -1045,19 +1039,13 @@ export default function CourseProjectWizardPage() {
                             {CHAPTERS[chapterIndexForStep(step)].steps.map((s) => {
                                 const isCurrent = s === step;
                                 const isDone = !isCurrent && stepDone(s);
-                                const locked = s > entry.stepCompleted;
                                 return (
                                     <button
                                         key={s}
                                         type="button"
-                                        disabled={locked}
-                                        title={locked ? "Complete the earlier step first" : undefined}
-                                        onClick={() => {
-                                            if (!locked) setStep(s);
-                                        }}
+                                        onClick={() => setStep(s)}
                                         className={clsx(
                                             "ciel-transition rounded-full border-2 px-3 py-1 text-[10.5px] font-bold",
-                                            locked && "cursor-not-allowed opacity-60",
                                             isCurrent
                                                 ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep"
                                                 : isDone
@@ -1893,13 +1881,8 @@ export default function CourseProjectWizardPage() {
                                 type="button"
                                 disabled={saving || uploading}
                                 onClick={async () => {
-                                    const missing = courseworkStepMissing(step, entry);
-                                    if (missing.length) {
-                                        // Keep what was typed, but do not mark the step complete.
-                                        await save(saveAllFields());
-                                        setError(`Complete this step before continuing — missing: ${missing.join(", ")}.`);
-                                        return;
-                                    }
+                                    // Save whatever was typed and move on; required answers are only
+                                    // enforced on the Submit page (which links back to each gap).
                                     await save(saveAllFields(), step + 1);
                                 }}
                                 className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
