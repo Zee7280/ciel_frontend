@@ -361,14 +361,14 @@ export default function AdminProjectEvidencePage() {
             name: "Reports",
             selector: (row) => row.report_count,
             sortable: true,
-            right: true,
+            style: { justifyContent: "flex-end" },
             width: "100px",
         },
         {
             name: "Evidence files",
             selector: (row) => row.evidence_file_count,
             sortable: true,
-            right: true,
+            style: { justifyContent: "flex-end" },
             width: "130px",
         },
         {
@@ -390,7 +390,7 @@ export default function AdminProjectEvidencePage() {
                 </button>
             ),
             ignoreRowClick: true,
-            button: true,
+            style: { justifyContent: "flex-end" },
         },
     ];
 

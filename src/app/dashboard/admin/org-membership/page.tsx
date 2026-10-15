@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { ExternalLink, Loader2, Check, X, Building2, User, History, AlertTriangle } from "lucide-react";
+import { ExternalLink, Loader2, Check, X, Building2, User, History, AlertTriangle, CheckSquare } from "lucide-react";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
@@ -221,6 +221,52 @@ export default function AdminOrgMembershipPage() {
     const [historyTotal, setHistoryTotal] = useState<number | null>(null);
     const [historyPage, setHistoryPage] = useState(1);
     const [action, setAction] = useState<PendingAction>(null);
+    /** Bulk approve on the pending tab — amount-mismatch rows are skipped (approve those one by one). */
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const toggleSelected = (id: string) =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    const runBulkApprove = async () => {
+        const picked = rows.filter((r) => selectedIds.has(r.id));
+        const clean = picked.filter((r) => !isMismatch(r));
+        const skipped = picked.length - clean.length;
+        if (!clean.length) {
+            toast.error("Every selected row has an amount mismatch — approve those individually.");
+            return;
+        }
+        if (!window.confirm(`Approve ${clean.length} organization payment${clean.length === 1 ? "" : "s"}?${skipped ? ` ${skipped} with an amount mismatch will be skipped.` : ""}`)) return;
+        setBulkBusy(true);
+        let ok = 0;
+        const failed: string[] = [];
+        try {
+            for (const r of clean) {
+                try {
+                    const res = await authenticatedFetch(`/api/v1/admin/org-membership/${r.id}/approve`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({}),
+                    });
+                    if (res && res.ok) ok += 1;
+                    else failed.push(await readErrorMessage(res, "Approve failed"));
+                } catch (e) {
+                    failed.push(e instanceof Error ? e.message : "Approve failed");
+                }
+            }
+            if (ok) toast.success(`${ok} approved`);
+            if (skipped) toast.warning(`${skipped} skipped (amount mismatch)`);
+            if (failed.length) toast.error(`${failed.length} failed. ${failed[0]}`, { duration: 8000 });
+            setSelectedIds(new Set());
+            setHistoryTotal(null);
+            await load();
+        } finally {
+            setBulkBusy(false);
+        }
+    };
     const [mismatchAck, setMismatchAck] = useState(false);
     const { begin } = useAbortableFetch();
 
@@ -385,6 +431,26 @@ export default function AdminOrgMembershipPage() {
                     History
                     {badge(historyTotal, tab === "history")}
                 </button>
+                {tab === "pending" && rows.length > 0 ? (
+                    <div className="ml-auto flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            onClick={() => setSelectedIds(selectedIds.size === rows.length ? new Set() : new Set(rows.map((r) => r.id)))}
+                        >
+                            {selectedIds.size === rows.length ? "Clear selection" : "Select all"}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!selectedIds.size || bulkBusy}
+                            onClick={() => void runBulkApprove()}
+                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            <CheckSquare className="h-4 w-4" aria-hidden />
+                            {bulkBusy ? "Approving…" : `Approve selected (${selectedIds.size})`}
+                        </button>
+                    </div>
+                ) : null}
             </div>
 
             {loading ? (
@@ -403,7 +469,17 @@ export default function AdminOrgMembershipPage() {
                             <li key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="min-w-0">
-                                        <p className="font-semibold text-slate-900">{r.user?.name || "Unknown user"}</p>
+                                        <p className="flex items-center gap-2 font-semibold text-slate-900">
+                                            {tab === "pending" ? (
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Select ${r.user?.name || "row"}`}
+                                                    checked={selectedIds.has(r.id)}
+                                                    onChange={() => toggleSelected(r.id)}
+                                                />
+                                            ) : null}
+                                            <span>{r.user?.name || "Unknown user"}</span>
+                                        </p>
                                         <p className="text-sm text-slate-600 break-all">{r.user?.email}</p>
                                         <p className="mt-1 text-xs text-slate-500 break-all">
                                             Role: {r.user?.role} · User ID: {r.userId} · Paid PKR{" "}

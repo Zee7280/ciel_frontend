@@ -97,6 +97,7 @@ export default function AdminNotificationsPage() {
     };
 
     const deleteNotification = async (id: number) => {
+        if (!window.confirm("Delete this notification? This cannot be undone.")) return;
         try {
             const res = await authenticatedFetch(`/api/v1/notifications/${id}`, {
                 method: "DELETE",

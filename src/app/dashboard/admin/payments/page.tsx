@@ -13,10 +13,11 @@ import {
     Calendar,
     FileText,
     AlertCircle,
-    RotateCcw
+    RotateCcw, CheckSquare
 } from 'lucide-react';
 import clsx from 'clsx';
 import { authenticatedFetch } from '@/utils/api';
+import { downloadCsv } from "../_shared/csv";
 import { toast } from 'sonner';
 import { Button } from '../../student/report/components/ui/button';
 import { Card, CardContent, CardHeader } from '../../student/report/components/ui/card';
@@ -252,6 +253,19 @@ export default function AdminPaymentsPage() {
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isActionOpen, setIsActionOpen] = useState(false);
+    /** Bulk approve / reject on the pending tab (each payment still goes through /verify one by one). */
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkMode, setBulkMode] = useState(false);
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [activeTab]);
+    const toggleSelected = (id: string) =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
     const [feedback, setFeedback] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -394,6 +408,41 @@ export default function AdminPaymentsPage() {
     }, [activeTab, fetchPayments, refreshPendingCount]);
 
     const handleAction = async () => {
+        if (bulkMode) {
+            const ids = filteredPayments.filter((p) => selectedIds.has(p.id)).map((p) => p.id);
+            if (!ids.length) return;
+            setIsSubmitting(true);
+            let ok = 0;
+            const failed: string[] = [];
+            try {
+                for (const id of ids) {
+                    try {
+                        const res = await authenticatedFetch(`/api/v1/admin/payments/${id}/verify`, {
+                            method: 'POST',
+                            body: JSON.stringify({ status: actionType === 'approve' ? 'approved' : 'rejected', feedback }),
+                        });
+                        if (res && res.ok) {
+                            ok += 1;
+                            setPayments((prev) => prev.filter((p) => p.id !== id));
+                        } else {
+                            failed.push(await readErrorMessage(res, `Could not ${actionType} payment`));
+                        }
+                    } catch (error) {
+                        failed.push(error instanceof Error ? error.message : 'Failed');
+                    }
+                }
+                if (ok) toast.success(`${ok} payment${ok === 1 ? '' : 's'} ${actionType}d`);
+                if (failed.length) toast.error(`${failed.length} failed — still pending. ${failed[0]}`, { duration: 8000 });
+                setIsActionOpen(false);
+                setBulkMode(false);
+                setSelectedIds(new Set());
+                setFeedback("");
+                await refreshPendingCount();
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
         if (!selectedPayment) return;
         
         setIsSubmitting(true);
@@ -572,10 +621,48 @@ export default function AdminPaymentsPage() {
                         </button>
                     ))}
                 </div>
-                <p className="text-xs text-slate-500">
-                    Showing <span className="font-semibold text-slate-700">{filteredPayments.length}</span>
-                    {searchQuery.trim() ? ' matching' : ''} {activeTab} payment{filteredPayments.length === 1 ? '' : 's'}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-slate-500">
+                        Showing <span className="font-semibold text-slate-700">{filteredPayments.length}</span>
+                        {searchQuery.trim() ? ' matching' : ''} {activeTab} payment{filteredPayments.length === 1 ? '' : 's'}
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 gap-1.5 text-xs"
+                        disabled={!filteredPayments.length}
+                        onClick={() =>
+                            downloadCsv(`payments-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`, [
+                                ['Student', 'Email', 'Project', 'Amount', 'Submitted', 'Status', 'Mode', 'Team size', 'Attempt'],
+                                ...filteredPayments.map((p) => [
+                                    p.studentName, p.studentEmail, p.projectTitle, p.amount, p.date, p.status, p.participationMode, p.teamMemberCount,
+                                    p.submissionNumber != null ? `${p.submissionNumber}/${p.submissionTotal ?? ''}` : '',
+                                ]),
+                            ])
+                        }
+                    >
+                        <Download className="h-3.5 w-3.5" /> Export CSV
+                    </Button>
+                    {activeTab === 'pending' && selectedIds.size > 0 ? (
+                        <>
+                            <Button
+                                size="sm"
+                                className="h-9 gap-1.5 bg-emerald-600 text-xs font-semibold hover:bg-emerald-700"
+                                onClick={() => { setBulkMode(true); setSelectedPayment(null); setActionType('approve'); setIsActionOpen(true); }}
+                            >
+                                <CheckSquare className="h-3.5 w-3.5" /> Approve selected ({selectedIds.size})
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 gap-1.5 border-red-200 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                onClick={() => { setBulkMode(true); setSelectedPayment(null); setActionType('reject'); setIsActionOpen(true); }}
+                            >
+                                Reject selected ({selectedIds.size})
+                            </Button>
+                        </>
+                    ) : null}
+                </div>
             </div>
 
             <Card className="overflow-hidden rounded-xl border-slate-200 shadow-sm">
@@ -611,6 +698,16 @@ export default function AdminPaymentsPage() {
                             <table className="w-full min-w-[1100px] border-collapse text-left">
                                 <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm">
                                     <tr>
+                                        {activeTab === 'pending' ? (
+                                            <th className={clsx(TH, 'w-10')}>
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label="Select all pending payments"
+                                                    checked={filteredPayments.length > 0 && filteredPayments.every((p) => selectedIds.has(p.id))}
+                                                    onChange={(e) => setSelectedIds(e.target.checked ? new Set(filteredPayments.map((p) => p.id)) : new Set())}
+                                                />
+                                            </th>
+                                        ) : null}
                                         <th className={TH}>Submitted by</th>
                                         <th className={TH}>Team</th>
                                         <th className={TH}>Project</th>
@@ -628,6 +725,16 @@ export default function AdminPaymentsPage() {
                                             key={payment.id}
                                             className="transition-colors hover:bg-slate-50/80"
                                         >
+                                            {activeTab === 'pending' ? (
+                                                <td className={clsx(TD, 'w-10')}>
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`Select payment from ${payment.studentName}`}
+                                                        checked={selectedIds.has(payment.id)}
+                                                        onChange={() => toggleSelected(payment.id)}
+                                                    />
+                                                </td>
+                                            ) : null}
                                             <td className={TD}>
                                                 <div className="flex min-w-[180px] max-w-[220px] items-center gap-2.5">
                                                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
@@ -939,7 +1046,9 @@ export default function AdminPaymentsPage() {
                 open={isActionOpen}
                 title={actionType === 'approve' ? 'Approve payment?' : 'Reject payment?'}
                 description={
-                    actionType === 'approve'
+                    bulkMode
+                        ? `${actionType === 'approve' ? 'Approve' : 'Reject'} ${selectedIds.size} selected payment${selectedIds.size === 1 ? '' : 's'}. Each one is processed through the normal verification; any failure stays in the queue.`
+                        : actionType === 'approve'
                         ? `Confirm that you've verified the transfer of ${selectedPayment?.amount ?? '—'} from ${selectedPayment?.studentName ?? 'the student'}${
                               selectedPayment?.participationMode === 'team'
                                   ? ` (team of ${selectedPayment.teamMemberCount})`
@@ -954,6 +1063,7 @@ export default function AdminPaymentsPage() {
                 onConfirm={handleAction}
                 onCancel={() => {
                     setIsActionOpen(false);
+                    setBulkMode(false);
                     setFeedback("");
                 }}
             >

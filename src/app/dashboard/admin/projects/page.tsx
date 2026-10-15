@@ -59,6 +59,8 @@ type AdminProjectRow = {
     remainingSeats: number | null;
     remainingMembers: number | null;
     hours: number;
+    /** Hours confirmed on the locked flash card (0 until the report is reviewed). */
+    verifiedHours: number;
     remainingHours: number | null;
     raw: Record<string, unknown>;
     /** Present when listing is scoped with `student_email` query — role on that opportunity. */
@@ -181,10 +183,12 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     const vrFromTimeline = timeline ? optionalPositiveNumber(timeline, ["volunteers_required"]) : null;
     const volunteersRequired = vrFromRoot ?? vrFromTimeline;
 
-    const hours =
+    const verifiedHours =
         Math.round(
             (Number(raw.hours ?? raw.total_hours ?? raw.verified_hours ?? timeline?.expected_hours ?? raw.impact_hours) || 0) * 100,
         ) / 100;
+    // Prefer what students have actually logged; `hours` only counts once the flash card is locked.
+    const hours = raw.logged_hours != null ? Math.round((Number(raw.logged_hours) || 0) * 100) / 100 : verifiedHours;
 
     const parseNonNegInt = (v: unknown): number | null =>
         v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Math.max(0, Math.round(Number(v) * 100) / 100) : null;
@@ -220,6 +224,7 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
         remainingSeats,
         remainingMembers,
         hours,
+        verifiedHours,
         remainingHours,
         raw,
         studentMatch,
@@ -1607,7 +1612,7 @@ export default function AdminProjectsPage() {
         const unfilledSeatsTotal = rows.reduce((sum, r) => sum + (r.remainingSeats ?? 0), 0);
         const unfilledSeatsProjects = rows.filter((r) => (r.remainingSeats ?? 0) > 0).length;
         const totalHoursLogged = Math.round(rows.reduce((sum, r) => sum + r.hours, 0) * 100) / 100;
-        const totalHoursCommitted = Math.round(rows.reduce((sum, r) => sum + r.hours + (r.remainingHours ?? 0), 0) * 100) / 100;
+        const totalHoursCommitted = Math.round(rows.reduce((sum, r) => sum + r.verifiedHours + (r.remainingHours ?? 0), 0) * 100) / 100;
         return {
             total,
             active,
@@ -1924,12 +1929,13 @@ export default function AdminProjectsPage() {
                 width: "128px",
                 selector: (r) => r.hours,
                 cell: (r) => {
-                    const committed = r.remainingHours != null ? Math.round((r.hours + r.remainingHours) * 100) / 100 : null;
+                    const committed = r.remainingHours != null ? Math.round((r.verifiedHours + r.remainingHours) * 100) / 100 : null;
                     return (
                         <div className="text-center w-full py-1">
                             <span className="text-sm font-bold text-slate-900">{fmtHours(r.hours)}</span>
                             <div className="text-[10px] font-medium text-slate-500 mt-0.5">
                                 {committed != null ? `of ${committed} h committed` : "h logged"}
+                                {r.verifiedHours !== r.hours ? ` · ${fmtHours(r.verifiedHours)} verified` : ""}
                             </div>
                         </div>
                     );

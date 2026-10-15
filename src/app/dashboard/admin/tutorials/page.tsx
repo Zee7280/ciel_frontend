@@ -42,8 +42,8 @@ type TutorialRow = {
  * List/delete use the same base as typical API calls (OK for small payloads).
  */
 function adminTutorialsReadUrl(pathSuffix: "" | `/${string}`): string {
-    const p = resolvePreferredApiV1Base();
-    if (p) return `${p}/admin/tutorials${pathSuffix}`;
+    // Same-origin proxy like every other admin page (no CORS preflight to the backend origin);
+    // only the large presign/upload step below talks to the backend directly.
     return `/api/v1/admin/tutorials${pathSuffix}`;
 }
 

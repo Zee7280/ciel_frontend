@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle } from "lucide-react";
+import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
+import { downloadCsv } from "../_shared/csv";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -389,12 +390,31 @@ export default function AdminOrganizationsPage() {
                     <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Organizations</h1>
                     <p className="text-slate-500">Manage NGO, corporate, and university partners.</p>
                 </div>
-                <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
-                >
-                    <Building2 className="w-4 h-4" /> Onboard Organization
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const rec = (o: unknown) => (o && typeof o === "object" ? (o as Record<string, unknown>) : {});
+                            downloadCsv(`organizations-${new Date().toISOString().slice(0, 10)}.csv`, [
+                                ["Name", "Type", "Status", "Email", "Contact person", "Contact number", "Members", "Opportunities", "Created"],
+                                ...filteredOrgs.map((org) => {
+                                    const r = rec(org);
+                                    return [org.name, org.organization_type || org.type, r.status ?? r.verificationStatus, org.email, org.contact_person, org.contact_number, r.members_count, r.opportunities_count, r.created_at];
+                                }),
+                            ]);
+                        }}
+                        disabled={!filteredOrgs.length}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                    >
+                        <Building2 className="w-4 h-4" /> Onboard Organization
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}

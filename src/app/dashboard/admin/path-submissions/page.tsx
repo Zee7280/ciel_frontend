@@ -24,7 +24,6 @@ import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAna
 import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { CourseworkMonitorRow, isCourseworkMonitorStalled } from "@/components/ciel/coursework/CourseworkMonitorRow";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { courseworkRibbons, COURSEWORK_RIBBON_LEVEL_LABEL, type CourseworkRibbonEntry } from "@/utils/courseProjectTypes";
@@ -528,7 +527,7 @@ function AdminPathSubmissionsHub() {
                     <>
                     <CourseworkHero
                         kicker="CIEL PK · COURSEWORK"
-                        title={namedTimeGreeting("CIEL PK", "📘")}
+                        title="Coursework 📘"
                         subtitle="Command view of coursework records from first draft to faculty verification across every university. Stalled records surface first."
                         stats={[
                             { value: String(approvedCourse.length), label: "APPROVED" },

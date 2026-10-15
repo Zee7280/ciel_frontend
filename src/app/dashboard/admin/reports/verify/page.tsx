@@ -1089,7 +1089,7 @@ export default function AdminReportsVerificationPage() {
                 name: '',
                 width: '148px',
                 minWidth: '148px',
-                right: true,
+                style: { justifyContent: "flex-end" },
                 cell: (report) => (
                     <div className="flex items-center justify-end gap-1.5">
                         <button

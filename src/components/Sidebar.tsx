@@ -700,6 +700,7 @@ export default function Sidebar() {
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
                 { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
                 { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
+                { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
             ]),
         [withCounts],
     );
