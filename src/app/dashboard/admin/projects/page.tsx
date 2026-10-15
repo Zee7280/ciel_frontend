@@ -11,6 +11,12 @@ import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
 import { downloadCsv } from "@/app/dashboard/admin/_shared/csv";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
 import {
+    ImpactConfirmDialog,
+    RecentChangesPanel,
+    toImpactPreview,
+    type ImpactDialogState,
+} from "@/app/dashboard/admin/projects/TeamActionSafety";
+import {
     attendanceUnlockLabel,
     attendanceUnlockTone,
     parseAdminEnrollmentAttendanceRows,
@@ -873,6 +879,8 @@ export default function AdminProjectsPage() {
     const [teamMergeLeadId, setTeamMergeLeadId] = useState("");
     const [teamMergeTargetTeamId, setTeamMergeTargetTeamId] = useState("");
     const [teamMergeSubmitting, setTeamMergeSubmitting] = useState(false);
+    const [impactDialog, setImpactDialog] = useState<ImpactDialogState | null>(null);
+    const [snapshotsRefreshKey, setSnapshotsRefreshKey] = useState(0);
     const [attendanceToggleParticipationId, setAttendanceToggleParticipationId] = useState<string | null>(null);
     const [dedupeSeatsStudentUserId, setDedupeSeatsStudentUserId] = useState<string | null>(null);
     const [reconcileEnrollmentsLoading, setReconcileEnrollmentsLoading] = useState(false);
@@ -1070,16 +1078,90 @@ export default function AdminProjectsPage() {
         setTrackerModalRow(null);
     };
 
-    const handleRemoveTeam = async (teamId: string) => {
-        if (!teamOverviewModal) return;
-        if (
-            !confirmDangerSequence([
-                "Remove this full team?\n\nAll team members will be removed from this project and seats will be released.\n\nThis cannot be undone.",
-                "Second confirmation: delete the ENTIRE team and free all seats?\n\nType confirms with OK — Cancel stops.",
-            ])
-        ) {
+    /** Shows the impact of a destructive action first; `run` only fires after the admin confirms. */
+    const openImpactDialog = async (opts: {
+        title: string;
+        confirmLabel: string;
+        typedWord?: string;
+        previewRequest: () => Promise<Response | null>;
+        run: () => Promise<void>;
+    }) => {
+        const base = { title: opts.title, confirmLabel: opts.confirmLabel, typedWord: opts.typedWord, busy: false };
+        setImpactDialog({ ...base, preview: null, loading: true, onConfirm: () => {} });
+        try {
+            const res = await opts.previewRequest();
+            const body = res ? await res.json().catch(() => ({})) : {};
+            if (!res?.ok) {
+                const msg = typeof (body as { message?: string }).message === "string" ? (body as { message: string }).message : "";
+                setImpactDialog({
+                    ...base,
+                    preview: msg ? { lines: [], warnings: [], blockers: [msg] } : null,
+                    loading: false,
+                    onConfirm: () => {},
+                });
+                return;
+            }
+            setImpactDialog({
+                ...base,
+                preview: toImpactPreview(body),
+                loading: false,
+                onConfirm: () => {
+                    setImpactDialog((cur) => (cur ? { ...cur, busy: true } : cur));
+                    void opts.run().finally(() => setImpactDialog(null));
+                },
+            });
+        } catch {
+            setImpactDialog({ ...base, preview: null, loading: false, onConfirm: () => {} });
+        }
+    };
+
+    /** Success toast that carries the snapshot so the admin can undo straight away. */
+    const toastWithUndo = (message: string, opportunityId: string, snapshotId: unknown) => {
+        setSnapshotsRefreshKey((k) => k + 1);
+        if (typeof snapshotId !== "string" || !snapshotId) {
+            toast.success(message);
             return;
         }
+        toast.success(message, {
+            duration: 12000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    void (async () => {
+                        const res = await authenticatedFetch(
+                            `/api/v1/admin/opportunities/${encodeURIComponent(opportunityId)}/team-snapshots/${encodeURIComponent(snapshotId)}/restore`,
+                            { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+                        );
+                        const data = res ? await res.json().catch(() => ({})) : {};
+                        if (res?.ok) {
+                            toast.success("Change undone");
+                            setSnapshotsRefreshKey((k) => k + 1);
+                            await loadTeamOverview(opportunityId);
+                            void loadProjects(true);
+                        } else {
+                            toast.error(typeof (data as { message?: string }).message === "string" ? (data as { message: string }).message : "Could not undo this change");
+                        }
+                    })();
+                },
+            },
+        });
+    };
+
+    const handleRemoveTeam = async (teamId: string) => {
+        if (!teamOverviewModal) return;
+        const oppId = teamOverviewModal.opportunityId;
+        await openImpactDialog({
+            title: "Remove this full team?",
+            confirmLabel: "Remove team",
+            typedWord: "DELETE",
+            previewRequest: () =>
+                authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(oppId)}/teams/${encodeURIComponent(teamId)}/delete-preview`),
+            run: () => performRemoveTeam(teamId),
+        });
+    };
+
+    const performRemoveTeam = async (teamId: string) => {
+        if (!teamOverviewModal) return;
         setDeletingTeamId(teamId);
         try {
             const res = await authenticatedFetch(
@@ -1087,7 +1169,8 @@ export default function AdminProjectsPage() {
                 { method: "DELETE" },
             );
             if (res && (res.ok || res.status === 204)) {
-                toast.success("Team removed successfully");
+                const delBody = res.status === 204 ? {} : await res.json().catch(() => ({}));
+                toastWithUndo("Team removed", teamOverviewModal.opportunityId, (delBody as { snapshot_id?: string }).snapshot_id);
                 await loadTeamOverview(teamOverviewModal.opportunityId);
                 void loadProjects(true);
             } else {
@@ -1107,14 +1190,20 @@ export default function AdminProjectsPage() {
 
     const handleRemoveTeamMember = async (teamId: string, memberId: string) => {
         if (!teamOverviewModal) return;
-        if (
-            !confirmDangerSequence([
-                "Remove this member from the team?\n\nSeat and linked report/payment stubs for this person on this project will be cleared.\n\nThis cannot be undone.",
-                "Second confirmation: permanently remove ONLY this member from this team?",
-            ])
-        ) {
-            return;
-        }
+        const oppId = teamOverviewModal.opportunityId;
+        await openImpactDialog({
+            title: "Remove this member?",
+            confirmLabel: "Remove member",
+            previewRequest: () =>
+                authenticatedFetch(
+                    `/api/v1/admin/opportunities/${encodeURIComponent(oppId)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}/delete-preview`,
+                ),
+            run: () => performRemoveTeamMember(teamId, memberId),
+        });
+    };
+
+    const performRemoveTeamMember = async (teamId: string, memberId: string) => {
+        if (!teamOverviewModal) return;
         setDeletingMemberId(memberId);
         try {
             const res = await authenticatedFetch(
@@ -1122,7 +1211,8 @@ export default function AdminProjectsPage() {
                 { method: "DELETE" },
             );
             if (res && (res.ok || res.status === 204)) {
-                toast.success("Member removed successfully");
+                const delBody = res.status === 204 ? {} : await res.json().catch(() => ({}));
+                toastWithUndo("Member removed", teamOverviewModal.opportunityId, (delBody as { snapshot_id?: string }).snapshot_id);
                 setTeamMemberEditor((cur) => (cur?.memberId === memberId ? null : cur));
                 await loadTeamOverview(teamOverviewModal.opportunityId);
                 void loadProjects(true);
@@ -1368,14 +1458,27 @@ export default function AdminProjectsPage() {
         }
         const leadLabel =
             mergeableEnrollments.find((m) => m.participationId === teamMergeLeadId)?.name ?? "selected lead";
-        if (
-            !confirmDangerSequence([
-                `Merge ${teamMergeSelectedIds.length} enrollments into one team?\n\nTeam lead: ${leadLabel}.\n\nDraft reports on other members may be removed or moved to the lead.`,
-                "Second confirmation: apply team merge on this project?",
-            ])
-        ) {
-            return;
-        }
+        const mergeOppId = teamOverviewModal.opportunityId;
+        const mergeBody = JSON.stringify({
+            member_participation_ids: teamMergeSelectedIds,
+            lead_participation_id: teamMergeLeadId,
+            ...(teamMergeTargetTeamId.trim() ? { target_team_id: teamMergeTargetTeamId.trim() } : {}),
+        });
+        await openImpactDialog({
+            title: `Merge ${teamMergeSelectedIds.length} enrollments into one team (lead: ${leadLabel})?`,
+            confirmLabel: "Merge team",
+            previewRequest: () =>
+                authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(mergeOppId)}/teams/merge-preview`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: mergeBody,
+                }),
+            run: () => performMergeTeamMembers(),
+        });
+    };
+
+    const performMergeTeamMembers = async () => {
+        if (!teamOverviewModal) return;
         setTeamMergeSubmitting(true);
         try {
             const res = await authenticatedFetch(
@@ -1397,7 +1500,7 @@ export default function AdminProjectsPage() {
                     typeof (data as { message?: string }).message === "string"
                         ? (data as { message: string }).message
                         : "Team merged successfully";
-                toast.success(msg);
+                toastWithUndo(msg, teamOverviewModal.opportunityId, (data as { snapshot_id?: string }).snapshot_id);
                 const mappedRows = extractTeamRows(data);
                 if (mappedRows.length > 0) {
                     setTeamOverviewRows(mappedRows);
@@ -3130,6 +3233,8 @@ export default function AdminProjectsPage() {
                 </>
             )}
 
+            <ImpactConfirmDialog state={impactDialog} onCancel={() => setImpactDialog(null)} />
+
             {teamOverviewModal && (
                 <>
                     <div className="fixed inset-0 z-[80] bg-slate-900/40" aria-hidden onClick={closeTeamOverviewModal} />
@@ -3250,6 +3355,14 @@ export default function AdminProjectsPage() {
                         ) : null}
                         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                         {teamOverviewPipelineRibbon}
+                        <RecentChangesPanel
+                            opportunityId={teamOverviewModal.opportunityId}
+                            refreshKey={snapshotsRefreshKey}
+                            onRestored={() => {
+                                void loadTeamOverview(teamOverviewModal.opportunityId);
+                                void loadProjects(true);
+                            }}
+                        />
                         {!teamOverviewLoading && mergeableEnrollments.length >= 2 ? (
                             <div className="px-5 py-3 border-b border-slate-100 bg-indigo-50/40">
                                 <button

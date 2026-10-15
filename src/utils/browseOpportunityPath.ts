@@ -118,6 +118,21 @@ export function classifyBrowseCreator(opportunity: {
     return null;
 }
 
+export function browseDaysLeftLabel(value: string | null | undefined, now = new Date()): string | null {
+    if (!value) return null;
+    const iso = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const end = iso
+        ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+        : new Date(value);
+    if (Number.isNaN(end.getTime())) return null;
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000);
+    if (days < 0) return "Ended";
+    if (days === 0) return "Ends today";
+    if (days === 1) return "1 day left";
+    return `${days} days left`;
+}
+
 export function isUrgentBrowseDeadline(value: string | null | undefined, now = new Date()): boolean {
     if (!value) return false;
     const iso = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);

@@ -149,6 +149,7 @@ interface BrowseOpportunity {
     cover_url?: string | null;
     department?: string | null;
     partner_name?: string | null;
+    faculty_name?: string | null;
     sdg_ids?: string[];
     is_full?: boolean;
     is_virtual?: boolean;
@@ -288,6 +289,7 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
     const sdgIds = Array.isArray(raw.sdg_ids)
         ? raw.sdg_ids.map((id) => String(id))
         : [sdgIdRaw].filter((id) => id != null && String(id).trim()).map((id) => String(id));
+    const faculty_name = pickBrowseFacultyName(raw);
     const remainingForFull = typeof seatsRemaining === "number" ? seatsRemaining : null;
     const is_full =
         typeof raw.is_full === "boolean"
@@ -326,6 +328,7 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         cover_url: typeof raw.cover_url === "string" ? raw.cover_url : null,
         department: typeof raw.department === "string" && raw.department.trim() ? raw.department : null,
         partner_name: typeof raw.partner_name === "string" && raw.partner_name.trim() ? raw.partner_name : orgName || null,
+        faculty_name,
         is_full,
         is_virtual: typeof raw.is_virtual === "boolean" ? raw.is_virtual : normalizeModeBucket(op.mode ?? raw.mode) === "remote",
         is_urgent: typeof raw.is_urgent === "boolean" ? raw.is_urgent : isUrgentBrowseDeadline(timelineEnd),
@@ -391,6 +394,50 @@ function isPendingJoin(op: BrowseOpportunity): boolean {
     return isJoinApplicationPendingStatus(op.application_status || "");
 }
 
+type BrowseFeedTab = "all" | "live" | "applied" | "expiring" | "expired";
+
+function pickBrowseFacultyName(raw: Record<string, unknown>): string | null {
+    const supervision =
+        raw.supervision && typeof raw.supervision === "object" ? (raw.supervision as Record<string, unknown>) : null;
+    const faculty = raw.faculty && typeof raw.faculty === "object" ? (raw.faculty as Record<string, unknown>) : null;
+    const candidates = [
+        supervision?.supervisor_name,
+        supervision?.faculty_name,
+        faculty?.name,
+        raw.faculty_name,
+        raw.faculty_supervisor_name,
+        raw.supervisor_name,
+    ];
+    for (const value of candidates) {
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return null;
+}
+
+function isBrowseExpired(op: BrowseOpportunity): boolean {
+    return listingIsExpiredFromPayload(op as unknown as Record<string, unknown>);
+}
+
+function isBrowseApplied(op: BrowseOpportunity): boolean {
+    return Boolean(op.hasApplied || op.has_applied || op.applyLocked);
+}
+
+function isBrowseExpiring(op: BrowseOpportunity): boolean {
+    return !isBrowseExpired(op) && Boolean(op.is_urgent);
+}
+
+function matchesBrowseFeedTab(op: BrowseOpportunity, tab: BrowseFeedTab): boolean {
+    if (tab === "all") return true;
+    if (tab === "live") return !isBrowseExpired(op);
+    if (tab === "applied") return isBrowseApplied(op);
+    if (tab === "expiring") return isBrowseExpiring(op);
+    return isBrowseExpired(op);
+}
+
+function padBrowseCount(n: number): string {
+    return String(n).padStart(2, "0");
+}
+
 export default function StudentBrowseOpportunitiesPage() {
     const cachedBrowse = peekStudentBrowsePayload();
     const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>(() => mapBrowseFromPayload(cachedBrowse));
@@ -407,7 +454,8 @@ export default function StudentBrowseOpportunitiesPage() {
     const [isScoringLevelsOpen, setIsScoringLevelsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
-    const [sortNewest, setSortNewest] = useState(true);
+    const [sortMode, setSortMode] = useState<"live" | "newest" | "oldest">("live");
+    const [feedTab, setFeedTab] = useState<BrowseFeedTab>("all");
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
     const [hoursLogged, setHoursLogged] = useState(0);
     const [hoursTarget, setHoursTarget] = useState(16);
@@ -429,7 +477,7 @@ export default function StudentBrowseOpportunitiesPage() {
     const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
     const [creatorFilter, setCreatorFilter] = useState<"all" | BrowseCreatorLabel>("all");
     const [pathTab, setPathTab] = useState<"all" | BrowsePathKey>("all");
-    const [filtersOpen, setFiltersOpen] = useState(true);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<"all" | "open" | "full">("all");
     const [departmentFilter, setDepartmentFilter] = useState("all");
     const [partnerFilter, setPartnerFilter] = useState("all");
@@ -504,19 +552,36 @@ export default function StudentBrowseOpportunitiesPage() {
     const filteredPathCounts = computeBrowsePathCounts(afterListingFilters);
     const needle = searchQuery.trim().toLowerCase();
     const fullHiddenCount = afterListingFilters.filter((op) => op.seatsRemaining != null && op.seatsRemaining <= 0).length;
-    const filteredOpportunities = afterListingFilters
-        .filter((op) => {
-            if (onlyOpenSeats && op.seatsRemaining != null && op.seatsRemaining <= 0) return false;
-            if (!needle) return true;
-            const hay = `${op.title ?? ""} ${op.organization_name ?? ""} ${op.description ?? ""}`.toLowerCase();
-            return hay.includes(needle);
-        })
+    const searchedOpportunities = afterListingFilters.filter((op) => {
+        if (onlyOpenSeats && op.seatsRemaining != null && op.seatsRemaining <= 0) return false;
+        if (!needle) return true;
+        const hay = `${op.title ?? ""} ${op.organization_name ?? ""} ${op.description ?? ""}`.toLowerCase();
+        return hay.includes(needle);
+    });
+    const feedCounts = {
+        all: afterListingFilters.length,
+        live: afterListingFilters.filter((op) => !isBrowseExpired(op)).length,
+        applied: afterListingFilters.filter(isBrowseApplied).length,
+        expiring: afterListingFilters.filter(isBrowseExpiring).length,
+        expired: afterListingFilters.filter(isBrowseExpired).length,
+    };
+    const filteredOpportunities = searchedOpportunities
+        .filter((op) => matchesBrowseFeedTab(op, feedTab))
         .sort((a, b) => {
+            if (sortMode === "live") {
+                const rank = (op: BrowseOpportunity) => {
+                    if (isBrowseApplied(op) && !isBrowseExpired(op)) return 0;
+                    if (!isBrowseExpired(op)) return 1;
+                    return 2;
+                };
+                const byFeed = rank(a) - rank(b);
+                if (byFeed !== 0) return byFeed;
+            }
             const ta = new Date(a.createdAt || a.start_date || 0).getTime();
             const tb = new Date(b.createdAt || b.start_date || 0).getTime();
             const na = Number.isFinite(ta) ? ta : 0;
             const nb = Number.isFinite(tb) ? tb : 0;
-            return sortNewest ? nb - na : na - nb;
+            return sortMode === "oldest" ? na - nb : nb - na;
         });
 
     const clearListingFilters = () => {
@@ -530,7 +595,8 @@ export default function StudentBrowseOpportunitiesPage() {
         setCreatorFilter("all");
         setSearchQuery("");
         setOnlyOpenSeats(false);
-        setSortNewest(true);
+        setSortMode("live");
+        setFeedTab("all");
         setPathTab("all");
         setStatusFilter("all");
         setDepartmentFilter("all");
@@ -686,7 +752,7 @@ export default function StudentBrowseOpportunitiesPage() {
         return (
             <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
                 <header>
-                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Community Service Opportunities</h1>
                     <p className="mt-1 text-sm text-ciel-text-mid">Published listings from Faculty, NGOs, Partners and CIEL PK.</p>
                 </header>
                 <div className="flex flex-col justify-center items-center min-h-[280px] gap-3">
@@ -699,23 +765,74 @@ export default function StudentBrowseOpportunitiesPage() {
 
     return (
         <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
-            <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
-                    <p className="mt-1 text-sm text-ciel-text-mid">
-                        Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to My Reports.
-                    </p>
-                    <Link href="/dashboard/student/paths/community-service" className="mt-2 inline-block text-xs font-extrabold text-[#0e7d74] hover:underline">
-                        ← Community Service hub
-                    </Link>
+            <header
+                className="overflow-hidden rounded-[22px] px-5 py-5 text-white sm:px-7 sm:py-6"
+                style={{ background: "linear-gradient(135deg, #0f766e 0%, #14b8a6 52%, #5eead4 100%)" }}
+            >
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="max-w-3xl">
+                        <p className="text-[11px] font-semibold tracking-wide text-white/80">
+                            Community Service Opportunities · better organized for high-volume browsing
+                        </p>
+                        <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[30px]">
+                            Live opportunities first, your applied projects upfront, and expired listings neatly separated.
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/85">
+                            Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to My Reports.
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setFeedTab("live")}
+                                className="h-9 rounded-full bg-white px-3.5 text-[12px] font-bold text-[#0f5e57] hover:bg-white/90"
+                            >
+                                View Live Opportunities
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFeedTab("applied")}
+                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
+                            >
+                                Go to Applied
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFeedTab("expired")}
+                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
+                            >
+                                Open Expired Archive
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsScoringLevelsOpen(true)}
+                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
+                            >
+                                How scoring works
+                            </button>
+                        </div>
+                        <Link href="/dashboard/student/paths/community-service" className="mt-3 inline-block text-[11px] font-extrabold text-white/85 hover:underline">
+                            ← Community Service hub
+                        </Link>
+                    </div>
+                    <div className="grid shrink-0 grid-cols-2 gap-3 sm:min-w-[240px]">
+                        <div className="rounded-2xl bg-white/15 px-4 py-3">
+                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.all)}</p>
+                            <p className="mt-1 text-[11px] text-white/80">Total available this semester</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/15 px-4 py-3">
+                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.live)}</p>
+                            <p className="mt-1 text-[11px] text-white/80">Live right now</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/15 px-4 py-3">
+                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.applied)}</p>
+                            <p className="mt-1 text-[11px] text-white/80">Applied by you</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/15 px-4 py-3">
+                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.expired)}</p>
+                            <p className="mt-1 text-[11px] text-white/80">Moved to archive</p>
+                        </div>
+                    </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setIsScoringLevelsOpen(true)}
-                    className="h-9 shrink-0 rounded-lg border border-ciel-border bg-white px-3.5 text-sm font-medium text-ciel-text hover:bg-slate-50"
-                >
-                    How scoring works
-                </button>
             </header>
 
             {applyMaintenanceBanner ? (
@@ -735,6 +852,57 @@ export default function StudentBrowseOpportunitiesPage() {
                 </p>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {(
+                    [
+                        ["all", "LIVE OPPORTUNITIES", feedCounts.live, "Visible at the top of the page. Students can apply immediately with a project start and end date.", "live"],
+                        ["applied", "APPLIED BY ME", feedCounts.applied, "Applications are brought near the top so students can continue reports, attendance and progress checks.", "applied"],
+                        ["expiring", "EXPIRING SOON", feedCounts.expiring, "Automatically tagged from inside Live, so urgent listings don’t get missed.", "expiring"],
+                        ["expired", "EXPIRED ARCHIVE", feedCounts.expired, "Shifted away from the main browsing feed. Still accessible for reference, but no longer mixed with current opportunities.", "expired"],
+                    ] as Array<[BrowseFeedTab, string, number, string, BrowseFeedTab]>
+                ).map(([id, label, count, hint, tab]) => (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => setFeedTab(tab)}
+                        className={`rounded-[18px] border px-4 py-4 text-left shadow-[0_8px_22px_rgba(15,42,48,.05)] transition ${
+                            feedTab === tab ? "border-[#0e7d74] bg-[#f3fbf9]" : "border-[#dce8e6] bg-white hover:border-[#b7d8d2]"
+                        }`}
+                    >
+                        <p className="text-[10px] font-black tracking-wide text-[#8aa0a6]">{label}</p>
+                        <p className="mt-1 text-[32px] font-black leading-none text-[#16313d]">{padBrowseCount(count)}</p>
+                        <p className="mt-2 text-[11px] leading-snug text-[#5d7278]">{hint}</p>
+                    </button>
+                ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Opportunity feed">
+                {(
+                    [
+                        ["all", "All Visible", feedCounts.all],
+                        ["live", "Live", feedCounts.live],
+                        ["applied", "Applied", feedCounts.applied],
+                        ["expiring", "Expiring Soon", feedCounts.expiring],
+                        ["expired", "Expired Archive", feedCounts.expired],
+                    ] as Array<[BrowseFeedTab, string, number]>
+                ).map(([tab, label, count]) => (
+                    <button
+                        key={tab}
+                        type="button"
+                        role="tab"
+                        aria-selected={feedTab === tab}
+                        onClick={() => setFeedTab(tab)}
+                        className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${
+                            feedTab === tab ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f] hover:bg-[#e2eaec]"
+                        }`}
+                    >
+                        {label}
+                        <span className="ml-1.5 text-[11px] font-black opacity-80">{padBrowseCount(count)}</span>
+                    </button>
+                ))}
+            </div>
+
+            {feedTab === "applied" ? (
             <section className="rounded-xl border border-ciel-border bg-white p-4">
                 <h2 className="text-[17px] font-semibold text-[#16313d]">My applications</h2>
                 <p className="mt-1 text-[12.5px] text-[#70808a]">
@@ -794,6 +962,7 @@ export default function StudentBrowseOpportunitiesPage() {
                     </div>
                 )}
             </section>
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {BROWSE_PATHS.map((path) => {

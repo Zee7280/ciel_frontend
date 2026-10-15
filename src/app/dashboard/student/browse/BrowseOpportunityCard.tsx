@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CheckCircle2, Clock, MapPin, Share2, Users } from "lucide-react";
+import { CheckCircle2, Share2 } from "lucide-react";
 import { findSdgById } from "@/utils/sdgData";
-import { BROWSE_PATH_BY_KEY, formatBrowseDeadline, type BrowsePathKey } from "@/utils/browseOpportunityPath";
+import { BROWSE_PATH_BY_KEY, browseDaysLeftLabel, type BrowsePathKey } from "@/utils/browseOpportunityPath";
 
 export type BrowseCardSdg = { number: number; title: string; color: string };
 
@@ -42,23 +42,17 @@ type BrowseOpportunityCardProps = {
     onShare: () => void;
     onWithdraw?: () => void;
     onJoin?: () => void;
+    facultyName?: string | null;
+    categoryLabel?: string | null;
+    seatsFilledLabel?: string | null;
 };
 
-function SdgTiles({ sdgs }: { sdgs: BrowseCardSdg[] }) {
-    if (!sdgs.length) return null;
+function SdgLine({ sdgs }: { sdgs: BrowseCardSdg[] }) {
+    if (!sdgs.length) return <span className="text-[#8aa0a6]">—</span>;
     return (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {sdgs.slice(0, 4).map((sdg) => (
-                <span
-                    key={sdg.number}
-                    title={`SDG ${sdg.number} · ${sdg.title}`}
-                    className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 text-[10px] font-black text-white shadow-sm"
-                    style={{ background: sdg.color }}
-                >
-                    {sdg.number}
-                </span>
-            ))}
-        </div>
+        <span className="font-semibold text-[#16313d]">
+            {sdgs.slice(0, 2).map((s) => `SDG ${s.number}`).join(", ")}
+        </span>
     );
 }
 
@@ -84,74 +78,85 @@ export function sdgsForBrowseCard(ids: Array<string | number | null | undefined>
 
 export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps) {
     const path = BROWSE_PATH_BY_KEY[props.pathKey];
-    const deadline = formatBrowseDeadline(props.deadline);
+    const daysLeft = browseDaysLeftLabel(props.deadline);
     const detailsHref = props.detailsHref || `/dashboard/student/browse/${props.id}`;
-    const coverStyle = {
-        backgroundImage: props.coverUrl
-            ? `linear-gradient(180deg, rgba(8,20,24,.15), rgba(8,20,24,.55)), url(${JSON.stringify(props.coverUrl)})`
-            : `linear-gradient(135deg, ${path.coverFrom} 0%, ${path.coverTo} 100%)`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-    };
+    const statusLabel = props.isExpired
+        ? "EXPIRED"
+        : props.appliedPending
+          ? "APPLIED"
+          : props.isFull
+            ? "FULL"
+            : "LIVE";
+    const headerBg = props.isExpired
+        ? "linear-gradient(135deg, #64748b 0%, #94a3b8 100%)"
+        : `linear-gradient(135deg, ${path.coverFrom} 0%, ${path.coverTo} 100%)`;
 
     return (
         <article
             className={
                 props.viewMode === "list"
-                    ? "grid overflow-hidden rounded-2xl border border-[#e2ece9] bg-white shadow-[0_10px_28px_rgba(15,42,48,.06)] md:grid-cols-[220px_1fr]"
-                    : "flex h-full flex-col overflow-hidden rounded-2xl border border-[#e2ece9] bg-white shadow-[0_10px_28px_rgba(15,42,48,.06)]"
+                    ? "grid overflow-hidden rounded-[18px] border border-[#dce8e6] bg-white shadow-[0_8px_22px_rgba(15,42,48,.06)] md:grid-cols-[minmax(220px,280px)_1fr]"
+                    : "flex h-full flex-col overflow-hidden rounded-[18px] border border-[#dce8e6] bg-white shadow-[0_8px_22px_rgba(15,42,48,.06)]"
             }
         >
-            <div className={props.viewMode === "list" ? "relative min-h-[140px]" : "relative h-[132px]"} style={coverStyle}>
-                <span
-                    className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-black ${
-                        props.isExpired
-                            ? "bg-white text-amber-800"
-                            : props.isFull
-                              ? "bg-white text-[#2563eb]"
-                              : "bg-white/92 text-[#0f6b4a]"
-                    }`}
-                >
-                    {props.isExpired ? "Expired" : props.isFull ? "Full" : "Open"}
-                </span>
-                <span
-                    className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black"
-                    style={{ background: "rgba(255,255,255,.94)", color: path.accentText }}
-                >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: path.accent }} />
-                    {props.pathLabel}
-                </span>
+            <div
+                className={props.viewMode === "list" ? "relative min-h-[128px] p-4" : "relative px-4 pb-4 pt-3.5"}
+                style={{ background: headerBg }}
+            >
+                <div className="flex items-start justify-between gap-2">
+                    <span className="rounded-full bg-white/18 px-2 py-0.5 text-[9px] font-black tracking-wide text-white">
+                        ● {statusLabel}
+                    </span>
+                    {daysLeft ? (
+                        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-black text-[#0f5e57]">
+                            {daysLeft}
+                        </span>
+                    ) : null}
+                </div>
+                <h3 className="mt-3 text-[15px] font-extrabold leading-snug text-white">{props.title || "Untitled opportunity"}</h3>
+                <p className="mt-1 truncate text-[11px] text-white/80">
+                    {props.city || "Remote"}
+                    {props.modeLabel ? ` · ${props.modeLabel}` : ""}
+                </p>
             </div>
 
-            <div className="flex flex-1 flex-col p-4">
-                <h3 className="text-[15px] font-bold leading-snug text-[#16313d]">{props.title || "Untitled opportunity"}</h3>
-                {props.description ? (
-                    <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-relaxed text-[#5d7278]">{props.description}</p>
-                ) : null}
-
-                <SdgTiles sdgs={props.sdgs} />
-
-                <p className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-[#6b7c86]">
-                    <Building2 className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{props.organizationName || "Partner"}</span>
-                    <span className="text-[#c5d0d4]">·</span>
-                    <MapPin className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{props.city || "Remote"}</span>
-                    <span className="text-[#c5d0d4]">·</span>
-                    <span>{props.modeLabel}</span>
-                </p>
-
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-[#6b7c86]">
-                    <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {props.hoursLabel}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
-                        {props.seatsLabel}
-                    </span>
-                    {deadline ? <span>{deadline}</span> : null}
+            <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                    <p>
+                        <span className="text-[#8aa0a6]">Hours</span>
+                        <br />
+                        <span className="font-semibold text-[#16313d]">{props.hoursLabel} verified min</span>
+                    </p>
+                    <p>
+                        <span className="text-[#8aa0a6]">Seats</span>
+                        <br />
+                        <span className="font-semibold text-[#16313d]">{props.seatsFilledLabel || props.seatsLabel}</span>
+                    </p>
+                    <p>
+                        <span className="text-[#8aa0a6]">SDG</span>
+                        <br />
+                        <SdgLine sdgs={props.sdgs} />
+                    </p>
+                    <p>
+                        <span className="text-[#8aa0a6]">Faculty</span>
+                        <br />
+                        <span className="truncate font-semibold text-[#16313d]">{props.facultyName || "—"}</span>
+                    </p>
+                    <p>
+                        <span className="text-[#8aa0a6]">Partner</span>
+                        <br />
+                        <span className="truncate font-semibold text-[#16313d]">{props.organizationName || "—"}</span>
+                    </p>
+                    <p>
+                        <span className="text-[#8aa0a6]">Category</span>
+                        <br />
+                        <span className="truncate font-semibold text-[#16313d]">{props.categoryLabel || props.pathLabel}</span>
+                    </p>
                 </div>
+
+                {props.description ? (
+                    <p className="mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-[#5d7278]">{props.description}</p>
+                ) : null}
 
                 {props.visibilityTag ? (
                     <p className={`mt-2 text-[11px] font-semibold ${props.visibilityWarn ? "text-[#c2410c]" : "text-[#0f6b4a]"}`}>
@@ -159,7 +164,7 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                     </p>
                 ) : null}
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                     {props.appliedPending ? (
                         <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#0e7d74]">
                             <CheckCircle2 className="h-4 w-4" /> Applied
@@ -187,20 +192,13 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                     </button>
                 </div>
 
-                <div className="mt-auto flex flex-col gap-2 pt-3">
-                    <Link
-                        href={detailsHref}
-                        className="inline-flex h-10 items-center justify-center rounded-xl border text-[13px] font-bold"
-                        style={{ borderColor: path.accentBorder, color: path.accentText, background: path.accentSoft }}
-                    >
-                        View Details
-                    </Link>
+                <div className="mt-auto flex gap-2 pt-3">
                     {props.showWithdraw ? (
                         <button
                             type="button"
                             onClick={props.onWithdraw}
                             disabled={props.withdrawing}
-                            className="h-10 rounded-xl border border-slate-800 bg-white text-[13px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                            className="h-9 flex-1 rounded-lg border border-slate-800 bg-white text-[12px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
                         >
                             {props.withdrawing ? "Withdrawing…" : "Withdraw"}
                         </button>
@@ -212,16 +210,27 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                             title={props.joinTitle}
                             className={
                                 props.canApplyNow
-                                    ? "h-10 rounded-xl text-[13px] font-semibold text-white"
-                                    : "h-10 cursor-not-allowed rounded-xl bg-slate-100 text-[13px] font-semibold text-slate-500"
+                                    ? "h-9 flex-1 rounded-lg bg-[#0e7d74] text-[12px] font-semibold text-white hover:bg-[#0c6b64]"
+                                    : "h-9 flex-1 cursor-not-allowed rounded-lg bg-slate-100 text-[12px] font-semibold text-slate-500"
                             }
-                            style={props.canApplyNow ? { background: path.accent } : undefined}
                         >
-                            {props.isExpired || !props.isFull || props.canApplyNow
-                                ? props.joinButtonLabel
-                                : "Full"}
+                            {(() => {
+                                const label =
+                                    props.isExpired || !props.isFull || props.canApplyNow
+                                        ? props.joinButtonLabel
+                                        : "Full";
+                                return label === "Join Opportunity" ? "Apply now" : label;
+                            })()}
                         </button>
-                    ) : null}
+                    ) : (
+                        <span className="h-9 flex-1" />
+                    )}
+                    <Link
+                        href={detailsHref}
+                        className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[#cfe3de] bg-white text-[12px] font-semibold text-[#0f5e57] hover:bg-[#f3fbf9]"
+                    >
+                        Details
+                    </Link>
                 </div>
             </div>
         </article>
