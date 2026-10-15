@@ -361,7 +361,10 @@ export default function NationalRankingStudio({
                                                     </td>
                                                     <td>{r.score != null ? <span className="score">{r.score.toFixed(2)}</span> : <span className="muted">—</span>}</td>
                                                     <td>{r.cii ?? "—"}<span className="projectsub">{r.ciiLocked ? "Locked" : "Pending lock"}</span></td>
-                                                    <td><span className={`badge ${r.status === "Excluded" ? "red" : r.status === "Review" ? "amber" : ""}`}>{r.status}</span></td>
+                                                    <td>
+                                                        <span className={`badge ${r.status === "Excluded" ? "red" : r.status === "Review" ? "amber" : ""}`}>{r.status}</span>
+                                                        {r.status !== "Ranked" && r.reason ? <span className="projectsub">{r.reason}</span> : null}
+                                                    </td>
                                                     <td><button type="button" className="link" onClick={() => { setInspectId(r.id); setInspectTab("findings"); }}>Inspect ↗</button></td>
                                                 </tr>
                                             ))}
