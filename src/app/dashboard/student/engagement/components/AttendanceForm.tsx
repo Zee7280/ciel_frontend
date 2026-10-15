@@ -54,7 +54,7 @@ type AttendanceLogLike = {
 
 function attendanceParticipantKey(id: unknown): string {
     if (typeof id !== "string") return "";
-    const memberMatch = /^member:\d+:(.+)$/.exec(id);
+    const memberMatch = /^member:[^:]+:(.+)$/.exec(id);
     if (memberMatch?.[1]) return memberMatch[1];
     if (id.startsWith("lead:")) return id.slice("lead:".length);
     return id;
@@ -142,6 +142,7 @@ export default function AttendanceForm({
     isParticipationUnlocked,
     setParticipationUnlocked,
     allowManualUnlock = true,
+    lockParticipant = false,
 }: {
     verifiedUsers: { id: string; name: string; status?: string; email?: string }[];
     onSuccess: () => void;
@@ -151,6 +152,8 @@ export default function AttendanceForm({
     isParticipationUnlocked?: boolean;
     setParticipationUnlocked?: (unlocked: boolean) => void;
     allowManualUnlock?: boolean;
+    /** Team members log only for themselves: show the participant read-only, no dropdown. */
+    lockParticipant?: boolean;
 }) {
     const { data: reportData, updateSection } = useReportForm();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -286,7 +289,8 @@ export default function AttendanceForm({
                 const realId =
                     segments.length > 1 ? segments[segments.length - 1] : activeParticipantId;
 
-                if (!realId || realId === "anon") {
+                const looksLikeSeatId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(realId);
+                if (!realId || realId === "anon" || !looksLikeSeatId) {
                     const message =
                         "This student is not linked to a participation record yet. Refresh the page or complete team registration first.";
                     setSubmitError(message);
@@ -390,11 +394,21 @@ export default function AttendanceForm({
         <form onSubmit={handleSubmit} className="min-w-0 space-y-5">
             {/* Select Student */}
             <div className="space-y-1.5">
-                <Label className={labelClass}>Select Student</Label>
+                <Label className={labelClass}>{lockParticipant ? "Logging for" : "Select Student"}</Label>
                 <div className="relative">
                     <div className="pointer-events-none absolute left-3 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-[#0e7d74] to-[#2dd4bf] text-xs font-bold text-white">
                         {selectedInitial}
                     </div>
+                    {lockParticipant ? (
+                        <div
+                            className={clsx(fieldClass, "flex w-full items-center pl-12 pr-3 cursor-not-allowed bg-slate-50 text-slate-700")}
+                            aria-readonly="true"
+                            title="Team members can log attendance only for themselves"
+                        >
+                            {selectedUser?.name || "You (Self)"}
+                        </div>
+                    ) : (
+                    <>
                     <select
                         value={formData.participantId}
                         onChange={(e) => {
@@ -415,6 +429,8 @@ export default function AttendanceForm({
                         ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </>
+                    )}
                 </div>
             </div>
 

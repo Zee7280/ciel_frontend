@@ -98,6 +98,20 @@ function pickLocation(p: Record<string, unknown>): string {
     return "Unknown";
 }
 
+/** Round away float noise (e.g. 243.79000000000005 -> 243.79) and drop trailing zeros. */
+function fmtHours(n: number): string {
+    if (!Number.isFinite(n)) return "0";
+    return String(Math.round(n * 100) / 100);
+}
+
+/** "Student opportunity — Title — af263eea" is an internal label; show just the readable bit. */
+function cleanSubtitle(s: string): string {
+    return s
+        .replace(/^Student opportunity\s*[—-]\s*/i, "")
+        .replace(/\s*[—-]\s*[0-9a-f]{8}$/i, "")
+        .trim();
+}
+
 function subtitleFromRaw(raw: Record<string, unknown>): string {
     const c = raw.creator && typeof raw.creator === "object" ? (raw.creator as Record<string, unknown>) : null;
     const fromCreator = c && typeof c.name === "string" ? c.name.trim() : "";
@@ -168,10 +182,12 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     const volunteersRequired = vrFromRoot ?? vrFromTimeline;
 
     const hours =
-        Number(raw.hours ?? raw.total_hours ?? raw.verified_hours ?? timeline?.expected_hours ?? raw.impact_hours) || 0;
+        Math.round(
+            (Number(raw.hours ?? raw.total_hours ?? raw.verified_hours ?? timeline?.expected_hours ?? raw.impact_hours) || 0) * 100,
+        ) / 100;
 
     const parseNonNegInt = (v: unknown): number | null =>
-        v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : null;
+        v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Math.max(0, Math.round(Number(v) * 100) / 100) : null;
 
     const remainingHours = parseNonNegInt(raw.remaining_hours);
     const remainingSeats = parseNonNegInt(raw.remaining_seats);
@@ -193,7 +209,7 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     return {
         id,
         title,
-        subtitle: subtitleFromRaw(raw),
+        subtitle: cleanSubtitle(subtitleFromRaw(raw)) || "—",
         displayStatus,
         statusKey,
         adminCanApprove,
@@ -432,6 +448,7 @@ export default function AdminProjectsPage() {
     const [studentEmailInput, setStudentEmailInput] = useState("");
     const [studentEmailApplied, setStudentEmailApplied] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [quickFilter, setQuickFilter] = useState<"all" | "over" | "expired_active" | "pending">("all");
     const [directoryFilter, setDirectoryFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
     const [degreeFilter, setDegreeFilter] = useState("all");
@@ -1336,6 +1353,9 @@ export default function AdminProjectsPage() {
         const q = searchQuery.trim().toLowerCase();
         return rows.filter((r) => {
             if (statusFilter !== "all" && r.statusKey !== statusFilter) return false;
+            if (quickFilter === "over" && !(r.volunteersRequired != null && r.volunteers > r.volunteersRequired)) return false;
+            if (quickFilter === "expired_active" && !(r.adminExpired && r.statusKey === "active")) return false;
+            if (quickFilter === "pending" && !r.statusKey.startsWith("pending")) return false;
             if (directoryFilter === "hidden" && !r.adminHidden) return false;
             if (directoryFilter === "expired" && !r.adminExpired) return false;
             if (directoryFilter === "visible" && (r.adminHidden || !r.directoryVisible)) return false;
@@ -1358,10 +1378,12 @@ export default function AdminProjectsPage() {
                 r.title.toLowerCase().includes(q) ||
                 r.subtitle.toLowerCase().includes(q) ||
                 r.locationLabel.toLowerCase().includes(q) ||
-                r.displayStatus.toLowerCase().includes(q)
+                r.displayStatus.toLowerCase().includes(q) ||
+                r.id.toLowerCase().startsWith(q) ||
+                pickFacultySupervisorEmail(r.raw).includes(q)
             );
         });
-    }, [rows, searchQuery, statusFilter, directoryFilter, locationFilter, degreeFilter, facultyEmailFilter]);
+    }, [rows, searchQuery, statusFilter, quickFilter, directoryFilter, locationFilter, degreeFilter, facultyEmailFilter]);
 
     const filteredTeamOverviewRows = useMemo(() => {
         if (teamOverviewParticipationFilter === "all") return teamOverviewRows;
@@ -1584,8 +1606,8 @@ export default function AdminProjectsPage() {
         const rejected = rows.filter((r) => r.statusKey === "rejected").length;
         const unfilledSeatsTotal = rows.reduce((sum, r) => sum + (r.remainingSeats ?? 0), 0);
         const unfilledSeatsProjects = rows.filter((r) => (r.remainingSeats ?? 0) > 0).length;
-        const totalHoursLogged = rows.reduce((sum, r) => sum + r.hours, 0);
-        const totalHoursCommitted = rows.reduce((sum, r) => sum + r.hours + (r.remainingHours ?? 0), 0);
+        const totalHoursLogged = Math.round(rows.reduce((sum, r) => sum + r.hours, 0) * 100) / 100;
+        const totalHoursCommitted = Math.round(rows.reduce((sum, r) => sum + r.hours + (r.remainingHours ?? 0), 0) * 100) / 100;
         return {
             total,
             active,
@@ -1843,8 +1865,11 @@ export default function AdminProjectsPage() {
                             Expired
                         </span>
                     ) : null}
-                    {!r.applicationsOpen ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100">
+                    {!r.applicationsOpen && !r.adminExpired ? (
+                        <span
+                            title={r.applyBlockedReason ?? undefined}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100"
+                        >
                             Apply closed
                         </span>
                     ) : null}
@@ -1896,13 +1921,13 @@ export default function AdminProjectsPage() {
             {
                 name: "Hours",
                 sortable: true,
-                width: "112px",
+                width: "128px",
                 selector: (r) => r.hours,
                 cell: (r) => {
-                    const committed = r.remainingHours != null ? r.hours + r.remainingHours : null;
+                    const committed = r.remainingHours != null ? Math.round((r.hours + r.remainingHours) * 100) / 100 : null;
                     return (
                         <div className="text-center w-full py-1">
-                            <span className="text-sm font-bold text-slate-900">{r.hours}</span>
+                            <span className="text-sm font-bold text-slate-900">{fmtHours(r.hours)}</span>
                             <div className="text-[10px] font-medium text-slate-500 mt-0.5">
                                 {committed != null ? `of ${committed} h committed` : "h logged"}
                             </div>
@@ -1986,7 +2011,7 @@ export default function AdminProjectsPage() {
                             <h3 className="text-sm font-bold text-amber-900">No hours have been logged on any project</h3>
                             <p className="text-sm text-amber-800 mt-1">
                                 All {summaryStats.total} projects show 0 hours against a combined{" "}
-                                {summaryStats.totalHoursCommitted} hours of commitment. Either students aren&apos;t logging, or
+                                {fmtHours(summaryStats.totalHoursCommitted)} hours of commitment. Either students aren&apos;t logging, or
                                 the logging step isn&apos;t reaching the platform — worth checking before the next
                                 verification cycle.
                             </p>
@@ -2043,20 +2068,43 @@ export default function AdminProjectsPage() {
                 ))}
             </div>
 
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+                {([
+                    ["all", "All projects", rows.length],
+                    ["over", "Over capacity", rows.filter((r) => r.volunteersRequired != null && r.volunteers > r.volunteersRequired).length],
+                    ["expired_active", "Expired but active", rows.filter((r) => r.adminExpired && r.statusKey === "active").length],
+                    ["pending", "Pending approval", rows.filter((r) => r.statusKey.startsWith("pending")).length],
+                ] as const).map(([key, label, count]) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setQuickFilter(key)}
+                        aria-pressed={quickFilter === key}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                            quickFilter === key ?
+                                "border-[#15988b] bg-[#15988b] text-white"
+                            :   "border-[#dde5ea] bg-white text-slate-600 hover:border-[#15988b]/50"
+                        }`}
+                    >
+                        {label} <span className="opacity-70">{count}</span>
+                    </button>
+                ))}
+            </div>
+
             <div className="mb-6 flex flex-col gap-3 rounded-[22px] border border-[#dde5ea] bg-white p-3 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-4">
-                <div className="flex flex-col lg:flex-row gap-3">
-                    <div className="relative flex-1 min-w-0">
+                <div className="flex flex-col gap-3">
+                    <div className="relative min-w-0">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="search"
-                            placeholder="Search projects..."
+                            placeholder="Search by project, organisation, location, status, faculty email or ID…"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#15988b] focus:ring-4 focus:ring-[#15988b]/15 transition-all outline-none font-medium text-slate-700 text-sm"
                         />
                     </div>
-                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:shrink-0">
-                        <div className="relative min-w-0 sm:min-w-[160px]">
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <div className="relative min-w-0">
                             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
                                 value={statusFilter}
@@ -2071,7 +2119,7 @@ export default function AdminProjectsPage() {
                                 ))}
                             </select>
                         </div>
-                        <div className="relative min-w-0 sm:min-w-[160px]">
+                        <div className="relative min-w-0">
                             <EyeOff className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
                                 value={directoryFilter}
@@ -2085,7 +2133,7 @@ export default function AdminProjectsPage() {
                                 <option value="expired">Expired</option>
                             </select>
                         </div>
-                        <div className="relative min-w-0 sm:min-w-[160px]">
+                        <div className="relative min-w-0">
                             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
                                 value={locationFilter}
@@ -2100,7 +2148,7 @@ export default function AdminProjectsPage() {
                                 ))}
                             </select>
                         </div>
-                        <div className="relative min-w-0 sm:min-w-[160px]">
+                        <div className="relative min-w-0">
                             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
                                 value={degreeFilter}
@@ -2115,7 +2163,7 @@ export default function AdminProjectsPage() {
                                 ))}
                             </select>
                         </div>
-                        <div className="relative min-w-0 sm:min-w-[160px]">
+                        <div className="relative min-w-0">
                             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
                                 value={facultyEmailFilter}
@@ -2209,7 +2257,7 @@ export default function AdminProjectsPage() {
                                                         Expired
                                                     </span>
                                                 ) : null}
-                                                {!r.applicationsOpen ? (
+                                                {!r.applicationsOpen && !r.adminExpired ? (
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100">
                                                         Apply closed
                                                     </span>
@@ -2222,7 +2270,7 @@ export default function AdminProjectsPage() {
                                                 {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers} volunteers
                                                 {note.primary ? ` (${note.primary})` : ""}
                                             </span>
-                                            <span>{r.hours} h logged</span>
+                                            <span>{fmtHours(r.hours)} h logged</span>
                                             {studentEmailFiltered && r.studentMatch ? <span className="capitalize">Role: {r.studentMatch.role}</span> : null}
                                         </div>
                                         <div className="mt-2 flex items-center justify-end gap-1">
@@ -2272,6 +2320,12 @@ export default function AdminProjectsPage() {
                         paginationPerPage={10}
                         paginationRowsPerPageOptions={[10, 25, 50, 100]}
                         highlightOnHover
+                        conditionalRowStyles={[
+                            {
+                                when: (r) => r.volunteersRequired != null && r.volunteers > r.volunteersRequired,
+                                style: { backgroundColor: "#fff7f7" },
+                            },
+                        ]}
                         responsive
                         dense
                         customStyles={{

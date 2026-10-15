@@ -13,7 +13,7 @@ function firstNonBlank(...vals: unknown[]): string {
 function engagementParticipantBareId(id: string | undefined | null): string {
     if (!id) return "";
     if (id.startsWith("lead:")) return id.slice("lead:".length);
-    const m = /^member:\d+:(.+)$/.exec(id);
+    const m = /^member:[^:]+:(.+)$/.exec(id);
     if (m?.[1]) return m[1];
     return id;
 }

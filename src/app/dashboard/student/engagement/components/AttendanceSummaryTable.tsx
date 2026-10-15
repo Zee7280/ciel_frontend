@@ -103,7 +103,7 @@ function resolvedRejectRemark(entry: AttendanceEntry): string {
 function engagementParticipantBareId(id: string | undefined | null): string {
     if (!id) return "";
     if (id.startsWith("lead:")) return id.slice("lead:".length);
-    const m = /^member:\d+:(.+)$/.exec(id);
+    const m = /^member:[^:]+:(.+)$/.exec(id);
     if (m?.[1]) return m[1];
     return id;
 }
@@ -260,6 +260,11 @@ function SessionCard({
                             <p className="mt-0.5 truncate text-xs text-slate-500">
                                 {locationText || participantLabel}
                             </p>
+                            {(entry as { loggedByRole?: string | null }).loggedByRole === "team_lead" ? (
+                                <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                                    Added by team lead
+                                </span>
+                            ) : null}
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1.5">
                             <span className="text-xs font-medium text-indigo-600">

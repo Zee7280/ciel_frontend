@@ -129,7 +129,7 @@ function displayName(person: { name?: string; fullName?: string } | undefined): 
 function uuidFromRosterId(studentId: string): string {
     const lead = /^lead:(.+)$/.exec(studentId);
     if (lead?.[1]) return lead[1];
-    const member = /^member:\d+:(.+)$/.exec(studentId);
+    const member = /^member:[^:]+:(.+)$/.exec(studentId);
     if (member?.[1]) return member[1];
     return studentId;
 }

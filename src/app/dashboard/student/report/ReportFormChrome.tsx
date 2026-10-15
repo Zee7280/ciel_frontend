@@ -1052,7 +1052,7 @@ function BannerShell({
 
 function participantKey(id: string): string {
     if (id.startsWith("lead:")) return id.slice("lead:".length);
-    const member = /^member:\d+:(.+)$/.exec(id);
+    const member = /^member:[^:]+:(.+)$/.exec(id);
     return member?.[1] || id;
 }
 

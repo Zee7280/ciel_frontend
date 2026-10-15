@@ -71,7 +71,8 @@ export function resolveRequiredHoursPerStudent(source: unknown, fallback = 16): 
 function engagementParticipantCompareKey(id: string | undefined | null): string {
     if (!id) return "";
     if (id.startsWith("lead:")) return id.slice("lead:".length);
-    const m = /^member:\d+:(.+)$/.exec(id);
+    // `member:<idx>:<seat>` (roster rows) and `member:self:<seat>` (the signed-in teammate's own card)
+    const m = /^member:[^:]+:(.+)$/.exec(id);
     if (m?.[1]) return m[1];
     return id;
 }

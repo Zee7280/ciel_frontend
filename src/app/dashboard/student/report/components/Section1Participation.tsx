@@ -36,7 +36,8 @@ import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 function engagementParticipantCompareKey(id: string | undefined | null): string {
     if (!id) return "";
     if (id.startsWith("lead:")) return id.slice("lead:".length);
-    const m = /^member:\d+:(.+)$/.exec(id);
+    // `member:<idx>:<seat>` (roster rows) and `member:self:<seat>` (the signed-in teammate's own card)
+    const m = /^member:[^:]+:(.+)$/.exec(id);
     if (m?.[1]) return m[1];
     return id;
 }
@@ -82,10 +83,19 @@ function selfParticipantRealIds(
 }
 
 function canDeleteAttendanceEntry(
-    entry: { participantId?: string | null },
+    entry: { participantId?: string | null; loggedByRole?: string | null; loggedByUserId?: string | null },
     selfIds: string[],
     currentUserEmail: string | null,
+    currentUserId: string | null = null,
 ): boolean {
+    // A Team Lead may remove a proxy entry they themselves logged for a teammate.
+    if (
+        currentUserId &&
+        entry?.loggedByRole === "team_lead" &&
+        entry?.loggedByUserId === currentUserId
+    ) {
+        return true;
+    }
     if (currentUserEmail && selfIds.length === 0) return false;
     if (!entry?.participantId || selfIds.length === 0) return true;
     return selfIds.some((sid) => engagementParticipantIdsMatch(entry.participantId, sid));
@@ -464,6 +474,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isVerified, setIsVerified] = React.useState(!!team_lead?.verified);
     const [participantId, setParticipantId] = React.useState<string | null>(team_lead?.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
     const [viewerIsTeamLead, setViewerIsTeamLead] = React.useState<boolean | null>(null);
     const [viewerSeat, setViewerSeat] = React.useState<{
         id: string;
@@ -553,6 +564,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 const u = JSON.parse(storedUser);
                 const email = u?.email || u?.Email;
                 if (email) setCurrentUserEmail(email);
+                const uid = u?.id ?? u?.userId ?? u?.user_id;
+                if (uid) setCurrentUserId(String(uid));
             } catch (e) { }
         }
     }, []);
@@ -1039,7 +1052,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
         const entry = attendanceLogs.find((l: any) => l.id === entryId);
         if (!entry) return;
 
-        if (!canDeleteAttendanceEntry(entry as { participantId?: string }, selfParticipantIds, currentUserEmail)) {
+        if (!canDeleteAttendanceEntry(entry as { participantId?: string }, selfParticipantIds, currentUserEmail, currentUserId)) {
             toast.error("You can only delete attendance entries that you logged for yourself.");
             return;
         }
@@ -1245,6 +1258,29 @@ export default function Section1Participation({ projectData }: { projectData?: a
     }
 
 
+
+    /** A team member may log only their own hours: no participant picker, cards are display-only. */
+    // Only an explicit team-member seat (backend isTeamLead=false on a team project) is self-only;
+    // individual participants and leads keep the full picker.
+    const memberSelfOnly =
+        isTeamMemberAttendanceOnly ||
+        (data.section1?.participation_type === "team" && viewerIsTeamLead === false && !!viewerSeat?.id);
+    const selfRosterEntry = React.useMemo(() => {
+        if (!memberSelfOnly) return null;
+        const seatId = viewerSeat?.id ?? "";
+        const email = String(currentUserEmail || viewerSeat?.email || "").trim().toLowerCase();
+        return (
+            rawParticipants.find((p: { id: string }) => !!seatId && engagementParticipantIdsMatch(p.id, `member:self:${seatId}`)) ||
+            rawParticipants.find((p: { id: string }) => !!seatId && p.id.endsWith(seatId)) ||
+            rawParticipants.find((p: { email?: string }) => !!email && String(p.email || "").trim().toLowerCase() === email) ||
+            null
+        );
+    }, [memberSelfOnly, rawParticipants, viewerSeat, currentUserEmail]);
+    React.useEffect(() => {
+        if (selfRosterEntry && selectedParticipantId !== selfRosterEntry.id) {
+            setSelectedParticipantId(selfRosterEntry.id);
+        }
+    }, [selfRosterEntry, selectedParticipantId]);
 
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
 
@@ -1757,11 +1793,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         </span>
                                         <h4 className="text-[14.5px] font-bold text-[#0d2b33]">Your crew</h4>
                                         <span className="ml-auto rounded-full bg-[#e3f4fa] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#0891b2]">
-                                            TAP TO LOG FOR
+                                            {memberSelfOnly ? "TEAM PROGRESS" : "TAP TO LOG FOR"}
                                         </span>
                                     </div>
                                     <p className="mb-3 text-[11px] text-[#7a919a]">
-                                        Tap the member you’re logging hours for.
+                                        {memberSelfOnly
+                                            ? "You can log hours only for yourself. Teammates' progress is shown for reference."
+                                            : "Tap the member you’re logging hours for."}
                                     </p>
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                         {rawParticipants.map((u) => {
@@ -1783,16 +1821,20 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                     ? Math.min(100, (hrs / requiredHoursPerStudent) * 100)
                                                     : 0;
                                             const initial = (u.name || "?").replace(/\s*\(Self\)\s*/i, "").trim().charAt(0).toUpperCase();
+                                            const cardClickable = !memberSelfOnly;
+                                            const Card: React.ElementType = cardClickable ? "button" : "div";
                                             return (
-                                                <button
+                                                <Card
                                                     key={u.id}
-                                                    type="button"
-                                                    onClick={() => setSelectedParticipantId(u.id)}
+                                                    {...(cardClickable
+                                                        ? { type: "button", onClick: () => setSelectedParticipantId(u.id) }
+                                                        : { "aria-disabled": true })}
                                                     className={clsx(
                                                         "rounded-[14px] border p-3 text-center transition",
+                                                        !cardClickable && "cursor-default",
                                                         on
                                                             ? "border-[#0e7d74] bg-[#e6f6f4] ring-1 ring-[#0e7d74]/30"
-                                                            : "border-[#dcebee] bg-white hover:border-[#0e7d74]/50",
+                                                            : clsx("border-[#dcebee] bg-white", cardClickable && "hover:border-[#0e7d74]/50"),
                                                     )}
                                                 >
                                                     <div
@@ -1818,7 +1860,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         {hrs}h / {requiredHoursPerStudent}h
                                                         {hrs >= requiredHoursPerStudent ? " 🏆" : ""}
                                                     </p>
-                                                </button>
+                                                </Card>
                                             );
                                         })}
                                     </div>
@@ -1844,6 +1886,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     <div className="min-w-0 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                         <AttendanceForm
                                             verifiedUsers={rawParticipants}
+                                            lockParticipant={memberSelfOnly}
                                             onSuccess={() => loadAllEntries()}
                                             selectedParticipantId={selectedParticipantId}
                                             onParticipantChange={setSelectedParticipantId}
@@ -1896,6 +1939,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         entry,
                                                         selfParticipantIds,
                                                         currentUserEmail,
+                                                        currentUserId,
                                                     )
                                                 }
                                                 isLocked={isAttendanceFormLocked}

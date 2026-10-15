@@ -12,7 +12,7 @@ function normStr(v: unknown): string {
 }
 
 function extractUuidFromSyntheticStudentId(studentId: string): string | null {
-    const m = studentId.match(/^member:\d+:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    const m = studentId.match(/^member:[^:]+:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
     return m?.[1] ? m[1].toLowerCase() : null;
 }
 
