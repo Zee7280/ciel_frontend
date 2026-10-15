@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    browseDaysLeftLabel,
     classifyBrowseCreator,
     classifyBrowsePath,
     formatBrowseDeadline,
@@ -48,6 +49,16 @@ test("classifyBrowseCreator returns null for an unclassifiable/empty opportunity
         classifyBrowseCreator({ isStudentCreated: false, facultyId: null, organizationId: null }),
         null,
     );
+});
+
+test("browseDaysLeftLabel formats remaining days without Invalid Date", () => {
+    const now = new Date("2026-10-15T12:00:00");
+    assert.equal(browseDaysLeftLabel(null, now), null);
+    assert.equal(browseDaysLeftLabel("TBD", now), null);
+    assert.equal(browseDaysLeftLabel("2026-10-14", now), "Ended");
+    assert.equal(browseDaysLeftLabel("2026-10-15", now), "Ends today");
+    assert.equal(browseDaysLeftLabel("2026-10-16", now), "1 day left");
+    assert.equal(browseDaysLeftLabel("2026-10-18", now), "3 days left");
 });
 
 test("isUrgentBrowseDeadline flags only deadlines within the next 14 days, never a malformed date", () => {

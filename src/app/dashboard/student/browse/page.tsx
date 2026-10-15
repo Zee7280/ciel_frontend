@@ -855,14 +855,14 @@ export default function StudentBrowseOpportunitiesPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {(
                     [
-                        ["all", "LIVE OPPORTUNITIES", feedCounts.live, "Visible at the top of the page. Students can apply immediately with a project start and end date.", "live"],
-                        ["applied", "APPLIED BY ME", feedCounts.applied, "Applications are brought near the top so students can continue reports, attendance and progress checks.", "applied"],
-                        ["expiring", "EXPIRING SOON", feedCounts.expiring, "Automatically tagged from inside Live, so urgent listings don’t get missed.", "expiring"],
-                        ["expired", "EXPIRED ARCHIVE", feedCounts.expired, "Shifted away from the main browsing feed. Still accessible for reference, but no longer mixed with current opportunities.", "expired"],
-                    ] as Array<[BrowseFeedTab, string, number, string, BrowseFeedTab]>
-                ).map(([id, label, count, hint, tab]) => (
+                        ["live", "LIVE OPPORTUNITIES", feedCounts.live, "Visible at the top of the page. Students can apply immediately with a project start and end date."],
+                        ["applied", "APPLIED BY ME", feedCounts.applied, "Applications are brought near the top so students can continue reports, attendance and progress checks."],
+                        ["expiring", "EXPIRING SOON", feedCounts.expiring, "Automatically tagged from inside Live, so urgent listings don’t get missed."],
+                        ["expired", "EXPIRED ARCHIVE", feedCounts.expired, "Shifted away from the main browsing feed. Still accessible for reference, but no longer mixed with current opportunities."],
+                    ] as Array<[BrowseFeedTab, string, number, string]>
+                ).map(([tab, label, count, hint]) => (
                     <button
-                        key={id}
+                        key={tab}
                         type="button"
                         onClick={() => setFeedTab(tab)}
                         className={`rounded-[18px] border px-4 py-4 text-left shadow-[0_8px_22px_rgba(15,42,48,.05)] transition ${
@@ -1186,7 +1186,18 @@ export default function StudentBrowseOpportunitiesPage() {
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[15px] font-black text-[#16313d]">{filteredOpportunities.length} Opportunities Found</p>
+                    <p className="text-[15px] font-black text-[#16313d]">
+                        {feedTab === "live"
+                            ? "Live Opportunities"
+                            : feedTab === "applied"
+                              ? "Applied"
+                              : feedTab === "expiring"
+                                ? "Expiring Soon"
+                                : feedTab === "expired"
+                                  ? "Expired Archive"
+                                  : "All Visible"}{" "}
+                        · {filteredOpportunities.length}
+                    </p>
                     <button type="button" onClick={() => setPathTab("all")} className={`rounded-full px-2.5 py-1 text-[11px] font-black ${pathTab === "all" ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f]"}`}>
                         All {pathTab === "all" ? filteredPathCounts.all : pathCounts.all}
                     </button>
@@ -1206,9 +1217,47 @@ export default function StudentBrowseOpportunitiesPage() {
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <label className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa0a6]" />
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Quick filter within visible cards"
+                            className="h-10 w-[220px] rounded-xl border border-[#e4eeec] bg-white pl-8 pr-3 text-[12px] text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none"
+                        />
+                    </label>
                     <div className="relative">
-                        <select value={sortNewest ? "newest" : "oldest"} onChange={(e) => setSortNewest(e.target.value === "newest")} className={`${filterSelectClass} min-w-[9rem] rounded-xl`} title="Sort">
+                        <select value={oppTypeFilter} onChange={(e) => setOppTypeFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="Type">
+                            <option value="all">All Types</option>
+                            {oppTypeOptions.map((t) => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                    </div>
+                    <div className="relative">
+                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="SDG">
+                            <option value="all">Filter by SDG</option>
+                            {sdgOptions.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                    </div>
+                    <div className="relative">
+                        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="City">
+                            <option value="all">Filter by City</option>
+                            {locationOptions.map((loc) => (
+                                <option key={loc} value={loc}>{loc}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
+                    </div>
+                    <div className="relative">
+                        <select value={sortMode} onChange={(e) => setSortMode(e.target.value as "live" | "newest" | "oldest")} className={`${filterSelectClass} min-w-[9rem] rounded-xl`} title="Sort">
+                            <option value="live">Live first</option>
                             <option value="newest">Most Recent</option>
                             <option value="oldest">Oldest first</option>
                         </select>
@@ -1240,7 +1289,7 @@ export default function StudentBrowseOpportunitiesPage() {
                     </Button>
                 </div>
             ) : (
-                <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "space-y-4"}>
+                <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "space-y-4"}>
                     {filteredOpportunities.map((op) => {
                         const applyEligibility = resolveStudentUniversityApplyEligibility(
                             op as unknown as Record<string, unknown>,
@@ -1302,6 +1351,13 @@ export default function StudentBrowseOpportunitiesPage() {
                                 coverUrl={op.cover_url}
                                 isFull={Boolean(op.is_full)}
                                 isExpired={listingIsExpiredFromPayload(rawOp)}
+                                facultyName={op.faculty_name}
+                                categoryLabel={op.category || op.path_label || BROWSE_PATH_BY_KEY[pathKey].shortLabel}
+                                seatsFilledLabel={
+                                    op.seatsTotal != null && op.seatsApproved != null
+                                        ? `${op.seatsApproved} / ${op.seatsTotal}`
+                                        : `${seatsLeft} seats`
+                                }
                                 sdgs={sdgsForBrowseCard(op.sdg_ids || [], op.sdgNumber, op.sdgTitle)}
                                 visibilityTag={visibilityTag}
                                 visibilityWarn={Boolean(applyEligibility.listingRestrictionLabel)}

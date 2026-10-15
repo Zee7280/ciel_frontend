@@ -33,6 +33,14 @@ export function toImpactPreview(body: unknown): ImpactPreview {
     if (reports.length) {
         lines.push(`${reports.length} report${reports.length === 1 ? "" : "s"}: ${reports.map((r) => `${String(r.owner ?? "member")} — ${String(r.status ?? "draft")}`).join(", ")}`);
     }
+    const opMember = data.member && typeof data.member === "object" ? (data.member as Record<string, unknown>) : null;
+    if (typeof data.op === "string" && opMember) {
+        const name = String(opMember.name ?? opMember.email ?? "Member");
+        const from = data.from_team_id ? `team ${String(data.from_team_id)}` : "individual";
+        if (data.op === "move") lines.push(`Move ${name} from ${from} to team ${String(data.to_team_id ?? "")}`);
+        else if (data.op === "split") lines.push(`Make ${name} an individual enrollment (leaves ${from})`);
+        else if (data.op === "set_lead") lines.push(`Make ${name} the lead of ${from}`);
+    }
     if (typeof data.payments === "number" && data.payments > 0) lines.push(`${data.payments} payment record(s)`);
     if (typeof data.applications_to_withdraw === "number" && data.applications_to_withdraw > 0) {
         lines.push(`${data.applications_to_withdraw} application(s) will be withdrawn`);
@@ -41,6 +49,59 @@ export function toImpactPreview(body: unknown): ImpactPreview {
         lines.push(`${data.draft_reports_to_remove} draft report(s) on non-lead members will be removed`);
     }
     return { lines, warnings: asStrings(root.warnings), blockers: asStrings(root.blockers) };
+}
+
+/** Pick the team a seat moves into. Only persisted teams are offered. */
+export function TeamPickerDialog({
+    title,
+    options,
+    onPick,
+    onCancel,
+}: {
+    title: string;
+    options: Array<{ id: string; label: string }>;
+    onPick: (teamId: string) => void;
+    onCancel: () => void;
+}) {
+    const [value, setValue] = useState("");
+    return (
+        <>
+            <div className="fixed inset-0 z-[100] bg-slate-900/50" aria-hidden onClick={onCancel} />
+            <div role="dialog" aria-modal="true" className="fixed left-1/2 top-1/2 z-[110] w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                <h3 className="text-base font-extrabold text-slate-900">{title}</h3>
+                {options.length ? (
+                    <select
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        aria-label="Target team"
+                        className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                    >
+                        <option value="">Choose a team…</option>
+                        {options.map((o) => (
+                            <option key={o.id} value={o.id}>
+                                {o.label}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <p className="mt-3 text-sm text-slate-600">There is no other team on this project to move into.</p>
+                )}
+                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        disabled={!value}
+                        onClick={() => onPick(value)}
+                        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Check &amp; continue
+                    </button>
+                </div>
+            </div>
+        </>
+    );
 }
 
 export type ImpactDialogState = {
@@ -164,6 +225,9 @@ const KIND_LABEL: Record<string, string> = {
     delete_team: "Team removed",
     delete_member: "Member removed",
     merge: "Teams merged",
+    move_member: "Member moved",
+    split_member: "Made individual",
+    set_lead: "Lead changed",
 };
 
 /** Undo list: every delete / merge made from this modal, newest first. */

@@ -13,6 +13,7 @@ import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrack
 import {
     ImpactConfirmDialog,
     RecentChangesPanel,
+    TeamPickerDialog,
     toImpactPreview,
     type ImpactDialogState,
 } from "@/app/dashboard/admin/projects/TeamActionSafety";
@@ -880,6 +881,7 @@ export default function AdminProjectsPage() {
     const [teamMergeTargetTeamId, setTeamMergeTargetTeamId] = useState("");
     const [teamMergeSubmitting, setTeamMergeSubmitting] = useState(false);
     const [impactDialog, setImpactDialog] = useState<ImpactDialogState | null>(null);
+    const [movePicker, setMovePicker] = useState<{ member: TeamMemberRow; fromTeamId: string } | null>(null);
     const [snapshotsRefreshKey, setSnapshotsRefreshKey] = useState(0);
     const [attendanceToggleParticipationId, setAttendanceToggleParticipationId] = useState<string | null>(null);
     const [dedupeSeatsStudentUserId, setDedupeSeatsStudentUserId] = useState<string | null>(null);
@@ -1143,6 +1145,53 @@ export default function AdminProjectsPage() {
                         }
                     })();
                 },
+            },
+        });
+    };
+
+    /** Roster correction on one enrolled seat: preview first, then apply with an undo snapshot. */
+    const runTeamOp = async (op: "move" | "split" | "set_lead", member: TeamMemberRow, targetTeamId?: string) => {
+        if (!teamOverviewModal) return;
+        const oppId = teamOverviewModal.opportunityId;
+        const payload = JSON.stringify({
+            op,
+            member_participation_id: member.id,
+            ...(targetTeamId ? { target_team_id: targetTeamId } : {}),
+        });
+        const headers = { "Content-Type": "application/json" };
+        const titles = {
+            move: `Move ${member.name || "this member"} to another team?`,
+            split: `Make ${member.name || "this member"} an individual enrollment?`,
+            set_lead: `Make ${member.name || "this member"} the team lead?`,
+        } as const;
+        await openImpactDialog({
+            title: titles[op],
+            confirmLabel: op === "move" ? "Move member" : op === "split" ? "Make individual" : "Make lead",
+            previewRequest: () =>
+                authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(oppId)}/team-ops/preview`, { method: "POST", headers, body: payload }),
+            run: async () => {
+                try {
+                    const res = await authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(oppId)}/team-ops/apply`, {
+                        method: "POST",
+                        headers,
+                        body: payload,
+                    });
+                    const data = res ? await res.json().catch(() => ({})) : {};
+                    if (res?.ok) {
+                        toastWithUndo(
+                            typeof (data as { message?: string }).message === "string" ? (data as { message: string }).message : "Roster updated",
+                            oppId,
+                            (data as { snapshot_id?: string }).snapshot_id,
+                        );
+                        await loadTeamOverview(oppId);
+                        void loadProjects(true);
+                    } else {
+                        toast.error(typeof (data as { message?: string }).message === "string" ? (data as { message: string }).message : "Could not update the roster");
+                        await loadTeamOverview(oppId);
+                    }
+                } catch {
+                    toast.error("Could not update the roster");
+                }
             },
         });
     };
@@ -1596,7 +1645,11 @@ export default function AdminProjectsPage() {
             );
             const data = res ? await res.json().catch(() => ({})) : {};
             if (res?.ok) {
+                const patchWarnings = Array.isArray((data as { warnings?: unknown }).warnings)
+                    ? ((data as { warnings: unknown[] }).warnings.filter((w) => typeof w === "string") as string[])
+                    : [];
                 toast.success("Member details updated");
+                for (const w of patchWarnings) toast.warning(w, { duration: 10000 });
                 setTeamMemberEditor(null);
                 await loadTeamOverview(teamOverviewModal.opportunityId);
                 void loadProjects(true);
@@ -3234,6 +3287,21 @@ export default function AdminProjectsPage() {
             )}
 
             <ImpactConfirmDialog state={impactDialog} onCancel={() => setImpactDialog(null)} />
+            {movePicker ? (
+                <TeamPickerDialog
+                    title={`Move ${movePicker.member.name || "this member"} into which team?`}
+                    options={teamOverviewRows
+                        .filter((t) => t.participationMode === "team" && !isSyntheticIndividualGroupId(t.id) && t.id !== movePicker.fromTeamId)
+                        .filter((t) => t.members.some((m) => isMergeableTeamMember(m)))
+                        .map((t) => ({ id: t.id, label: `${t.teamName} — ${t.members.length} member${t.members.length === 1 ? "" : "s"}` }))}
+                    onCancel={() => setMovePicker(null)}
+                    onPick={(teamId) => {
+                        const m = movePicker.member;
+                        setMovePicker(null);
+                        void runTeamOp("move", m, teamId);
+                    }}
+                />
+            ) : null}
 
             {teamOverviewModal && (
                 <>
@@ -3777,6 +3845,39 @@ export default function AdminProjectsPage() {
                                                                                             </>
                                                                                         )}
                                                                                     </button>
+                                                                                ) : null}
+                                                                                {isMergeableTeamMember(member) ? (
+                                                                                    <>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => setMovePicker({ member, fromTeamId: team.id })}
+                                                                                            title="Move this seat into another team"
+                                                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100"
+                                                                                        >
+                                                                                            <GitMerge className="w-3 h-3" /> Move
+                                                                                        </button>
+                                                                                        {team.participationMode === "team" && !isSyntheticIndividualGroupId(team.id) ? (
+                                                                                            <>
+                                                                                                {member.role !== "lead" ? (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={() => void runTeamOp("set_lead", member)}
+                                                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-violet-700 bg-violet-50 border border-violet-100 hover:bg-violet-100"
+                                                                                                    >
+                                                                                                        Make lead
+                                                                                                    </button>
+                                                                                                ) : null}
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={() => void runTeamOp("split", member)}
+                                                                                                    title="Take this seat out of the team and keep it as an individual enrollment"
+                                                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                                                                                                >
+                                                                                                    Make individual
+                                                                                                </button>
+                                                                                            </>
+                                                                                        ) : null}
+                                                                                    </>
                                                                                 ) : null}
                                                                                 <button
                                                                                     type="button"

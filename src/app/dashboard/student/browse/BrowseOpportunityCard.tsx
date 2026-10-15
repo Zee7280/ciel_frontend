@@ -125,7 +125,9 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                     <p>
                         <span className="text-[#8aa0a6]">Hours</span>
                         <br />
-                        <span className="font-semibold text-[#16313d]">{props.hoursLabel} verified min</span>
+                        <span className="font-semibold text-[#16313d]">
+                            {String(props.hoursLabel).replace(/\s*hrs?$/i, "")} verified hrs
+                        </span>
                     </p>
                     <p>
                         <span className="text-[#8aa0a6]">Seats</span>
