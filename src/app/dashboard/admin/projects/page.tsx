@@ -1416,6 +1416,11 @@ export default function AdminProjectsPage() {
                         ? (data as { message: string }).message
                         : "Could not merge team members",
                 );
+                // The roster the admin selected from is stale (or included a pending applicant): reload it
+                // so the next attempt starts from what the server actually has.
+                setTeamMergeSelectedIds([]);
+                setTeamMergeLeadId("");
+                await loadTeamOverview(teamOverviewModal.opportunityId);
             }
         } catch {
             toast.error("Could not merge team members");
