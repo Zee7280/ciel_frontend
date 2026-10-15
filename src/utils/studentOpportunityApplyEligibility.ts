@@ -104,7 +104,8 @@ export function collectUniversityParticipationAllowlist(raw: Record<string, unkn
         }
     }
 
-    const linkage = raw.visibility_and_academic_linkage;
+    // Mirrors the backend: stale linkage names do not restrict a listing whose rule is "open to all".
+    const linkage = participationRuleIsOpenAll(raw) ? null : raw.visibility_and_academic_linkage;
     if (linkage && typeof linkage === "object") {
         const arr = (linkage as Record<string, unknown>).restricted_university_names;
         if (Array.isArray(arr)) {
@@ -238,7 +239,9 @@ export function resolveStudentUniversityApplyEligibility(
     const allowedUniversities = collectUniversityParticipationAllowlist(raw);
     const dept = studentDepartment ?? readStudentDepartmentFromBrowserStorage();
 
-    if (isOpenParticipation(raw)) {
+    // An explicit university allowlist (participation scope OR legacy `restricted_universities`) always
+    // wins over "public" / "open to all": the API enforces it for the lead and every teammate.
+    if (allowedUniversities.length === 0 && isOpenParticipation(raw)) {
         return applyDepartmentGate(
             raw,
             {

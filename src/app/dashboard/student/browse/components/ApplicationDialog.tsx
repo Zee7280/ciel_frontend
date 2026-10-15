@@ -820,11 +820,16 @@ export default function ApplicationDialog({
                                         You are the team lead (row 1). Add every teammate and verify their email by OTP.
                                         {maxTeamSize != null ? ` Seats left: ${maxTeamSize} (team of ${teamMembers.length}).` : ""}
                                     </p>
+                                    {universityAllowlist.length === 0 ? (
+                                        <p className="text-xs font-medium text-slate-500">
+                                            This opportunity is open to students of any university.
+                                        </p>
+                                    ) : null}
                                     {universityAllowlist.length > 0 ? (
                                         <p className="text-xs font-semibold text-indigo-600">
                                             {universityLocked
-                                                ? `Open to ${universityAllowlist[0]} students only — every member must be from there.`
-                                                : `Open to: ${universityAllowlist.join(", ")}. Every member must be from one of these.`}
+                                                ? `Open to ${universityAllowlist[0]} students only — every member must be from there and registered on CIEL.`
+                                                : `Open to: ${universityAllowlist.join(", ")}. Every member must be from one of these and registered on CIEL.`}
                                         </p>
                                     ) : null}
                                 </div>
