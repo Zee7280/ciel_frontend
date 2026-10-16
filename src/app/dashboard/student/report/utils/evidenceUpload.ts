@@ -4,6 +4,10 @@ import {
     resolveTutorialMultipartUploadApiV1Base,
 } from "@/utils/backendApiV1Base";
 import { MAX_REPORT_UPLOAD_BYTES, MAX_REPORT_UPLOAD_LABEL } from "./fileUploadLimits";
+import { compressImageForUpload, mapWithConcurrency } from "@/utils/compressImageForUpload";
+
+/** Files uploaded at once; keeps a phone uplink busy without starving each transfer. */
+const UPLOAD_CONCURRENCY = 2;
 
 /** Same-origin BFF / Vercel often rejects multipart bodies above ~1MB; presign + S3 PUT avoids that. */
 const MULTIPART_BODY_LIMIT_BYTES = 1024 * 1024;
@@ -304,8 +308,9 @@ async function uploadEvidenceFile(
     projectId: string,
     section: string,
     field: string,
-    file: File,
+    originalFile: File,
 ): Promise<EvidenceRecord> {
+    const file = await compressImageForUpload(originalFile);
     if (file.size > MAX_REPORT_UPLOAD_BYTES) {
         throw new Error(
             `Evidence upload failed for ${file.name}: file exceeds ${MAX_REPORT_UPLOAD_LABEL} limit.`,
@@ -339,19 +344,13 @@ async function uploadEvidenceList(
 ): Promise<EvidenceItem[]> {
     if (!Array.isArray(files) || files.length === 0) return [];
 
-    const uploaded: EvidenceItem[] = [];
-
-    for (const item of files) {
+    return mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (item) => {
         const pendingFile = getPendingFile(item);
         if (pendingFile) {
-            uploaded.push(await uploadEvidenceFile(projectId, section, field, pendingFile));
-            continue;
+            return (await uploadEvidenceFile(projectId, section, field, pendingFile)) as EvidenceItem;
         }
-
-        uploaded.push(stripRuntimeFile(item));
-    }
-
-    return uploaded;
+        return stripRuntimeFile(item);
+    });
 }
 
 /** If the API only allows certain `section` values, keep draft save working with file metadata (user may re-attach).
@@ -415,9 +414,8 @@ async function resolveAttendanceLogEvidenceFiles(
 ): Promise<Record<string, unknown>[] | undefined> {
     if (!Array.isArray(logs) || logs.length === 0) return logs;
 
-    const out: Record<string, unknown>[] = [];
-    for (let i = 0; i < logs.length; i++) {
-        const log = { ...logs[i] };
+    return mapWithConcurrency(logs, UPLOAD_CONCURRENCY, async (srcLog, i) => {
+        const log = { ...srcLog };
         const raw = log.evidence_file;
         let file: File | null = null;
         if (typeof File !== "undefined" && raw instanceof File) {
@@ -444,9 +442,8 @@ async function resolveAttendanceLogEvidenceFiles(
                 };
             }
         }
-        out.push(log);
-    }
-    return out;
+        return log;
+    });
 }
 
 /** `strict`: pass true on final submit so a failed evidence upload throws (and blocks submit with a
@@ -460,44 +457,28 @@ export async function prepareReportEvidenceForSave<T extends object>(
     const reportRecord = reportData as Record<string, unknown>;
 
     const section1 = (reportRecord.section1 || {}) as { attendance_logs?: Record<string, unknown>[]; [key: string]: unknown };
-    const attendanceLogs = await resolveAttendanceLogEvidenceFiles(projectId, section1.attendance_logs, strict);
-
     const section6 = (reportRecord.section6 || {}) as {
         evidence_files?: EvidenceItem[];
         [key: string]: unknown;
     };
-    const section6Files = await uploadEvidenceListWithFallback(
-        projectId,
-        "section6",
-        "evidence_files",
-        section6.evidence_files,
-        strict,
-    );
-
     const section7 = (reportRecord.section7 || {}) as {
         formalization_files?: EvidenceItem[];
         [key: string]: unknown;
     };
-    const section7Files = await uploadEvidenceListWithFallback(
-        projectId,
-        "section7",
-        "formalization_files",
-        section7.formalization_files,
-        strict,
-    );
-
     const section8 = (reportRecord.section8 || {}) as {
         evidence_files?: EvidenceItem[];
         partner_verification_files?: EvidenceItem[];
         [key: string]: unknown;
     };
-    const evidenceFiles = await uploadEvidenceList(projectId, "section8", "evidence_files", section8.evidence_files);
-    const partnerFiles = await uploadEvidenceList(
-        projectId,
-        "section8",
-        "partner_verification_files",
-        section8.partner_verification_files,
-    );
+
+    // Independent groups upload side by side instead of one section after another.
+    const [attendanceLogs, section6Files, section7Files, evidenceFiles, partnerFiles] = await Promise.all([
+        resolveAttendanceLogEvidenceFiles(projectId, section1.attendance_logs, strict),
+        uploadEvidenceListWithFallback(projectId, "section6", "evidence_files", section6.evidence_files, strict),
+        uploadEvidenceListWithFallback(projectId, "section7", "formalization_files", section7.formalization_files, strict),
+        uploadEvidenceList(projectId, "section8", "evidence_files", section8.evidence_files),
+        uploadEvidenceList(projectId, "section8", "partner_verification_files", section8.partner_verification_files),
+    ]);
 
     const evidenceUrls = evidenceFiles
         .map(getUrl)

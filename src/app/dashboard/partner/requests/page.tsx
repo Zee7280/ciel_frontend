@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, ExternalLink, ShieldCheck } from "lucide-react";
+import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, Copy, ExternalLink, ShieldCheck } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
@@ -355,6 +355,14 @@ export default function PartnerRequestsPage() {
                                 className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-medium transition-colors"
                             >
                                 <Edit className="w-3.5 h-3.5 text-slate-400" /> Edit Opportunity
+                            </button>
+                        )}
+                        {activeRequest.viewer_access?.is_org_owner === false ? null : (
+                            <button
+                                onClick={() => router.push(`/dashboard/partner/requests/new?duplicate=${encodeURIComponent(activeRequest.id)}`)}
+                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-medium transition-colors"
+                            >
+                                <Copy className="w-3.5 h-3.5 text-slate-400" /> Duplicate Opportunity
                             </button>
                         )}
                         {hasPendingVerificationLink ? (

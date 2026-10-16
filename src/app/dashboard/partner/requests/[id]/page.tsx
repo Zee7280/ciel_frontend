@@ -3,7 +3,7 @@
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Info, MapPin, Calendar, Clock, CheckCircle, Circle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Printer, Share2, Search, Plus } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, Circle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, Copy, ArrowLeft, Save, X, Printer, Share2, Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
@@ -534,6 +534,14 @@ function OpportunityDetailsContent() {
                         <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
                             <Printer className="w-4 h-4" /> Print PDF
                         </button>
+                        {viewerCanEdit ? (
+                            <Link
+                                href={`/dashboard/partner/requests/new?duplicate=${encodeURIComponent(String(id))}`}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                            >
+                                <Copy className="w-4 h-4" /> Duplicate
+                            </Link>
+                        ) : null}
                         {viewerCanEdit ? (
                             <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
                                 <Edit className="w-4 h-4" /> Edit Opportunity

@@ -799,8 +799,8 @@ function FacultyCommunityServiceHub() {
                                             ? `${CREATE_FORM}?edit=${encodeURIComponent(row.id)}${createTab === "drafts" ? "&draft=1" : ""}`
                                             : `${MY_OPPS}?tab=${createTab === "published" ? "live" : createTab === "closed" ? "rejected" : "review"}`;
                                     return (
-                                        <Link
-                                            key={row.id}
+                                        <div key={row.id} className="relative">
+<Link
                                             href={href}
                                             className="flex min-w-0 gap-0 transition hover:bg-[#f7fafb]"
                                         >
@@ -835,6 +835,16 @@ function FacultyCommunityServiceHub() {
                                                 ) : null}
                                             </div>
                                         </Link>
+                                        {createTab !== "drafts" ? (
+                                            <Link
+                                                href={`${CREATE_FORM}?duplicate=${encodeURIComponent(row.id)}`}
+                                                title="Duplicate — create a new opportunity from this one"
+                                                className="absolute bottom-3 right-4 rounded-full border border-[#d9e3e7] bg-white px-3 py-1 text-[11px] font-extrabold text-[#126a67] shadow-sm hover:bg-[#f7fafb]"
+                                            >
+                                                Duplicate
+                                            </Link>
+                                        ) : null}
+                                        </div>
                                     );
                                 })}
                             </div>

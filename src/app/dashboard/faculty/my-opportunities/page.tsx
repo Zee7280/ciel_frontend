@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
-import { AlertTriangle, ChevronRight, Info, Loader2, MoreVertical, Pencil, Plus, Search, Users } from "lucide-react";
+import { AlertTriangle, ChevronRight, Copy, Info, Loader2, MoreVertical, Pencil, Plus, Search, Users } from "lucide-react";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 import {
@@ -482,6 +482,7 @@ export default function FacultyMyOpportunitiesPage() {
                         const mode = formatMode(row.mode);
                         const rejectedCopy = row.review_feedback || row.rejection_reason || null;
                         const editHref = `/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(row.id)}`;
+                        const duplicateHref = `/dashboard/faculty/create-opportunity?duplicate=${encodeURIComponent(row.id)}`;
                         const highlighted = highlightIds.includes(row.id);
                         const steps = pipelineSteps(row);
 
@@ -556,6 +557,14 @@ export default function FacultyMyOpportunitiesPage() {
                                             >
                                                 <Pencil className="h-4 w-4" />
                                             </Link>
+                                            <Link
+                                                href={duplicateHref}
+                                                title="Duplicate — create a new opportunity from this one"
+                                                aria-label="Duplicate opportunity"
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                            </Link>
                                             <div className="relative">
                                                 <button
                                                     type="button"
@@ -573,6 +582,13 @@ export default function FacultyMyOpportunitiesPage() {
                                                             onClick={() => setOpenMenuId(null)}
                                                         >
                                                             Edit listing
+                                                        </Link>
+                                                        <Link
+                                                            href={duplicateHref}
+                                                            className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                                            onClick={() => setOpenMenuId(null)}
+                                                        >
+                                                            Duplicate listing
                                                         </Link>
                                                         <Link
                                                             href="/dashboard/faculty/join-applications"

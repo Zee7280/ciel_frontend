@@ -1,4 +1,5 @@
 import { authenticatedFetch } from "@/utils/api";
+import { compressImageForUpload } from "@/utils/compressImageForUpload";
 import { MAX_REPORT_UPLOAD_BYTES, MAX_REPORT_UPLOAD_LABEL } from "@/app/dashboard/student/report/utils/fileUploadLimits";
 
 /** Shared presign → direct-S3-PUT upload, generalized from attendanceEvidenceUpload.ts's proven
@@ -34,7 +35,8 @@ function pickPresignPayload(json: unknown): PresignResponse | null {
  * and returning {data: {uploadUrl, publicUrl}}), then PUTs the file straight to S3. Throws an
  * `Error` with a real, user-showable reason on any failure — never swallow it into a generic
  * "upload failed" message; surface `(err as Error).message` to the student instead. */
-export async function uploadFileViaPresign(presignPath: string, file: File): Promise<string> {
+export async function uploadFileViaPresign(presignPath: string, originalFile: File): Promise<string> {
+    const file = await compressImageForUpload(originalFile);
     if (file.size > MAX_REPORT_UPLOAD_BYTES) {
         throw new Error(`File exceeds ${MAX_REPORT_UPLOAD_LABEL}. Use a smaller file or compress it.`);
     }

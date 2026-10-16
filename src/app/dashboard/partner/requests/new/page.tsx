@@ -183,6 +183,8 @@ export default function OpportunityPostingPage() {
     /** Synchronous double-click guard: isSubmitting is state, so two clicks in one tick can both pass. */
     const submitInFlightRef = useRef(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    /** `?duplicate=<id>`: prefill from an existing request, but submit as a brand-new one. */
+    const [duplicateSourceId, setDuplicateSourceId] = useState<string | null>(null);
     const [isDraftMode, setIsDraftMode] = useState(false);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
     const draftIdRef = useRef<string | null>(null);
@@ -792,6 +794,8 @@ export default function OpportunityPostingPage() {
             if (editId) {
                 draftIdRef.current = editId;
                 setEditingOpportunityId(editId);
+            } else if (params.get("duplicate")?.trim()) {
+                setDuplicateSourceId(params.get("duplicate")!.trim());
             } else {
                 try {
                     localStorage.removeItem(PARTNER_OPPORTUNITY_DRAFT_KEY);
@@ -897,11 +901,13 @@ export default function OpportunityPostingPage() {
     }, [router]);
 
     useEffect(() => {
-        if (!editingOpportunityId || isLoadingProfile) return;
+        const sourceId = editingOpportunityId || duplicateSourceId;
+        if (!sourceId || isLoadingProfile) return;
         if (skipDraftHydrateRef.current) {
             skipDraftHydrateRef.current = false;
             return;
         }
+        const duplicating = !editingOpportunityId && Boolean(duplicateSourceId);
         let cancelled = false;
         (async () => {
             setIsLoadingEdit(true);
@@ -909,7 +915,7 @@ export default function OpportunityPostingPage() {
                 const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: editingOpportunityId }),
+                    body: JSON.stringify({ id: sourceId }),
                 });
                 if (!res?.ok) {
                     toast.error("Could not load this opportunity");
@@ -918,7 +924,9 @@ export default function OpportunityPostingPage() {
                 const json = await res.json();
                 const d = json?.data as Record<string, unknown> | undefined;
                 if (!d || cancelled) return;
-                if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
+                if (duplicating) {
+                    toast.info("Request copied. Review the details, then submit to create a new one.", { id: "partner-opp-duplicate" });
+                } else if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 const str = (v: unknown) => (typeof v === "string" ? v : "");
                 const timeline = (d.timeline && typeof d.timeline === "object" ? d.timeline : {}) as Record<string, unknown>;
                 const sdgInfo = (d.sdg_info && typeof d.sdg_info === "object" ? d.sdg_info : {}) as Record<string, unknown>;
@@ -950,7 +958,13 @@ export default function OpportunityPostingPage() {
                 if (cancelled) return;
                 setFormData((prev) => ({
                     ...prev,
-                    title: str(d.title) === "Untitled opportunity" ? "" : str(d.title),
+                    // A copy needs its own title (the server refuses a reused one).
+                    title:
+                        str(d.title) === "Untitled opportunity"
+                            ? ""
+                            : duplicating && str(d.title).trim()
+                              ? `${str(d.title).trim()} (Copy)`
+                              : str(d.title),
                     hook: str(objectives.hook),
                     creatorDetailType: str(exec.organization_type) || prev.creatorDetailType,
                     creatorSector: str(exec.sector),
@@ -1006,7 +1020,9 @@ export default function OpportunityPostingPage() {
                             subIndicatorId: str(x.sub_indicator_id),
                             justification: str(x.justification),
                         })),
-                    electronicSignature: str(sup.electronic_signature) || prev.electronicSignature,
+                    electronicSignature: duplicating
+                        ? prev.electronicSignature
+                        : str(sup.electronic_signature) || prev.electronicSignature,
                     selectedDepartments: savedDepartments.length ? savedDepartments : prev.selectedDepartments,
                     verificationSafety: {
                         ...prev.verificationSafety,
@@ -1056,7 +1072,7 @@ export default function OpportunityPostingPage() {
         return () => {
             cancelled = true;
         };
-    }, [editingOpportunityId, isLoadingProfile]);
+    }, [editingOpportunityId, duplicateSourceId, isLoadingProfile]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>

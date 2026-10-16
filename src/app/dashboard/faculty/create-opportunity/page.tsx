@@ -138,6 +138,8 @@ export default function FacultyOpportunityCreationPage() {
     /** Synchronous lock: state updates are async, so a fast double-click could otherwise fire two creates. */
     const submitLock = useRef(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    /** `?duplicate=<id>`: prefill this form from an existing opportunity, but submit as a brand-new one. */
+    const [duplicateSourceId, setDuplicateSourceId] = useState<string | null>(null);
     const [isDraftMode, setIsDraftMode] = useState(false);
     /** Set once this visit has been submitted, so the autosave timer cannot write that form back. */
     const deviceDraftClosed = useRef(false);
@@ -927,6 +929,11 @@ export default function FacultyOpportunityCreationPage() {
             setEditingOpportunityId(e);
             return;
         }
+        const dup = p.get("duplicate")?.trim();
+        if (dup) {
+            setDuplicateSourceId(dup);
+            return;
+        }
         // A new opportunity must not reopen the last form saved on this device.
         // That copy stayed after submit, and the page asked to resume it.
         try {
@@ -956,11 +963,13 @@ export default function FacultyOpportunityCreationPage() {
     }, [formData, editingOpportunityId]);
 
     useEffect(() => {
-        if (!editingOpportunityId || isLoadingProfile) return;
+        const sourceId = editingOpportunityId || duplicateSourceId;
+        if (!sourceId || isLoadingProfile) return;
         if (skipDraftHydrateRef.current) {
             skipDraftHydrateRef.current = false;
             return;
         }
+        const duplicating = !editingOpportunityId && Boolean(duplicateSourceId);
         let cancelled = false;
         (async () => {
             setIsLoadingEdit(true);
@@ -968,7 +977,7 @@ export default function FacultyOpportunityCreationPage() {
                 const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: editingOpportunityId }),
+                    body: JSON.stringify({ id: sourceId }),
                 });
                 if (!res?.ok) {
                     toast.error("Could not load this opportunity");
@@ -991,8 +1000,9 @@ export default function FacultyOpportunityCreationPage() {
                     /* ignore */
                 }
                 if (myId && typeof d.creatorId === "string" && d.creatorId !== myId) {
-                    toast.error("You can only edit opportunities you created");
+                    toast.error(duplicating ? "You can only duplicate opportunities you created" : "You can only edit opportunities you created");
                     setEditingOpportunityId(null);
+                    setDuplicateSourceId(null);
                     return;
                 }
                 let facultyDetailsPatch: ReturnType<typeof mapOpportunityDetailToFacultyForm>["facultyDetailsPatch"];
@@ -1005,7 +1015,19 @@ export default function FacultyOpportunityCreationPage() {
                     return;
                 }
                 if (cancelled) return;
-                if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
+                if (duplicating) {
+                    // A copy is a new submission: keep every detail, but the title must differ (the
+                    // server refuses a reused title) and the declarations/signature are re-affirmed.
+                    const baseTitle = typeof formDataPatch.title === "string" ? formDataPatch.title.trim() : "";
+                    formDataPatch = {
+                        ...formDataPatch,
+                        title: baseTitle ? `${baseTitle} (Copy)` : "",
+                    };
+                    delete formDataPatch.safetyDeclarations;
+                    delete formDataPatch.finalConfirmations;
+                    delete formDataPatch.electronicSignature;
+                    toast.info("Opportunity copied. Review the details, then submit to create a new one.", { id: "faculty-opp-duplicate" });
+                } else if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 setFacultyDetails((prev) => ({
                     ...prev,
                     ...facultyDetailsPatch,
@@ -1055,7 +1077,7 @@ export default function FacultyOpportunityCreationPage() {
         return () => {
             cancelled = true;
         };
-    }, [editingOpportunityId, isLoadingProfile]);
+    }, [editingOpportunityId, duplicateSourceId, isLoadingProfile]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
