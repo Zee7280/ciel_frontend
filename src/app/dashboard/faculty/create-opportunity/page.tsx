@@ -999,10 +999,13 @@ export default function FacultyOpportunityCreationPage() {
                 } catch {
                     /* ignore */
                 }
-                if (myId && typeof d.creatorId === "string" && d.creatorId !== myId) {
-                    toast.error(duplicating ? "You can only duplicate opportunities you created" : "You can only edit opportunities you created");
+                // Editing stays limited to the creator. A copy is a new listing owned by the current
+                // user, so any opportunity this user may open (own, or one they supervise) can be copied.
+                const copyOfSomeoneElses =
+                    duplicating && Boolean(myId) && typeof d.creatorId === "string" && d.creatorId !== myId;
+                if (!duplicating && myId && typeof d.creatorId === "string" && d.creatorId !== myId) {
+                    toast.error("You can only edit opportunities you created");
                     setEditingOpportunityId(null);
-                    setDuplicateSourceId(null);
                     return;
                 }
                 let facultyDetailsPatch: ReturnType<typeof mapOpportunityDetailToFacultyForm>["facultyDetailsPatch"];
@@ -1026,6 +1029,11 @@ export default function FacultyOpportunityCreationPage() {
                     delete formDataPatch.safetyDeclarations;
                     delete formDataPatch.finalConfirmations;
                     delete formDataPatch.electronicSignature;
+                    if (copyOfSomeoneElses) {
+                        // The new listing is yours: keep your own creator / academic-lead details.
+                        delete formDataPatch.academicLead;
+                        facultyDetailsPatch = {};
+                    }
                     toast.info("Opportunity copied. Review the details, then submit to create a new one.", { id: "faculty-opp-duplicate" });
                 } else if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 setFacultyDetails((prev) => ({
