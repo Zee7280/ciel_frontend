@@ -1,5 +1,6 @@
 "use client";
 
+import DuplicateNotice, { type DuplicateNoticeState } from "@/components/opportunities/DuplicateNotice";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS } from "@/utils/opportunityChipOptions";
@@ -140,6 +141,8 @@ export default function FacultyOpportunityCreationPage() {
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     /** `?duplicate=<id>`: prefill this form from an existing opportunity, but submit as a brand-new one. */
     const [duplicateSourceId, setDuplicateSourceId] = useState<string | null>(null);
+    const [duplicateNotice, setDuplicateNotice] = useState<DuplicateNoticeState>(null);
+    const [duplicateRetry, setDuplicateRetry] = useState(0);
     const [isDraftMode, setIsDraftMode] = useState(false);
     /** Set once this visit has been submitted, so the autosave timer cannot write that form back. */
     const deviceDraftClosed = useRef(false);
@@ -973,20 +976,40 @@ export default function FacultyOpportunityCreationPage() {
         let cancelled = false;
         (async () => {
             setIsLoadingEdit(true);
+            if (duplicating) setDuplicateNotice({ kind: "loading" });
             try {
-                const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: sourceId }),
-                });
+                const loadDetail = () =>
+                    authenticatedFetch(`/api/v1/opportunities/detail`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: sourceId }),
+                    });
+                let res = await loadDetail();
+                // One automatic retry for a transient network / server hiccup (never for 4xx).
+                if (duplicating && (!res || res.status >= 500)) {
+                    await new Promise((r) => setTimeout(r, 800));
+                    res = await loadDetail();
+                }
                 if (!res?.ok) {
-                    toast.error("Could not load this opportunity");
+                    if (duplicating) {
+                        setDuplicateNotice({
+                            kind: "error",
+                            message: !res
+                                ? "your session expired or the network blocked the request."
+                                : res.status === 404 || res.status === 403
+                                  ? "you do not have access to open that opportunity."
+                                  : `the server answered HTTP ${res.status}.`,
+                        });
+                    } else {
+                        toast.error("Could not load this opportunity");
+                    }
                     return;
                 }
                 const json = await res.json();
                 const d = json?.data as Record<string, unknown> | undefined;
                 if (!d) {
-                    toast.error("Opportunity not found");
+                    if (duplicating) setDuplicateNotice({ kind: "error", message: "the opportunity was not found." });
+                    else toast.error("Opportunity not found");
                     return;
                 }
                 let myId: string | null = null;
@@ -1014,7 +1037,8 @@ export default function FacultyOpportunityCreationPage() {
                     ({ facultyDetailsPatch, formDataPatch } = mapOpportunityDetailToFacultyForm(d));
                 } catch (err) {
                     console.error("mapOpportunityDetailToFacultyForm failed", err);
-                    toast.error("Could not open this opportunity for edit — record shape looks incomplete.");
+                    if (duplicating) setDuplicateNotice({ kind: "error", message: "its saved data looks incomplete." });
+                    else toast.error("Could not open this opportunity for edit — record shape looks incomplete.");
                     return;
                 }
                 if (cancelled) return;
@@ -1034,7 +1058,7 @@ export default function FacultyOpportunityCreationPage() {
                         delete formDataPatch.academicLead;
                         facultyDetailsPatch = {};
                     }
-                    toast.info("Opportunity copied. Review the details, then submit to create a new one.", { id: "faculty-opp-duplicate" });
+                    setDuplicateNotice({ kind: "ok", title: String(d.title || "the previous opportunity") });
                 } else if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 setFacultyDetails((prev) => ({
                     ...prev,
@@ -1077,7 +1101,10 @@ export default function FacultyOpportunityCreationPage() {
                     },
                 }));
             } catch {
-                if (!cancelled) toast.error("Could not load this opportunity");
+                if (!cancelled) {
+                    if (duplicating) setDuplicateNotice({ kind: "error", message: "an unexpected error occurred while reading it." });
+                    else toast.error("Could not load this opportunity");
+                }
             } finally {
                 if (!cancelled) setIsLoadingEdit(false);
             }
@@ -1085,7 +1112,7 @@ export default function FacultyOpportunityCreationPage() {
         return () => {
             cancelled = true;
         };
-    }, [editingOpportunityId, duplicateSourceId, isLoadingProfile]);
+    }, [editingOpportunityId, duplicateSourceId, duplicateRetry, isLoadingProfile]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -1250,6 +1277,9 @@ export default function FacultyOpportunityCreationPage() {
                             <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
                         </p>
                     ) : null}
+                    <div className="mt-3">
+                        <DuplicateNotice state={duplicateNotice} onRetry={() => setDuplicateRetry((n) => n + 1)} />
+                    </div>
                 </div>
                 <div
                     className="co-progress-ring"
