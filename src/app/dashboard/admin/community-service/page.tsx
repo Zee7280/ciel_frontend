@@ -1187,7 +1187,7 @@ export function AdminCommunityServiceHub() {
 
             {effectiveView === "run" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="AI Ranking Analyzer" subtitle="NPE-1.1 National Ranking Studio. Approved packages only. Locked CII is preserved. RUBERIX medals stay on award-notify." />
+                    <MockupSectionHead title="AI Ranking Analyzer" subtitle="National Ranking Studio. Approved packages only. Locked CII is preserved. RUBERIX medals stay on award-notify." />
                     <NationalRankingStudio
                         role="ciel_admin"
                         packagesEndpoint="/api/v1/admin/community-service/ranking/packages"

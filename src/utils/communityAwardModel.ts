@@ -83,7 +83,22 @@ export type CommunityAwardCard = {
     awardBadges?: CommunityAwardBadge[];
     awardBadgeHistory?: CommunityAwardBadge[];
     impact_verify_url?: string | null;
-    /** Published NPE-1.1 standing. Does not replace CII or RUBERIX total. */
+    /** Rankings published from the Ranking Studio that include this project (each with its own label,
+     * filters, position and date). Additive: absent when nothing has been published. */
+    studioRankings?: Array<{
+        publicationId: string;
+        name: string;
+        lensTitle: string;
+        groupBy: string;
+        label: string;
+        rank: number;
+        of: number;
+        revision: number;
+        publishedAt: string;
+        movement: "up" | "down" | "same" | "new" | "cohort";
+        previousRank: number | null;
+    }>;
+    /** Published NPE ranking standing. Does not replace CII or RUBERIX total. */
     npeStanding?: {
         snapshotId: string;
         scope: string;

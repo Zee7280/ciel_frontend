@@ -1067,7 +1067,7 @@ export default function UniversityCommunityServiceHub() {
 
             {effectiveView === "run" && (
                 <div className="mt-4">
-                    <MockupSectionHead title="AI Ranking Analyzer" subtitle={`${orgName} University Cohort only — NPE-1.1. Locked CII is preserved. Other universities never enter this pool.`} />
+                    <MockupSectionHead title="AI Ranking Analyzer" subtitle={`${orgName} University Cohort only. Locked CII is preserved. Other universities never enter this pool.`} />
                     <NationalRankingStudio
                         role="university"
                         packagesEndpoint="/api/v1/partners/community-service/ranking/packages"

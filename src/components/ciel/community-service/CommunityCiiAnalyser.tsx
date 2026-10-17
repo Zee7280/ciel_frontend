@@ -272,9 +272,12 @@ export default function CommunityCiiAnalyser({
             return;
         }
         if (locked && !isCielPk) return;
+        const publishedReport = ["verified", "paid"].includes(String(report?.status ?? "").toLowerCase());
         if (locked && isCielPk) {
             const ok = window.confirm(
-                "This CII is locked. Re-run the CII v5.0 Analyzer? The lock will clear until you approve the new score.",
+                publishedReport
+                    ? "This report is already PUBLISHED. Re-running the CII v5.0 Analyzer clears its approved CII lock until you approve the new score, and its certificate and rankings rest on that score. Continue?"
+                    : "This CII is locked. Re-run the CII v5.0 Analyzer? The lock will clear until you approve the new score.",
             );
             if (!ok) return;
         }
@@ -298,7 +301,12 @@ export default function CommunityCiiAnalyser({
             setAnalysing(true);
             let res: Response | null = null;
             try {
-                res = await authenticatedFetch(analysePath, { method: "POST" }, { timeoutMs: ANALYSE_TIMEOUT_MS });
+                res = await authenticatedFetch(
+                    analysePath,
+                    // the confirmation above is the admin's explicit consent to clear a published report's lock
+                    isCielPk && locked ? { method: "POST", body: JSON.stringify({ force: true }) } : { method: "POST" },
+                    { timeoutMs: ANALYSE_TIMEOUT_MS },
+                );
             } catch (err) {
                 const aborted =
                     (err instanceof DOMException && err.name === "AbortError") ||

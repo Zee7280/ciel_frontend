@@ -89,6 +89,25 @@ export default function CommunityFlashCard({
                 <div className="mt-3 flex flex-wrap gap-1.5">
                     <span className="rounded-full bg-[#e8f5ef] px-2.5 py-1 text-[10px] font-bold text-[#1d765d]">✓ Accepted</span>
                 </div>
+                {card.studioRankings?.length ? (
+                    <div className="mt-3 rounded-xl border border-[#eedbb0] bg-[#fffaed] px-3 py-2.5">
+                        <p className="text-[8px] font-black uppercase tracking-wide text-[#875f16]">CIEL PK rankings</p>
+                        {card.studioRankings.slice(0, 3).map((r) => (
+                            <div key={r.publicationId} className="mt-1.5 border-t border-[#ecdabb] pt-1.5 first:mt-1 first:border-0 first:pt-0">
+                                <p className="text-[11px] font-bold leading-snug text-[#563f1e]">
+                                    <span className="text-[14px] font-black text-[#865b18]">#{r.rank}</span> {r.name}
+                                </p>
+                                <p className="text-[9.5px] text-[#756240]">
+                                    of {r.of} · {r.groupBy === "project" ? "project position" : `${r.groupBy}: ${r.label}`} · {new Date(r.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                                    {r.movement === "up" && r.previousRank != null ? ` · ▲ ${r.previousRank - r.rank}` : r.movement === "down" && r.previousRank != null ? ` · ▼ ${r.rank - r.previousRank}` : ""}
+                                </p>
+                            </div>
+                        ))}
+                        {card.studioRankings.length > 3 ? (
+                            <p className="mt-1.5 text-[9.5px] font-bold text-[#875f16]">+{card.studioRankings.length - 3} more published ranking{card.studioRankings.length - 3 === 1 ? "" : "s"}</p>
+                        ) : null}
+                    </div>
+                ) : null}
                 {packageHref || reportHref ? (
                 <div className="mt-auto flex gap-2 border-t border-[#eef2f1] pt-3">
                     {packageHref ? (
