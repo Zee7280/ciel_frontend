@@ -314,6 +314,16 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
                                 ? po.official_email
                                 : ""
                     : "",
+            ...(() => {
+                const raw =
+                    executingContext === "partner"
+                        ? [sup.partner_phone, sup.external_partner_phone, partnerBlock.contact_phone, extC.contact_phone, po.contact_phone].find(
+                              (v) => typeof v === "string" && v.trim(),
+                          )
+                        : "";
+                const parsed = parsePhoneForDisplay(typeof raw === "string" ? raw : "");
+                return { partnerPhoneKey: parsed.phoneCountryKey, partnerPhone: parsed.national };
+            })(),
             independentSiteDescription:
                 typeof indBlock.activity_site_description === "string" ? indBlock.activity_site_description : "",
             independentLocalContact:

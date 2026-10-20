@@ -26,6 +26,8 @@ import {
     canJoinOrApply,
     canRecordCompletedService,
     lifecycleStatusLabel,
+    todayDateOnlyPk,
+    toDateOnlyString,
 } from "@/utils/opportunityTimelineLifecycle";
 import {
     applicationsOpenFromPayload,
@@ -36,19 +38,17 @@ import {
 import {
     isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
-    isJoinApplicationApprovedStatus,
     joinApplicationLocksApplyButton,
     mergeHasAppliedFields,
     pickJoinApplicationId,
     pickJoinApplicationStage,
-    joinApplicationPendingLabel,
 } from "@/utils/studentJoinApplication";
 import {
     buildStudentReportsCheckMap,
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
-import { Loader2, Globe, LayoutGrid, List, Users, Mail, Phone, GraduationCap, ChevronDown, Search, Filter, Leaf, Lightbulb } from "lucide-react";
+import { Loader2, Globe, LayoutGrid, List, Users, Mail, Phone, GraduationCap, ChevronDown, Search, Filter } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { fetchStudentBrowsePayload, peekStudentBrowsePayload } from "@/utils/student-community-cache";
@@ -415,7 +415,13 @@ function pickBrowseFacultyName(raw: Record<string, unknown>): string | null {
 }
 
 function isBrowseExpired(op: BrowseOpportunity): boolean {
-    return listingIsExpiredFromPayload(op as unknown as Record<string, unknown>);
+    if (listingIsExpiredFromPayload(op as unknown as Record<string, unknown>)) return true;
+    // Service ended but the reporting window is open: "Record Completed Service" still works,
+    // so keep the listing live instead of greying it out under Expired.
+    if (canRecordCompletedService((op as { timeline?: unknown }).timeline)) return false;
+    // Pakistan calendar date, the same "today" the apply / reporting rules use.
+    const end = toDateOnlyString(op.end_date);
+    return end !== null && end < todayDateOnlyPk();
 }
 
 function isBrowseApplied(op: BrowseOpportunity): boolean {
@@ -434,9 +440,6 @@ function matchesBrowseFeedTab(op: BrowseOpportunity, tab: BrowseFeedTab): boolea
     return isBrowseExpired(op);
 }
 
-function padBrowseCount(n: number): string {
-    return String(n).padStart(2, "0");
-}
 
 export default function StudentBrowseOpportunitiesPage() {
     const cachedBrowse = peekStudentBrowsePayload();
@@ -514,8 +517,6 @@ export default function StudentBrowseOpportunitiesPage() {
         fyp: list.filter((op) => op.path_key === "fyp").length,
         startup: list.filter((op) => op.path_key === "startup").length,
     });
-    const pathCounts = computeBrowsePathCounts(opportunities);
-
     const afterListingFilters = opportunities.filter((op) => {
         // Defense-in-depth: the backend already excludes admin_hidden rows from this endpoint,
         // but never render one as a normal "Open" card if it ever slips through.
@@ -528,7 +529,6 @@ export default function StudentBrowseOpportunitiesPage() {
         if (!passesSeatsFilter(op.seatsRemaining ?? null, seatsFilter)) return false;
         if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;
         if (creatorFilter !== "all" && op.creatorLabel !== creatorFilter) return false;
-        if (pathTab !== "all" && (op.path_key || "community_service") !== pathTab) return false;
         if (statusFilter === "open" && op.is_full) return false;
         if (statusFilter === "full" && !op.is_full) return false;
         if (departmentFilter !== "all" && op.department !== departmentFilter) return false;
@@ -549,21 +549,26 @@ export default function StudentBrowseOpportunitiesPage() {
         if (urgentOnly && !op.is_urgent) return false;
         return true;
     });
-    const filteredPathCounts = computeBrowsePathCounts(afterListingFilters);
     const needle = searchQuery.trim().toLowerCase();
     const fullHiddenCount = afterListingFilters.filter((op) => op.seatsRemaining != null && op.seatsRemaining <= 0).length;
-    const searchedOpportunities = afterListingFilters.filter((op) => {
+    const matchesSearchAndSeats = (op: BrowseOpportunity) => {
         if (onlyOpenSeats && op.seatsRemaining != null && op.seatsRemaining <= 0) return false;
         if (!needle) return true;
         const hay = `${op.title ?? ""} ${op.organization_name ?? ""} ${op.description ?? ""}`.toLowerCase();
         return hay.includes(needle);
+    };
+    const searchedExceptPath = afterListingFilters.filter(matchesSearchAndSeats);
+    const pathCountsForChips = computeBrowsePathCounts(searchedExceptPath);
+    const searchedOpportunities = searchedExceptPath.filter((op) => {
+        if (pathTab !== "all" && (op.path_key || "community_service") !== pathTab) return false;
+        return true;
     });
     const feedCounts = {
-        all: afterListingFilters.length,
-        live: afterListingFilters.filter((op) => !isBrowseExpired(op)).length,
-        applied: afterListingFilters.filter(isBrowseApplied).length,
-        expiring: afterListingFilters.filter(isBrowseExpiring).length,
-        expired: afterListingFilters.filter(isBrowseExpired).length,
+        all: searchedOpportunities.length,
+        live: searchedOpportunities.filter((op) => !isBrowseExpired(op)).length,
+        applied: searchedOpportunities.filter(isBrowseApplied).length,
+        expiring: searchedOpportunities.filter(isBrowseExpiring).length,
+        expired: searchedOpportunities.filter(isBrowseExpired).length,
     };
     const filteredOpportunities = searchedOpportunities
         .filter((op) => matchesBrowseFeedTab(op, feedTab))
@@ -629,7 +634,6 @@ export default function StudentBrowseOpportunitiesPage() {
     ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0) + (pathTab !== "all" ? 1 : 0) + (virtualOnly ? 1 : 0) + (urgentOnly ? 1 : 0) + (dateFrom || dateTo ? 1 : 0);
 
     const pendingApplicationsCount = opportunities.filter((op) => op.applyLocked && isPendingJoin(op)).length;
-    const myApplications = opportunities.filter((op) => op.hasApplied || op.has_applied || op.applyLocked);
     const hoursRemaining = Math.max(0, hoursTarget - hoursLogged);
     const hoursPct = hoursTarget > 0 ? Math.min(100, Math.round((hoursLogged / hoursTarget) * 100)) : 0;
 
@@ -752,7 +756,7 @@ export default function StudentBrowseOpportunitiesPage() {
         return (
             <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
                 <header>
-                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Community Service Opportunities</h1>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
                     <p className="mt-1 text-sm text-ciel-text-mid">Published listings from Faculty, NGOs, Partners and CIEL PK.</p>
                 </header>
                 <div className="flex flex-col justify-center items-center min-h-[280px] gap-3">
@@ -766,73 +770,25 @@ export default function StudentBrowseOpportunitiesPage() {
     return (
         <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
             <header
-                className="overflow-hidden rounded-[22px] px-5 py-5 text-white sm:px-7 sm:py-6"
+                className="flex flex-col gap-3 rounded-[22px] px-5 py-4 text-white sm:flex-row sm:items-start sm:justify-between sm:px-6"
                 style={{ background: "linear-gradient(135deg, #0f766e 0%, #14b8a6 52%, #5eead4 100%)" }}
             >
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="max-w-3xl">
-                        <p className="text-[11px] font-semibold tracking-wide text-white/80">
-                            Community Service Opportunities · better organized for high-volume browsing
-                        </p>
-                        <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[30px]">
-                            Live opportunities first, your applied projects upfront, and expired listings neatly separated.
-                        </h1>
-                        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/85">
-                            Only published opportunities created by Faculty, NGOs, Partners or CIEL PK appear here. Apply here; once participation is approved, the project moves to My Reports.
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setFeedTab("live")}
-                                className="h-9 rounded-full bg-white px-3.5 text-[12px] font-bold text-[#0f5e57] hover:bg-white/90"
-                            >
-                                View Live Opportunities
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setFeedTab("applied")}
-                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
-                            >
-                                Go to Applied
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setFeedTab("expired")}
-                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
-                            >
-                                Open Expired Archive
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsScoringLevelsOpen(true)}
-                                className="h-9 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
-                            >
-                                How scoring works
-                            </button>
-                        </div>
-                        <Link href="/dashboard/student/paths/community-service" className="mt-3 inline-block text-[11px] font-extrabold text-white/85 hover:underline">
-                            ← Community Service hub
-                        </Link>
-                    </div>
-                    <div className="grid shrink-0 grid-cols-2 gap-3 sm:min-w-[240px]">
-                        <div className="rounded-2xl bg-white/15 px-4 py-3">
-                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.all)}</p>
-                            <p className="mt-1 text-[11px] text-white/80">Total available this semester</p>
-                        </div>
-                        <div className="rounded-2xl bg-white/15 px-4 py-3">
-                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.live)}</p>
-                            <p className="mt-1 text-[11px] text-white/80">Live right now</p>
-                        </div>
-                        <div className="rounded-2xl bg-white/15 px-4 py-3">
-                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.applied)}</p>
-                            <p className="mt-1 text-[11px] text-white/80">Applied by you</p>
-                        </div>
-                        <div className="rounded-2xl bg-white/15 px-4 py-3">
-                            <p className="text-[28px] font-black leading-none">{padBrowseCount(feedCounts.expired)}</p>
-                            <p className="mt-1 text-[11px] text-white/80">Moved to archive</p>
-                        </div>
-                    </div>
+                <div>
+                    <h1 className="text-[22px] font-extrabold tracking-tight sm:text-[24px]">Browse opportunities</h1>
+                    <p className="mt-1 max-w-2xl text-[13px] text-white/85">
+                        Published listings from Faculty, NGOs, Partners and CIEL PK. Apply here; once participation is approved, the project moves to My Reports.
+                    </p>
+                    <Link href="/dashboard/student/paths/community-service" className="mt-2 inline-block text-[11px] font-extrabold text-white/85 hover:underline">
+                        ← Community Service hub
+                    </Link>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setIsScoringLevelsOpen(true)}
+                    className="h-9 shrink-0 rounded-full border border-white/40 bg-white/10 px-3.5 text-[12px] font-bold text-white hover:bg-white/20"
+                >
+                    How scoring works
+                </button>
             </header>
 
             {applyMaintenanceBanner ? (
@@ -852,38 +808,14 @@ export default function StudentBrowseOpportunitiesPage() {
                 </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {(
-                    [
-                        ["live", "LIVE OPPORTUNITIES", feedCounts.live, "Visible at the top of the page. Students can apply immediately with a project start and end date."],
-                        ["applied", "APPLIED BY ME", feedCounts.applied, "Applications are brought near the top so students can continue reports, attendance and progress checks."],
-                        ["expiring", "EXPIRING SOON", feedCounts.expiring, "Automatically tagged from inside Live, so urgent listings don’t get missed."],
-                        ["expired", "EXPIRED ARCHIVE", feedCounts.expired, "Shifted away from the main browsing feed. Still accessible for reference, but no longer mixed with current opportunities."],
-                    ] as Array<[BrowseFeedTab, string, number, string]>
-                ).map(([tab, label, count, hint]) => (
-                    <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setFeedTab(tab)}
-                        className={`rounded-[18px] border px-4 py-4 text-left shadow-[0_8px_22px_rgba(15,42,48,.05)] transition ${
-                            feedTab === tab ? "border-[#0e7d74] bg-[#f3fbf9]" : "border-[#dce8e6] bg-white hover:border-[#b7d8d2]"
-                        }`}
-                    >
-                        <p className="text-[10px] font-black tracking-wide text-[#8aa0a6]">{label}</p>
-                        <p className="mt-1 text-[32px] font-black leading-none text-[#16313d]">{padBrowseCount(count)}</p>
-                        <p className="mt-2 text-[11px] leading-snug text-[#5d7278]">{hint}</p>
-                    </button>
-                ))}
-            </div>
-
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="Opportunity feed">
                 {(
                     [
-                        ["all", "All Visible", feedCounts.all],
+                        ["all", "All", feedCounts.all],
                         ["live", "Live", feedCounts.live],
                         ["applied", "Applied", feedCounts.applied],
                         ["expiring", "Expiring Soon", feedCounts.expiring],
-                        ["expired", "Expired Archive", feedCounts.expired],
+                        ["expired", "Expired", feedCounts.expired],
                     ] as Array<[BrowseFeedTab, string, number]>
                 ).map(([tab, label, count]) => (
                     <button
@@ -897,97 +829,9 @@ export default function StudentBrowseOpportunitiesPage() {
                         }`}
                     >
                         {label}
-                        <span className="ml-1.5 text-[11px] font-black opacity-80">{padBrowseCount(count)}</span>
+                        <span className="ml-1.5 text-[11px] font-black opacity-80">{count}</span>
                     </button>
                 ))}
-            </div>
-
-            {feedTab === "applied" ? (
-            <section className="rounded-xl border border-ciel-border bg-white p-4">
-                <h2 className="text-[17px] font-semibold text-[#16313d]">My applications</h2>
-                <p className="mt-1 text-[12.5px] text-[#70808a]">
-                    Apply here → participation approval stays here → once approved, the assigned project moves to My Reports → Ready to Start.
-                </p>
-                {myApplications.length === 0 ? (
-                    <p className="mt-3 text-sm text-[#7a919a]">No applications yet.</p>
-                ) : (
-                    <div className="mt-3 grid gap-2.5">
-                        {myApplications.map((op) => {
-                            const status = op.application_status || "";
-                            const pending = isPendingJoin(op);
-                            const approved = isJoinApplicationApprovedStatus(status);
-                            const declined = isJoinApplicationRejectedStatus(status);
-                            const next = pending
-                                ? "No action required — waiting on participation approval"
-                                : approved
-                                  ? "Moved to My Reports · Ready to Start"
-                                  : declined
-                                    ? "Application closed — review other opportunities"
-                                    : "—";
-                            return (
-                                <div key={op.id} className="flex flex-col gap-2 rounded-2xl border border-[#dde5ea] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-sm font-semibold text-[#16313d]">{op.title || "Opportunity"}</p>
-                                        <p className="mt-0.5 text-[11.5px] text-[#6b7c86]">
-                                            {pending
-                                                ? joinApplicationPendingLabel(op as unknown as Record<string, unknown>)
-                                                : approved
-                                                  ? "Approved · assigned"
-                                                  : declined
-                                                    ? "Declined"
-                                                    : status || "Applied"}
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[11.5px] text-[#6b7c86]">{next}</span>
-                                        {approved ? (
-                                            <Link
-                                                href="/dashboard/student/paths/community-service?view=workspace&filter=ready"
-                                                className="rounded-[9px] bg-[#174b43] px-2.5 py-2 text-[10px] font-black text-white"
-                                            >
-                                                Go to My Reports
-                                            </Link>
-                                        ) : (
-                                            <Link
-                                                href={`/dashboard/student/browse/${encodeURIComponent(op.id)}`}
-                                                className="rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
-                                            >
-                                                View opportunity
-                                            </Link>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </section>
-            ) : null}
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {BROWSE_PATHS.map((path) => {
-                    const Icon = path.key === "coursework" ? Leaf : path.key === "startup" ? Lightbulb : path.key === "fyp" ? Search : Users;
-                    const active = pathTab === path.key;
-                    return (
-                        <button
-                            key={path.key}
-                            type="button"
-                            onClick={() => setPathTab(active ? "all" : path.key)}
-                            className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-left shadow-sm transition ${
-                                active ? "border-transparent text-white" : "border-[#e4eeec] bg-white hover:border-[#cfe3de]"
-                            }`}
-                            style={active ? { background: path.accent } : undefined}
-                        >
-                            <span className={`mt-0.5 grid h-10 w-10 place-items-center rounded-xl ${active ? "bg-white/15 text-white" : ""}`} style={!active ? { background: path.accentSoft, color: path.accentText } : undefined}>
-                                <Icon className="h-5 w-5" />
-                            </span>
-                            <span>
-                                <span className="block text-[15px] font-bold leading-tight">{path.label}</span>
-                                <span className={`mt-0.5 block text-[12px] ${active ? "text-white/85" : "text-[#6b7c86]"}`}>{path.tagline}</span>
-                            </span>
-                        </button>
-                    );
-                })}
             </div>
 
             <section className="rounded-2xl border border-[#e4eeec] bg-white p-4 shadow-[0_8px_24px_rgba(15,42,48,.04)]" aria-label="Filters">
@@ -1013,28 +857,11 @@ export default function StudentBrowseOpportunitiesPage() {
                     <div className="space-y-3">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                             <label className="block text-[11px] font-bold text-[#5d7278]">
-                                Keyword Search
-                                <span className="relative mt-1 block">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                    <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by title, partner, skills…" className="h-10 w-full rounded-xl border border-[#e4eeec] bg-white pl-9 pr-3 text-sm text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none" />
-                                </span>
-                            </label>
-                            <label className="block text-[11px] font-bold text-[#5d7278]">
                                 Opportunity Type
                                 <span className="relative mt-1 block">
                                     <select value={oppTypeFilter} onChange={(e) => setOppTypeFilter(e.target.value)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
                                         <option value="all">All Types</option>
                                         {oppTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                                    </select>
-                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                                </span>
-                            </label>
-                            <label className="block text-[11px] font-bold text-[#5d7278]">
-                                Category
-                                <span className="relative mt-1 block">
-                                    <select value={pathTab} onChange={(e) => setPathTab(e.target.value as "all" | BrowsePathKey)} className={`${filterSelectClass} w-full min-w-0 rounded-xl`}>
-                                        <option value="all">All Categories</option>
-                                        {BROWSE_PATHS.map((p) => <option key={p.key} value={p.key}>{p.shortLabel}</option>)}
                                     </select>
                                     <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
                                 </span>
@@ -1186,26 +1013,15 @@ export default function StudentBrowseOpportunitiesPage() {
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[15px] font-black text-[#16313d]">
-                        {feedTab === "live"
-                            ? "Live Opportunities"
-                            : feedTab === "applied"
-                              ? "Applied"
-                              : feedTab === "expiring"
-                                ? "Expiring Soon"
-                                : feedTab === "expired"
-                                  ? "Expired Archive"
-                                  : "All Visible"}{" "}
-                        · {filteredOpportunities.length}
-                    </p>
+                    <p className="text-[15px] font-black text-[#16313d]">{filteredOpportunities.length} opportunities</p>
                     <button type="button" onClick={() => setPathTab("all")} className={`rounded-full px-2.5 py-1 text-[11px] font-black ${pathTab === "all" ? "bg-[#16313d] text-white" : "bg-[#edf2f3] text-[#29454f]"}`}>
-                        All {pathTab === "all" ? filteredPathCounts.all : pathCounts.all}
+                        All {pathCountsForChips.all}
                     </button>
                     {BROWSE_PATHS.map((path) => (
                         <button
                             key={path.key}
                             type="button"
-                            onClick={() => setPathTab(path.key)}
+                            onClick={() => setPathTab(pathTab === path.key ? "all" : path.key)}
                             className="rounded-full px-2.5 py-1 text-[11px] font-black"
                             style={
                                 pathTab === path.key
@@ -1213,7 +1029,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                     : { background: path.accentSoft, color: path.accentText }
                             }
                         >
-                            {path.shortLabel} {pathTab === path.key ? filteredPathCounts[path.key] : pathCounts[path.key]}
+                            {path.shortLabel} {pathCountsForChips[path.key]}
                         </button>
                     ))}
                 </div>
@@ -1224,37 +1040,10 @@ export default function StudentBrowseOpportunitiesPage() {
                             type="search"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Quick filter within visible cards"
+                            placeholder="Search title or partner"
                             className="h-10 w-[220px] rounded-xl border border-[#e4eeec] bg-white pl-8 pr-3 text-[12px] text-[#16313d] placeholder:text-[#8aa0a6] focus:border-[#0e7d74] focus:outline-none"
                         />
                     </label>
-                    <div className="relative">
-                        <select value={oppTypeFilter} onChange={(e) => setOppTypeFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="Type">
-                            <option value="all">All Types</option>
-                            {oppTypeOptions.map((t) => (
-                                <option key={t} value={t}>{t}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                    </div>
-                    <div className="relative">
-                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="SDG">
-                            <option value="all">Filter by SDG</option>
-                            {sdgOptions.map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                    </div>
-                    <div className="relative">
-                        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={`${filterSelectClass} min-w-[8rem] rounded-xl`} title="City">
-                            <option value="all">Filter by City</option>
-                            {locationOptions.map((loc) => (
-                                <option key={loc} value={loc}>{loc}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0a6]" />
-                    </div>
                     <div className="relative">
                         <select value={sortMode} onChange={(e) => setSortMode(e.target.value as "live" | "newest" | "oldest")} className={`${filterSelectClass} min-w-[9rem] rounded-xl`} title="Sort">
                             <option value="live">Live first</option>
@@ -1283,10 +1072,21 @@ export default function StudentBrowseOpportunitiesPage() {
                         <Globe className="h-8 w-8 text-ciel-green-deep" />
                     </div>
                     <h3 className="text-lg font-semibold text-ciel-text">No opportunities match</h3>
-                    <p className="mt-1 text-sm text-ciel-text-mid">Try adjusting your filters or check back later.</p>
-                    <Button variant="outline" className="mt-6 rounded-lg border-ciel-border" onClick={clearListingFilters}>
-                        Clear filters
-                    </Button>
+                    <p className="mt-1 text-sm text-ciel-text-mid">
+                        {feedTab !== "all" || pathTab !== "all"
+                            ? "This tab or path has no listings. Switch to All, or clear filters."
+                            : "Try adjusting your filters or check back later."}
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2">
+                        {feedTab !== "all" ? (
+                            <Button variant="outline" className="rounded-lg border-ciel-border" onClick={() => setFeedTab("all")}>
+                                Show all
+                            </Button>
+                        ) : null}
+                        <Button variant="outline" className="rounded-lg border-ciel-border" onClick={clearListingFilters}>
+                            Clear filters
+                        </Button>
+                    </div>
                 </div>
             ) : (
                 <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "space-y-4"}>
@@ -1350,7 +1150,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 deadline={op.end_date}
                                 coverUrl={op.cover_url}
                                 isFull={Boolean(op.is_full)}
-                                isExpired={listingIsExpiredFromPayload(rawOp)}
+                                isExpired={isBrowseExpired(op)}
                                 facultyName={op.faculty_name}
                                 categoryLabel={op.category || op.path_label || BROWSE_PATH_BY_KEY[pathKey].shortLabel}
                                 seatsFilledLabel={

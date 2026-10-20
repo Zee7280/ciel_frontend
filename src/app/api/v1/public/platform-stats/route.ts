@@ -273,5 +273,6 @@ export async function GET() {
         },
     };
 
-    return NextResponse.json(normalized);
+    // Anonymous, user-independent: let Vercel's edge serve repeat hits from the visitor's region.
+    return NextResponse.json(normalized, { headers: { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" } });
 }

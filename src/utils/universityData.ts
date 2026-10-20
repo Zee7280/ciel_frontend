@@ -224,6 +224,14 @@ export function facultyDepartmentOptionsForInstitution(institution?: string | nu
     return Array.from(new Set(base.map((s) => s.trim()).filter(Boolean)));
 }
 
+/** Department options when an opportunity targets several universities: each selected
+ * university's list in order (so BNU schools appear when BNU is among them), de-duplicated. */
+export function facultyDepartmentOptionsForInstitutions(institutions: ReadonlyArray<string | null | undefined>): string[] {
+    const named = institutions.map((i) => (i ?? "").trim()).filter(Boolean);
+    const lists = named.length ? named.map((i) => facultyDepartmentOptionsForInstitution(i)) : [facultyDepartmentOptionsForInstitution(null)];
+    return Array.from(new Set(lists.flat()));
+}
+
 function foldAcademicLabel(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -257,7 +265,7 @@ export function isSchoolOrInstituteAcademicLabel(value: string): boolean {
 export function departmentFromDegreeProgram(program: string): string {
     const raw = program.trim();
     if (!raw) return "";
-    let s = raw
+    const s = raw
         .replace(/^(associate degree in)\s+/i, "")
         .replace(/^(bachelor of|bachelor in|master of)\s+/i, "")
         .replace(/^(mphil|phd)\s+/i, "")
@@ -269,6 +277,58 @@ export function departmentFromDegreeProgram(program: string): string {
     const group = BNU_DEGREE_PROGRAMS.find((g) => g.programs.includes(raw));
     if (group) return stripSchoolWrapperFromAcademicUnit(group.school);
     return s;
+}
+
+function foldAcademicUnitKey(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+/**
+ * Every spelling under which one academic unit may be stored: the label itself, without a
+ * "School of …" / "Institute of …" wrapper, without a degree prefix ("BS Computer Science" →
+ * "Computer Science"), the BNU school a programme belongs to, and a trailing "(ABBR)".
+ * A student profile stores an HEC programme while a listing stores a department or school.
+ * Mirrors ciel_backend/src/common/academic-department.util.ts academicUnitMatchKeys so the page
+ * never blocks a student the API would accept, or vice versa.
+ */
+export function academicUnitMatchKeys(value: string | null | undefined): string[] {
+    const raw = String(value ?? "").trim();
+    if (!raw) return [];
+    const forms = new Set<string>();
+    const add = (v: string) => {
+        const k = foldAcademicUnitKey(v);
+        if (k) forms.add(k);
+    };
+    const expand = (v: string) => {
+        const t = v.trim();
+        if (!t) return;
+        add(t);
+        add(stripSchoolWrapperFromAcademicUnit(t));
+        const abbr = t.match(/^(.*?)\s*\(([^()]{2,24})\)\s*$/);
+        if (abbr) {
+            add(abbr[1]);
+            add(abbr[2]);
+        }
+    };
+    expand(raw);
+    const asDepartment = departmentFromDegreeProgram(raw);
+    if (asDepartment) expand(asDepartment);
+    const rawKey = foldAcademicUnitKey(raw);
+    const group = BNU_DEGREE_PROGRAMS.find((g) => g.programs.some((prog) => foldAcademicUnitKey(prog) === rawKey));
+    if (group) expand(group.school);
+    return Array.from(forms);
+}
+
+/** true when two stored academic-unit labels refer to the same department / school / programme. */
+export function academicDepartmentsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+    const ka = academicUnitMatchKeys(a);
+    if (!ka.length) return false;
+    const kb = new Set(academicUnitMatchKeys(b));
+    return ka.some((k) => kb.has(k));
 }
 
 /**

@@ -26,7 +26,7 @@ import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
-import { pakistaniUniversities } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
@@ -217,6 +217,8 @@ export default function FacultyOpportunityCreationPage() {
             orgName: "",
             contactPerson: "",
             email: "",
+            phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+            phoneNational: "",
             designation: "",
             function: "",
         },
@@ -428,6 +430,8 @@ export default function FacultyOpportunityCreationPage() {
             if (p.email.trim() && !isValidEmail(p.email)) {
                 F.partnerEmail = "Please enter a valid partner organization email (Section F — F2)";
             }
+            const partnerPhoneErr = validateOptionalNationalPhone(p.phoneCountryKey, p.phoneNational);
+            if (partnerPhoneErr) F.partnerPhone = `Partner phone: ${partnerPhoneErr}`;
         }
 
         const applyScope = formData.applyScope;
@@ -534,6 +538,9 @@ export default function FacultyOpportunityCreationPage() {
                 formData.safetyDeclarations.guidedSupervised &&
                 formData.safetyDeclarations.lawfulEthical &&
                 formData.safetyDeclarations.precautionsInPlace;
+            const partnerPhoneE164 = formData.partnerCollaboration.hasPartner
+                ? composeInternationalPhone(formData.partnerCollaboration.phoneCountryKey, formData.partnerCollaboration.phoneNational)
+                : "";
 
             const payload = {
                 title: formData.title,
@@ -604,6 +611,9 @@ export default function FacultyOpportunityCreationPage() {
                               external_partner_org_name: formData.partnerCollaboration.orgName.trim(),
                               external_partner_contact_person: formData.partnerCollaboration.contactPerson.trim(),
                               external_partner_email: formData.partnerCollaboration.email.trim(),
+                              ...(partnerPhoneE164
+                                  ? { external_partner_phone: partnerPhoneE164, partner_phone: partnerPhoneE164 }
+                                  : {}),
                           }
                         : {}),
                     safe_environment: allSafetyConfirmed,
@@ -623,6 +633,7 @@ export default function FacultyOpportunityCreationPage() {
                           organization_name: formData.partnerCollaboration.orgName.trim(),
                           contact_person: formData.partnerCollaboration.contactPerson.trim(),
                           official_email: formData.partnerCollaboration.email.trim(),
+                          ...(partnerPhoneE164 ? { contact_phone: partnerPhoneE164 } : {}),
                       }
                     : null,
                 participation_scope: {
@@ -2310,17 +2321,13 @@ export default function FacultyOpportunityCreationPage() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Department <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Computer Science"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                <SearchableSelect
                                     value={formData.academicLead.department}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            academicLead: { ...formData.academicLead, department: e.target.value },
-                                        })
-                                    }
+                                    onChange={(department) => setFormData((prev) => ({ ...prev, academicLead: { ...prev.academicLead, department } }))}
+                                    options={facultyDepartmentOptionsForInstitution(facultyDetails.institution)}
+                                    placeholder="Select department / school…"
+                                    searchPlaceholder="Search departments…"
+                                    ariaLabel="Academic lead department"
                                 />
                             </div>
                             <div>
@@ -2392,6 +2399,8 @@ export default function FacultyOpportunityCreationPage() {
                                                 orgName: "",
                                                 contactPerson: "",
                                                 email: "",
+                                                phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+                                                phoneNational: "",
                                                 designation: "",
                                                 function: "",
                                             },
@@ -2454,6 +2463,29 @@ export default function FacultyOpportunityCreationPage() {
                                         })
                                     }
                                 />
+                                <div className="md:col-span-3">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Partner contact phone / WhatsApp (optional)</label>
+                                    <PhoneConnectivityRow
+                                        phoneCountryKey={formData.partnerCollaboration.phoneCountryKey}
+                                        nationalDigits={formData.partnerCollaboration.phoneNational}
+                                        placeholderNational="300 1234567"
+                                        selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                        inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                        onPhoneCountryKeyChange={(key) =>
+                                            setFormData({
+                                                ...formData,
+                                                partnerCollaboration: { ...formData.partnerCollaboration, phoneCountryKey: key },
+                                            })
+                                        }
+                                        onNationalDigitsChange={(digits) =>
+                                            setFormData({
+                                                ...formData,
+                                                partnerCollaboration: { ...formData.partnerCollaboration, phoneNational: digits },
+                                            })
+                                        }
+                                    />
+                                    <p className="mt-1 text-[11px] text-slate-400">Private — used by CIEL PK to reach the partner contact. Never shown to students.</p>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -2647,20 +2679,28 @@ export default function FacultyOpportunityCreationPage() {
                             </p>
                             {formData.participationScope.departments.map((dep, idx) => (
                                 <div key={idx} className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. BBA, Computer Science"
-                                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm"
-                                        value={dep}
-                                        onChange={(e) => {
-                                            const next = [...formData.participationScope.departments];
-                                            next[idx] = e.target.value;
-                                            setFormData({
-                                                ...formData,
-                                                participationScope: { ...formData.participationScope, departments: next },
-                                            });
-                                        }}
-                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <SearchableSelect
+                                            value={dep}
+                                            onChange={(value) => {
+                                                const next = [...formData.participationScope.departments];
+                                                next[idx] = value;
+                                                setFormData({
+                                                    ...formData,
+                                                    participationScope: { ...formData.participationScope, departments: next },
+                                                });
+                                            }}
+                                            options={facultyDepartmentOptionsForInstitutions(
+                                                formData.participationScope.selectedUniversities.length
+                                                    ? formData.participationScope.selectedUniversities
+                                                    : [facultyDetails.institution],
+                                            )}
+                                            placeholder="Select department / programme…"
+                                            searchPlaceholder="Search departments…"
+                                            ariaLabel={`Permitted department ${idx + 1}`}
+                                            accent="pink"
+                                        />
+                                    </div>
                                     {formData.participationScope.departments.length > 1 && (
                                         <button
                                             type="button"

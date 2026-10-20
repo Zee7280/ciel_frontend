@@ -32,6 +32,9 @@
     top: 56px;
     z-index: 30;
     background: var(--bg);
+    /* Own compositor layer: keeps the sticky bar from repainting with the page while scrolling. */
+    transform: translateZ(0);
+    backface-visibility: hidden;
     padding-top: 8px;
     padding-bottom: 8px;
 }
@@ -2478,6 +2481,16 @@
     background: #fff;
     border: 1px solid var(--line);
     box-shadow: 0 8px 20px rgba(13, 43, 51, 0.05);
+}
+
+/* The progress card lives inside .cer-sticky-head, so toolbar + progress stick as ONE block (no gap for content to show through). */
+.cer .cer-sticky-head .cer-apph {
+    margin-bottom: 8px;
+}
+
+.cer .cer-sticky-head .cer-journey-map {
+    position: static;
+    margin: 0;
 }
 
 @media (min-width: 1024px) {

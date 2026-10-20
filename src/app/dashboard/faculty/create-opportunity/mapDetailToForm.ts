@@ -93,6 +93,13 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
         exPartner.official_email ||
         extC.official_email ||
         po.official_email;
+    const extPhone =
+        sup.external_partner_phone ||
+        sup.partner_phone ||
+        exPartner.contact_phone ||
+        extC.contact_phone ||
+        po.contact_phone;
+    const extPhoneParsed = parsePhoneForDisplay(typeof extPhone === "string" ? extPhone : "");
     const hasPartner = Boolean(
         (typeof extOrg === "string" && extOrg.trim()) ||
             (typeof extContact === "string" && extContact.trim()) ||
@@ -238,6 +245,8 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             orgName: typeof extOrg === "string" ? extOrg : "",
             contactPerson: typeof extContact === "string" ? extContact : "",
             email: typeof extEmail === "string" ? extEmail : "",
+            phoneCountryKey: extPhoneParsed.phoneCountryKey,
+            phoneNational: extPhoneParsed.national,
             designation: "",
             function: "",
         },

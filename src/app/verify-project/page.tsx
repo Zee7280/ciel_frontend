@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, Suspense } from "react";
+import { dancingScript } from "@/app/fonts/dancing-script";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2, Home, ExternalLink, LogIn, ClipboardList, Handshake, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -157,7 +158,7 @@ function VerifyProjectContent() {
                                 Partner signed in
                             </span>
                         ) : null}
-                        <h2 className="font-dancing text-2xl text-blue-600 font-bold">Ciel PK</h2>
+                        <h2 className={`${dancingScript.className} text-2xl text-blue-600 font-bold`}>Ciel PK</h2>
                     </div>
 
                     {/* Status Illustration */}

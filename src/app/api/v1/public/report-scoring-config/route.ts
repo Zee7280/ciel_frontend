@@ -60,5 +60,6 @@ export async function GET() {
         return NextResponse.json(FALLBACK);
     }
 
-    return NextResponse.json(result.data);
+    // Anonymous, user-independent: let Vercel's edge serve repeat hits from the visitor's region.
+    return NextResponse.json(result.data, { headers: { "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=3600" } });
 }

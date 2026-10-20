@@ -65,6 +65,18 @@ class StudioApiError extends Error {
     }
 }
 
+function downloadCsv(lines: Array<Array<string | number>>, filename: string) {
+    const csv = lines.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function api<T>(url: string, init?: RequestInit, timeoutMs?: number): Promise<T> {
     const res = await authenticatedFetch(
         url,
@@ -408,15 +420,31 @@ export default function NationalRankingStudio({
             .map(([k, v]) => `${FILTER_TITLES[k] || k}: ${prettyFilterValue(k, v as string | number)}`)
             .join("; ");
         const lines = [header, ...result.rows.map((r) => [r.rank, r.label, nameInput || result.name, lensMeta.title, r.metric.toFixed(2), r.cii == null ? "" : r.cii.toFixed(1), r.projectCount, fs])];
-        const csv = lines.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-        const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "CIEL_PK_Ranking_Preview.csv";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadCsv(lines, "CIEL_PK_Ranking_Preview.csv");
+    };
+
+    /** Every approved package in this cohort — ranked, eligible-but-unranked and held — with the reason it is held. */
+    const exportAllProjectsCsv = () => {
+        if (!library.length) return;
+        const rankByProject = new Map<string, number>();
+        for (const r of result?.rows ?? []) for (const id of r.projectIds ?? []) rankByProject.set(id, r.rank);
+        const header = ["Project", "Project ID", "University", "Department", "SDG", "Date", "Approved CII", "Status", "Rank in current preview", "Reason / note"];
+        const lines = [
+            header,
+            ...library.map((p) => [
+                p.title,
+                p.id,
+                p.university,
+                p.department,
+                p.sdg,
+                p.date,
+                p.cii == null ? "" : p.cii.toFixed(1),
+                rankByProject.has(p.id) ? "Ranked" : p.ready ? (p.evaluated ? "Eligible" : "Eligible, not yet read by AI") : "Held",
+                rankByProject.get(p.id) ?? "",
+                p.reason,
+            ]),
+        ];
+        downloadCsv(lines, "CIEL_PK_All_Projects.csv");
     };
 
     const rankedCount = run?.rows?.filter((r) => r.status === "Ranked").length ?? 0;
@@ -702,6 +730,7 @@ export default function NationalRankingStudio({
                                     </div>
                                     <div className="actions">
                                         <button type="button" className="btn" disabled={!result || dirty || !result.rows.length} onClick={exportCsv}>↓ Export CSV</button>
+                                        <button type="button" className="btn" disabled={!library.length} onClick={exportAllProjectsCsv}>↓ Export all projects</button>
                                         <button type="button" className="btn gold" disabled={!canPublish} title={blockers[0] || (dirty ? "Run the analyzer first" : "")} onClick={() => setPublishOpen(true)}>Publish to all Impact Walls →</button>
                                     </div>
                                 </div>

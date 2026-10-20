@@ -13,14 +13,6 @@ const outfit = localFont({
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const dancingScript = localFont({
-  src: "./fonts/dancing-script-latin-wght-normal.woff2",
-  variable: "--font-dancing",
-  display: "swap",
-  weight: "400 700",
-  fallback: ["cursive"],
-});
-
 export const metadata: Metadata = {
   title: "CIEL PK - Community Impact Education Lab",
   description: "Where Youth, Universities & Communities Create Measurable Impact",
@@ -34,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${outfit.variable} ${dancingScript.variable} font-sans antialiased text-slate-800 bg-slate-50`}
+        className={`${outfit.variable} font-sans antialiased text-slate-800 bg-slate-50`}
       >
         {children}
         <FloatingSupportButton />

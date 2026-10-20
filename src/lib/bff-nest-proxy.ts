@@ -37,7 +37,7 @@ function backendWouldSelfLoop(req: NextRequest, apiBase: string): boolean {
     }
 }
 
-async function passthroughResponse(upstream: Response): Promise<Response> {
+async function passthroughResponse(upstream: Response, edgeCacheable = false): Promise<Response> {
     if (upstream.status === 204) {
         return new NextResponse(null, { status: 204 });
     }
@@ -45,6 +45,19 @@ async function passthroughResponse(upstream: Response): Promise<Response> {
     const outHeaders = new Headers();
     const contentType = upstream.headers.get("content-type");
     if (contentType) outHeaders.set("content-type", contentType);
+    // Nest marks a few anonymous, user-independent GETs (public config, platform stats, tutorials)
+    // as edge-cacheable. Forward that so Vercel's edge serves repeat hits from the region nearest
+    // the visitor instead of a US function round trip. Only for anonymous GET/HEAD 200s, so a
+    // per-user response can never land in the shared edge cache even if Nest sets the header.
+    const cacheControl = edgeCacheable && upstream.status === 200 ? upstream.headers.get("cache-control") : null;
+    if (
+        cacheControl &&
+        /\bpublic\b/.test(cacheControl) &&
+        /s-maxage=\d+/.test(cacheControl) &&
+        !/private|no-store|no-cache/.test(cacheControl)
+    ) {
+        outHeaders.set("cache-control", cacheControl);
+    }
 
     const body = await upstream.arrayBuffer();
     return new NextResponse(body, { status: upstream.status, headers: outHeaders });
@@ -93,6 +106,9 @@ export async function proxyToNest(
     if (accept) headers.set("accept", accept);
 
     const method = req.method.toUpperCase();
+    // Only the authorization header carries identity to Nest (cookies are not forwarded), so a
+    // request without it gets a user-independent answer that is safe to share at the edge.
+    const edgeCacheable = (method === "GET" || method === "HEAD") && !authorization;
     let body: ArrayBuffer | undefined;
     if (method !== "GET" && method !== "HEAD") {
         body = await req.arrayBuffer();
@@ -113,7 +129,7 @@ export async function proxyToNest(
 
             const isLast = i === paths.length - 1;
             if (upstream.status !== 404 || isLast) {
-                return passthroughResponse(upstream);
+                return passthroughResponse(upstream, edgeCacheable);
             }
             lastResponse = upstream;
         } catch (error) {
@@ -122,5 +138,5 @@ export async function proxyToNest(
         }
     }
 
-    return passthroughResponse(lastResponse ?? new Response(null, { status: 404 }));
+    return passthroughResponse(lastResponse ?? new Response(null, { status: 404 }), edgeCacheable);
 }

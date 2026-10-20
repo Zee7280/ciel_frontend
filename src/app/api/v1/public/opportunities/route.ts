@@ -22,5 +22,6 @@ export async function GET() {
         return NextResponse.json(EMPTY);
     }
 
-    return NextResponse.json({ success: true, data: payload.data });
+    // Anonymous, user-independent: let Vercel's edge serve repeat hits from the visitor's region.
+    return NextResponse.json({ success: true, data: payload.data }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300" } });
 }

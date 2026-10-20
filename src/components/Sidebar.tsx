@@ -944,7 +944,7 @@ export default function Sidebar() {
                         "relative grid shrink-0 place-items-center overflow-hidden border border-white/5 bg-white/[0.06]",
                         collapsed ? "h-10 w-10 rounded-xl p-0.5" : "h-[62px] w-[62px] rounded-2xl p-1",
                     )}>
-                        <img src="/iel-pk-logo.png" alt="IEL PK" className={clsx("object-contain", collapsed ? "h-8 w-8" : "h-11 w-11")} width={44} height={44} />
+                        <img src="/iel-pk-logo-192.webp" alt="IEL PK" className={clsx("object-contain", collapsed ? "h-8 w-8" : "h-11 w-11")} width={44} height={44} />
                     </div>
                     {!collapsed && (
                         <div className="flex min-w-0 flex-col">

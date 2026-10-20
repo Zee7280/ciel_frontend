@@ -521,61 +521,69 @@ function SignUpContent() {
 
     const fieldClass = (hasError: boolean, extra?: string) =>
         clsx(
-            "w-full min-w-0 rounded-xl border bg-white px-3.5 py-3 text-sm font-medium text-ciel-text outline-none transition-all placeholder:text-ciel-text-soft focus-visible:ring-2 focus-visible:ring-ciel-green/40",
-            hasError ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-ciel-green",
+            "w-full min-w-0 rounded-lg border bg-white px-3.5 py-3 text-sm font-medium text-[#173540] outline-none transition-all placeholder:text-[#94a3b0] focus-visible:ring-2 focus-visible:ring-[#0e7d74]/35",
+            hasError ? "border-red-400 focus:border-red-500" : "border-[#d7e3e6] focus:border-[#0e7d74]",
             extra,
         );
 
     const selectClass = (hasError: boolean) => clsx(fieldClass(hasError), "pr-11 cursor-pointer appearance-none");
-    const labelClass = "mb-1.5 block text-[13px] font-semibold text-ciel-text";
+    const labelClass = "mb-1.5 block text-[12px] font-semibold text-[#3d5560]";
     const orgButtons = [
         { id: "university", label: "University", icon: Building2 },
         { id: "ngo", label: "NGO", icon: Handshake },
-        { id: "corporate", label: "Organization", icon: Briefcase },
-        { id: "government", label: "HEC / Gov", icon: Landmark },
+        { id: "corporate", label: "Organisation", icon: Briefcase },
+        { id: "government", label: "HEC / Govt", icon: Landmark },
     ] as const;
+    const formStepLabel = isInvestor
+        ? `GET STARTED · STEP 0${investorStep} OF 03`
+        : step === "otp"
+          ? "GET STARTED · STEP 02 OF 02"
+          : "GET STARTED · STEP 01 OF 02";
+    const formProgressPct = isInvestor ? (investorStep / 3) * 100 : step === "otp" ? 100 : 48;
 
     return (
-        <div className="min-h-dvh bg-white font-sans antialiased text-ciel-text">
-            <div className="grid min-h-dvh grid-cols-1 lg:grid-cols-[minmax(280px,34%)_1fr]">
-                <aside className="relative flex flex-col justify-between overflow-hidden bg-[#12303F] px-6 py-6 text-white sm:px-8 lg:px-10 lg:py-8">
-                    <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-ciel-green/10 blur-3xl" />
+        <div className="min-h-dvh bg-[#f7fafb] font-sans antialiased text-[#173540]">
+            <div className="grid min-h-dvh grid-cols-1 lg:grid-cols-[minmax(300px,40%)_1fr]">
+                <aside className="relative flex flex-col justify-between overflow-hidden bg-[linear-gradient(165deg,#071c22_0%,#0b2f38_42%,#0e4a4a_100%)] px-6 py-7 text-white sm:px-8 lg:px-11 lg:py-9">
+                    <div className="pointer-events-none absolute -left-16 top-24 h-64 w-64 rounded-full border border-white/5" />
+                    <div className="pointer-events-none absolute -right-20 -top-10 h-80 w-80 rounded-full border border-white/[0.06]" />
+                    <div className="pointer-events-none absolute bottom-28 right-8 h-40 w-40 rounded-full bg-[#14b8a6]/10 blur-3xl" />
                     <div>
                         <Link href="/" className="relative z-10 inline-flex items-center gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1.5">
-                                <Image src="/iel-pk-logo.png" alt="CIEL" width={80} height={80} className="object-contain" />
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
+                                <Image src="/iel-pk-logo-192.webp" alt="CIEL PK" width={80} height={80} className="object-contain" />
                             </div>
                             <div className="min-w-0">
-                                <p className="text-[11px] font-black uppercase leading-tight tracking-[0.14em] text-white">Community Impact Education Lab</p>
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ciel-green">Youth Empowered Impact</p>
+                                <p className="text-[10px] font-black uppercase leading-tight tracking-[0.14em] text-white/95">Community Impact Education Lab - PK</p>
+                                <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#7dfff0]/90">Youth Empowered Community Impact</p>
                             </div>
                         </Link>
 
-                        <div className="relative z-10 mt-10 hidden lg:block">
-                            <h2 className="text-[1.75rem] font-semibold leading-tight tracking-tight">
+                        <div className="relative z-10 mt-12 hidden lg:block">
+                            <h2 className="max-w-[20ch] text-[2.05rem] font-semibold leading-[1.15] tracking-tight">
                                 {step === "otp" ? (
-                                    <>Verify <span className="text-ciel-green">your email.</span></>
+                                    <>Verify <span className="text-[#5eead4]">your email.</span></>
                                 ) : (
-                                    <>Turn your volunteering into a <span className="text-ciel-green">verified record.</span></>
+                                    <>Where your contribution becomes <span className="text-[#5eead4]">credible impact.</span></>
                                 )}
                             </h2>
-                            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
+                            <p className="mt-4 max-w-md text-[14px] leading-relaxed text-white/68">
                                 {step === "otp"
                                     ? `A 6-digit code was sent to ${formData.email}. Enter it to activate your account.`
-                                    : "CIEL helps Pakistani students turn campus and community work into a record employers and universities can trust."}
+                                    : "Connect with meaningful community projects, record your verified service, and build an impact profile you can share with confidence."}
                             </p>
                             {step === "form" && (
-                                <ul className="mt-8 space-y-5">
+                                <ul className="mt-9 space-y-5">
                                     {[
-                                        { title: "Find real projects", body: "Browse opportunities from vetted NGOs and campus societies." },
-                                        { title: "Log your hours", body: "Your supervisor verifies them, so the record holds up." },
-                                        { title: "Get a verified certificate", body: "Scored against the CII index and scannable by anyone." },
+                                        { title: "Discover meaningful opportunities", body: "Explore community service projects aligned with the SDGs." },
+                                        { title: "Document work that matters", body: "Track attendance, service hours and approved evidence." },
+                                        { title: "Showcase your verified impact", body: "Receive a published report package, CII score and QR-linked certificate after approval." },
                                     ].map((item) => (
                                         <li key={item.title} className="flex gap-3">
-                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ciel-green text-[10px] font-black text-[#12303F]">✓</span>
+                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#14b8a6] text-[10px] font-black text-[#062428]">✓</span>
                                             <div>
-                                                <p className="text-sm font-semibold">{item.title}</p>
-                                                <p className="mt-0.5 text-sm leading-relaxed text-white/60">{item.body}</p>
+                                                <p className="text-[14px] font-semibold text-white">{item.title}</p>
+                                                <p className="mt-0.5 text-[13px] leading-relaxed text-white/55">{item.body}</p>
                                             </div>
                                         </li>
                                     ))}
@@ -589,41 +597,76 @@ function SignUpContent() {
                             <button
                                 type="button"
                                 onClick={() => setStep("form")}
-                                className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-white/60 hover:text-ciel-green"
+                                className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-white/60 hover:text-[#5eead4]"
                             >
                                 <ArrowLeft className="h-3.5 w-3.5" /> Back to details
                             </button>
                         )}
-                        <div className="hidden gap-6 text-xs font-medium text-white/80 lg:flex">
-                            <span>156 live projects</span>
-                            <span>2,400+ students</span>
-                            <span>40+ partners</span>
+                        {step === "form" && (
+                            <div className="mb-6 hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm lg:block">
+                                <div className="mb-3 flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">CIEL PK Impact Profile</p>
+                                    <span className="rounded-full bg-[#14b8a6]/20 px-2 py-0.5 text-[10px] font-bold text-[#5eead4]">Verified</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { n: "01", t: "Community Service" },
+                                        { n: "02", t: "Verified Hours" },
+                                        { n: "03", t: "Impact & CII" },
+                                    ].map((item) => (
+                                        <div key={item.n} className="rounded-xl bg-black/20 px-2.5 py-2.5">
+                                            <p className="text-[10px] font-black text-[#5eead4]">{item.n}</p>
+                                            <p className="mt-1 text-[11px] font-semibold leading-snug text-white/85">{item.t}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[10px] uppercase tracking-[0.14em] text-white/40">
+                            <span>© 2026 CIEL PK</span>
+                            <span className="normal-case tracking-normal text-white/45">Serve · Apply · Investigate · Innovate</span>
                         </div>
-                        <p className="mt-5 text-[10px] uppercase tracking-[0.16em] text-white/35">© 2026 CIEL Global</p>
                     </div>
                 </aside>
 
-                <main className="min-w-0 overflow-y-auto bg-white px-5 py-8 sm:px-10 lg:px-16 lg:py-12">
-                    <div className={clsx("mx-auto w-full", isInvestor ? "max-w-[46rem]" : "max-w-[34rem]")}>
+                <main className="min-w-0 overflow-y-auto bg-white px-5 py-6 sm:px-10 lg:px-14 lg:py-8">
+                    <div className={clsx("mx-auto w-full", isInvestor ? "max-w-[46rem]" : "max-w-[40rem]")}>
+                        <div className="mb-5 flex items-center justify-between gap-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a9099]">Secure account registration</p>
+                            <Link href="/login" className="shrink-0 text-[13px] font-semibold text-[#0e7d74] hover:underline">
+                                Already a member? Sign in →
+                            </Link>
+                        </div>
 
                         {step === "form" && (
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
-                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">
-                                        {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].title : "Create your account"}
-                                    </h1>
-                                    <p className="mt-1.5 text-sm text-ciel-text-mid">
-                                        {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].sub : "Takes about a minute. You'll verify your email at the end."}
-                                    </p>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0e7d74]">{formStepLabel}</p>
+                                            <h1 className="mt-1.5 text-[1.85rem] font-semibold tracking-tight text-[#173540]">
+                                                {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].title : "Create your account"}
+                                            </h1>
+                                            <p className="mt-1.5 text-sm text-[#5d737c]">
+                                                {isInvestor ? INVESTOR_STEP_COPY[investorStep - 1].sub : "Choose your role, complete your details, then verify your email."}
+                                            </p>
+                                        </div>
+                                        <span className="mt-1 shrink-0 rounded-full border border-[#d7e3e6] bg-[#f4f8f8] px-2.5 py-1 text-[11px] font-semibold text-[#5d737c]">
+                                            About 1 minute
+                                        </span>
+                                    </div>
+                                    <div className="mt-4 h-1 overflow-hidden rounded-full bg-[#e6eff1]">
+                                        <div className="h-full rounded-full bg-[#0e7d74] transition-all duration-300" style={{ width: `${formProgressPct}%` }} />
+                                    </div>
                                 </div>
 
                                 <div>
-                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ciel-text-soft">I&apos;m joining as</p>
-                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">I&apos;m joining as</p>
+                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                                         {([
-                                            { id: "student", label: "Student", desc: "Find projects, log hours, build your impact record.", Icon: GraduationCap },
-                                            { id: "faculty", label: "Faculty", desc: "Post opportunities, review reports, verify student hours.", Icon: User },
-                                            { id: "investor", label: "Investor / VC", desc: "Browse faculty-verified ventures. KYC within 3 working days.", Icon: TrendingUp },
+                                            { id: "student", label: "Student", Icon: GraduationCap },
+                                            { id: "faculty", label: "Faculty", Icon: User },
+                                            { id: "investor", label: "Investor / VC", Icon: TrendingUp },
                                         ] as const).map((item) => {
                                             const selected = role === item.id;
                                             return (
@@ -634,24 +677,25 @@ function SignUpContent() {
                                                     aria-checked={selected}
                                                     onClick={() => handleRoleSelect(item.id)}
                                                     className={clsx(
-                                                        "relative rounded-2xl border px-4 py-4 text-left transition-colors",
-                                                        selected ? "border-ciel-green bg-ciel-green-soft" : "border-slate-200 bg-white hover:border-ciel-green/40",
+                                                        "relative flex min-h-[92px] flex-col items-start justify-center rounded-xl border px-4 py-4 text-left transition-colors",
+                                                        selected
+                                                            ? "border-[#0e7d74] bg-[#e8f7f4] shadow-[0_0_0_1px_rgba(14,125,116,0.15)]"
+                                                            : "border-[#d7e3e6] bg-white hover:border-[#0e7d74]/45",
                                                     )}
                                                 >
                                                     {selected && (
-                                                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-ciel-green-deep text-white">
+                                                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#0e7d74] text-white">
                                                             <Check className="h-3 w-3" strokeWidth={3} />
                                                         </span>
                                                     )}
-                                                    <item.Icon className={clsx("h-5 w-5", selected ? "text-ciel-green-deep" : "text-ciel-text-mid")} />
-                                                    <p className="mt-2 text-sm font-semibold text-ciel-text">{item.label}</p>
-                                                    <p className="mt-1 text-[12px] leading-snug text-ciel-text-mid">{item.desc}</p>
+                                                    <item.Icon className={clsx("h-5 w-5", selected ? "text-[#0e7d74]" : "text-[#6b828b]")} />
+                                                    <p className="mt-2 text-sm font-semibold text-[#173540]">{item.label}</p>
                                                 </button>
                                             );
                                         })}
                                     </div>
-                                    <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-ciel-text-soft">or register an organisation</p>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">or register an organisation</p>
+                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                         {orgButtons.map((item) => {
                                             const selected = role === item.id;
                                             return (
@@ -661,7 +705,7 @@ function SignUpContent() {
                                                     onClick={() => handleRoleSelect(item.id)}
                                                     className={clsx(
                                                         "flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 text-center transition-colors",
-                                                        selected ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-slate-200 bg-white text-ciel-text-mid hover:border-ciel-green/40",
+                                                        selected ? "border-[#0e7d74] bg-[#e8f7f4] text-[#0b5f58]" : "border-[#d7e3e6] bg-white text-[#5d737c] hover:border-[#0e7d74]/40",
                                                     )}
                                                 >
                                                     <item.icon className="h-4 w-4" />
@@ -670,7 +714,7 @@ function SignUpContent() {
                                             );
                                         })}
                                     </div>
-                                    <p className="mt-2 text-[12px] italic leading-relaxed text-ciel-text-soft">
+                                    <p className="mt-2 text-[12px] leading-relaxed text-[#7a9099]">
                                         {isInvestor
                                             ? "Investor accounts are KYC-verified by CIEL PK within 3 working days before founder access is activated."
                                             : "Organisation accounts need a short CIEL admin check. Students and faculty activate after email verification."}
@@ -678,6 +722,7 @@ function SignUpContent() {
                                 </div>
 
                                 <div className="space-y-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">Your details</p>
                                     {isOrgRole ? (
                                         <div key={role} className="ciel-crossfade-enter space-y-4">
                                             <div>
@@ -698,10 +743,31 @@ function SignUpContent() {
                                         </div>
                                     ) : (
                                         <div key={`${role}-name`} className="ciel-crossfade-enter space-y-4">
-                                            <div>
-                                                <label className={labelClass}>Full name{isInvestor ? " *" : ""}</label>
-                                                <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name)} placeholder={isInvestor ? "e.g. Ayesha Khan" : role === "faculty" ? "As it appears on your faculty record" : "As it appears on your student record"} />
-                                                {errors.name && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.name}</p>}
+                                            <div className={clsx(!isInvestor && "grid grid-cols-1 items-start gap-4 sm:grid-cols-2")}>
+                                                <div>
+                                                    <label className={labelClass}>Full name{isInvestor ? " *" : ""}</label>
+                                                    <div className="relative">
+                                                        {!isInvestor ? <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b0]" /> : null}
+                                                        <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name, !isInvestor ? "pl-10" : undefined)} placeholder={isInvestor ? "e.g. Ayesha Khan" : "Enter your full name"} />
+                                                    </div>
+                                                    {errors.name && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.name}</p>}
+                                                </div>
+                                                {!isInvestor ? (
+                                                    <div>
+                                                        <label className={labelClass}>Email address</label>
+                                                        <div className="group relative">
+                                                            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b0]" />
+                                                            <input
+                                                                type="email"
+                                                                value={formData.email}
+                                                                onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
+                                                                className={fieldClass(!!errors.email, "pl-10")}
+                                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : "you@university.edu.pk"}
+                                                            />
+                                                        </div>
+                                                        {errors.email && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.email}</p>}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                             {isInvestor && (
                                                 <>
@@ -717,6 +783,23 @@ function SignUpContent() {
                                                     </div>
                                                 </>
                                             )}
+                                            {!isInvestor && formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && !errors.email ? (
+                                                isPersonalEmail && !dismissedEmailWarning ? (
+                                                    <div className="flex items-start gap-2 rounded-xl bg-[#f4f8f8] px-3 py-2.5">
+                                                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#5d737c]" />
+                                                        <div className="flex-1">
+                                                            <p className="text-[12px] leading-relaxed text-[#5d737c]">A personal email works. A university address skips extra checks — you&apos;d be active after verifying, instead of waiting on an admin.</p>
+                                                            <button type="button" onClick={() => setDismissedEmailWarning(true)} className="mt-1 text-[12px] font-semibold text-[#0b5f58] underline">
+                                                                Use it anyway
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-[#0b5f58]">
+                                                        <BadgeCheck className="h-3.5 w-3.5" /> Looks good — we&apos;ll verify this at the end
+                                                    </p>
+                                                )
+                                            ) : null}
                                         </div>
                                     )}
 
@@ -726,12 +809,6 @@ function SignUpContent() {
                                                 <label className={labelClass}>University</label>
                                                 <SearchableSelect value={formData.institution} onChange={(v) => handleGenericChange("institution", v)} options={pakistaniUniversities} placeholder="Select university" searchPlaceholder="Search universities..." hasError={!!errors.institution} ariaLabel="University" allowCustomValue={false} />
                                                 {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
-                                                {role === "student" && platformCfg.student_subscription_required ? (
-                                                    <p className="mt-1 text-[11px] leading-relaxed text-ciel-text-soft">
-                                                        Students of CIEL member universities join free. If your university is not a CIEL member, a one-time PKR{" "}
-                                                        {platformCfg.student_subscription_fee_pkr.toLocaleString("en-PK")} subscription is paid after signup to unlock the portal.
-                                                    </p>
-                                                ) : null}
                                             </div>
                                             <div className="relative z-20 min-w-0">
                                                 <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>
@@ -745,67 +822,71 @@ function SignUpContent() {
                                         </div>
                                     )}
 
+                                    {(isOrgRole || isInvestor) && (
                                     <div>
                                         <label className={labelClass}>{isOrgRole ? "Official email address" : "Email address"}</label>
                                         <div className="group relative">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ciel-text-soft" />
+                                            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b0]" />
                                             <input
                                                 type="email"
                                                 value={formData.email}
                                                 onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
-                                                className={fieldClass(!!errors.email, "pl-11")}
-                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : isInvestor ? "name@fund.com" : orgHints.email}
+                                                className={fieldClass(!!errors.email, "pl-10")}
+                                                placeholder={isInvestor ? "name@fund.com" : orgHints.email}
                                             />
                                         </div>
                                         {errors.email && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.email}</p>}
                                         {!errors.email && formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
                                             isPersonalEmail && !dismissedEmailWarning ? (
                                                 <div className="mt-2 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
-                                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-ciel-text-mid" />
+                                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#5d737c]" />
                                                     <div className="flex-1">
-                                                        <p className="text-[12px] leading-relaxed text-ciel-text-mid">A personal email works. A university address skips extra checks — you&apos;d be active after verifying, instead of waiting on an admin.</p>
-                                                        <button type="button" onClick={() => setDismissedEmailWarning(true)} className="mt-1 text-[12px] font-semibold text-ciel-green-deep underline">
+                                                        <p className="text-[12px] leading-relaxed text-[#5d737c]">A personal email works. A university address skips extra checks — you&apos;d be active after verifying, instead of waiting on an admin.</p>
+                                                        <button type="button" onClick={() => setDismissedEmailWarning(true)} className="mt-1 text-[12px] font-semibold text-[#0b5f58] underline">
                                                             Use it anyway
                                                         </button>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-ciel-green-deep">
+                                                <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-[#0b5f58]">
                                                     <BadgeCheck className="h-3.5 w-3.5" /> Looks good — we&apos;ll verify this at the end
                                                 </p>
                                             )
                                         )}
                                     </div>
-
-                                    <div>
-                                        <label className={labelClass}>Mobile number</label>
-                                        <PhoneConnectivityRow
-                                            phoneCountryKey={formData.phoneCountryKey}
-                                            nationalDigits={formData.phone}
-                                            onPhoneCountryKeyChange={(phoneCountryKey) => setFormData((prev) => ({ ...prev, phoneCountryKey }))}
-                                            onNationalDigitsChange={(phone) => {
-                                                setFormData((prev) => ({ ...prev, phone }));
-                                                if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
-                                            }}
-                                            errorText={errors.phone}
-                                            maxNationalDigits={15}
-                                            inputClassName={clsx(errors.phone ? "border-red-500 focus:border-red-500" : "border-ciel-border focus:border-ciel-green")}
-                                        />
-                                    </div>
-
-                                    {!isInvestor && (
-                                    <div>
-                                        <label className={labelClass}>City</label>
-                                        <div className="relative">
-                                            <select value={formData.city} onChange={(e) => handleGenericChange("city", e.target.value)} aria-invalid={!!errors.city} aria-label="City" className={selectClass(!!errors.city)}>
-                                                <option value="">Select city</option>
-                                                {PAKISTAN_REGION_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
-                                        </div>
-                                        {errors.city && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.city}</p>}
-                                    </div>
                                     )}
+
+                                    <div className={clsx(!isInvestor && "grid grid-cols-1 items-start gap-4 sm:grid-cols-2")}>
+                                        <div>
+                                            <label className={labelClass}>Mobile number</label>
+                                            <PhoneConnectivityRow
+                                                phoneCountryKey={formData.phoneCountryKey}
+                                                nationalDigits={formData.phone}
+                                                onPhoneCountryKeyChange={(phoneCountryKey) => setFormData((prev) => ({ ...prev, phoneCountryKey }))}
+                                                onNationalDigitsChange={(phone) => {
+                                                    setFormData((prev) => ({ ...prev, phone }));
+                                                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
+                                                }}
+                                                errorText={errors.phone}
+                                                maxNationalDigits={15}
+                                                inputClassName={clsx(errors.phone ? "border-red-500 focus:border-red-500" : "border-[#d7e3e6] focus:border-[#0e7d74]")}
+                                            />
+                                        </div>
+
+                                        {!isInvestor && (
+                                        <div>
+                                            <label className={labelClass}>City</label>
+                                            <div className="relative">
+                                                <select value={formData.city} onChange={(e) => handleGenericChange("city", e.target.value)} aria-invalid={!!errors.city} aria-label="City" className={selectClass(!!errors.city)}>
+                                                    <option value="">Select city</option>
+                                                    {PAKISTAN_REGION_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b0]" aria-hidden />
+                                            </div>
+                                            {errors.city && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.city}</p>}
+                                        </div>
+                                        )}
+                                    </div>
 
                                     {isOrgRole && (
                                         <div className="ciel-crossfade-enter space-y-3">
@@ -904,29 +985,29 @@ function SignUpContent() {
                                     )}
 
                                     <div>
-                                        <label className={labelClass}>Password</label>
+                                        <label className={labelClass}>Create password</label>
                                         <div className="group relative">
-                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ciel-text-soft" />
+                                            <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b0]" />
                                             <input
                                                 type={showPassword ? "text" : "password"}
                                                 value={formData.password}
                                                 onChange={(e) => handleGenericChange("password", e.target.value)}
-                                                className={fieldClass(!!errors.password, "pl-11 pr-11")}
-                                                placeholder={isInvestor ? "Min. 10 characters" : "At least 8 characters"}
+                                                className={fieldClass(!!errors.password, "pl-10 pr-11")}
+                                                placeholder={isInvestor ? "Min. 10 characters" : "Minimum 8 characters"}
                                             />
-                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-ciel-text-soft hover:text-ciel-green ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs" tabIndex={-1}>
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-2 text-[#94a3b0] hover:text-[#0e7d74] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]" tabIndex={-1}>
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
                                         </div>
                                         {errors.password ? (
-                                            <div className="flex items-start gap-1.5 mt-1">
-                                                <AlertCircle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
-                                                <p className="text-[11px] text-red-500 font-semibold">{errors.password}</p>
+                                            <div className="mt-1 flex items-start gap-1.5">
+                                                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+                                                <p className="text-[11px] font-semibold text-red-500">{errors.password}</p>
                                             </div>
                                         ) : formData.password ? (
                                             <PasswordStrengthMeter password={formData.password} />
                                         ) : (
-                                            <p className="mt-1.5 text-[12px] text-ciel-text-soft">Use 8 or more characters</p>
+                                            <p className="mt-1.5 text-[12px] text-[#7a9099]">Use 8 or more characters</p>
                                         )}
                                     </div>
                                 </div>
@@ -957,27 +1038,39 @@ function SignUpContent() {
 
                                 {!isInvestor && (
                                 <>
-                                <label className="flex items-start gap-3 cursor-pointer">
+                                {role === "student" ? (
+                                    <div className="flex items-start gap-2.5 rounded-xl border border-[#d7e8e6] bg-[#f3faf8] px-3.5 py-3">
+                                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#0e7d74]" />
+                                        <p className="text-[12px] leading-relaxed text-[#3d5560]">
+                                            For students: CIEL PK member-university registrations are free. Any applicable non-member subscription is confirmed after signup; community service reporting fees are separate
+                                            {platformCfg.student_subscription_required
+                                                ? ` (non-member portal unlock: PKR ${platformCfg.student_subscription_fee_pkr.toLocaleString("en-PK")}).`
+                                                : "."}
+                                        </p>
+                                    </div>
+                                ) : null}
+
+                                <label className="flex cursor-pointer items-start gap-3">
                                     <input
                                         type="checkbox"
                                         checked={consent}
                                         onChange={(e) => { setConsent(e.target.checked); if (errors.consent) setErrors((prev) => ({ ...prev, consent: "" })); }}
-                                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-ciel-border text-ciel-green focus-visible:ring-2 focus-visible:ring-ciel-green"
+                                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#d7e3e6] text-[#0e7d74] focus-visible:ring-2 focus-visible:ring-[#0e7d74]"
                                     />
-                                    <span className="text-xs text-ciel-text-mid leading-relaxed">
-                                        I agree to CIEL&apos;s <Link href="/about" className="font-semibold text-ciel-green-deep underline">terms and data use policy</Link>, and consent to my verified activity being recorded on the platform.
+                                    <span className="text-xs leading-relaxed text-[#5d737c]">
+                                        I agree to CIEL PK&apos;s <Link href="/about" className="font-semibold text-[#0b5f58] underline">Terms &amp; Conditions</Link> and <Link href="/about" className="font-semibold text-[#0b5f58] underline">Data Use &amp; Privacy Policy</Link>, and consent to my verified activity being recorded on the platform.
                                     </span>
                                 </label>
-                                {errors.consent && <p className="text-[11px] text-red-500 font-semibold -mt-4 ml-7">{errors.consent}</p>}
+                                {errors.consent && <p className="-mt-4 ml-7 text-[11px] font-semibold text-red-500">{errors.consent}</p>}
 
                                 <button
                                     type="submit"
                                     disabled={isLoading || !isFormValid}
                                     className={clsx(
-                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2",
+                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74] focus-visible:ring-offset-2",
                                         isFormValid && !isLoading
-                                            ? "bg-[#12303F] text-white hover:bg-[#0d242f]"
-                                            : "cursor-not-allowed bg-slate-200 text-slate-500",
+                                            ? "bg-[#0e7d74] text-white hover:bg-[#0b655e]"
+                                            : "cursor-not-allowed bg-[#dce5e8] text-[#7a9099]",
                                     )}
                                 >
                                     {isLoading ? (
@@ -986,29 +1079,34 @@ function SignUpContent() {
                                         <>Create account <ArrowRight className="h-4 w-4" /></>
                                     )}
                                 </button>
+                                <p className="text-center text-[12px] text-[#7a9099]">Next step: verify your email address to activate your profile.</p>
                                 {!isFormValid && (
-                                    <p className="text-center text-[12px] text-ciel-text-soft">{firstIncompleteHint}</p>
+                                    <p className="text-center text-[12px] text-[#7a9099]">{firstIncompleteHint}</p>
                                 )}
                                 {isOrgRole && (
-                                    <p className="text-center text-[12px] text-ciel-text-soft">Organisation accounts stay pending until CIEL admin review.</p>
+                                    <p className="text-center text-[12px] text-[#7a9099]">Organisation accounts stay pending until CIEL admin review.</p>
                                 )}
                                 </>
                                 )}
 
-                                <p className="text-center text-sm text-ciel-text-mid">
-                                    Already a member?{" "}
-                                    <Link href="/login" className="font-semibold text-ciel-green-deep hover:underline">Sign in</Link>
-                                </p>
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e8f0f2] pt-4 text-[12px] text-[#7a9099]">
+                                    <span>Built for verified community impact · CIEL PK</span>
+                                    <Link href="/contact" className="font-semibold text-[#0e7d74] hover:underline">Need help?</Link>
+                                </div>
                             </form>
                         )}
 
                         {step === "otp" && (
                             <div className="space-y-6">
                                 <div>
-                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">Check your inbox</h1>
-                                    <p className="mt-1.5 text-sm text-ciel-text-mid">
-                                        We sent a 6-digit code to <span className="font-semibold text-ciel-green-deep">{formData.email}</span>
+                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0e7d74]">{formStepLabel}</p>
+                                    <h1 className="mt-1.5 text-[1.85rem] font-semibold tracking-tight text-[#173540]">Check your inbox</h1>
+                                    <p className="mt-1.5 text-sm text-[#5d737c]">
+                                        We sent a 6-digit code to <span className="font-semibold text-[#0b5f58]">{formData.email}</span>
                                     </p>
+                                    <div className="mt-4 h-1 overflow-hidden rounded-full bg-[#e6eff1]">
+                                        <div className="h-full rounded-full bg-[#0e7d74]" style={{ width: "100%" }} />
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-wrap justify-center gap-2 sm:gap-3" onPaste={handleOtpPaste}>
@@ -1041,10 +1139,10 @@ function SignUpContent() {
                                     onClick={handleVerifyOtp}
                                     disabled={otpLoading || otpDigits.join("").length !== 6}
                                     className={clsx(
-                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2",
+                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74] focus-visible:ring-offset-2",
                                         otpLoading || otpDigits.join("").length !== 6
-                                            ? "cursor-not-allowed bg-slate-200 text-slate-500"
-                                            : "bg-[#12303F] text-white hover:bg-[#0d242f]",
+                                            ? "cursor-not-allowed bg-[#dce5e8] text-[#7a9099]"
+                                            : "bg-[#0e7d74] text-white hover:bg-[#0b655e]",
                                     )}
                                 >
                                     {otpLoading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Verifying...</>) : (<><ShieldCheck className="h-4 w-4" /> Verify &amp; create account</>)}

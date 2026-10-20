@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import { dancingScript } from "@/app/fonts/dancing-script";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -418,7 +419,7 @@ function LoginContent() {
                                 <span className="text-2xl font-bold tracking-tight text-white leading-none">
                                     Community Impact <br /> Education Lab
                                 </span>
-                                <span className="text-sm text-emerald-400 font-[family-name:var(--font-dancing)] mt-1 tracking-wide">
+                                <span className={`text-sm text-emerald-400 ${dancingScript.className} mt-1 tracking-wide`}>
                                     Youth Empowered Community Impact
                                 </span>
                             </div>

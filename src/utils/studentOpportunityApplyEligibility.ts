@@ -1,4 +1,5 @@
 import { pickVisibilityBucket } from "@/utils/opportunityListing";
+import { academicDepartmentsMatch } from "@/utils/universityData";
 
 function normUni(value: unknown): string {
     if (typeof value !== "string") return "";
@@ -203,7 +204,7 @@ function applyDepartmentGate(
     if (!base.canApply || !needsDepartmentMatch(raw)) return base;
     const { departments } = departmentRestriction(raw);
     if (departments.length === 0) return base;
-    const dept = normUni(studentDepartment || readStudentDepartmentFromBrowserStorage());
+    const dept = (studentDepartment || readStudentDepartmentFromBrowserStorage()).trim();
     const label = base.listingRestrictionLabel || "Selected departments only";
     if (!dept) {
         return {
@@ -214,7 +215,9 @@ function applyDepartmentGate(
             listingRestrictionLabel: label,
         };
     }
-    const ok = departments.some((d) => normUni(d) === dept);
+    // Profile holds an HEC programme ("BS Computer Science"); the listing holds a department or
+    // BNU school — same tolerant comparison as the API.
+    const ok = departments.some((d) => academicDepartmentsMatch(d, dept));
     if (!ok) {
         return {
             ...base,

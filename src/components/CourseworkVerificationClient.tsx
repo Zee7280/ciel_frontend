@@ -83,7 +83,7 @@ export default function CourseworkVerificationClient({ verificationKey }: Props)
         <div className="min-h-[100dvh] bg-slate-50 px-4 py-16 font-sans text-slate-900">
             <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
                 <div className="mb-6 flex justify-center">
-                    <img src="/iel-pk-logo.png" alt="CIEL" className="h-14 w-14 object-contain" width={256} height={256} />
+                    <img src="/iel-pk-logo-192.webp" alt="CIEL" className="h-14 w-14 object-contain" width={56} height={56} />
                 </div>
 
                 {state === "loading" ? (

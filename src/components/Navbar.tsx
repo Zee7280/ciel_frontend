@@ -45,7 +45,7 @@ export default function Navbar() {
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 sm:gap-4 group cursor-pointer min-w-0 flex-1 md:flex-none">
                     <div className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105">
-                        <img src="/iel-pk-logo.png" alt="IEL PK" className="h-10 w-10 sm:h-14 sm:w-14 object-contain" width={56} height={56} />
+                        <img src="/iel-pk-logo-192.webp" alt="IEL PK" className="h-10 w-10 sm:h-14 sm:w-14 object-contain" width={56} height={56} />
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="text-sm sm:text-[18px] font-black tracking-tight text-slate-800 leading-tight line-clamp-2 sm:line-clamp-none">

@@ -1104,6 +1104,15 @@ function ReportFormContent() {
                         ) : null}
                     </div>
                 </div>
+                    {!onFlash && !stepperLockedToSummaryOnly ? (
+                        <JourneyView
+                            data={deferredData}
+                            activeStep={activeStep}
+                            incompleteStepNums={incompleteStepNums}
+                            sectionsCompleteCount={sectionsCompleteCount}
+                            onGo={goJourney}
+                        />
+                    ) : null}
                 </div>
 
                 {isTeamMemberAttendanceOnly ? (
@@ -1124,16 +1133,6 @@ function ReportFormContent() {
 
                 {!onFlash ? (
                     <MissionHeroView data={deferredData} projectData={projectDetails} step={activeStep} onOpenHelp={openSectionHelp} />
-                ) : null}
-
-                {!onFlash && !stepperLockedToSummaryOnly ? (
-                    <JourneyView
-                        data={deferredData}
-                        activeStep={activeStep}
-                        incompleteStepNums={incompleteStepNums}
-                        sectionsCompleteCount={sectionsCompleteCount}
-                        onGo={goJourney}
-                    />
                 ) : null}
 
                 {!onFlash ? (

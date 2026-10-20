@@ -24,7 +24,7 @@ import {
     validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
-import { facultyDepartmentOptionsForInstitution } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 import {
@@ -386,6 +386,8 @@ function StudentOpportunityCreationPageInner() {
             partnerOrgName: "",
             partnerContactPerson: "",
             partnerEmail: "",
+            partnerPhoneKey: DEFAULT_PHONE_COUNTRY_KEY,
+            partnerPhone: "",
             independentSiteDescription: "",
             independentLocalContact: "",
             independentContactPhoneKey: DEFAULT_PHONE_COUNTRY_KEY,
@@ -566,6 +568,10 @@ function StudentOpportunityCreationPageInner() {
                 if (!s.partnerContactPerson.trim()) errors.partnerContactPerson = "Enter the partner contact person.";
                 if (!s.partnerEmail.trim() || !isValidEmail(s.partnerEmail)) {
                     errors.partnerEmail = "Enter a valid partner email.";
+                }
+                if (s.partnerPhone.trim()) {
+                    const partnerPhoneErr = validateNationalPhone(s.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY, s.partnerPhone);
+                    if (partnerPhoneErr) errors.partnerPhone = partnerPhoneErr;
                 }
             }
             if (formData.verification.length === 0) {
@@ -753,6 +759,11 @@ function StudentOpportunityCreationPageInner() {
                 privatePhoneKey,
                 normalizeNationalPhoneInput(privatePhoneKey, formData.privatePhone),
             ).trim();
+            const partnerPhoneKey = formData.supervision.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY;
+            const partnerPhoneFull =
+                formData.supervision.executingContext === "partner" && formData.supervision.partnerPhone.trim()
+                    ? composeInternationalPhone(partnerPhoneKey, normalizeNationalPhoneInput(partnerPhoneKey, formData.supervision.partnerPhone)).trim()
+                    : "";
 
             // Transform state to match API Spec
             const payload = {
@@ -829,6 +840,7 @@ function StudentOpportunityCreationPageInner() {
                               external_partner_org_name: formData.supervision.partnerOrgName.trim(),
                               external_partner_contact_person: formData.supervision.partnerContactPerson.trim(),
                               external_partner_email: formData.supervision.partnerEmail.trim(),
+                              ...(partnerPhoneFull ? { partner_phone: partnerPhoneFull, external_partner_phone: partnerPhoneFull } : {}),
                           }
                         : {}),
                     safe_environment:
@@ -846,11 +858,13 @@ function StudentOpportunityCreationPageInner() {
                               organization_name: formData.supervision.partnerOrgName.trim(),
                               contact_person: formData.supervision.partnerContactPerson.trim(),
                               official_email: formData.supervision.partnerEmail.trim(),
+                              ...(partnerPhoneFull ? { contact_phone: partnerPhoneFull } : {}),
                           },
                           partner_organization: {
                               organization_name: formData.supervision.partnerOrgName.trim(),
                               contact_person: formData.supervision.partnerContactPerson.trim(),
                               official_email: formData.supervision.partnerEmail.trim(),
+                              ...(partnerPhoneFull ? { contact_phone: partnerPhoneFull } : {}),
                           },
                       }
                     : { external_partner_collaboration: null, partner_organization: null }),
@@ -875,6 +889,7 @@ function StudentOpportunityCreationPageInner() {
                                   organization_name: formData.supervision.partnerOrgName.trim(),
                                   contact_person: formData.supervision.partnerContactPerson.trim(),
                                   official_email: formData.supervision.partnerEmail.trim(),
+                                  ...(partnerPhoneFull ? { contact_phone: partnerPhoneFull } : {}),
                               },
                           }
                         : {
@@ -3217,6 +3232,30 @@ function StudentOpportunityCreationPageInner() {
                                         <FieldError message={fieldErrors.partnerEmail} />
                                     </div>
                                 </div>
+                                <div className="min-w-0">
+                                    <label className="co-label" style={{ marginTop: 0 }}>Partner contact phone / WhatsApp · optional · private</label>
+                                    <PhoneConnectivityRow
+                                        phoneCountryKey={formData.supervision.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY}
+                                        nationalDigits={formData.supervision.partnerPhone}
+                                        onPhoneCountryKeyChange={(partnerPhoneKey) => {
+                                            clearFieldError("partnerPhone");
+                                            setFormData((prev) => ({ ...prev, supervision: { ...prev.supervision, partnerPhoneKey } }));
+                                        }}
+                                        onNationalDigitsChange={(partnerPhone) => {
+                                            clearFieldError("partnerPhone");
+                                            setFormData((prev) => ({ ...prev, supervision: { ...prev.supervision, partnerPhone } }));
+                                        }}
+                                        usePortalCountryPicker
+                                        maxNationalDigits={(formData.supervision.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY).startsWith("PK|") ? 10 : 15}
+                                        errorText={fieldErrors.partnerPhone}
+                                        rowClassName="co-phone-row"
+                                        selectClassName={`h-[42px] rounded-[10px] border py-0 text-xs font-semibold ${fieldErrors.partnerPhone ? "border-red-500" : "border-slate-200"}`}
+                                        inputClassName={`h-[42px] rounded-[10px] border py-0 text-sm font-medium ${fieldErrors.partnerPhone ? "border-red-500 focus:border-red-500" : "border-slate-200"}`}
+                                    />
+                                    {!fieldErrors.partnerPhone ? (
+                                        <p className="mt-1 text-[10px] text-[#7a919a]">Pakistan: 10 digits starting with 3, no leading 0 — e.g. 300 1234567. Never shown on the public opportunity.</p>
+                                    ) : null}
+                                </div>
                                 <p className="text-xs text-slate-500">The partner contact gets a heads-up email when you submit. Their approval link is sent separately once your faculty supervisor approves (Step 1 → Step 2).</p>
                             </div>
                         )}
@@ -3291,16 +3330,18 @@ function StudentOpportunityCreationPageInner() {
                                 <div className="mt-3 space-y-3">
                                     <label className="co-label">Selected universities *</label>
                                     {formData.selectedUniversities.map((uni, idx) => (
-                                        <input
+                                        <SearchableSelect
                                             key={idx}
-                                            type="text"
-                                            placeholder="University name"
                                             value={uni}
-                                            onChange={(e) => {
+                                            onChange={(value) => {
                                                 const next = [...formData.selectedUniversities];
-                                                next[idx] = e.target.value;
+                                                next[idx] = value;
                                                 setFormData({ ...formData, selectedUniversities: next });
                                             }}
+                                            options={pakistaniUniversities.filter((u) => u === uni || !formData.selectedUniversities.includes(u))}
+                                            placeholder="Select university…"
+                                            searchPlaceholder="Search universities…"
+                                            ariaLabel={`Selected university ${idx + 1}`}
                                         />
                                     ))}
                                     <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, selectedUniversities: [...formData.selectedUniversities, ""] })}>+ Add university</button>
@@ -3310,16 +3351,18 @@ function StudentOpportunityCreationPageInner() {
                                 <div className="mt-3 space-y-3">
                                     <label className="co-label">Departments / programmes *</label>
                                     {formData.participation.departments.map((dep, idx) => (
-                                        <input
+                                        <SearchableSelect
                                             key={idx}
-                                            type="text"
-                                            placeholder="Department or programme"
                                             value={dep}
-                                            onChange={(e) => {
+                                            onChange={(value) => {
                                                 const next = [...formData.participation.departments];
-                                                next[idx] = e.target.value;
+                                                next[idx] = value;
                                                 setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
                                             }}
+                                            options={facultyDepartmentOptionsForInstitutions(formData.selectedUniversities)}
+                                            placeholder="Select department / programme…"
+                                            searchPlaceholder="Search departments…"
+                                            ariaLabel={`Department ${idx + 1}`}
                                         />
                                     ))}
                                     <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departments: [...formData.participation.departments, ""], departmentScope: "specific" } })}>+ Add department</button>
@@ -3365,16 +3408,18 @@ function StudentOpportunityCreationPageInner() {
                                 <div className="mt-3 space-y-3">
                                     <label className="co-label">Permitted departments / programmes *</label>
                                     {formData.participation.departments.map((dep, idx) => (
-                                        <input
+                                        <SearchableSelect
                                             key={idx}
-                                            type="text"
-                                            placeholder="Department or program name"
                                             value={dep}
-                                            onChange={(e) => {
+                                            onChange={(value) => {
                                                 const next = [...formData.participation.departments];
-                                                next[idx] = e.target.value;
+                                                next[idx] = value;
                                                 setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
                                             }}
+                                            options={facultyDepartmentOptionsForInstitution(studentDetails.institution)}
+                                            placeholder="Select department / programme…"
+                                            searchPlaceholder="Search departments…"
+                                            ariaLabel={`Permitted department ${idx + 1}`}
                                         />
                                     ))}
                                     <button type="button" className="text-xs font-bold text-[#0e7d74]" onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departments: [...formData.participation.departments, ""], departmentScope: "specific" } })}>+ Add department</button>

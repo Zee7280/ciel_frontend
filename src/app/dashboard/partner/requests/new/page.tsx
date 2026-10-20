@@ -4,7 +4,7 @@ import DuplicateNotice, { type DuplicateNoticeState } from "@/components/opportu
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { ORG_SKILL_PRESETS, ORG_VERIFICATION_PRESETS, OPPORTUNITY_BENEFICIARY_PRESETS, splitCustomValues } from "@/utils/opportunityChipOptions";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Info, MapPin, AlertCircle, ChevronDown, Loader2, Plus, X } from "lucide-react";
@@ -25,7 +25,7 @@ import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
-import { pakistaniUniversities } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -102,6 +102,13 @@ const COHOST_ORG_TYPES = [
     "Individual / Independent Partner",
     "Other",
 ] as const;
+
+const subscribeToNothing = () => () => {};
+/** false during SSR and the hydrating render, true afterwards — so role copy read from localStorage
+ * never differs between the server HTML and the first client render (hydration mismatch). */
+function useHydrated(): boolean {
+    return useSyncExternalStore(subscribeToNothing, () => true, () => false);
+}
 
 function storedOrgTypeHint(): string {
     const u = readStoredCurrentUser();
@@ -262,6 +269,8 @@ export default function OpportunityPostingPage() {
                 orgName: "",
                 contactPerson: "",
                 officialEmail: "",
+                phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+                phoneNational: "",
                 designation: "",
                 orgType: "",
                 functionInOpportunity: "",
@@ -429,6 +438,8 @@ export default function OpportunityPostingPage() {
             if (!vs.partnerOrg.officialEmail.trim() || !isValidEmail(vs.partnerOrg.officialEmail)) {
                 F.cohostEmail = "Please enter a valid official email for the co-host organization";
             }
+            const cohostPhoneErr = validateOptionalNationalPhone(vs.partnerOrg.phoneCountryKey, vs.partnerOrg.phoneNational);
+            if (cohostPhoneErr) F.cohostPhone = `Co-host phone: ${cohostPhoneErr}`;
             if (!vs.partnerOrg.designation.trim()) F.cohostRole = "Please enter the co-host designation / role";
             if (!vs.partnerOrg.functionInOpportunity.trim()) {
                 F.cohostFunction = "Please describe the co-host’s function in this opportunity";
@@ -506,6 +517,10 @@ export default function OpportunityPostingPage() {
             const visibility = participationRule === "open_all_universities" ? "public" : "restricted";
             const applyRestrictedUnis = participationRule === "open_all_universities" ? [] : selectedUnis;
             const fl = formData.restrictedFacultyLinkage;
+            const partnerOrgState = formData.verificationSafety.partnerOrg;
+            const partnerPhoneE164 = partnerOrgState.hasPartner
+                ? composeInternationalPhone(partnerOrgState.phoneCountryKey, partnerOrgState.phoneNational)
+                : "";
             const payload = {
                 title: formData.title,
                 types:
@@ -574,6 +589,7 @@ export default function OpportunityPostingPage() {
                     electronic_signature: formData.electronicSignature.trim(),
                     safe_environment: formData.verificationSafety.safety.siteSafeSuitable,
                     supervised: formData.verificationSafety.safety.supervisedThroughout,
+                    ...(partnerPhoneE164 ? { partner_phone: partnerPhoneE164, external_partner_phone: partnerPhoneE164 } : {}),
                     ...(composeInternationalPhone(
                         formData.verificationSafety.executingOrg.whatsappCountryKey,
                         formData.verificationSafety.executingOrg.whatsappNational,
@@ -598,6 +614,7 @@ export default function OpportunityPostingPage() {
                         organization_name: formData.verificationSafety.partnerOrg.orgName.trim(),
                         contact_person_name: formData.verificationSafety.partnerOrg.contactPerson.trim(),
                         official_email: formData.verificationSafety.partnerOrg.officialEmail.trim(),
+                        ...(partnerPhoneE164 ? { contact_phone: partnerPhoneE164 } : {}),
                         designation: formData.verificationSafety.partnerOrg.designation.trim() || undefined,
                         organization_type: formData.verificationSafety.partnerOrg.orgType.trim() || undefined,
                         function_in_opportunity: formData.verificationSafety.partnerOrg.functionInOpportunity.trim() || undefined,
@@ -608,6 +625,7 @@ export default function OpportunityPostingPage() {
                         organization_name: formData.verificationSafety.partnerOrg.orgName.trim(),
                         contact_person: formData.verificationSafety.partnerOrg.contactPerson.trim(),
                         official_email: formData.verificationSafety.partnerOrg.officialEmail.trim(),
+                        ...(partnerPhoneE164 ? { contact_phone: partnerPhoneE164 } : {}),
                     }
                     : null,
                 safety_declaration: {
@@ -1068,6 +1086,13 @@ export default function OpportunityPostingPage() {
                             orgName: str(partner.organization_name),
                             contactPerson: str(partner.contact_person_name),
                             officialEmail: str(partner.official_email),
+                            ...(() => {
+                                // Same precedence as the backend's partner_contact_phone resolver: supervision first.
+                                const parsed = parsePhoneForDisplay(
+                                    str(sup.partner_phone) || str(sup.external_partner_phone) || str(partner.contact_phone),
+                                );
+                                return { phoneCountryKey: parsed.phoneCountryKey, phoneNational: parsed.national };
+                            })(),
                             designation: str(partner.designation),
                             orgType: str(partner.organization_type),
                             functionInOpportunity: str(partner.function_in_opportunity),
@@ -1128,8 +1153,9 @@ export default function OpportunityPostingPage() {
         end_date: formData.dates.end,
     });
 
-    const isNgoCreator = isNgoCreatorAccount(orgDetails.organizationType || storedOrgTypeHint());
-    const isUniversityCreator = storedSignupRole() === "university";
+    const hydrated = useHydrated();
+    const isNgoCreator = hydrated && isNgoCreatorAccount(orgDetails.organizationType || storedOrgTypeHint());
+    const isUniversityCreator = hydrated && storedSignupRole() === "university";
     const creatorTypes: readonly string[] = isNgoCreator
         ? NGO_CREATOR_TYPES
         : isUniversityCreator
@@ -2439,28 +2465,40 @@ export default function OpportunityPostingPage() {
                                 </div>
                                 <div>
                                     <label className="co-label" style={{ marginTop: 0 }}>University / institution *</label>
-                                    <input
-                                        type="text"
+                                    <SearchableSelect
                                         value={formData.restrictedFacultyLinkage.university}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                restrictedFacultyLinkage: { ...formData.restrictedFacultyLinkage, university: e.target.value },
-                                            })
+                                        onChange={(university) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                restrictedFacultyLinkage: {
+                                                    ...prev.restrictedFacultyLinkage,
+                                                    university,
+                                                    // The department list is per-university; a stale pick from another
+                                                    // university must not survive the change.
+                                                    ...(university !== prev.restrictedFacultyLinkage.university ? { department: "" } : {}),
+                                                },
+                                            }))
                                         }
+                                        options={pakistaniUniversities}
+                                        placeholder="Select university / institution…"
+                                        searchPlaceholder="Search universities…"
+                                        ariaLabel="Faculty contact university"
                                     />
                                 </div>
                                 <div>
                                     <label className="co-label" style={{ marginTop: 0 }}>Department / programme</label>
-                                    <input
-                                        type="text"
+                                    <SearchableSelect
                                         value={formData.restrictedFacultyLinkage.department}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                restrictedFacultyLinkage: { ...formData.restrictedFacultyLinkage, department: e.target.value },
-                                            })
+                                        onChange={(department) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                restrictedFacultyLinkage: { ...prev.restrictedFacultyLinkage, department },
+                                            }))
                                         }
+                                        options={facultyDepartmentOptionsForInstitution(formData.restrictedFacultyLinkage.university)}
+                                        placeholder={formData.restrictedFacultyLinkage.university ? "Select department / school…" : "Select the university first…"}
+                                        searchPlaceholder="Search departments…"
+                                        ariaLabel="Faculty contact department"
                                     />
                                 </div>
                                 <div>
@@ -2634,6 +2672,35 @@ export default function OpportunityPostingPage() {
                                         }
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Contact phone / WhatsApp (optional)</label>
+                                    <PhoneConnectivityRow
+                                        phoneCountryKey={formData.verificationSafety.partnerOrg.phoneCountryKey}
+                                        nationalDigits={formData.verificationSafety.partnerOrg.phoneNational}
+                                        placeholderNational="300 1234567"
+                                        selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                        inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                        onPhoneCountryKeyChange={(key) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    partnerOrg: { ...formData.verificationSafety.partnerOrg, phoneCountryKey: key },
+                                                },
+                                            })
+                                        }
+                                        onNationalDigitsChange={(digits) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    partnerOrg: { ...formData.verificationSafety.partnerOrg, phoneNational: digits },
+                                                },
+                                            })
+                                        }
+                                    />
+                                    <p className="mt-1 text-[11px] text-slate-400">Private — never shown to students.</p>
+                                </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-bold text-slate-600 mb-1">Function in opportunity <span className="text-red-500">*</span></label>
                                     <textarea
@@ -2794,17 +2861,20 @@ export default function OpportunityPostingPage() {
                                     <label className="co-label">Departments / programmes *</label>
                                     {formData.selectedDepartments.map((dep, idx) => (
                                         <div key={idx} className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Department or programme"
-                                                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm"
-                                                value={dep}
-                                                onChange={(e) => {
-                                                    const next = [...formData.selectedDepartments];
-                                                    next[idx] = e.target.value;
-                                                    setFormData({ ...formData, selectedDepartments: next });
-                                                }}
-                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <SearchableSelect
+                                                    value={dep}
+                                                    onChange={(value) => {
+                                                        const next = [...formData.selectedDepartments];
+                                                        next[idx] = value;
+                                                        setFormData({ ...formData, selectedDepartments: next });
+                                                    }}
+                                                    options={facultyDepartmentOptionsForInstitutions(formData.restrictedUniversities)}
+                                                    placeholder="Select department / programme…"
+                                                    searchPlaceholder="Search departments…"
+                                                    ariaLabel={`Permitted department ${idx + 1}`}
+                                                />
+                                            </div>
                                             {formData.selectedDepartments.length > 1 && (
                                                 <button
                                                     type="button"

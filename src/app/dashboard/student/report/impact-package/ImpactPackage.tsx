@@ -320,7 +320,7 @@ export default function ImpactPackage({
             <div className="mast">
                 <div className="brand">
                     <div className="brandmark">
-                        <img src="/iel-pk-logo.png" alt="CIEL PK" width={44} height={44} />
+                        <img src="/iel-pk-logo-192.webp" alt="CIEL PK" width={44} height={44} />
                     </div>
                     CIEL<span>PK</span>
                     <small>THE IMPACT PACKAGE</small>
