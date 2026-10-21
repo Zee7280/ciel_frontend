@@ -22,6 +22,7 @@ type ScopeRow = {
     assigned_by_name?: string;
     assigned_by_email?: string;
     assigned_by?: string;
+    assigned_by_role?: string | null;
 };
 
 type AdminUser = {
@@ -299,8 +300,9 @@ export default function AdminFacultyUniversityScopePage() {
                         </button>
                     </form>
                     <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                        Students are matched when their profile <strong>university</strong> or <strong>institution</strong> text
-                        equals the organization name (normalized). Keep naming consistent.
+                        Students are matched when their profile <strong>university</strong> or <strong>institution</strong> names
+                        this organization (case, spacing and punctuation ignored; its short form in brackets, e.g. “BNU”, also
+                        counts), or when their account is linked to the organization.
                     </p>
                 </div>
 
@@ -337,6 +339,7 @@ export default function AdminFacultyUniversityScopePage() {
                                                 {r.assigned_by_name || r.assigned_by_email || r.assigned_by
                                                     ? ` by ${r.assigned_by_name || r.assigned_by_email || r.assigned_by}`
                                                     : ""}
+                                                {r.assigned_by_role && r.assigned_by_role !== "admin" ? " · added by the university" : ""}
                                             </p>
                                         ) : null}
                                     </div>

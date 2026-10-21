@@ -13,6 +13,7 @@ import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
 import {
     buildOpportunityRecordFlashcard,
+    flashcardCanApply,
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 import {
@@ -244,6 +245,12 @@ export default function ProjectDetailsPage() {
     const objectiveContent = readObjectiveItems(projectRecord);
     const activityPlan = readActivityPlan(projectRecord);
     const stakeholders = readSupervisionStakeholders(projectRecord);
+    const flashModel = buildOpportunityRecordFlashcard(projectRecord, {
+        partnerOrg: project.partner_name || stakeholders.partner?.organization || undefined,
+        university: stakeholders.faculty?.university || undefined,
+        facultyName: stakeholders.faculty?.name || project.supervision?.supervisor_name || undefined,
+    });
+    const applicationsOpen = applicationsOpenFromPayload(projectRecord);
 
     const category = (project.types && project.types.length > 0) ? project.types[0] : "Social Impact";
     const status = project.status || "Active";
@@ -333,28 +340,23 @@ export default function ProjectDetailsPage() {
                 <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 animate-fade-in-up">
                     
                     <StudentOpportunityFlashcard
-                        model={buildOpportunityRecordFlashcard(projectRecord, {
-                            partnerOrg:
-                                project.partner_name ||
-                                stakeholders.partner?.organization ||
-                                undefined,
-                            university: stakeholders.faculty?.university || undefined,
-                            facultyName:
-                                stakeholders.faculty?.name ||
-                                project.supervision?.supervisor_name ||
-                                undefined,
-                        })}
+                        model={flashModel}
+                        applyHref={applicationsOpen ? applyHref : undefined}
                     />
 
                     {/* Apply Action */}
-                    {applicationsOpenFromPayload(projectRecord) ? (
+                    {applicationsOpen ? (
                         <>
-                            <Link
-                                href={applyHref}
-                                className="w-full flex items-center justify-center py-4 rounded-2xl bg-[#4285F4] text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-[0.2em] uppercase"
-                            >
-                                {applyLabel}
-                            </Link>
+                            {/* The card's own "Apply now" links to the same place; this button stays only
+                                when the card shows no Apply now (e.g. its deadline has passed). */}
+                            {flashcardCanApply(flashModel) ? null : (
+                                <Link
+                                    href={applyHref}
+                                    className="w-full flex items-center justify-center py-4 rounded-2xl bg-[#4285F4] text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-[0.2em] uppercase"
+                                >
+                                    {applyLabel}
+                                </Link>
+                            )}
                             <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">
                                 Apply through the student dashboard. Sign in and use Browse Opportunities to apply.
                             </p>

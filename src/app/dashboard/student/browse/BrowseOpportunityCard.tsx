@@ -45,6 +45,16 @@ type BrowseOpportunityCardProps = {
     facultyName?: string | null;
     categoryLabel?: string | null;
     seatsFilledLabel?: string | null;
+    /** Who posted the listing; same classification as the browse "posted by" filter. */
+    creatorLabel?: "Student" | "Faculty" | "NGO" | "Partner" | "CIEL PK" | null;
+};
+
+const CREATOR_ICON: Record<NonNullable<BrowseOpportunityCardProps["creatorLabel"]>, string> = {
+    Student: "🎓",
+    Faculty: "🏛",
+    NGO: "🤝",
+    Partner: "🏢",
+    "CIEL PK": "⭐",
 };
 
 function SdgLine({ sdgs }: { sdgs: BrowseCardSdg[] }) {
@@ -104,9 +114,19 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                 style={{ background: headerBg }}
             >
                 <div className="flex items-start justify-between gap-2">
-                    <span className="rounded-full bg-white/18 px-2 py-0.5 text-[9px] font-black tracking-wide text-white">
-                        ● {statusLabel}
-                    </span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-white/18 px-2 py-0.5 text-[9px] font-black tracking-wide text-white">
+                            ● {statusLabel}
+                        </span>
+                        {props.creatorLabel ? (
+                            <span
+                                className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-black text-[#16313d]"
+                                title={`Posted by ${props.creatorLabel}`}
+                            >
+                                {CREATOR_ICON[props.creatorLabel]} {props.creatorLabel}
+                            </span>
+                        ) : null}
+                    </div>
                     {daysLeft ? (
                         <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-black text-[#0f5e57]">
                             {daysLeft}
@@ -145,7 +165,7 @@ export default function BrowseOpportunityCard(props: BrowseOpportunityCardProps)
                         <span className="truncate font-semibold text-[#16313d]">{props.facultyName || "—"}</span>
                     </p>
                     <p>
-                        <span className="text-[#8aa0a6]">Partner</span>
+                        <span className="text-[#8aa0a6]">{props.creatorLabel === "NGO" ? "NGO" : "Partner"}</span>
                         <br />
                         <span className="truncate font-semibold text-[#16313d]">{props.organizationName || "—"}</span>
                     </p>

@@ -1152,6 +1152,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 isFull={Boolean(op.is_full)}
                                 isExpired={isBrowseExpired(op)}
                                 facultyName={op.faculty_name}
+                                creatorLabel={op.creatorLabel}
                                 categoryLabel={op.category || op.path_label || BROWSE_PATH_BY_KEY[pathKey].shortLabel}
                                 seatsFilledLabel={
                                     op.seatsTotal != null && op.seatsApproved != null

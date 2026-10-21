@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { findSdgById } from "@/utils/sdgData";
 import {
     applicationsOpenFromPayload,
@@ -77,6 +78,16 @@ function daysUntil(deadline: string): number | null {
     const end = new Date(d.length <= 10 ? `${d}T23:59:59` : d);
     if (Number.isNaN(end.getTime())) return null;
     return Math.floor((end.getTime() - Date.now()) / 86400000);
+}
+
+/**
+ * True when the card's bottom banner shows "Apply now" (not "Closed" / "View only"): eligible,
+ * not closed by CIEL PK, and the deadline has not passed. Pages use it to avoid a second CTA.
+ */
+export function flashcardCanApply(model: StudentFlashcardModel): boolean {
+    const days = daysUntil(String(model.deadline || ""));
+    const closed = Boolean(model.applyForcedClosed) || (days !== null && days < 0);
+    return model.eligible && !closed;
 }
 
 function prettyDate(iso: string): string {
@@ -310,9 +321,15 @@ export function resolveFacultyFlashEligibility(input: {
 export function StudentOpportunityFlashcard({
     model,
     className = "",
+    hideApplyCta = false,
+    applyHref,
 }: {
     model: StudentFlashcardModel;
     className?: string;
+    /** Omit the bottom "Apply now" banner, for pages that render their own working Apply button. */
+    hideApplyCta?: boolean;
+    /** Makes the banner's "Apply now" a link (only shown while {@link flashcardCanApply}). */
+    applyHref?: string;
 }) {
     const [note, setNote] = useState("");
     const sdg = findSdgById(model.sdg);
@@ -366,7 +383,7 @@ export function StudentOpportunityFlashcard({
     const host = flashHost(model.host);
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
     const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
-    const canApply = model.eligible && !closed;
+    const canApply = flashcardCanApply(model);
     const ctaTitle = closed
         ? catalogClosed && model.applyClosedReason === "maintenance"
             ? "Applications are temporarily paused."
@@ -632,19 +649,27 @@ export function StudentOpportunityFlashcard({
                     </div>
                 </section>
             </div>
-            <section className={`co-flash-cta ${closed || !model.eligible ? "muted" : ""}${canApply ? "" : " co-flash-cta--status"}`}>
-                <div className="co-flash-cta-copy">
-                    <h3>{ctaTitle}</h3>
-                    <p>{esc(ctaBody)}</p>
-                </div>
-                {canApply ? (
-                    <div className="co-flash-btns">
-                        <span className="co-flash-btn apply">Apply now</span>
+            {hideApplyCta ? null : (
+                <section className={`co-flash-cta ${closed || !model.eligible ? "muted" : ""}${canApply ? "" : " co-flash-cta--status"}`}>
+                    <div className="co-flash-cta-copy">
+                        <h3>{ctaTitle}</h3>
+                        <p>{esc(ctaBody)}</p>
                     </div>
-                ) : (
-                    <span className="co-flash-status-pill">{closed ? "Closed" : "View only"}</span>
-                )}
-            </section>
+                    {canApply ? (
+                        <div className="co-flash-btns">
+                            {applyHref ? (
+                                <Link href={applyHref} className="co-flash-btn apply">
+                                    Apply now
+                                </Link>
+                            ) : (
+                                <span className="co-flash-btn apply">Apply now</span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="co-flash-status-pill">{closed ? "Closed" : "View only"}</span>
+                    )}
+                </section>
+            )}
             {note ? <p className="co-flash-note">{note}</p> : null}
             <footer className="co-flash-foot">
                 <span>CIEL PK</span>

@@ -580,6 +580,7 @@ export default function OpportunityDetailsPage() {
             <div className="overflow-hidden rounded-2xl print:border-none">
                 <StudentOpportunityFlashcard
                     className="co-flash--page"
+                    hideApplyCta
                     model={{
                         ...buildOpportunityRecordFlashcard(opportunity as Record<string, unknown>, {
                             studentName: opportunity.isStudentOwner ? "You" : undefined,
