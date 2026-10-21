@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, EyeOff, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send, RotateCcw, History, Bug, CalendarClock, Settings } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, EyeOff, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send, RotateCcw, CalendarClock, Settings } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
@@ -2364,25 +2364,6 @@ export default function AdminProjectsPage() {
                             className="admin-project-menu-panel fixed w-60 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-y-auto max-h-[min(72vh,32rem)] text-left py-0.5"
                             style={{ top: activeMenu.top, right: activeMenu.right }}
                         >
-                            {(() => {
-                                const raw = activeMenuRow.raw;
-                                const stage = String(raw.workflow_stage ?? "").trim() || "—";
-                                const status = String(raw.status ?? "").trim() || "—";
-                                const approved = raw.admin_approved === true ? "yes" : "no";
-                                return (
-                                    <div className="px-3 py-2 text-[10px] leading-relaxed font-mono text-slate-500 bg-slate-50 border-b border-slate-100">
-                                        <div>status={status}</div>
-                                        <div>stage={stage} approved={approved}</div>
-                                        <div>
-                                            dir={activeMenuRow.adminHidden ? "hidden" : "listed"} apply=
-                                            {activeMenuRow.applicationsOpen ? "open" : activeMenuRow.applyBlockedReason || "closed"}
-                                        </div>
-                                        {typeof raw.public_code === "string" && raw.public_code ? (
-                                            <div>code={raw.public_code}</div>
-                                        ) : null}
-                                    </div>
-                                );
-                            })()}
                             <Link
                                 href={`/dashboard/student/browse/${encodeURIComponent(activeMenuRow.id)}`}
                                 className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -2390,6 +2371,13 @@ export default function AdminProjectsPage() {
                             >
                                 <Eye className="w-4 h-4" /> View details
                             </Link>
+                            <button
+                                type="button"
+                                onClick={() => openProjectTrackerModal(activeMenuRow)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                                <ClipboardList className="w-4 h-4" /> Project tracker
+                            </button>
                             {(() => {
                                 const c = activeMenuRow.raw.creator && typeof activeMenuRow.raw.creator === "object"
                                     ? (activeMenuRow.raw.creator as Record<string, unknown>)
@@ -2398,59 +2386,23 @@ export default function AdminProjectsPage() {
                                 const digits = rawPhone.replace(/\D/g, "");
                                 const waPhone = rawPhone.startsWith("+") ? digits : digits.length >= 10 ? `92${digits.slice(-10)}` : digits;
                                 if (!waPhone) return null;
-                                const waIcon = (
-                                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current shrink-0" aria-hidden>
-                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                                        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.556 4.12 1.527 5.855L.057 23.25a.75.75 0 0 0 .916.919l5.556-1.458A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.712 9.712 0 0 1-4.953-1.355l-.355-.213-3.684.966.984-3.595-.232-.371A9.712 9.712 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/>
-                                    </svg>
-                                );
-                                const rejectionTemplate = `Dear Student,\n\nYour opportunity has been rejected because the partner organization has not been added. Since your activity requires a partner, please click the Edit button and revise your opportunity by adding the organization where you plan to conduct the activity.\n\nOnce the partner is added, please ensure that the partner logs in or registers on the dashboard using the same email address you entered, and then approves the opportunity.\n\nAfter partner approval, your opportunity will be cleared and made live.`;
                                 return (
-                                    <>
-                                        <a
-                                            href={`https://wa.me/${waPhone}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
-                                            onClick={() => setActiveMenu(null)}
-                                        >
-                                            {waIcon}
-                                            WhatsApp creator
-                                        </a>
-                                        <a
-                                            href={`https://wa.me/${waPhone}?text=${encodeURIComponent(rejectionTemplate)}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
-                                            onClick={() => setActiveMenu(null)}
-                                        >
-                                            {waIcon}
-                                            Send rejection template
-                                        </a>
-                                    </>
+                                    <a
+                                        href={`https://wa.me/${waPhone}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                                        onClick={() => setActiveMenu(null)}
+                                    >
+                                        <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current shrink-0" aria-hidden>
+                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.556 4.12 1.527 5.855L.057 23.25a.75.75 0 0 0 .916.919l5.556-1.458A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.712 9.712 0 0 1-4.953-1.355l-.355-.213-3.684.966.984-3.595-.232-.371A9.712 9.712 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/>
+                                        </svg>
+                                        WhatsApp creator
+                                    </a>
                                 );
                             })()}
-                            <button
-                                type="button"
-                                onClick={() => openProjectTrackerModal(activeMenuRow)}
-                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-50 flex items-center gap-2"
-                            >
-                                <ClipboardList className="w-4 h-4" /> Project tracker
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => openApplicantsModal(activeMenuRow)}
-                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                            >
-                                <Users className="w-4 h-4" /> Applicant list
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => openTeamOverviewModal(activeMenuRow)}
-                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                            >
-                                <Users className="w-4 h-4" /> Teams &amp; enrollments
-                            </button>
+                            <div className="h-px bg-slate-100 my-0.5" />
                             {(() => {
                                 const r = activeMenuRow;
                                 const k = r.statusKey;
@@ -2568,25 +2520,6 @@ export default function AdminProjectsPage() {
                                                 Reopen reporting window
                                             </button>
                                         ) : null}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setActiveMenu(null);
-                                                setDebugInspector(r);
-                                            }}
-                                            className={`${item} text-slate-800 hover:bg-slate-50`}
-                                        >
-                                            <Bug className="w-4 h-4" />
-                                            Debug inspect
-                                        </button>
-                                        <Link
-                                            href={`/dashboard/admin/audit-logs?path=${encodeURIComponent(r.id)}`}
-                                            className={`${item} text-slate-800 hover:bg-slate-50`}
-                                            onClick={() => setActiveMenu(null)}
-                                        >
-                                            <History className="w-4 h-4" />
-                                            Audit log for this project
-                                        </Link>
                                     </>
                                 );
                             })()}
@@ -3811,6 +3744,14 @@ export default function AdminProjectsPage() {
                     row={trackerModalRow}
                     onClose={() => setTrackerModalRow(null)}
                     onOpenTeamsEnrollments={openTeamOverviewFromTracker}
+                    onOpenIncompleteReports={() => {
+                        openApplicantsModal(trackerModalRow);
+                        setTrackerModalRow(null);
+                    }}
+                    onOpenDebug={() => {
+                        setDebugInspector(trackerModalRow);
+                        setTrackerModalRow(null);
+                    }}
                 />
             ) : null}
         </div>
