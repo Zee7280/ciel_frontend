@@ -146,7 +146,9 @@ export function readStudentDepartmentFromBrowserStorage(): string {
         const raw = window.localStorage.getItem("ciel_user") || window.localStorage.getItem("user");
         if (!raw) return "";
         const u = JSON.parse(raw) as Record<string, unknown>;
-        const s = u.department ?? u.major ?? u.faculty_department ?? u.programme;
+        // `||`, not `??`: an empty department falls through to major, as the backend's
+        // `user.department || user.major` does, so the Apply Now gate matches the API.
+        const s = u.department || u.major || u.faculty_department || u.programme;
         return typeof s === "string" ? s.trim() : "";
     } catch {
         return "";

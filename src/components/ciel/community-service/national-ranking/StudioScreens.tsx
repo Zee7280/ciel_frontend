@@ -166,7 +166,7 @@ export function PublishedScreen({
     packages,
     projectId,
     onProject,
-    rankings,
+    rankings: projectRankings,
     onOpen,
     role,
 }: {
@@ -178,10 +178,15 @@ export function PublishedScreen({
     role: StudioRole;
 }) {
     const [viewer, setViewer] = useState<(typeof VIEWERS)[number]>(role === "ciel_admin" ? "CIEL PK Super Admin" : "University Admin");
-    const project = packages.find((p) => p.id === projectId) ?? packages[0];
+    const selected = packages.find((p) => p.id === projectId);
+    const project = selected ?? packages[0];
+    // Rankings were fetched for `projectId`; never show them beside a different project's flashcard.
+    const rankings = selected ? projectRankings : [];
+    // A published ranking can name a project that has since left the approved library; select a
+    // project that exists so the flashcard and its rankings always describe the same project.
     useEffect(() => {
-        if (!projectId && packages[0]) onProject(packages[0].id);
-    }, [projectId, packages, onProject]);
+        if (!selected && packages[0]) onProject(packages[0].id);
+    }, [selected, packages, onProject]);
 
     if (!project) {
         return (
@@ -237,7 +242,7 @@ export function PublishedScreen({
                             <b>Rankings linked to this project</b>
                             {rankings.length ? (
                                 rankings.map((r) => (
-                                    <div className="flashrank" key={r.publicationId}>
+                                    <div className="flashrank" key={`${r.publicationId}:${r.rank}:${r.label}`}>
                                         <b><span className="position">#{r.rank}</span> {r.name}</b>
                                         <small>{r.groupBy === "project" ? "Project position" : `Group position: ${r.groupBy} · ${r.label}`} · {r.lensTitle} · of {r.of}</small>
                                         <small><FilterChips filters={r.filters} /></small>

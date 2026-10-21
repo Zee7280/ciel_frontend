@@ -3148,7 +3148,11 @@ function StudentOpportunityCreationPageInner() {
                                 <FieldError message={fieldErrors.facultyDepartment} />
                             </div>
                             <div>
-                                <span className="co-locked w-full">🏛️ {studentDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">University</label>
+                                <span className="co-locked w-full min-h-[44px] !text-[13px] font-semibold text-slate-700">
+                                    🏛️ <span className="flex-1 truncate">{studentDetails.institution || "—"}</span>
+                                    <span className="co-lock-badge !text-[9px]">🔒 Locked</span>
+                                </span>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Official email address <span className="text-red-500">*</span></label>

@@ -65,8 +65,14 @@ class StudioApiError extends Error {
     }
 }
 
+/** A text cell starting with = + - @ (or tab / CR) runs as a formula in Excel; prefix ' so it stays text. */
+function csvCell(v: string | number): string {
+    const s = typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v);
+    return `"${s.replace(/"/g, '""')}"`;
+}
+
 function downloadCsv(lines: Array<Array<string | number>>, filename: string) {
-    const csv = lines.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const csv = lines.map((row) => row.map(csvCell).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
@@ -124,6 +130,11 @@ export default function NationalRankingStudio({
     // preview + table
     const [preview, setPreview] = useState<StudioPreview | null>(null);
     const [dirty, setDirty] = useState(false);
+    // Bumped on every definition change. A preview request that resolves after a change describes
+    // the old definition, so it must not clear `dirty` (Publish stays blocked until a fresh run).
+    const definitionVersion = useRef(0);
+    // The exact body that produced the preview on screen; Publish sends this, never a newer one.
+    const previewBody = useRef<Record<string, unknown> | null>(null);
     const [page, setPage] = useState(0);
     const [search, setSearch] = useState("");
     const [showCount, setShowCount] = useState("all");
@@ -155,11 +166,15 @@ export default function NationalRankingStudio({
     );
 
     const fetchPreview = useCallback(async () => {
-        const data = await api<StudioPreview>(`${studioBase}/preview`, { method: "POST", body: JSON.stringify(buildBody()) });
+        const body = buildBody();
+        const version = definitionVersion.current;
+        const data = await api<StudioPreview>(`${studioBase}/preview`, { method: "POST", body: JSON.stringify(body) });
         setPreview(data);
-        setDirty(false);
+        previewBody.current = body;
+        const stillCurrent = definitionVersion.current === version;
+        setDirty(!stillCurrent);
         setPage(0);
-        if (!nameTouched.current) setNameInput(data.result.name);
+        if (stillCurrent && !nameTouched.current) setNameInput(data.result.name);
         return data;
     }, [studioBase, buildBody]);
 
@@ -196,7 +211,10 @@ export default function NationalRankingStudio({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [packagesEndpoint]);
 
-    const markDirty = () => setDirty(true);
+    const markDirty = () => {
+        definitionVersion.current += 1;
+        setDirty(true);
+    };
     const changeFilter = (key: keyof StudioFilters, value: string) => {
         setFilters((prev) => {
             const next = { ...prev } as Record<string, unknown>;
@@ -294,12 +312,12 @@ export default function NationalRankingStudio({
     };
 
     const confirmPublish = async () => {
-        if (!preview || publishing) return;
+        if (!preview || publishing || dirty || !previewBody.current) return;
         setPublishing(true);
         try {
             const out = await api<{ status: "published" | "unchanged"; publication: PublicationSummary }>(`${studioBase}/publish`, {
                 method: "POST",
-                body: JSON.stringify(buildBody({ name: nameInput.trim() || undefined })),
+                body: JSON.stringify({ ...previewBody.current, name: nameInput.trim() || undefined }),
             });
             setPublishOpen(false);
             await loadHistory();
@@ -410,7 +428,7 @@ export default function NationalRankingStudio({
         setNameInput("");
         setLens(kind === "sdg" ? "sdg" : kind === "skill" ? "learning" : "excellence");
         setGroupBy(kind === "university" ? "university" : "project");
-        setDirty(true);
+        markDirty();
     };
 
     const exportCsv = () => {
@@ -425,7 +443,8 @@ export default function NationalRankingStudio({
 
     /** Every approved package in this cohort — ranked, eligible-but-unranked and held — with the reason it is held. */
     const exportAllProjectsCsv = () => {
-        if (!library.length) return;
+        // Ranks come from the preview on screen; a stale preview would mislabel "Ranked" projects.
+        if (!library.length || dirty) return;
         const rankByProject = new Map<string, number>();
         for (const r of result?.rows ?? []) for (const id of r.projectIds ?? []) rankByProject.set(id, r.rank);
         const header = ["Project", "Project ID", "University", "Department", "SDG", "Date", "Approved CII", "Status", "Rank in current preview", "Reason / note"];
@@ -730,7 +749,7 @@ export default function NationalRankingStudio({
                                     </div>
                                     <div className="actions">
                                         <button type="button" className="btn" disabled={!result || dirty || !result.rows.length} onClick={exportCsv}>↓ Export CSV</button>
-                                        <button type="button" className="btn" disabled={!library.length} onClick={exportAllProjectsCsv}>↓ Export all projects</button>
+                                        <button type="button" className="btn" disabled={!library.length || dirty} onClick={exportAllProjectsCsv}>↓ Export all projects</button>
                                         <button type="button" className="btn gold" disabled={!canPublish} title={blockers[0] || (dirty ? "Run the analyzer first" : "")} onClick={() => setPublishOpen(true)}>Publish to all Impact Walls →</button>
                                     </div>
                                 </div>

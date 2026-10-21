@@ -439,7 +439,7 @@ export function AdminCommunityServiceHub() {
             ),
         ])
             .then(([award, reportsAll, projects, mineRes]) => {
-                const reports = { data: reportsAll.rows as any[] };
+                const reports = { data: reportsAll.rows as Record<string, unknown>[] };
                 setReportsTruncated(reportsAll.truncated);
                 setCards(Array.isArray(award?.data) ? award.data : []);
                 const reportList = Array.isArray(reports?.data) ? reports.data : [];
@@ -1141,6 +1141,14 @@ export function AdminCommunityServiceHub() {
             {effectiveView === "wall" && (
                 <div className="mt-4">
                     <MockupSectionHead title="CIEL PK · My Impact Wall" subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR is on the Impact Package." />
+                    <div className="mt-3">
+                        <Link
+                            href={`${CS_BASE}?view=run`}
+                            className="inline-flex items-center gap-2 rounded-full bg-[#6d28d9] px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-[#5b21b6]"
+                        >
+                            🏆 National AI Analyzer →
+                        </Link>
+                    </div>
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (

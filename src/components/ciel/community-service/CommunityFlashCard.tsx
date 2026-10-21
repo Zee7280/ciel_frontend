@@ -93,7 +93,7 @@ export default function CommunityFlashCard({
                     <div className="mt-3 rounded-xl border border-[#eedbb0] bg-[#fffaed] px-3 py-2.5">
                         <p className="text-[8px] font-black uppercase tracking-wide text-[#875f16]">CIEL PK rankings</p>
                         {card.studioRankings.slice(0, 3).map((r) => (
-                            <div key={r.publicationId} className="mt-1.5 border-t border-[#ecdabb] pt-1.5 first:mt-1 first:border-0 first:pt-0">
+                            <div key={`${r.publicationId}:${r.rank}:${r.label}`} className="mt-1.5 border-t border-[#ecdabb] pt-1.5 first:mt-1 first:border-0 first:pt-0">
                                 <p className="text-[11px] font-bold leading-snug text-[#563f1e]">
                                     <span className="text-[14px] font-black text-[#865b18]">#{r.rank}</span> {r.name}
                                 </p>
