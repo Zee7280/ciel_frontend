@@ -1870,7 +1870,15 @@ export default function AdminProjectsPage() {
                             Expired
                         </span>
                     ) : null}
-                    {!r.applicationsOpen && !r.adminExpired ? (
+                    {r.raw.team_mode === "private_team" ? (
+                        <span
+                            title="Private team: nobody applies; the creator adds members from the report"
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-50 text-violet-800 border border-violet-200"
+                        >
+                            Private team
+                        </span>
+                    ) : null}
+                    {!r.applicationsOpen && !r.adminExpired && r.applyBlockedReason !== "private_team" ? (
                         <span
                             title={r.applyBlockedReason ?? undefined}
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-100"

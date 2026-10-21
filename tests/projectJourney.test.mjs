@@ -306,6 +306,33 @@ test("join applications waiting: applications step current, admin owns admin/par
     assert.equal(s.applications.headline, "2 waiting for a decision · 3 total");
 });
 
+test("private team: applications skipped, creator told to start the report", () => {
+    const empty = teamsSummary({
+        applications_roster: [],
+        applications_pipeline_total_non_withdrawn: 0,
+        applications_by_internal_status: {},
+    });
+    const steps = journeyFor(
+        { team_mode: "private_team", admin_expired: false, applications_open: false, apply_blocked_reason: "private_team" },
+        empty,
+        { volunteers: 0, remainingSeats: 8, volunteersRequired: 8, hours: 0, verifiedHours: 0, remainingHours: 128 },
+    );
+    const s = byKey(steps);
+    assert.equal(s.applications.state, "skipped");
+    assert.match(s.applications.headline, /Private team — nobody applies/);
+    assert.equal(s.enrollment.state, "current");
+    assert.equal(s.enrollment.owner, "student");
+    assert.match(s.enrollment.guide, /Start your report and add your members/);
+    assert.match(s.enrollment.guide, /report\?projectId=/);
+    assert.equal(focusStepIndex(steps), 5);
+});
+
+test("open builder listing keeps the normal applications step", () => {
+    const s = byKey(journeyFor({ team_mode: "open" }));
+    assert.equal(s.applications.state, "done");
+    assert.equal(s.enrollment.owner, null);
+});
+
 test("reportStage maps every backend status", () => {
     const st = (v) => reportStage({ impactReportRawStatus: v });
     assert.equal(st(null), "none");

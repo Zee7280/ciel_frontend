@@ -351,7 +351,9 @@ export function StudentOpportunityFlashcard({
             ? "TEMPORARILY PAUSED"
             : model.applyClosedReason === "catalog_closed"
               ? "EXPIRED"
-              : "APPLICATIONS CLOSED"
+              : model.applyClosedReason === "private_team"
+                ? "PRIVATE TEAM"
+                : "APPLICATIONS CLOSED"
         : days === null
           ? "APPLICATIONS OPEN"
           : dateClosed
@@ -389,7 +391,9 @@ export function StudentOpportunityFlashcard({
             ? "Applications are temporarily paused."
             : catalogClosed && model.applyClosedReason === "catalog_closed"
               ? "This opportunity has expired."
-              : "Applications are closed."
+              : catalogClosed && model.applyClosedReason === "private_team"
+                ? "Private team — the creator adds members."
+                : "Applications are closed."
         : !model.eligible
           ? "You can view this opportunity."
           : hot

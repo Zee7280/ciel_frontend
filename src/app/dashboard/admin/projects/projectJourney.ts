@@ -465,54 +465,77 @@ export function buildJourney(input: JourneyInput, origin = ""): JourneyStepModel
     const pendingJoin = pendingFacultyJoin + pendingPartnerJoin + pendingAdminJoin;
     const totalApps = snapshot?.pipelineTotal ?? 0;
     const applicationsOpen = raw.applications_open !== false;
-    const applications: JourneyStepModel = {
-        key: "applications",
-        title: "Applications",
-        state: totalApps === 0 ? (adminApproved && !closedOrDone ? "current" : "waiting") : pendingJoin > 0 ? "current" : "done",
-        owner:
-            pendingAdminJoin + pendingPartnerJoin > 0
-                ? "admin"
-                : pendingFacultyJoin > 0
-                  ? "faculty"
-                  : totalApps === 0 && adminApproved && applicationsOpen && !closedOrDone
-                    ? "student"
-                    : null,
-        headline:
-            totalApps === 0
-                ? adminApproved
-                    ? applicationsOpen
-                        ? "Open — no applications yet"
-                        : "No applications — applications are closed"
-                    : "Opens once the listing is live"
-                : pendingJoin > 0
-                  ? `${pendingJoin} waiting for a decision · ${totalApps} total`
-                  : `${plural(totalApps, "application")} processed`,
-        guide:
-            totalApps === 0 && adminApproved && applicationsOpen && !closedOrDone
-                ? `The opportunity is live. Students can apply from this page: ${link(STUDENT_PATHS.listing(id))}`
-                : pendingFacultyJoin > 0
-                  ? "Some join requests are waiting for faculty approval. Please ask the faculty supervisor to approve them from their CIEL dashboard."
-                  : "",
-    };
+    // Private team (backend team_mode): nobody applies — the creator adds members from the report.
+    const privateTeam = raw.team_mode === "private_team";
+    const applications: JourneyStepModel =
+        privateTeam && totalApps === 0
+            ? {
+                  key: "applications",
+                  title: "Applications",
+                  state: "skipped",
+                  owner: null,
+                  headline: "Private team — nobody applies; the creator adds members in the report",
+                  guide: "",
+              }
+            : {
+                  key: "applications",
+                  title: "Applications",
+                  state: totalApps === 0 ? (adminApproved && !closedOrDone ? "current" : "waiting") : pendingJoin > 0 ? "current" : "done",
+                  owner:
+                      pendingAdminJoin + pendingPartnerJoin > 0
+                          ? "admin"
+                          : pendingFacultyJoin > 0
+                            ? "faculty"
+                            : totalApps === 0 && adminApproved && applicationsOpen && !closedOrDone
+                              ? "student"
+                              : null,
+                  headline:
+                      totalApps === 0
+                          ? adminApproved
+                              ? applicationsOpen
+                                  ? "Open — no applications yet"
+                                  : "No applications — applications are closed"
+                              : "Opens once the listing is live"
+                          : pendingJoin > 0
+                            ? `${pendingJoin} waiting for a decision · ${totalApps} total`
+                            : `${plural(totalApps, "application")} processed`,
+                  guide:
+                      totalApps === 0 && adminApproved && applicationsOpen && !closedOrDone
+                          ? `The opportunity is live. Students can apply from this page: ${link(STUDENT_PATHS.listing(id))}`
+                          : pendingFacultyJoin > 0
+                            ? "Some join requests are waiting for faculty approval. Please ask the faculty supervisor to approve them from their CIEL dashboard."
+                            : "",
+              };
 
     // F — enrollment
     const capacity = input.volunteersRequired;
     const seatsFull =
         (input.remainingSeats != null && input.remainingSeats <= 0 && capacity != null) ||
         (capacity != null && input.volunteers >= capacity);
+    const privateTeamToStart = privateTeam && adminApproved && !closedOrDone && input.volunteers === 0;
     const enrollment: JourneyStepModel = {
         key: "enrollment",
         title: "Enrollment",
         state:
-            input.volunteers === 0 ? (totalApps > 0 ? "current" : "waiting") : seatsFull || closedOrDone ? "done" : "current",
-        owner: null,
+            input.volunteers === 0
+                ? totalApps > 0 || privateTeamToStart
+                    ? "current"
+                    : "waiting"
+                : seatsFull || closedOrDone
+                  ? "done"
+                  : "current",
+        owner: privateTeamToStart ? "student" : null,
         headline:
             input.volunteers === 0
-                ? "No one enrolled yet"
+                ? privateTeamToStart
+                    ? "Private team is live — the creator has not started the report yet"
+                    : "No one enrolled yet"
                 : capacity != null
                   ? `${input.volunteers} / ${capacity} volunteers${seatsFull ? " · full" : input.remainingSeats != null ? ` · ${input.remainingSeats} open` : ""}`
                   : `${plural(input.volunteers, "volunteer")} enrolled`,
-        guide: "",
+        guide: privateTeamToStart
+            ? `Your private team is approved. Start your report and add your members in Section 1 (no one applies to a private team): ${link(STUDENT_PATHS.report(id))}`
+            : "",
     };
 
     // G — attendance & hours

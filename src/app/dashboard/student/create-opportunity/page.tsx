@@ -10,10 +10,24 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle";
 import { integerFieldInput } from "@/utils/integerFieldInput";
+import { usePublicPlatformConfig } from "@/utils/publicPlatformConfig";
 import dynamic from 'next/dynamic';
 import { findSdgById, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, missingProfileFieldsForRole, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
+import AiDraftModal from "./AiDraftModal";
+import { aiDraftInputsFromForm, applyAiDraft, type AiDraftFields, type AiDraftInputs } from "./aiDraft";
+import {
+    clampSeatsForPrivateTeam,
+    loadedTeamModeFromDetail,
+    OPEN_MAX_SEATS,
+    PRIVATE_TEAM_MAX_SEATS,
+    seatsRangeError,
+    teamModeChooserVisible,
+    teamModePayload,
+    type LoadedTeamMode,
+    type TeamMode,
+} from "./teamMode";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuidance";
 import {
@@ -327,6 +341,7 @@ function StudentOpportunityCreationPageInner() {
         dates: { start: "", end: "", fromTime: "", endTime: "" },
         scheduleNotes: "",
         capacity: { hours: "", volunteers: "" },
+        teamMode: "open" as TeamMode,
 
         // Section C
         sdg: "",
@@ -425,6 +440,24 @@ function StudentOpportunityCreationPageInner() {
         visibility: "restricted" as "restricted" | "public",
     });
     const [flashViewer, setFlashViewer] = useState<FlashViewer>("eligible");
+    const platformConfig = usePublicPlatformConfig();
+    const privateTeamEnabled = platformConfig.student_private_team_enabled;
+    /** Generate & Auto-Fill: admin flag on AND the server has an OpenAI key. */
+    const aiDraftEnabled = platformConfig.student_ai_draft_enabled;
+    const [aiModalOpen, setAiModalOpen] = useState(false);
+    /** Last modal inputs, so reopening keeps the student's brainstorm text. */
+    const [aiLastInputs, setAiLastInputs] = useState<AiDraftInputs | null>(null);
+    /** Set after a draft is applied: drives the review banner and the Step E workload note. */
+    const [aiReview, setAiReview] = useState<{ feasibility: string } | null>(null);
+    const [aiAppliedCount, setAiAppliedCount] = useState(0);
+    // Older on-device drafts have no teamMode: treat anything but private_team as open.
+    const isPrivateTeam = formData.teamMode === "private_team";
+    /** team_mode of the listing being edited (undefined while creating a new one). */
+    const [loadedTeamMode, setLoadedTeamMode] = useState<LoadedTeamMode>(undefined);
+    /** The student used the Private / Open chooser (or picked a mode in the AI modal). */
+    const [teamModeTouched, setTeamModeTouched] = useState(false);
+    /** Hidden until admins enable private teams; an existing private team keeps it so it can switch to Open. */
+    const showTeamModeChooser = teamModeChooserVisible(privateTeamEnabled, loadedTeamMode, formData.teamMode);
     const [creatorFieldErrors, setCreatorFieldErrors] = useState<CreatorFieldErrors>({});
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const goToStepRef = useRef<(key: string) => void>(() => {});
@@ -512,10 +545,8 @@ function StudentOpportunityCreationPageInner() {
             if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 500) {
                 errors.hours = "Required hours per student must be between 1 and 500.";
             }
-            const volNum = parseInt(formData.capacity.volunteers, 10);
-            if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 1 || volNum > 5000) {
-                errors.seats = "Available seats must be between 1 and 5000.";
-            }
+            const seatsError = seatsRangeError(formData.capacity.volunteers, isPrivateTeam);
+            if (seatsError) errors.seats = seatsError;
             const benStr = formData.objectives.beneficiariesCount.trim();
             const benNum = parseInt(benStr, 10);
             if (benStr && (Number.isNaN(benNum) || benNum < 0)) {
@@ -935,6 +966,10 @@ function StudentOpportunityCreationPageInner() {
                 verification_method: formData.verification,
                 visibility,
                 restricted_universities: restricted,
+                ...teamModePayload(showTeamModeChooser, formData.teamMode, {
+                    loaded: loadedTeamMode,
+                    touched: teamModeTouched,
+                }),
             };
         return payload;
     };
@@ -946,7 +981,9 @@ function StudentOpportunityCreationPageInner() {
 
         if (!editingOpportunityId && similarMatches.length > 0 && !formData.privateCandidate) {
             toast.error(
-                "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
+                privateTeamEnabled
+                    ? "Disclaimer: A similar project already exists at your university. Ask your team lead to add you (via Apply Now, or from their report if it is a private team). Do not create another listing."
+                    : "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
                 { duration: 6000 },
             );
             return;
@@ -1043,7 +1080,9 @@ function StudentOpportunityCreationPageInner() {
                     fromNest ||
                     (typeof errObj.error === "string" ? errObj.error : undefined) ||
                     (res.status === 409
-                        ? "Disclaimer: A similar project already exists. Join the existing team via Apply Now instead of creating a duplicate listing."
+                        ? privateTeamEnabled
+                            ? "Disclaimer: A similar project already exists. Join the existing team (via Apply Now, or ask its creator to add you if it is a private team) instead of creating a duplicate listing."
+                            : "Disclaimer: A similar project already exists. Join the existing team via Apply Now instead of creating a duplicate listing."
                         : res.status === 401 || res.status === 403
                           ? "Not authorized. Please log in again."
                           : res.status >= 500
@@ -1249,8 +1288,16 @@ function StudentOpportunityCreationPageInner() {
                 : "Pending Faculty Approval",
             eligible: elig.eligible,
             eligibilityWhy: elig.why,
+            ...(isPrivateTeam
+                ? {
+                      applyForcedClosed: true,
+                      applyClosedReason: "private_team",
+                      applyClosedMessage:
+                          "Private team · no outside applications. You add your members from your report after approval.",
+                  }
+                : {}),
         };
-    }, [formData, studentDetails, flashViewer]);
+    }, [formData, studentDetails, flashViewer, isPrivateTeam]);
 
     const handleSaveDraft = async (quiet = false, opts: DraftSaveOptions = {}) => {
         if (editingOpportunityId && !isDraftMode) return;
@@ -1346,6 +1393,32 @@ function StudentOpportunityCreationPageInner() {
         return job;
     };
     persistDraftRef.current = handleSaveDraft;
+
+    const handleAiDraftApply = (fields: AiDraftFields, inputs: AiDraftInputs) => {
+        setFormData((prev) =>
+            applyAiDraft(prev, fields, inputs, {
+                cityOptions: PAKISTAN_REGION_OPTIONS,
+                sdgTargetExists: (sdgId, targetId) => Boolean(findSdgTarget(findSdgById(sdgId), targetId)),
+                teamModeChoosable: showTeamModeChooser,
+            }),
+        );
+        if (showTeamModeChooser) setTeamModeTouched(true);
+        setAiLastInputs(inputs);
+        setAiModalOpen(false);
+        setAiReview({ feasibility: fields.feasibility_warning });
+        setFieldErrors({});
+        setAiAppliedCount((n) => n + 1);
+        userNavigatedRef.current = true;
+        goToStep("B");
+        toast.success("Draft filled — review every step before submitting.");
+    };
+
+    // Save the AI-filled form once it has rendered (handleSaveDraft reads the latest formData).
+    useEffect(() => {
+        if (aiAppliedCount > 0 && canPersistDraft) {
+            void persistDraftRef.current(true, { resumeStep: "B", silent: true });
+        }
+    }, [aiAppliedCount, canPersistDraft]);
 
     useEffect(() => {
         if (!isWizard) return;
@@ -1547,6 +1620,7 @@ function StudentOpportunityCreationPageInner() {
                 let formDataPatch: ReturnType<typeof mapOpportunityDetailToStudentForm>["formDataPatch"];
                 try {
                     ({ studentDetailsPatch, formDataPatch } = mapOpportunityDetailToStudentForm(d));
+                    setLoadedTeamMode(loadedTeamModeFromDetail(d.team_mode));
                 } catch (err) {
                     console.error("mapOpportunityDetailToStudentForm failed", err);
                     toast.error("Could not open this opportunity for edit — record shape looks incomplete.");
@@ -1658,7 +1732,11 @@ function StudentOpportunityCreationPageInner() {
     const previewBits = [
         formData.mode || "",
         formData.capacity.hours.trim() ? `${formData.capacity.hours}h per student` : "",
-        formData.capacity.volunteers.trim() ? `team of ${formData.capacity.volunteers}` : "",
+        formData.capacity.volunteers.trim()
+            ? isPrivateTeam
+                ? `private team of up to ${formData.capacity.volunteers}`
+                : `team of ${formData.capacity.volunteers}`
+            : "",
         formData.objectives.beneficiariesCount.trim() ? `~${formData.objectives.beneficiariesCount} beneficiaries` : "",
         formData.supervision.facultyName.trim() ? `supervised by ${formData.supervision.facultyName}` : "",
     ].filter(Boolean);
@@ -1671,6 +1749,18 @@ function StudentOpportunityCreationPageInner() {
 
     return (
         <div className="co-form">
+            {aiModalOpen ? (
+                <AiDraftModal
+                    initial={aiLastInputs ? { ...aiDraftInputsFromForm(formData), idea: aiLastInputs.idea } : aiDraftInputsFromForm(formData)}
+                    creatorPathway={formData.privateCandidate ? "private" : "university"}
+                    teamModeChoosable={showTeamModeChooser}
+                    onClose={(inputs) => {
+                        setAiLastInputs(inputs);
+                        setAiModalOpen(false);
+                    }}
+                    onApply={handleAiDraftApply}
+                />
+            ) : null}
             {showTeamLeadNotice ? (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(4,37,43,0.6)] p-5"
@@ -1688,6 +1778,9 @@ function StudentOpportunityCreationPageInner() {
                         </p>
                         <p className="mb-2 text-[11.5px] leading-relaxed text-[#3c5a5c]">
                             <strong>One team lead</strong> creates it. Once approved and live, the lead uses <strong>Apply Now</strong> on that listing and adds all other team members there.
+                            {privateTeamEnabled ? (
+                                <> With a <strong>Private Team</strong>, nobody applies — you add your members from your report after approval.</>
+                            ) : null}
                         </p>
                         <p className="mb-2 text-[11.5px] leading-relaxed text-[#3c5a5c]">
                             If duplicates already exist, agree on a single project lead and remove the extras.
@@ -1804,6 +1897,24 @@ function StudentOpportunityCreationPageInner() {
                             <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
                         </p>
                     ) : null}
+                    {aiDraftEnabled && !isLoadingEdit ? (
+                        <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-[#cfe6df] bg-[linear-gradient(135deg,#edf8f4,#fff)] p-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-xs font-extrabold text-[#0d2b33]">✦ AI Opportunity Assistant</p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-[#3c5a5c]">
+                                    Describe your idea once in any words — AI drafts the editable fields of this form. You review
+                                    every step.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="shrink-0 rounded-[13px] bg-[#0e7d74] px-4 py-2.5 text-[12px] font-extrabold text-white"
+                                onClick={() => setAiModalOpen(true)}
+                            >
+                                ✦ Generate &amp; Auto-Fill
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
                 <div
                     className="co-progress-ring"
@@ -1853,6 +1964,25 @@ function StudentOpportunityCreationPageInner() {
                 </aside>
 
                 <div className="co-wizard-main">
+
+            {aiReview ? (
+                <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11.5px] leading-relaxed text-amber-950" role="status">
+                    <div className="flex items-start justify-between gap-2">
+                        <p>
+                            <b>✨ AI drafted this form.</b> Review every step: check the facts, add your faculty, the partner&apos;s
+                            contact and the location pin, and confirm the declarations yourself. AI never approves or signs anything.
+                        </p>
+                        <button
+                            type="button"
+                            className="shrink-0 rounded-lg p-1 text-amber-800 hover:bg-amber-100"
+                            aria-label="Dismiss"
+                            onClick={() => setAiReview(null)}
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             {/* SECTION A: STUDENT DETAILS */}
             {activeStep === "A" && (
@@ -2074,7 +2204,9 @@ function StudentOpportunityCreationPageInner() {
                                                 </p>
                                                 <p className="mt-1">
                                                     You should not create another copy. Only <strong>one team lead</strong> should submit the opportunity. All other members must open an existing listing below and join through{" "}
-                                                    <strong>Apply Now</strong> so team members can be added correctly.
+                                                    <strong>Apply Now</strong>
+                                                    {privateTeamEnabled ? " — or, for a private team, ask its creator to add them from the report —" : ""} so team members
+                                                    are added correctly.
                                                 </p>
                                             </div>
                                         </div>
@@ -2447,6 +2579,66 @@ function StudentOpportunityCreationPageInner() {
                             </div>
                         )}
                         <FieldError message={fieldErrors.datesTime} />
+                        {showTeamModeChooser ? (
+                            <div className="mt-4">
+                                <label className="co-label" style={{ marginTop: 0 }}>Who can join this opportunity? *</label>
+                                <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        aria-pressed={isPrivateTeam}
+                                        className={`co-choice${isPrivateTeam ? " on" : ""}`}
+                                        onClick={() => {
+                                            const { seats, clamped } = clampSeatsForPrivateTeam(formData.capacity.volunteers);
+                                            if (clamped) {
+                                                toast.message(`Private team capacity is limited to ${PRIVATE_TEAM_MAX_SEATS}, including you.`);
+                                            }
+                                            setFormData({
+                                                ...formData,
+                                                teamMode: "private_team",
+                                                capacity: { ...formData.capacity, volunteers: seats },
+                                            });
+                                            setTeamModeTouched(true);
+                                            clearFieldError("seats");
+                                        }}
+                                    >
+                                        <div className="text-[22px]">🔒</div>
+                                        <div className="mt-1 text-xs font-extrabold">Private Team</div>
+                                        <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">
+                                            Reserve 1–{PRIVATE_TEAM_MAX_SEATS} places. Only you start the report and add members there. Nobody else can apply.
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-pressed={!isPrivateTeam}
+                                        className={`co-choice${!isPrivateTeam ? " on" : ""}`}
+                                        onClick={() => {
+                                            setFormData({ ...formData, teamMode: "open" });
+                                            setTeamModeTouched(true);
+                                            clearFieldError("seats");
+                                        }}
+                                    >
+                                        <div className="text-[22px]">🌍</div>
+                                        <div className="mt-1 text-xs font-extrabold">Open Opportunity</div>
+                                        <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">
+                                            Other eligible students apply. Each report team has up to {PRIVATE_TEAM_MAX_SEATS} members.
+                                        </div>
+                                    </button>
+                                </div>
+                                <div className="co-note aqua mt-3">
+                                    <span>
+                                        {isPrivateTeam ? (
+                                            <>
+                                                <b>Private team:</b> do not add anyone here. After approval, start your report and add or remove members (up to the seats you choose, including you). The card is still publicly visible, but Apply Now stays off.
+                                            </>
+                                        ) : (
+                                            <>
+                                                <b>Open opportunity:</b> you are counted once; other eligible students use Apply Now for the remaining seats. Teams of up to {PRIVATE_TEAM_MAX_SEATS} form in their own reports.
+                                            </>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : null}
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
                                 <label className="co-label" style={{ marginTop: 0 }}>Required hours / student *</label>
@@ -2477,7 +2669,9 @@ function StudentOpportunityCreationPageInner() {
                                 <FieldError message={fieldErrors.hours} />
                             </div>
                             <div>
-                                <label className="co-label" style={{ marginTop: 0 }}>Available seats * · 1–5000</label>
+                                <label className="co-label" style={{ marginTop: 0 }}>
+                                    {isPrivateTeam ? `Team seats * · 1–${PRIVATE_TEAM_MAX_SEATS} (including you)` : `Available seats * · 1–${OPEN_MAX_SEATS}`}
+                                </label>
                                 <input
                                     type="text"
                                     inputMode="numeric"
@@ -2491,13 +2685,11 @@ function StudentOpportunityCreationPageInner() {
                                     onChange={(e) => {
                                         const volunteers = integerFieldInput(e.target.value, 4);
                                         setFormData({ ...formData, capacity: { ...formData.capacity, volunteers } });
-                                        const n = parseInt(volunteers, 10);
                                         setFieldErrors((prev) => {
                                             const next = { ...prev };
                                             delete next.seats;
-                                            if (volunteers && (Number.isNaN(n) || n < 1 || n > 5000)) {
-                                                next.seats = "Available seats must be between 1 and 5000.";
-                                            }
+                                            const seatsError = volunteers ? seatsRangeError(volunteers, isPrivateTeam) : null;
+                                            if (seatsError) next.seats = seatsError;
                                             return next;
                                         });
                                     }}
@@ -2931,6 +3123,21 @@ function StudentOpportunityCreationPageInner() {
             )}
 
             {/* SECTION E: ACTIVITY DETAILS */}
+            {activeStep === "E" && aiReview?.feasibility ? (
+                <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11.5px] leading-relaxed text-amber-950">
+                    <p className="font-extrabold">✨ AI scope and hours check</p>
+                    <p className="mt-1 whitespace-pre-line">{aiReview.feasibility}</p>
+                    {aiDraftEnabled ? (
+                        <button
+                            type="button"
+                            className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-extrabold text-amber-900"
+                            onClick={() => setAiModalOpen(true)}
+                        >
+                            Review or broaden activity plan
+                        </button>
+                    ) : null}
+                </div>
+            ) : null}
             {activeStep === "E" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#38bdf8" }}>
                 <CoSectionHead

@@ -423,7 +423,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const maxTeamSize = projectData?.timeline?.volunteers_required || projectData?.volunteers_needed || projectData?.available_spots || 20;
     const seatCapRaw = Math.floor(Number(projectData?.timeline?.volunteers_required ?? projectData?.volunteers_needed ?? projectData?.volunteersNeeded));
     // The lead takes one seat, so members are capped at seats − 1. No cap when it has no seat count.
-    const maxTeammates = Number.isFinite(seatCapRaw) && seatCapRaw > 0 ? Math.max(0, seatCapRaw - 1) : undefined;
+    // Builder listings (team_mode set) also cap each report team at 20 people, matching the server.
+    const seatCap = Number.isFinite(seatCapRaw) && seatCapRaw > 0 ? seatCapRaw : 0;
+    const teamSizeCap = projectData?.team_mode ? (seatCap ? Math.min(seatCap, 20) : 20) : seatCap;
+    const maxTeammates = teamSizeCap > 0 ? Math.max(0, teamSizeCap - 1) : undefined;
     const requiredHoursPerStudent = resolveRequiredHoursPerStudent(projectData, data.required_hours || 16);
 
 

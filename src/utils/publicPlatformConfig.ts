@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { REPORTING_FEE_PKR } from "@/config/reportingFee";
 import { STUDENT_SUBSCRIPTION_DEFAULT_FEE_PKR } from "@/utils/studentSubscription";
 
+/** Admin setting behind `student_private_team_enabled` (Settings → Applications). */
+export const STUDENT_PRIVATE_TEAM_ENABLED_KEY = "STUDENT_PRIVATE_TEAM_ENABLED";
+/** Admin setting behind `student_ai_draft_enabled` (Settings → Applications). */
+export const STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY = "STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED";
+
 /** Shape of `GET /api/v1/public/config` (unauthenticated; admin-set platform flags and fees). */
 export type PublicPlatformConfig = {
     maintenance_mode: boolean;
@@ -13,6 +18,10 @@ export type PublicPlatformConfig = {
     reporting_fee_pkr: number;
     student_subscription_required: boolean;
     student_subscription_fee_pkr: number;
+    /** Students may create Private Team opportunities (admin setting STUDENT_PRIVATE_TEAM_ENABLED). */
+    student_private_team_enabled: boolean;
+    /** "Generate & Auto-Fill" is on AND the server has an OpenAI key. */
+    student_ai_draft_enabled: boolean;
 };
 
 const DEFAULTS: PublicPlatformConfig = {
@@ -23,6 +32,8 @@ const DEFAULTS: PublicPlatformConfig = {
     reporting_fee_pkr: REPORTING_FEE_PKR,
     student_subscription_required: true,
     student_subscription_fee_pkr: STUDENT_SUBSCRIPTION_DEFAULT_FEE_PKR,
+    student_private_team_enabled: false,
+    student_ai_draft_enabled: false,
 };
 
 const CACHE_TTL_MS = 60_000;
@@ -55,6 +66,8 @@ export async function fetchPublicPlatformConfig(): Promise<PublicPlatformConfig>
                     d.student_subscription_fee_pkr,
                     DEFAULTS.student_subscription_fee_pkr,
                 ),
+                student_private_team_enabled: d.student_private_team_enabled === true,
+                student_ai_draft_enabled: d.student_ai_draft_enabled === true,
             };
             cached = { at: Date.now(), value };
             return value;

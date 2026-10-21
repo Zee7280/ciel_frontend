@@ -57,6 +57,10 @@ import {
     STUDENT_APPLY_MAINTENANCE_ENABLED_KEY,
     STUDENT_APPLY_MAINTENANCE_MESSAGE_KEY,
 } from "@/utils/studentApplyMaintenance";
+import {
+    STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY,
+    STUDENT_PRIVATE_TEAM_ENABLED_KEY,
+} from "@/utils/publicPlatformConfig";
 
 /* ----------------------------- constants & types ----------------------------- */
 
@@ -470,6 +474,8 @@ export default function AdminSettingsPage() {
 
     /* ---- toggle values ---- */
     const applyPaused = parseBool(server[STUDENT_APPLY_MAINTENANCE_ENABLED_KEY], false);
+    const privateTeamEnabled = parseBool(server[STUDENT_PRIVATE_TEAM_ENABLED_KEY], false);
+    const aiDraftEnabled = parseBool(server[STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY], false);
     const partnerMembershipRequired = parsePartnerMembershipRequiredSettingValue(
         server[PARTNER_MEMBERSHIP_REQUIRED_KEY],
         false,
@@ -966,6 +972,64 @@ export default function AdminSettingsPage() {
                                     next
                                         ? "Student apply is paused. Reports, attendance, and reviews still work."
                                         : "Student apply is open again (except listings closed by the cutoff).",
+                                )
+                            }
+                        />
+
+                        <ToggleRow
+                            id="private-team"
+                            title="Let students create Private Team opportunities"
+                            description={
+                                <>
+                                    When <strong>on</strong>, the student create form asks <em>Who can join?</em>: a Private Team
+                                    (1–20 seats, nobody applies, the creator adds members from the report) or an Open
+                                    Opportunity (Apply Now, report teams of up to 20). When <strong>off</strong>, new listings use
+                                    today&apos;s flow. Existing private teams keep their rules either way.
+                                </>
+                            }
+                            checked={privateTeamEnabled}
+                            saving={!!saving[STUDENT_PRIVATE_TEAM_ENABLED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[STUDENT_PRIVATE_TEAM_ENABLED_KEY]}
+                            stateLabel={privateTeamEnabled ? "Private teams available" : "Private teams off"}
+                            onChange={(next) =>
+                                void saveToggle(
+                                    STUDENT_PRIVATE_TEAM_ENABLED_KEY,
+                                    next,
+                                    "private team setting",
+                                    next
+                                        ? "Students can now choose Private Team or Open Opportunity when creating."
+                                        : "Private Team is hidden for new opportunities. Existing private teams are unchanged.",
+                                )
+                            }
+                        />
+
+                        <ToggleRow
+                            id="ai-draft"
+                            title="Let students draft opportunities with AI (Generate & Auto-Fill)"
+                            description={
+                                <>
+                                    When <strong>on</strong>, the create form offers <em>Generate &amp; Auto-Fill</em>: the student
+                                    describes the idea in any words and AI drafts the editable text (title, summary, plan, SDG,
+                                    skills). AI never fills faculty, partner contacts, location pin, declarations or signature. Needs
+                                    the server&apos;s OpenAI key; limited to 3 drafts a minute and 30 a day per user.
+                                </>
+                            }
+                            checked={aiDraftEnabled}
+                            saving={!!saving[STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY]}
+                            stateLabel={aiDraftEnabled ? "AI drafting available" : "AI drafting off"}
+                            onChange={(next) =>
+                                void saveToggle(
+                                    STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY,
+                                    next,
+                                    "AI draft setting",
+                                    next
+                                        ? "Students can now use Generate & Auto-Fill (when the OpenAI key is configured)."
+                                        : "Generate & Auto-Fill is hidden.",
                                 )
                             }
                         />

@@ -213,6 +213,7 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
             hours: Number(timeline.expected_hours) > 0 ? String(timeline.expected_hours) : "",
             volunteers: Number(timeline.volunteers_required) > 0 ? String(timeline.volunteers_required) : "",
         },
+        teamMode: d.team_mode === "private_team" ? "private_team" : "open",
         sdg: typeof sdgInfo.sdg_id === "string" ? sdgInfo.sdg_id : typeof d.sdg === "string" ? d.sdg : "",
         target: typeof sdgInfo.target_id === "string" ? sdgInfo.target_id : "",
         indicator: typeof sdgInfo.indicator_id === "string" ? sdgInfo.indicator_id : "",

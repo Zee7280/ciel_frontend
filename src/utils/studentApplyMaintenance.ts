@@ -37,6 +37,7 @@ export function applyClosedCtaLabel(reason: string | null | undefined): string {
     if (reason === "maintenance") return "Temporarily paused";
     if (reason === "catalog_closed" || reason === "opportunity_expired") return "Expired";
     if (reason === "opportunity_hidden") return "Not available";
+    if (reason === "private_team") return "Private team";
     return "Applications Closed";
 }
 
@@ -44,6 +45,7 @@ export function applyClosedBannerTitle(reason: string | null | undefined): strin
     if (reason === "maintenance") return "Applications temporarily paused";
     if (reason === "catalog_closed" || reason === "opportunity_expired") return "Opportunity expired";
     if (reason === "opportunity_hidden") return "Opportunity not available";
+    if (reason === "private_team") return "Private team — no applications";
     return "Applications closed";
 }
 
