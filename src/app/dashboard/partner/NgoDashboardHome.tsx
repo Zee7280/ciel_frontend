@@ -4,6 +4,7 @@ import Link from "next/link";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
+import { usePartnerOpportunityReview } from "@/components/faculty/FacultyOpportunityReviewActions";
 import { NGO_CS_BASE, NGO_CS_IMPACT, useNgoCommunityServiceData } from "./community-service/useNgoCommunityServiceData";
 
 const TONE_CLASS = {
@@ -14,6 +15,7 @@ const TONE_CLASS = {
 
 export default function NgoDashboardHome() {
     const cs = useNgoCommunityServiceData();
+    const partnerReview = usePartnerOpportunityReview(cs.reload);
     const dash = (n: number) => (cs.loading ? "—" : String(n));
     const tone = (n: number, kind: "bad" | "warn" = "bad") => (n ? kind : "default");
 
@@ -99,7 +101,13 @@ export default function NgoDashboardHome() {
             </div>
 
             <div className="mt-4">
-                <FacultyCsInbox items={cs.inboxItems} loading={cs.loading} hideEmpty />
+                <FacultyCsInbox
+                    items={cs.inboxItems}
+                    loading={cs.loading}
+                    hideEmpty
+                    onOpportunityReview={partnerReview.review}
+                    busyOpportunityId={partnerReview.approveSubmittingId}
+                />
             </div>
 
             <MockupSectionHead
@@ -127,6 +135,7 @@ export default function NgoDashboardHome() {
                     background={MOCKUP_GRADIENTS.green}
                 />
             </div>
+            {partnerReview.dialogs}
         </div>
     );
 }

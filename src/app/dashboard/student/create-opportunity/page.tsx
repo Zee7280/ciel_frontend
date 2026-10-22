@@ -12,7 +12,7 @@ import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import { usePublicPlatformConfig } from "@/utils/publicPlatformConfig";
 import dynamic from 'next/dynamic';
-import { findSdgById, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
+import { findSdgById, findSdgIndicator, findSdgTarget, opportunityFormSdgList, resolveSdgTargetSelectValue, resolveSdgIndicatorSelectValue } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, missingProfileFieldsForRole, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
 import AiDraftModal from "./AiDraftModal";
@@ -237,6 +237,9 @@ type SimilarOpportunityMatch = {
     status?: string | null;
     workflow_stage?: string | null;
     match_strength?: "exact" | "similar";
+    /** The student created it themselves (e.g. this draft already went in once). */
+    is_own?: boolean;
+    team_mode?: "private_team" | "open" | null;
 };
 
 function formatSimilarOpportunityStatus(row: SimilarOpportunityMatch): string {
@@ -979,13 +982,19 @@ function StudentOpportunityCreationPageInner() {
         if (submitInFlightRef.current) return;
         if (!validateForm()) return;
 
-        if (!editingOpportunityId && similarMatches.length > 0 && !formData.privateCandidate) {
+        // Submitting a draft creates the listing, so it gets the same duplicate check as a new one.
+        if ((!editingOpportunityId || isDraftMode) && similarMatches.length > 0 && !formData.privateCandidate) {
+            const own = similarMatches.find((m) => m.is_own);
             toast.error(
-                privateTeamEnabled
-                    ? "Disclaimer: A similar project already exists at your university. Ask your team lead to add you (via Apply Now, or from their report if it is a private team). Do not create another listing."
-                    : "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
+                own
+                    ? `You have already submitted "${own.title}". Open it from your created opportunities instead of submitting another copy.`
+                    : privateTeamEnabled
+                      ? "Disclaimer: A similar project already exists at your university. Ask your team lead to add you (via Apply Now, or from their report if it is a private team). Do not create another listing."
+                      : "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
                 { duration: 6000 },
             );
+            // The matching listings (with links) sit under the title field.
+            goToStepRef.current("B");
             return;
         }
 
@@ -1069,6 +1078,7 @@ function StudentOpportunityCreationPageInner() {
                         : undefined);
                 if (res.status === 409 && Array.isArray(similarFrom409) && similarFrom409.length > 0) {
                     setSimilarMatches(similarFrom409);
+                    goToStepRef.current("B");
                 }
                 const fromNest = Array.isArray((data as { message?: unknown }).message)
                     ? apiErrorMessage(data, "")
@@ -1399,6 +1409,8 @@ function StudentOpportunityCreationPageInner() {
             applyAiDraft(prev, fields, inputs, {
                 cityOptions: PAKISTAN_REGION_OPTIONS,
                 sdgTargetExists: (sdgId, targetId) => Boolean(findSdgTarget(findSdgById(sdgId), targetId)),
+                sdgIndicatorExists: (sdgId, targetId, indicatorId) =>
+                    Boolean(findSdgIndicator(findSdgTarget(findSdgById(sdgId), targetId), indicatorId)),
                 teamModeChoosable: showTeamModeChooser,
             }),
         );
@@ -1703,7 +1715,8 @@ function StudentOpportunityCreationPageInner() {
     }, []);
 
     useEffect(() => {
-        if (editingOpportunityId) {
+        // Editing a submitted listing never re-checks; a draft has not been submitted yet, so it does.
+        if (editingOpportunityId && !isDraftMode) {
             setSimilarMatches([]);
             return;
         }
@@ -1714,10 +1727,10 @@ function StudentOpportunityCreationPageInner() {
             return;
         }
         const timer = window.setTimeout(() => {
-            void checkSimilarTitles(title, uni);
+            void checkSimilarTitles(title, uni, editingOpportunityId);
         }, 500);
         return () => window.clearTimeout(timer);
-    }, [formData.title, formData.privateCandidate, studentDetails.institution, editingOpportunityId, checkSimilarTitles]);
+    }, [formData.title, formData.privateCandidate, studentDetails.institution, editingOpportunityId, isDraftMode, checkSimilarTitles]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -1809,7 +1822,7 @@ function StudentOpportunityCreationPageInner() {
                             Double-check these email addresses
                         </p>
                         <p className="mb-3 text-[11.5px] leading-relaxed text-[#3c5a5c]">
-                            Approval requests go to <strong>exactly</strong> these addresses. A typo means the verification email never arrives and your opportunity cannot move forward.
+                            Approval requests are sent to <strong>exactly</strong> these addresses. If an email address is misspelled, the verification email will not arrive and your opportunity cannot move forward.
                         </p>
                         <div className="mb-4 flex flex-col gap-2">
                             {facultyEmailForConfirm ? (
@@ -2179,7 +2192,7 @@ function StudentOpportunityCreationPageInner() {
                             }}
                         />
                         <FieldError message={fieldErrors.title} />
-                        {!formData.privateCandidate && !editingOpportunityId && (similarCheckLoading || similarMatches.length > 0) ? (
+                        {!formData.privateCandidate && (!editingOpportunityId || isDraftMode) && (similarCheckLoading || similarMatches.length > 0) ? (
                             <div
                                 className={`mt-3 rounded-xl border p-4 ${
                                     similarMatches.length > 0
@@ -2200,7 +2213,9 @@ function StudentOpportunityCreationPageInner() {
                                             <div className="text-sm text-amber-950 leading-relaxed">
                                                 <p className="text-xs font-bold uppercase tracking-widest text-amber-800">Disclaimer</p>
                                                 <p className="font-bold mt-1">
-                                                    A similar project title already exists at your university.
+                                                    {similarMatches.some((m) => m.is_own)
+                                                        ? "You have already submitted a project with this title."
+                                                        : "A similar project title already exists at your university."}
                                                 </p>
                                                 <p className="mt-1">
                                                     You should not create another copy. Only <strong>one team lead</strong> should submit the opportunity. All other members must open an existing listing below and join through{" "}
@@ -2223,12 +2238,25 @@ function StudentOpportunityCreationPageInner() {
                                                             {row.match_strength === "exact" ? " · Same title" : " · Similar title"}
                                                         </p>
                                                     </div>
-                                                    <Link
-                                                        href={`/dashboard/student/browse/${encodeURIComponent(row.id)}`}
-                                                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                                                    >
-                                                        View &amp; apply <ExternalLink className="h-3.5 w-3.5" />
-                                                    </Link>
+                                                    {row.is_own ? (
+                                                        <Link
+                                                            href="/dashboard/student/paths/community-service?view=create"
+                                                            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                                                        >
+                                                            Open my opportunities <ExternalLink className="h-3.5 w-3.5" />
+                                                        </Link>
+                                                    ) : row.team_mode === "private_team" ? (
+                                                        <span className="shrink-0 text-xs font-semibold text-amber-900">
+                                                            Private team — ask its lead to add you
+                                                        </span>
+                                                    ) : (
+                                                        <Link
+                                                            href={`/dashboard/student/browse/${encodeURIComponent(row.id)}`}
+                                                            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                                                        >
+                                                            View &amp; apply <ExternalLink className="h-3.5 w-3.5" />
+                                                        </Link>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>

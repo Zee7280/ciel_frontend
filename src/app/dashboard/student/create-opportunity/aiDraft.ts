@@ -39,8 +39,8 @@ export type AiDraftFields = {
     prerequisites: string;
     resources: string;
     feasibility_warning: string;
-    primary_sdg: { sdg_id: string; target_id: string; why: string; local_metric: string } | null;
-    supporting_sdg: { sdg_id: string; target_id: string; why: string } | null;
+    primary_sdg: { sdg_id: string; target_id: string; indicator_id?: string; why: string; local_metric: string } | null;
+    supporting_sdg: { sdg_id: string; target_id: string; indicator_id?: string; why: string } | null;
 };
 
 /** The slice of the wizard's form state this module reads and writes. */
@@ -86,6 +86,8 @@ export type ApplyAiDraftOptions = {
     cityOptions: readonly string[];
     /** True when the SDG target id exists in the wizard's SDG catalog. */
     sdgTargetExists: (sdgId: string, targetId: string) => boolean;
+    /** True when the indicator id is listed under that target in the catalog. */
+    sdgIndicatorExists: (sdgId: string, targetId: string, indicatorId: string) => boolean;
     /** Whether the wizard shows Private / Open (team_mode is only applied then). */
     teamModeChoosable: boolean;
 };
@@ -205,21 +207,30 @@ export function applyAiDraft<F extends AiDraftFormShape>(
     const hours = positiveInt(inputs.hours, 500);
     const mainPartner = inputs.mainPartner.trim();
 
+    /** Target + indicator the dropdowns can show; anything missing from the catalog stays empty. */
+    const catalogPick = (sdg: { sdg_id: string; target_id: string; indicator_id?: string }) => {
+        const target = sdg.target_id && opts.sdgTargetExists(sdg.sdg_id, sdg.target_id) ? sdg.target_id : "";
+        const indicator =
+            target && sdg.indicator_id && opts.sdgIndicatorExists(sdg.sdg_id, target, sdg.indicator_id)
+                ? sdg.indicator_id
+                : "";
+        return { target, indicator };
+    };
+    const primaryPick = primary ? catalogPick(primary) : null;
+    const supportingPick = supporting ? catalogPick(supporting) : null;
+
     const sdgFields = primary
         ? {
               sdg: primary.sdg_id,
-              target: primary.target_id && opts.sdgTargetExists(primary.sdg_id, primary.target_id) ? primary.target_id : "",
-              indicator: "",
+              target: primaryPick?.target ?? "",
+              indicator: primaryPick?.indicator ?? "",
               subIndicator: primary.local_metric,
               sdgWhy: primary.why,
               ...(supporting
                   ? {
                         secondarySdg: supporting.sdg_id,
-                        secondaryTarget:
-                            supporting.target_id && opts.sdgTargetExists(supporting.sdg_id, supporting.target_id)
-                                ? supporting.target_id
-                                : "",
-                        secondaryIndicator: "",
+                        secondaryTarget: supportingPick?.target ?? "",
+                        secondaryIndicator: supportingPick?.indicator ?? "",
                         secondarySubIndicator: "",
                         secondarySdgWhy: supporting.why,
                     }

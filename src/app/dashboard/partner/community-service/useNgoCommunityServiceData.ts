@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { formatOpportunityCode } from "@/utils/displayIds";
 import { partnerQueueBucket } from "@/utils/partnerOpportunityQueue";
@@ -119,6 +119,9 @@ export function useNgoCommunityServiceData() {
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [orgName, setOrgName] = useState("NGO / Nonprofit");
+    /** Bumped after an approve / revision / rejection so the queues refresh in place. */
+    const [reloadKey, setReloadKey] = useState(0);
+    const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
     useEffect(() => {
         setOrgName(readNgoOrgName());
@@ -185,7 +188,7 @@ export function useNgoCommunityServiceData() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadKey]);
 
     const currentUserId = getStoredCurrentUserId();
     const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
@@ -248,6 +251,7 @@ export function useNgoCommunityServiceData() {
                     meta: `${formatOpportunityCode(row)} · ${creator} · ${resolveStudentOpportunityWorkflow(row).badgeLabel}`,
                     href: `${NGO_CS_APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`,
                     cta: facultyCreated ? "View Flashcard & Acknowledge" : "View Flashcard & Approve",
+                    opportunityId: row.id,
                     studentEmail: emailOrUndef(pickStr(row, "creator_email", "student_email", "submitted_by_email", "email")),
                 };
             }),
@@ -256,6 +260,7 @@ export function useNgoCommunityServiceData() {
 
     return {
         loading,
+        reload,
         orgName,
         oppRows,
         mine,

@@ -13,6 +13,7 @@ import {
     type ApprovalPipelineStepState,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
+import { FacultyPendingReviewButtons, usePartnerOpportunityReview } from "@/components/faculty/FacultyOpportunityReviewActions";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
@@ -260,6 +261,7 @@ export default function NgoCommunityServiceHub() {
     const tabParam = searchParams.get("tab") || "";
     const {
         loading,
+        reload,
         orgName,
         mine,
         pendingApprovals,
@@ -276,6 +278,8 @@ export default function NgoCommunityServiceHub() {
         deckCards,
         inboxItems,
     } = useNgoCommunityServiceData();
+    /** Flashcard / revision / rejection open here, through the partner approval endpoints. */
+    const partnerReview = usePartnerOpportunityReview(reload);
     const [innerTab, setInnerTab] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
 
@@ -389,7 +393,12 @@ export default function NgoCommunityServiceHub() {
                         clean overview.
                     </ZoneRule>
                     <div className="mt-4">
-                        <FacultyCsInbox items={inboxItems} loading={loading} />
+                        <FacultyCsInbox
+                            items={inboxItems}
+                            loading={loading}
+                            onOpportunityReview={partnerReview.review}
+                            busyOpportunityId={partnerReview.approveSubmittingId}
+                        />
                     </div>
 
                     <AttentionRow items={attention} />
@@ -634,17 +643,19 @@ export default function NgoCommunityServiceHub() {
                                                 {...model}
                                                 actions={
                                                     mode === "pending" ? (
-                                                        <>
-                                                            <Link href={href} className={approvalActionClass.green}>
-                                                                View Flashcard & Approve
-                                                            </Link>
-                                                            <Link href={href} className={approvalActionClass.gold}>
-                                                                Request Revision
-                                                            </Link>
-                                                            <Link href={href} className={approvalActionClass.red}>
-                                                                Reject
-                                                            </Link>
-                                                        </>
+                                                        <FacultyPendingReviewButtons
+                                                            opportunityId={row.id}
+                                                            approvalAction="partner_ack"
+                                                            approveLabel={
+                                                                String(row.created_by_role ?? row.creator_role ?? "").trim().toLowerCase() === "faculty"
+                                                                    ? "View Flashcard & Acknowledge"
+                                                                    : "View Flashcard & Approve"
+                                                            }
+                                                            approveSubmittingId={partnerReview.approveSubmittingId}
+                                                            onOpenFlashcard={(id) => partnerReview.review(id, "open")}
+                                                            onRevise={(id) => partnerReview.review(id, "revise")}
+                                                            onReject={(id) => partnerReview.review(id, "reject")}
+                                                        />
                                                     ) : (
                                                         <Link href={href} className={approvalActionClass.soft}>
                                                             {mode === "decided" ? "Open record" : "View same record"}
@@ -658,9 +669,6 @@ export default function NgoCommunityServiceHub() {
                             );
                         })()
                     )}
-                    <Link href={APPROVALS} className="mt-4 inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
-                        Open full approvals →
-                    </Link>
                 </div>
             )}
 
@@ -818,6 +826,7 @@ export default function NgoCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
+            {partnerReview.dialogs}
         </div>
     );
 }

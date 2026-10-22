@@ -5,14 +5,18 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import "./ranking-studio.css";
 import {
+    FALLBACK_GROUPS,
+    FALLBACK_LENSES,
     FILTER_TITLES,
+    buildProjectStandings,
     fmtDate,
     fmtNum,
+    groupTitle,
     metricBarPercent,
     metricDisplay,
     prettyFilterValue,
+    standingLabel,
     type CustomWeights,
-    type LensMeta,
     type PackageRow,
     type ProjectRanking,
     type PublicationSummary,
@@ -23,18 +27,13 @@ import {
     type StudioRole,
 } from "./studio-types";
 import { PackageDrawer, GroupDrawer, PublishModal, FilterChips } from "./StudioParts";
-import { HistoryScreen, PackagesScreen, PublishedScreen, ReviewScreen, RulesScreen } from "./StudioScreens";
+import { AllProjectsPanel, HistoryScreen, PackagesScreen, PublishedScreen, ReviewScreen, RulesScreen } from "./StudioScreens";
 
 type Tab = "analyzer" | "review" | "packages" | "published" | "history" | "rules";
 
 const PAGE_SIZE = 12;
 const DEFAULT_WEIGHTS: CustomWeights = { impact: 35, sustain: 20, learning: 25, cii: 20 };
 
-/** Shown before the first preview arrives; the server's list (with descriptions) replaces it. */
-const FALLBACK_LENSES: LensMeta[] = [
-    { key: "excellence", title: "Overall Project Excellence", description: "", kind: "points", needsEvaluation: true },
-    { key: "cii", title: "Approved CII Score", description: "", kind: "points", needsEvaluation: false },
-];
 const LENS_GROUPS: Array<[string, string[]]> = [
     ["Overall", ["excellence", "cii", "custom"]],
     ["Evidence-based criteria", ["impact", "need", "sustain", "partner", "efficiency", "sdg", "scale", "learning"]],
@@ -44,11 +43,10 @@ const LENS_GROUPS: Array<[string, string[]]> = [
 const MORE_FILTERS: Array<[keyof StudioFilters, string, string]> = [
     ["semester", "Semester", "semesters"],
     ["city", "City", "cities"],
-    ["partner", "Partner", "partners"],
-    ["activity", "Activity", "activities"],
+    ["partner", "Partner / NGO", "partners"],
+    ["activity", "Activity type", "activity types"],
     ["theme", "Impact theme", "themes"],
     ["ciiBadge", "CII badge", "badges"],
-    ["privacy", "Evidence class", "classes"],
 ];
 
 function apiMessage(json: unknown, fallback: string): string {
@@ -165,8 +163,9 @@ export default function NationalRankingStudio({
         [lens, groupBy, filters, weights],
     );
 
-    const fetchPreview = useCallback(async () => {
-        const body = buildBody();
+    /** `override` lets a preset preview its new definition before React state has caught up. */
+    const fetchPreview = useCallback(async (override?: Record<string, unknown>) => {
+        const body = override ?? buildBody();
         const version = definitionVersion.current;
         const data = await api<StudioPreview>(`${studioBase}/preview`, { method: "POST", body: JSON.stringify(body) });
         setPreview(data);
@@ -276,6 +275,8 @@ export default function NationalRankingStudio({
     const runAnalyzer = async () => {
         if (busy || previewBusy) return;
         const lensMeta = (preview?.lenses ?? FALLBACK_LENSES).find((l) => l.key === lens);
+        setSearch("");
+        setPage(0);
         setPreviewBusy(true);
         try {
             let data = await fetchPreview();
@@ -389,14 +390,37 @@ export default function NationalRankingStudio({
         if (tab === "history") void loadHistory();
     }, [tab, loadHistory]);
 
+    // Escape closes the publish dialog first, then the drawer (same as the reference design).
+    useEffect(() => {
+        if (!publishOpen && !drawer) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (publishOpen) {
+                if (!publishing) setPublishOpen(false);
+            } else {
+                setDrawer(null);
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [publishOpen, drawer, publishing]);
+
     // ---------------------------------------------------------------------------------- derived
-    const lenses = preview?.lenses ?? FALLBACK_LENSES;
+    const lenses = preview?.lenses?.length ? preview.lenses : FALLBACK_LENSES;
     const lensMeta = lenses.find((l) => l.key === lens) ?? lenses[0];
     const result = preview?.result ?? null;
+    /** Units and titles of the rows on screen follow the lens they were calculated with, not the dropdown. */
+    const resultLensMeta = (result && lenses.find((l) => l.key === result.lens)) || lensMeta;
+    const groups = (preview?.groups?.length ? preview.groups : FALLBACK_GROUPS).filter(
+        // A university studio only sees its own institution: comparing universities is meaningless there.
+        (g) => role === "ciel_admin" || g.key !== "university",
+    );
     const counts = preview?.counts;
     const options = preview?.options ?? {};
     const library = useMemo(() => preview?.packages ?? [], [preview]);
     const pkgById = useMemo(() => new Map(library.map((p) => [p.id, p])), [library]);
+    /** Each project's standing in the preview on screen; one map for the panel, the drawer and the CSV. */
+    const standings = useMemo(() => buildProjectStandings(preview?.result ?? null, library, dirty), [preview, library, dirty]);
     const runRowById = useMemo(() => new Map((run?.rows ?? []).map((r) => [r.id, r])), [run]);
     const pendingReviews = preview?.pendingReviews ?? 0;
     const blockers = preview?.publishBlockers ?? [];
@@ -412,32 +436,67 @@ export default function NationalRankingStudio({
     const safePage = Math.min(page, pageCount - 1);
     const pageRows = shownRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
     const maxMetric = result?.rows.reduce((m, r) => Math.max(m, r.metric), 0) ?? 0;
+    /**
+     * Footer counts, kept apart. The server's `heldIds` mixes three cases: failed the package check
+     * (`ready` false), waiting for the AI read, and no documented value for this measure. Eligible
+     * projects missing from the rows sit in groups too small to rank.
+     */
+    const footer = useMemo(() => {
+        if (!result) return null;
+        const unread = new Set(result.unreadIds);
+        const inRows = new Set(result.rows.flatMap((r) => r.projectIds ?? []));
+        const failedCheck = (id: string) => pkgById.get(id)?.ready === false;
+        return {
+            gateHeld: result.heldIds.filter((id) => failedCheck(id)).length,
+            unread: unread.size,
+            noData:
+                result.heldIds.filter((id) => !failedCheck(id) && !unread.has(id)).length +
+                result.eligibleIds.filter((id) => !inRows.has(id)).length,
+        };
+    }, [result, pkgById]);
     const isProject = (result?.groupBy ?? "project") === "project";
 
     const latestYear = [...(options.year ?? [])].sort().pop();
+    /** SDG 4 when the cohort has it, otherwise its most common primary SDG — the chip names the one used. */
+    const presetSdg = useMemo(() => {
+        const sdgs = options.sdg ?? [];
+        const sdg4 = sdgs.find((v) => /^sdg\s*0?4\b/i.test(v.trim()));
+        if (sdg4) return sdg4;
+        const freq = new Map<string, number>();
+        for (const p of library) if (p.sdg && sdgs.includes(p.sdg)) freq.set(p.sdg, (freq.get(p.sdg) ?? 0) + 1);
+        return [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? sdgs[0];
+    }, [options.sdg, library]);
+    const presetSkill = (options.skills ?? []).find((v) => /leadership/i.test(v));
+    /** Presets replace the whole definition (latest year included) and preview it at once; AI reads stay on Run. */
     const applyPreset = (kind: "all" | "sdg" | "skill" | "university") => {
+        if (busy || previewBusy) return;
         const nextFilters: StudioFilters = {};
-        if (kind === "all" && latestYear) nextFilters.year = latestYear;
-        if (kind === "skill") {
-            const leadership = (options.skills ?? []).find((s) => /leadership/i.test(s)) ?? (options.skills ?? [])[0];
-            if (leadership) nextFilters.skills = leadership;
-        }
+        if (latestYear) nextFilters.year = latestYear;
+        if (kind === "sdg" && presetSdg) nextFilters.sdg = presetSdg;
+        if (kind === "skill" && presetSkill) nextFilters.skills = presetSkill;
+        const nextLens = kind === "sdg" ? "sdg" : kind === "skill" ? "learning" : "excellence";
+        const nextGroup = kind === "university" ? "university" : "project";
         setFilters(nextFilters);
         setWeights(DEFAULT_WEIGHTS);
         nameTouched.current = false;
         setNameInput("");
-        setLens(kind === "sdg" ? "sdg" : kind === "skill" ? "learning" : "excellence");
-        setGroupBy(kind === "university" ? "university" : "project");
+        setLens(nextLens);
+        setGroupBy(nextGroup);
+        setSearch("");
         markDirty();
+        setPreviewBusy(true);
+        void fetchPreview({ lens: nextLens, groupBy: nextGroup, filters: nextFilters, weights: DEFAULT_WEIGHTS })
+            .catch((err) => toast.error(err instanceof Error ? err.message : "Could not preview this ranking."))
+            .finally(() => setPreviewBusy(false));
     };
 
     const exportCsv = () => {
         if (!result || dirty) return;
-        const header = ["Position", isProject ? "Project" : "Group", "Ranking label", "Measure", "Value", "Average approved CII", "Eligible projects", "Filters"];
+        const header = ["Position", isProject ? "Project" : "Group", "Ranking label", "Metric", "Value", "Average approved CII", "Eligible projects", "Filters"];
         const fs = Object.entries(result.filters)
             .map(([k, v]) => `${FILTER_TITLES[k] || k}: ${prettyFilterValue(k, v as string | number)}`)
             .join("; ");
-        const lines = [header, ...result.rows.map((r) => [r.rank, r.label, nameInput || result.name, lensMeta.title, r.metric.toFixed(2), r.cii == null ? "" : r.cii.toFixed(1), r.projectCount, fs])];
+        const lines = [header, ...result.rows.map((r) => [r.rank, r.label, nameInput || result.name, resultLensMeta.title, r.metric.toFixed(2), r.cii == null ? "" : r.cii.toFixed(1), r.projectCount, fs])];
         downloadCsv(lines, "CIEL_PK_Ranking_Preview.csv");
     };
 
@@ -445,8 +504,6 @@ export default function NationalRankingStudio({
     const exportAllProjectsCsv = () => {
         // Ranks come from the preview on screen; a stale preview would mislabel "Ranked" projects.
         if (!library.length || dirty) return;
-        const rankByProject = new Map<string, number>();
-        for (const r of result?.rows ?? []) for (const id of r.projectIds ?? []) rankByProject.set(id, r.rank);
         const header = ["Project", "Project ID", "University", "Department", "SDG", "Date", "Approved CII", "Status", "Rank in current preview", "Reason / note"];
         const lines = [
             header,
@@ -458,8 +515,11 @@ export default function NationalRankingStudio({
                 p.sdg,
                 p.date,
                 p.cii == null ? "" : p.cii.toFixed(1),
-                rankByProject.has(p.id) ? "Ranked" : p.ready ? (p.evaluated ? "Eligible" : "Eligible, not yet read by AI") : "Held",
-                rankByProject.get(p.id) ?? "",
+                standingLabel(standings.get(p.id)),
+                (() => {
+                    const st = standings.get(p.id);
+                    return st?.kind === "ranked" || st?.kind === "in_group" ? st.rank : "";
+                })(),
                 p.reason,
             ]),
         ];
@@ -557,7 +617,7 @@ export default function NationalRankingStudio({
                         <div className="stat"><small>Four-part checks passed</small><b>{counts ? counts.eligible : "—"}</b><span>Eligible for ranking</span></div>
                         <div className="stat"><small>Requires verification</small><b>{counts ? counts.held : "—"}</b><span>Excluded until complete</span></div>
                         <div className="stat"><small>Current comparison</small><b>{counts ? counts.inRanking : "—"}</b><span>Selected eligible projects</span></div>
-                        <div className="stat"><small>Published ranking views</small><b>{history.length}</b><span>Retained with history</span></div>
+                        <div className="stat"><small>Published ranking views</small><b>{history.length >= 200 ? "200+" : history.length}</b><span>Retained separately</span></div>
                     </div>
 
                     <div className="sectiontitle">
@@ -566,10 +626,16 @@ export default function NationalRankingStudio({
                             <p>Select the audience, reporting period and evidence-backed result you want to compare.</p>
                         </div>
                         <div className="presetrow">
-                            <button type="button" className="preset" onClick={() => applyPreset("all")}>All projects{latestYear ? ` · ${latestYear}` : ""}</button>
-                            <button type="button" className="preset" onClick={() => applyPreset("sdg")}>SDG leaders</button>
-                            <button type="button" className="preset" onClick={() => applyPreset("skill")}>Leadership skills</button>
-                            <button type="button" className="preset" onClick={() => applyPreset("university")}>University standings</button>
+                            <button type="button" className="preset" disabled={busy || previewBusy} onClick={() => applyPreset("all")}>All projects{latestYear ? ` · ${latestYear}` : ""}</button>
+                            {presetSdg ? (
+                                <button type="button" className="preset" disabled={busy || previewBusy} onClick={() => applyPreset("sdg")}>{presetSdg} leaders</button>
+                            ) : null}
+                            {presetSkill ? (
+                                <button type="button" className="preset" disabled={busy || previewBusy} onClick={() => applyPreset("skill")}>{presetSkill} skills</button>
+                            ) : null}
+                            {role === "ciel_admin" ? (
+                                <button type="button" className="preset" disabled={busy || previewBusy} onClick={() => applyPreset("university")}>University standings</button>
+                            ) : null}
                         </div>
                     </div>
 
@@ -596,9 +662,9 @@ export default function NationalRankingStudio({
                             <div className="field">
                                 <label htmlFor="rs-group">Compare</label>
                                 <select id="rs-group" value={groupBy} onChange={(e) => { setGroupBy(e.target.value); markDirty(); }}>
-                                    {(preview?.groups ?? [{ key: "project", title: "Individual projects" }]).map((g) => (
+                                    {groups.map((g) => (
                                         <option key={g.key} value={g.key}>
-                                            {g.key === "project" ? g.title : `${g.title} (average of projects)`}
+                                            {g.key === "project" ? g.title : `${groupTitle(g.key, g.title)} (average of projects)`}
                                         </option>
                                     ))}
                                 </select>
@@ -626,7 +692,7 @@ export default function NationalRankingStudio({
 
                             <div className="filter-section">
                                 <strong>2. Choose who &amp; what to include</strong>
-                                {filterRow("university", "University", "universities")}
+                                {role === "ciel_admin" ? filterRow("university", "University", "universities") : null}
                                 <div className="fieldgrid">
                                     {filterRow("department", "Department", "departments")}
                                     {filterRow("instructor", "Instructor", "instructors")}
@@ -662,16 +728,16 @@ export default function NationalRankingStudio({
                                     </div>
                                 </div>
                                 <details className="advanced">
-                                    <summary>More report filters</summary>
+                                    <summary>More report filters ＋</summary>
                                     <div className="fieldgrid">
                                         {MORE_FILTERS.map(([k, label, plural]) => filterRow(k, label, plural))}
                                         <div className="field">
                                             <label htmlFor="rs-f-minhours">Min. verified hours</label>
-                                            <input id="rs-f-minhours" type="number" min={0} value={filters.minHours ?? ""} onChange={(e) => changeFilter("minHours", e.target.value)} />
+                                            <input id="rs-f-minhours" type="number" min={0} placeholder="Any" value={filters.minHours ?? ""} onChange={(e) => changeFilter("minHours", e.target.value)} />
                                         </div>
                                         <div className="field">
                                             <label htmlFor="rs-f-mincii">Min. approved CII</label>
-                                            <input id="rs-f-mincii" type="number" min={0} max={110} value={filters.minCii ?? ""} onChange={(e) => changeFilter("minCii", e.target.value)} />
+                                            <input id="rs-f-mincii" type="number" min={0} max={110} placeholder="Any" value={filters.minCii ?? ""} onChange={(e) => changeFilter("minCii", e.target.value)} />
                                         </div>
                                         <div className="field">
                                             <label htmlFor="rs-f-team">Team size</label>
@@ -683,6 +749,7 @@ export default function NationalRankingStudio({
                                                 <option value="11-999">11+ students</option>
                                             </select>
                                         </div>
+                                        {filterRow("privacy", "Evidence classification", "classifications")}
                                     </div>
                                 </details>
                             </div>
@@ -691,7 +758,7 @@ export default function NationalRankingStudio({
                                 <strong>3. Title your ranking</strong>
                                 <div className="field">
                                     <label htmlFor="rs-name">Name shown on the Impact Wall</label>
-                                    <input id="rs-name" value={nameInput} placeholder="Automatically generated from your filters" onChange={(e) => { nameTouched.current = true; setNameInput(e.target.value); }} />
+                                    <input id="rs-name" value={nameInput} maxLength={140} placeholder="Automatically generated from your criteria" onChange={(e) => { nameTouched.current = true; setNameInput(e.target.value); }} />
                                     <p className="smallnote" style={{ marginTop: 5 }}>e.g. Top Projects — SDG 4 — Lahore — 2026</p>
                                 </div>
                                 <div className="actionstack">
@@ -727,10 +794,16 @@ export default function NationalRankingStudio({
                                 <div className="statusline">
                                     <span>
                                         {counts
-                                            ? `${counts.eligible} of ${counts.packages} approved packages pass the four-part gate; ${counts.held} are held for missing or unreadable material.`
+                                            ? `${counts.eligible} of ${counts.packages} approved packages pass the four-part gate; ${counts.held} are held until required material is complete (approval, CII lock, hours, consent, packet or evidence).`
                                             : "Checking packages…"}
+                                        {counts && result && !dirty
+                                            ? ` In this filtered cohort: ${counts.inRanking} included, ${counts.heldInSelection} held.`
+                                            : ""}
                                     </span>
-                                    <span className={`labelchip ${dirty ? "gold" : ""}`}>{previewBusy ? "Working…" : dirty ? "Preview needs refresh" : "Latest analysis ready"}</span>
+                                    <span className="actions">
+                                        <span className={`labelchip ${dirty ? "gold" : ""}`}>{previewBusy ? "Working…" : dirty ? "Preview needs refresh" : "Latest analysis ready"}</span>
+                                        <button type="button" className="btn sm" onClick={() => setTab("packages")}>Open package library →</button>
+                                    </span>
                                 </div>
                             </section>
 
@@ -738,19 +811,19 @@ export default function NationalRankingStudio({
                                 <div className="rankingbar">
                                     <div>
                                         <span className="eyebrow" style={{ color: "var(--green)" }}>LIVE PREVIEW · {rubric}</span>
-                                        <h3>{nameInput || result?.name || lensMeta.title}</h3>
+                                        <h3>{nameInput || result?.name || resultLensMeta.title}</h3>
                                         <p>
                                             {dirty
                                                 ? "Filters changed. Run Ranking Analyzer to calculate a fresh ranking before publishing."
                                                 : result
-                                                  ? `${lensMeta.description || lensMeta.title} · ${isProject ? "Projects" : `Grouped by ${result.groupBy}`} · ${result.rows.length} ranked ${isProject ? "projects" : "groups"}`
+                                                  ? `${resultLensMeta.description || resultLensMeta.title} · ${isProject ? "Projects" : `Grouped by ${groupTitle(result.groupBy, groups.find((g) => g.key === result.groupBy)?.title).toLowerCase()}`} · ${result.rows.length} ranked ${isProject ? "projects" : "groups"}`
                                                   : "Run the analyzer to generate a ranking."}
                                         </p>
                                     </div>
                                     <div className="actions">
                                         <button type="button" className="btn" disabled={!result || dirty || !result.rows.length} onClick={exportCsv}>↓ Export CSV</button>
                                         <button type="button" className="btn" disabled={!library.length || dirty} onClick={exportAllProjectsCsv}>↓ Export all projects</button>
-                                        <button type="button" className="btn gold" disabled={!canPublish} title={blockers[0] || (dirty ? "Run the analyzer first" : "")} onClick={() => setPublishOpen(true)}>Publish to all Impact Walls →</button>
+                                        <button type="button" className="btn gold" disabled={!canPublish} title={blockers[0] || (dirty ? "Run the analyzer first" : "")} onClick={() => setPublishOpen(true)}>{role === "ciel_admin" ? "Publish to all Impact Walls →" : "Publish to this university’s Impact Walls →"}</button>
                                     </div>
                                 </div>
                                 {result ? <FilterChips filters={result.filters} /> : null}
@@ -774,6 +847,7 @@ export default function NationalRankingStudio({
                                         <select id="rs-show" value={showCount} onChange={(e) => { setShowCount(e.target.value); setPage(0); }}>
                                             <option value="all">All</option>
                                             <option value="3">Top 3</option>
+                                            <option value="20">Top 20</option>
                                             <option value="10">Top 10</option>
                                             <option value="25">Top 25</option>
                                         </select>
@@ -811,8 +885,8 @@ export default function NationalRankingStudio({
                                                             )}
                                                         </td>
                                                         <td>
-                                                            <strong>{metricDisplay(r.metric, lensMeta.kind)}</strong>
-                                                            <span className="bar"><i style={{ width: `${metricBarPercent(r.metric, maxMetric, lensMeta.kind)}%` }} /></span>
+                                                            <strong>{metricDisplay(r.metric, resultLensMeta.kind)}</strong>
+                                                            <span className="bar"><i style={{ width: `${metricBarPercent(r.metric, maxMetric, resultLensMeta.kind)}%` }} /></span>
                                                         </td>
                                                         <td>{r.cii == null ? "—" : fmtNum(r.cii)} <span className="muted">/100</span></td>
                                                         <td>
@@ -833,6 +907,8 @@ export default function NationalRankingStudio({
                                                                 <><b>No approved packages yet</b>Approved projects with a locked CII appear here automatically.</>
                                                             ) : result.unreadIds.length > 0 && !result.rows.length ? (
                                                                 <><b>Not read yet</b>{result.unreadIds.length} package{result.unreadIds.length === 1 ? " is" : "s are"} waiting for the AI read. Press Run Ranking Analyzer.</>
+                                                            ) : !result.rows.length && result.eligibleIds.length === 0 && result.heldReasons.length > 0 ? (
+                                                                <><b>No eligible projects yet</b>{result.heldReasons.length} approved project{result.heldReasons.length === 1 ? " is" : "s are"} held for verification. See each one and the reason in All approved projects below.</>
                                                             ) : (
                                                                 <><b>No matches</b>Try different filters or search terms.</>
                                                             )}
@@ -845,10 +921,15 @@ export default function NationalRankingStudio({
                                 </div>
                                 <div className="toolbar" style={{ marginTop: 10 }}>
                                     <div className="smallnote">
-                                        {result && result.heldReasons.length
-                                            ? `${result.heldReasons.length} selected projects require verification and are not ranked. Pending does not mean low performance.`
-                                            : "Every selected project is included."}
-                                        {result && result.unreadIds.length ? ` ${result.unreadIds.length} are waiting for the AI read.` : ""}
+                                        {footer ? (
+                                            <>
+                                                {`${footer.gateHeld} selected project${footer.gateHeld === 1 ? "" : "s"} require verification and are not ranked. Pending does not mean low performance.`}
+                                                {footer.unread ? ` ${footer.unread} ${footer.unread === 1 ? "is" : "are"} waiting for the AI read.` : ""}
+                                                {footer.noData ? ` ${footer.noData} eligible ${footer.noData === 1 ? "project has" : "projects have"} no value for this measure${isProject ? "" : " or belong to groups too small to rank"}.` : ""}
+                                            </>
+                                        ) : (
+                                            "No ranking calculated yet."
+                                        )}
                                     </div>
                                     <div className="pagination">
                                         <button type="button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>←</button>
@@ -863,10 +944,19 @@ export default function NationalRankingStudio({
                                             {result.heldReasons.slice(0, 50).map((h) => (
                                                 <li key={h.id}><b>{h.title}</b>: {h.reason}</li>
                                             ))}
+                                            {result.heldReasons.length > 50 ? (
+                                                <li className="muted">+{result.heldReasons.length - 50} more — see All approved projects below or Export all projects.</li>
+                                            ) : null}
                                         </ul>
                                     </details>
                                 ) : null}
                             </section>
+
+                            <AllProjectsPanel
+                                packages={library}
+                                standings={standings}
+                                onOpen={(id) => setDrawer({ kind: "project", id })}
+                            />
 
                             <section className="panel">
                                 <div className="paneltitle">What will appear on each flashcard?</div>
@@ -880,9 +970,9 @@ export default function NationalRankingStudio({
                                     <div className="goldpanel" style={{ marginTop: 0 }}>
                                         <small style={{ color: "#756240" }}>CIEL PK RANKINGS · ILLUSTRATIVE FLASHCARD ENTRY</small>
                                         <div style={{ marginTop: 6 }}>
-                                            <b className="position">#1</b> <b>{nameInput || result?.name || lensMeta.title}</b>
+                                            <b className="position">#1</b> <b>{nameInput || result?.name || resultLensMeta.title}</b>
                                             <br />
-                                            <small>{isProject ? "Individual projects" : `Groups: ${result?.groupBy}`} · {lensMeta.title}</small>
+                                            <small>{isProject ? "Individual projects" : `Groups: ${groupTitle(result?.groupBy ?? "", groups.find((g) => g.key === result?.groupBy)?.title)}`} · {resultLensMeta.title}</small>
                                             <br />
                                             <span className="labelchip gold">Latest publish date and movement</span>
                                         </div>
@@ -921,6 +1011,7 @@ export default function NationalRankingStudio({
                     onProject={setWallProject}
                     rankings={wallRankings}
                     onOpen={(id) => setDrawer({ kind: "project", id })}
+                    onCreate={() => setTab("analyzer")}
                     role={role}
                 />
             )}
@@ -928,17 +1019,24 @@ export default function NationalRankingStudio({
                 <HistoryScreen
                     items={history}
                     studioBase={studioBase}
+                    lenses={lenses}
                     onShowProject={(id) => { setWallProject(id); setTab("published"); }}
+                    onCreate={() => setTab("analyzer")}
                 />
             )}
             {tab === "rules" && <RulesScreen criteria={preview?.criteria ?? run?.criteria ?? []} rubric={rubric} />}
 
             {drawer?.kind === "project" ? (
                 <PackageDrawer
+                    key={drawer.id}
+                    projectId={drawer.id}
                     row={(runRowById.get(drawer.id) as RunRow | undefined) ?? null}
                     lib={pkgById.get(drawer.id) ?? null}
                     criteria={preview?.criteria ?? run?.criteria ?? []}
                     rubric={rubric}
+                    standing={standings.get(drawer.id)}
+                    previewName={dirty ? undefined : nameInput || result?.name}
+                    studioBase={studioBase}
                     onClose={() => setDrawer(null)}
                 />
             ) : null}
@@ -946,8 +1044,8 @@ export default function NationalRankingStudio({
                 <GroupDrawer
                     row={result.rows.find((r) => r.id === drawer.id) ?? null}
                     result={result}
-                    lensTitle={lensMeta.title}
-                    kind={lensMeta.kind}
+                    lensTitle={resultLensMeta.title}
+                    kind={resultLensMeta.kind}
                     library={pkgById}
                     onOpenProject={(id) => setDrawer({ kind: "project", id })}
                     onClose={() => setDrawer(null)}
@@ -957,9 +1055,15 @@ export default function NationalRankingStudio({
                 <PublishModal
                     name={nameInput || result.name}
                     result={result}
-                    lensTitle={lensMeta.title}
+                    lensTitle={resultLensMeta.title}
+                    role={role}
+                    lastPublication={preview?.lastPublication ?? null}
                     busy={publishing}
-                    audience={role === "ciel_admin" ? "Student, Teammate, Faculty, Partner/NGO, University and CIEL PK Impact Wall (respecting access controls)" : "This university’s students, faculty and Impact Wall (respecting access controls)"}
+                    audience={
+                        role === "ciel_admin"
+                            ? "Project flashcards on the CIEL PK, Faculty, Partner / NGO and University dashboards (respecting access controls)"
+                            : "This university’s project flashcards on its University, Faculty and Partner dashboards (respecting access controls)"
+                    }
                     onCancel={() => setPublishOpen(false)}
                     onConfirm={() => void confirmPublish()}
                 />

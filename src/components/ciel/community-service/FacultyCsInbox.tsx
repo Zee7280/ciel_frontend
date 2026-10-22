@@ -12,16 +12,25 @@ export type FacultyInboxItem = {
     href: string;
     cta: string;
     studentEmail?: string | null;
+    /** With `onOpportunityReview`, opportunity rows act in place instead of linking to `href`. */
+    opportunityId?: string;
 };
+
+export type InboxReviewAction = "open" | "revise" | "reject";
 
 export function FacultyCsInbox({
     items,
     loading,
     hideEmpty = false,
+    onOpportunityReview,
+    busyOpportunityId,
 }: {
     items: FacultyInboxItem[];
     loading?: boolean;
     hideEmpty?: boolean;
+    /** Opens the Flashcard / revision / rejection dialogs on this page (same endpoints as the approvals page). */
+    onOpportunityReview?: (opportunityId: string, action: InboxReviewAction) => void;
+    busyOpportunityId?: string | null;
 }) {
     const [secure, setSecure] = useState<FacultyInboxItem | null>(null);
 
@@ -62,22 +71,30 @@ export function FacultyCsInbox({
                                     <small className="mt-0.5 block text-[11px] text-[#4f6068]">{item.meta}</small>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    <Link href={item.href} className="rounded-full bg-[#0e7d74] px-3.5 py-1.5 text-[11px] font-extrabold text-white">
-                                        {item.cta}
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecure(item)}
-                                        className="rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]"
-                                    >
-                                        ✉ Secure Review Link
-                                    </button>
-                                    <Link href={item.href} className="rounded-full bg-[#f4e3b8] px-3 py-1.5 text-[11px] font-extrabold text-[#7a4b00]">
-                                        ✏ Revision
-                                    </Link>
-                                    <Link href={item.href} className="rounded-full bg-[#f8d4d4] px-3 py-1.5 text-[11px] font-extrabold text-[#9a2b2b]">
-                                        ✕ Reject
-                                    </Link>
+                                    {onOpportunityReview && item.kind === "opp" && item.opportunityId ? (
+                                        <InPlaceReviewButtons
+                                            item={item}
+                                            opportunityId={item.opportunityId}
+                                            busy={busyOpportunityId === item.opportunityId}
+                                            onReview={onOpportunityReview}
+                                            onSecure={() => setSecure(item)}
+                                        />
+                                    ) : (
+                                        <>
+                                            <Link href={item.href} className={INBOX_BTN.primary}>
+                                                {item.cta}
+                                            </Link>
+                                            <button type="button" onClick={() => setSecure(item)} className={INBOX_BTN.secure}>
+                                                ✉ Secure Review Link
+                                            </button>
+                                            <Link href={item.href} className={INBOX_BTN.revise}>
+                                                ✏ Revision
+                                            </Link>
+                                            <Link href={item.href} className={INBOX_BTN.reject}>
+                                                ✕ Reject
+                                            </Link>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -85,6 +102,44 @@ export function FacultyCsInbox({
                 )}
             </div>
             {secure ? <SecureReviewModal item={secure} onClose={() => setSecure(null)} /> : null}
+        </>
+    );
+}
+
+const INBOX_BTN = {
+    primary: "rounded-full bg-[#0e7d74] px-3.5 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-60",
+    secure: "rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]",
+    revise: "rounded-full bg-[#f4e3b8] px-3 py-1.5 text-[11px] font-extrabold text-[#7a4b00] disabled:opacity-60",
+    reject: "rounded-full bg-[#f8d4d4] px-3 py-1.5 text-[11px] font-extrabold text-[#9a2b2b] disabled:opacity-60",
+};
+
+function InPlaceReviewButtons({
+    item,
+    opportunityId,
+    busy,
+    onReview,
+    onSecure,
+}: {
+    item: FacultyInboxItem;
+    opportunityId: string;
+    busy: boolean;
+    onReview: (opportunityId: string, action: InboxReviewAction) => void;
+    onSecure: () => void;
+}) {
+    return (
+        <>
+            <button type="button" disabled={busy} onClick={() => onReview(opportunityId, "open")} className={INBOX_BTN.primary}>
+                {busy ? "Approving…" : item.cta}
+            </button>
+            <button type="button" onClick={onSecure} className={INBOX_BTN.secure}>
+                ✉ Secure Review Link
+            </button>
+            <button type="button" disabled={busy} onClick={() => onReview(opportunityId, "revise")} className={INBOX_BTN.revise}>
+                ✏ Revision
+            </button>
+            <button type="button" disabled={busy} onClick={() => onReview(opportunityId, "reject")} className={INBOX_BTN.reject}>
+                ✕ Reject
+            </button>
         </>
     );
 }

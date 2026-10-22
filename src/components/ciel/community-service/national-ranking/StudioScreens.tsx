@@ -7,9 +7,13 @@ import { FilterChips } from "./StudioParts";
 import {
     fmtDate,
     fmtNum,
+    metricDisplay,
+    standingLabel,
     type CriterionMeta,
+    type LensMeta,
     type LibraryPackage,
     type ProjectRanking,
+    type ProjectStanding,
     type PublicationSummary,
     type RunPayload,
     type StudioRole,
@@ -115,7 +119,7 @@ export function PackagesScreen({
             <div className="sectiontitle" style={{ marginTop: 0 }}>
                 <div>
                     <h2>Combined Project Package Library</h2>
-                    <p>Readiness checks before a project can be included in rankings.</p>
+                    <p>Readiness checks before the Super Admin can include a project in rankings.</p>
                 </div>
                 <button type="button" className="btn primary" onClick={onAnalyze}>Open Ranking Analyzer →</button>
             </div>
@@ -124,7 +128,7 @@ export function PackagesScreen({
             </div>
             <section className="panel">
                 <div className="toolbar" style={{ marginBottom: 10 }}>
-                    <input className="searchfield" style={{ maxWidth: 320 }} placeholder="Search project, university or ID" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search packages" />
+                    <input className="searchfield" style={{ maxWidth: 320 }} placeholder="Search title, university or report ID" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search packages" />
                     <div className="actions">
                         <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Package status">
                             <option value="all">All packages</option>
@@ -150,12 +154,115 @@ export function PackagesScreen({
                                     <td><button type="button" className="btn sm" onClick={() => onOpen(p.id)}>Open →</button></td>
                                 </tr>
                             ))}
-                            {!list.length ? <tr><td colSpan={6}><div className="empty"><b>No packages</b>Nothing matches this search.</div></td></tr> : null}
+                            {!list.length ? (
+                                <tr><td colSpan={6}><div className="empty"><b>No packages</b>{packages.length ? "Nothing matches this search." : "Approved projects with a locked CII appear here automatically."}</div></td></tr>
+                            ) : null}
                         </tbody>
                     </table>
                 </div>
             </section>
         </>
+    );
+}
+
+function standingTone(st: ProjectStanding | undefined): "" | "gray" | "red" | "gold" {
+    if (st?.kind === "ranked" || st?.kind === "in_group") return "gold";
+    if (st?.kind === "held") return "red";
+    if (st?.kind === "unread" || st?.kind === "outside") return "gray";
+    return "";
+}
+
+/**
+ * Every approved package on the Analyzer itself — not only the ranked rows — so admins see which
+ * projects are in, which are outside the current filters, and exactly why a held one is held.
+ */
+export function AllProjectsPanel({
+    packages,
+    standings,
+    onOpen,
+}: {
+    packages: LibraryPackage[];
+    standings: Map<string, ProjectStanding>;
+    onOpen: (id: string) => void;
+}) {
+    const [text, setText] = useState("");
+    const [status, setStatus] = useState<"all" | "ranked" | "eligible" | "outside" | "held">("all");
+    const list = useMemo(() => {
+        const rankOf = (id: string) => {
+            const st = standings.get(id);
+            return st?.kind === "ranked" || st?.kind === "in_group" ? st.rank : Infinity;
+        };
+        return packages
+                .filter((p) => {
+                    const kind = standings.get(p.id)?.kind;
+                    if (status === "ranked" && kind !== "ranked" && kind !== "in_group") return false;
+                    if (status === "eligible" && kind !== "eligible" && kind !== "unread") return false;
+                    if (status === "outside" && kind !== "outside") return false;
+                    if (status === "held" && kind !== "held") return false;
+                    return `${p.title} ${p.university} ${p.department} ${p.id}`.toLowerCase().includes(text.toLowerCase());
+                })
+                .sort((a, b) => rankOf(a.id) - rankOf(b.id));
+    }, [packages, standings, text, status]);
+    const held = packages.filter((p) => !p.ready).length;
+    return (
+        <section className="panel">
+            <div className="paneltitle">
+                All approved projects <span className="labelchip gray">{packages.length} in cohort</span>
+                {held ? <span className="labelchip red">{held} held</span> : null}
+            </div>
+            <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 0 }}>
+                Every approved package, ranked or not. A held project is waiting for missing or unreadable material — it is never
+                given a low rank. Open a package to see its four parts.
+            </p>
+            <div className="toolbar" style={{ margin: "10px 0" }}>
+                <input
+                    className="searchfield"
+                    style={{ maxWidth: 320 }}
+                    placeholder="Search project, university, department or ID"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    aria-label="Search all approved projects"
+                />
+                <div className="actions">
+                    <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Project standing">
+                        <option value="all">All projects</option>
+                        <option value="ranked">Ranked / in a ranked group</option>
+                        <option value="eligible">Eligible, not ranked</option>
+                        <option value="outside">Outside current filters</option>
+                        <option value="held">Held for verification</option>
+                    </select>
+                    <span className="smallnote">{list.length} shown</span>
+                </div>
+            </div>
+            <div className="tablewrap">
+                <table className="table">
+                    <thead>
+                        <tr><th>Project</th><th>University / department</th><th>SDG</th><th>Approved CII</th><th>Standing</th><th>Package</th></tr>
+                    </thead>
+                    <tbody>
+                        {list.map((p) => {
+                            const st = standings.get(p.id);
+                            return (
+                                <tr key={p.id}>
+                                    <td><b>{p.title}</b><small className="pmeta">{p.id.slice(0, 8)} · {fmtDate(p.date)}</small></td>
+                                    <td>{p.university || "—"}<small className="pmeta">{p.department}</small></td>
+                                    <td>{p.sdg ? <span className="labelchip gray">{p.sdg}</span> : "—"}</td>
+                                    <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b></td>
+                                    <td>
+                                        <span className={`labelchip ${standingTone(st)}`}>{standingLabel(st)}</span>
+                                        {!p.ready && p.reason ? <small className="pmeta">{p.reason}</small> : null}
+                                    </td>
+                                    <td><button type="button" className="btn sm" onClick={() => onOpen(p.id)}>Open 4-part package →</button></td>
+                                </tr>
+                            );
+                        })}
+                        {!list.length ? (
+                            <tr><td colSpan={6}><div className="empty"><b>No projects</b>{packages.length ? "Nothing matches this search." : "Approved projects appear here automatically."}</div></td></tr>
+                        ) : null}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     );
 }
 
@@ -168,6 +275,7 @@ export function PublishedScreen({
     onProject,
     rankings: projectRankings,
     onOpen,
+    onCreate,
     role,
 }: {
     packages: LibraryPackage[];
@@ -175,6 +283,7 @@ export function PublishedScreen({
     onProject: (id: string) => void;
     rankings: ProjectRanking[];
     onOpen: (id: string) => void;
+    onCreate: () => void;
     role: StudioRole;
 }) {
     const [viewer, setViewer] = useState<(typeof VIEWERS)[number]>(role === "ciel_admin" ? "CIEL PK Super Admin" : "University Admin");
@@ -204,16 +313,25 @@ export function PublishedScreen({
             <div className="sectiontitle" style={{ marginTop: 0 }}>
                 <div>
                     <h2>Published Results on My Impact Wall</h2>
-                    <p>The same named rankings are projected to the relevant project flashcards, preserving each ranking’s own label, filters, position and date.</p>
+                    <p>
+                        The same named rankings are projected to the relevant project flashcards across stakeholder dashboards,
+                        preserving each ranking’s own label, filters, position and date.
+                    </p>
                 </div>
                 <div className="actions">
-                    <select value={project.id} onChange={(e) => onProject(e.target.value)} aria-label="Project" style={{ maxWidth: 280, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
-                        {packages.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    <label className="smallnote" htmlFor="rs-wall-project">Project</label>
+                    <select id="rs-wall-project" value={project.id} onChange={(e) => onProject(e.target.value)} style={{ maxWidth: 300, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
+                        {packages.map((p) => <option key={p.id} value={p.id}>{p.title} · {p.id.slice(0, 8)}</option>)}
                     </select>
-                    <select value={viewer} onChange={(e) => setViewer(e.target.value as typeof viewer)} aria-label="Preview as" style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
+                    <label className="smallnote" htmlFor="rs-wall-viewer">Preview as</label>
+                    <select id="rs-wall-viewer" value={viewer} onChange={(e) => setViewer(e.target.value as typeof viewer)} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
                         {VIEWERS.map((v) => <option key={v}>{v}</option>)}
                     </select>
+                    <button type="button" className="btn primary" onClick={onCreate}>Create another ranking →</button>
                 </div>
+            </div>
+            <div className="chips" style={{ marginTop: 0 }}>
+                <span className="labelchip">One ranking record · synchronized views</span>
             </div>
             <div className="wallgrid">
                 <article className="flashcard">
@@ -270,20 +388,41 @@ export function PublishedScreen({
                     </div>
                 </article>
             </div>
+            <section className="panel" style={{ marginTop: 14 }}>
+                <div className="paneltitle">Ranking publication rules</div>
+                <p className="smallnote">
+                    The original CII score and CII badge stay unchanged. Ranking chips are additional recognitions, each with its own
+                    label, filters, position and date. Partner / NGO views never gain access to restricted or confidential files.
+                    Students see their approved certificates separately.
+                </p>
+            </section>
         </>
     );
 }
 
 // ------------------------------------------------------------------------------------ history
+const MOVEMENT_LEGEND: Array<[string, string]> = [
+    ["▲ Rising", "Better position in a comparable ranking using the same method and cohort definition."],
+    ["▼ Falling", "Lower position in the same comparable ranking."],
+    ["→ Unchanged", "The published position stayed the same."],
+    ["New / different cohort", "Do not claim a rise or fall when the filters, period, method or cohort changed."],
+    ["Never erase old results", "New publications append an auditable snapshot. The Impact Wall highlights the latest position for each named comparison."],
+];
+
 export function HistoryScreen({
     items,
     studioBase,
+    lenses,
     onShowProject,
+    onCreate,
 }: {
     items: PublicationSummary[];
     studioBase: string;
+    lenses: LensMeta[];
     onShowProject: (projectId: string) => void;
+    onCreate: () => void;
 }) {
+    const kindOf = (lens: string) => lenses.find((l) => l.key === lens)?.kind;
     const [openId, setOpenId] = useState<string | null>(null);
     const [detail, setDetail] = useState<PublicationSummary | null>(null);
     useEffect(() => {
@@ -312,8 +451,11 @@ export function HistoryScreen({
                     <h2>Ranking History &amp; Performance</h2>
                     <p>Every published ranking is retained, with its exact filters and each project’s movement since the previous publication.</p>
                 </div>
+                <button type="button" className="btn primary" onClick={onCreate}>Create new ranking →</button>
             </div>
+            <div className="buildergrid" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
             <section className="panel">
+                <div className="paneltitle">Saved ranking views <span className="labelchip gray">{items.length}</span></div>
                 {items.length ? (
                     items.map((p) => (
                         <div key={p.id}>
@@ -328,6 +470,9 @@ export function HistoryScreen({
                                         {p.lensTitle} · {p.rowCount} ranked results · {p.eligibleCount} contributing projects
                                         {p.top.length ? ` · Top: ${p.top.map((t) => `#${t.rank} ${t.label}`).join(" · ")}` : ""}
                                     </small>
+                                    {p.revision > 1 && !p.cohortComparable ? (
+                                        <span className="labelchip gray">Different cohort — movement not compared</span>
+                                    ) : null}
                                 </div>
                                 <button type="button" className="btn sm" onClick={() => setOpenId(openId === p.id ? null : p.id)}>{openId === p.id ? "Hide" : "View"}</button>
                             </div>
@@ -340,7 +485,7 @@ export function HistoryScreen({
                                                 <tr key={r.id}>
                                                     <td><span className="rank">#{r.rank}</span></td>
                                                     <td><b>{r.label}</b><small className="pmeta">{r.projectCount} project{r.projectCount === 1 ? "" : "s"}</small></td>
-                                                    <td>{fmtNum(r.metric, 2)}</td>
+                                                    <td>{metricDisplay(r.metric, kindOf(p.lens))}</td>
                                                     <td><span className={`movement ${r.movement}`}>{movementLabel(r.movement, r.previousRank, r.rank)}</span></td>
                                                     <td>{r.projectIds[0] ? <button type="button" className="rowlink" onClick={() => onShowProject(r.projectIds[0])}>On Impact Wall →</button> : null}</td>
                                                 </tr>
@@ -355,6 +500,18 @@ export function HistoryScreen({
                     <div className="empty"><b>No rankings published</b>Publish a preview from the Ranking Analyzer to start the history.</div>
                 )}
             </section>
+            <section className="panel">
+                <div className="paneltitle">What the movement symbols mean</div>
+                {MOVEMENT_LEGEND.map(([t, d]) => (
+                    <div className="audititem" key={t}>
+                        <div>
+                            <b>{t}</b>
+                            <small>{d}</small>
+                        </div>
+                    </div>
+                ))}
+            </section>
+            </div>
         </>
     );
 }

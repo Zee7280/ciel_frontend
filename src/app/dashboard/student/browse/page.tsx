@@ -458,7 +458,8 @@ export default function StudentBrowseOpportunitiesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
     const [sortMode, setSortMode] = useState<"live" | "newest" | "oldest">("live");
-    const [feedTab, setFeedTab] = useState<BrowseFeedTab>("all");
+    // Open on Live: students land on listings they can still join, not the expired backlog.
+    const [feedTab, setFeedTab] = useState<BrowseFeedTab>("live");
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
     const [hoursLogged, setHoursLogged] = useState(0);
     const [hoursTarget, setHoursTarget] = useState(16);
@@ -601,7 +602,7 @@ export default function StudentBrowseOpportunitiesPage() {
         setSearchQuery("");
         setOnlyOpenSeats(false);
         setSortMode("live");
-        setFeedTab("all");
+        setFeedTab("live");
         setPathTab("all");
         setStatusFilter("all");
         setDepartmentFilter("all");

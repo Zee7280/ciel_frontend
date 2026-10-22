@@ -93,14 +93,15 @@ const fields = (over = {}) => ({
     prerequisites: "Follow safeguarding rules.",
     resources: "To be confirmed.",
     feasibility_warning: "10 × 16 = 160 student-hours.",
-    primary_sdg: { sdg_id: "4", target_id: "4.a", why: "Better classrooms.", local_metric: "Classrooms improved" },
-    supporting_sdg: { sdg_id: "12", target_id: "12.9", why: "Reuse furniture." },
+    primary_sdg: { sdg_id: "4", target_id: "4.a", indicator_id: "4.a.1", why: "Better classrooms.", local_metric: "Classrooms improved" },
+    supporting_sdg: { sdg_id: "12", target_id: "12.9", indicator_id: "12.9.1", why: "Reuse furniture." },
     ...over,
 });
 
 const opts = {
     cityOptions: ["Karachi", "Lahore", "Islamabad"],
     sdgTargetExists: (sdg, target) => ({ 4: ["4.a", "4.1"], 12: ["12.5"] })[sdg]?.includes(target) ?? false,
+    sdgIndicatorExists: (sdg, target, ind) => ({ "4.a": ["4.a.1"], "4.1": ["4.1.1"], "12.5": ["12.5.1"] })[target]?.includes(ind) ?? false,
     teamModeChoosable: true,
 };
 
@@ -117,6 +118,7 @@ test("fills the drafted text and the student's own facts", () => {
     assert.equal(out.teamMode, "private_team");
     assert.equal(out.sdg, "4");
     assert.equal(out.target, "4.a");
+    assert.equal(out.indicator, "4.a.1");
     assert.equal(out.subIndicator, "Classrooms improved");
     assert.equal(out.objectives.beneficiariesCount, "30");
     assert.deepEqual(out.objectives.beneficiariesType, ["Children"]);
@@ -144,8 +146,28 @@ test("drops SDG targets missing from the catalog and keeps unknown-city places a
     const out = applyAiDraft(blankForm(), fields(), inputs({ place: "Village near Murree" }), opts);
     assert.equal(out.secondarySdg, "12");
     assert.equal(out.secondaryTarget, "", "12.9 is not in the catalog");
+    assert.equal(out.secondaryIndicator, "", "no indicator without a catalog target");
     assert.equal(out.location.city, "");
     assert.equal(out.location.venue, "Village near Murree");
+});
+
+test("fills the supporting SDG's target and indicator when both are in the catalog", () => {
+    const out = applyAiDraft(
+        blankForm(),
+        fields({ supporting_sdg: { sdg_id: "12", target_id: "12.5", indicator_id: "12.5.1", why: "Reuse." } }),
+        inputs(),
+        opts,
+    );
+    assert.equal(out.secondaryTarget, "12.5");
+    assert.equal(out.secondaryIndicator, "12.5.1");
+    const wrongIndicator = applyAiDraft(
+        blankForm(),
+        fields({ primary_sdg: { sdg_id: "4", target_id: "4.1", indicator_id: "4.a.1", why: "x", local_metric: "" } }),
+        inputs(),
+        opts,
+    );
+    assert.equal(wrongIndicator.target, "4.1");
+    assert.equal(wrongIndicator.indicator, "");
 });
 
 test("keeps what the student already wrote when the AI leaves a field empty", () => {

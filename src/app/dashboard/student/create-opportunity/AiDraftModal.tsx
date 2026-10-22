@@ -117,6 +117,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                         </label>
                         <input
                             id="ai-title"
+                            className="co-input"
                             type="text"
                             maxLength={200}
                             placeholder="e.g. Classroom Upgradation"
@@ -130,6 +131,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                         </label>
                         <textarea
                             id="ai-idea"
+                            className="co-input min-h-[120px] resize-y leading-relaxed"
                             rows={5}
                             maxLength={4000}
                             spellCheck
@@ -148,6 +150,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-place"
+                                className="co-input"
                                 type="text"
                                 maxLength={200}
                                 placeholder="e.g. SOS Village, Lahore"
@@ -161,6 +164,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-benef"
+                                className="co-input"
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="e.g. 30"
@@ -214,6 +218,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-seats"
+                                className="co-input"
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="e.g. 10"
@@ -227,6 +232,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-hours"
+                                className="co-input"
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="e.g. 16"
@@ -240,6 +246,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-start"
+                                className="co-input"
                                 type="date"
                                 value={inputs.startDate}
                                 max={inputs.endDate || undefined}
@@ -252,6 +259,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             </label>
                             <input
                                 id="ai-end"
+                                className="co-input"
                                 type="date"
                                 value={inputs.endDate}
                                 min={inputs.startDate || undefined}
@@ -265,6 +273,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                         </label>
                         <input
                             id="ai-partner"
+                            className="co-input"
                             type="text"
                             maxLength={200}
                             placeholder="e.g. SOS Children's Villages Pakistan"

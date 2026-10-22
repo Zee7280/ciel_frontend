@@ -19,6 +19,15 @@ import type { FacultyApprovalAction } from "@/utils/facultyApprovals";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
 import { approvalActionClass } from "@/components/ciel/community-service/OpportunityApprovalCard";
 
+/** Same rule as /dashboard/partner/verify: an executing-org token that is not yet confirmed. */
+function needsExecutingOrgPortalConfirm(opp: Record<string, unknown> | null): boolean {
+    if (!opp) return false;
+    const tok = opp.execution_verification_token ?? opp.executionVerificationToken;
+    const hasTok = typeof tok === "string" && tok.trim().length > 0;
+    const verified = opp.execution_verified === true || opp.executionVerified === true;
+    return hasTok && !verified;
+}
+
 /** Same faculty/partner approval endpoints as /dashboard/faculty/approvals — UI only stays on Review Opportunities. */
 export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
     const [detailOpen, setDetailOpen] = useState(false);
@@ -159,7 +168,17 @@ export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
                 closeRejectDialog();
                 onChanged?.();
             } else {
-                toast.error("Failed to reject project");
+                let message =
+                    feedbackMode === "revise" ? "Could not send the revision request" : "Could not reject the opportunity";
+                try {
+                    const errorBody = (await res?.json()) as { message?: unknown };
+                    if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
+                        message = errorBody.message.trim();
+                    }
+                } catch {
+                    /* ignore */
+                }
+                toast.error(message);
             }
         } catch {
             toast.error("Error connecting to server");
@@ -183,10 +202,10 @@ export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
             >
                 <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Student opportunity</DialogTitle>
+                        <DialogTitle>{detailActionKind === "partner_ack" ? "Opportunity Flashcard" : "Student opportunity"}</DialogTitle>
                         <DialogDescription>
                             Review the flashcard and full proposal here. Approve, request revision, or reject without leaving
-                            Review Opportunities.
+                            this page.
                         </DialogDescription>
                     </DialogHeader>
                     {detailLoading ? (
@@ -196,6 +215,19 @@ export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
                     ) : detailRecord ? (
                         <>
                             <FacultyOpportunityDetailBody d={detailRecord} />
+                            {detailActionId &&
+                            detailActionKind === "partner_ack" &&
+                            needsExecutingOrgPortalConfirm(detailRecord) ? (
+                                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
+                                    This listing also asks the executing organization to confirm execution details.{" "}
+                                    <a
+                                        href={`/dashboard/partner/verify?tab=pending&opportunity=${encodeURIComponent(detailActionId)}`}
+                                        className="font-bold underline"
+                                    >
+                                        Confirm execution details →
+                                    </a>
+                                </p>
+                            ) : null}
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
                                     <Button
@@ -282,6 +314,22 @@ export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
     };
 }
 
+/**
+ * NGO / partner side: the same Flashcard, revision and rejection dialogs, always through the partner
+ * approval endpoints (`partner_ack`) — what /dashboard/partner/verify uses — without leaving the hub.
+ */
+export function usePartnerOpportunityReview(onChanged?: () => void) {
+    const actions = useFacultyOpportunityReviewActions(onChanged);
+    const review = (opportunityId: string, action: "open" | "revise" | "reject") => {
+        if (action === "open") {
+            void actions.openOpportunityDetail(opportunityId, { showActions: true, approvalAction: "partner_ack" });
+        } else {
+            actions.openRejectDialog(opportunityId, "partner_ack", action === "revise" ? "revise" : "reject_permanent");
+        }
+    };
+    return { ...actions, review };
+}
+
 export function FacultyPendingReviewButtons({
     opportunityId,
     approvalAction = "faculty_review",
@@ -289,6 +337,7 @@ export function FacultyPendingReviewButtons({
     onRevise,
     onReject,
     onOpenFlashcard,
+    approveLabel = "View Flashcard & Approve",
 }: {
     opportunityId: string;
     approvalAction?: FacultyApprovalAction;
@@ -296,6 +345,8 @@ export function FacultyPendingReviewButtons({
     onRevise: (id: string, action: FacultyApprovalAction) => void;
     onReject: (id: string, action: FacultyApprovalAction) => void;
     onOpenFlashcard: (id: string, action: FacultyApprovalAction) => void;
+    /** e.g. "View Flashcard & Acknowledge" for a faculty-created listing on the partner side. */
+    approveLabel?: string;
 }) {
     const busy = approveSubmittingId === opportunityId;
     return (
@@ -306,7 +357,7 @@ export function FacultyPendingReviewButtons({
                 disabled={busy}
                 onClick={() => onOpenFlashcard(opportunityId, approvalAction)}
             >
-                {busy ? "Approving…" : "View Flashcard & Approve"}
+                {busy ? "Approving…" : approveLabel}
             </button>
             <button
                 type="button"

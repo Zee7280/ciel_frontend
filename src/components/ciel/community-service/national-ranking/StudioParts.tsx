@@ -1,18 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { authenticatedFetch } from "@/utils/api";
 import {
     FILTER_TITLES,
     fmtDate,
     fmtNum,
     metricDisplay,
     prettyFilterValue,
+    standingLabel,
     type CriterionMeta,
     type LensMeta,
     type LibraryPackage,
+    type ProjectRanking,
+    type ProjectStanding,
     type RunRow,
     type StudioFilters,
     type StudioResult,
+    type StudioRole,
     type StudioRow,
 } from "./studio-types";
 
@@ -35,19 +40,43 @@ export function FilterChips({ filters }: { filters: StudioFilters }) {
 
 /** Slide-over with the four parts of one approved package and the evidence-based assessment. */
 export function PackageDrawer({
+    projectId,
     row,
     lib,
     criteria,
     rubric,
+    standing,
+    previewName,
+    studioBase,
     onClose,
 }: {
+    projectId: string;
     row: RunRow | null;
     lib: LibraryPackage | null;
     criteria: CriterionMeta[];
     rubric: string;
+    /** Where this project stands in the preview on screen. */
+    standing?: ProjectStanding;
+    previewName?: string;
+    studioBase: string;
     onClose: () => void;
 }) {
-    const [tab, setTab] = useState<"package" | "assessment">("package");
+    const [tab, setTab] = useState<"package" | "assessment" | "rankings">("package");
+    const [published, setPublished] = useState<ProjectRanking[] | null>(null);
+    useEffect(() => {
+        if (tab !== "rankings" || published !== null) return;
+        let cancelled = false;
+        (async () => {
+            const res = await authenticatedFetch(`${studioBase}/project/${encodeURIComponent(projectId)}`);
+            const json = await res?.json().catch(() => null);
+            if (cancelled) return;
+            const rows = res?.ok ? ((json?.data ?? json) as ProjectRanking[]) : [];
+            setPublished(Array.isArray(rows) ? rows : []);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, published, studioBase, projectId]);
     const title = row?.title ?? lib?.title ?? "Project package";
     const university = row?.university ?? lib?.university ?? "—";
     const cii = row?.cii ?? lib?.cii ?? null;
@@ -69,16 +98,17 @@ export function PackageDrawer({
                 <div className="tabrow">
                     <button type="button" className={tab === "package" ? "active" : ""} onClick={() => setTab("package")}>Combined package</button>
                     <button type="button" className={tab === "assessment" ? "active" : ""} onClick={() => setTab("assessment")}>Evidence-based assessment</button>
+                    <button type="button" className={tab === "rankings" ? "active" : ""} onClick={() => setTab("rankings")}>Ranking results</button>
                 </div>
                 <div className="drawerbody">
                     {tab === "package" ? (
                         <>
                             <div className="source-detail">
-                                <h4>01 · Flashcard <span className="labelchip">Present</span></h4>
+                                <h4>01 · Flashcard <span className="labelchip">Approved record</span></h4>
                                 <p>{title} · {lib?.sdg || "SDG —"} · {university}{lib?.date ? ` · ${fmtDate(lib.date)}` : ""}</p>
                             </div>
                             <div className="source-detail">
-                                <h4>02 · Full detailed report <span className="labelchip">9 sections</span></h4>
+                                <h4>02 · Full detailed report <span className={`labelchip ${ready ? "" : "gray"}`}>{ready ? "Package check passed" : "See check result below"}</span></h4>
                                 <p>Project context, needs, activities and outputs, outcomes, verified participation, SDG mapping, resources, partner coordination, learning and sustainability. The server reads the full report, not only the flashcard.</p>
                             </div>
                             <div className="source-detail">
@@ -88,7 +118,7 @@ export function PackageDrawer({
                             <div className="source-detail">
                                 <h4>04 · Evidence manifest and originals <span className={`labelchip ${ready ? "" : "red"}`}>{ready ? "Passed" : "Needs verification"}</span></h4>
                                 <p>{ready ? "Every required original passed the server-side access check." : row?.reason || lib?.reason || "A required original could not be verified."}</p>
-                                <ul>{parts.map((p) => <li key={p}>{p}</li>)}</ul>
+                                <p className="smallnote" style={{ marginTop: 6 }}>Package parts checked by the server: {parts.join(" · ")}</p>
                             </div>
                             {row?.evidenceRead ? (
                                 <div className="source-detail">
@@ -104,6 +134,37 @@ export function PackageDrawer({
                             ) : null}
                             {!ready ? <div className="callout">This project is held for verification, never given an artificially low rank.</div> : null}
                         </>
+                    ) : tab === "rankings" ? (
+                        <>
+                            <div className="source-detail">
+                                <h4>In the preview on screen</h4>
+                                <p>
+                                    <span className={`labelchip ${standing?.kind === "held" ? "red" : standing?.kind === "ranked" || standing?.kind === "in_group" ? "gold" : "gray"}`}>
+                                        {standingLabel(standing)}
+                                    </span>
+                                    {previewName ? <> · {previewName}</> : null}
+                                </p>
+                            </div>
+                            <div className="source-detail">
+                                <h4>Published rankings that include this project</h4>
+                                {published === null ? (
+                                    <p>Loading…</p>
+                                ) : published.length ? (
+                                    published.map((r) => (
+                                        <div className="flashrank" key={`${r.publicationId}:${r.rank}:${r.label}`}>
+                                            <b><span className="position">#{r.rank}</span> {r.name}</b>
+                                            <small>
+                                                {r.groupBy === "project" ? "Project position" : `Group position: ${r.groupBy} · ${r.label}`} · {r.lensTitle} · of {r.of} · Published {fmtDate(r.publishedAt)}
+                                                {r.revision > 1 ? ` · Update ${r.revision}` : ""}
+                                            </small>
+                                            <FilterChips filters={r.filters} />
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p>No published ranking includes this project yet.</p>
+                                )}
+                            </div>
+                        </>
                     ) : row?.evaluation && row.scoreBreakdown ? (
                         <>
                             <div className="source-detail">
@@ -111,7 +172,7 @@ export function PackageDrawer({
                                 <p>{row.evaluation.summary}</p>
                             </div>
                             <div className="source-detail">
-                                <h4>Excellence {row.scoreBreakdown.total.toFixed(2)} / 100 {row.rank ? <span className="labelchip">Official rank #{row.rank}</span> : null}</h4>
+                                <h4>Excellence {row.scoreBreakdown.total.toFixed(2)} / 100 {row.rank ? <span className="labelchip" title="From the official excellence run, not the Studio preview">Official run rank #{row.rank}</span> : null}</h4>
                                 <div className="criteriongroup">
                                     {(criteria.length ? criteria : Object.keys(row.scoreBreakdown.criteria).map((k) => ({ key: k, title: k, weight: 0 }))).map((c) => {
                                         const j = row.evaluation?.criteria?.[c.key];
@@ -223,6 +284,8 @@ export function PublishModal({
     result,
     lensTitle,
     audience,
+    role,
+    lastPublication,
     busy,
     onCancel,
     onConfirm,
@@ -231,6 +294,9 @@ export function PublishModal({
     result: StudioResult;
     lensTitle: string;
     audience: string;
+    role: StudioRole;
+    /** The latest publication of this exact ranking, if any (publishing again creates the next update). */
+    lastPublication: { revision: number; publishedAt: string } | null;
     busy: boolean;
     onCancel: () => void;
     onConfirm: () => void;
@@ -242,13 +308,19 @@ export function PublishModal({
     return (
         <div className="modalbg open" onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
             <div className="modal" role="dialog" aria-label="Publish ranking">
-                <div className="eyebrow" style={{ color: "var(--green)" }}>SUPER ADMIN PUBLICATION</div>
-                <h2>Publish this ranking?</h2>
-                <p>This writes an immutable ranking snapshot with its exact filters and shows it on the relevant My Impact Walls. Approved CII scores are never changed. Publishing the same ranking again creates the next update and records movement.</p>
+                <div className="eyebrow" style={{ color: "var(--green)" }}>{role === "ciel_admin" ? "SUPER ADMIN PUBLICATION" : "UNIVERSITY PUBLICATION"}</div>
+                <h2>Publish this ranking to Impact Walls?</h2>
+                <p>
+                    You are publishing one named ranking view as an immutable snapshot with its exact filters. Existing rankings,
+                    approved CII scores and original badges remain intact.
+                    {lastPublication
+                        ? ` This will be update ${lastPublication.revision + 1} (last published ${fmtDate(lastPublication.publishedAt)}); movement is recorded against it.`
+                        : " This is the first publication of this ranking."}
+                </p>
                 <div className="summarybox">
                     <div><b>Ranking:</b> {name}</div>
                     <div><b>Compared:</b> {result.groupBy === "project" ? "Individual projects" : `Groups by ${result.groupBy}`}</div>
-                    <div><b>Measure:</b> {lensTitle}</div>
+                    <div><b>Metric:</b> {lensTitle}</div>
                     <div><b>Filters:</b> {filters || "All eligible approved projects"}</div>
                     <div><b>Included:</b> {result.eligibleIds.length} complete packages · {result.heldIds.length} on hold</div>
                     <div><b>Top results:</b> {top || "—"}</div>
@@ -256,7 +328,7 @@ export function PublishModal({
                 </div>
                 <div className="actions" style={{ justifyContent: "flex-end" }}>
                     <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
-                    <button type="button" className="btn primary" disabled={busy} onClick={onConfirm}>{busy ? "Publishing…" : "Publish ranking"}</button>
+                    <button type="button" className="btn primary" disabled={busy} onClick={onConfirm}>{busy ? "Publishing…" : "Confirm publication →"}</button>
                 </div>
             </div>
         </div>

@@ -15,6 +15,7 @@ import OpportunityApprovalCard, {
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
+import { FacultyPendingReviewButtons, usePartnerOpportunityReview } from "@/components/faculty/FacultyOpportunityReviewActions";
 import {
     mapCommunityPipelineRow,
     mergeCommunityLiveDeck,
@@ -277,6 +278,10 @@ export default function PartnerCommunityServiceHub() {
     const [pipeline, setPipeline] = useState<CommunityPipelineRow[]>([]);
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
+    /** Bumped after an approve / revision / rejection so the queues refresh in place. */
+    const [reloadKey, setReloadKey] = useState(0);
+    /** Flashcard / revision / rejection open here, through the partner approval endpoints. */
+    const partnerReview = usePartnerOpportunityReview(() => setReloadKey((k) => k + 1));
     const [innerTab, setInnerTab] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
 
@@ -334,7 +339,7 @@ export default function PartnerCommunityServiceHub() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadKey]);
 
     const currentUserId = getStoredCurrentUserId();
     const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
@@ -511,24 +516,34 @@ export default function PartnerCommunityServiceHub() {
                                             </small>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Link
-                                                href={`${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`}
-                                                className="rounded-full bg-[#0e7d74] px-3.5 py-1.5 text-[11px] font-extrabold text-white"
+                                            <button
+                                                type="button"
+                                                disabled={partnerReview.approveSubmittingId === row.id}
+                                                onClick={() => partnerReview.review(row.id, "open")}
+                                                className="rounded-full bg-[#0e7d74] px-3.5 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-60"
                                             >
-                                                View Flashcard & Approve
-                                            </Link>
-                                            <Link
-                                                href={`${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`}
-                                                className="rounded-full bg-[#f4e3b8] px-3 py-1.5 text-[11px] font-extrabold text-[#7a4b00]"
+                                                {partnerReview.approveSubmittingId === row.id
+                                                    ? "Approving…"
+                                                    : lower(row.created_by_role ?? row.creator_role) === "faculty"
+                                                      ? "View Flashcard & Acknowledge"
+                                                      : "View Flashcard & Approve"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={partnerReview.approveSubmittingId === row.id}
+                                                onClick={() => partnerReview.review(row.id, "revise")}
+                                                className="rounded-full bg-[#f4e3b8] px-3 py-1.5 text-[11px] font-extrabold text-[#7a4b00] disabled:opacity-60"
                                             >
                                                 ✏ Revision
-                                            </Link>
-                                            <Link
-                                                href={`${APPROVALS}?tab=pending&opportunity=${encodeURIComponent(row.id)}`}
-                                                className="rounded-full bg-[#f8d4d4] px-3 py-1.5 text-[11px] font-extrabold text-[#9a2b2b]"
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={partnerReview.approveSubmittingId === row.id}
+                                                onClick={() => partnerReview.review(row.id, "reject")}
+                                                className="rounded-full bg-[#f8d4d4] px-3 py-1.5 text-[11px] font-extrabold text-[#9a2b2b] disabled:opacity-60"
                                             >
                                                 ✕ Reject
-                                            </Link>
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -765,17 +780,17 @@ export default function PartnerCommunityServiceHub() {
                                                 {...model}
                                                 actions={
                                                     mode === "pending" ? (
-                                                        <>
-                                                            <Link href={href} className={approvalActionClass.green}>
-                                                                {acknowledge ? "View Flashcard & Acknowledge" : "View Flashcard & Approve"}
-                                                            </Link>
-                                                            <Link href={href} className={approvalActionClass.gold}>
-                                                                Request Revision
-                                                            </Link>
-                                                            <Link href={href} className={approvalActionClass.red}>
-                                                                Reject
-                                                            </Link>
-                                                        </>
+                                                        <FacultyPendingReviewButtons
+                                                            opportunityId={row.id}
+                                                            approvalAction="partner_ack"
+                                                            approveLabel={
+                                                                acknowledge ? "View Flashcard & Acknowledge" : "View Flashcard & Approve"
+                                                            }
+                                                            approveSubmittingId={partnerReview.approveSubmittingId}
+                                                            onOpenFlashcard={(id) => partnerReview.review(id, "open")}
+                                                            onRevise={(id) => partnerReview.review(id, "revise")}
+                                                            onReject={(id) => partnerReview.review(id, "reject")}
+                                                        />
                                                     ) : (
                                                         <>
                                                             <Link href={href} className={approvalActionClass.soft}>
@@ -799,9 +814,6 @@ export default function PartnerCommunityServiceHub() {
                             );
                         })()
                     )}
-                    <Link href={APPROVALS} className="mt-4 inline-block text-[11px] font-semibold text-[#0e7d74] hover:underline">
-                        Open full approvals →
-                    </Link>
                 </div>
             )}
 
@@ -955,6 +967,7 @@ export default function PartnerCommunityServiceHub() {
                     </div>
                 </div>
             ) : null}
+            {partnerReview.dialogs}
         </div>
     );
 }

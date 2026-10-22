@@ -328,7 +328,10 @@ export function StudentOpportunityFlashcard({
     className?: string;
     /** Omit the bottom "Apply now" banner, for pages that render their own working Apply button. */
     hideApplyCta?: boolean;
-    /** Makes the banner's "Apply now" a link (only shown while {@link flashcardCanApply}). */
+    /**
+     * Target of the banner's "Apply now" (shown only while {@link flashcardCanApply}). Without it the
+     * button is omitted — create wizards and reviewer previews have nothing to apply to.
+     */
     applyHref?: string;
 }) {
     const [note, setNote] = useState("");
@@ -659,16 +662,15 @@ export function StudentOpportunityFlashcard({
                         <h3>{ctaTitle}</h3>
                         <p>{esc(ctaBody)}</p>
                     </div>
+                    {/* "Apply now" only where it is a working link; create / review previews show no button. */}
                     {canApply ? (
-                        <div className="co-flash-btns">
-                            {applyHref ? (
+                        applyHref ? (
+                            <div className="co-flash-btns">
                                 <Link href={applyHref} className="co-flash-btn apply">
                                     Apply now
                                 </Link>
-                            ) : (
-                                <span className="co-flash-btn apply">Apply now</span>
-                            )}
-                        </div>
+                            </div>
+                        ) : null
                     ) : (
                         <span className="co-flash-status-pill">{closed ? "Closed" : "View only"}</span>
                     )}
