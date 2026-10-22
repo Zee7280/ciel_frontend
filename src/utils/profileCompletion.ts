@@ -160,17 +160,22 @@ export function isPartnerProfileComplete(user: Record<string, unknown>): boolean
     );
 }
 
+/** Labels of the organization fields still blocking the partner dashboard (empty when complete). */
+export function missingPartnerOrganizationFields(org: Record<string, unknown>): string[] {
+    const missing: string[] = [];
+    if (!nonEmptyString(pickOrganizationLabel(org))) missing.push("Organization name");
+    if (!nonEmptyString(pickOrganizationDescription(org))) missing.push("Description");
+    if (!nonEmptyString(pickOrganizationWebsite(org))) missing.push("Website");
+    if (!nonEmptyString(pickCity(org))) missing.push("City");
+    if (!nonEmptyString(pickOrganizationRegion(org))) missing.push("Region / province");
+    if (!nonEmptyString(pickOrganizationContactName(org))) missing.push("Contact person");
+    if (!isValidEmailFormat(pickOrganizationContactEmail(org))) missing.push("Contact email");
+    if (!nonEmptyString(pickOrganizationContactPhone(org))) missing.push("Contact phone");
+    return missing;
+}
+
 export function isPartnerOrganizationComplete(org: Record<string, unknown>): boolean {
-    return (
-        nonEmptyString(pickOrganizationLabel(org)) &&
-        nonEmptyString(pickOrganizationDescription(org)) &&
-        nonEmptyString(pickOrganizationWebsite(org)) &&
-        nonEmptyString(pickCity(org)) &&
-        nonEmptyString(pickOrganizationRegion(org)) &&
-        nonEmptyString(pickOrganizationContactName(org)) &&
-        isValidEmailFormat(pickOrganizationContactEmail(org)) &&
-        nonEmptyString(pickOrganizationContactPhone(org))
-    );
+    return missingPartnerOrganizationFields(org).length === 0;
 }
 
 export function isPartnerRole(role: string): boolean {

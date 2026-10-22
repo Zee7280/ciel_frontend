@@ -77,7 +77,7 @@ export default function PlatformTutorialsPanel({
     visible = true,
     publicMode = false,
     emptyTitle = "No tutorials yet",
-    emptyDescription = 'Platform guides will appear here when your administrator publishes them under "Platform tutorial".',
+    emptyDescription = "Step-by-step video guides are on their way. Meanwhile, the Help page has FAQs and a support ticket form.",
 }: PlatformTutorialsPanelProps) {
     const [tutorials, setTutorials] = useState<PlatformTutorialItem[]>([]);
     const [loading, setLoading] = useState(false);

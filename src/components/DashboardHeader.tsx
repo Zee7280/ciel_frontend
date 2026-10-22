@@ -21,7 +21,7 @@ import {
     type FacultyScopeSessionPayload,
 } from "@/utils/facultyScopeSession";
 import { useHasDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
-import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
+import { readPartnerOrgKind, readPartnerOrgLabel, type PartnerOrgKind } from "@/utils/partnerOrgKind";
 function facultyPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/faculty") return "Dashboard";
@@ -46,7 +46,7 @@ function facultyPageKicker(pathname: string): string {
     return "Faculty";
 }
 
-function universityPageKicker(pathname: string): string {
+function partnerPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
     if (p === "/dashboard/partner") return "Dashboard";
     if (p.startsWith("/dashboard/partner/community-service")) return "Community Service";
@@ -63,7 +63,15 @@ function universityPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/partner/attendance-review")) return "Attendance";
     if (p.startsWith("/dashboard/partner/messages")) return "Messages";
     if (p.startsWith("/dashboard/partner/notifications")) return "Notifications";
-    return "University";
+    if (p.startsWith("/dashboard/partner/funding")) return "Funding";
+    if (p.startsWith("/dashboard/partner/membership-payment")) return "Membership fee";
+    if (p.startsWith("/dashboard/partner/participants")) return "Participants";
+    if (p.startsWith("/dashboard/partner/volunteers")) return "Volunteers";
+    if (p.startsWith("/dashboard/partner/tutorials")) return "Platform tutorial";
+    if (p.startsWith("/dashboard/partner/profile")) return "Profile";
+    if (p.startsWith("/dashboard/partner/settings")) return "Settings";
+    if (p.startsWith("/dashboard/partner/help")) return "Help";
+    return "Dashboard";
 }
 
 function studentPageKicker(pathname: string): string {
@@ -102,7 +110,7 @@ function adminPageKicker(pathname: string, searchParams: { get(name: string): st
     }
     if (p.startsWith("/dashboard/admin/analytics")) return "Impact Intelligence Hub";
     if (p.startsWith("/dashboard/admin/master-analytics")) return "CIEL Master";
-    if (p.startsWith("/dashboard/admin/approvals")) return "Opportunity Review";
+    if (p.startsWith("/dashboard/admin/approvals")) return "Pending Approvals";
     if (p.startsWith("/dashboard/admin/join-applications")) return "Applications";
     if (p.startsWith("/dashboard/admin/users")) return "Users";
     if (p.startsWith("/dashboard/admin/organizations")) return "Organizations";
@@ -118,7 +126,14 @@ function adminPageKicker(pathname: string, searchParams: { get(name: string): st
     if (p.startsWith("/dashboard/admin/notifications")) return "Notifications";
     if (p.startsWith("/dashboard/admin/messages")) return "Messages";
     if (p.startsWith("/dashboard/admin/settings")) return "Settings";
-    return "Super Admin";
+    if (p.startsWith("/dashboard/admin/faculty-university-scope")) return "Faculty ↔ University scope";
+    if (p.startsWith("/dashboard/admin/project-evidence")) return "Project evidence export";
+    if (p.startsWith("/dashboard/admin/tutorials")) return "Platform tutorial";
+    if (p.startsWith("/dashboard/admin/email")) return "Send email";
+    if (p.startsWith("/dashboard/admin/cep-feedback")) return "CEP feedback";
+    if (p.startsWith("/dashboard/admin/all-fields-console")) return "All-fields console";
+    if (p.startsWith("/dashboard/admin/impact")) return "Impact";
+    return "Dashboard";
 }
 
 function investorPageKicker(pathname: string): string {
@@ -161,7 +176,7 @@ function DashboardHeaderInner() {
         router.push("/login");
     };
 
-    const [user, setUser] = useState<{ name: string; role: string; email: string; image?: string; logoUrl?: string; notifications_count?: number } | null>(null);
+    const [user, setUser] = useState<{ name: string; role: string; roleTitle?: string; email: string; image?: string; logoUrl?: string; notifications_count?: number } | null>(null);
 
     const [facultyDelegatedScope, setFacultyDelegatedScope] = useState<FacultyScopeSessionPayload | null>(null);
 
@@ -176,24 +191,22 @@ function DashboardHeaderInner() {
         return () => window.removeEventListener(CIEL_FACULTY_SCOPE_EVENT, sync);
     }, [navRole, pathname]);
 
-    const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
     const [partnerOrgKind, setPartnerOrgKind] = useState<PartnerOrgKind>("partner");
+    const [partnerOrgLabel, setPartnerOrgLabel] = useState("Partner Organization");
     useEffect(() => {
         if (navRole !== "partner") {
-            setIsUniversityPartnerOrg(false);
             setPartnerOrgKind("partner");
             return;
         }
         try {
             const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
             const u = raw
-                ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string; role?: string })
+                ? (JSON.parse(raw) as { orgType?: string; organizationCategory?: string; organization_type?: string; type?: string; role?: string })
                 : null;
             const kind = readPartnerOrgKind(u);
             setPartnerOrgKind(kind);
-            setIsUniversityPartnerOrg(kind === "university");
+            setPartnerOrgLabel(readPartnerOrgLabel(u));
         } catch {
-            setIsUniversityPartnerOrg(false);
             setPartnerOrgKind("partner");
         }
     }, [navRole, pathname]);
@@ -205,10 +218,8 @@ function DashboardHeaderInner() {
               ? "Faculty Dashboard"
               : navRole === "partner" && partnerOrgKind === "university"
                 ? "University Dashboard"
-                : navRole === "partner" && partnerOrgKind === "ngo"
-                  ? "NGO / Nonprofit"
-                  : navRole === "partner"
-                    ? "Partner Organization"
+                : navRole === "partner"
+                  ? partnerOrgLabel
                   : navRole === "admin"
                     ? "Super Admin"
                     : navRole === "investor"
@@ -220,10 +231,8 @@ function DashboardHeaderInner() {
             ? studentPageKicker(pathname)
             : navRole === "faculty"
               ? facultyPageKicker(pathname)
-              : navRole === "partner" && isUniversityPartnerOrg
-                ? universityPageKicker(pathname)
-                : navRole === "partner"
-                  ? universityPageKicker(pathname)
+              : navRole === "partner"
+                ? partnerPageKicker(pathname)
                 : navRole === "admin"
                   ? adminPageKicker(pathname, searchParams)
                   : navRole === "investor"
@@ -569,7 +578,7 @@ function DashboardHeaderInner() {
                 <div className="flex items-center gap-2 border-l border-ciel-border pl-2 sm:gap-4 sm:pl-4 lg:pl-6">
                     <div className="text-right hidden md:block">
                         <div className="mb-1 text-sm font-black leading-none text-ciel-text">{user?.name || "Guest User"}</div>
-                        <div className="text-[10px] font-bold uppercase leading-none tracking-widest text-ciel-text-soft">{user?.role || "Visitor"}</div>
+                        <div className="text-[10px] font-bold uppercase leading-none tracking-widest text-ciel-text-soft">{user?.roleTitle || user?.role || "Visitor"}</div>
                     </div>
                     <div className="grid h-[38px] w-[38px] place-items-center overflow-hidden rounded-full bg-[#dff1ed] text-[13px] font-black text-[#145a4f]">
                         {getProfileImage() ? (

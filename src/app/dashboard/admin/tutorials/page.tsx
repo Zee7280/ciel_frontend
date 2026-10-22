@@ -460,8 +460,7 @@ export default function AdminTutorialsPage() {
                             )}
                         </Button>
                         <p className="text-xs text-slate-500">
-                            Videos upload directly to S3 using a presigned URL (avoids Vercel 413 limits). If S3 upload fails,
-                            add an S3 CORS rule that allows PUT from this website origin.
+                            Large videos can take a few minutes to upload. Keep this tab open until the progress bar finishes.
                         </p>
                     </form>
                 </section>

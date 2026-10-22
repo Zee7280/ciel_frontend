@@ -18,6 +18,13 @@ import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
+import {
+    SIGNUP_PROOF_ACCEPT,
+    SignupProofUnavailableError,
+    signupProofFileError,
+    uploadSignupProof,
+    type SignupProofDocument,
+} from "@/utils/signupProofUpload";
 import { authApiErrorMessage, isSignupEmailUnverifiedMessage } from "@/utils/authApiError";
 import { EMPTY_INVESTOR_SIGNUP, INVESTOR_STEP_COPY, InvestorSignupPanel, type InvestorSignupState, type InvestorWizardStep } from "@/components/ciel/auth/InvestorSignupPanel";
 
@@ -97,6 +104,7 @@ function SignUpContent() {
     const [investor, setInvestor] = useState<InvestorSignupState>(EMPTY_INVESTOR_SIGNUP);
     const [proofMethod, setProofMethod] = useState<"upload" | "link">("upload");
     const [proofFileName, setProofFileName] = useState("");
+    const [proofFile, setProofFile] = useState<File | null>(null);
     const [proofLinkType, setProofLinkType] = useState<(typeof PROOF_LINK_TYPES)[number]>(PROOF_LINK_TYPES[0]);
     const [proofUrl, setProofUrl] = useState("");
     const searchParams = useSearchParams();
@@ -211,8 +219,10 @@ function SignUpContent() {
                 if (!investor.sectors.length) newErrors.sectors = "Select at least one sector";
             }
             if (investorStep >= 3) {
-                if (!investor.proofOrgLabel.trim()) newErrors.proofOrgLabel = "Proof of organisation is required";
-                if (!investor.proofRoleLabel.trim()) newErrors.proofRoleLabel = "Proof of role is required";
+                if (!investor.proofOrgFile) newErrors.proofOrgLabel = "Proof of organisation is required";
+                else if (signupProofFileError(investor.proofOrgFile)) newErrors.proofOrgLabel = signupProofFileError(investor.proofOrgFile)!;
+                if (!investor.proofRoleFile) newErrors.proofRoleLabel = "Proof of role is required";
+                else if (signupProofFileError(investor.proofRoleFile)) newErrors.proofRoleLabel = signupProofFileError(investor.proofRoleFile)!;
                 if (!investor.agreePlatform || !investor.agreePrivacy || !investor.agreeAuthority) {
                     newErrors.consent = "Accept all three agreement checkboxes to continue";
                 }
@@ -278,7 +288,8 @@ function SignUpContent() {
             if (!formData.name.trim() || !formData.contactPerson.trim() || !formData.orgName.trim()) return false;
             if (!investor.linkedin.trim() || !investor.website.trim() || !investor.investorType.trim()) return false;
             if (!investor.preferredRounds.length || !investor.preferredStages.length || !investor.sectors.length || !investor.typicalTicket.trim()) return false;
-            if (!investor.proofOrgLabel.trim() || !investor.proofRoleLabel.trim()) return false;
+            if (!investor.proofOrgFile || !investor.proofRoleFile) return false;
+            if (signupProofFileError(investor.proofOrgFile) || signupProofFileError(investor.proofRoleFile)) return false;
             if (!investor.agreePlatform || !investor.agreePrivacy || !investor.agreeAuthority) return false;
             return true;
         }
@@ -287,6 +298,8 @@ function SignUpContent() {
             if (proofMethod === "link") {
                 const url = proofUrl.trim();
                 if (!url || !/^https?:\/\/.+\..+/.test(url)) return false;
+            } else if (!proofFile || signupProofFileError(proofFile)) {
+                return false;
             }
         } else if (!formData.name.trim()) {
             return false;
@@ -294,7 +307,7 @@ function SignUpContent() {
         if ((role === "student" || role === "faculty") && (!formData.institution.trim() || !formData.department.trim())) return false;
         if (role === "student" && !formData.enrollmentYear.trim()) return false;
         return true;
-    }, [formData, role, isOrgRole, isInvestor, investor, consent, proofMethod, proofUrl]);
+    }, [formData, role, isOrgRole, isInvestor, investor, consent, proofMethod, proofUrl, proofFile]);
 
     const firstIncompleteHint = useMemo(() => {
         if (isFormValid) return "";
@@ -304,8 +317,9 @@ function SignUpContent() {
             if (!formData.email.trim()) return "Enter your official email to continue";
             if (!formData.phone.trim() || validateNationalPhone(formData.phoneCountryKey, formData.phone)) return "Enter your mobile number to continue";
             if (!formData.city.trim()) return "Select your city to continue";
-            if (!formData.password || formData.password.length < 8) return "Create a password to continue";
+            if (!formData.password || formData.password.length < 8) return "Create a password of at least 8 characters to continue";
             if (proofMethod === "link" && !proofUrl.trim()) return "Add a verification link to continue";
+            if (proofMethod === "upload" && !proofFile) return "Upload a proof document to continue";
             if (!consent) return "Accept the terms to continue";
             return "Complete the remaining fields to continue";
         }
@@ -318,10 +332,10 @@ function SignUpContent() {
         if (!formData.phone.trim() || validateNationalPhone(formData.phoneCountryKey, formData.phone)) return "Enter your mobile number to continue";
         if (!formData.city.trim()) return "Select your city to continue";
         if (role === "student" && !formData.enrollmentYear.trim()) return "Select your enrolment year to continue";
-        if (!formData.password || formData.password.length < 8) return "Create a password to continue";
+        if (!formData.password || formData.password.length < 8) return "Create a password of at least 8 characters to continue";
         if (!consent) return "Accept the terms to continue";
         return "Complete the remaining fields to continue";
-    }, [isFormValid, isOrgRole, formData, role, proofMethod, proofUrl, consent]);
+    }, [isFormValid, isOrgRole, formData, role, proofMethod, proofUrl, proofFile, consent]);
 
     // Step 1: Validate form, then send OTP — swaps the form into the "check your inbox" state.
     const handleSubmit = async (e: React.FormEvent) => {
@@ -376,6 +390,28 @@ function SignUpContent() {
                 ? ""
                 : authApiErrorMessage(verifyData, "That code is invalid or expired");
 
+            // The proof files go up only once the email is verified — the backend refuses them before that.
+            const proofUploads: { label: string; file: File }[] = !verifyRes.ok
+                ? []
+                : isInvestor
+                  ? [
+                        ...(investor.proofOrgFile ? [{ label: "Proof of organisation", file: investor.proofOrgFile }] : []),
+                        ...(investor.proofRoleFile ? [{ label: "Proof of role", file: investor.proofRoleFile }] : []),
+                    ]
+                  : isOrgRole && proofMethod === "upload" && proofFile
+                    ? [{ label: "Proof of affiliation", file: proofFile }]
+                    : [];
+            const signupProofDocuments: SignupProofDocument[] = [];
+            try {
+                for (const p of proofUploads) {
+                    signupProofDocuments.push(await uploadSignupProof(normalizedEmail, p.label, p.file));
+                }
+            } catch (uploadError) {
+                // An API without the upload endpoint (mid-deploy) shouldn't block signup; the file
+                // name still goes to the admin in affiliationProofLabel, as before this feature.
+                if (!(uploadError instanceof SignupProofUnavailableError)) throw uploadError;
+            }
+
             const { phoneCountryKey, token: _inviteToken, ...signupFields } = formData;
             const signupRes = await fetch("/api/v1/auth/signup", {
                 method: "POST",
@@ -400,6 +436,7 @@ function SignUpContent() {
                         : isInvestor
                           ? [investor.proofOrgLabel, investor.proofRoleLabel].filter(Boolean).join(" · ")
                           : undefined,
+                    signupProofDocuments: signupProofDocuments.length ? signupProofDocuments : undefined,
                     university:
                         role === "student" || role === "faculty"
                             ? formData.institution.trim()
@@ -455,7 +492,9 @@ function SignUpContent() {
                   ? "subscription"
                   : createdUser?.account_status === "pending" || createdUser?.status === "pending"
                     ? "pending"
-                    : "success";
+                    : isOrgRole
+                      ? "org_pending"
+                      : "success";
             loginQs.set("signup", su);
             if (postAuthRedirectNext) loginQs.set("next", postAuthRedirectNext);
             router.push(`/login?${loginQs.toString()}`);
@@ -528,12 +567,50 @@ function SignUpContent() {
 
     const selectClass = (hasError: boolean) => clsx(fieldClass(hasError), "pr-11 cursor-pointer appearance-none");
     const labelClass = "mb-1.5 block text-[12px] font-semibold text-[#3d5560]";
+    const personRoleButtons = [
+        { id: "student", label: "Student", icon: GraduationCap },
+        { id: "faculty", label: "Faculty", icon: User },
+        { id: "investor", label: "Investor / VC", icon: TrendingUp },
+    ] as const;
     const orgButtons = [
         { id: "university", label: "University", icon: Building2 },
         { id: "ngo", label: "NGO", icon: Handshake },
         { id: "corporate", label: "Organisation", icon: Briefcase },
         { id: "government", label: "HEC / Govt", icon: Landmark },
     ] as const;
+    /** Both rows are one single choice, so every option shares the same card, check mark and radio semantics. */
+    const renderRoleOption = (
+        item: { id: string; label: string; icon: typeof GraduationCap },
+        size: "tall" | "short",
+    ) => {
+        const selected = role === item.id;
+        return (
+            <button
+                key={item.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => handleRoleSelect(item.id)}
+                className={clsx(
+                    "relative flex flex-col items-start justify-center rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]/35",
+                    size === "tall" ? "min-h-[84px] px-3 py-3 sm:min-h-[92px] sm:px-4 sm:py-4" : "min-h-[76px] px-3 py-3 sm:px-3.5",
+                    selected
+                        ? "border-[#0e7d74] bg-[#e8f7f4] shadow-[0_0_0_1px_rgba(14,125,116,0.15)]"
+                        : "border-[#d7e3e6] bg-white hover:border-[#0e7d74]/45",
+                )}
+            >
+                {selected && (
+                    <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#0e7d74] text-white">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                    </span>
+                )}
+                <item.icon className={clsx("h-5 w-5", selected ? "text-[#0e7d74]" : "text-[#6b828b]")} />
+                <p className={clsx("mt-2 font-semibold leading-tight text-[#173540]", size === "tall" ? "text-[13px] sm:text-sm" : "text-[13px]")}>
+                    {item.label}
+                </p>
+            </button>
+        );
+    };
     const formStepLabel = isInvestor
         ? `GET STARTED · STEP 0${investorStep} OF 03`
         : step === "otp"
@@ -630,7 +707,7 @@ function SignUpContent() {
                 </aside>
 
                 <main className="min-w-0 overflow-y-auto bg-white px-5 py-6 sm:px-10 lg:px-14 lg:py-8">
-                    <div className={clsx("mx-auto w-full", isInvestor ? "max-w-[46rem]" : "max-w-[40rem]")}>
+                    <div className="mx-auto w-full max-w-[44rem]">
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a9099]">Secure account registration</p>
                             <Link href="/login" className="shrink-0 text-[13px] font-semibold text-[#0e7d74] hover:underline">
@@ -661,58 +738,15 @@ function SignUpContent() {
                                 </div>
 
                                 <div>
-                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">I&apos;m joining as</p>
-                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                                        {([
-                                            { id: "student", label: "Student", Icon: GraduationCap },
-                                            { id: "faculty", label: "Faculty", Icon: User },
-                                            { id: "investor", label: "Investor / VC", Icon: TrendingUp },
-                                        ] as const).map((item) => {
-                                            const selected = role === item.id;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    role="radio"
-                                                    aria-checked={selected}
-                                                    onClick={() => handleRoleSelect(item.id)}
-                                                    className={clsx(
-                                                        "relative flex min-h-[92px] flex-col items-start justify-center rounded-xl border px-4 py-4 text-left transition-colors",
-                                                        selected
-                                                            ? "border-[#0e7d74] bg-[#e8f7f4] shadow-[0_0_0_1px_rgba(14,125,116,0.15)]"
-                                                            : "border-[#d7e3e6] bg-white hover:border-[#0e7d74]/45",
-                                                    )}
-                                                >
-                                                    {selected && (
-                                                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#0e7d74] text-white">
-                                                            <Check className="h-3 w-3" strokeWidth={3} />
-                                                        </span>
-                                                    )}
-                                                    <item.Icon className={clsx("h-5 w-5", selected ? "text-[#0e7d74]" : "text-[#6b828b]")} />
-                                                    <p className="mt-2 text-sm font-semibold text-[#173540]">{item.label}</p>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">or register an organisation</p>
-                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                        {orgButtons.map((item) => {
-                                            const selected = role === item.id;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() => handleRoleSelect(item.id)}
-                                                    className={clsx(
-                                                        "flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 text-center transition-colors",
-                                                        selected ? "border-[#0e7d74] bg-[#e8f7f4] text-[#0b5f58]" : "border-[#d7e3e6] bg-white text-[#5d737c] hover:border-[#0e7d74]/40",
-                                                    )}
-                                                >
-                                                    <item.icon className="h-4 w-4" />
-                                                    <span className="text-[10px] font-semibold leading-tight">{item.label}</span>
-                                                </button>
-                                            );
-                                        })}
+                                    <div role="radiogroup" aria-label="Account type">
+                                        <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">I&apos;m joining as</p>
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                                            {personRoleButtons.map((item) => renderRoleOption(item, "tall"))}
+                                        </div>
+                                        <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a9099]">or register an organisation</p>
+                                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                                            {orgButtons.map((item) => renderRoleOption(item, "short"))}
+                                        </div>
                                     </div>
                                     <p className="mt-2 text-[12px] leading-relaxed text-[#7a9099]">
                                         {isInvestor
@@ -728,7 +762,7 @@ function SignUpContent() {
                                             <div>
                                                 <label className={labelClass}>Organization name</label>
                                                 {orgKind === "university" ? (
-                                                    <SearchableSelect value={formData.orgName} onChange={(v) => handleGenericChange("orgName", v)} options={pakistaniUniversities} placeholder="Select organization name" searchPlaceholder="Search universities..." hasError={!!errors.orgName} ariaLabel="Organization name" allowCustomValue={false} />
+                                                    <SearchableSelect value={formData.orgName} onChange={(v) => handleGenericChange("orgName", v)} options={pakistaniUniversities} placeholder="Select organization name" searchPlaceholder="Search universities..." hasError={!!errors.orgName} ariaLabel="Organization name" allowCustomValue={false} variant="field" />
                                                 ) : (
                                                     <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder={orgHints.orgName} aria-label="Organization name" />
                                                 )}
@@ -807,15 +841,15 @@ function SignUpContent() {
                                         <div key={`${role}-inst`} className="ciel-crossfade-enter relative z-30 grid grid-cols-1 items-start gap-4 overflow-visible sm:grid-cols-2">
                                             <div>
                                                 <label className={labelClass}>University</label>
-                                                <SearchableSelect value={formData.institution} onChange={(v) => handleGenericChange("institution", v)} options={pakistaniUniversities} placeholder="Select university" searchPlaceholder="Search universities..." hasError={!!errors.institution} ariaLabel="University" allowCustomValue={false} />
+                                                <SearchableSelect value={formData.institution} onChange={(v) => handleGenericChange("institution", v)} options={pakistaniUniversities} placeholder="Select university" searchPlaceholder="Search universities..." hasError={!!errors.institution} ariaLabel="University" allowCustomValue={false} variant="field" />
                                                 {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
                                             </div>
                                             <div className="relative z-20 min-w-0">
                                                 <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>
                                                 {role === "student" ? (
-                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} />
+                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} variant="field" />
                                                 ) : (
-                                                    <input type="text" value={formData.department} onChange={(e) => handleGenericChange("department", e.target.value)} className={fieldClass(!!errors.department)} placeholder="e.g. School of Management Sciences" />
+                                                    <input type="text" value={formData.department} onChange={(e) => handleGenericChange("department", e.target.value)} className={fieldClass(!!errors.department)} placeholder="e.g. School of Management Sciences" aria-label="Department" />
                                                 )}
                                                 {errors.department && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.department}</p>}
                                             </div>
@@ -869,7 +903,11 @@ function SignUpContent() {
                                                 }}
                                                 errorText={errors.phone}
                                                 maxNationalDigits={15}
-                                                inputClassName={clsx(errors.phone ? "border-red-500 focus:border-red-500" : "border-[#d7e3e6] focus:border-[#0e7d74]")}
+                                                selectClassName="rounded-lg border border-[#d7e3e6] bg-white py-3 text-sm font-medium text-[#173540] focus:border-[#0e7d74]"
+                                                inputClassName={clsx(
+                                                    "rounded-lg border bg-white py-3 text-sm font-medium text-[#173540] placeholder:text-[#94a3b0] focus:bg-white sm:px-3.5",
+                                                    errors.phone ? "border-red-500 focus:border-red-500" : "border-[#d7e3e6] focus:border-[#0e7d74]",
+                                                )}
                                             />
                                         </div>
 
@@ -932,11 +970,17 @@ function SignUpContent() {
                                                         <input
                                                             type="file"
                                                             className="sr-only"
-                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,application/pdf,image/*"
-                                                            onChange={(e) => setProofFileName(e.target.files?.[0]?.name ?? "")}
+                                                            accept={SIGNUP_PROOF_ACCEPT}
+                                                            onChange={(e) => {
+                                                                const f = e.target.files?.[0] ?? null;
+                                                                setProofFile(f);
+                                                                setProofFileName(f?.name ?? "");
+                                                                setErrors((prev) => ({ ...prev, proofFile: signupProofFileError(f) ?? "" }));
+                                                            }}
                                                         />
                                                     </label>
-                                                    <p className="mt-2 text-[12px] leading-relaxed text-ciel-text-soft">Accepted: university or employee ID, faculty card, or authorization letter.</p>
+                                                    <p className="mt-2 text-[12px] leading-relaxed text-ciel-text-soft">Accepted: university or employee ID, faculty card, or authorization letter (PDF or image, max 4 MB). CIEL PK reviews it before approving your account.</p>
+                                                    {errors.proofFile ? <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.proofFile}</p> : null}
                                                 </div>
                                             ) : (
                                                 <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -1007,7 +1051,7 @@ function SignUpContent() {
                                         ) : formData.password ? (
                                             <PasswordStrengthMeter password={formData.password} />
                                         ) : (
-                                            <p className="mt-1.5 text-[12px] text-[#7a9099]">Use 8 or more characters</p>
+                                            <p className="mt-1.5 text-[12px] text-[#7a9099]">Use {isInvestor ? 10 : 8} or more characters</p>
                                         )}
                                     </div>
                                 </div>

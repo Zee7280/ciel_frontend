@@ -141,11 +141,6 @@ function MetricCardsGrid({
                             <CategoryPill category={category} />
                         </div>
                         <AnalyticsFieldValue fieldKey={key} value={value} meta={meta} />
-                        {meta?.presentation ? (
-                            <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-slate-400">
-                                {meta.presentation}
-                            </p>
-                        ) : null}
                     </article>
                 );
             })}

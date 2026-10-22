@@ -474,7 +474,7 @@ function LoginContent() {
                                     <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
                                 </div>
 
-                                {searchParams.get("signup") === "membership" && (
+                                {!error && searchParams.get("signup") === "membership" && (
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/90 p-4 text-left text-xs font-semibold text-blue-900">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                                         <span>
@@ -483,7 +483,7 @@ function LoginContent() {
                                         </span>
                                     </div>
                                 )}
-                                {searchParams.get("signup") === "subscription" && (
+                                {!error && searchParams.get("signup") === "subscription" && (
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50/90 p-4 text-left text-xs font-semibold text-teal-900">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
                                         <span>
@@ -492,7 +492,7 @@ function LoginContent() {
                                         </span>
                                     </div>
                                 )}
-                                {searchParams.get("signup") === "pending" && (
+                                {!error && searchParams.get("signup") === "pending" && (
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/90 p-4 text-left text-xs font-semibold text-amber-950">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                         <span>
@@ -500,7 +500,16 @@ function LoginContent() {
                                         </span>
                                     </div>
                                 )}
-                                {searchParams.get("signup") === "success" && (
+                                {!error && searchParams.get("signup") === "org_pending" && (
+                                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/90 p-4 text-left text-xs font-semibold text-amber-950">
+                                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                        <span>
+                                            Your organisation account was created. CIEL PK verifies new organisations before
+                                            first sign-in, and we&apos;ll email you as soon as it&apos;s approved.
+                                        </span>
+                                    </div>
+                                )}
+                                {!error && searchParams.get("signup") === "success" && (
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-4 text-left text-xs font-semibold text-emerald-900">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                                         <span>

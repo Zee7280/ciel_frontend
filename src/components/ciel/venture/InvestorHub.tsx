@@ -368,7 +368,9 @@ function InvestorHubInner() {
     const [savingMandate, setSavingMandate] = useState(false);
     const viewedRef = useRef<string>("");
 
-    const me = readStoredCurrentUser();
+    // Read after mount: the server render has no localStorage, so reading it here would mismatch.
+    const [me, setMe] = useState<ReturnType<typeof readStoredCurrentUser>>(null);
+    useEffect(() => setMe(readStoredCurrentUser()), []);
     const investorProfile = me?.investor && typeof me.investor === "object" ? (me.investor as Record<string, unknown>) : null;
     const org = String(orgName || me?.orgName || investorProfile?.investorType || "Investor").trim();
     const name = String(me?.name || "Investor").trim();
@@ -634,7 +636,7 @@ function InvestorHubInner() {
             <CourseworkCrumb role="Investor" pathLabel="Startup / Venture" view={SCREEN_NAME[screen] || "Investor Hub"} />
             {kycPending && (
                 <div className="mb-4 rounded-[14px] border border-[#ffe08a] bg-[#fff8e1] px-4 py-3 text-[13.5px] leading-relaxed text-[#5d6c78]">
-                    <b className="text-[#a06a00]">Account pending.</b> Browse only — introductions, rooms and outcomes unlock after CIEL PK verifies your account (CIEL PK Master Dashboard → Investor Accounts).
+                    <b className="text-[#a06a00]">Account pending.</b> Browse only — introductions, rooms and outcomes unlock after CIEL PK verifies your account, usually within 3 working days.
                 </div>
             )}
 

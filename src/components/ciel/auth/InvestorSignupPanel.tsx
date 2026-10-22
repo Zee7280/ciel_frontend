@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import clsx from "clsx";
+import { SIGNUP_PROOF_ACCEPT } from "@/utils/signupProofUpload";
 
 export const INVESTOR_TYPES = [
     "Venture Capital Fund",
@@ -78,6 +79,9 @@ export type InvestorSignupState = {
     professionalReference: string;
     proofOrgLabel: string;
     proofRoleLabel: string;
+    /** The actual files — uploaded after the email OTP is verified, then shown to the admin. */
+    proofOrgFile: File | null;
+    proofRoleFile: File | null;
     agreePlatform: boolean;
     agreePrivacy: boolean;
     agreeAuthority: boolean;
@@ -104,6 +108,8 @@ export const EMPTY_INVESTOR_SIGNUP: InvestorSignupState = {
     professionalReference: "",
     proofOrgLabel: "",
     proofRoleLabel: "",
+    proofOrgFile: null,
+    proofRoleFile: null,
     agreePlatform: false,
     agreePrivacy: false,
     agreeAuthority: false,
@@ -210,7 +216,7 @@ export function InvestorSignupPanel({
                             </div>
                         </div>
                     </div>
-                    <button type="button" onClick={onNext} className="flex w-full items-center justify-center rounded-xl bg-[#19a36d] py-3.5 text-sm font-semibold text-white">
+                    <button type="button" onClick={onNext} className="flex w-full items-center justify-center rounded-xl bg-[#0e7d74] py-3.5 text-sm font-semibold text-white hover:bg-[#0b6760]">
                         Continue → Mandate
                     </button>
                 </>
@@ -314,7 +320,7 @@ export function InvestorSignupPanel({
                     </div>
                     <div className="flex gap-2.5">
                         <button type="button" onClick={() => setStep(1)} className="rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-[#516174]">← Back</button>
-                        <button type="button" onClick={onNext} className="flex-1 rounded-xl bg-[#19a36d] py-3.5 text-sm font-semibold text-white">Continue → Verification</button>
+                        <button type="button" onClick={onNext} className="flex-1 rounded-xl bg-[#0e7d74] py-3.5 text-sm font-semibold text-white hover:bg-[#0b6760]">Continue → Verification</button>
                     </div>
                 </>
             )}
@@ -326,15 +332,15 @@ export function InvestorSignupPanel({
                         <div>
                             <label className={labelClass}>Proof of organisation *</label>
                             <label className="block cursor-pointer rounded-xl border border-dashed border-slate-200 bg-[#f7fafc] px-4 py-4 text-center text-[13px] text-[#65758b]">
-                                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => patch({ proofOrgLabel: e.target.files?.[0]?.name || "" })} />
-                                {investor.proofOrgLabel ? <>✓ <b className="text-ciel-text">{investor.proofOrgLabel}</b> attached</> : <>📎 <b className="text-ciel-text">Upload</b> SECP / company registration, fund licence, or NTN<br /><small>PDF, JPG · max 10 MB</small></>}
+                                <input type="file" className="hidden" accept={SIGNUP_PROOF_ACCEPT} onChange={(e) => { const f = e.target.files?.[0] ?? null; patch({ proofOrgLabel: f?.name || "", proofOrgFile: f }); }} />
+                                {investor.proofOrgLabel ? <>✓ <b className="text-ciel-text">{investor.proofOrgLabel}</b> attached</> : <>📎 <b className="text-ciel-text">Upload</b> SECP / company registration, fund licence, or NTN<br /><small>PDF, JPG, PNG · max 4 MB</small></>}
                             </label>
                             {errors.proofOrgLabel && <p className="ml-1 text-[11px] font-semibold text-red-500">{errors.proofOrgLabel}</p>}
                         </div>
                         <div>
                             <label className={labelClass}>Proof of role *</label>
                             <label className="block cursor-pointer rounded-xl border border-dashed border-slate-200 bg-[#f7fafc] px-4 py-4 text-center text-[13px] text-[#65758b]">
-                                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => patch({ proofRoleLabel: e.target.files?.[0]?.name || "" })} />
+                                <input type="file" className="hidden" accept={SIGNUP_PROOF_ACCEPT} onChange={(e) => { const f = e.target.files?.[0] ?? null; patch({ proofRoleLabel: f?.name || "", proofRoleFile: f }); }} />
                                 {investor.proofRoleLabel ? <>✓ <b className="text-ciel-text">{investor.proofRoleLabel}</b> attached</> : <>📎 <b className="text-ciel-text">Upload</b> business card, employer letter, or fund website team page<br /><small>Angels: CNIC front + LinkedIn is enough</small></>}
                             </label>
                             {errors.proofRoleLabel && <p className="ml-1 text-[11px] font-semibold text-red-500">{errors.proofRoleLabel}</p>}
@@ -385,7 +391,7 @@ export function InvestorSignupPanel({
                     </div>
                     <div className="flex gap-2.5">
                         <button type="button" onClick={() => setStep(2)} className="rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-[#516174]">← Back</button>
-                        <button type="submit" className="flex-1 rounded-xl bg-[#19a36d] py-3.5 text-sm font-semibold text-white">Submit for verification →</button>
+                        <button type="submit" className="flex-1 rounded-xl bg-[#0e7d74] py-3.5 text-sm font-semibold text-white hover:bg-[#0b6760]">Submit for verification →</button>
                     </div>
                 </>
             )}

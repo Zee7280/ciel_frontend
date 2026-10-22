@@ -221,8 +221,8 @@ export default function FacultyImpactWallPage() {
             )}
 
             <div className="mt-4 rounded-[15px] border border-[#d5eee8] bg-[#eef8f6] px-4 py-3.5 text-[11px] text-[#4b6f68]">
-                <b>Unified Impact Wall rule:</b> once any project is faculty-approved and verified, its flashcard appears here
-                and synchronizes to the relevant Student, University, CIEL PK and authorized HEC / UN Impact Walls.
+                Projects appear here once you approve them and they're verified. The same card also shows on the student's and
+                university's impact walls.
             </div>
         </div>
     );

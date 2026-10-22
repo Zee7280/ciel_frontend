@@ -11,7 +11,6 @@ import {
     HubBackButton,
     HubTabs,
     UserGuideBanner,
-    ZoneRule,
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import {
@@ -655,11 +654,6 @@ export function AdminCommunityServiceHub() {
             {effectiveView === "home" && (
                 <>
                     <UserGuideBanner {...GUIDES.home} />
-                    <ZoneRule title="Navigation rule">
-                        You entered Community Service from the left. Everything below belongs to this impact area; Home remains a
-                        clean overview. Create Opportunity publishes for CIEL PK; projects, report review, impact, analytics and exports remain
-                        separate for clarity.
-                    </ZoneRule>
                     <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                         {[
                             {

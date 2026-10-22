@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, HubBackButton, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import {
     ApprovalPipelineMini,
     SummaryTiles,
@@ -32,7 +32,6 @@ import {
     NGO_CS_APPROVALS as APPROVALS,
     NGO_CS_BASE as CS_BASE,
     NGO_CS_CREATE_FORM as CREATE_FORM,
-    NGO_CS_HOME as HOME,
     NGO_CS_HOURS as HOURS,
     NGO_CS_MY_OPPS as MY_OPPS,
     NGO_CS_REPORTS as REPORTS,
@@ -58,15 +57,15 @@ const VIEW_CRUMB: Partial<Record<CsView, string>> = {
 
 const GUIDES: Record<string, { title: string; desc: string; items?: [string, string][]; rule: string }> = {
     home: {
-        title: "NGO / Nonprofit Community Service Hub",
-        desc: "Everything your NGO / nonprofit does in Community Service is grouped here: create, approve, monitor, verify impact and analyse.",
+        title: "Community Service Hub",
+        desc: "Everything your organization does in Community Service is grouped here: create, approve, monitor, verify impact and analyse.",
         rule: "Home stays an organization overview; Community Service operations stay inside this hub.",
     },
     create: {
         title: "Create Opportunity",
-        desc: "Create and manage NGO / Nonprofit-created opportunities through CIEL PK review and publication.",
+        desc: "Create and manage your organization's opportunities through CIEL PK review and publication.",
         items: [
-            ["Create New Opportunity", "Open the NGO / Nonprofit Opportunity Form. Faculty linkage is optional."],
+            ["Create New Opportunity", "Open the opportunity form. Faculty linkage is optional."],
             ["Drafts", "Saved opportunities not yet submitted."],
             ["Under Approval", "Submitted opportunities waiting for CIEL PK review."],
             ["Action Required", "Revisions returned to your organization for correction."],
@@ -77,7 +76,7 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
     },
     approvals: {
         title: "Approvals",
-        desc: "Review opportunities created by others that name your NGO as a linked organization.",
+        desc: "Review opportunities created by others that name your organization as a linked organization.",
         items: [
             ["Linked Drafts", "Named to you but not submitted yet — view the same master record."],
             ["Waiting for Faculty", "Submitted and linked; Faculty has not approved yet. View only."],
@@ -103,7 +102,7 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
     },
     impact: {
         title: "My Impact",
-        desc: "Verified Community Service impact linked to your NGO.",
+        desc: "Verified Community Service impact linked to your organization.",
         items: [
             ["Impact Wall", "Verified visible records under the permitted visibility setting."],
             ["Flashcard & Credentials", "Open the verified project summary, CII, badge, certificate and QR."],
@@ -127,7 +126,7 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
 function NgoRemindButtons({ email, title }: { email?: string | null; title: string }) {
     const to = email && email.includes("@") ? email : "";
     const subject = `Community Service reminder — ${title}`;
-    const body = `A reminder from your linked NGO / nonprofit about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
+    const body = `A reminder from your linked organization about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
     return (
         <div className="mt-1.5 flex flex-wrap gap-2">
             <a href={mailtoHref(to, subject, body)} className="rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]">
@@ -142,38 +141,6 @@ function NgoRemindButtons({ email, title }: { email?: string | null; title: stri
 
 function reportHref(id: string) {
     return `/dashboard/partner/verify/${encodeURIComponent(id)}?package=1`;
-}
-
-const TONE_CLASS = {
-    default: "text-[#0e4d4e]",
-    warn: "text-[#9a6410]",
-    bad: "text-[#b34c4c]",
-} as const;
-
-function AttentionRow({
-    items,
-}: {
-    items: { key: string; n: number; title: string; sub: string; href: string; tone?: keyof typeof TONE_CLASS }[];
-}) {
-    return (
-        <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-            {items.map((item) => (
-                <Link
-                    key={item.key}
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-2xl border border-[#dde5ea] bg-white px-4 py-3.5 shadow-[0_8px_22px_rgba(24,52,64,.04)] transition hover:-translate-y-0.5 hover:border-[#bcd4d8] hover:shadow-[0_8px_18px_rgba(23,49,57,.08)]"
-                >
-                    <span className={`min-w-[36px] text-[26px] font-black leading-none ${TONE_CLASS[item.tone ?? "default"]}`}>
-                        {item.n}
-                    </span>
-                    <span className="min-w-0">
-                        <b className="block text-[13px] font-extrabold leading-snug text-[#16313d]">{item.title}</b>
-                        <small className="mt-0.5 block text-[11.5px] leading-relaxed text-[#6b7c86]">{item.sub}</small>
-                    </span>
-                </Link>
-            ))}
-        </div>
-    );
 }
 
 function HubTabs({
@@ -263,6 +230,7 @@ export default function NgoCommunityServiceHub() {
         loading,
         reload,
         orgName,
+        orgLabel,
         mine,
         pendingApprovals,
         linkedDrafts,
@@ -310,56 +278,21 @@ export default function NgoCommunityServiceHub() {
     const guide = GUIDES[guideKey] || GUIDES.home;
 
 
-    const attention = [
-        {
-            key: "approvals",
-            n: pendingApprovals.length,
-            title: "Approvals waiting",
-            sub: `Opportunities naming ${orgName}`,
-            href: `${CS_BASE}?view=approvals&tab=pending`,
-            tone: pendingApprovals.length ? ("bad" as const) : ("default" as const),
-        },
-        {
-            key: "progress",
-            n: waiting.length,
-            title: "Linked reports in progress",
-            sub: "Monitor completion · send reminders",
-            href: `${CS_BASE}?view=projects&tab=active`,
-            tone: waiting.length ? ("warn" as const) : ("default" as const),
-        },
-        {
-            key: "apps",
-            n: applicationsOnMine,
-            title: "Applications on my opportunities",
-            sub: "Approved by supervising faculty",
-            href: `${CS_BASE}?view=create&tab=published`,
-            tone: "default" as const,
-        },
-        {
-            key: "impact",
-            n: deckCards.length,
-            title: "Verified impact records",
-            sub: "Linked to your organization",
-            href: `${CS_BASE}?view=impact`,
-            tone: "default" as const,
-        },
-    ];
-
     return (
         <div className="mx-auto min-w-0 max-w-[1500px] pb-16">
-            <CommunityCrumb role="NGO / Nonprofit" view={crumb} />
+            <CommunityCrumb role={orgLabel} view={crumb} />
 
             {view === "home" ? (
                 <MockupHero
-                    kicker={`Community Service · NGO / Nonprofit`}
+                    kicker={`Community Service · ${orgLabel}`}
                     title={`${orgName} · Community Service`}
                     subtitle="Create opportunities, approve records that name your organization, monitor linked projects and showcase verified impact."
                     gradient={COMMAND_HERO}
                     stats={[
-                        { value: String(pendingApprovals.length), label: "Pending approvals", href: `${CS_BASE}?view=approvals` },
-                        { value: String(publishedMine.length), label: "Published opportunities", href: `${CS_BASE}?view=create&tab=published` },
-                        { value: String(pipeline.length), label: "Linked projects", href: `${CS_BASE}?view=projects` },
-                        { value: String(deckCards.length), label: "Verified impact", href: `${CS_BASE}?view=impact` },
+                        { value: loading ? "—" : String(publishedMine.length), label: "Live opportunities", href: `${CS_BASE}?view=create&tab=published` },
+                        { value: loading ? "—" : String(applicationsOnMine), label: "Applications", href: MY_OPPS },
+                        { value: loading ? "—" : String(waiting.length), label: "Reports in progress", href: `${CS_BASE}?view=projects&tab=active` },
+                        { value: loading ? "—" : String(deckCards.length), label: "Verified impact", href: `${CS_BASE}?view=impact` },
                     ]}
                     rightStat={{ value: "🌍", label: "Community Service hub" }}
                 />
@@ -371,27 +304,7 @@ export default function NgoCommunityServiceHub() {
 
             {view === "home" && (
                 <>
-                    <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
-                        <div>
-                            <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Community Service</h2>
-                            <p className="mt-1 max-w-[820px] text-[12.5px] text-[#70808a]">
-                                Everything your NGO does in Community Service is grouped here. Creator lifecycle stays in Create
-                                Opportunity; external approvals stay in Approvals; execution stays in Projects.
-                            </p>
-                        </div>
-                        <Link
-                            href={HOME}
-                            className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
-                        >
-                            ← Back to Home
-                        </Link>
-                    </div>
-
                     <UserGuideBanner desc={GUIDES.home.desc} rule={GUIDES.home.rule} />
-                    <ZoneRule title="Navigation rule">
-                        You entered Community Service from the left. Everything below belongs to this impact area; Home remains a
-                        clean overview.
-                    </ZoneRule>
                     <div className="mt-4">
                         <FacultyCsInbox
                             items={inboxItems}
@@ -401,15 +314,26 @@ export default function NgoCommunityServiceHub() {
                         />
                     </div>
 
-                    <AttentionRow items={attention} />
-                    <MockupSectionHead title="Community Service tools" subtitle="Choose the responsibility you need to work on." />
+                    <MockupSectionHead
+                        title="Community Service tools"
+                        subtitle="Pick what you want to work on."
+                        action={
+                            <button
+                                type="button"
+                                onClick={() => setHelpOpen(true)}
+                                className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+                            >
+                                How it works
+                            </button>
+                        }
+                    />
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                         <MockupActionCard
                             href={`${CS_BASE}?view=create`}
                             emoji="🚀"
                             ghost="🚀"
                             title="Create Opportunity"
-                            subtitle="Create an NGO opportunity and manage Drafts, Under Approval, Action Required, Published and Closed."
+                            subtitle="Create an opportunity and manage Drafts, Under Approval, Action Required, Published and Closed."
                             badge="CREATE + TRACK"
                             background={MOCKUP_GRADIENTS.teal}
                         />
@@ -418,7 +342,7 @@ export default function NgoCommunityServiceHub() {
                             emoji="✅"
                             ghost="✅"
                             title="Approvals"
-                            subtitle="Approve or acknowledge opportunities created by others that name your NGO."
+                            subtitle="Approve or acknowledge opportunities created by others that name your organization."
                             badge="ACTION"
                             background={MOCKUP_GRADIENTS.orange}
                             hot={pendingApprovals.length > 0}
@@ -428,7 +352,7 @@ export default function NgoCommunityServiceHub() {
                             emoji="📈"
                             ghost="📈"
                             title="Community Service Projects"
-                            subtitle="Monitor approved projects linked to your NGO, including progress and reminders."
+                            subtitle="Monitor approved projects linked to your organization, including progress and reminders."
                             badge="TRACK"
                             background={MOCKUP_GRADIENTS.navy}
                         />
@@ -437,7 +361,7 @@ export default function NgoCommunityServiceHub() {
                             emoji="🏅"
                             ghost="🏅"
                             title="My Impact"
-                            subtitle="Verified Community Service impact linked to your NGO."
+                            subtitle="Verified Community Service impact linked to your organization."
                             badge="VERIFIED"
                             background={MOCKUP_GRADIENTS.green}
                         />
@@ -460,7 +384,7 @@ export default function NgoCommunityServiceHub() {
                 <div className="mt-4">
                     <MockupSectionHead
                         title="Create Opportunity"
-                        subtitle="Your organization’s creator lifecycle stays here from draft to publication. Faculty linkage is optional; CIEL PK provides platform review."
+                        subtitle="Opportunities your organization created, from draft to published. CIEL PK reviews each one before it goes live."
                         action={
                             <Link href={CREATE_FORM} className="rounded-full bg-[#0e7d74] px-4 py-2 text-[12px] font-extrabold text-white">
                                 + Create New Opportunity
@@ -693,7 +617,7 @@ export default function NgoCommunityServiceHub() {
                         (() => {
                             const list = projectTab === "verified" ? liveRows : projectTab === "all" ? pipeline : waiting;
                             if (!list.length) {
-                                return <EmptyPanel title="No linked projects" text="Approved engagements linked to your NGO appear here." />;
+                                return <EmptyPanel title="No linked projects" text="Approved engagements linked to your organization appear here." />;
                             }
                             return (
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -734,7 +658,7 @@ export default function NgoCommunityServiceHub() {
                 <div className="mt-4">
                     <MockupSectionHead
                         title={`My Impact Wall · ${orgName}`}
-                        subtitle="Published records: flashcard, CII and detailed report. QR is on the Impact Package. No certificate download."
+                        subtitle="Verified community service linked to your organization. Open a card for the full impact package."
                         action={
                             <Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">
                                 Open analytics →
@@ -744,7 +668,10 @@ export default function NgoCommunityServiceHub() {
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact.</p>
+                        <EmptyPanel
+                            title="No verified impact yet"
+                            text="Once a student's report on one of your projects is verified, it appears here."
+                        />
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {deckCards.map((c) => (
@@ -782,17 +709,6 @@ export default function NgoCommunityServiceHub() {
                 </div>
             )}
 
-            {view === "home" ? (
-                <button
-                    type="button"
-                    onClick={() => setHelpOpen(true)}
-                    title="How NGO community service works"
-                    className="fixed bottom-[88px] right-5 z-50 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#0e5f63,#12a5a0)] text-[21px] text-white shadow-[0_10px_26px_rgba(14,125,116,0.35)] transition hover:scale-105 lg:bottom-6"
-                >
-                    ❓
-                </button>
-            ) : null}
-
             {helpOpen ? (
                 <div
                     className="fixed inset-0 z-[100] overflow-auto bg-[rgba(4,37,43,0.55)] p-5"
@@ -803,7 +719,7 @@ export default function NgoCommunityServiceHub() {
                     <div className="mx-auto mt-6 w-full max-w-[560px] overflow-hidden rounded-[22px] bg-white">
                         <div className="flex items-center gap-2.5 bg-[linear-gradient(115deg,#04252b,#0e5f63_60%,#12a5a0_120%)] px-5 py-4 text-white">
                             <span className="text-lg">🗺️</span>
-                            <b className="text-[13.5px]">NGO / Nonprofit Community Service</b>
+                            <b className="text-[13.5px]">{orgLabel} Community Service</b>
                             <button
                                 type="button"
                                 onClick={() => setHelpOpen(false)}
@@ -819,7 +735,7 @@ export default function NgoCommunityServiceHub() {
                                 is the only academic report approver.
                             </p>
                             <p>
-                                <b>Create</b> — your own opportunities. <b>Approvals</b> — only records that name your NGO.{" "}
+                                <b>Create</b> — your own opportunities. <b>Approvals</b> — only records that name your organization.{" "}
                                 <b>Projects</b> — monitor linked work. <b>Impact</b> — verified flashcards.
                             </p>
                         </div>

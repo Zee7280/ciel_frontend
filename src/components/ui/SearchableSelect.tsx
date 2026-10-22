@@ -19,6 +19,8 @@ export type SearchableSelectProps = {
     accent?: "emerald" | "violet" | "blue" | "pink";
     /** Reserve space on the left when the parent overlays an icon. */
     hasLeftIcon?: boolean;
+    /** `field` matches plain form inputs (thin border, regular weight) — used on the auth pages. */
+    variant?: "pill" | "field";
 };
 
 const ACCENTS = {
@@ -45,7 +47,9 @@ export default function SearchableSelect({
     disabled = false,
     accent = "emerald",
     hasLeftIcon = false,
+    variant = "pill",
 }: SearchableSelectProps) {
+    const field = variant === "field";
     const a = ACCENTS[accent];
     const listRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -141,10 +145,17 @@ export default function SearchableSelect({
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
                 className={clsx(
-                    "w-full cursor-pointer truncate whitespace-nowrap py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-left disabled:cursor-not-allowed disabled:opacity-60",
-                    hasLeftIcon ? "pl-12" : "pl-5",
-                    value ? "text-slate-800" : "text-slate-300",
-                    hasError ? "border-red-500 focus:border-red-500" : `border-slate-100 ${a.focus}`,
+                    "w-full cursor-pointer truncate whitespace-nowrap pr-12 outline-none transition-all text-left disabled:cursor-not-allowed disabled:opacity-60",
+                    field
+                        ? "rounded-lg border bg-white py-3 text-sm font-medium"
+                        : "py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white font-bold",
+                    hasLeftIcon ? "pl-12" : field ? "pl-3.5" : "pl-5",
+                    value ? (field ? "text-[#173540]" : "text-slate-800") : field ? "text-[#94a3b0]" : "text-slate-300",
+                    hasError
+                        ? "border-red-500 focus:border-red-500"
+                        : field
+                          ? "border-[#d7e3e6] focus:border-[#0e7d74]"
+                          : `border-slate-100 ${a.focus}`,
                     isOpen && "hidden",
                 )}
             >
@@ -171,9 +182,12 @@ export default function SearchableSelect({
                         placeholder={searchPlaceholder}
                         aria-label={ariaLabel}
                         className={clsx(
-                            "w-full pr-5 py-4 rounded-2xl border-2 bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                            "w-full pr-5 bg-white outline-none transition-all",
+                            field
+                                ? "rounded-lg border py-3 text-sm font-medium text-[#173540] placeholder:text-[#94a3b0]"
+                                : "py-4 rounded-2xl border-2 font-bold text-slate-800 placeholder:text-slate-300",
                             hasLeftIcon ? "pl-12" : "pl-11",
-                            hasError ? "border-red-500 focus:border-red-500" : a.border,
+                            hasError ? "border-red-500 focus:border-red-500" : field ? "border-[#0e7d74]" : a.border,
                         )}
                     />
 

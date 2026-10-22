@@ -256,7 +256,9 @@ function FacultyStartupBusinessHub() {
     const [certifying, setCertifying] = useState(false);
 
     const myId = getStoredCurrentUserId();
-    const greetName = facultyFirstName();
+    // Read after mount: the server render has no localStorage, so reading it here would mismatch.
+    const [greetName, setGreetName] = useState("Faculty");
+    useEffect(() => setGreetName(facultyFirstName()), []);
 
     useEffect(() => {
         void loadAll();
@@ -389,7 +391,7 @@ function FacultyStartupBusinessHub() {
                 <CourseworkCrumb role="Faculty" view={crumbView} pathLabel="Startup / Venture" />
                 {screen !== "create" ? (
                     <MockupHero
-                        kicker="MY PATHS · STARTUP / VENTURE"
+                        kicker="FACULTY · STARTUP / VENTURE"
                         title={greetName === "Faculty" ? "Welcome" : `Welcome, ${greetName}`}
                         subtitle="One pipeline for every venture you supervise. Each submission arrives as two separate documents: the student's Venture Card (flashcard) and the CIEL AI Analysis Report — a Shark-Tank / VC-lens review shared only with you, your university and CIEL PK."
                         badge="👩‍🏫 FACULTY"

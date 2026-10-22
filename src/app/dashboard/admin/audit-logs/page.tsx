@@ -224,8 +224,8 @@ function AdminAuditLogsPageInner() {
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Audit Logs</h1>
                         <p className="mt-1 max-w-3xl text-sm text-slate-500 sm:text-base">
-                            Admin mutations (successful POST/PATCH/DELETE) recorded by the backend. Use this for accountability and tracing who
-                            changed what — separate from Issue Logs (API errors).
+                            Every change an admin makes (create, update, delete), so you can trace who changed what. Errors are
+                            in Issue Logs.
                         </p>
                     </div>
                 </div>

@@ -102,7 +102,7 @@ export default function UniversityDashboardHome() {
 
             <MockupSectionHead
                 title="Impact Areas"
-                subtitle="Home is only an overview. Open Community Service from the left navigation to access its complete workflow."
+                subtitle="Pick an impact area to see its work, approvals and verified impact."
             />
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <MockupActionCard

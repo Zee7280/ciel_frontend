@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Bell, Lock, Globe, Palette, Shield, Loader2, Save } from "lucide-react";
+import { Bell, Shield, Loader2, Save } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -38,8 +38,13 @@ export default function PartnerSettingsPage() {
             const res = await authenticatedFetch(`/api/v1/settings`);
             if (res && res.ok) {
                 const data = await res.json();
-                if (data.success) {
-                    setSettings(data.data);
+                if (data.success && data.data) {
+                    setSettings((prev) => ({
+                        ...prev,
+                        ...data.data,
+                        notifications: { ...prev.notifications, ...data.data.notifications },
+                        privacy: { ...prev.privacy, ...data.data.privacy },
+                    }));
                 }
             }
         } catch (error) {
@@ -58,7 +63,9 @@ export default function PartnerSettingsPage() {
                 body: JSON.stringify(settings)
             });
             if (res && res.ok) {
-                toast.success("Settings saved successfully");
+                toast.success("Settings saved");
+            } else {
+                toast.error("Could not save settings. Please try again.");
             }
         } catch (error) {
             toast.error("Failed to save settings");
@@ -69,25 +76,25 @@ export default function PartnerSettingsPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+            <div className="flex items-center justify-center py-32">
+                <Loader2 className="w-12 h-12 animate-spin text-[#0e7d74]" />
             </div>
         );
     }
 
     return (
-        <div className="mx-auto max-w-4xl p-0 lg:p-8">
+        <div className="w-full max-w-4xl">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Settings</h1>
-                <p className="text-slate-500">Manage your account preferences and settings</p>
+                <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+                <p className="text-slate-500">Notification and privacy preferences for your account.</p>
             </div>
 
             <div className="space-y-6">
                 {/* Notifications Settings */}
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
-                        <Bell className="w-6 h-6 text-blue-600" />
+                        <Bell className="w-6 h-6 text-[#0e7d74]" />
                         <div>
                             <h2 className="text-xl font-bold text-slate-900">Notification Preferences</h2>
                             <p className="text-sm text-slate-500">Choose how you want to be notified</p>
@@ -109,7 +116,7 @@ export default function PartnerSettingsPage() {
                                     }))}
                                     className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#bfe6df] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0e7d74]"></div>
                             </label>
                         </div>
                         <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
@@ -127,7 +134,7 @@ export default function PartnerSettingsPage() {
                                     }))}
                                     className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#bfe6df] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0e7d74]"></div>
                             </label>
                         </div>
                         <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
@@ -145,7 +152,7 @@ export default function PartnerSettingsPage() {
                                     }))}
                                     className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#bfe6df] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0e7d74]"></div>
                             </label>
                         </div>
                     </div>
@@ -154,7 +161,7 @@ export default function PartnerSettingsPage() {
                 {/* Privacy Settings */}
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
-                        <Shield className="w-6 h-6 text-green-600" />
+                        <Shield className="w-6 h-6 text-[#0e7d74]" />
                         <div>
                             <h2 className="text-xl font-bold text-slate-900">Privacy & Security</h2>
                             <p className="text-sm text-slate-500">Control your privacy settings</p>
@@ -169,7 +176,7 @@ export default function PartnerSettingsPage() {
                                     ...prev,
                                     privacy: { ...prev.privacy, profileVisibility: e.target.value as "public" | "private" }
                                 }))}
-                                className="w-full px-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white"
+                                className="w-full px-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-[#0e7d74] bg-white"
                             >
                                 <option value="public">Public - Visible to everyone</option>
                                 <option value="private">Private - Only visible to you</option>
@@ -190,59 +197,8 @@ export default function PartnerSettingsPage() {
                                     }))}
                                     className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#bfe6df] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0e7d74]"></div>
                             </label>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Appearance Settings */}
-                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Palette className="w-6 h-6 text-purple-600" />
-                        <div>
-                            <h2 className="text-xl font-bold text-slate-900">Appearance</h2>
-                            <p className="text-sm text-slate-500">Customize your interface</p>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="p-4 bg-slate-50 rounded-lg">
-                            <h3 className="font-semibold text-slate-900 mb-3">Theme</h3>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <button
-                                    onClick={() => setSettings(prev => ({ ...prev, theme: "light" }))}
-                                    className={`p-4 border-2 rounded-lg transition-all ${settings.theme === "light"
-                                            ? "border-purple-600 bg-purple-50"
-                                            : "border-slate-200 hover:border-slate-300"
-                                        }`}
-                                >
-                                    <div className="w-full h-12 bg-white border border-slate-200 rounded mb-2"></div>
-                                    <p className="font-semibold text-sm">Light</p>
-                                </button>
-                                <button
-                                    onClick={() => setSettings(prev => ({ ...prev, theme: "dark" }))}
-                                    className={`p-4 border-2 rounded-lg transition-all ${settings.theme === "dark"
-                                            ? "border-purple-600 bg-purple-50"
-                                            : "border-slate-200 hover:border-slate-300"
-                                        }`}
-                                >
-                                    <div className="w-full h-12 bg-slate-900 rounded mb-2"></div>
-                                    <p className="font-semibold text-sm">Dark</p>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4 bg-slate-50 rounded-lg">
-                            <h3 className="font-semibold text-slate-900 mb-3">Language</h3>
-                            <select
-                                value={settings.language}
-                                onChange={(e) => setSettings(prev => ({ ...prev, language: e.target.value }))}
-                                className="w-full px-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white"
-                            >
-                                <option value="en">English</option>
-                                <option value="ur">Urdu</option>
-                                <option value="es">Spanish</option>
-                                <option value="fr">French</option>
-                            </select>
                         </div>
                     </div>
                 </div>
@@ -252,10 +208,10 @@ export default function PartnerSettingsPage() {
                     <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0e7d74] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#0b6760] disabled:opacity-60 sm:w-auto"
                     >
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Save All Settings
+                        Save settings
                     </button>
                 </div>
             </div>

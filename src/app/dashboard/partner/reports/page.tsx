@@ -285,12 +285,12 @@ export default function PartnerReportsPage() {
     };
 
     return (
-        <div className="p-0 lg:p-8">
+        <div className="w-full">
             {/* Header */}
             <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Impact Reports</h1>
-                    <p className="text-slate-500">Review, manage, and track submitted impact reports</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Impact Reports</h1>
+                    <p className="text-slate-500">Student impact reports on opportunities linked to your organization.</p>
                 </div>
             </div>
 
@@ -301,7 +301,7 @@ export default function PartnerReportsPage() {
                     <input
                         type="text"
                         placeholder="Search reports..."
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white"
+                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-[#0e7d74] bg-white"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -309,14 +309,14 @@ export default function PartnerReportsPage() {
                 <div className="relative">
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <select
-                        className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-8 font-medium outline-none focus:border-blue-500"
+                        className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-8 font-medium outline-none focus:border-[#0e7d74]"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
-                        <option value="All">All Status</option>
+                        <option value="All">All statuses</option>
                         <option value="Draft">Draft</option>
                         <option value="Submitted">Submitted</option>
-                        <option value="Approved">Approved</option>
+                        <option value="Verified">Verified</option>
                         <option value="Rejected">Rejected</option>
                     </select>
                 </div>
@@ -331,8 +331,17 @@ export default function PartnerReportsPage() {
                 ) : filteredReports.length === 0 ? (
                     <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-slate-100">
                         <FileText className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                        <h3 className="text-lg font-bold text-slate-900 mb-2">No Reports Found</h3>
-                        <p className="text-slate-500">Try adjusting your filters or search query.</p>
+                        {q || statusFilter !== "All" ? (
+                            <>
+                                <h3 className="text-lg font-bold text-slate-900 mb-2">No reports match</h3>
+                                <p className="text-slate-500">Try a different search or status.</p>
+                            </>
+                        ) : (
+                            <>
+                                <h3 className="text-lg font-bold text-slate-900 mb-2">No student reports yet</h3>
+                                <p className="text-slate-500">Reports appear here once a student submits one on an opportunity linked to your organization.</p>
+                            </>
+                        )}
                     </div>
                 ) : (
                     filteredReports.map((report) => (
@@ -347,16 +356,20 @@ export default function PartnerReportsPage() {
                                         {getStatusIcon(report.status)}
                                         <span className="truncate">{String(report.status ?? "").replace(/_/g, " ")}</span>
                                     </span>
-                                    {report.partner_status != null && String(report.partner_status).trim() !== "" && (
-                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                                            NGO / partner: {String(report.partner_status).replace(/_/g, " ")}
-                                        </span>
-                                    )}
-                                    {report.admin_status != null && String(report.admin_status).trim() !== "" && (
-                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                                            Corporate / admin: {String(report.admin_status).replace(/_/g, " ")}
-                                        </span>
-                                    )}
+                                    {report.partner_status != null &&
+                                        String(report.partner_status).trim() !== "" &&
+                                        String(report.partner_status).toLowerCase() !== "not_applicable" && (
+                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                                                Your review: {String(report.partner_status).replace(/_/g, " ")}
+                                            </span>
+                                        )}
+                                    {report.admin_status != null &&
+                                        String(report.admin_status).trim() !== "" &&
+                                        String(report.admin_status).toLowerCase() !== "not_applicable" && (
+                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                                                CIEL PK review: {String(report.admin_status).replace(/_/g, " ")}
+                                            </span>
+                                        )}
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                     {isStudentImpactReportRow(report) ? (
@@ -409,10 +422,17 @@ export default function PartnerReportsPage() {
                             </div>
 
                             {/* Report Info */}
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">{cardTitle(report)}</h3>
+                            <h3 className="mb-2 line-clamp-3 text-lg font-bold text-slate-900">{cardTitle(report)}</h3>
                             {isStudentImpactReportRow(report) && (report.student_name || report.project_title || report.organization_name || report.organization || report.student_email) && (
                                 <p className="mb-1 break-words text-xs leading-relaxed text-slate-500">
-                                    {[report.student_name, report.project_title, report.organization_name ?? report.organization, report.student_email].filter(Boolean).join(" · ")}
+                                    {[
+                                        report.student_name,
+                                        report.project_title !== cardTitle(report) ? report.project_title : null,
+                                        report.organization_name ?? report.organization,
+                                        report.student_email,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
                                 </p>
                             )}
                             <p className="text-sm text-slate-500 mb-4">
@@ -421,7 +441,7 @@ export default function PartnerReportsPage() {
                             {isStudentImpactReportRow(report) && (
                                 <Link
                                     href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
-                                    className="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700 mb-3"
+                                    className="mb-3 inline-flex text-sm font-semibold text-[#0e7d74] hover:underline"
                                 >
                                     View Impact Package
                                 </Link>

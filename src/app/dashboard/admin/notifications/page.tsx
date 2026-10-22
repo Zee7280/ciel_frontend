@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Bell, CheckCheck, CheckCircle, Clock, ExternalLink, Info, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, Bell, CheckCheck, CheckCircle, Clock, ExternalLink, Info, Loader2, Trash2, XCircle } from "lucide-react";
+import { notificationDisplayType } from "@/utils/notificationTone";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
@@ -138,13 +139,19 @@ export default function AdminNotificationsPage() {
         }
     };
 
-    const getTypeVisual = (type: Notification["type"]) => {
+    const getTypeVisual = (type: string) => {
         switch (type) {
             case "approval":
                 return {
                     bar: "bg-emerald-500",
                     iconWrap: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100/80",
                     icon: <CheckCircle className="h-5 w-5" strokeWidth={2} />,
+                };
+            case "rejected":
+                return {
+                    bar: "bg-red-500",
+                    iconWrap: "bg-red-50 text-red-700 ring-1 ring-red-100/80",
+                    icon: <XCircle className="h-5 w-5" strokeWidth={2} />,
                 };
             case "reminder":
                 return {
@@ -276,7 +283,7 @@ export default function AdminNotificationsPage() {
             ) : (
                 <ul className="mx-auto max-w-4xl space-y-3" role="list">
                     {filteredNotifications.map((notification) => {
-                        const visual = getTypeVisual(notification.type);
+                        const visual = getTypeVisual(notificationDisplayType(notification));
                         const unread = !notification.isRead;
                         return (
                             <li key={notification.id}>

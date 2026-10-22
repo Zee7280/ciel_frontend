@@ -1357,7 +1357,7 @@ export default function StartupBusinessHub({
                             emoji="🚀"
                             ghost="🚀"
                             title="Create Startup Record"
-                            subtitle="Open the CIEL PK Venture Studio form (v13). Nine steps — each drafts its own summary for you to accept; your first saved fields issue a Venture ID and auto-save one master record shared with your faculty, university and CIEL PK."
+                            subtitle="Open the CIEL PK Venture Studio form. Nine steps — each drafts its own summary for you to accept; your first saved fields issue a Venture ID and auto-save one master record shared with your faculty, university and CIEL PK."
                             badge="START"
                             background={MOCKUP_GRADIENTS.teal}
                         />

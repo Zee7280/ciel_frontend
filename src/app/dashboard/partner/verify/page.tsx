@@ -23,7 +23,7 @@ import {
     type FacultyApprovalRow,
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
-import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { getStoredCurrentUserId, getStoredOrganizationId } from "@/utils/currentUser";
 import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
@@ -32,6 +32,7 @@ import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFac
 import { History } from "lucide-react";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
+import { isOwnedByCurrentPartner } from "@/utils/partnerOpportunityOwnership";
 
 /** Partner/NGO's own line has already been reached here — their pending decision IS the "Partner /
  * NGO" stage, so (unlike the Create Opportunity tab's "my own opportunity" pipeline) it's shown as
@@ -73,12 +74,6 @@ function pickObj(record: Record<string, unknown> | null, ...keys: string[]): Rec
         if (value && typeof value === "object") return value as Record<string, unknown>;
     }
     return null;
-}
-
-function isOwnedByCurrentPartner(record: Record<string, unknown>, currentUserId: string) {
-    if (lower(record.created_by_role ?? record.creator_role) === "partner") return true;
-    const creatorId = record.creatorId ?? record.creator_id ?? record.created_by ?? record.owner_id;
-    return Boolean(currentUserId && creatorId != null && String(creatorId).trim() === currentUserId);
 }
 
 function hasPartnerSignal(record: Record<string, unknown>) {
@@ -163,7 +158,7 @@ function mapPartnerApprovalRows(payload: unknown, currentUserId: string): Partne
             // do not belong in the partner approval queue.
             const access = raw.viewer_access as { can_partner_review?: boolean } | undefined;
             if (access?.can_partner_review === false) return false;
-            return !isOwnedByCurrentPartner(raw, currentUserId) && hasPartnerSignal(raw);
+            return !isOwnedByCurrentPartner(raw, currentUserId, getStoredOrganizationId()) && hasPartnerSignal(raw);
         });
 }
 
@@ -588,14 +583,12 @@ export default function VerifyWorkPage() {
     }, [isLoading, rows]);
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
+        <div className="w-full space-y-6 pb-20">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Partner Opportunity Approvals</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Verify Work</h1>
                 <p className="text-slate-500">
-                    Opportunities appear here when a student listed your organisation as the partner while creating the project.
-                </p>
-                <p className="text-slate-500 text-sm mt-2">
-                    This is not impact report verification. It is the partner approval queue, similar to the faculty approvals flow.
+                    Opportunities created by students or faculty that name your organization as a partner. Approve them,
+                    ask for changes, or decline.
                 </p>
             </div>
 

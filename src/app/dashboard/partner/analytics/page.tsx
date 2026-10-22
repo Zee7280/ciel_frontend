@@ -5,12 +5,11 @@ import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOve
 
 export default function PartnerAnalyticsPage() {
     return (
-        <div className="mx-auto max-w-[1400px] space-y-4 pb-10">
+        <div className="w-full space-y-4 pb-10">
             <header className="border-b border-slate-200 pb-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">BI workspace</p>
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analytics</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                    Organization-wide participation and verification by form section (4A/4B for activities and outcomes).
+                    Participation, hours and verification across every opportunity linked to your organization.
                 </p>
             </header>
 

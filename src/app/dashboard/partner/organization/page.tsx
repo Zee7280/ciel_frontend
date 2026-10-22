@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Upload, Loader2, ChevronDown } from "lucide-react";
+import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Clock, Upload, Loader2, ChevronDown } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -12,6 +12,8 @@ import {
     validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_PROVINCE_OPTIONS, PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
+import { missingPartnerOrganizationFields } from "@/utils/profileCompletion";
 
 const normalizeText = (value: unknown) =>
     typeof value === "string" ? value : value == null ? "" : String(value);
@@ -46,11 +48,40 @@ function syncStoredUserFromOrganisation(apiData: Record<string, unknown>) {
     }
 }
 
+/** Upload paths like `/uploads/x.png` are served by the API host, not this app. */
+function resolveUploadUrl(url: string): string {
+    if (!url.startsWith("/")) return url;
+    const api = resolveBackendApiV1Base();
+    try {
+        return api ? `${new URL(api).origin}${url}` : url;
+    } catch {
+        return url;
+    }
+}
+
+function websiteHref(website: string): string {
+    const trimmed = website.trim().replace(/^(https?):\/*/i, "$1://");
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function orgTypeLabel(type: string, category: string): string {
+    if (/government/i.test(category)) return "HEC / Government";
+    const t = type.trim().toLowerCase();
+    if (!t) return "Organization";
+    if (t === "ngo") return "NGO / Nonprofit";
+    if (t === "corporate") return "Corporate partner";
+    if (t === "university") return "University";
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export default function OrganizationProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [logoFailed, setLogoFailed] = useState(false);
+    /** Fields still blocking the rest of the partner dashboard (see ProfileCompletionGate). */
+    const [missingFields, setMissingFields] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [phoneCountryKey, setPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
     const [phoneNational, setPhoneNational] = useState("");
@@ -62,6 +93,7 @@ export default function OrganizationProfilePage() {
         // Basic Info
         name: "", // Read-only
         type: "", // Read-only
+        category: "", // Read-only (e.g. "Government Organization")
         description: "",
         website: "",
         city: "",
@@ -84,6 +116,14 @@ export default function OrganizationProfilePage() {
         isSafeguardingAcknowledged: false,
         isDataPolicyAcknowledged: false
     });
+
+    const verificationStatusLower = orgData.verificationStatus.trim().toLowerCase();
+    const verificationTone =
+        verificationStatusLower === "approved" || verificationStatusLower === "verified"
+            ? "approved"
+            : verificationStatusLower === "rejected"
+              ? "rejected"
+              : "pending";
 
     const orgCityInList = useMemo(
         () => (PAKISTAN_REGION_OPTIONS as readonly string[]).includes(orgData.city.trim()),
@@ -125,12 +165,12 @@ export default function OrganizationProfilePage() {
 
                     if (apiData) {
                         syncStoredUserFromOrganisation(apiData as Record<string, unknown>);
+                        const missing = missingPartnerOrganizationFields(apiData as Record<string, unknown>);
+                        setMissingFields(missing);
+                        if (missing.length) setIsEditing(true);
                         // Handle logo URL
                         let logoUrl = normalizeText(apiData.logoUrl ?? apiData.image);
-                        if (logoUrl && logoUrl.startsWith("/")) {
-                            // Force the base URL to localhost:3000 as explicitly requested
-                            logoUrl = `http://localhost:3000${logoUrl}`;
-                        }
+                        logoUrl = resolveUploadUrl(logoUrl);
 
                         const rawPhone = normalizeText(apiData.contactPhone);
                         const phoneParts = parsePhoneForDisplay(rawPhone);
@@ -144,6 +184,7 @@ export default function OrganizationProfilePage() {
                             ...prev,
                             name: normalizeText(apiData.name),
                             type: normalizeText(apiData.orgType),
+                            category: normalizeText(apiData.organizationCategory),
                             description: normalizeText(apiData.description),
                             website: normalizeText(apiData.websiteUrl ?? apiData.website),
                             city: normalizeText(apiData.city),
@@ -218,13 +259,8 @@ export default function OrganizationProfilePage() {
                 const uploadedUrl = data.data?.logo_url || data.data?.url;
 
                 if (data.success && uploadedUrl) {
-                    // Force the base URL to localhost:3000 as explicitly requested
-                    let fullUrl = uploadedUrl;
-                    if (uploadedUrl.startsWith("/")) {
-                        fullUrl = `http://localhost:3000${uploadedUrl}`;
-                    }
-
-                    setOrgData(prev => ({ ...prev, image: fullUrl }));
+                    setLogoFailed(false);
+                    setOrgData(prev => ({ ...prev, image: resolveUploadUrl(uploadedUrl) }));
                     toast.success("Logo uploaded successfully");
                 } else {
                     toast.error(data.message || "Failed to upload logo");
@@ -331,9 +367,15 @@ export default function OrganizationProfilePage() {
                         contactPhone: contactPhoneE164,
                     });
                     setOrgData((prev) => ({ ...prev, contactPhone: contactPhoneE164 }));
-                    // Optionally update state with response data if API returns updated object
-                    // Note: If API returns the mapped object, we might need to map it back to state if we use the response
-                    toast.success("Profile updated successfully!");
+                    const stillMissing = missingPartnerOrganizationFields({ ...payload, name: orgData.name });
+                    const wasBlocked = missingFields.length > 0;
+                    setMissingFields(stillMissing);
+                    if (stillMissing.length) {
+                        setIsEditing(true);
+                        toast.warning(`Saved. Still needed: ${stillMissing.join(", ")}`);
+                    } else {
+                        toast.success(wasBlocked ? "Profile complete. Your dashboard is unlocked." : "Profile updated successfully!");
+                    }
                 } else {
                     toast.error(data.message || "Failed to update profile");
                 }
@@ -350,10 +392,19 @@ export default function OrganizationProfilePage() {
 
     return (
         <div className="w-full space-y-6">
+            {missingFields.length > 0 ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+                    <p className="font-bold">Finish your organization profile to unlock the dashboard</p>
+                    <p className="mt-1">
+                        Opportunities, approvals and reports open once these are filled in:{" "}
+                        <b>{missingFields.join(", ")}</b>.
+                    </p>
+                </div>
+            ) : null}
             <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">My Organization</h1>
-                    <p className="text-slate-500 text-sm mt-1">Manage your organization profile and public trading settings.</p>
+                    <p className="text-slate-500 text-sm mt-1">Your organization profile as students and reviewers see it.</p>
                 </div>
                 <button
                     onClick={() => setIsEditing(!isEditing)}
@@ -385,8 +436,13 @@ export default function OrganizationProfilePage() {
                                         <div className="absolute inset-0 bg-slate-100 flex items-center justify-center">
                                             <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                                         </div>
-                                    ) : orgData.image ? (
-                                        <img src={orgData.image} alt="Logo" className="w-full h-full object-cover" />
+                                    ) : orgData.image && !logoFailed ? (
+                                        <img
+                                            src={orgData.image}
+                                            alt={`${orgData.name || "Organization"} logo`}
+                                            className="w-full h-full object-cover"
+                                            onError={() => setLogoFailed(true)}
+                                        />
                                     ) : (
                                         <Building2 className="w-12 h-12 text-slate-400" />
                                     )}
@@ -401,11 +457,24 @@ export default function OrganizationProfilePage() {
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900">{orgData.name || "Organization Name"}</h2>
                                 {orgData.verificationStatus && (
-                                    <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-bold mt-2">
-                                        <CheckCircle className="w-3 h-3" /> {orgData.verificationStatus}
+                                    <div
+                                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 ${
+                                            verificationTone === "approved"
+                                                ? "bg-green-50 text-green-700"
+                                                : verificationTone === "rejected"
+                                                  ? "bg-red-50 text-red-700"
+                                                  : "bg-amber-50 text-amber-700"
+                                        }`}
+                                    >
+                                        {verificationTone === "approved" ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}{" "}
+                                        {verificationTone === "approved"
+                                            ? "Verified"
+                                            : verificationTone === "rejected"
+                                              ? "Not approved"
+                                              : "Awaiting CIEL PK verification"}
                                     </div>
                                 )}
-                                <p className="text-sm text-slate-500 mt-4">{orgData.type || "Organization Type"}</p>
+                                <p className="text-sm text-slate-500 mt-4">{orgTypeLabel(orgData.type, orgData.category)}</p>
                             </>
                         )}
                     </div>
@@ -471,12 +540,22 @@ export default function OrganizationProfilePage() {
                                             onChange={(e) => setOrgData({ ...orgData, website: e.target.value })}
                                         />
                                     ) : (
-                                        <a href={`https://${orgData.website}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{orgData.website || "N/A"}</a>
+                                        orgData.website ? (
+                                            <a href={websiteHref(orgData.website)} target="_blank" rel="noreferrer" className="break-all text-[#0e7d74] hover:underline">
+                                                {orgData.website}
+                                            </a>
+                                        ) : (
+                                            <span className="text-slate-400">Not added</span>
+                                        )
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-500 uppercase mb-1">Country (Locked)</label>
-                                    <input type="text" value={orgData.country} readOnly className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                                    <label className="block text-sm font-bold text-slate-500 uppercase mb-1">Country</label>
+                                    {isEditing ? (
+                                        <input type="text" value={orgData.country} readOnly title="Country can't be changed" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed" />
+                                    ) : (
+                                        <p className="text-slate-900">{orgData.country}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-500 uppercase mb-1">City</label>
@@ -660,7 +739,7 @@ export default function OrganizationProfilePage() {
                             <button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-70"
+                                className="flex items-center gap-2 rounded-lg bg-[#0e7d74] px-6 py-2 font-bold text-white hover:bg-[#0b6760] disabled:opacity-70"
                             >
                                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {isSaving ? "Saving..." : "Save Changes"}

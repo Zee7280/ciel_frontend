@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { CommunityCrumb, HubBackButton, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, HubBackButton, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import NationalRankingStudio from "@/components/ciel/community-service/national-ranking/NationalRankingStudio";
@@ -551,11 +551,6 @@ export default function UniversityCommunityServiceHub() {
             {effectiveView === "home" && (
                 <>
                     <UserGuideBanner {...GUIDES.home} />
-                    <ZoneRule title="Navigation rule">
-                        You entered Community Service from the left. Everything below belongs to this impact area; Home remains a
-                        clean overview. Faculty Allocation controls authority; projects, impact, analytics and exports remain
-                        separate for clarity.
-                    </ZoneRule>
                     <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                         {attention.map((item) => (
                             <Link

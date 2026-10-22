@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download } from "lucide-react";
+import SignupProofDocuments, { readSignupProofDocuments } from "@/components/admin/SignupProofDocuments";
+import { Paperclip, Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { downloadCsv } from "../_shared/csv";
@@ -288,6 +289,8 @@ export default function AdminOrganizationsPage() {
                 toast.success(`${name} suspended`);
             }
             setConfirm(null);
+            // Approving / rejecting from the details view: its status is now stale, so close it.
+            if (selectedOrg?.id === id) setSelectedOrg(null);
         } catch (error) {
             console.error(`Error running ${action} on organization`, error);
             toast.error("Action failed");
@@ -496,6 +499,15 @@ export default function AdminOrganizationsPage() {
                                                 <div>
                                                     <div className="font-bold text-slate-900">{org.name}</div>
                                                     <div className="text-xs text-slate-400">{org.email}</div>
+                                                    {Number(org.signup_documents_count) > 0 ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openOrganizationDetails(org)}
+                                                            className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#cbece4] bg-[#e8f7f3] px-2 py-0.5 text-[11px] font-semibold text-[#08756b] hover:border-[#0e7d74]"
+                                                        >
+                                                            <Paperclip className="h-3 w-3" /> {org.signup_documents_count} signup document{Number(org.signup_documents_count) === 1 ? "" : "s"}
+                                                        </button>
+                                                    ) : null}
                                                 </div>
                                             </div>
                                         </td>
@@ -670,6 +682,9 @@ export default function AdminOrganizationsPage() {
                                         <p className="mt-1 whitespace-pre-wrap">{readOrgValue(selectedOrg, ["verification_notes"], "No reason recorded.")}</p>
                                     </div>
                                 ) : null}
+                                <div className="mb-4">
+                                    <SignupProofDocuments documents={readSignupProofDocuments(selectedOrg?.signup_proof_documents)} />
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                     <DetailCard label="Organization Name" value={readOrgValue(selectedOrg, ["name", "organization_name"])} strong />
                                     <DetailCard label="Email" value={readOrgValue(selectedOrg, ["email"])} breakAll />
@@ -751,6 +766,26 @@ export default function AdminOrganizationsPage() {
                                     )}
                                 </div>
                             </>
+                        )}
+
+                        {selectedOrg && !isDetailsLoading && orgStatusOf(selectedOrg) === "pending" && (
+                            <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                                <p className="mr-auto text-xs text-slate-500">Check the signup documents above before deciding.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => openConfirm("reject", selectedOrg)}
+                                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100"
+                                >
+                                    Reject
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openConfirm("approve", selectedOrg)}
+                                    className="rounded-xl bg-[#0e7d74] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b6760]"
+                                >
+                                    Approve organization
+                                </button>
+                            </div>
                         )}
 
                         {selectedOrg && isUniversityOrganization(selectedOrg) && (

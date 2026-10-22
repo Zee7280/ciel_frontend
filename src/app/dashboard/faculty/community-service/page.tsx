@@ -673,7 +673,19 @@ function FacultyCommunityServiceHub() {
                 <>
                     <UserGuideBanner {...FACULTY_CS_GUIDES.home} />
                     <AttentionRow items={attention} />
-                    <MockupSectionHead title="Community Service tools" subtitle="Choose the responsibility you need to work on." />
+                    <MockupSectionHead
+                        title="Community Service tools"
+                        subtitle="Pick what you want to work on."
+                        action={
+                            <button
+                                type="button"
+                                onClick={() => setHelpOpen(true)}
+                                className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+                            >
+                                How it works
+                            </button>
+                        }
+                    />
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                         <MockupActionCard
                             href={`${CS_BASE}?view=create`}
@@ -1239,17 +1251,6 @@ function FacultyCommunityServiceHub() {
                     </a>
                 </div>
             )}
-
-            {view === "home" ? (
-                <button
-                    type="button"
-                    onClick={() => setHelpOpen(true)}
-                    title="How faculty community service works"
-                    className="fixed bottom-[88px] right-5 z-50 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#0e5f63,#12a5a0)] text-[21px] text-white shadow-[0_10px_26px_rgba(14,125,116,0.35)] transition hover:scale-105 lg:bottom-6"
-                >
-                    ❓
-                </button>
-            ) : null}
 
             {helpOpen ? (
                 <div

@@ -842,10 +842,7 @@ export default function AttendanceReviewDashboard({
                                                     </p>
                                                     {!partnerTeamsLoading ? (
                                                         <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                                                            Titles in the pattern &quot;[lead name]&apos;s team&quot; use the{" "}
-                                                            <strong>team lead on roster</strong> — they label the cohort you
-                                                            selected, not who is approving and not proof that everyone on that
-                                                            roster has partner-pending attendance.
+                                                            Teams are named after their team lead.
                                                         </p>
                                                     ) : null}
                                                     {partnerTeamsLoading ? (
@@ -934,13 +931,8 @@ export default function AttendanceReviewDashboard({
                                                     Group members ({partnerRoster.length})
                                                 </p>
                                                 <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                                                    Only volunteers who currently have attendance <strong>sitting in your partner queue</strong>{" "}
-                                                    appear here — not everyone enrolled on the project roster. With a cohort
-                                                    card selected right now, rows must also <strong>match that cohort&apos;s grouping key</strong>{" "}
-                                                    (often the team ID). If someone is missing, usual causes: no attendance log yet,
-                                                    routed to <strong>faculty</strong> instead of partner, already approved, or roster /{" "}
-                                                    <strong>teamId</strong> on their record doesn&apos;t line up — try another cohort card if
-                                                    the project lists more than one, or escalate a data fix.
+                                                    Only members with attendance waiting for your review are listed. Someone missing
+                                                    may not have logged hours yet, or their hours go to faculty instead.
                                                 </p>
                                                 <div className="mt-2 min-h-[5rem] max-h-48 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                                                     {partnerRoster.length === 0 ? (

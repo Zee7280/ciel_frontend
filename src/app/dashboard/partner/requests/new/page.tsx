@@ -135,7 +135,13 @@ function isNgoOrganizationType(orgType: string): boolean {
     );
 }
 
+/** HEC / Government signups are stored as NGO accounts; only the org category tells them apart. */
+function storedIsGovernmentOrg(): boolean {
+    return /government/i.test(String(readStoredCurrentUser()?.organizationCategory ?? ""));
+}
+
 function isNgoCreatorAccount(orgType: string): boolean {
+    if (storedIsGovernmentOrg()) return false;
     const role = storedSignupRole();
     if (role === "ngo") return true;
     if (role === "corporate" || role === "government" || role === "university") return false;
@@ -144,6 +150,7 @@ function isNgoCreatorAccount(orgType: string): boolean {
 
 function defaultCreatorDetailType(orgType: string): string {
     if (storedSignupRole() === "university") return UNIVERSITY_CREATOR_TYPE;
+    if (storedIsGovernmentOrg()) return "Government Department / Authority";
     if (isNgoOrganizationType(orgType)) return "NGO / Nonprofit";
     const t = orgType.trim().toLowerCase();
     if (t.includes("government") || t.includes("public sector")) return "Public Sector Organization";
@@ -369,15 +376,15 @@ export default function OpportunityPostingPage() {
         if (!formData.title.trim()) B.title = "Please enter an Opportunity Title";
         if (!formData.hook.trim()) B.hook = "Please add a one-line student hook.";
         if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
-            B.opportunityType = "Please select at least one Opportunity Type (Section B)";
+            B.opportunityType = "Please select at least one Opportunity Type";
         }
         if (formData.isOtherTypeChecked) {
             const otherSpecs = formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean);
             if (otherSpecs.length === 0) {
-                B.otherType = "Please add at least one Other opportunity type description (Section B)";
+                B.otherType = "Please add at least one Other opportunity type description";
             }
         }
-        if (!formData.mode) B.mode = "Please select a Mode of Engagement (Section B)";
+        if (!formData.mode) B.mode = "Please select a Mode of Engagement";
         if (formData.mode !== "Remote") {
             if (!formData.location.city.trim()) B.locationCity = "Please enter a City/Area";
             if (!formData.location.pin.trim()) {
@@ -417,7 +424,7 @@ export default function OpportunityPostingPage() {
         if (!formData.objectives.outputs.trim()) C.outputs = "Please describe expected outputs.";
 
         if (!formData.activity.responsibilities.trim()) {
-            E.responsibilities = "Please list Student Responsibilities (Section E)";
+            E.responsibilities = "Please list Student Responsibilities";
         }
 
         const vs = formData.verificationSafety;
@@ -751,6 +758,8 @@ export default function OpportunityPostingPage() {
 
     const handleSaveDraft = async (quiet = false) => {
         if (editingOpportunityId && !isDraftMode) return;
+        // Autosave on "Next" must not create an empty "Untitled opportunity" draft for someone just browsing the steps.
+        if (quiet && !draftIdRef.current && !formData.title.trim()) return;
         const job = draftSaveChain.current.then(async () => {
             const payload = {
                 ...buildOpportunityPayload(),
@@ -1164,7 +1173,7 @@ export default function OpportunityPostingPage() {
     const creatorCopy = isNgoCreator
         ? {
             eyebrow: "CIEL PK · NGO / NONPROFIT COMMUNITY SERVICE",
-            heroTitle: "Create an opportunity — faculty is optional, Apply Now is yours to define.",
+            heroTitle: "Create a community service opportunity",
             intro: "Faculty linkage is optional. The opportunity may be open across all universities or targeted to selected universities/departments. Add a co-host only when a separate collaborator is involved.",
             flow: "NGO/Nonprofit creator → co-host acknowledgement if another organization is named → CIEL PK final review → Published opportunity",
             badge: "NGO / NONPROFIT CREATOR",
@@ -1178,7 +1187,7 @@ export default function OpportunityPostingPage() {
         }
         : {
             eyebrow: "CIEL PK · PARTNER CREATOR",
-            heroTitle: "Create an opportunity — with the right checks for partner creator.",
+            heroTitle: "Create an opportunity for students",
             intro: "Private, public, government, CSR, SME, social-enterprise, professional and community partners are supported. Faculty is optional. Add another partner only when there is a separate co-host/collaborator.",
             flow: "Partner creator → CIEL PK review → Published opportunity; co-host acknowledgement first when another organization is named",
             badge: "PARTNER CREATOR",
@@ -1332,7 +1341,7 @@ export default function OpportunityPostingPage() {
                         </div>
                     </div>
                     <div className="co-fun-tip">
-                        <b>Design rule</b>
+                        <b>Good to know</b>
                         <p>The card can be publicly discoverable while Apply Now stays limited to the universities or departments you select.</p>
                     </div>
                     <div className="co-side-card">
@@ -1388,7 +1397,7 @@ export default function OpportunityPostingPage() {
                                 <input
                                     readOnly
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm"
-                                    value={orgDetails.organizationType || creatorCopy.unitFallback}
+                                    value={creatorCopy.unitFallback}
                                 />
                             </div>
                             <div>
@@ -3091,7 +3100,7 @@ export default function OpportunityPostingPage() {
                                     className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
                                     onClick={goNextStep}
                                 >
-                                    {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
+                                    {WIZARD_STEPS[activeStepIndex + 1]?.label ? `Next: ${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
                                 </button>
                             ) : null}
                         </div>

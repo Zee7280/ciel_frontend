@@ -189,7 +189,7 @@ function FacultyFypThesisHub() {
                         ]}
                     />
                 ) : view === "pending" || view === "rank" || view === "progress" ? null : (
-                    <HubBackButton href={homeHref} label="← Back to module buttons" />
+                    <HubBackButton href={homeHref} label="← Back to FYP" />
                 )}
 
                 {view === "home" && (
@@ -279,7 +279,7 @@ function FacultyFypThesisHub() {
                                 { value: String(revision.length), label: "REVISION WITH STUDENT" },
                             ]}
                         />
-                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <HubBackButton href={homeHref} label="← Back to FYP" />
                         <PathSectionHead
                             title="Final Year Projects in Progress"
                             subtitle="Live completion from each student's FYP record. Reminders open Email / WhatsApp with a prefilled message."
@@ -321,7 +321,7 @@ function FacultyFypThesisHub() {
                                 { value: String(aiFlagsToCheck), label: "AI FLAGS TO CHECK" },
                             ]}
                         />
-                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <HubBackButton href={homeHref} label="← Back to FYP" />
                         <PathSectionHead
                             title="Final Year Project submissions"
                             subtitle="Open the Detailed Review: every section shows the preliminary score, the review comment, strengths, limitations and how to improve, with a box to amend the score and add your own comment. Then approve, request revision or reject."
@@ -420,7 +420,7 @@ function FacultyFypThesisHub() {
                                 { value: "Unlimited", label: "CONFIDENTIAL PREVIEWS" },
                             ]}
                         />
-                        <HubBackButton href={homeHref} label="← Back to module buttons" />
+                        <HubBackButton href={homeHref} label="← Back to FYP" />
                         <PathSectionHead
                             title="FYP Ranking Studio — Comparative AI Grader"
                             subtitle="Standard formula CIEL-PK-FYP-COMP-2.0 · discipline-weighted, benchmarked against excellent work in each discipline · the same formula the University and CIEL PK use — only the cohort changes."

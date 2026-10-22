@@ -10,10 +10,9 @@ export default function PartnerTutorialsPage() {
                         <Building2 className="h-7 w-7" strokeWidth={2} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Platform tutorial</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Platform tutorial</h1>
                         <p className="mt-1 max-w-2xl text-sm text-slate-500 sm:text-base">
-                            Step-by-step guides for using the partner dashboard and verification flows. Universities and
-                            other partner organisations see the same tutorials here.
+                            Step-by-step guides for creating opportunities, approving work and tracking verified impact.
                         </p>
                     </div>
                 </div>

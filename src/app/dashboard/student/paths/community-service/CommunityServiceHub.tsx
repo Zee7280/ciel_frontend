@@ -5,7 +5,7 @@ import Link from "next/link";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import { CommunityCrumb, UserGuideBanner, ZoneRule } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { CommunityCrumb, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { prefetchCommunityServiceData, prefetchStudentBrowseOpportunities, fetchCommunityServiceRankings } from "@/utils/student-community-cache";
 
 const HUB = "/dashboard/student/paths/community-service";
@@ -120,7 +120,7 @@ export default function CommunityServiceHub({
             <div className="mb-1 mt-6">
                 <h2 className="m-0 text-[21px] font-semibold text-[#16313d]">Community Service</h2>
                 <p className="mt-1 text-[12.5px] text-[#70808a]">
-                    One contained area. Proposal approval stays in My Opportunities; applications stay in Browse; only approved work moves into My Reports.
+                    Find or propose an opportunity, get it approved, then log your work and report your impact.
                 </p>
             </div>
 
@@ -129,13 +129,33 @@ export default function CommunityServiceHub({
                 rule="My Opportunities happen before My Reports; My Reports starts after approval."
             />
 
-            <ZoneRule title="Where am I?">
-                You entered Community Service from the left navigation. Everything below belongs to this impact area; Home remains a clean overview.
-            </ZoneRule>
-
             {attention?.length ? <AttentionRow items={attention} /> : null}
 
-            <MockupSectionHead title="Community Service tools" subtitle="Choose what you need to do next." />
+            <MockupSectionHead
+
+                title="Community Service tools"
+
+                subtitle="Choose what you need to do next."
+
+                action={
+
+                    <button
+
+                        type="button"
+
+                        onClick={() => setHelpOpen(true)}
+
+                        className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+
+                    >
+
+                        How it works
+
+                    </button>
+
+                }
+
+            />
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 <MockupActionCard
@@ -168,7 +188,7 @@ export default function CommunityServiceHub({
                     emoji="🛠️"
                     ghost="🛠️"
                     title="My Reports"
-                    subtitle="Report operational home: Ready to Start → In Progress → Under Review → Action Required → Completed → Rejected / Closed."
+                    subtitle="Your approved projects and reports, from Ready to Start through to Completed."
                     badge="REPORT HOME"
                     background={MOCKUP_GRADIENTS.orange}
                     hot={workspaceHot}
@@ -231,15 +251,6 @@ export default function CommunityServiceHub({
                     Create opportunity
                 </Link>
             </p>
-
-            <button
-                type="button"
-                onClick={() => setHelpOpen(true)}
-                title="How community service works"
-                className="fixed bottom-[88px] right-5 z-50 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#0e5f63,#12a5a0)] text-[21px] text-white shadow-[0_10px_26px_rgba(14,125,116,0.35)] transition hover:scale-105 lg:bottom-6"
-            >
-                ❓
-            </button>
 
             {helpOpen ? (
                 <div

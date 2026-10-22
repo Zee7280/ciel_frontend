@@ -18,6 +18,9 @@ import {
     studentPathAllowedDuringSubscriptionPending,
 } from "@/utils/studentSubscription";
 
+/** The org page reads `complete=1` to explain why the partner was sent there. */
+const PARTNER_COMPLETE_PROFILE_PATH = "/dashboard/partner/organization?complete=1";
+
 /**
  * Redirects student/partner/faculty to their profile until required fields exist on the cached user
  * (localStorage, merged after login / profile save). Admin is not gated.
@@ -56,15 +59,18 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
         }
 
         if (pathname.startsWith("/dashboard/partner")) {
-            if (partnerNeedsMembershipPayment(user) && !partnerPathAllowedDuringMembershipPending(pathname)) {
-                router.replace("/dashboard/partner/membership-payment");
+            if (partnerNeedsMembershipPayment(user)) {
+                // Paying comes first: the profile check below would otherwise bounce them off the payment page.
+                if (!partnerPathAllowedDuringMembershipPending(pathname)) {
+                    router.replace("/dashboard/partner/membership-payment");
+                }
                 return;
             }
             if (pathname.startsWith("/dashboard/partner/organization")) return;
             const token = localStorage.getItem("ciel_token");
             const userId = user.id ?? user.userId ?? user.user_id;
             if (!token || userId == null || userId === "") {
-                router.replace("/dashboard/partner/organization");
+                router.replace(PARTNER_COMPLETE_PROFILE_PATH);
                 return;
             }
             void (async () => {
@@ -74,7 +80,7 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
                         body: JSON.stringify({ userId }),
                     }, { redirectToLogin: false });
                     if (!res?.ok) {
-                        router.replace("/dashboard/partner/organization");
+                        router.replace(PARTNER_COMPLETE_PROFILE_PATH);
                         return;
                     }
                     const body = await res.json().catch(() => null);
@@ -87,10 +93,10 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
                             ? (root.data as Record<string, unknown>)
                             : root;
                     if (!org || !isPartnerOrganizationComplete(org)) {
-                        router.replace("/dashboard/partner/organization");
+                        router.replace(PARTNER_COMPLETE_PROFILE_PATH);
                     }
                 } catch {
-                    router.replace("/dashboard/partner/organization");
+                    router.replace(PARTNER_COMPLETE_PROFILE_PATH);
                 }
             })();
             return;

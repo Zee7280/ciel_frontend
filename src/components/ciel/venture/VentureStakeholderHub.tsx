@@ -15,6 +15,7 @@ import { computeVentureMeritScorecard, type VentureMeritEntry } from "@/utils/ve
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 import VentureAiCriticalReviewPanel from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
 import { analyseVentureCriticalReview } from "@/utils/ventureCriticalReview";
+import SignupProofDocuments, { readSignupProofDocuments } from "@/components/admin/SignupProofDocuments";
 
 export type VentureHubVariant = "university" | "ciel";
 
@@ -356,7 +357,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
         orgName?: string;
         status?: string;
         createdAt?: string;
-        settings?: { investor?: { investorType?: string; plan?: string; kycStatus?: string } };
+        settings?: { investor?: { investorType?: string; plan?: string; kycStatus?: string; proofDocuments?: unknown } };
     }[]>([]);
     const [investorActingId, setInvestorActingId] = useState<string | null>(null);
 
@@ -1027,6 +1028,9 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                                         <div className="min-w-0 flex-1">
                                             <div className="font-extrabold text-[#14212b]">{u.name || "Investor"}</div>
                                             <div className="text-[13px] text-[#5d6c78]">{u.email} · {type} · {u.orgName || "—"}</div>
+                                            <div className="mt-1.5">
+                                                <SignupProofDocuments compact documents={readSignupProofDocuments(u.settings?.investor?.proofDocuments)} />
+                                            </div>
                                         </div>
                                         <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold uppercase ${pending ? "bg-[#fff3e0] text-[#c65b00]" : String(u.status).toLowerCase() === "active" ? "bg-[#e6f6ec] text-[#1c8a52]" : "bg-[#eceff1] text-[#455a64]"}`}>{u.status || "pending"}</span>
                                         {pending && (

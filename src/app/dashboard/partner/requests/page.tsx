@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, Copy, ExternalLink, ShieldCheck } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
-import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { getStoredCurrentUserId, getStoredOrganizationId } from "@/utils/currentUser";
 import { peekPersistedVerificationReturn } from "@/utils/verificationReturnUrl";
 import {
     canEditReturnedOpportunity,
@@ -16,21 +16,11 @@ import {
 } from "@/utils/opportunityWorkflow";
 import { toast } from "sonner";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
+import { isOwnedByCurrentPartner } from "@/utils/partnerOpportunityOwnership";
 
-function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
-    const createdByRole = String(opportunity.created_by_role ?? opportunity.creator_role ?? "").toLowerCase();
-    const source = String(opportunity.source ?? "").toLowerCase();
-
-    if (opportunity.is_student_created === true || createdByRole === "student" || source === "student_created") {
-        return false;
-    }
-
-    const creatorId = opportunity.creatorId ?? opportunity.creator_id ?? opportunity.created_by ?? opportunity.owner_id;
-    if (!currentUserId || creatorId == null) {
-        return true;
-    }
-
-    return String(creatorId).trim() === currentUserId;
+/** Drafts reopen in the create wizard, where the remaining steps can be finished and submitted. */
+function draftHref(id: unknown): string {
+    return `/dashboard/partner/requests/new?edit=${encodeURIComponent(String(id))}&draft=1`;
 }
 
 type StatusTab = "all" | "drafts" | "review" | "action" | "live" | "rejected";
@@ -96,7 +86,7 @@ export default function PartnerRequestsPage() {
                         ? rows.filter((item: unknown) => item && typeof item === "object")
                         : rows.filter((item: unknown) =>
                               item && typeof item === "object"
-                                  ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId) ||
+                                  ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId, getStoredOrganizationId()) ||
                                     // The executing-organization contact is told to open the opportunity here
                                     // to confirm execution details, so their row must not be filtered out.
                                     (item as { viewer_access?: { is_executing_contact?: boolean } }).viewer_access
@@ -165,13 +155,13 @@ export default function PartnerRequestsPage() {
         <div className="w-full pb-32 space-y-6">
             <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-bold text-slate-900">Create & manage your opportunities</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">My Opportunities</h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        Draft → Submit → CIEL PK review → Published / Closed. Faculty linkage is optional.
+                        Draft → Submit → CIEL PK review → Live. Track applicants and progress for each one.
                     </p>
                 </div>
-                <Link href="/dashboard/partner/requests/new" className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
-                    <Plus className="w-4 h-4" /> Post New
+                <Link href="/dashboard/partner/requests/new" className="flex items-center justify-center gap-2 rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#0b6760]">
+                    <Plus className="w-4 h-4" /> Create opportunity
                 </Link>
             </div>
 
@@ -248,7 +238,13 @@ export default function PartnerRequestsPage() {
                                             <div className="flex flex-col gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => router.push(`/dashboard/partner/requests/${req.id}`)}
+                                                    onClick={() =>
+                                                        router.push(
+                                                            listTab(req) === "drafts" && req.viewer_access?.is_org_owner !== false
+                                                                ? draftHref(req.id)
+                                                                : `/dashboard/partner/requests/${req.id}`,
+                                                        )
+                                                    }
                                                     className="overflow-hidden rounded-2xl text-left"
                                                 >
                                                     <OpportunityListFlashHead title={req.title} />
@@ -298,7 +294,14 @@ export default function PartnerRequestsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">
-                                                {req.viewer_access?.is_org_owner === false ? null : (
+                                                {req.viewer_access?.is_org_owner === false ? null : listTab(req) === "drafts" ? (
+                                                    <Link
+                                                        href={draftHref(req.id)}
+                                                        className="h-10 px-3 flex items-center gap-2 bg-[#0e7d74] text-white text-xs font-bold rounded-lg hover:bg-[#0b6760] whitespace-nowrap transition-all shadow-sm"
+                                                    >
+                                                        <Edit className="w-3 h-3" /> Continue editing
+                                                    </Link>
+                                                ) : (
                                                     <Link
                                                         href={`/dashboard/partner/requests/${req.id}/applicants`}
                                                         className="h-10 px-3 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 whitespace-nowrap transition-all shadow-sm"

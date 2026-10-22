@@ -539,7 +539,7 @@ export default function AdminEmailPage() {
                                 <p className="text-xs text-amber-800">
                                     <span className="font-semibold">Note:</span> Emails are sent from{" "}
                                     <span className="font-mono bg-amber-100 px-1 py-0.5 rounded">admin@cielpk.com</span>{" "}
-                                    using the official CIEL PK template. Ensure SMTP is properly configured.
+                                    using the official CIEL PK template.
                                 </p>
                             </div>
                         </div>

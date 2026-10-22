@@ -429,6 +429,9 @@ export function resolvePartnerOpportunityListLabels(project: Record<string, unkn
     }
 
     const st = lower(project.status);
+    if (st === "draft") {
+        return { primaryLabel: "Draft", badgeTone: "neutral", workflowSubtitle: null };
+    }
     if (st === "rejected") {
         return { primaryLabel: "Rejected", badgeTone: "rejected", workflowSubtitle: wf };
     }
@@ -438,7 +441,7 @@ export function resolvePartnerOpportunityListLabels(project: Record<string, unkn
     }
 
     if (
-        ["pending_verification", "pending_approval", "pending_execution", "pending", "draft"].includes(st) ||
+        ["pending_verification", "pending_approval", "pending_execution", "pending"].includes(st) ||
         st.includes("pending")
     ) {
         const label = st === "pending_approval" ? "Pending approval" : "Under review";

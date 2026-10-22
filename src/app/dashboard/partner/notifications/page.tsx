@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, CheckCircle, Trash2, Filter, Loader2, AlertCircle, Info, Clock } from "lucide-react";
+import { Bell, CheckCircle, Trash2, Filter, Loader2, AlertCircle, Info, Clock, XCircle } from "lucide-react";
+import { notificationDisplayType } from "@/utils/notificationTone";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
@@ -80,6 +81,7 @@ export default function PartnerNotificationsPage() {
 
     const getIcon = (type: string) => {
         switch (type) {
+            case "rejected": return <XCircle className="w-5 h-5 text-red-600" />;
             case "approval": return <CheckCircle className="w-5 h-5 text-green-600" />;
             case "reminder": return <Clock className="w-5 h-5 text-blue-600" />;
             case "update": return <Info className="w-5 h-5 text-purple-600" />;
@@ -90,6 +92,7 @@ export default function PartnerNotificationsPage() {
 
     const getTypeColor = (type: string) => {
         switch (type) {
+            case "rejected": return "bg-red-50 border-red-200";
             case "approval": return "bg-green-50 border-green-200";
             case "reminder": return "bg-blue-50 border-blue-200";
             case "update": return "bg-purple-50 border-purple-200";
@@ -105,11 +108,11 @@ export default function PartnerNotificationsPage() {
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
-        <div className="p-0 lg:p-8">
+        <div className="w-full">
             {/* Header */}
             <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Notifications</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
                     <p className="text-slate-500">
                         {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
                     </p>
@@ -154,12 +157,12 @@ export default function PartnerNotificationsPage() {
                             key={notification.id}
                             className={`rounded-2xl border p-5 transition-all ${notification.isRead
                                     ? "bg-white border-slate-100"
-                                    : `${getTypeColor(notification.type)} border-2`
+                                    : `${getTypeColor(notificationDisplayType(notification))} border-2`
                                 }`}
                         >
                             <div className="flex items-start gap-4">
                                 <div className="flex-shrink-0 mt-1">
-                                    {getIcon(notification.type)}
+                                    {getIcon(notificationDisplayType(notification))}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="mb-2 flex flex-col items-start justify-between gap-1 sm:flex-row sm:gap-4">

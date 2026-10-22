@@ -608,7 +608,7 @@ function AdminPathSubmissionsHub() {
                     ) : null}
                     <MockupHero
                         title="Final Year Project (FYP)"
-                        subtitle="Track Final Year Projects from initial draft through faculty approval and final EI analysis."
+                        subtitle="Track Final Year Projects from initial draft through faculty approval and final AI analysis."
                         stats={[
                             { value: String(fypRows.length), label: "Total Records" },
                             { value: String(underReviewFypBadge), label: "Waiting for Review" },

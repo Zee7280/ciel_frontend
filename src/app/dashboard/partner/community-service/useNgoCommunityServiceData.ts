@@ -10,7 +10,8 @@ import {
     type CommunityAwardCard,
     type CommunityPipelineRow,
 } from "@/utils/communityAwardModel";
-import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
+import { getStoredCurrentUserId, getStoredOrganizationId, readStoredCurrentUser } from "@/utils/currentUser";
+import { readPartnerOrgLabel } from "@/utils/partnerOrgKind";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import {
     canEditReturnedOpportunity,
@@ -19,6 +20,7 @@ import {
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
+import { isOwnedByCurrentPartner } from "@/utils/partnerOpportunityOwnership";
 
 export const NGO_CS_BASE = "/dashboard/partner/community-service";
 export const NGO_CS_CREATE_FORM = "/dashboard/partner/requests/new";
@@ -68,12 +70,6 @@ function emailOrUndef(value?: string): string | undefined {
     return value && value.includes("@") ? value : undefined;
 }
 
-function isOwnedByCurrentPartner(record: Record<string, unknown>, currentUserId: string) {
-    if (lower(record.created_by_role ?? record.creator_role) === "partner") return true;
-    const creatorId = record.creatorId ?? record.creator_id ?? record.created_by ?? record.owner_id;
-    return Boolean(currentUserId && creatorId != null && String(creatorId).trim() === currentUserId);
-}
-
 function hasPartnerSignal(record: Record<string, unknown>) {
     const supervision =
         record.supervision && typeof record.supervision === "object"
@@ -119,12 +115,15 @@ export function useNgoCommunityServiceData() {
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [orgName, setOrgName] = useState("NGO / Nonprofit");
+    /** "NGO / Nonprofit" or "HEC / Government" — both use this hub. */
+    const [orgLabel, setOrgLabel] = useState("NGO / Nonprofit");
     /** Bumped after an approve / revision / rejection so the queues refresh in place. */
     const [reloadKey, setReloadKey] = useState(0);
     const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
     useEffect(() => {
         setOrgName(readNgoOrgName());
+        setOrgLabel(readPartnerOrgLabel(readStoredCurrentUser() as Parameters<typeof readPartnerOrgLabel>[0]));
     }, []);
 
     useEffect(() => {
@@ -191,11 +190,12 @@ export function useNgoCommunityServiceData() {
     }, [reloadKey]);
 
     const currentUserId = getStoredCurrentUserId();
-    const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
+    const currentOrgId = getStoredOrganizationId();
+    const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId, currentOrgId)), [oppRows, currentUserId, currentOrgId]);
     const namedToUs = useMemo(
         () =>
-            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId) && hasPartnerSignal(row)),
-        [oppRows, currentUserId],
+            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId, currentOrgId) && hasPartnerSignal(row)),
+        [oppRows, currentUserId, currentOrgId],
     );
     const linkedDrafts = useMemo(
         () => namedToUs.filter((row) => partnerQueueBucket(row) === "linked"),
@@ -262,6 +262,7 @@ export function useNgoCommunityServiceData() {
         loading,
         reload,
         orgName,
+        orgLabel,
         oppRows,
         mine,
         pendingApprovals,

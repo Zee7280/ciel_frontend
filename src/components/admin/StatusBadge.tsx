@@ -32,9 +32,16 @@ const STATUS_TONE: Record<string, Tone> = {
     expired: "red",
 };
 
+/** Short labels for long statuses, so table chips don't overflow into the next column. */
+const SHORT_LABEL: Record<string, string> = {
+    pending_membership_payment: "Fee pending",
+    pending_subscription_payment: "Fee pending",
+};
+
 export function statusLabel(status: string | null | undefined): string {
     const s = String(status ?? "").trim();
     if (!s) return "Unknown";
+    if (SHORT_LABEL[s.toLowerCase()]) return SHORT_LABEL[s.toLowerCase()];
     return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -58,6 +65,7 @@ export default function StatusBadge({
     const t = tone ?? statusTone(status);
     return (
         <span
+            title={status ? status.replace(/_/g, " ") : undefined}
             className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${TONE[t]} ${className}`}
         >
             {children ?? label ?? statusLabel(status)}

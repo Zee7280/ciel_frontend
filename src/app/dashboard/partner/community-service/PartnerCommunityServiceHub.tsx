@@ -22,7 +22,7 @@ import {
     type CommunityAwardCard,
     type CommunityPipelineRow,
 } from "@/utils/communityAwardModel";
-import { getStoredCurrentUserId, readStoredCurrentUser } from "@/utils/currentUser";
+import { getStoredCurrentUserId, getStoredOrganizationId, readStoredCurrentUser } from "@/utils/currentUser";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 import {
     canEditReturnedOpportunity,
@@ -33,6 +33,7 @@ import {
 import { formatOpportunityCode } from "@/utils/displayIds";
 import { partnerQueueBucket } from "@/utils/partnerOpportunityQueue";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
+import { isOwnedByCurrentPartner } from "@/utils/partnerOpportunityOwnership";
 
 const CS_VIEWS = ["home", "create", "approvals", "projects", "impact", "analytics", "pending", "approved"] as const;
 type CsView = (typeof CS_VIEWS)[number];
@@ -152,12 +153,6 @@ function lower(value: unknown): string {
     return String(value ?? "")
         .trim()
         .toLowerCase();
-}
-
-function isOwnedByCurrentPartner(record: Record<string, unknown>, currentUserId: string) {
-    if (lower(record.created_by_role ?? record.creator_role) === "partner") return true;
-    const creatorId = record.creatorId ?? record.creator_id ?? record.created_by ?? record.owner_id;
-    return Boolean(currentUserId && creatorId != null && String(creatorId).trim() === currentUserId);
 }
 
 function hasPartnerSignal(record: Record<string, unknown>) {
@@ -342,11 +337,12 @@ export default function PartnerCommunityServiceHub() {
     }, [reloadKey]);
 
     const currentUserId = getStoredCurrentUserId();
-    const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId)), [oppRows, currentUserId]);
+    const currentOrgId = getStoredOrganizationId();
+    const mine = useMemo(() => oppRows.filter((row) => isOwnedByCurrentPartner(row, currentUserId, currentOrgId)), [oppRows, currentUserId, currentOrgId]);
     const namedToUs = useMemo(
         () =>
-            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId) && hasPartnerSignal(row)),
-        [oppRows, currentUserId],
+            oppRows.filter((row) => !isOwnedByCurrentPartner(row, currentUserId, currentOrgId) && hasPartnerSignal(row)),
+        [oppRows, currentUserId, currentOrgId],
     );
     const linkedDrafts = useMemo(
         () => namedToUs.filter((row) => partnerQueueBucket(row) === "linked"),
@@ -478,11 +474,6 @@ export default function PartnerCommunityServiceHub() {
 
                     <UserGuide view="home" />
 
-                    <p className="mt-4 rounded-[15px] border border-[#cee3e0] bg-[linear-gradient(135deg,#eef9f6,#fff)] px-3.5 py-3 text-[12.5px] leading-relaxed text-[#4d6d6b]">
-                        <b className="text-[#126b60]">Navigation rule:</b> You entered Community Service from the left. Everything
-                        below belongs to this impact area; Home remains a clean overview.
-                    </p>
-
                     <div className="mt-4 rounded-[18px] border border-[#cfe3de] bg-[linear-gradient(135deg,#f2fbf7,#fff)] p-4 shadow-[0_8px_24px_rgba(23,75,67,.06)]">
                         <h3 className="m-0 flex items-center gap-2 text-[15px] font-semibold text-[#16313d]">
                             Approvals waiting for you
@@ -552,7 +543,19 @@ export default function PartnerCommunityServiceHub() {
                     </div>
 
                     <AttentionRow items={attention} />
-                    <MockupSectionHead title="Community Service tools" subtitle="Choose the responsibility you need to work on." />
+                    <MockupSectionHead
+                        title="Community Service tools"
+                        subtitle="Pick what you want to work on."
+                        action={
+                            <button
+                                type="button"
+                                onClick={() => setHelpOpen(true)}
+                                className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+                            >
+                                How it works
+                            </button>
+                        }
+                    />
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                         <MockupActionCard
                             href={`${CS_BASE}?view=create`}
@@ -885,7 +888,10 @@ export default function PartnerCommunityServiceHub() {
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
                     ) : deckCards.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-500">Rejected work never appears as verified impact.</p>
+                        <EmptyPanel
+                            title="No verified impact yet"
+                            text="Once a student's report on one of your projects is verified, it appears here."
+                        />
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {deckCards.map((c) => (
@@ -922,17 +928,6 @@ export default function PartnerCommunityServiceHub() {
                     </a>
                 </div>
             )}
-
-            {view === "home" ? (
-                <button
-                    type="button"
-                    onClick={() => setHelpOpen(true)}
-                    title="How partner community service works"
-                    className="fixed bottom-[88px] right-5 z-50 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#0e5f63,#12a5a0)] text-[21px] text-white shadow-[0_10px_26px_rgba(14,125,116,0.35)] transition hover:scale-105 lg:bottom-6"
-                >
-                    ❓
-                </button>
-            ) : null}
 
             {helpOpen ? (
                 <div

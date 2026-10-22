@@ -20,7 +20,7 @@ import {
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
 import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
-import { readPartnerOrgKind, type PartnerOrgKind } from "@/utils/partnerOrgKind";
+import { readPartnerOrgKind, readPartnerOrgLabel, type PartnerOrgKind } from "@/utils/partnerOrgKind";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 import {
     CIEL_IMPACT_SUMMARY_CACHE_EVENT,
@@ -419,6 +419,7 @@ export default function Sidebar() {
 
     const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
     const [partnerOrgKind, setPartnerOrgKind] = useState<PartnerOrgKind>("partner");
+    const [partnerOrgLabel, setPartnerOrgLabel] = useState("Partner Organization");
     useEffect(() => {
         if (!isPartner) {
             setIsUniversityPartnerOrg(false);
@@ -429,10 +430,11 @@ export default function Sidebar() {
             try {
                 const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
                 const u = raw
-                    ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string; role?: string })
+                    ? (JSON.parse(raw) as { orgType?: string; organizationCategory?: string; organization_type?: string; type?: string; role?: string })
                     : null;
                 const kind = readPartnerOrgKind(u);
                 setPartnerOrgKind(kind);
+                setPartnerOrgLabel(readPartnerOrgLabel(u));
                 setIsUniversityPartnerOrg(kind === "university");
             } catch {
                 setIsUniversityPartnerOrg(false);
@@ -601,13 +603,16 @@ export default function Sidebar() {
                     ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
                     : []),
                 { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
+                ...(!isUniversityPartnerOrg
+                    ? [{ label: "Participants", href: "/dashboard/partner/participants", icon: Users }]
+                    : []),
                 // Universities don't author Community Service opportunities directly — faculty
                 // representatives create them on the institution's behalf (see the backend's
                 // matching guard in OpportunitiesService.create).
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus }]
                     : []),
-                { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
+                { label: "Verify Work", href: "/dashboard/partner/verify", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
                 ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/community-service?view=impact", icon: FileBarChart }] : []),
                 ...(!isUniversityPartnerOrg
@@ -963,9 +968,13 @@ export default function Sidebar() {
                                           : isAdmin
                                             ? "Super Admin Dashboard"
                                             : isPartner
-                                              ? partnerOrgKind === "ngo"
-                                                ? "NGO Dashboard"
-                                                : "Partner Dashboard"
+                                              ? partnerOrgLabel === "HEC / Government"
+                                                ? "HEC / Govt Dashboard"
+                                                : partnerOrgLabel === "Corporate Partner"
+                                                  ? "Corporate Dashboard"
+                                                  : partnerOrgKind === "ngo"
+                                                    ? "NGO Dashboard"
+                                                    : "Partner Dashboard"
                                             : "Dashboard"}
                             </span>
                         </div>
@@ -1206,6 +1215,9 @@ export default function Sidebar() {
                         ))}
                     </>
                 )}
+                {/* Overlay scrollbars stay hidden until you scroll, so fade the bottom edge to show
+                    there are more items below the fold. It takes its own space, so it never covers the last item. */}
+                <div aria-hidden className="pointer-events-none sticky -bottom-2 h-8 bg-gradient-to-t from-[#0f2d3a] to-transparent" />
             </div>
 
             <div className="shrink-0 space-y-1 border-t border-white/10 p-3">

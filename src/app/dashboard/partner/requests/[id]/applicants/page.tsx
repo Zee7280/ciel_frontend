@@ -97,6 +97,11 @@ function teamRowsForDialog(applicant: Applicant | null, allApplicants: Applicant
     return [leaderRow, ...memberRows];
 }
 
+/** The backend reports an accepted applicant as either `accepted` or `approved`. */
+function isAcceptedStatus(status: string): boolean {
+    return status === 'accepted' || status === 'approved';
+}
+
 export default function ManageApplicantsPage() {
     const params = useParams();
     const router = useRouter();
@@ -189,7 +194,10 @@ export default function ManageApplicantsPage() {
     const filteredApplicants = applicants.filter(app => {
         const matchesSearch = app.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             app.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = filterStatus === 'all' || app.status === filterStatus;
+        const matchesFilter =
+            filterStatus === 'all' ||
+            app.status === filterStatus ||
+            (filterStatus === 'accepted' && isAcceptedStatus(app.status));
         return matchesSearch && matchesFilter;
     });
 
@@ -201,11 +209,11 @@ export default function ManageApplicantsPage() {
     const selectedTeamRows = teamRowsForDialog(selectedTeam, applicants);
 
     if (isLoading) {
-        return <div className="flex items-center justify-center p-0 lg:p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+        return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#0e7d74]" /></div>;
     }
 
     return (
-        <div className="mx-auto max-w-7xl p-0 lg:p-8">
+        <div className="w-full">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <Link href="/dashboard/partner/requests" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 mb-2 transition-colors">
@@ -272,7 +280,7 @@ export default function ManageApplicantsPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10 border border-slate-200">
-                                                <AvatarImage src={app.avatar} />
+                                                {app.avatar ? <AvatarImage src={app.avatar} alt="" /> : null}
                                                 <AvatarFallback>{app.studentName.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                             <div>
@@ -323,7 +331,7 @@ export default function ManageApplicantsPage() {
                                                             Shortlist
                                                         </button>
                                                     )}
-                                                    {app.status !== 'accepted' && (
+                                                    {!isAcceptedStatus(app.status) && app.status !== 'finalized' && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(app.id, 'accepted')}
                                                             className="px-3 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-bold shadow-sm shadow-green-500/30 transition-colors"
@@ -331,7 +339,7 @@ export default function ManageApplicantsPage() {
                                                             Accept
                                                         </button>
                                                     )}
-                                                    {app.status !== 'rejected' && (
+                                                    {app.status !== 'rejected' && app.status !== 'finalized' && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(app.id, 'rejected')}
                                                             className="px-3 py-2.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-bold transition-colors"

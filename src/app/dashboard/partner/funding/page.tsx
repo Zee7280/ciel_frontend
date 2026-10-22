@@ -23,6 +23,16 @@ interface Application {
     submittedDate: string;
 }
 
+function FundingEmpty({ title, text }: { title: string; text: string }) {
+    return (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+            <DollarSign className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+            <p className="font-bold text-slate-800">{title}</p>
+            <p className="mt-1 text-sm text-slate-500">{text}</p>
+        </div>
+    );
+}
+
 export default function PartnerFundingPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [opportunities, setOpportunities] = useState<FundingOpportunity[]>([]);
@@ -70,11 +80,11 @@ export default function PartnerFundingPage() {
     };
 
     return (
-        <div className="p-0 lg:p-8">
+        <div className="w-full">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Funding Opportunities</h1>
-                <p className="text-slate-500">Explore and apply for funding to scale your impact</p>
+                <h1 className="text-2xl font-bold text-slate-900">Funding Opportunities</h1>
+                <p className="text-slate-500">Explore and apply for funding to scale your impact.</p>
             </div>
 
             {/* Tabs */}
@@ -82,25 +92,25 @@ export default function PartnerFundingPage() {
                 <button
                     onClick={() => setActiveTab("opportunities")}
                     className={`pb-3 px-4 font-semibold transition-colors relative ${activeTab === "opportunities"
-                        ? "text-blue-600"
+                        ? "text-[#0e7d74]"
                         : "text-slate-500 hover:text-slate-700"
                         }`}
                 >
                     Available Opportunities
                     {activeTab === "opportunities" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0e7d74]" />
                     )}
                 </button>
                 <button
                     onClick={() => setActiveTab("applications")}
                     className={`pb-3 px-4 font-semibold transition-colors relative ${activeTab === "applications"
-                        ? "text-blue-600"
+                        ? "text-[#0e7d74]"
                         : "text-slate-500 hover:text-slate-700"
                         }`}
                 >
-                    My Applications
+                    My Applications{applications.length ? ` (${applications.length})` : ""}
                     {activeTab === "applications" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0e7d74]" />
                     )}
                 </button>
             </div>
@@ -109,6 +119,10 @@ export default function PartnerFundingPage() {
                 <div className="flex justify-center py-20">
                     <Loader2 className="w-10 h-10 animate-spin text-slate-400" />
                 </div>
+            ) : activeTab === "opportunities" && opportunities.length === 0 ? (
+                <FundingEmpty title="No funding calls open right now" text="New funding opportunities from CIEL PK and its partners will appear here." />
+            ) : activeTab === "applications" && applications.length === 0 ? (
+                <FundingEmpty title="No applications yet" text="Applications you submit for open funding calls are tracked here." />
             ) : activeTab === "opportunities" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {opportunities.map((opp) => (
@@ -126,7 +140,7 @@ export default function PartnerFundingPage() {
                             <div className="space-y-3 mb-6">
                                 <div className="flex items-center gap-3 text-slate-600">
                                     <DollarSign className="w-5 h-5 text-green-600" />
-                                    <span className="font-semibold">Up to ${opp.amount.toLocaleString()}</span>
+                                    <span className="font-semibold">Up to ${Number(opp.amount || 0).toLocaleString()}</span>
                                 </div>
                                 <div className="flex items-center gap-3 text-slate-600">
                                     <Calendar className="w-5 h-5 text-blue-600" />
@@ -142,7 +156,7 @@ export default function PartnerFundingPage() {
                                 onClick={() => setSelectedOpportunity(opp)}
                                 disabled={opp.status === "closed"}
                                 className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${opp.status === "open"
-                                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                                    ? "bg-[#0e7d74] text-white hover:bg-[#0b6760]"
                                     : "bg-slate-100 text-slate-400 cursor-not-allowed"
                                     }`}
                             >
@@ -164,7 +178,7 @@ export default function PartnerFundingPage() {
                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
                                     <span className="flex items-center gap-2">
                                         <DollarSign className="w-4 h-4" />
-                                        ${app.amount.toLocaleString()}
+                                        ${Number(app.amount || 0).toLocaleString()}
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <Calendar className="w-4 h-4" />

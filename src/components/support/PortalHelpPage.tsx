@@ -311,12 +311,7 @@ export default function PortalHelpPage({
                 {tab === "tutorials" && (
                     <PlatformTutorialsPanel
                         visible={tab === "tutorials"}
-                        emptyDescription={
-                            <>
-                                Platform guides will appear here when your administrator publishes them under{" "}
-                                <span className="font-semibold text-slate-700">Admin → Platform tutorial</span>.
-                            </>
-                        }
+                        emptyDescription="Step-by-step video guides are on their way. Meanwhile, check the FAQs or submit a ticket and our team will help."
                     />
                 )}
 

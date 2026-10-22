@@ -542,7 +542,7 @@ export default function CommunityServiceWorkspace({
             <CommunityCrumb role="Student" view="My Reports" />
             <MockupSectionHead
                 title="My Reports"
-                subtitle="Report operational home after an opportunity or participation request is approved. Same Report ID moves across folders by status — never proposal approval."
+                subtitle="Projects you've been approved for. Each report moves between these folders as its status changes."
                 action={
                     <Link href={HUB} className="border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline">
                         ← Back to module buttons

@@ -5,7 +5,14 @@ import PendingAttendanceModal from "@/components/engagement/PendingAttendanceMod
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { usePartnerOpportunityReview } from "@/components/faculty/FacultyOpportunityReviewActions";
-import { NGO_CS_BASE, NGO_CS_IMPACT, useNgoCommunityServiceData } from "./community-service/useNgoCommunityServiceData";
+import {
+    NGO_CS_APPROVALS,
+    NGO_CS_BASE,
+    NGO_CS_CREATE_FORM,
+    NGO_CS_IMPACT,
+    NGO_CS_MY_OPPS,
+    useNgoCommunityServiceData,
+} from "./community-service/useNgoCommunityServiceData";
 
 const TONE_CLASS = {
     default: "text-[#0e4d4e]",
@@ -24,16 +31,20 @@ export default function NgoDashboardHome() {
             <PendingAttendanceModal variant="partner" />
 
             <MockupHero
-                kicker="CIEL PK · NGO / Nonprofit Dashboard"
+                kicker={`CIEL PK · ${cs.orgLabel}`}
                 title={cs.orgName}
-                subtitle="Choose Community Service from the left to create opportunities, approve linked work, monitor projects and view verified impact."
+                subtitle="Post community service opportunities, approve work that names your organization and track verified impact."
                 gradient={COMMAND_HERO}
                 stats={[
-                    { value: "1", label: "Active impact area" },
                     {
-                        value: dash(cs.pendingApprovals.length),
-                        label: "Community actions",
-                        href: `${NGO_CS_BASE}?view=approvals`,
+                        value: dash(cs.createCounts.published),
+                        label: "Live opportunities",
+                        href: `${NGO_CS_MY_OPPS}?tab=live`,
+                    },
+                    {
+                        value: dash(cs.applicationsOnMine),
+                        label: "Applications",
+                        href: NGO_CS_MY_OPPS,
                     },
                     {
                         value: dash(cs.pipeline.length),
@@ -43,42 +54,43 @@ export default function NgoDashboardHome() {
                     {
                         value: dash(cs.deckCards.length),
                         label: "Verified impact",
-                        href: `${NGO_CS_BASE}?view=impact`,
+                        href: NGO_CS_IMPACT,
                     },
                 ]}
-                rightStat={{ value: "🌍", label: "NGO / Nonprofit" }}
+                rightStat={{ value: cs.orgLabel === "HEC / Government" ? "🏛️" : cs.orgLabel === "Corporate Partner" ? "💼" : "🌍", label: cs.orgLabel }}
             />
 
-            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            <MockupSectionHead title="Needs your attention" />
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                 {(
                     [
                         {
                             n: cs.pendingApprovals.length,
                             title: "Approvals waiting",
-                            sub: `Opportunities naming ${cs.orgName}`,
-                            href: `${NGO_CS_BASE}?view=approvals&tab=pending`,
+                            sub: "Opportunities that name your organization",
+                            href: `${NGO_CS_APPROVALS}?tab=pending`,
                             tone: tone(cs.pendingApprovals.length),
                         },
                         {
+                            n: cs.createCounts.action,
+                            title: "Changes requested",
+                            sub: "Your opportunities sent back by reviewers",
+                            href: `${NGO_CS_MY_OPPS}?tab=action`,
+                            tone: tone(cs.createCounts.action),
+                        },
+                        {
+                            n: cs.createCounts.drafts,
+                            title: "Unfinished drafts",
+                            sub: "Finish and submit for review",
+                            href: `${NGO_CS_MY_OPPS}?tab=drafts`,
+                            tone: tone(cs.createCounts.drafts, "warn"),
+                        },
+                        {
                             n: cs.waiting.length,
-                            title: "Linked reports in progress",
-                            sub: "Monitor completion · send reminders",
+                            title: "Reports in progress",
+                            sub: "Student reports on your projects",
                             href: `${NGO_CS_BASE}?view=projects&tab=active`,
                             tone: tone(cs.waiting.length, "warn"),
-                        },
-                        {
-                            n: cs.applicationsOnMine,
-                            title: "Applications on my opportunities",
-                            sub: "Approved by supervising faculty",
-                            href: `${NGO_CS_BASE}?view=create&tab=published`,
-                            tone: "default" as const,
-                        },
-                        {
-                            n: cs.deckCards.length,
-                            title: "Verified impact records",
-                            sub: "Linked to your organization",
-                            href: `${NGO_CS_BASE}?view=impact`,
-                            tone: "default" as const,
                         },
                     ] as const
                 ).map((item) => (
@@ -110,28 +122,40 @@ export default function NgoDashboardHome() {
                 />
             </div>
 
-            <MockupSectionHead
-                title="Impact Areas"
-                subtitle="Home is only an overview. Open Community Service from the left navigation to access its complete workflow."
-            />
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <MockupSectionHead title="Quick actions" />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
                 <MockupActionCard
-                    href={NGO_CS_BASE}
-                    emoji="🌱"
-                    ghost="🌱"
-                    title="Community Service"
-                    subtitle="Create opportunities, approve linked records, monitor projects and showcase verified impact."
-                    badge="OPEN AREA"
+                    href={NGO_CS_CREATE_FORM}
+                    emoji="🚀"
+                    title="Create opportunity"
+                    subtitle="Post a new community service opportunity for students."
+                    badge="NEW"
                     background={MOCKUP_GRADIENTS.teal}
-                    hot={cs.pendingApprovals.length + cs.waiting.length > 0}
+                />
+                <MockupActionCard
+                    href={NGO_CS_MY_OPPS}
+                    emoji="📋"
+                    title="My opportunities"
+                    subtitle="Drafts, reviews, live listings and applicants."
+                    badge={cs.loading ? "…" : `${cs.mine.length} TOTAL`}
+                    background={MOCKUP_GRADIENTS.navy}
+                    hot={cs.createCounts.action > 0}
+                />
+                <MockupActionCard
+                    href={`${NGO_CS_APPROVALS}?tab=pending`}
+                    emoji="✅"
+                    title="Verify work"
+                    subtitle="Approve opportunities that name your organization."
+                    badge={cs.loading ? "…" : `${cs.pendingApprovals.length} WAITING`}
+                    background={MOCKUP_GRADIENTS.orange}
+                    hot={cs.pendingApprovals.length > 0}
                 />
                 <MockupActionCard
                     href={NGO_CS_IMPACT}
                     emoji="🏆"
-                    ghost="🏆"
-                    title="Organization Impact Portfolio"
-                    subtitle="A future combined view of your organization’s verified impact across CIEL PK areas."
-                    badge="PORTFOLIO"
+                    title="Impact wall"
+                    subtitle="Verified community service linked to your organization."
+                    badge={cs.loading ? "…" : `${cs.deckCards.length} VERIFIED`}
                     background={MOCKUP_GRADIENTS.green}
                 />
             </div>
