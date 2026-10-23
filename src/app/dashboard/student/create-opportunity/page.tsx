@@ -231,6 +231,10 @@ function resolveDraftResumeStep(record: Record<string, unknown>, draftId: string
     return null;
 }
 
+/** Similar-title warning and block for student listings. Switched off for now, matching the server's
+ * STUDENT_SIMILAR_TITLE_BLOCK_ENABLED; set both to true to turn it back on. */
+const SIMILAR_TITLE_CHECK_ENABLED = false;
+
 type SimilarOpportunityMatch = {
     id: string;
     title: string;
@@ -983,7 +987,12 @@ function StudentOpportunityCreationPageInner() {
         if (!validateForm()) return;
 
         // Submitting a draft creates the listing, so it gets the same duplicate check as a new one.
-        if ((!editingOpportunityId || isDraftMode) && similarMatches.length > 0 && !formData.privateCandidate) {
+        if (
+            SIMILAR_TITLE_CHECK_ENABLED &&
+            (!editingOpportunityId || isDraftMode) &&
+            similarMatches.length > 0 &&
+            !formData.privateCandidate
+        ) {
             const own = similarMatches.find((m) => m.is_own);
             toast.error(
                 own
@@ -1716,7 +1725,7 @@ function StudentOpportunityCreationPageInner() {
 
     useEffect(() => {
         // Editing a submitted listing never re-checks; a draft has not been submitted yet, so it does.
-        if (editingOpportunityId && !isDraftMode) {
+        if (!SIMILAR_TITLE_CHECK_ENABLED || (editingOpportunityId && !isDraftMode)) {
             setSimilarMatches([]);
             return;
         }

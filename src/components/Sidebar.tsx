@@ -5,7 +5,7 @@ import Link from "next/link";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -602,15 +602,8 @@ export default function Sidebar() {
                 ...(partnerMembershipNav
                     ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
                     : []),
-                { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Participants", href: "/dashboard/partner/participants", icon: Users }]
-                    : []),
-                // Universities don't author Community Service opportunities directly — faculty
-                // representatives create them on the institution's behalf (see the backend's
-                // matching guard in OpportunitiesService.create).
-                ...(!isUniversityPartnerOrg
-                    ? [{ label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus }]
                     : []),
                 { label: "Verify Work", href: "/dashboard/partner/verify", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },

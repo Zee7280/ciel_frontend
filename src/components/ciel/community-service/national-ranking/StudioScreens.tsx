@@ -27,6 +27,24 @@ const movementLabel = (m: ProjectRanking["movement"] | undefined, prev: number |
     return "New comparison";
 };
 
+// A hold reason can be a long evidence explanation; clamp it to 2 lines with an expand toggle so
+// it reads as a note rather than taking over the row.
+function ReasonText({ text }: { text: string }) {
+    const [open, setOpen] = useState(false);
+    if (!text) return null;
+    const long = text.length > 140;
+    return (
+        <div className="reasonbox">
+            <small className={`pmeta reasontext${open ? "" : " clamped"}`}>{text}</small>
+            {long ? (
+                <button type="button" className="reasontoggle" onClick={() => setOpen((o) => !o)}>
+                    {open ? "Show less" : "Show full note"}
+                </button>
+            ) : null}
+        </div>
+    );
+}
+
 // ------------------------------------------------------------------------------------ review queue
 export function ReviewScreen({
     run,
@@ -149,7 +167,7 @@ export function PackagesScreen({
                                     <td><b>{p.title}</b><small className="pmeta">{p.id.slice(0, 8)} · {fmtDate(p.date)}</small></td>
                                     <td>{p.university}<small className="pmeta">{p.department}</small></td>
                                     <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b><small className="pmeta">Locked approval</small></td>
-                                    <td><span className={`labelchip ${p.ready ? "" : "red"}`}>{p.ready ? "Complete" : "Verification required"}</span>{!p.ready && p.reason ? <small className="pmeta">{p.reason}</small> : null}</td>
+                                    <td><span className={`labelchip ${p.ready ? "" : "red"}`}>{p.ready ? "Complete" : "Verification required"}</span>{!p.ready && p.reason ? <ReasonText text={p.reason} /> : null}</td>
                                     <td><span className={`labelchip ${p.evaluated ? "" : "gray"}`}>{p.evaluated ? "Read" : p.ready ? "Awaiting read" : "—"}</span></td>
                                     <td><button type="button" className="btn sm" onClick={() => onOpen(p.id)}>Open →</button></td>
                                 </tr>
@@ -250,7 +268,7 @@ export function AllProjectsPanel({
                                     <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b></td>
                                     <td>
                                         <span className={`labelchip ${standingTone(st)}`}>{standingLabel(st)}</span>
-                                        {!p.ready && p.reason ? <small className="pmeta">{p.reason}</small> : null}
+                                        {!p.ready && p.reason ? <ReasonText text={p.reason} /> : null}
                                     </td>
                                     <td><button type="button" className="btn sm" onClick={() => onOpen(p.id)}>Open 4-part package →</button></td>
                                 </tr>

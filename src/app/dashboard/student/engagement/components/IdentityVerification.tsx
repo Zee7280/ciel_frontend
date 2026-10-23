@@ -162,6 +162,30 @@ export default function IdentityVerification({
         }
     }, [initialData.verified]);
 
+    // The saved record can arrive after the form mounts (report reload, engagement sync). Fill only
+    // fields that are still blank so nothing the student already typed is overwritten.
+    const initialUniversityId = String(initialData?.universityId ?? initialData?.university_id ?? "").trim();
+    const initialProgram = String(initialData?.academicProgram ?? initialData?.academic_program ?? "").trim();
+    const initialDepartment = String(initialData?.department ?? "").trim();
+    const initialSemester = String(initialData?.semester ?? "").trim();
+    useEffect(() => {
+        setFormData((prev) => {
+            const next = {
+                ...prev,
+                universityId: prev.universityId || initialUniversityId,
+                academicProgram: prev.academicProgram || initialProgram,
+                department: prev.department || initialDepartment,
+                semester: prev.semester || initialSemester,
+            };
+            return next.universityId === prev.universityId &&
+                next.academicProgram === prev.academicProgram &&
+                next.department === prev.department &&
+                next.semester === prev.semester
+                ? prev
+                : next;
+        });
+    }, [initialUniversityId, initialProgram, initialDepartment, initialSemester]);
+
     useEffect(() => {
         const next = parsePhoneForDisplay(String(initialData?.mobile ?? ""));
         setPhoneCountryKey(next.phoneCountryKey);
