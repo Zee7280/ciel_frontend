@@ -7,6 +7,7 @@ import { GraduationCap, Loader2, Plus, Trash2, Link2, AlertTriangle } from "luci
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { formatAdminDate } from "@/utils/adminDate";
+import { isLinkableUniversityName, universityNamesLooselyMatch } from "@/utils/universityData";
 
 const USERS_PAGE_LIMIT = 100;
 const USERS_MAX_PAGES = 50;
@@ -30,7 +31,21 @@ type AdminUser = {
     name?: string;
     email?: string;
     role?: string;
+    university?: string | null;
+    institution?: string | null;
 };
+
+/** The university a faculty account registered at (profile), if any. */
+function facultyUniversity(u: AdminUser | undefined): string {
+    return String(u?.university || u?.institution || "").trim();
+}
+
+/** Verified universities first, then pending, then the rest; alphabetical within each group. */
+function orgSortKey(org: AdminOrg): string {
+    const st = String(org.status || "").toLowerCase();
+    const rank = st === "verified" || st === "approved" ? 0 : st === "pending" ? 1 : 2;
+    return `${rank}|${String(org.name || "").toLowerCase()}`;
+}
 
 type AdminOrg = {
     id: string;
@@ -57,7 +72,9 @@ export default function AdminFacultyUniversityScopePage() {
     const [orgs, setOrgs] = useState<AdminOrg[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [showAllOrgs, setShowAllOrgs] = useState(false);
+    // University accounts can use the platform while still PENDING, so every university is
+    // assignable; this only hides the unverified / suspended ones when the admin asks.
+    const [hideUnverifiedOrgs, setHideUnverifiedOrgs] = useState(false);
     const [confirmReplace, setConfirmReplace] = useState(false);
     const [removeTarget, setRemoveTarget] = useState<ScopeRow | null>(null);
     const [removing, setRemoving] = useState(false);
@@ -128,18 +145,26 @@ export default function AdminFacultyUniversityScopePage() {
         [users],
     );
 
-    const universityOrgs = useMemo(() => orgs.filter(isUniversityOrg), [orgs]);
-    const universityOrgOptions = useMemo(
-        () => (showAllOrgs ? universityOrgs : universityOrgs.filter(isEligibleOrg)),
-        [universityOrgs, showAllOrgs],
+    const universityOrgs = useMemo(
+        () => orgs.filter(isUniversityOrg).sort((a, b) => orgSortKey(a).localeCompare(orgSortKey(b))),
+        [orgs],
     );
-    const hiddenOrgCount = universityOrgs.length - universityOrgs.filter(isEligibleOrg).length;
+    const universityOrgOptions = useMemo(
+        () => (hideUnverifiedOrgs ? universityOrgs.filter(isEligibleOrg) : universityOrgs),
+        [universityOrgs, hideUnverifiedOrgs],
+    );
+    const unverifiedOrgCount = universityOrgs.length - universityOrgs.filter(isEligibleOrg).length;
 
     const existingAssignment = useMemo(
         () => (facultyUserId ? rows.find((r) => r.faculty_user_id === facultyUserId) ?? null : null),
         [rows, facultyUserId],
     );
     const selectedOrg = orgs.find((o) => o.id === universityOrganizationId);
+    const selectedFaculty = users.find((u) => u.id === facultyUserId);
+    const selectedOrgOffList = !!selectedOrg && !isLinkableUniversityName(selectedOrg.name);
+    const facultyUni = facultyUniversity(selectedFaculty);
+    const facultyAtOtherUniversity =
+        !!selectedOrg && !!facultyUni && !universityNamesLooselyMatch(facultyUni, selectedOrg.name);
 
     const handleAssign = (e: React.FormEvent) => {
         e.preventDefault();
@@ -239,6 +264,7 @@ export default function AdminFacultyUniversityScopePage() {
                                             {(u.name || "—") +
                                                 " · " +
                                                 (u.email || u.id) +
+                                                (facultyUniversity(u) ? ` · ${facultyUniversity(u)}` : "") +
                                                 (cur ? ` (currently: ${cur.university_organization_name || "assigned"})` : "")}
                                         </option>
                                     );
@@ -269,25 +295,47 @@ export default function AdminFacultyUniversityScopePage() {
                                 <option value="">Select organization…</option>
                                 {universityOrgOptions.map((o) => (
                                     <option key={o.id} value={o.id}>
-                                        {(o.name || o.id) + (o.status ? ` · ${o.status}` : "")}
+                                        {(o.name || o.id) +
+                                            (o.status ? ` · ${o.status}` : "") +
+                                            (isLinkableUniversityName(o.name) ? "" : " · ⚠ name not on university list")}
                                     </option>
                                 ))}
                             </select>
-                            <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
-                                <input
-                                    type="checkbox"
-                                    checked={showAllOrgs}
-                                    onChange={(e) => {
-                                        setShowAllOrgs(e.target.checked);
-                                        setUniversityOrganizationId("");
-                                    }}
-                                />
-                                Show unverified / suspended universities too
-                                {!showAllOrgs && hiddenOrgCount > 0 ? ` (${hiddenOrgCount} hidden)` : ""}
-                            </label>
+                            {unverifiedOrgCount > 0 && (
+                                <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={hideUnverifiedOrgs}
+                                        onChange={(e) => {
+                                            setHideUnverifiedOrgs(e.target.checked);
+                                            setUniversityOrganizationId("");
+                                        }}
+                                    />
+                                    Hide unverified / suspended universities ({unverifiedOrgCount})
+                                </label>
+                            )}
                             {universityOrgOptions.length === 0 && (
                                 <p className="text-xs text-amber-600 mt-1">
-                                    No eligible university organizations — verify one, or toggle to show all.
+                                    No university organizations yet — onboard one under Organizations.
+                                </p>
+                            )}
+                            {selectedOrgOffList && (
+                                <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                                    <span>
+                                        “{selectedOrg?.name}” is not on the university list, so no student can be matched to it by
+                                        name — the faculty would only see students whose account is linked to this organization.
+                                        Rename it under Organizations first.
+                                    </span>
+                                </p>
+                            )}
+                            {facultyAtOtherUniversity && (
+                                <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                                    <span>
+                                        This faculty registered at <strong>{facultyUni}</strong>, not {selectedOrg?.name}. CIEL PK
+                                        admin may still assign them.
+                                    </span>
                                 </p>
                             )}
                         </div>

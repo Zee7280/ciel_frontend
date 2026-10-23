@@ -424,3 +424,18 @@ export function isLinkableUniversityName(name: unknown): boolean {
         return !!abbr && foldUniversityName(abbr[1]) === key;
     });
 }
+
+/** Same institution despite spelling, or a listed abbreviation of the full name (backend `universityNamesMatch`). */
+export function universityNamesLooselyMatch(a: unknown, b: unknown): boolean {
+    const fa = foldUniversityName(String(a ?? ""));
+    const fb = foldUniversityName(String(b ?? ""));
+    if (!fa || !fb) return false;
+    if (fa === fb) return true;
+    const abbr = (name: string) => {
+        const m = name.match(/\(([^()]{2,12})\)\s*$/);
+        return m ? foldUniversityName(m[1]) : "";
+    };
+    const aa = abbr(String(a ?? ""));
+    const ab = abbr(String(b ?? ""));
+    return (!!aa && aa === fb) || (!!ab && ab === fa);
+}
