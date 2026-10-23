@@ -409,3 +409,18 @@ export function canonicalUniversityAllowlist(names: ReadonlyArray<string> | null
     }
     return out;
 }
+
+/**
+ * True when the backend can link students / faculty to a university organization with this name:
+ * a listed name, or the bracketed abbreviation of one ("BNU" → "Beaconhouse National University (BNU)").
+ * Mirrors ciel_backend `universityNamesMatch`.
+ */
+export function isLinkableUniversityName(name: unknown): boolean {
+    const key = foldUniversityName(String(name ?? ""));
+    if (!key) return false;
+    return pakistaniUniversities.some((u) => {
+        if (foldUniversityName(u) === key) return true;
+        const abbr = u.match(/\(([^()]{2,12})\)\s*$/);
+        return !!abbr && foldUniversityName(abbr[1]) === key;
+    });
+}

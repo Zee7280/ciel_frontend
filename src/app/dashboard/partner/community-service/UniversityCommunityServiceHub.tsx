@@ -23,6 +23,7 @@ import { resolveStudentOpportunityWorkflow } from "@/utils/opportunityWorkflow";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { authenticatedFetch } from "@/utils/api";
+import { isLinkableUniversityName } from "@/utils/universityData";
 import {
     UNI_CS_ANALYTICS as ANALYTICS,
     UNI_CS_BASE as CS_BASE,
@@ -282,6 +283,7 @@ export default function UniversityCommunityServiceHub() {
     const {
         loading,
         orgName,
+        registeredOrgName,
         mine,
         approvalOpps,
         draftOpps,
@@ -294,9 +296,13 @@ export default function UniversityCommunityServiceHub() {
         closedReports,
         deckCards,
         reps,
+        awaitingReps,
         reloadReps,
         approvedProjects,
     } = useUniversityCommunityServiceData();
+    // Students and faculty are linked to the university by its name, so an off-list name ("uni")
+    // links nobody — say so instead of showing an unexplained empty dashboard.
+    const orgNameOffList = !!registeredOrgName && !isLinkableUniversityName(registeredOrgName);
     const [innerTab, setInnerTab] = useState("");
     const [deptFilter, setDeptFilter] = useState("");
     const [facFilter, setFacFilter] = useState("");
@@ -405,9 +411,9 @@ export default function UniversityCommunityServiceHub() {
     const attention = [
         {
             key: "alloc",
-            n: 0,
-            title: "Faculty allocation requests",
-            sub: "Authorise opportunity-creation authority",
+            n: awaitingReps.length,
+            title: "Faculty awaiting authorisation",
+            sub: "Registered at your university · authorise in one click",
             href: `${CS_BASE}?view=allocation&tab=requested`,
             tone: "default" as const,
         },
@@ -437,23 +443,29 @@ export default function UniversityCommunityServiceHub() {
         },
     ];
 
+    const authoriseFacultyEmail = async (email: string): Promise<boolean> => {
+        const res = await authenticatedFetch(UNI_CS_REPS, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ faculty_email: email.trim() }),
+        });
+        const json = await res?.json().catch(() => null);
+        if (!res?.ok) {
+            toast.error(json?.message || "Could not authorise that faculty email.");
+            return false;
+        }
+        toast.success("Faculty authorised to create Community Service opportunities.");
+        await reloadReps();
+        return true;
+    };
+
     const allocateFaculty = async () => {
         setAllocBusy(true);
         try {
-            const res = await authenticatedFetch(UNI_CS_REPS, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ faculty_email: allocEmail.trim() }),
-            });
-            const json = await res?.json().catch(() => null);
-            if (!res?.ok) {
-                toast.error(json?.message || "Could not authorise that faculty email.");
-                return;
+            if (await authoriseFacultyEmail(allocEmail)) {
+                setAllocEmail("");
+                setAllocOpen(false);
             }
-            toast.success("Faculty authorised to create Community Service opportunities.");
-            setAllocEmail("");
-            setAllocOpen(false);
-            await reloadReps();
         } finally {
             setAllocBusy(false);
         }
@@ -545,6 +557,12 @@ export default function UniversityCommunityServiceHub() {
             ) : (
                 <div className="mt-4">
                     <HubBackButton href={homeHref} label="← Back to Community Service" />
+                </div>
+            )}
+
+            {orgNameOffList && (
+                <div role="alert" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+                    <strong>“{orgName}” is not on the university list.</strong> Students and faculty are linked to your university by the name they pick at signup, so none can be linked yet. Ask CIEL PK admin to rename this organization to your university’s listed name.
                 </div>
             )}
 
@@ -669,17 +687,59 @@ export default function UniversityCommunityServiceHub() {
                     />
                     <HubTabs
                         tabs={[
-                            { id: "requested", label: "Requested", count: 0 },
+                            { id: "requested", label: "Awaiting", count: awaitingReps.length },
                             { id: "authorized", label: "Authorised", count: reps.length },
                             { id: "history", label: "Revoked / History", count: 0 },
                         ]}
                         active={allocTab}
                         onChange={setHubTab}
                     />
-                    {allocTab !== "authorized" ? (
+                    {allocTab === "requested" ? (
+                        loading ? (
+                            <p className="text-sm text-slate-500">Loading…</p>
+                        ) : awaitingReps.length === 0 ? (
+                            <EmptyPanel
+                                title="No faculty awaiting authorisation"
+                                text="Faculty who sign up with your university appear here until you authorise them. You can also allocate any faculty email directly."
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {awaitingReps.map((rep) => (
+                                    <article key={rep.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-slate-900">{rep.faculty_name || "Faculty member"}</h3>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {[rep.faculty_department, rep.faculty_email].filter(Boolean).join(" · ") || "Registered at your university"}
+                                                </p>
+                                            </div>
+                                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase text-amber-800">Awaiting</span>
+                                        </div>
+                                        {rep.faculty_email ? (
+                                            <button
+                                                type="button"
+                                                disabled={allocBusy}
+                                                onClick={async () => {
+                                                    setAllocBusy(true);
+                                                    try {
+                                                        await authoriseFacultyEmail(rep.faculty_email || "");
+                                                    } finally {
+                                                        setAllocBusy(false);
+                                                    }
+                                                }}
+                                                className="mt-3 rounded-full bg-[#0e7d74] px-3 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-60"
+                                            >
+                                                Authorise
+                                            </button>
+                                        ) : null}
+                                    </article>
+                                ))}
+                            </div>
+                        )
+                    ) : allocTab !== "authorized" ? (
                         <EmptyPanel
-                            title={allocTab === "requested" ? "No requests waiting" : "No revoked history in this list"}
-                            text="Authorised faculty appear under Authorised. Incoming requests show here when a faculty account asks for institutional authority."
+                            title="No revoked history in this list"
+                            text="Authorised faculty appear under Authorised. Revoked faculty move back to Awaiting while their profile names your university."
                         />
                     ) : loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>

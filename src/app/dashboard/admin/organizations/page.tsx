@@ -6,6 +6,8 @@ import SignupProofDocuments, { readSignupProofDocuments } from "@/components/adm
 import { Paperclip, Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import { isLinkableUniversityName, pakistaniUniversities } from "@/utils/universityData";
 import { downloadCsv } from "../_shared/csv";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
@@ -344,6 +346,40 @@ export default function AdminOrganizationsPage() {
         return t.includes("university");
     };
 
+    const [renameOrg, setRenameOrg] = useState<any | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+
+    const openRename = (org: any) => {
+        setActionMenu(null);
+        setRenameOrg(org);
+        setRenameValue(isUniversityOrganization(org) && !isLinkableUniversityName(org?.name) ? "" : String(org?.name || ""));
+    };
+
+    const handleRename = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const orgId = renameOrg?.id;
+        if (!orgId || isSubmitting || !renameValue.trim()) return;
+        setIsSubmitting(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/organizations/${orgId}/name`, {
+                method: "PATCH",
+                body: JSON.stringify({ name: renameValue.trim() }),
+            });
+            if (!res?.ok) {
+                toast.error(await readErrorMessage(res, "Could not rename the organization"));
+                return;
+            }
+            toast.success("Organization renamed. Its members see the new name at their next sign-in.");
+            setRenameOrg(null);
+            void fetchOrganizations();
+        } catch (err) {
+            console.error(err);
+            toast.error("Could not rename the organization");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
     const [memberForm, setMemberForm] = useState({
         name: "",
@@ -515,6 +551,16 @@ export default function AdminOrganizationsPage() {
                                             <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                                 <Globe className="w-4 h-4 text-blue-500" /> {org.organization_type || org.type || "N/A"}
                                             </span>
+                                            {isUniversityOrganization(org) && !isLinkableUniversityName(org.name) ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openRename(org)}
+                                                    className="mt-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                                                    title="Students and faculty cannot be linked until the name matches the university list"
+                                                >
+                                                    Name not on university list · Rename
+                                                </button>
+                                            ) : null}
                                         </td>
                                         <td className="p-4 sm:p-6 text-sm text-slate-600">
                                             {org.contact_person || "N/A"}
@@ -585,12 +631,28 @@ export default function AdminOrganizationsPage() {
                         <form onSubmit={handleAddOrganization} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Organization Name</label>
-                                <input
-                                    type="text" required
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                />
+                                {formData.type === "university" ? (
+                                    <>
+                                        <SearchableSelect
+                                            value={formData.name}
+                                            onChange={(v) => setFormData({ ...formData, name: v })}
+                                            options={pakistaniUniversities}
+                                            placeholder="Select university"
+                                            searchPlaceholder="Search universities..."
+                                            ariaLabel="University"
+                                            allowCustomValue={false}
+                                            variant="field"
+                                        />
+                                        <p className="mt-1 text-xs text-slate-500">Students and faculty are linked to the university by this exact name.</p>
+                                    </>
+                                ) : (
+                                    <input
+                                        type="text" required
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
@@ -615,7 +677,14 @@ export default function AdminOrganizationsPage() {
                                 <select
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.type}
-                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            type: e.target.value,
+                                            // A university must use a listed name; drop free text typed for another type.
+                                            name: e.target.value === "university" && !isLinkableUniversityName(formData.name) ? "" : formData.name,
+                                        })
+                                    }
                                 >
                                     <option value="ngo">NGO / Partner</option>
                                     <option value="corporate">Corporate</option>
@@ -807,6 +876,64 @@ export default function AdminOrganizationsPage() {
                 </div>
             )}
 
+            {renameOrg && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                            <h3 className="text-lg font-bold text-slate-900">Rename organization</h3>
+                            <button type="button" onClick={() => setRenameOrg(null)} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <p className="mb-4 text-sm text-slate-500">
+                            Current name: <strong>{readOrgValue(renameOrg, ["name"])}</strong>
+                        </p>
+                        <form onSubmit={handleRename} className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">New name</label>
+                                {isUniversityOrganization(renameOrg) ? (
+                                    <>
+                                        <SearchableSelect
+                                            value={renameValue}
+                                            onChange={setRenameValue}
+                                            options={pakistaniUniversities}
+                                            placeholder="Select university"
+                                            searchPlaceholder="Search universities..."
+                                            ariaLabel="University"
+                                            allowCustomValue={false}
+                                            variant="field"
+                                        />
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Students and faculty who picked this university at signup are linked to the organization automatically.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <input
+                                        required
+                                        maxLength={200}
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+                                        value={renameValue}
+                                        onChange={(e) => setRenameValue(e.target.value)}
+                                    />
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button type="button" onClick={() => setRenameOrg(null)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting || !renameValue.trim()}
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                    {isSubmitting ? "Saving…" : "Save name"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {isMemberModalOpen && selectedOrg && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
                     <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
@@ -936,6 +1063,13 @@ export default function AdminOrganizationsPage() {
                                 Suspend Organization
                             </button>
                         )}
+                        <button
+                            type="button"
+                            onClick={() => openRename(actionMenuOrg)}
+                            className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                            Rename
+                        </button>
                         <button
                             type="button"
                             onClick={() => openConfirm("delete", actionMenuOrg)}

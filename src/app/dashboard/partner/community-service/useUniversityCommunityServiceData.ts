@@ -27,6 +27,8 @@ export const UNI_CS_STARTUP = "/dashboard/partner/startup-business";
 export const UNI_CS_ANALYTICS = "/dashboard/partner/university-analytics";
 export const UNI_CS_HOME = "/dashboard/partner";
 export const UNI_CS_REPS = "/api/v1/partners/community-service/faculty-representatives";
+/** Faculty whose profile names this university and who are not authorised anywhere yet. */
+export const UNI_CS_REPS_AWAITING = `${UNI_CS_REPS}/awaiting`;
 
 export type UniOppRow = Record<string, unknown> & { id: string; title: string };
 
@@ -52,6 +54,13 @@ function pickStr(item: Record<string, unknown>, ...keys: string[]): string | und
         if (typeof value === "string" && value.trim()) return value.trim();
     }
     return undefined;
+}
+
+function toFacultyReps(json: unknown): UniFacultyRep[] {
+    const data = (json as { data?: unknown } | null)?.data;
+    return (Array.isArray(data) ? data : []).filter(
+        (item: unknown): item is UniFacultyRep => Boolean(item && typeof item === "object" && (item as UniFacultyRep).id),
+    );
 }
 
 export function uniPickStr(item: Record<string, unknown>, ...keys: string[]): string | undefined {
@@ -104,18 +113,19 @@ export function useUniversityCommunityServiceData() {
     const [pipeline, setPipeline] = useState<UniPipelineRow[]>([]);
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [reps, setReps] = useState<UniFacultyRep[]>([]);
+    const [awaitingReps, setAwaitingReps] = useState<UniFacultyRep[]>([]);
     const [loading, setLoading] = useState(true);
     const [orgName, setOrgName] = useState("University");
+    /** The organization's current name from the database (the cached login copy can be stale). */
+    const [registeredOrgName, setRegisteredOrgName] = useState<string | null>(null);
 
     const reloadReps = async () => {
-        const faculty = await authenticatedFetch(UNI_CS_REPS, {}, { redirectToLogin: false }).then((r) =>
-            r?.ok ? r.json() : null,
-        );
-        setReps(
-            (Array.isArray(faculty?.data) ? faculty.data : []).filter(
-                (item: unknown): item is UniFacultyRep => Boolean(item && typeof item === "object" && (item as UniFacultyRep).id),
-            ),
-        );
+        const [faculty, awaiting] = await Promise.all([
+            authenticatedFetch(UNI_CS_REPS, {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+            authenticatedFetch(UNI_CS_REPS_AWAITING, {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+        ]);
+        setReps(toFacultyReps(faculty));
+        setAwaitingReps(toFacultyReps(awaiting));
     };
 
     useEffect(() => {
@@ -135,9 +145,17 @@ export function useUniversityCommunityServiceData() {
                 r?.ok ? r.json() : null,
             ),
             authenticatedFetch(UNI_CS_REPS, {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+            authenticatedFetch(UNI_CS_REPS_AWAITING, {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+            authenticatedFetch(
+                "/api/v1/organisation/profile/detail",
+                { method: "POST", body: JSON.stringify({}) },
+                { redirectToLogin: false },
+            ).then((r) => (r?.ok ? r.json() : null)),
         ])
-            .then(([list, reports, award, faculty]) => {
+            .then(([list, reports, award, faculty, awaiting, org]) => {
                 if (cancelled) return;
+                const dbName = (org as { name?: unknown } | null)?.name;
+                if (typeof dbName === "string" && dbName.trim()) setRegisteredOrgName(dbName.trim());
                 const rawList: unknown[] = Array.isArray(list?.data) ? list.data : [];
                 setOppRows(
                     rawList
@@ -173,12 +191,8 @@ export function useUniversityCommunityServiceData() {
                         .filter((row): row is UniPipelineRow => row != null),
                 );
                 setCards(Array.isArray(award?.data) ? award.data : []);
-                setReps(
-                    (Array.isArray(faculty?.data) ? faculty.data : []).filter(
-                        (item: unknown): item is UniFacultyRep =>
-                            Boolean(item && typeof item === "object" && (item as UniFacultyRep).id),
-                    ),
-                );
+                setReps(toFacultyReps(faculty));
+                setAwaitingReps(toFacultyReps(awaiting));
                 setLoading(false);
             })
             .catch(() => {
@@ -187,6 +201,7 @@ export function useUniversityCommunityServiceData() {
                 setPipeline([]);
                 setCards([]);
                 setReps([]);
+                setAwaitingReps([]);
                 setLoading(false);
             });
         return () => {
@@ -259,7 +274,8 @@ export function useUniversityCommunityServiceData() {
 
     return {
         loading,
-        orgName,
+        orgName: registeredOrgName || orgName,
+        registeredOrgName,
         oppRows,
         mine,
         approvalOpps,
@@ -274,6 +290,7 @@ export function useUniversityCommunityServiceData() {
         decidedReports,
         deckCards,
         reps: authorizedReps,
+        awaitingReps,
         reloadReps,
         approvedProjects,
     };
