@@ -7,4 +7,7 @@ export const dancingScript = localFont({
   display: "swap",
   weight: "400 700",
   fallback: ["cursive"],
+  // Not preloaded: a prefetched link to /login would otherwise preload it on every page that shows
+  // that link (the home page), competing with critical CSS on slow mobile networks.
+  preload: false,
 });

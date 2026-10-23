@@ -232,15 +232,19 @@ export default function ProjectsPage() {
             setIsLoading(true);
             setFetchError(false);
             try {
+                // Same-origin BFF first: served from Vercel's edge cache near the visitor instead of a
+                // cross-origin round trip to the API region on every page view (slow on mobile).
+                // If it is unavailable, ask the API directly as before.
+                let response = await fetch("/api/v1/public/opportunities").catch(() => null);
                 const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/$/, "");
-                if (!backendUrl) {
-                    console.error("NEXT_PUBLIC_BACKEND_BASE_URL is not set");
+                if ((!response || !response.ok) && backendUrl) {
+                    response = await fetch(`${backendUrl}/public/opportunities`, { cache: "no-store" });
+                }
+                if (!response) {
                     setProjects([]);
                     setFetchError(true);
                     return;
                 }
-                const url = `${backendUrl}/public/opportunities`;
-                const response = await fetch(url, { cache: "no-store" });
                 if (!response.ok) {
                     console.error("GET /public/opportunities failed:", response.status, response.statusText);
                     setProjects([]);

@@ -153,6 +153,14 @@ body {
 }
 
 @layer utilities {
+  /* Below-the-fold sections: the browser skips their style/layout/paint until they near the
+     viewport — the main win for slow phone CPUs on long pages. `auto` remembers the real height
+     once rendered, so scrolling and #anchors stay accurate. */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
+  }
+
   .text-balance {
     text-wrap: balance;
   }

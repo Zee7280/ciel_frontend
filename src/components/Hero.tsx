@@ -69,8 +69,9 @@ export default function Hero() {
     return (
         <section className="relative overflow-hidden bg-ciel-navy">
             {/* Soft Background Glow */}
-            <div className="pointer-events-none absolute right-0 top-0 -z-0 h-[600px] w-[700px] bg-ciel-green/10 blur-[140px]" />
-            <div className="pointer-events-none absolute bottom-0 left-0 -z-0 h-[500px] w-[500px] bg-ciel-indigo/10 blur-[120px]" />
+            {/* Large blurs are the costliest paint on phone GPUs: smaller and softer below md. */}
+            <div className="pointer-events-none absolute right-0 top-0 -z-0 h-[320px] w-[320px] bg-ciel-green/10 blur-[64px] md:h-[600px] md:w-[700px] md:blur-[140px]" />
+            <div className="pointer-events-none absolute bottom-0 left-0 -z-0 h-[260px] w-[260px] bg-ciel-indigo/10 blur-[56px] md:h-[500px] md:w-[500px] md:blur-[120px]" />
 
                             <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-16 pt-32 sm:px-6 md:px-10 md:pb-24 md:pt-36 lg:pb-28 lg:pt-40">
                 <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">

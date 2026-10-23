@@ -23,19 +23,26 @@ export default function Home() {
       <Hero />
       <ImpactStrip />
       <SdgStickerMarquee />
-      <WhereImpactLives />
-      <ImpactMap />
-      <SdgImpactWheel />
-      <ImpactCalculator />
-      <LiveProjectsShowcase />
-      <ImpactSnapshot />
-      <ShowcaseSpotlight />
-      <WhoIsItFor />
-      <HowWeWork />
-      <FeaturesBar />
-      <FinalCTA />
-      <PartnersFooter />
-      <Footer />
+      {/* Below the fold: rendered when scrolled near (see .cv-auto in globals.css). */}
+      {[
+        <WhereImpactLives key="where" />,
+        <ImpactMap key="map" />,
+        <SdgImpactWheel key="wheel" />,
+        <ImpactCalculator key="calculator" />,
+        <LiveProjectsShowcase key="live" />,
+        <ImpactSnapshot key="snapshot" />,
+        <ShowcaseSpotlight key="spotlight" />,
+        <WhoIsItFor key="who" />,
+        <HowWeWork key="how" />,
+        <FeaturesBar key="features" />,
+        <FinalCTA key="cta" />,
+        <PartnersFooter key="partners" />,
+        <Footer key="footer" />,
+      ].map((section) => (
+        <div key={section.key} className="cv-auto">
+          {section}
+        </div>
+      ))}
     </main>
   );
 }
