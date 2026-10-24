@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
-import { formatHours, shortDate, type QuickWorkLog } from "@/utils/quickWorkRules";
+import { formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
@@ -124,7 +124,8 @@ export default function FacultyQuickWorkPage() {
     );
 }
 
-function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<void> }) {
+function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][number]; onDone: () => Promise<void> }) {
+    const blocked = log.approveBlockedReason || null;
     const [verified, setVerified] = useState(false);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState<Action | null>(null);
@@ -132,6 +133,7 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
 
     const act = async (action: Action) => {
         if (action !== "approve" && !note.trim()) return setError(["Add a brief reason or correction first."]);
+        if (action === "approve" && blocked) return setError([blocked]);
         if (action === "approve" && !verified) return setError(["Confirm you reviewed the attendance and evidence."]);
         setBusy(action);
         setError([]);
@@ -177,8 +179,13 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
                     </ul>
                 </div>
             ) : null}
+            {blocked ? (
+                <div role="note" className="mb-3 rounded-[9px] border border-[#e8d9b7] bg-[#fff6e5] px-4 py-3 text-xs leading-relaxed text-[#79571c]">
+                    <b>You cannot approve this log.</b> {blocked}
+                </div>
+            ) : null}
             <label className="my-3 flex items-start gap-2.5 text-xs">
-                <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#0e7d74]" checked={verified} onChange={(e) => setVerified(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#0e7d74]" checked={verified} disabled={!!blocked} onChange={(e) => setVerified(e.target.checked)} />
                 <span>I have reviewed the evidence and confirm the individual participation times shown above.</span>
             </label>
             <label htmlFor={`note-${log.id}`} className="mb-1.5 block text-xs font-semibold">
@@ -195,7 +202,7 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
             <div className="mt-3.5 flex flex-wrap gap-2.5">
                 <button
                     type="button"
-                    disabled={busy != null}
+                    disabled={busy != null || !!blocked}
                     onClick={() => void act("approve")}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-[#0e7d74] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0b6760] disabled:opacity-50"
                 >

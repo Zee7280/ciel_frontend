@@ -706,6 +706,7 @@ export default function Sidebar() {
                 { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
                 { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
+                { label: "Quick Community Work", href: "/dashboard/admin/quick-work", icon: Leaf },
                 { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
                 { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
                 { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },

@@ -1,5 +1,5 @@
 import { authenticatedFetch } from "@/utils/api";
-import type { QuickWorkLog } from "@/utils/quickWorkRules";
+import type { QuickWorkLog, QuickWorkStatus } from "@/utils/quickWorkRules";
 
 export const QUICK_WORK_HREF = "/dashboard/student/paths/community-service/quick-work";
 export const QUICK_WORK_PRESIGN_PATH = "/api/v1/quick-work/evidence/presign";
@@ -9,7 +9,92 @@ export type QuickWorkMine = {
     totals: { approvedMinutes: number; pendingMinutes: number; approvedActivities: number };
 };
 
-export type FacultyQuickWorkQueue = { pending: QuickWorkLog[]; reviewed: QuickWorkLog[] };
+/** `approveBlockedReason` is set when this faculty member may not approve (not authorised for the students' university). */
+export type FacultyQuickWorkQueue = {
+    pending: (QuickWorkLog & { approveBlockedReason?: string | null })[];
+    reviewed: QuickWorkLog[];
+};
+
+export type QuickWorkReviewBody = { action: "approve" | "changes" | "reject"; note?: string; verified?: boolean };
+
+export type AdminQuickWorkFilters = {
+    status?: QuickWorkStatus | "";
+    search?: string;
+    university?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+};
+
+export type AdminQuickWorkRow = {
+    id: string;
+    title: string;
+    status: QuickWorkStatus;
+    activityDate: string | null;
+    university: string;
+    department: string;
+    leadName: string;
+    leadEmail: string;
+    facultyName: string;
+    facultyEmail: string;
+    facultyHasAccount: boolean;
+    participantCount: number;
+    minutes: number;
+    evidenceCount: number;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    createdAt: string;
+};
+
+export type AdminQuickWorkList = {
+    rows: AdminQuickWorkRow[];
+    total: number;
+    page: number;
+    limit: number;
+    counts: Record<QuickWorkStatus, number>;
+    approvedMinutes: number;
+};
+
+export type AdminQuickWorkDetail = QuickWorkLog & {
+    facultyAccount: { exists: boolean; name: string | null; status: string | null; authorisedUniversity: string | null };
+    history: { action: string; at: string; byUserId: string; note?: string; byName: string | null; byRole: string | null }[];
+};
+
+export type AdminQuickWorkExportRow = {
+    logId: string;
+    title: string;
+    status: QuickWorkStatus;
+    activityType: string;
+    activityDate: string | null;
+    university: string;
+    department: string;
+    location: string;
+    facultyName: string;
+    facultyEmail: string;
+    studentName: string;
+    studentEmail: string;
+    studentId: string;
+    role: "lead" | "teammate";
+    joinStatus: string;
+    present: boolean;
+    startTime: string | null;
+    endTime: string | null;
+    breakMinutes: number;
+    minutes: number;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    reviewNote: string | null;
+};
+
+function filterQuery(f: AdminQuickWorkFilters): string {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) {
+        if (v !== undefined && v !== null && String(v).trim() !== "") p.set(k, String(v).trim());
+    }
+    const q = p.toString();
+    return q ? `?${q}` : "";
+}
 
 /** Thrown with every readable reason the API gave (Nest sends one string or a list). */
 export class QuickWorkApiError extends Error {
@@ -43,8 +128,16 @@ export const quickWorkApi = {
     join: (id: string, accept: boolean) =>
         call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}/join`, { method: "POST", body: JSON.stringify({ accept }) }),
     facultyQueue: () => call<FacultyQuickWorkQueue>("/faculty/quick-work"),
-    review: (id: string, body: { action: "approve" | "changes" | "reject"; note?: string; verified?: boolean }) =>
+    review: (id: string, body: QuickWorkReviewBody) =>
         call<QuickWorkLog>(`/faculty/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
+    adminList: (f: AdminQuickWorkFilters) => call<AdminQuickWorkList>(`/admin/quick-work${filterQuery(f)}`),
+    adminExport: (f: AdminQuickWorkFilters) =>
+        call<{ rows: AdminQuickWorkExportRow[]; truncated: boolean }>(`/admin/quick-work/export${filterQuery({ ...f, page: undefined, limit: undefined })}`),
+    adminGet: (id: string) => call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}`),
+    adminReassign: (id: string, body: { facultyName: string; facultyEmail: string; note?: string }) =>
+        call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/faculty`, { method: "PATCH", body: JSON.stringify(body) }),
+    adminReview: (id: string, body: QuickWorkReviewBody) =>
+        call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
 
 export function apiMessages(err: unknown): string[] {
