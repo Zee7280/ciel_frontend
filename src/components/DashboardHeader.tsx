@@ -68,6 +68,7 @@ function partnerPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/partner/participants")) return "Participants";
     if (p.startsWith("/dashboard/partner/volunteers")) return "Volunteers";
     if (p.startsWith("/dashboard/partner/tutorials")) return "Platform tutorial";
+    if (p.startsWith("/dashboard/partner/integrations")) return "External Records";
     if (p.startsWith("/dashboard/partner/profile")) return "Profile";
     if (p.startsWith("/dashboard/partner/settings")) return "Settings";
     if (p.startsWith("/dashboard/partner/help")) return "Help";
@@ -118,6 +119,7 @@ function adminPageKicker(pathname: string, searchParams: { get(name: string): st
     if (p.startsWith("/dashboard/admin/reports")) return "Reports & Moderation";
     if (p.startsWith("/dashboard/admin/payments")) return "Payments";
     if (p.startsWith("/dashboard/admin/org-membership")) return "Org membership fees";
+    if (p.startsWith("/dashboard/admin/integrations")) return "Integration Hub";
     if (p.startsWith("/dashboard/admin/student-subscriptions")) return "Student subscriptions";
     if (p.startsWith("/dashboard/admin/projects")) return "All projects";
     if (p.startsWith("/dashboard/admin/issue-logs")) return "Issue Logs";

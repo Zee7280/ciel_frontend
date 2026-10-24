@@ -11,6 +11,7 @@ import {
 import {
     partnerNeedsMembershipPayment,
     partnerPathAllowedDuringMembershipPending,
+    refreshStoredUserFromMeApi,
 } from "@/utils/membershipPayment";
 import {
     STUDENT_SUBSCRIPTION_PATH,
@@ -61,8 +62,22 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
         if (pathname.startsWith("/dashboard/partner")) {
             if (partnerNeedsMembershipPayment(user)) {
                 // Paying comes first: the profile check below would otherwise bounce them off the payment page.
+                // The cached flag may be stale (admin turned the partner fee off), so confirm with `/users/me`
+                // before sending anyone to a payment screen that no longer applies.
                 if (!partnerPathAllowedDuringMembershipPending(pathname)) {
-                    router.replace("/dashboard/partner/membership-payment");
+                    void (async () => {
+                        await refreshStoredUserFromMeApi();
+                        let fresh: Record<string, unknown> | null = null;
+                        try {
+                            const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                            fresh = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+                        } catch {
+                            fresh = null;
+                        }
+                        if (partnerNeedsMembershipPayment(fresh ?? user)) {
+                            router.replace("/dashboard/partner/membership-payment");
+                        }
+                    })();
                 }
                 return;
             }

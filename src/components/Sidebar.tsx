@@ -40,6 +40,7 @@ import {
     type AdminPendingCounts,
 } from "@/utils/adminPendingCounts";
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
+import { refreshStoredUserFromMeApi } from "@/utils/membershipPayment";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
 const SIDEBAR_EXPANDED_WIDTH = "280px";
@@ -396,6 +397,12 @@ export default function Sidebar() {
         window.addEventListener("ciel_user_updated", read);
         return () => window.removeEventListener("ciel_user_updated", read);
     }, [isPartner, pathname]);
+    // The cached flag can outlive the admin turning the partner fee off: re-read `/users/me` once per
+    // partner session so a "Membership fee" entry never shows for a fee that no longer applies.
+    useEffect(() => {
+        if (!isPartner) return;
+        void refreshStoredUserFromMeApi();
+    }, [isPartner]);
 
     const [studentSubscriptionNav, setStudentSubscriptionNav] = useState(false);
     useEffect(() => {
@@ -607,6 +614,7 @@ export default function Sidebar() {
                     : []),
                 { label: "Verify Work", href: "/dashboard/partner/verify", icon: CheckCircle },
                 { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
+                { label: "External Records", href: "/dashboard/partner/integrations", icon: Link2 },
                 ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/community-service?view=impact", icon: FileBarChart }] : []),
                 ...(!isUniversityPartnerOrg
                     ? [{ label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 }]
@@ -690,6 +698,7 @@ export default function Sidebar() {
                 { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
                 { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
                 { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
+                { label: "Integration Hub", href: "/dashboard/admin/integrations", icon: Link2 },
                 { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
                 { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
