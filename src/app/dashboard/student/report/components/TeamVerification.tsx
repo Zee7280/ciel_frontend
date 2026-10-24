@@ -197,9 +197,9 @@ export default function TeamVerification({
                 <button
                     type="button"
                     onClick={handleAddMember}
-                    className="cer-addbig flex items-center justify-center gap-1.5"
+                    className="cer-addbig mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#e6f6f4] px-4 py-3 text-[13px] font-semibold text-[#0e7d74] hover:bg-[#cfe9e6] transition-colors"
                 >
-                    <UserPlus className="h-3.5 w-3.5" />
+                    <UserPlus className="h-4 w-4" />
                     Add team member — individual + academic configuration
                 </button>
             ) : null}

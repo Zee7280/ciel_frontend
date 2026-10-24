@@ -572,7 +572,7 @@ const EXAMPLE_SPOTS: Record<number, [string, string, string]> = {
 export function ReportExampleSpot({ step }: { step: number }) {
     const uiStep = canonicalReportStep(step);
     const spot = EXAMPLE_SPOTS[uiStep];
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     if (!spot) return null;
     return (
         <div className="cer-spot-wrap">

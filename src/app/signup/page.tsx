@@ -73,7 +73,6 @@ const ORG_FIELD_HINTS: Record<string, { orgName: string; designation: string; em
 
 const PROOF_LINK_TYPES = [
     "Official Website Profile",
-    "University / Organization Staff Directory",
     "LinkedIn Profile",
     "Official Organization Announcement",
     "Other Public Verification Link",
@@ -107,6 +106,7 @@ function SignUpContent() {
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [proofLinkType, setProofLinkType] = useState<(typeof PROOF_LINK_TYPES)[number]>(PROOF_LINK_TYPES[0]);
     const [proofUrl, setProofUrl] = useState("");
+    const [showUniversityAdminModal, setShowUniversityAdminModal] = useState(false);
     const searchParams = useSearchParams();
 
     // OTP states
@@ -163,6 +163,14 @@ function SignUpContent() {
     }, [searchParams]);
 
     const handleRoleSelect = (selectedRole: string) => {
+        if (selectedRole === "university") {
+            setShowUniversityAdminModal(true);
+            return;
+        }
+        applyRoleSelection(selectedRole);
+    };
+
+    const applyRoleSelection = (selectedRole: string) => {
         setRole(selectedRole);
         setInvestorStep(1);
         const kindMatch = ORG_KIND_OPTIONS.find((o) => o.kind === selectedRole);
@@ -890,7 +898,7 @@ function SignUpContent() {
                                     </div>
                                     )}
 
-                                    <div className={clsx(!isInvestor && "grid grid-cols-1 items-start gap-4 sm:grid-cols-2")}>
+                                    <div className={clsx("grid grid-cols-1 items-start gap-4", !isOrgRole && !isInvestor && "sm:grid-cols-2")}>
                                         <div>
                                             <label className={labelClass}>Mobile number</label>
                                             <PhoneConnectivityRow
@@ -1206,6 +1214,64 @@ function SignUpContent() {
                     </div>
                 </main>
             </div>
+
+            {showUniversityAdminModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 z-50">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+                        <div className="flex justify-center mb-4">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f7f4]">
+                                <Landmark className="h-8 w-8 text-[#0e7d74]" />
+                            </div>
+                        </div>
+                        <h2 className="text-center text-[1.35rem] font-semibold text-[#173540]">
+                            Are you a university administrator?
+                        </h2>
+                        <p className="mt-3 text-center text-[13px] leading-relaxed text-[#5d737c]">
+                            The University category is only for authorised administrators registering on behalf of their institution.
+                        </p>
+
+                        <div className="mt-5 rounded-xl bg-[#f0f9f7] border border-[#c8e6e0] p-3.5">
+                            <div className="flex gap-3">
+                                <GraduationCap className="h-4 w-4 shrink-0 text-[#0e7d74] mt-0.5" />
+                                <p className="text-[13px] leading-relaxed text-[#0e7d74]">
+                                    If you are a university student, please register under <strong>Student</strong>.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 space-y-2.5">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowUniversityAdminModal(false);
+                                    applyRoleSelection("university");
+                                }}
+                                className="w-full rounded-xl bg-[#0e7d74] px-4 py-3 text-center text-[13px] font-semibold text-white hover:bg-[#0b655e] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]/35"
+                            >
+                                Yes, continue as University Admin
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowUniversityAdminModal(false);
+                                    applyRoleSelection("student");
+                                }}
+                                className="w-full rounded-xl border-2 border-[#0e7d74] px-4 py-3 text-center text-[13px] font-semibold text-[#0e7d74] hover:bg-[#f0f9f7] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74]/35"
+                            >
+                                No, register as Student
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowUniversityAdminModal(false)}
+                            className="mt-4 w-full text-center text-[13px] font-semibold text-[#5d737c] hover:text-[#0e7d74] transition-colors"
+                        >
+                            Back to role selection
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

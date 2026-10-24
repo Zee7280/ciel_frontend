@@ -9,6 +9,7 @@ import { HUB_ADMIN_BASE, HUB_PLATFORM_STATUSES, hubRequest, type HubDataResponse
 import { PlatformFormDialog, ReasonDialog } from "./HubDialogs";
 import { btnPrimary, btnSecondary, btnSmall, HubBadge, inputCls, Pager, TableShell, TD, TH } from "./HubUi";
 import { useHubList } from "./useHubList";
+import HubDeleteButton from "./HubDeleteButton";
 
 export default function PlatformsTab() {
     const [status, setStatus] = useState("");
@@ -119,6 +120,15 @@ export default function PlatformsTab() {
                                         <Link href={`/dashboard/admin/integrations/platforms/${p.id}`} className={`${btnSmall} inline-flex items-center gap-1`}>
                                             Detail <ExternalLink className="h-3 w-3" />
                                         </Link>
+                                        {p.status !== "live" ? (
+                                            <HubDeleteButton
+                                                kind="platforms"
+                                                id={p.id}
+                                                name={p.name}
+                                                className={`${btnSmall} inline-flex items-center gap-1`}
+                                                onDeleted={list.reload}
+                                            />
+                                        ) : null}
                                     </div>
                                 </TD>
                             </tr>
@@ -133,7 +143,7 @@ export default function PlatformsTab() {
                 title={reason?.to === "retired" ? `Retire ${reason.platform.name}?` : `Suspend ${reason?.platform.name}?`}
                 description={
                     reason?.to === "retired"
-                        ? "Retired platforms cannot authenticate, receive credentials or be edited. This cannot be undone."
+                        ? "Retired platforms cannot authenticate, receive credentials or be edited. This cannot be undone. If the platform was created by mistake and never sent data, use Delete instead."
                         : "Suspended platforms are refused at authentication; queued events wait until the platform is live again."
                 }
                 confirmLabel={reason?.to === "retired" ? "Retire" : "Suspend"}

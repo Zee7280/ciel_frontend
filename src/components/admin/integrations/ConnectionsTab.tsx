@@ -17,6 +17,7 @@ import {
 import { ConnectionFormDialog, ReasonDialog } from "./HubDialogs";
 import { btnPrimary, btnSecondary, btnSmall, HubBadge, inputCls, Pager, TableShell, TD, TH } from "./HubUi";
 import { useHubList } from "./useHubList";
+import HubDeleteButton from "./HubDeleteButton";
 
 export type ConnectionAction = "authorize" | "suspend" | "resume" | "revoke";
 
@@ -29,7 +30,18 @@ export async function runConnectionAction(id: string, action: ConnectionAction, 
     return j.data;
 }
 
-export function ConnectionActionButtons({ connection, onDone, compact }: { connection: HubConnection; onDone: () => void; compact?: boolean }) {
+export function ConnectionActionButtons({
+    connection,
+    onDone,
+    compact,
+    onDeleted,
+}: {
+    connection: HubConnection;
+    onDone: () => void;
+    compact?: boolean;
+    /** When set, a Delete button is offered for non-active connections. */
+    onDeleted?: () => void;
+}) {
     const [reason, setReason] = useState<"suspend" | "revoke" | null>(null);
     const [busy, setBusy] = useState(false);
     const cls = compact ? btnSmall : btnSecondary;
@@ -70,6 +82,15 @@ export function ConnectionActionButtons({ connection, onDone, compact }: { conne
                 <button type="button" className={`${cls} text-red-700`} disabled={busy} onClick={() => setReason("revoke")}>
                     Revoke
                 </button>
+            ) : null}
+            {connection.status !== "active" && onDeleted ? (
+                <HubDeleteButton
+                    kind="connections"
+                    id={connection.id}
+                    name={`Connection to ${connection.organizationName}`}
+                    className={`${cls} inline-flex items-center gap-1`}
+                    onDeleted={onDeleted}
+                />
             ) : null}
             <ReasonDialog
                 open={Boolean(reason)}
@@ -187,7 +208,7 @@ export default function ConnectionsTab({ initialPlatformId }: { initialPlatformI
                                 <TD className="whitespace-nowrap text-xs">{formatAdminDateTime(c.updatedAt)}</TD>
                                 <TD>
                                     <div className="flex flex-wrap items-center justify-end gap-1">
-                                        <ConnectionActionButtons connection={c} onDone={list.reload} compact />
+                                        <ConnectionActionButtons connection={c} onDone={list.reload} onDeleted={list.reload} compact />
                                         <Link href={`/dashboard/admin/integrations/connections/${c.id}`} className={`${btnSmall} inline-flex items-center gap-1`}>
                                             Detail <ExternalLink className="h-3 w-3" />
                                         </Link>

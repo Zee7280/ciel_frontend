@@ -1137,19 +1137,6 @@ function ReportFormContent() {
 
                 {!onFlash ? (
                     <>
-                        {activeStep === 1 ? (
-                            <div className="cer-own">
-                                <div>
-                                    <div className="ey">REPORT OWNERSHIP & ACCESS</div>
-                                    <b>{isTeamMemberAttendanceOnly ? "Team member · attendance only" : "Master Student · Report Owner"}</b>
-                                    <p>
-                                        {isTeamMemberAttendanceOnly
-                                            ? "You can read every section of the shared report. Only your own attendance can be edited. The team lead writes Sections 2–9 and submits."
-                                            : "You control Sections 1–9, team setup, final declarations and submission."}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : null}
                         <ReportWritingGuide step={activeStep} />
                         <ReportExampleSpot step={activeStep} />
                         <ReportGlobalCoverage step={activeStep} />

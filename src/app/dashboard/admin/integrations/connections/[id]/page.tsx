@@ -9,6 +9,7 @@ import { ConnectionFormDialog } from "@/components/admin/integrations/HubDialogs
 import { ConnectionActionButtons } from "@/components/admin/integrations/ConnectionsTab";
 import { btnSecondary, HubBadge, KV, SectionCard, TableShell, TD, TH } from "@/components/admin/integrations/HubUi";
 import { useHubResource } from "@/components/admin/integrations/useHubList";
+import { useRouter } from "next/navigation";
 
 type ConnectionDetail = { connection: HubConnection; summaries: HubSummary[] };
 
@@ -53,6 +54,7 @@ export { SummaryTable };
 
 export default function ConnectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const detail = useHubResource<ConnectionDetail>(`${HUB_ADMIN_BASE}/connections/${id}`);
     const [editOpen, setEditOpen] = useState(false);
     const c = detail.data?.connection;
@@ -93,7 +95,11 @@ export default function ConnectionDetailPage({ params }: { params: Promise<{ id:
                                     <Pencil className="h-4 w-4" /> Edit
                                 </button>
                             ) : null}
-                            <ConnectionActionButtons connection={c} onDone={detail.reload} />
+                            <ConnectionActionButtons
+                                connection={c}
+                                onDone={detail.reload}
+                                onDeleted={() => router.push("/dashboard/admin/integrations?tab=connections")}
+                            />
                         </div>
                     </div>
 

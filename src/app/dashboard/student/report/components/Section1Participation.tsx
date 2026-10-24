@@ -361,14 +361,16 @@ function ParticipationQuest({
                     );
                 })}
             </div>
-            <div className="cer-quest-context">
-                <div className="badge">{mission.icon}</div>
-                <div className="copy">
-                    <div className="ey">MISSION {currentMission + 1} OF {QUEST_MISSIONS.length}</div>
-                    <b>{mission.title}</b>
+            {currentMission !== QUEST_MISSIONS.length - 1 && (
+                <div className="cer-quest-context">
+                    <div className="badge">{mission.icon}</div>
+                    <div className="copy">
+                        <div className="ey">MISSION {currentMission + 1} OF {QUEST_MISSIONS.length}</div>
+                        <b>{mission.title}</b>
+                    </div>
+                    <span className="state">{missionDone[currentMission] ? "★ MISSION COMPLETE" : "● IN PROGRESS"}</span>
                 </div>
-                <span className="state">{missionDone[currentMission] ? "★ MISSION COMPLETE" : "● IN PROGRESS"}</span>
-            </div>
+            )}
             <div className="cer-quest-controls">
                 <button
                     type="button"
@@ -1496,8 +1498,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </p>
                             </div>
 
-                            {/* 1. Identity Verification */}
-                            <div id="s1-mission-verify" className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                            {/* 1. Identity Verification & Team Members Combined */}
+                            <div className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white shadow-sm">
+                                <div id="s1-mission-verify" className="p-4 sm:p-5">
                                 <div className="mb-3 flex items-center gap-2">
                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                         1.1
@@ -1623,10 +1626,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         />
                                     )}
                                 </div>
-                            </div>
+                                </div>
 
-                            {/* 2. Team Members */}
-                            <div id="s1-mission-crew" className="scroll-mt-24 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                                {/* 2. Team Members - Same Card */}
+                                <div id="s1-mission-crew" className="border-t border-[#dcebee] p-4 sm:p-5">
                                 <div className="mb-3 flex items-center gap-2">
                                     <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
                                         1.2
@@ -1730,6 +1733,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             }
                                         }}
                                     />
+                                </div>
                                 </div>
                             </div>
                         </div>

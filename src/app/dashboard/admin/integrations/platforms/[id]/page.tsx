@@ -19,11 +19,14 @@ import {
 import { PlatformFormDialog, ReasonDialog } from "@/components/admin/integrations/HubDialogs";
 import { btnDanger, btnPrimary, btnSecondary, btnSmall, Field, HubBadge, inputCls, KV, Modal, SectionCard, TableShell, TD, TH } from "@/components/admin/integrations/HubUi";
 import { useHubResource } from "@/components/admin/integrations/useHubList";
+import HubDeleteButton from "@/components/admin/integrations/HubDeleteButton";
+import { useRouter } from "next/navigation";
 
 type PlatformDetail = { platform: HubPlatform; credentials: HubCredential[]; connections: HubConnection[] };
 
 export default function PlatformDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const detail = useHubResource<PlatformDetail>(`${HUB_ADMIN_BASE}/platforms/${id}`);
     const [editOpen, setEditOpen] = useState(false);
     const [reason, setReason] = useState<"suspended" | "retired" | null>(null);
@@ -150,6 +153,15 @@ export default function PlatformDetailPage({ params }: { params: Promise<{ id: s
                                 <button type="button" className={btnDanger} onClick={() => setReason("retired")}>
                                     Retire
                                 </button>
+                            ) : null}
+                            {p.status !== "live" ? (
+                                <HubDeleteButton
+                                    kind="platforms"
+                                    id={p.id}
+                                    name={p.name}
+                                    className={`${btnSecondary} inline-flex items-center gap-1`}
+                                    onDeleted={() => router.push("/dashboard/admin/integrations?tab=platforms")}
+                                />
                             ) : null}
                         </div>
                     </div>
