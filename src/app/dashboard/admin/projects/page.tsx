@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
@@ -458,7 +458,10 @@ export default function AdminProjectsPage() {
     const [locationFilter, setLocationFilter] = useState("all");
     const [degreeFilter, setDegreeFilter] = useState("all");
     const [facultyEmailFilter, setFacultyEmailFilter] = useState("all");
-    const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
+    /** Row actions menu, anchored to the trigger's viewport rect; final top/height are measured in a layout effect. */
+    const [activeMenu, setActiveMenu] = useState<{ id: string; anchorTop: number; anchorBottom: number; right: number } | null>(null);
+    const [menuPlacement, setMenuPlacement] = useState<{ top: number; maxHeight: number } | null>(null);
+    const menuPanelRef = useRef<HTMLDivElement>(null);
     const [applicantsModal, setApplicantsModal] = useState<{ opportunityId: string; title: string } | null>(null);
     const [incompleteApplicants, setIncompleteApplicants] = useState<IncompleteReportApplicantRow[]>([]);
     const [applicantsLoading, setApplicantsLoading] = useState(false);
@@ -1306,14 +1309,56 @@ export default function AdminProjectsPage() {
             setActiveMenu(null);
             return;
         }
-        const close = () => setActiveMenu(null);
+        // The panel is position:fixed, so page scroll/resize would detach it from its row; scrolling inside the panel is fine.
+        const close = (e: Event) => {
+            if (e.target instanceof Node && menuPanelRef.current?.contains(e.target)) return;
+            setActiveMenu(null);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setActiveMenu(null);
+        };
         window.addEventListener("scroll", close, true);
         window.addEventListener("resize", close);
+        window.addEventListener("keydown", onKey);
         return () => {
             window.removeEventListener("scroll", close, true);
             window.removeEventListener("resize", close);
+            window.removeEventListener("keydown", onKey);
         };
     }, [activeMenu, rows]);
+
+    // Open below the trigger when the whole menu fits, otherwise on whichever side has more room, capped to the viewport.
+    useLayoutEffect(() => {
+        const panel = menuPanelRef.current;
+        if (!activeMenu || !panel) {
+            setMenuPlacement(null);
+            return;
+        }
+        const gap = 6;
+        const margin = 8;
+        const natural = panel.scrollHeight;
+        const below = window.innerHeight - activeMenu.anchorBottom - gap - margin;
+        const above = activeMenu.anchorTop - gap - margin;
+        const openUp = natural > below && above > below;
+        const maxHeight = Math.max(120, openUp ? above : below);
+        const height = Math.min(natural, maxHeight);
+        setMenuPlacement({ top: openUp ? activeMenu.anchorTop - gap - height : activeMenu.anchorBottom + gap, maxHeight });
+    }, [activeMenu]);
+
+    const toggleRowMenu = useCallback((id: string, trigger: HTMLElement) => {
+        const rect = trigger.getBoundingClientRect();
+        const panelWidth = 240; // w-60
+        setActiveMenu((prev) =>
+            prev?.id === id ?
+                null
+            :   {
+                    id,
+                    anchorTop: rect.top,
+                    anchorBottom: rect.bottom,
+                    right: Math.min(Math.max(8, window.innerWidth - rect.right), window.innerWidth - panelWidth - 8),
+                },
+        );
+    }, []);
 
     const statusOptions = useMemo(() => {
         const set = new Set<string>();
@@ -1970,12 +2015,7 @@ export default function AdminProjectsPage() {
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setActiveMenu((prev) =>
-                                    prev?.id === r.id
-                                        ? null
-                                        : { id: r.id, top: rect.bottom + 6, right: window.innerWidth - rect.right },
-                                );
+                                toggleRowMenu(r.id, e.currentTarget);
                             }}
                             className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-2.5 rounded-full hover:bg-slate-200 transition-colors"
                             aria-label="More actions"
@@ -1989,10 +2029,11 @@ export default function AdminProjectsPage() {
         ];
 
         return studentEmailFiltered ? [...baseColumns, studentRoleColumn, ...restColumns] : [...baseColumns, ...restColumns];
-    }, [studentEmailFiltered, activeMenu]);
+    }, [studentEmailFiltered, activeMenu, toggleRowMenu]);
 
     return (
-        <div className="mx-auto min-w-0 max-w-[1500px] p-0">
+        // Bottom padding lets the last rows scroll clear of the fixed support buttons, which sit over the Actions column.
+        <div className="mx-auto min-w-0 max-w-[1500px] p-0 pb-56 sm:pb-60">
             <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-end">
                 <div className="min-w-0">
                     <p className="text-[11px] font-black uppercase tracking-[0.13em] text-[#0e756e]">All projects</p>
@@ -2117,7 +2158,7 @@ export default function AdminProjectsPage() {
                             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#15988b] focus:ring-4 focus:ring-[#15988b]/15 transition-all outline-none font-medium text-slate-700 text-sm"
                         />
                     </div>
-                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
                         <div className="relative min-w-0">
                             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <select
@@ -2236,7 +2277,8 @@ export default function AdminProjectsPage() {
                     </div>
                 ) : (
                     <>
-                    <div className="md:hidden divide-y divide-slate-100">
+                    {/* Cards below xl: with the sidebar open, narrower screens squeeze the table until titles and locations break. */}
+                    <div className="xl:hidden divide-y divide-slate-100">
                         {isLoading ?
                             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
                         :   filteredRows.slice(0, mobileVisible).map((r) => {
@@ -2298,14 +2340,10 @@ export default function AdminProjectsPage() {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={(e) => {
-                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                    setActiveMenu((prev) =>
-                                                        prev?.id === r.id ? null : { id: r.id, top: Math.min(rect.bottom + 6, window.innerHeight - 420), right: Math.max(8, window.innerWidth - rect.right) },
-                                                    );
-                                                }}
+                                                onClick={(e) => toggleRowMenu(r.id, e.currentTarget)}
                                                 className="admin-project-menu-trigger rounded-full p-2.5 text-slate-400 hover:bg-slate-200"
                                                 aria-label="More actions"
+                                                aria-expanded={activeMenu?.id === r.id}
                                             >
                                                 <MoreVertical className="h-4 w-4" />
                                             </button>
@@ -2325,7 +2363,7 @@ export default function AdminProjectsPage() {
                             </div>
                         ) : null}
                     </div>
-                    <div className="hidden md:block">
+                    <div className="hidden xl:block">
                     <DataTable<AdminProjectRow>
                         columns={columns}
                         data={filteredRows}
@@ -2366,11 +2404,18 @@ export default function AdminProjectsPage() {
                 )}
                 {activeMenu && activeMenuRow && (
                     <>
-                        <div className="fixed inset-0 z-40" aria-hidden onClick={() => setActiveMenu(null)} />
+                        {/* Above the floating support buttons (z-60), below the modals the menu items open. */}
+                        <div className="fixed inset-0 z-[61]" aria-hidden onClick={() => setActiveMenu(null)} />
                         <div
+                            ref={menuPanelRef}
                             role="menu"
-                            className="admin-project-menu-panel fixed w-60 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-y-auto max-h-[min(72vh,32rem)] text-left py-0.5"
-                            style={{ top: activeMenu.top, right: activeMenu.right }}
+                            className="admin-project-menu-panel fixed w-60 bg-white rounded-xl shadow-xl border border-slate-100 z-[62] overflow-y-auto overscroll-contain text-left py-0.5"
+                            style={{
+                                top: menuPlacement?.top ?? activeMenu.anchorBottom + 6,
+                                right: activeMenu.right,
+                                maxHeight: menuPlacement?.maxHeight,
+                                visibility: menuPlacement ? "visible" : "hidden",
+                            }}
                         >
                             <Link
                                 href={`/dashboard/student/browse/${encodeURIComponent(activeMenuRow.id)}`}
