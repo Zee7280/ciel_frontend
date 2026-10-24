@@ -12,6 +12,8 @@ import RecordsTab from "@/components/admin/integrations/RecordsTab";
 import EvidenceTab from "@/components/admin/integrations/EvidenceTab";
 import MetricsTab from "@/components/admin/integrations/MetricsTab";
 import AuditTab from "@/components/admin/integrations/AuditTab";
+import { HubDisabledNotice, useHubAvailability } from "@/components/admin/integrations/HubAvailability";
+import { HUB_ADMIN_BASE } from "@/utils/integrationHub";
 
 const TABS = [
     { key: "overview", label: "Overview", icon: Activity },
@@ -51,6 +53,7 @@ function IntegrationConsole() {
     const tab: TabKey = isTab(tabParam) ? tabParam : "overview";
     const platformId = searchParams.get("platformId") ?? undefined;
     const connectionId = searchParams.get("connectionId") ?? undefined;
+    const availability = useHubAvailability(`${HUB_ADMIN_BASE}/health`);
 
     const go = (key: TabKey) => {
         const q = new URLSearchParams();
@@ -74,6 +77,15 @@ function IntegrationConsole() {
                 </Link>
             </div>
 
+            {availability === "disabled" ? <HubDisabledNotice audience="admin" /> : null}
+            {availability === "checking" ? (
+                <div className="flex justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+            ) : null}
+
+            {availability !== "enabled" && availability !== "error" ? null : (
+            <>
             <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1" aria-label="Integration console sections">
                 {TABS.map((t) => {
                     const Icon = t.icon;
@@ -110,6 +122,8 @@ function IntegrationConsole() {
             {tab === "evidence" ? <EvidenceTab key={connectionId ?? "all"} initialConnectionId={connectionId} /> : null}
             {tab === "metrics" ? <MetricsTab /> : null}
             {tab === "audit" ? <AuditTab /> : null}
+            </>
+            )}
         </div>
     );
 }

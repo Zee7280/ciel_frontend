@@ -20,6 +20,7 @@ import {
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { isAbortError, readErrorMessage, useAbortableFetch } from "@/components/admin/useAbortableFetch";
+import { HubDisabledNotice, useHubAvailability } from "@/components/admin/integrations/HubAvailability";
 import { formatAdminDate, formatAdminDateTime } from "@/utils/adminDate";
 
 /* ------------------------------------------------------------------------------------------------
@@ -1095,6 +1096,7 @@ function ExternalRecordsPageInner() {
     const [connections, setConnections] = useState<Connection[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const availability = useHubAvailability(`${BASE}/platforms`);
 
     const loadConnections = useCallback(() => {
         const run = begin();
@@ -1114,8 +1116,8 @@ function ExternalRecordsPageInner() {
     }, [begin]);
 
     useEffect(() => {
-        loadConnections();
-    }, [loadConnections]);
+        if (availability === "enabled" || availability === "error") loadConnections();
+    }, [loadConnections, availability]);
 
     const setTab = (t: Tab) => {
         const p = new URLSearchParams(searchParams.toString());
@@ -1140,6 +1142,14 @@ function ExternalRecordsPageInner() {
                     <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
                 </button>
             </div>
+            {availability === "disabled" ? <HubDisabledNotice audience="org" /> : null}
+            {availability === "checking" ? (
+                <div className="flex justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+            ) : null}
+            {availability !== "enabled" && availability !== "error" ? null : (
+            <>
             <div className="flex gap-1 rounded-xl bg-slate-100 p-1 text-sm">
                 {TABS.map((t) => (
                     <button
@@ -1158,6 +1168,8 @@ function ExternalRecordsPageInner() {
                 <RecordsTab connections={connections} />
             ) : (
                 <EvidenceTab connections={connections} />
+            )}
+            </>
             )}
         </div>
     );
