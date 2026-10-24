@@ -44,11 +44,11 @@ export default function FacultyQuickWorkPage() {
     const pending = queue?.pending ?? [];
 
     return (
-        <div className="mx-auto min-w-0 max-w-[1100px] pb-16 text-[#163d3b]">
+        <div className="mx-auto min-w-0 max-w-[1100px] pb-16 text-[#16313d]">
             <section className="pb-6 pt-2">
-                <div className="mb-3 text-[11px] font-bold uppercase tracking-[1.6px] text-[#12685d]">Quick Community Work / Faculty review</div>
-                <h1 className="text-[29px] font-semibold leading-tight tracking-[-1.2px] sm:text-[38px]">A quick check. A trusted record.</h1>
-                <p className="mt-3 max-w-[680px] text-[13px] text-[#57706e] sm:text-sm">
+                <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Work / Faculty review</div>
+                <h1 className="text-[21px] font-semibold leading-tight">A quick check. A trusted record.</h1>
+                <p className="mt-3 max-w-[680px] text-[13px] text-[#6b7c86] sm:text-sm">
                     Students submit short university activities after they finish, naming you as the coordinating faculty member. Review the activity,
                     each person’s attendance and the evidence together in one decision. Only approved hours count, and they stay separate from the
                     structured 16-hour requirement.
@@ -65,20 +65,20 @@ export default function FacultyQuickWorkPage() {
             ) : null}
 
             <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 className="text-[17px] font-semibold">
+                <h2 className="text-[15px] font-semibold">
                     {pending.length} item{pending.length === 1 ? "" : "s"} awaiting review
                 </h2>
             </div>
 
             {!queue && !loadError ? (
                 <div className="flex justify-center py-12">
-                    <Loader2 className="h-5 w-5 animate-spin text-[#57706e]" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[#6b7c86]" />
                 </div>
             ) : pending.length ? (
                 pending.map((log) => <ReviewCard key={log.id} log={log} onDone={load} />)
             ) : queue ? (
-                <div className="rounded-2xl border border-[#dce5df] bg-white px-6 py-11 text-center text-[#57706e]">
-                    <h3 className="mb-2 text-[17px] font-semibold text-[#163d3b]">You’re all caught up.</h3>
+                <div className="rounded-2xl border border-[#dcebee] bg-white px-6 py-11 text-center text-[#6b7c86]">
+                    <h3 className="mb-2 text-[15px] font-semibold text-[#16313d]">You’re all caught up.</h3>
                     <p className="mx-auto max-w-[440px] text-[13px]">
                         Requests appear here only after a student submits a completed quick-work log that names your email as coordinating faculty.
                     </p>
@@ -87,11 +87,11 @@ export default function FacultyQuickWorkPage() {
 
             {queue?.reviewed.length ? (
                 <section className="mt-8">
-                    <h2 className="mb-3 text-[17px] font-semibold">Recently reviewed</h2>
-                    <div className="overflow-x-auto rounded-2xl border border-[#dce5df] bg-white">
+                    <h2 className="mb-3 text-[15px] font-semibold">Recently reviewed</h2>
+                    <div className="overflow-x-auto rounded-2xl border border-[#dcebee] bg-white">
                         <table className="w-full min-w-[600px] border-collapse text-[13px]">
                             <thead>
-                                <tr className="bg-[#f6f8f4] text-left text-[11px] text-[#57706e]">
+                                <tr className="bg-[#f4f8f9] text-left text-xs text-[#6b7c86]">
                                     <th className="px-5 py-3.5 font-semibold">Activity</th>
                                     <th className="px-5 py-3.5 font-semibold">Lead</th>
                                     <th className="px-5 py-3.5 font-semibold">Team hours</th>
@@ -100,10 +100,10 @@ export default function FacultyQuickWorkPage() {
                             </thead>
                             <tbody>
                                 {queue.reviewed.map((r) => (
-                                    <tr key={r.id} className="border-b border-[#dce5df] align-top">
+                                    <tr key={r.id} className="border-b border-[#dcebee] align-top">
                                         <td className="px-5 py-3.5">
                                             <span className="font-semibold">{r.title}</span>
-                                            <small className="block text-[11px] text-[#57706e]">
+                                            <small className="block text-xs text-[#6b7c86]">
                                                 {shortDate(r.activityDate)} · {r.activityType}
                                             </small>
                                         </td>
@@ -111,7 +111,7 @@ export default function FacultyQuickWorkPage() {
                                         <td className="px-5 py-3.5">{formatHours(r.participants.reduce((a, p) => a + p.minutes, 0))} h</td>
                                         <td className="px-5 py-3.5">
                                             <QuickWorkStatusPill status={r.status} />
-                                            {r.reviewNote ? <small className="mt-1 block max-w-[260px] break-words text-[11px] text-[#57706e]">{r.reviewNote}</small> : null}
+                                            {r.reviewNote ? <small className="mt-1 block max-w-[260px] break-words text-xs text-[#6b7c86]">{r.reviewNote}</small> : null}
                                         </td>
                                     </tr>
                                 ))}
@@ -153,17 +153,17 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
     };
 
     return (
-        <article className="mb-4 rounded-[13px] border border-[#dce5df] bg-white p-4 sm:p-6">
+        <article className="mb-4 rounded-[13px] border border-[#dcebee] bg-white p-4 sm:p-6">
             <header className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row">
                 <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-[1.6px] text-[#12685d]">Final · completed activity review</span>
-                    <h2 className="mt-1 break-words text-[21px] font-bold tracking-[-0.6px]">{log.title}</h2>
+                    <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Final · completed activity review</span>
+                    <h2 className="mt-1 break-words text-lg font-bold">{log.title}</h2>
                 </div>
                 <QuickWorkStatusPill status={log.status} />
             </header>
             <QuickWorkRecordDetails log={log} />
             <details open className="my-3.5">
-                <summary className="cursor-pointer text-xs font-semibold text-[#12685d]">
+                <summary className="cursor-pointer text-xs font-semibold text-[#0e7d74]">
                     Review evidence ({log.evidence.length}) · {log.visibility}
                 </summary>
                 <EvidenceGallery evidence={log.evidence} />
@@ -178,11 +178,11 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
                 </div>
             ) : null}
             <label className="my-3 flex items-start gap-2.5 text-xs">
-                <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#12685d]" checked={verified} onChange={(e) => setVerified(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#0e7d74]" checked={verified} onChange={(e) => setVerified(e.target.checked)} />
                 <span>I have reviewed the evidence and confirm the individual participation times shown above.</span>
             </label>
             <label htmlFor={`note-${log.id}`} className="mb-1.5 block text-xs font-semibold">
-                Review note <span className="font-normal text-[#57706e]">(required when returning or declining)</span>
+                Review note <span className="font-normal text-[#6b7c86]">(required when returning or declining)</span>
             </label>
             <input
                 id={`note-${log.id}`}
@@ -190,14 +190,14 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Feedback for the activity lead"
-                className="w-full rounded-lg border border-[#cfdbd4] px-3 py-2.5 text-[13px] outline-none focus:border-[#71a68c] focus:ring-2 focus:ring-[#71a68c]/30"
+                className="w-full rounded-lg border border-[#d3e3e6] px-3 py-2.5 text-[13px] outline-none focus:border-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74]/30"
             />
             <div className="mt-3.5 flex flex-wrap gap-2.5">
                 <button
                     type="button"
                     disabled={busy != null}
                     onClick={() => void act("approve")}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#12685d] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#104c46] disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0e7d74] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0b6760] disabled:opacity-50"
                 >
                     {busy === "approve" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     Approve work & hours
@@ -206,7 +206,7 @@ function ReviewCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<
                     type="button"
                     disabled={busy != null}
                     onClick={() => void act("changes")}
-                    className="rounded-lg border border-[#b8cec3] bg-white px-4 py-2.5 text-xs font-semibold text-[#12685d] disabled:opacity-50"
+                    className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74] disabled:opacity-50"
                 >
                     Request changes
                 </button>

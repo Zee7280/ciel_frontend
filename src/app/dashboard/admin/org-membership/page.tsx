@@ -368,7 +368,7 @@ export default function AdminOrgMembershipPage() {
                 toast.error(await readErrorMessage(res, kind === "approve" ? "Approve failed" : "Reject failed"));
                 return;
             }
-            toast.success(kind === "approve" ? "Account activated" : "Submission rejected");
+            toast.success(kind === "approve" ? "Membership fee approved" : "Submission rejected");
             if (kind === "reject") setFeedback((f) => ({ ...f, [id]: "" }));
             setAction(null);
             setHistoryTotal(null);
@@ -399,7 +399,7 @@ export default function AdminOrgMembershipPage() {
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Organization membership fees</h1>
                 <p className="mt-1 text-slate-600">
-                    Review payment proofs for university and corporate signups. Approve to set the account active. History shows
+                    Review payment proofs for university and corporate signups. Approving the fee activates the account once its organization profile is also approved. History shows
                     past approvals and rejections.
                 </p>
             </div>

@@ -20,7 +20,6 @@ import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
 import {
     SIGNUP_PROOF_ACCEPT,
-    SignupProofUnavailableError,
     signupProofFileError,
     uploadSignupProof,
     type SignupProofDocument,
@@ -409,15 +408,10 @@ function SignUpContent() {
                   : isOrgRole && proofMethod === "upload" && proofFile
                     ? [{ label: "Proof of affiliation", file: proofFile }]
                     : [];
+            // Proof is required for every non-student account: if a file doesn't upload, stop here.
             const signupProofDocuments: SignupProofDocument[] = [];
-            try {
-                for (const p of proofUploads) {
-                    signupProofDocuments.push(await uploadSignupProof(normalizedEmail, p.label, p.file));
-                }
-            } catch (uploadError) {
-                // An API without the upload endpoint (mid-deploy) shouldn't block signup; the file
-                // name still goes to the admin in affiliationProofLabel, as before this feature.
-                if (!(uploadError instanceof SignupProofUnavailableError)) throw uploadError;
+            for (const p of proofUploads) {
+                signupProofDocuments.push(await uploadSignupProof(normalizedEmail, p.label, p.file));
             }
 
             const { phoneCountryKey, token: _inviteToken, ...signupFields } = formData;

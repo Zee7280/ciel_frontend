@@ -478,8 +478,9 @@ function LoginContent() {
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/90 p-4 text-left text-xs font-semibold text-blue-900">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                                         <span>
-                                            Your university or corporate account was created. After you sign in, you will
-                                            complete the one-time membership fee (or wait for an admin to activate you).
+                                            Your organisation account was created. After you sign in, complete the one-time
+                                            membership fee; CIEL PK then reviews your organisation profile and proof before
+                                            activating your portal.
                                         </span>
                                     </div>
                                 )}
@@ -496,7 +497,8 @@ function LoginContent() {
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/90 p-4 text-left text-xs font-semibold text-amber-950">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                         <span>
-                                            Application received. Sign in to browse the Investor Hub. CIEL PK verifies investor accounts within 3 working days before founder introductions unlock.
+                                            Application received. CIEL PK reviews your investor profile and proof documents
+                                            within 3 working days. You can sign in once it is approved.
                                         </span>
                                     </div>
                                 )}
@@ -504,8 +506,8 @@ function LoginContent() {
                                     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/90 p-4 text-left text-xs font-semibold text-amber-950">
                                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                         <span>
-                                            Your organisation account was created. CIEL PK verifies new organisations before
-                                            first sign-in, and we&apos;ll email you as soon as it&apos;s approved.
+                                            Your organisation account was created. CIEL PK reviews your organisation profile
+                                            and proof before first sign-in, and we&apos;ll email you as soon as it&apos;s approved.
                                         </span>
                                     </div>
                                 )}

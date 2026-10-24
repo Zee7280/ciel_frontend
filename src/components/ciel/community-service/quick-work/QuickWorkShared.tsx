@@ -45,16 +45,16 @@ export function PhotoIcon({ className = "h-7 w-7" }: { className?: string }) {
 /* ------------------------------------------------------------------ status */
 
 const PILL_TONE: Record<QuickWorkStatus, string> = {
-    draft: "bg-[#edf0ed] text-[#57706e]",
+    draft: "bg-[#eef2f4] text-[#6b7c86]",
     submitted: "bg-[#fff5de] text-[#916b21]",
     changes: "bg-[#fae9e7] text-[#ac3c3c]",
-    approved: "bg-[#edf5f0] text-[#12685d]",
+    approved: "bg-[#e6f6f4] text-[#0e7d74]",
     rejected: "bg-[#fae9e7] text-[#ac3c3c]",
 };
 
 export function QuickWorkStatusPill({ status }: { status: QuickWorkStatus }) {
     return (
-        <span className={`inline-block rounded-md px-2.5 py-1.5 text-[10px] font-semibold leading-tight ${PILL_TONE[status] ?? PILL_TONE.draft}`}>
+        <span className={`inline-block rounded-md px-2.5 py-1.5 text-[11px] font-semibold leading-tight ${PILL_TONE[status] ?? PILL_TONE.draft}`}>
             {STATUS_LABEL[status] ?? status}
         </span>
     );
@@ -92,7 +92,7 @@ export function QuickWorkModal({
     }, [onClose]);
     return (
         <div
-            className="fixed inset-0 z-[100] grid place-items-center overflow-auto overscroll-contain bg-[#0b2926]/50 p-3 sm:p-5"
+            className="fixed inset-0 z-[100] grid place-items-center overflow-auto overscroll-contain bg-[#04252b]/50 p-3 sm:p-5"
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
@@ -102,7 +102,7 @@ export function QuickWorkModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={labelledBy}
-                className={`max-h-[94dvh] w-full overflow-auto rounded-[17px] bg-white p-5 text-[#163d3b] shadow-2xl sm:p-7 ${wide ? "max-w-[760px]" : "max-w-[610px]"}`}
+                className={`max-h-[94dvh] w-full overflow-auto rounded-[17px] bg-white p-5 text-[#16313d] shadow-2xl sm:p-7 ${wide ? "max-w-[760px]" : "max-w-[610px]"}`}
             >
                 {children}
             </section>
@@ -116,7 +116,7 @@ export function ModalClose({ onClose, label = "Close" }: { onClose: () => void; 
             type="button"
             onClick={onClose}
             aria-label={label}
-            className="grid h-[30px] w-[30px] flex-none place-items-center rounded-full bg-[#f0f5f0] text-lg text-[#163d3b] hover:bg-[#e2ece4]"
+            className="grid h-[30px] w-[30px] flex-none place-items-center rounded-full bg-[#eef4f5] text-lg text-[#16313d] hover:bg-[#e2eef0]"
         >
             ×
         </button>
@@ -142,38 +142,38 @@ export function QuickWorkIntroDialog({
                     <span className="grid h-[43px] w-[43px] place-items-center rounded-xl bg-[#fff0cd] text-[#88600d]">
                         <LeafIcon />
                     </span>
-                    <div className="mt-3 text-[9px] font-bold uppercase tracking-[1.2px] text-[#718475]">Short university activities</div>
-                    <h2 id="quickWorkIntroTitle" className="mt-1.5 text-[26px] font-bold leading-tight tracking-[-0.9px] text-[#163d50] sm:text-[30px]">
+                    <div className="mt-3 text-[11px] font-bold uppercase tracking-[1.2px] text-[#6b7c86]">Short university activities</div>
+                    <h2 id="quickWorkIntroTitle" className="mt-1.5 text-[21px] font-bold leading-tight text-[#16313d] sm:text-[21px]">
                         Quick Community Work
                     </h2>
                 </div>
                 <ModalClose onClose={onClose} label="Close explanation" />
             </header>
-            <p className="text-[13px] leading-relaxed text-[#526b70]">
+            <p className="text-[13px] leading-relaxed text-[#6b7c86]">
                 Use this for brief community activities at university—even a one-hour activity—such as:
             </p>
             <div className="my-3.5 flex flex-wrap gap-1.5">
                 {["Tree-planting drives", "Awareness campaigns", "Pinktober events", "Campus clean-ups"].map((c) => (
-                    <span key={c} className="rounded-md border border-[#e4e9e3] bg-[#f8faf7] px-2 py-1 text-[10px] text-[#58716b]">
+                    <span key={c} className="rounded-md border border-[#dcebee] bg-[#f8fbfc] px-2 py-1 text-[11px] text-[#6b7c86]">
                         {c}
                     </span>
                 ))}
             </div>
-            <div className="border-t border-[#e6ebe6] pt-4">
+            <div className="border-t border-[#dcebee] pt-4">
                 <h3 className="text-sm font-semibold">A short log for work you have completed</h3>
-                <ol className="my-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-[#536c6b]">
+                <ol className="my-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-[#6b7c86]">
                     <li>
-                        <b className="text-[#224c47]">Add yourself or your team.</b> Select the faculty member who will review your work.
+                        <b className="text-[#16313d]">Add yourself or your team.</b> Select the faculty member who will review your work.
                     </li>
                     <li>
-                        <b className="text-[#224c47]">Record what you did.</b> Enter each person’s actual attendance and attach photos or supporting evidence.
+                        <b className="text-[#16313d]">Record what you did.</b> Enter each person’s actual attendance and attach photos or supporting evidence.
                     </li>
                     <li>
-                        <b className="text-[#224c47]">Submit for faculty approval.</b> Faculty reviews the completed work; approved individual hours appear in{" "}
-                        <b className="text-[#224c47]">My Quick Work</b>.
+                        <b className="text-[#16313d]">Submit for faculty approval.</b> Faculty reviews the completed work; approved individual hours appear in{" "}
+                        <b className="text-[#16313d]">My Quick Work</b>.
                     </li>
                 </ol>
-                <p className="mb-4 mt-3 text-[11px] font-semibold text-[#12685d]">Faculty approval happens only after submission.</p>
+                <p className="mb-4 mt-3 text-xs font-semibold text-[#0e7d74]">Faculty approval happens only after submission.</p>
             </div>
             <div className="rounded-md border-l-[3px] border-[#e3a72b] bg-[#fff6e1] px-4 py-3 text-xs leading-relaxed text-[#624b20]">
                 <b className="mb-1 block text-[13px]">Need to complete your 16-hour requirement?</b>
@@ -183,14 +183,14 @@ export function QuickWorkIntroDialog({
                 <button
                     type="button"
                     onClick={onContinue}
-                    className="min-h-[43px] flex-1 rounded-lg bg-[#12685d] px-3 text-xs font-semibold text-white hover:bg-[#104c46]"
+                    className="min-h-[43px] flex-1 rounded-lg bg-[#0e7d74] px-3 text-xs font-semibold text-white hover:bg-[#0b6760]"
                 >
                     Continue to Quick Work <span aria-hidden="true">→</span>
                 </button>
                 <button
                     type="button"
                     onClick={onStructured}
-                    className="min-h-[43px] flex-1 rounded-lg border border-[#b8cec3] bg-white px-3 text-xs font-semibold text-[#12685d] hover:bg-[#f5faf7]"
+                    className="min-h-[43px] flex-1 rounded-lg border border-[#cbe3e0] bg-white px-3 text-xs font-semibold text-[#0e7d74] hover:bg-[#f2faf9]"
                 >
                     Go to Structured Service
                 </button>
@@ -213,25 +213,25 @@ export function RouteChoiceDialog({
         <QuickWorkModal labelledBy="routeChoiceTitle" onClose={onClose}>
             <header className="mb-3.5 flex items-start justify-between gap-5">
                 <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[1.6px] text-[#12685d]">Choose the right route</div>
-                    <h2 id="routeChoiceTitle" className="mt-1 text-[23px] font-bold tracking-[-0.6px]">
+                    <div className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Choose the right route</div>
+                    <h2 id="routeChoiceTitle" className="mt-1 text-lg font-bold">
                         What are you here to do?
                     </h2>
                 </div>
                 <ModalClose onClose={onClose} />
             </header>
-            <div className="my-3.5 rounded-[10px] border border-[#dce5df] bg-[#f9fbf8] p-[18px]">
-                <h3 className="text-[17px] font-semibold">Complete the 16-hour requirement</h3>
-                <p className="mb-3.5 mt-2 text-[13px] text-[#57706e]">
+            <div className="my-3.5 rounded-[10px] border border-[#dcebee] bg-[#f8fbfc] p-[18px]">
+                <h3 className="text-[15px] font-semibold">Complete the 16-hour requirement</h3>
+                <p className="mb-3.5 mt-2 text-[13px] text-[#6b7c86]">
                     Choose Structured Community Service for a structured project, verified attendance and a detailed report.
                 </p>
-                <button type="button" onClick={onStructured} className="rounded-lg bg-[#12685d] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#104c46]">
+                <button type="button" onClick={onStructured} className="rounded-lg bg-[#0e7d74] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0b6760]">
                     Open Structured Service
                 </button>
             </div>
-            <div className="my-3.5 rounded-[10px] border border-[#dce5df] bg-[#f9fbf8] p-[18px]">
-                <h3 className="text-[17px] font-semibold">Record a short university activity</h3>
-                <p className="mb-3.5 mt-2 text-[13px] text-[#57706e]">
+            <div className="my-3.5 rounded-[10px] border border-[#dcebee] bg-[#f8fbfc] p-[18px]">
+                <h3 className="text-[15px] font-semibold">Record a short university activity</h3>
+                <p className="mb-3.5 mt-2 text-[13px] text-[#6b7c86]">
                     Choose Quick Community Work for a brief activity log, evidence and faculty approval after submission.
                 </p>
                 <button type="button" onClick={onQuick} className="rounded-lg bg-[#f4a51c] px-4 py-2.5 text-xs font-bold text-[#2e270e] hover:bg-[#e99a12]">
@@ -248,21 +248,21 @@ export function EvidenceTile({ item, children }: { item: QuickWorkEvidence; chil
     const isPdf = item.type === "application/pdf";
     const isImage = (QUICK_WORK_EVIDENCE_TYPES as readonly string[]).includes(item.type) && !isPdf;
     return (
-        <div className="overflow-hidden rounded-[9px] border border-[#dce5df]">
+        <div className="overflow-hidden rounded-[9px] border border-[#dcebee]">
             {isImage ? (
                 // eslint-disable-next-line @next/next/no-img-element -- user evidence from S3, any size
-                <img src={item.url} alt={item.caption || item.name} className="block h-[135px] w-full bg-[#edf5f0] object-cover" />
+                <img src={item.url} alt={item.caption || item.name} className="block h-[135px] w-full bg-[#e6f6f4] object-cover" />
             ) : (
-                <div className="grid h-[135px] place-items-center bg-[#edf5f0] font-bold text-[#104c46]">PDF evidence</div>
+                <div className="grid h-[135px] place-items-center bg-[#e6f6f4] font-bold text-[#0b6760]">PDF evidence</div>
             )}
             <div className="p-2.5">
-                <div className="truncate text-[10px] text-[#57706e]" title={item.name}>
+                <div className="truncate text-[11px] text-[#6b7c86]" title={item.name}>
                     {item.name}
                 </div>
                 {children ?? (
                     <>
-                        <p className="mt-1 text-xs text-[#163d3b]">{item.caption}</p>
-                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#12685d] underline">
+                        <p className="mt-1 text-xs text-[#16313d]">{item.caption}</p>
+                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0e7d74] underline">
                             Open evidence
                         </a>
                     </>
@@ -287,7 +287,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                 <Detail label="Coordinating faculty">
                     {log.facultyName || "—"}
                     <br />
-                    <span className="text-xs text-[#57706e]">{log.facultyEmail}</span>
+                    <span className="text-xs text-[#6b7c86]">{log.facultyEmail}</span>
                 </Detail>
                 <Detail label="Institution">
                     {log.university || "—"} · {log.department || "—"}
@@ -299,7 +299,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                 <Detail label="Evidence visibility">{log.visibility}</Detail>
             </div>
             {log.summary ? (
-                <div className="rounded-lg bg-[#edf5f0] px-3.5 py-3 text-xs leading-relaxed text-[#104c46]">
+                <div className="rounded-lg bg-[#e6f6f4] px-3.5 py-3 text-xs leading-relaxed text-[#0b6760]">
                     <b>Activity conducted</b>
                     <br />
                     <span className="whitespace-pre-wrap break-words">{log.summary}</span>
@@ -314,7 +314,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
             <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[420px] border-collapse text-xs">
                     <thead>
-                        <tr className="bg-[#f6f8f4] text-left text-[10px] tracking-[0.5px] text-[#57706e]">
+                        <tr className="bg-[#f4f8f9] text-left text-[11px] tracking-[0.5px] text-[#6b7c86]">
                             <th className="px-2 py-2.5 font-semibold">Participant</th>
                             <th className="px-2 py-2.5 font-semibold">Attendance</th>
                             <th className="px-2 py-2.5 font-semibold">Break</th>
@@ -323,17 +323,17 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                     </thead>
                     <tbody>
                         {log.participants.map((p) => (
-                            <tr key={p.id} className="border-b border-[#dce5df]">
+                            <tr key={p.id} className="border-b border-[#dcebee]">
                                 <td className="px-2 py-3 font-semibold">
                                     {p.name || p.email}
-                                    <small className="block text-[10px] font-normal text-[#57706e]">
+                                    <small className="block text-[11px] font-normal text-[#6b7c86]">
                                         {p.studentId || "—"} · {p.email}
                                         {p.isLead ? " · Lead" : ""}
                                     </small>
                                 </td>
                                 <td className="px-2 py-3">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</td>
                                 <td className="px-2 py-3">{p.present ? p.breakMinutes : 0} min</td>
-                                <td className="whitespace-nowrap px-2 py-3 font-bold text-[#12685d]">{formatHours(p.minutes)} h</td>
+                                <td className="whitespace-nowrap px-2 py-3 font-bold text-[#0e7d74]">{formatHours(p.minutes)} h</td>
                             </tr>
                         ))}
                     </tbody>
@@ -346,7 +346,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
 function Detail({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="min-w-0 break-words">
-            <small className="mb-0.5 block text-[10px] uppercase tracking-[0.6px] text-[#57706e]">{label}</small>
+            <small className="mb-0.5 block text-[11px] uppercase tracking-[0.6px] text-[#6b7c86]">{label}</small>
             {children}
         </div>
     );

@@ -230,6 +230,50 @@ function ReportFormContent() {
     const [helpSignal, setHelpSignal] = React.useState(0);
     const [opportunityFlashOpen, setOpportunityFlashOpen] = React.useState(false);
 
+    // Auto-focus the first empty field after the student explicitly advances to the next section
+    // (the page-level "Next step" button, or Section 1's own internal next/skip), so they can start
+    // typing immediately instead of scrolling up and clicking into it manually. Gated by an explicit
+    // request flag — NOT on every `activeStep` change — so jumping via the progress-bar stepper or
+    // "Back" still just opens the section normally instead of yanking focus to a field deep inside it.
+    const sectionContainerRef = React.useRef<HTMLDivElement>(null);
+    const pendingAutoFocusRef = React.useRef(false);
+    const requestAutoFocusOnNextStep = React.useCallback(() => {
+        pendingAutoFocusRef.current = true;
+    }, []);
+    const focusFirstEmptyField = React.useCallback(() => {
+        const container = sectionContainerRef.current;
+        if (!container) return false;
+        const candidates = Array.from(
+            container.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+                'input:not([type="hidden"]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])',
+            ),
+        );
+        for (const el of candidates) {
+            if (el.offsetParent === null) continue; // skip hidden/collapsed fields
+            if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+                if (!el.checked) {
+                    el.focus();
+                    return true;
+                }
+                continue;
+            }
+            if (!String(el.value || "").trim()) {
+                el.focus();
+                return true;
+            }
+        }
+        return false;
+    }, []);
+    React.useEffect(() => {
+        if (!pendingAutoFocusRef.current) return;
+        pendingAutoFocusRef.current = false;
+        if (isFlashCardStep(activeStep)) return;
+        const t = setTimeout(() => {
+            if (!focusFirstEmptyField()) window.scrollTo(0, 0);
+        }, 150);
+        return () => clearTimeout(t);
+    }, [activeStep, focusFirstEmptyField]);
+
     const goBackToPreviousPage = React.useCallback(() => {
         if (fromSurface === 'wall') {
             router.push('/dashboard/student/paths/community-service?view=wall');
@@ -674,9 +718,9 @@ function ReportFormContent() {
                 setIsSaving(false);
                 return;
             }
-            
+
+            requestAutoFocusOnNextStep();
             nextStep();
-            window.scrollTo(0, 0);
         } else {
             if (!canFinalizeSubmit) {
                 if (canSubmitReport && !isTeamLeadForSubmit) {
@@ -1145,8 +1189,8 @@ function ReportFormContent() {
                     </>
                 ) : null}
 
-                <div>
-                    {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
+                <div ref={sectionContainerRef}>
+                    {activeStep === 1 && <Section1Participation projectData={projectDetails} onWillAdvanceSection={requestAutoFocusOnNextStep} />}
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                     {isMergedActivitiesStep(activeStep) && (

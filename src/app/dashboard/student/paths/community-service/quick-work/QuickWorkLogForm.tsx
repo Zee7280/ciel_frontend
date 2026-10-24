@@ -25,6 +25,7 @@ import {
     QUICK_WORK_ACTIVITY_TYPES,
     QUICK_WORK_EVIDENCE_TYPES,
     QUICK_WORK_MAX_EVIDENCE,
+    QUICK_WORK_MAX_DAILY_MINUTES,
     QUICK_WORK_MAX_EVIDENCE_BYTES,
     QUICK_WORK_MAX_PARTICIPANTS,
     QUICK_WORK_SUMMARY_MAX,
@@ -37,9 +38,7 @@ import {
     type QuickWorkLog,
 } from "@/utils/quickWorkRules";
 import {
-    BookIcon,
     EvidenceTile,
-    LeafIcon,
     ModalClose,
     PhotoIcon,
     QuickWorkModal,
@@ -49,22 +48,23 @@ import {
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 
 const HUB = "/dashboard/student/paths/community-service";
+const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
 const STEPS = ["Team & faculty", "Activity details", "Attendance", "Evidence & submit"] as const;
 
 const inputCls =
-    "w-full min-w-0 rounded-lg border border-[#cfdbd4] bg-white px-3 py-2.5 text-[13px] text-[#163d3b] outline-none focus:border-[#71a68c] focus:ring-2 focus:ring-[#71a68c]/30 disabled:bg-[#f4f6f3] disabled:text-[#57706e]";
+    "w-full min-w-0 rounded-lg border border-[#d3e3e6] bg-white px-3 py-2.5 text-[13px] text-[#16313d] outline-none focus:border-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74]/30 disabled:bg-[#f4f7f8] disabled:text-[#6b7c86]";
 const btnCls =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#b8cec3] bg-white px-4 py-2.5 text-xs font-semibold text-[#12685d] hover:bg-[#f5faf7] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74] hover:bg-[#f2faf9] disabled:cursor-not-allowed disabled:opacity-50";
 const primaryCls =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#12685d] bg-[#12685d] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#104c46] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#0e7d74] bg-[#0e7d74] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0b6760] disabled:cursor-not-allowed disabled:opacity-50";
 
 function Field({ id, label, optional, required, children, full }: { id: string; label: string; optional?: boolean; required?: boolean; children: ReactNode; full?: boolean }) {
     return (
         <div className={full ? "sm:col-span-2" : undefined}>
-            <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-[#163d3b]">
+            <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-[#16313d]">
                 {label}
-                {required ? <span className="text-[#12685d]"> *</span> : null}
-                {optional ? <span className="font-normal text-[#57706e]"> (optional)</span> : null}
+                {required ? <span className="text-[#0e7d74]"> *</span> : null}
+                {optional ? <span className="font-normal text-[#6b7c86]"> (optional)</span> : null}
             </label>
             {children}
         </div>
@@ -89,6 +89,8 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const errorBox = useRef<HTMLDivElement>(null);
     const panel = useRef<HTMLElement>(null);
     const loadedId = useRef<string | null>(null);
+    /** Faculty this student named on earlier logs, offered as suggestions in Step 1. */
+    const [pastFaculty, setPastFaculty] = useState<{ name: string; email: string }[]>([]);
 
     /* ---------------------------------------------------------------- load */
 
@@ -121,6 +123,25 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             cancelled = true;
         };
     }, [logId, router]);
+
+    useEffect(() => {
+        let cancelled = false;
+        quickWorkApi
+            .mine()
+            .then(({ logs }) => {
+                if (cancelled) return;
+                const seen = new Map<string, { name: string; email: string }>();
+                for (const l of logs) {
+                    const email = l.facultyEmail.trim().toLowerCase();
+                    if (email && !seen.has(email)) seen.set(email, { name: l.facultyName.trim(), email });
+                }
+                setPastFaculty(Array.from(seen.values()));
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (!dirty) return;
@@ -167,7 +188,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 
     if (loadError) {
         return (
-            <div className="mx-auto max-w-[760px] py-10 text-[#163d3b]">
+            <div className="mx-auto max-w-[760px] py-10 text-[#16313d]">
                 <div role="alert" className="rounded-[9px] border border-[#edccc5] bg-[#fff0ed] px-4 py-3 text-sm text-[#9b3832]">
                     {loadError}
                 </div>
@@ -180,19 +201,19 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     if (!log || !form) {
         return (
             <div className="flex justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-[#57706e]" />
+                <Loader2 className="h-6 w-6 animate-spin text-[#6b7c86]" />
             </div>
         );
     }
 
     if (!log.isLead || (log.status !== "draft" && log.status !== "changes")) {
         return (
-            <div className="mx-auto max-w-[760px] py-10 text-[#163d3b]">
+            <div className="mx-auto max-w-[760px] py-10 text-[#16313d]">
                 <h1 className="text-2xl font-semibold">{log.title || "Quick Community Work log"}</h1>
                 <div className="mt-3">
                     <QuickWorkStatusPill status={log.status} />
                 </div>
-                <p className="mt-3 text-sm text-[#57706e]">
+                <p className="mt-3 text-sm text-[#6b7c86]">
                     {log.isLead ? "This log has been submitted, so it can no longer be edited." : "Only the activity lead can edit this log."}
                 </p>
                 <Link href={QUICK_WORK_HREF} className={`${btnCls} mt-4`}>
@@ -313,7 +334,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     continue;
                 }
                 if (file.size > QUICK_WORK_MAX_EVIDENCE_BYTES) {
-                    toast.error(`${original.name} exceeds 5 MB.`);
+                    toast.error(`${original.name} exceeds ${MAX_EVIDENCE_MB} MB.`);
                     continue;
                 }
                 const url = await uploadFileViaPresign(QUICK_WORK_PRESIGN_PATH, file);
@@ -336,59 +357,32 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const today = pktNow().date;
 
     return (
-        <div className="mx-auto min-w-0 max-w-[1280px] pb-16 text-[#163d3b]">
-            <Link href={QUICK_WORK_HREF} className="text-xs font-semibold text-[#12685d] underline underline-offset-[3px]">
+        <div className="mx-auto min-w-0 max-w-[1280px] pb-16 text-[#16313d]">
+            <Link href={QUICK_WORK_HREF} className="text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]">
                 ← My Quick Work
             </Link>
-            <section className="flex items-end justify-between gap-6 pb-6 pt-5">
-                <div>
-                    <div className="mb-3 text-[11px] font-bold uppercase tracking-[1.6px] text-[#12685d]">Community Service / Quick Community Work</div>
-                    <h1 className="text-[29px] font-semibold leading-tight tracking-[-1.2px] sm:text-[clamp(29px,3.5vw,43px)]">Quick Community Work Log</h1>
-                    <p className="mt-3 max-w-[650px] text-[13px] text-[#57706e] sm:text-sm">
-                        Record a short university activity you have completed. Submit your attendance and evidence for one final faculty review.
+            <section className="flex flex-wrap items-end justify-between gap-3 pb-5 pt-4">
+                <div className="min-w-0">
+                    <h1 className="break-words text-[21px] font-semibold leading-tight">{form.title.trim() || "Quick Community Work Log"}</h1>
+                    <p className="mt-1 text-[13px] text-[#6b7c86]">
+                        {log.status === "changes" ? "Changes requested" : "Draft"} · started {shortDate(log.createdAt.slice(0, 10))}
+                        {log.facultyName ? ` · faculty: ${log.facultyName}` : ""}
                     </p>
                 </div>
-                <div className="hidden min-w-[155px] border-l-2 border-[#bdceab] pl-4 lg:block">
-                    <b className="block text-[22px]">Every hour counts.</b>
-                    <small className="text-xs text-[#57706e]">One activity. One simple record.</small>
-                </div>
+                <button type="button" onClick={routes.openCompare} className="text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]">
+                    Which route should I use?
+                </button>
             </section>
 
             {log.status === "changes" && log.reviewNote ? (
-                <div className="mb-4 rounded-lg bg-[#fff6e5] px-3.5 py-3 text-xs leading-relaxed text-[#79571c]">
-                    <b>Faculty asked for changes:</b> {log.reviewNote}
+                <div className="mb-4 rounded-lg bg-[#fff6e5] px-3.5 py-3 text-[13px] leading-relaxed text-[#79571c]">
+                    <b>{log.facultyName || "Faculty"} asked for changes:</b> {log.reviewNote}
                 </div>
             ) : null}
 
-            <div className="mb-4 rounded-lg bg-[#edf5f0] px-3.5 py-3 text-xs leading-relaxed text-[#104c46]">
-                <b>Quick work record</b> · This log is separate from your structured 16-hour requirement.{" "}
-                <button type="button" onClick={routes.openCompare} className="ml-1 font-semibold underline underline-offset-[3px]">
-                    Which route should I use?
-                </button>
-            </div>
-
-            <div className="mb-6 grid grid-cols-1 gap-2 min-[481px]:grid-cols-2 sm:gap-3">
-                <div aria-current="page" className="flex items-center gap-3 rounded-xl border border-[#91b8a5] bg-[#edf5f0] px-4 py-3 text-[#104c46]">
-                    <LeafIcon className="h-6 w-6 flex-none" />
-                    <span>
-                        <b className="block text-sm">Quick Community Work Log</b>
-                        <small className="text-[11px]">Short activity · attendance · evidence · approved hours</small>
-                    </span>
-                    <span className="ml-auto text-lg">✓</span>
-                </div>
-                <Link href={`${HUB}#structured-tools`} className="flex items-center gap-3 rounded-xl border border-[#dce5df] bg-white px-4 py-3 text-[#57706e] hover:border-[#91b8a5]">
-                    <BookIcon className="h-6 w-6 flex-none" />
-                    <span>
-                        <b className="block text-sm">Structured Community Service Report</b>
-                        <small className="text-[11px]">16-hour requirement · detailed report · CII assessment</small>
-                    </span>
-                    <span className="ml-auto text-lg">↗</span>
-                </Link>
-            </div>
-
             <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_290px] lg:gap-6">
-                <section ref={panel} className="scroll-mt-20 overflow-hidden rounded-2xl border border-[#dce5df] bg-white shadow-[0_3px_12px_#173c3812]">
-                    <div aria-label="Form steps" className="grid grid-cols-4 gap-1.5 border-b border-[#dce5df] bg-[#fcfdfa] px-2 py-3 sm:px-4 sm:py-4">
+                <section ref={panel} className="scroll-mt-20 overflow-hidden rounded-2xl border border-[#dcebee] bg-white shadow-[0_3px_12px_#16313d12]">
+                    <div aria-label="Form steps" className="grid grid-cols-4 gap-1.5 border-b border-[#dcebee] bg-[#f8fbfc] px-2 py-3 sm:px-4 sm:py-4">
                         {STEPS.map((label, i) => {
                             const active = step === i + 1;
                             return (
@@ -397,10 +391,10 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     type="button"
                                     onClick={() => void goTo(i + 1)}
                                     aria-current={active ? "step" : undefined}
-                                    className={`flex flex-col items-center gap-1 p-1 text-center text-[9px] font-semibold sm:flex-row sm:text-left sm:text-[11px] ${active ? "text-[#12685d]" : "text-[#57706e]"}`}
+                                    className={`flex flex-col items-center gap-1 p-1 text-center text-[11px] font-semibold sm:flex-row sm:text-left sm:text-xs ${active ? "text-[#0e7d74]" : "text-[#6b7c86]"}`}
                                 >
                                     <span
-                                        className={`grid h-[26px] w-[26px] flex-none place-items-center rounded-full border ${active ? "border-[#12685d] bg-[#12685d] text-white" : "border-[#dce5df] bg-white"}`}
+                                        className={`grid h-[26px] w-[26px] flex-none place-items-center rounded-full border ${active ? "border-[#0e7d74] bg-[#0e7d74] text-white" : "border-[#dcebee] bg-white"}`}
                                     >
                                         {i + 1}
                                     </span>
@@ -425,24 +419,20 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         {step === 1 ? (
                             <>
                                 <StepHead title="Who’s taking part?" n={1} intro="Add yourself, your teammates and one coordinating faculty member." />
-                                <div className="mb-4 inline-flex rounded-lg border border-[#dce5df] bg-[#f1f4f0] p-[3px]" aria-label="Participation mode">
+                                <div className="mb-4 inline-flex rounded-lg border border-[#dcebee] bg-[#eef4f5] p-[3px]" aria-label="Participation mode">
                                     {(["solo", "team"] as const).map((m) => (
                                         <button
                                             key={m}
                                             type="button"
                                             onClick={() => void switchMode(m)}
                                             aria-pressed={form.mode === m}
-                                            className={`rounded-[5px] px-4 py-1.5 text-xs ${form.mode === m ? "bg-white font-semibold text-[#163d3b] shadow-[0_1px_4px_#1538311a]" : "text-[#57706e]"}`}
+                                            className={`rounded-[5px] px-4 py-1.5 text-xs ${form.mode === m ? "bg-white font-semibold text-[#16313d] shadow-[0_1px_4px_#16313d1a]" : "text-[#6b7c86]"}`}
                                         >
                                             {m === "solo" ? "Just me" : "With a team"}
                                         </button>
                                     ))}
                                 </div>
-                                <div className="mb-3 flex flex-wrap items-center gap-2.5 text-xs">
-                                    <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#edf5f0] font-bold text-[#12685d]">01</span>
-                                    <b>You · Activity lead</b>
-                                    <span className="rounded-md bg-[#edf0ed] px-2.5 py-1.5 text-[10px] font-semibold text-[#57706e]">One submission for the team</span>
-                                </div>
+                                <h3 className="mb-3 text-[15px] font-semibold">You · Activity lead</h3>
                                 <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
                                     <Field id="qwLeadName" label="Full name">
                                         <input id="qwLeadName" className={inputCls} value={form.leadName} disabled />
@@ -474,19 +464,19 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         />
                                     </Field>
                                 </div>
-                                <p className="mt-2 text-[11px] text-[#57706e]">Your name and email come from your CIEL profile.</p>
+                                <p className="mt-2 text-xs text-[#6b7c86]">Your name and email come from your CIEL profile.</p>
 
                                 {form.mode === "team" ? (
                                     <>
-                                        <hr className="my-6 border-[#dce5df]" />
+                                        <hr className="my-6 border-[#dcebee]" />
                                         <div className="mb-3 flex items-center justify-between gap-3">
-                                            <h3 className="text-[17px] font-semibold">Teammates</h3>
+                                            <h3 className="text-[15px] font-semibold">Teammates</h3>
                                             <div className="flex items-center gap-3">
-                                                <small className="text-xs text-[#57706e]">
+                                                <small className="text-xs text-[#6b7c86]">
                                                     {people.length} / {QUICK_WORK_MAX_PARTICIPANTS} members, including you
                                                 </small>
                                                 {form.teammates.length ? (
-                                                    <button type="button" onClick={() => void refreshTeam()} className="text-xs font-semibold text-[#12685d] underline">
+                                                    <button type="button" onClick={() => void refreshTeam()} className="text-xs font-semibold text-[#0e7d74] underline">
                                                         Refresh
                                                     </button>
                                                 ) : null}
@@ -494,20 +484,20 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         </div>
                                         {form.teammates.length ? (
                                             form.teammates.map((t) => (
-                                                <div key={t.email} className="my-2 flex flex-wrap items-center gap-2.5 rounded-[9px] border border-[#dce5df] p-3">
-                                                    <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#edf5f0] font-bold text-[#12685d]">
+                                                <div key={t.email} className="my-2 flex flex-wrap items-center gap-2.5 rounded-[9px] border border-[#dcebee] p-3">
+                                                    <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#e6f6f4] font-bold text-[#0e7d74]">
                                                         {(t.name || t.email).slice(0, 1).toUpperCase()}
                                                     </span>
                                                     <div className="min-w-[60%] flex-1 sm:min-w-0">
                                                         <b className="block break-words text-[13px]">{t.name || t.email}</b>
-                                                        <small className="block break-words text-xs text-[#57706e]">
+                                                        <small className="block break-words text-xs text-[#6b7c86]">
                                                             {t.email} · {t.studentId || "Student ID needed"}
                                                         </small>
                                                     </div>
                                                     <span
-                                                        className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${
+                                                        className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${
                                                             t.joinStatus === "joined"
-                                                                ? "bg-[#edf5f0] text-[#12685d]"
+                                                                ? "bg-[#e6f6f4] text-[#0e7d74]"
                                                                 : t.joinStatus === "declined"
                                                                   ? "bg-[#fae9e7] text-[#ac3c3c]"
                                                                   : "bg-[#fff5de] text-[#916b21]"
@@ -520,16 +510,16 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                         onClick={() => void removeMate(t.email)}
                                                         disabled={saving}
                                                         aria-label={`Remove ${t.name || t.email}`}
-                                                        className="p-1 text-[11px] text-[#57706e] hover:text-[#ac3c3c]"
+                                                        className="p-1 text-xs text-[#6b7c86] hover:text-[#ac3c3c]"
                                                     >
                                                         Remove
                                                     </button>
                                                 </div>
                                             ))
                                         ) : (
-                                            <p className="text-xs text-[#57706e]">Add each participant once. Their hours will appear on their own My Quick Work page.</p>
+                                            <p className="text-xs text-[#6b7c86]">Add each participant once. Their hours will appear on their own My Quick Work page.</p>
                                         )}
-                                        <div className="mt-3 rounded-[10px] border border-dashed border-[#a9c4b8] bg-[#fbfdfa] p-3.5">
+                                        <div className="mt-3 rounded-[10px] border border-dashed border-[#a8d3cd] bg-[#f8fbfc] p-3.5">
                                             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-end">
                                                 <Field id="qwMateEmail" label="Teammate’s CIEL account email">
                                                     <input
@@ -556,7 +546,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                     + Add teammate
                                                 </button>
                                             </div>
-                                            <p className="mt-2 text-[11px] text-[#57706e]">
+                                            <p className="mt-2 text-xs text-[#6b7c86]">
                                                 Teammates need a CIEL student account. They get a join request and confirm from their own My Quick Work page;
                                                 you can submit once everyone has confirmed.
                                             </p>
@@ -564,14 +554,26 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     </>
                                 ) : null}
 
-                                <hr className="my-6 border-[#dce5df]" />
+                                <hr className="my-6 border-[#dcebee]" />
                                 <div className="mb-3 flex items-center justify-between gap-3">
-                                    <h3 className="text-[17px] font-semibold">Coordinating faculty</h3>
-                                    <span className="rounded-md bg-[#edf5f0] px-2.5 py-1.5 text-[10px] font-semibold text-[#12685d]">Required approver</span>
+                                    <h3 className="text-[15px] font-semibold">Coordinating faculty</h3>
+                                    <span className="rounded-md bg-[#e6f6f4] px-2.5 py-1.5 text-[11px] font-semibold text-[#0e7d74]">Required approver</span>
                                 </div>
                                 <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
                                     <Field id="qwFaculty" label="Faculty member’s name" required>
-                                        <input id="qwFaculty" className={inputCls} value={form.facultyName} maxLength={100} placeholder="Full name" onChange={(e) => patch({ facultyName: e.target.value })} />
+                                        <input
+                                            id="qwFaculty"
+                                            className={inputCls}
+                                            value={form.facultyName}
+                                            maxLength={100}
+                                            placeholder="Full name"
+                                            list={pastFaculty.length ? "qwPastFacultyNames" : undefined}
+                                            onChange={(e) => {
+                                                const name = e.target.value;
+                                                const known = pastFaculty.find((f) => f.name && f.name === name);
+                                                patch(known && !form.facultyEmail.trim() ? { facultyName: name, facultyEmail: known.email } : { facultyName: name });
+                                            }}
+                                        />
                                     </Field>
                                     <Field id="qwFacultyEmail" label="Faculty university email" required>
                                         <input
@@ -581,11 +583,32 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             value={form.facultyEmail}
                                             maxLength={120}
                                             placeholder="faculty@university.edu.pk"
-                                            onChange={(e) => patch({ facultyEmail: e.target.value })}
+                                            list={pastFaculty.length ? "qwPastFacultyEmails" : undefined}
+                                            onChange={(e) => {
+                                                const email = e.target.value;
+                                                const known = pastFaculty.find((f) => f.email === email.trim().toLowerCase());
+                                                patch(known && !form.facultyName.trim() ? { facultyEmail: email, facultyName: known.name } : { facultyEmail: email });
+                                            }}
                                         />
                                     </Field>
                                 </div>
-                                <p className="mt-2.5 text-xs text-[#57706e]">
+                                {pastFaculty.length ? (
+                                    <>
+                                        <datalist id="qwPastFacultyNames">
+                                            {pastFaculty.filter((f) => f.name).map((f) => (
+                                                <option key={f.email} value={f.name} />
+                                            ))}
+                                        </datalist>
+                                        <datalist id="qwPastFacultyEmails">
+                                            {pastFaculty.map((f) => (
+                                                <option key={f.email} value={f.email}>
+                                                    {f.name}
+                                                </option>
+                                            ))}
+                                        </datalist>
+                                    </>
+                                ) : null}
+                                <p className="mt-2.5 text-xs text-[#6b7c86]">
                                     This faculty member reviews your completed work after you submit, from their CIEL dashboard. Selecting them does not
                                     send an approval request yet.
                                 </p>
@@ -601,7 +624,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             key={t.label}
                                             type="button"
                                             onClick={() => patch({ activityType: t.type, title: form.title || t.type, sdg: t.sdg ? String(t.sdg) : "" })}
-                                            className="rounded-md border border-[#dce5df] bg-[#f5f7f3] px-2.5 py-1.5 text-[11px] text-[#57706e] hover:border-[#12685d] hover:text-[#12685d]"
+                                            className="rounded-md border border-[#dcebee] bg-[#f4f8f9] px-2.5 py-1.5 text-xs text-[#6b7c86] hover:border-[#0e7d74] hover:text-[#0e7d74]"
                                         >
                                             {t.label}
                                         </button>
@@ -652,10 +675,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         </select>
                                     </Field>
                                 </div>
-                                <div className="mt-4 rounded-lg bg-[#edf5f0] px-3.5 py-3 text-xs leading-relaxed text-[#104c46]">
-                                    <b>Record work already completed.</b> Add the actual date, venue and time. Faculty review starts only when you submit the
-                                    complete log in Step 4. All times are Pakistan Standard Time (PKT).
-                                </div>
+                                <p className="mt-3 text-xs text-[#6b7c86]">Enter the actual date and times of work already completed, in Pakistan time (PKT).</p>
                             </>
                         ) : null}
 
@@ -663,20 +683,20 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                             <>
                                 <StepHead title="Record each person’s time" n={3} intro="Mark who attended, then enter their actual times. Absentees receive zero hours." />
                                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                                    <div className="text-xs text-[#57706e]">
+                                    <div className="text-xs text-[#6b7c86]">
                                         {shortDate(form.activityDate)} · {form.startTime || "—"}–{form.endTime || "—"}
                                         <br />
                                         {form.location || "Set the venue in Activity details"}
                                     </div>
-                                    <button type="button" onClick={applyEventTimes} className={`${btnCls} px-3 py-2 text-[11px]`}>
+                                    <button type="button" onClick={applyEventTimes} className={`${btnCls} px-3 py-2 text-xs`}>
                                         Use event times for all
                                     </button>
                                 </div>
-                                <p className="mb-2 text-[10px] text-[#57706e] sm:hidden">Swipe the attendance table to see all fields →</p>
+                                <p className="mb-2 text-[11px] text-[#6b7c86] sm:hidden">Swipe the attendance table to see all fields →</p>
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[520px] border-collapse">
                                         <thead>
-                                            <tr className="bg-[#f6f8f4] text-left text-[10px] tracking-[0.5px] text-[#57706e]">
+                                            <tr className="bg-[#f4f8f9] text-left text-[11px] tracking-[0.5px] text-[#6b7c86]">
                                                 <th className="px-2 py-2.5 font-semibold">Participant</th>
                                                 <th className="px-2 py-2.5 font-semibold">Present</th>
                                                 <th className="px-2 py-2.5 font-semibold">Arrival</th>
@@ -693,17 +713,17 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             {people.map((p) => {
                                                 const a = attendanceFor(form, p.email);
                                                 return (
-                                                    <tr key={p.email} className="border-b border-[#dce5df] text-xs">
+                                                    <tr key={p.email} className="border-b border-[#dcebee] text-xs">
                                                         <td className="min-w-[100px] px-2 py-3 font-semibold">
                                                             {p.name || p.email}
-                                                            <small className="block text-[10px] font-normal text-[#57706e]">
+                                                            <small className="block text-[11px] font-normal text-[#6b7c86]">
                                                                 {p.isLead ? "Activity lead" : p.joinStatus === "joined" ? "Joined" : "Join confirmation needed"}
                                                             </small>
                                                         </td>
                                                         <td className="px-2 py-3">
                                                             <input
                                                                 type="checkbox"
-                                                                className="h-[17px] w-[17px] accent-[#12685d]"
+                                                                className="h-[17px] w-[17px] accent-[#0e7d74]"
                                                                 aria-label={`${p.name || p.email} attended`}
                                                                 checked={a.present}
                                                                 onChange={(e) => setAttendance(p.email, { present: e.target.checked })}
@@ -713,7 +733,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                             <input
                                                                 type="time"
                                                                 aria-label={`${p.name || p.email} arrival`}
-                                                                className={`${inputCls} max-w-[110px] px-1.5 py-1.5 text-[11px]`}
+                                                                className={`${inputCls} max-w-[110px] px-1.5 py-1.5 text-xs`}
                                                                 value={a.startTime}
                                                                 disabled={!a.present}
                                                                 onChange={(e) => setAttendance(p.email, { startTime: e.target.value })}
@@ -723,7 +743,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                             <input
                                                                 type="time"
                                                                 aria-label={`${p.name || p.email} departure`}
-                                                                className={`${inputCls} max-w-[110px] px-1.5 py-1.5 text-[11px]`}
+                                                                className={`${inputCls} max-w-[110px] px-1.5 py-1.5 text-xs`}
                                                                 value={a.endTime}
                                                                 disabled={!a.present}
                                                                 onChange={(e) => setAttendance(p.email, { endTime: e.target.value })}
@@ -735,26 +755,22 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                                 min={0}
                                                                 step={1}
                                                                 aria-label={`${p.name || p.email} break minutes`}
-                                                                className={`${inputCls} max-w-[64px] px-2 py-1.5 text-[11px]`}
+                                                                className={`${inputCls} max-w-[64px] px-2 py-1.5 text-xs`}
                                                                 value={a.breakMinutes}
                                                                 disabled={!a.present}
                                                                 onChange={(e) => setAttendance(p.email, { breakMinutes: e.target.value })}
                                                             />
                                                         </td>
-                                                        <td className="whitespace-nowrap px-2 py-3 font-bold text-[#12685d]">{formatHours(attendanceMinutes(a))} h</td>
+                                                        <td className="whitespace-nowrap px-2 py-3 font-bold text-[#0e7d74]">{formatHours(attendanceMinutes(a))} h</td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="mt-4 rounded-lg bg-[#edf5f0] px-3.5 py-3 text-xs leading-relaxed text-[#104c46]">
-                                    <b>One hour is welcome.</b> Time is counted in minutes and added to each student’s service history after approval. Team
-                                    person-hours are shown separately from your own hours.
-                                </div>
-                                <p className="mt-3 text-xs text-[#57706e]">
-                                    Record actual service, excluding breaks and passive attendance. Maximum 9 hours per student per day. The same student
-                                    cannot claim an overlapping period twice, including time already logged in a structured project.
+                                <p className="mt-3 text-xs text-[#6b7c86]">
+                                    Record actual service time, excluding breaks. Up to {formatHours(QUICK_WORK_MAX_DAILY_MINUTES)} hours per student per day;
+                                    the same time cannot be claimed twice, including time logged in a structured project.
                                 </p>
                             </>
                         ) : null}
@@ -763,7 +779,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                             <>
                                 <StepHead title="A few words. A little evidence." n={4} intro="Describe what happened and attach at least one supporting photo or PDF." />
                                 <label htmlFor="qwSummary" className="mb-1.5 block text-xs font-semibold">
-                                    What did you do? <span className="text-[#12685d]">*</span>
+                                    What did you do? <span className="text-[#0e7d74]">*</span>
                                 </label>
                                 <textarea
                                     id="qwSummary"
@@ -773,7 +789,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     value={form.summary}
                                     onChange={(e) => patch({ summary: e.target.value })}
                                 />
-                                <div className="mt-1 text-right text-[10px] text-[#57706e]">
+                                <div className="mt-1 text-right text-[11px] text-[#6b7c86]">
                                     {form.summary.length} / {QUICK_WORK_SUMMARY_MAX} characters · 2–3 sentences are enough
                                 </div>
                                 <div className="my-4 grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
@@ -799,12 +815,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                 </div>
                                 <label
                                     htmlFor="qwFiles"
-                                    className="mb-2 block cursor-pointer rounded-xl border-[1.5px] border-dashed border-[#a6bfb2] bg-[#f9fbf7] p-5 text-center"
+                                    className="mb-2 block cursor-pointer rounded-xl border-[1.5px] border-dashed border-[#a8d3cd] bg-[#f8fbfc] p-5 text-center"
                                 >
-                                    <PhotoIcon className="mx-auto mb-1.5 h-7 w-7 text-[#12685d]" />
+                                    <PhotoIcon className="mx-auto mb-1.5 h-7 w-7 text-[#0e7d74]" />
                                     <b className="block text-[13px]">Add activity photos or supporting documents</b>
-                                    <span className="mt-1 block text-[11px] text-[#57706e]">
-                                        JPG, PNG, WEBP or PDF · up to {QUICK_WORK_MAX_EVIDENCE} files · 5 MB each
+                                    <span className="mt-1 block text-xs text-[#6b7c86]">
+                                        JPG, PNG, WEBP or PDF · up to {QUICK_WORK_MAX_EVIDENCE} files · {MAX_EVIDENCE_MB} MB each
                                     </span>
                                     <input
                                         id="qwFiles"
@@ -812,7 +828,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         multiple
                                         accept={QUICK_WORK_EVIDENCE_TYPES.join(",")}
                                         disabled={uploading > 0 || form.evidence.length >= QUICK_WORK_MAX_EVIDENCE}
-                                        className="mx-auto mt-3 block max-w-[240px] text-[11px]"
+                                        className="mx-auto mt-3 block max-w-[240px] text-xs"
                                         onChange={(e) => {
                                             const files = Array.from(e.target.files ?? []);
                                             e.target.value = "";
@@ -820,12 +836,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         }}
                                     />
                                     {uploading > 0 ? (
-                                        <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[#12685d]">
+                                        <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#0e7d74]">
                                             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…
                                         </span>
                                     ) : null}
                                 </label>
-                                <p className="text-xs text-[#57706e]">Choose images that show the activity and participation. Add a short caption.</p>
+                                <p className="text-xs text-[#6b7c86]">Choose images that show the activity and participation. Add a short caption.</p>
                                 {form.evidence.length ? (
                                     <div className="my-4 grid grid-cols-1 gap-3 min-[481px]:grid-cols-2">
                                         {form.evidence.map((ev) => (
@@ -835,7 +851,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 </label>
                                                 <input
                                                     id={`cap-${ev.url}`}
-                                                    className={`${inputCls} my-1.5 px-2 py-1.5 text-[11px]`}
+                                                    className={`${inputCls} my-1.5 px-2 py-1.5 text-xs`}
                                                     maxLength={160}
                                                     placeholder="What does this evidence show?"
                                                     value={ev.caption}
@@ -845,7 +861,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 />
                                                 <button
                                                     type="button"
-                                                    className="p-0.5 text-[10px] text-[#ac3c3c]"
+                                                    className="p-0.5 text-[11px] text-[#ac3c3c]"
                                                     onClick={() => patch({ evidence: form.evidence.filter((x) => x.url !== ev.url) })}
                                                 >
                                                     Remove
@@ -855,23 +871,23 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     </div>
                                 ) : null}
                                 <label className="my-3 flex items-start gap-2.5 text-xs">
-                                    <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#12685d]" checked={form.consent} onChange={(e) => patch({ consent: e.target.checked })} />
+                                    <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#0e7d74]" checked={form.consent} onChange={(e) => patch({ consent: e.target.checked })} />
                                     <span>I have permission to share this evidence and have protected participants’ privacy.</span>
                                 </label>
                                 <label className="my-3 flex items-start gap-2.5 text-xs">
-                                    <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#12685d]" checked={form.honest} onChange={(e) => patch({ honest: e.target.checked })} />
+                                    <input type="checkbox" className="mt-0.5 h-[17px] w-[17px] flex-none accent-[#0e7d74]" checked={form.honest} onChange={(e) => patch({ honest: e.target.checked })} />
                                     <span>I confirm these attendance entries are accurate and have not been claimed in another service log or academic report.</span>
                                 </label>
-                                <div className="mt-4 rounded-lg bg-[#edf5f0] px-3.5 py-3 text-xs leading-relaxed text-[#104c46]">
-                                    <b>Ready for final review.</b> Submit once your activity, individual attendance and evidence are complete. The assigned faculty
-                                    member can approve, return for correction or decline. Only approved hours count.
-                                </div>
                             </>
                         ) : null}
                     </div>
 
-                    <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#dce5df] bg-[#fcfdfa] px-4 py-4 sm:flex-row sm:items-center sm:px-7">
-                        <span className="text-xs text-[#57706e]">{saving ? "Saving…" : dirty ? "Unsaved changes" : "Draft saved"}</span>
+                    <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#dcebee] bg-[#f8fbfc] px-4 py-4 sm:flex-row sm:items-center sm:px-7">
+                        <span className="text-xs text-[#6b7c86]">{saving
+                                ? "Saving…"
+                                : dirty
+                                  ? "Unsaved changes"
+                                  : `Draft saved · ${new Date(log.updatedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}</span>
                         <div className="flex w-full gap-2 sm:w-auto">
                             {step > 1 ? (
                                 <button type="button" onClick={() => void goTo(step - 1)} disabled={saving} className={`${btnCls} flex-1 sm:flex-none`}>
@@ -896,44 +912,25 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     </footer>
                 </section>
 
-                <aside className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:sticky lg:top-5 lg:block lg:space-y-3.5">
-                    <div className="relative overflow-hidden rounded-2xl bg-[#104c46] p-6 text-white sm:col-span-2">
-                        <div className="text-[10px] font-bold uppercase tracking-[1.6px] text-[#b3d0be]">Live activity snapshot</div>
-                        <h3 className="mb-1 mt-2.5 break-words text-[17px] font-semibold leading-snug text-white">{form.title || "Your next act of service"}</h3>
-                        <p className="text-[11px] text-[#d7e8df]">
-                            {form.activityType || "A short community activity"}
-                            <br />
-                            {shortDate(form.activityDate)} · {form.location || "Location to be added"}
-                        </p>
-                        <div className="mt-4 grid max-w-[320px] grid-cols-2 gap-2.5 border-t border-white/15 pt-4 lg:max-w-none">
-                            <Stat value={String(people.length)} label={`registered participant${people.length === 1 ? "" : "s"}`} />
-                            <Stat value={formatHours(teamMinutes)} label="team person-hours" />
-                            <Stat value={formatHours(myMinutes)} label="your recorded hours" />
-                            <Stat value={String(form.evidence.length)} label="evidence files" />
-                        </div>
-                        <span className="mt-4 inline-block rounded-md bg-white/15 px-2.5 py-1.5 text-[10px] font-semibold text-[#eef7ef]">
-                            {log.status === "changes" ? "Changes requested" : "Draft"}
-                        </span>
-                        <p className="mt-3 text-[11px] text-[#d7e8df]">Recorded hours remain pending until faculty confirms attendance and evidence.</p>
+                <aside className="rounded-2xl border border-[#dcebee] bg-white p-5 lg:sticky lg:top-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <h3 className="text-[15px] font-semibold">Summary</h3>
+                        <QuickWorkStatusPill status={log.status} />
                     </div>
-                    <div className="rounded-xl border border-[#dce5df] bg-white p-5">
-                        <h3 className="mb-2.5 text-[13px] font-semibold">A simple approval journey</h3>
-                        {["Complete the activity; prepare your log.", "Submit attendance and evidence.", "Faculty reviews the completed work once.", "Each student’s hours accumulate."].map(
-                            (t, i) => (
-                                <div key={t} className="my-3 flex gap-2.5 text-xs">
-                                    <i className="grid h-[19px] w-[19px] flex-none place-items-center rounded-full bg-[#edf5f0] text-[10px] not-italic">{i + 1}</i>
-                                    <span>{t}</span>
-                                </div>
-                            ),
-                        )}
+                    <dl className="mt-3 space-y-1.5 text-[13px]">
+                        <SummaryRow label="Activity" value={form.activityType} />
+                        <SummaryRow label="Date" value={form.activityDate ? shortDate(form.activityDate) : ""} />
+                        <SummaryRow label="Time" value={form.startTime && form.endTime ? `${form.startTime}–${form.endTime}` : ""} />
+                        <SummaryRow label="Venue" value={form.location} />
+                        <SummaryRow label="Faculty" value={form.facultyName} />
+                    </dl>
+                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#dcebee] pt-4">
+                        <Stat value={String(people.length)} label={people.length === 1 ? "participant" : "participants"} />
+                        <Stat value={`${formatHours(myMinutes)} h`} label="your hours" />
+                        {people.length > 1 ? <Stat value={`${formatHours(teamMinutes)} h`} label="team person-hours" /> : null}
+                        <Stat value={`${form.evidence.length} / ${QUICK_WORK_MAX_EVIDENCE}`} label="evidence files" />
                     </div>
-                    <div className="rounded-xl border border-[#dce5df] bg-white p-5">
-                        <h3 className="mb-2.5 text-[13px] font-semibold">Your effort, recorded accurately</h3>
-                        <p className="text-xs text-[#57706e]">
-                            One hour is a valid entry. Each member receives only their own approved time. Quick logs keep a separate service history from
-                            academic CII scores and badges.
-                        </p>
-                    </div>
+                    <p className="mt-4 text-xs text-[#6b7c86]">Hours count only after faculty approval.</p>
                 </aside>
             </div>
 
@@ -941,18 +938,18 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                 <QuickWorkModal labelledBy="quickPreviewTitle" onClose={() => !submitting && setPreview(false)} wide>
                     <header className="mb-3 flex items-start justify-between gap-5">
                         <div className="min-w-0">
-                            <span className="text-[11px] font-bold uppercase tracking-[1.6px] text-[#12685d]">Quick service flashcard</span>
-                            <h2 id="quickPreviewTitle" className="mt-1 break-words text-[23px] font-bold tracking-[-0.6px]">
+                            <span className="text-xs font-semibold text-[#0e7d74]">Review before submitting</span>
+                            <h2 id="quickPreviewTitle" className="mt-1 break-words text-lg font-bold">
                                 {form.title}
                             </h2>
                         </div>
                         <ModalClose onClose={() => !submitting && setPreview(false)} />
                     </header>
                     <QuickWorkRecordDetails log={log} />
-                    <p className="mt-3 text-xs text-[#57706e]">
+                    <p className="mt-3 text-xs text-[#6b7c86]">
                         {form.evidence.length} evidence file(s) · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
                     </p>
-                    <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dce5df] pt-4">
+                    <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dcebee] pt-4">
                         <button type="button" onClick={() => setPreview(false)} disabled={submitting} className={btnCls}>
                             Back to edit
                         </button>
@@ -967,13 +964,13 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             {confirmSolo ? (
                 <QuickWorkModal labelledBy="soloTitle" onClose={() => setConfirmSolo(false)}>
                     <header className="mb-3 flex items-start justify-between gap-5">
-                        <h2 id="soloTitle" className="text-[21px] font-bold">
+                        <h2 id="soloTitle" className="text-lg font-bold">
                             Switch to individual participation?
                         </h2>
                         <ModalClose onClose={() => setConfirmSolo(false)} />
                     </header>
-                    <p className="text-[13px] text-[#57706e]">This removes teammates and their draft attendance from this activity only.</p>
-                    <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dce5df] pt-4">
+                    <p className="text-[13px] text-[#6b7c86]">This removes teammates and their draft attendance from this activity only.</p>
+                    <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dcebee] pt-4">
                         <button type="button" onClick={() => setConfirmSolo(false)} className={btnCls}>
                             Keep team
                         </button>
@@ -1001,11 +998,11 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 function StepHead({ title, n, intro }: { title: string; n: number; intro: string }) {
     return (
         <>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-                <h2 className="text-[21px] font-semibold tracking-[-0.6px] sm:text-[23px]">{title}</h2>
-                <span className="rounded-md bg-[#edf5f0] px-2.5 py-1.5 text-[10px] font-semibold text-[#12685d]">0{n} / 04</span>
-            </div>
-            <p className="mb-5 text-[13px] text-[#57706e]">{intro}</p>
+            <p className="text-xs font-semibold text-[#0e7d74]">
+                Step {n} of {STEPS.length}
+            </p>
+            <h2 className="mb-1 text-lg font-semibold">{title}</h2>
+            <p className="mb-5 text-[13px] text-[#6b7c86]">{intro}</p>
         </>
     );
 }
@@ -1013,8 +1010,17 @@ function StepHead({ title, n, intro }: { title: string; n: number; intro: string
 function Stat({ value, label }: { value: string; label: string }) {
     return (
         <div>
-            <b className="block text-[27px] font-medium text-[#ddebab]">{value}</b>
-            <span className="text-[10px] text-[#d7e8df]">{label}</span>
+            <b className="block text-lg font-semibold text-[#0e7d74]">{value}</b>
+            <span className="text-xs text-[#6b7c86]">{label}</span>
+        </div>
+    );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex gap-3">
+            <dt className="w-16 flex-none text-[#6b7c86]">{label}</dt>
+            <dd className={`min-w-0 break-words ${value ? "" : "text-[#9aa8b0]"}`}>{value || "Not added yet"}</dd>
         </div>
     );
 }

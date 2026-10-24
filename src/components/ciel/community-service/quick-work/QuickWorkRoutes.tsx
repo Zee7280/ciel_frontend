@@ -52,14 +52,14 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
             <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 md:gap-5">
                 <article className="flex flex-col items-start rounded-[18px] border border-[#ccdfe0] border-t-4 border-t-[#136d67] bg-white px-5 py-5 shadow-[0_5px_20px_#173c3806] sm:px-7 sm:py-6">
                     <div className="mb-4 flex w-full items-center justify-between gap-3">
-                        <span className="grid h-[38px] w-[38px] place-items-center rounded-[11px] bg-[#ebf5f1] text-[#12685d]">
+                        <span className="grid h-[38px] w-[38px] place-items-center rounded-[11px] bg-[#ebf5f1] text-[#0e7d74]">
                             <BookIcon className="h-[23px] w-[23px]" />
                         </span>
-                        <span className="rounded-full bg-[#edf6f3] px-3 py-1.5 text-[9px] font-extrabold tracking-[0.6px] text-[#21615b] sm:text-[10px] sm:tracking-[0.9px]">
+                        <span className="rounded-full bg-[#edf6f3] px-3 py-1.5 text-[11px] font-extrabold tracking-[0.6px] text-[#21615b]">
                             16-HOUR REQUIREMENT
                         </span>
                     </div>
-                    <h2 className="mb-2.5 text-[22px] font-bold leading-tight tracking-[-0.6px] text-[#163d50] sm:text-[25px]">Structured Community Service</h2>
+                    <h2 className="mb-2.5 text-lg font-bold leading-tight text-[#16313d] sm:text-xl">Structured Community Service</h2>
                     <p className="max-w-[480px] text-[13px] leading-relaxed text-[#526d74]">
                         Working towards your university’s HEC-aligned community service requirement? Choose this route.
                     </p>
@@ -70,11 +70,11 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                     <button
                         type="button"
                         onClick={onStructured}
-                        className="mt-auto flex w-full items-center justify-between rounded-[9px] bg-[#12685d] px-[18px] py-[13px] text-sm font-semibold text-white hover:bg-[#104c46]"
+                        className="mt-auto flex w-full items-center justify-between rounded-[9px] bg-[#0e7d74] px-[18px] py-[13px] text-sm font-semibold text-white hover:bg-[#0b6760]"
                     >
                         Open Structured Service <span aria-hidden="true">→</span>
                     </button>
-                    <small className="mt-2.5 text-[11px] leading-normal text-[#637875] sm:text-[10px]">
+                    <small className="mt-2.5 text-xs leading-normal text-[#637875]">
                         Find or create an opportunity, then complete your report.
                     </small>
                 </article>
@@ -83,11 +83,11 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                         <span className="grid h-[38px] w-[38px] place-items-center rounded-[11px] bg-[#fff0ce] text-[#986100]">
                             <LeafIcon className="h-[23px] w-[23px]" />
                         </span>
-                        <span className="rounded-full bg-[#fff1d5] px-3 py-1.5 text-[9px] font-extrabold tracking-[0.6px] text-[#825507] sm:text-[10px] sm:tracking-[0.9px]">
+                        <span className="rounded-full bg-[#fff1d5] px-3 py-1.5 text-[11px] font-extrabold tracking-[0.6px] text-[#825507]">
                             SHORT UNIVERSITY ACTIVITIES
                         </span>
                     </div>
-                    <h2 className="mb-2.5 text-[22px] font-bold leading-tight tracking-[-0.6px] text-[#163d50] sm:text-[25px]">Quick Community Work</h2>
+                    <h2 className="mb-2.5 text-lg font-bold leading-tight text-[#16313d] sm:text-xl">Quick Community Work</h2>
                     <p className="max-w-[480px] text-[13px] leading-relaxed text-[#526d74]">
                         Took part in a short activity at university? Record what you did through a brief activity log.
                     </p>
@@ -102,12 +102,12 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                     >
                         Quick Community Work <span aria-hidden="true">→</span>
                     </button>
-                    <small className="mt-2.5 text-[11px] leading-normal text-[#637875] sm:text-[10px]">
+                    <small className="mt-2.5 text-xs leading-normal text-[#637875]">
                         Separate activity record · does not automatically fulfil 16 hours.
                     </small>
                 </article>
             </div>
-            <div className="mb-2 mt-[18px] flex items-start gap-2.5 rounded-[10px] border border-[#dbe9ee] bg-[#eaf2f5] px-3 py-3 text-[11px] text-[#375965] sm:items-center sm:px-4 sm:text-xs">
+            <div className="mb-2 mt-[18px] flex items-start gap-2.5 rounded-[10px] border border-[#dbe9ee] bg-[#eaf2f5] px-3 py-3 text-xs text-[#375965] sm:items-center sm:px-4 sm:text-xs">
                 <span aria-hidden="true" className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-[#d4e5ec] font-serif font-bold">
                     i
                 </span>
@@ -123,14 +123,14 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
 /** Below the tools: a way back to submitted quick-work records. */
 export function QuickWorkRecordLink() {
     return (
-        <section className="my-5 flex flex-col items-start justify-between gap-4 rounded-[14px] border border-[#dce5df] bg-white px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+        <section className="my-5 flex flex-col items-start justify-between gap-4 rounded-[14px] border border-[#dcebee] bg-white px-5 py-5 sm:flex-row sm:items-center sm:px-6">
             <div>
-                <h3 className="text-[15px] font-semibold text-[#163d3b]">Already submitted quick community work?</h3>
-                <p className="mt-1 text-xs text-[#57706e]">Track faculty decisions and your approved quick-work hours.</p>
+                <h3 className="text-[15px] font-semibold text-[#16313d]">Already submitted quick community work?</h3>
+                <p className="mt-1 text-xs text-[#6b7c86]">Track faculty decisions and your approved quick-work hours.</p>
             </div>
             <Link
                 href={QUICK_WORK_HREF}
-                className="inline-flex w-full items-center justify-center rounded-lg border border-[#b8cec3] bg-white px-4 py-2.5 text-xs font-semibold text-[#12685d] hover:bg-[#f5faf7] sm:w-auto"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74] hover:bg-[#f2faf9] sm:w-auto"
             >
                 View My Quick Work →
             </Link>

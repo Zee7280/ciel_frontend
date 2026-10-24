@@ -396,7 +396,7 @@ function ParticipationQuest({
     );
 }
 
-export default function Section1Participation({ projectData }: { projectData?: any } = {}) {
+export default function Section1Participation({ projectData, onWillAdvanceSection }: { projectData?: any; onWillAdvanceSection?: () => void } = {}) {
     const {
         data,
         updateSection,
@@ -961,6 +961,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
             updateSection('section1', {
                 verified_summary: "Participation record finalized with HEC-compliant audit trail."
             });
+            onWillAdvanceSection?.();
             nextStep(); // Context next step
             return;
         }
@@ -970,6 +971,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     /** "Skip & continue" on Review & Submit: leave Section 1 without finalizing, and without
      * passing through the Metrics dashboard (step 4) — that view is for a finalized record. */
     const handleSkipToNextSection = () => {
+        onWillAdvanceSection?.();
         nextStep(); // Context next step
     };
 

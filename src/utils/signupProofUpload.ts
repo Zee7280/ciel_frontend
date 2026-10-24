@@ -15,9 +15,6 @@ export function signupProofFileError(file: { name: string; size: number } | null
     return null;
 }
 
-/** Thrown when the API doesn't have the upload endpoint yet (frontend deployed before backend). */
-export class SignupProofUnavailableError extends Error {}
-
 /**
  * Uploads one proof file for an account that doesn't exist yet. Only works right after the email
  * OTP is verified and before signup completes (the backend checks that window).
@@ -29,7 +26,6 @@ export async function uploadSignupProof(email: string, label: string, file: File
     const res = await fetch("/api/v1/auth/signup-proof", { method: "POST", body: fd });
     const json = (await res.json().catch(() => null)) as { data?: { url?: string; fileName?: string }; message?: unknown } | null;
     const url = json?.data?.url;
-    if (res.status === 404) throw new SignupProofUnavailableError("Document upload is not available yet.");
     if (!res.ok || !url) {
         const msg = typeof json?.message === "string" ? json.message : Array.isArray(json?.message) ? json.message.join(" ") : "";
         throw new Error(msg || `Could not upload "${file.name}". Please try again.`);

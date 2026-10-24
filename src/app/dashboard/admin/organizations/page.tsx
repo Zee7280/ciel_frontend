@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import SignupProofDocuments, { readSignupProofDocuments } from "@/components/admin/SignupProofDocuments";
-import { Paperclip, Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download } from "lucide-react";
+import { Paperclip, Search, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus, X, Users, CheckCircle2, XCircle, Download, ExternalLink, FileText, Link2, ImageIcon, Receipt } from "lucide-react";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import SearchableSelect from "@/components/ui/SearchableSelect";
@@ -38,6 +39,42 @@ function computeMenuPosition(trigger: DOMRect) {
     return { x, y };
 }
 
+/** Upload paths like `/uploads/x.png` are served by the API host, not this app. */
+function fileHref(url: unknown): string | null {
+    const raw = typeof url === "string" ? url.trim() : "";
+    if (!raw) return null;
+    if (raw.startsWith("/")) {
+        const api = resolveBackendApiV1Base();
+        try {
+            return api ? `${new URL(api).origin}${raw}` : raw;
+        } catch {
+            return raw;
+        }
+    }
+    return /^https?:\/\//i.test(raw) ? raw : null;
+}
+
+/** Free-text website from the org profile; only linked when it parses as a real host. */
+function websiteHref(website: unknown): string | null {
+    const raw = typeof website === "string" ? website.trim().replace(/^(https?):\/*/i, "$1://") : "";
+    if (!raw) return null;
+    const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+        return new URL(withScheme).hostname.includes(".") ? withScheme : null;
+    } catch {
+        return null;
+    }
+}
+
+/** verificationNotes minus the "Signup proof …" lines, which the detail view shows on their own. */
+function adminNotesOf(notes: unknown): string {
+    return String(notes || "")
+        .split("\n")
+        .filter((l) => !l.startsWith("Signup proof "))
+        .join("\n")
+        .trim();
+}
+
 const orgStatusOf = (org: any): string =>
     String(org?.status || org?.verification_status || "unknown").toLowerCase();
 
@@ -49,15 +86,24 @@ function DetailCard({
     upper,
     capitalize,
     wide,
+    href,
 }: {
     label: string;
     value: string;
+    href?: string | null;
     strong?: boolean;
     breakAll?: boolean;
     upper?: boolean;
     capitalize?: boolean;
     wide?: boolean;
 }) {
+    const body = href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline">
+            {value}
+        </a>
+    ) : (
+        value
+    );
     return (
         <div className={`rounded-xl border border-slate-100 bg-slate-50/60 p-4 ${wide ? "md:col-span-2" : ""}`}>
             <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">{label}</p>
@@ -66,9 +112,35 @@ function DetailCard({
                     upper ? "uppercase" : ""
                 } ${capitalize ? "capitalize" : ""}`}
             >
-                {value}
+                {body}
             </p>
         </div>
+    );
+}
+
+function FileRow({ icon, title, meta, href, action = "Open" }: { icon: React.ReactNode; title: string; meta?: string; href: string | null; action?: string }) {
+    return (
+        <li className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+            <span className="flex min-w-0 items-center gap-2 text-sm text-slate-800">
+                <span className="shrink-0 text-slate-400">{icon}</span>
+                <span className="min-w-0">
+                    <b className="block font-semibold">{title}</b>
+                    {meta ? <span className="block break-all text-xs text-slate-500">{meta}</span> : null}
+                </span>
+            </span>
+            {href ? (
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#cbece4] bg-[#e8f7f3] px-3 py-1.5 text-xs font-bold text-[#08756b] hover:border-[#0e7d74]"
+                >
+                    {action} <ExternalLink className="h-3 w-3" />
+                </a>
+            ) : (
+                <span className="text-xs text-slate-400">Link unavailable</span>
+            )}
+        </li>
     );
 }
 
@@ -723,13 +795,29 @@ export default function AdminOrganizationsPage() {
             {selectedOrg && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-6">
-                        <div className="mb-2 flex items-start justify-between gap-4">
-                            <h2 className="text-xl font-bold text-slate-900">Organization Details</h2>
+                        <div className="mb-6 flex items-start justify-between gap-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                    {fileHref(selectedOrg?.logo_url) ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={fileHref(selectedOrg?.logo_url)!} alt="" className="h-full w-full object-contain" />
+                                    ) : (
+                                        <Building2 className="h-6 w-6 text-slate-400" aria-hidden />
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="truncate text-xl font-bold text-slate-900">{readOrgValue(selectedOrg, ["name", "organization_name"], "Organization Details")}</h2>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                        <StatusBadge status={orgStatusOf(selectedOrg)} />
+                                        <span className="uppercase">{readOrgValue(selectedOrg, ["organization_type", "type"], "")}</span>
+                                        {selectedOrg?.organization_category ? <span>· {selectedOrg.organization_category}</span> : null}
+                                    </div>
+                                </div>
+                            </div>
                             <button type="button" aria-label="Close" onClick={() => setSelectedOrg(null)} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        <p className="text-sm text-slate-500 mb-6">Review organization profile and verification metadata.</p>
 
                         {isDetailsLoading ? (
                             <div className="h-36 flex items-center justify-center">
@@ -737,7 +825,7 @@ export default function AdminOrganizationsPage() {
                             </div>
                         ) : (
                             <>
-                                {orgStatusOf(selectedOrg) === "rejected" || selectedOrg?.verification_notes ? (
+                                {orgStatusOf(selectedOrg) === "rejected" || adminNotesOf(selectedOrg?.verification_notes) ? (
                                     <div
                                         className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
                                             orgStatusOf(selectedOrg) === "rejected"
@@ -748,17 +836,69 @@ export default function AdminOrganizationsPage() {
                                         <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
                                             {orgStatusOf(selectedOrg) === "rejected" ? "Rejection reason" : "Verification notes"}
                                         </p>
-                                        <p className="mt-1 whitespace-pre-wrap">{readOrgValue(selectedOrg, ["verification_notes"], "No reason recorded.")}</p>
+                                        <p className="mt-1 whitespace-pre-wrap">{adminNotesOf(selectedOrg?.verification_notes) || "No reason recorded."}</p>
                                     </div>
                                 ) : null}
-                                <div className="mb-4">
+                                <div className="mb-4 space-y-3">
                                     <SignupProofDocuments documents={readSignupProofDocuments(selectedOrg?.signup_proof_documents)} />
+                                    {selectedOrg?.signup_proof ? (
+                                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Signup verification proof</p>
+                                            <ul className="mt-2 space-y-2">
+                                                <FileRow
+                                                    icon={selectedOrg.signup_proof.url ? <Link2 className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                                    title={
+                                                        selectedOrg.signup_proof.method === "link"
+                                                            ? `Verification link${selectedOrg.signup_proof.detail ? ` · ${selectedOrg.signup_proof.detail}` : ""}`
+                                                            : `Document upload${selectedOrg.signup_proof.detail ? ` · ${selectedOrg.signup_proof.detail}` : ""}`
+                                                    }
+                                                    meta={selectedOrg.signup_proof.url || (selectedOrg.signup_proof.method === "upload" ? "The file itself is listed under Signup documents above." : undefined)}
+                                                    href={selectedOrg.signup_proof.url ? websiteHref(selectedOrg.signup_proof.url) : null}
+                                                    action="Open link"
+                                                />
+                                            </ul>
+                                        </div>
+                                    ) : null}
+                                    {(fileHref(selectedOrg?.logo_url) || (Array.isArray(selectedOrg?.membership_fee_payments) && selectedOrg.membership_fee_payments.length > 0)) && (
+                                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Other uploaded files</p>
+                                            <ul className="mt-2 space-y-2">
+                                                {fileHref(selectedOrg?.logo_url) ? (
+                                                    <FileRow icon={<ImageIcon className="h-4 w-4" />} title="Organization logo" meta="Uploaded on the organization profile" href={fileHref(selectedOrg.logo_url)} />
+                                                ) : null}
+                                                {(Array.isArray(selectedOrg?.membership_fee_payments) ? selectedOrg.membership_fee_payments : []).map((f: any) => (
+                                                    <FileRow
+                                                        key={f.id}
+                                                        icon={<Receipt className="h-4 w-4" />}
+                                                        title={`Membership fee proof · PKR ${Number(f.amount_pkr || 0).toLocaleString()}`}
+                                                        meta={[
+                                                            String(f.status || "").replace(/_/g, " "),
+                                                            f.submitted_at ? `submitted ${formatDateValue(f.submitted_at).split(",")[0]}` : "",
+                                                            f.admin_feedback ? `feedback: ${f.admin_feedback}` : "",
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" · ")}
+                                                        href={fileHref(f.proof_url)}
+                                                    />
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                     <DetailCard label="Organization Name" value={readOrgValue(selectedOrg, ["name", "organization_name"])} strong />
-                                    <DetailCard label="Email" value={readOrgValue(selectedOrg, ["email"])} breakAll />
-                                    <DetailCard label="Contact Person" value={readOrgValue(selectedOrg, ["contact_person", "contact", "contact_name"])} />
-                                    <DetailCard label="Phone" value={readOrgValue(selectedOrg, ["phone", "phone_number", "mobile"])} />
+                                    <DetailCard
+                                        label="Email"
+                                        value={readOrgValue(selectedOrg, ["email"])}
+                                        href={selectedOrg?.email ? `mailto:${selectedOrg.email}` : null}
+                                        breakAll
+                                    />
+                                    <DetailCard label="Contact Person / Designation" value={readOrgValue(selectedOrg, ["contact_person", "contact", "contact_name"])} />
+                                    <DetailCard
+                                        label="Phone"
+                                        value={readOrgValue(selectedOrg, ["phone", "phone_number", "mobile"])}
+                                        href={selectedOrg?.phone ? `tel:${selectedOrg.phone}` : null}
+                                    />
                                     <DetailCard label="Type" value={readOrgValue(selectedOrg, ["organization_type", "type"])} upper />
                                     <DetailCard label="Category" value={readOrgValue(selectedOrg, ["organization_category"])} />
                                     <DetailCard label="Legal Registration" value={readOrgValue(selectedOrg, ["legal_registration_type"])} />
@@ -768,7 +908,8 @@ export default function AdminOrganizationsPage() {
                                         label="Opportunities"
                                         value={`${readOrgValue(selectedOrg, ["active_projects_count", "projects"], "0")} active · ${readOrgValue(selectedOrg, ["opportunities_count"], "0")} total`}
                                     />
-                                    <DetailCard label="Website" value={readOrgValue(selectedOrg, ["website", "website_url"])} breakAll />
+                                    <DetailCard label="Website" value={readOrgValue(selectedOrg, ["website", "website_url"])} href={websiteHref(selectedOrg?.website)} breakAll />
+                                    <DetailCard label="Verification Scope" value={readOrgValue(selectedOrg, ["verification_scope"])} capitalize />
                                     <DetailCard label="City" value={readOrgValue(selectedOrg, ["city"])} />
                                     <DetailCard label="State / Province" value={readOrgValue(selectedOrg, ["state", "province"])} />
                                     <DetailCard label="Country" value={readOrgValue(selectedOrg, ["country"])} />
@@ -804,10 +945,11 @@ export default function AdminOrganizationsPage() {
                                     </div>
                                     {Array.isArray(selectedOrg?.members) && selectedOrg.members.length > 0 ? (
                                         <div className="overflow-x-auto rounded-xl border border-slate-100">
-                                            <table className="w-full min-w-[520px] text-left text-sm">
+                                            <table className="w-full min-w-[620px] text-left text-sm">
                                                 <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                                                     <tr>
                                                         <th className="px-3 py-2">User</th>
+                                                        <th className="px-3 py-2">Phone</th>
                                                         <th className="px-3 py-2">Role</th>
                                                         <th className="px-3 py-2">Status</th>
                                                         <th className="px-3 py-2">Joined</th>
@@ -818,8 +960,10 @@ export default function AdminOrganizationsPage() {
                                                         <tr key={m.id}>
                                                             <td className="px-3 py-2">
                                                                 <div className="font-semibold text-slate-900">{m.name || "—"}</div>
+                                                                {m.designation ? <div className="text-xs text-slate-600">{m.designation}</div> : null}
                                                                 <div className="text-xs text-slate-500 break-all">{m.email}</div>
                                                             </td>
+                                                            <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{m.phone || "—"}</td>
                                                             <td className="px-3 py-2 text-slate-700">{String(m.role || "").replace(/_/g, " ")}</td>
                                                             <td className="px-3 py-2"><StatusBadge status={m.status} /></td>
                                                             <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{formatDateValue(m.created_at).split(",")[0]}</td>
