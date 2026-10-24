@@ -7,6 +7,12 @@ import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { prefetchCommunityServiceData, prefetchStudentBrowseOpportunities, fetchCommunityServiceRankings } from "@/utils/student-community-cache";
+import {
+    QuickWorkRecordLink,
+    QuickWorkRouteCards,
+    STRUCTURED_TOOLS_ANCHOR,
+    useQuickWorkRoutes,
+} from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 
 const HUB = "/dashboard/student/paths/community-service";
 const CREATE_VIEW = `${HUB}?view=create`;
@@ -82,6 +88,7 @@ export default function CommunityServiceHub({
 }) {
     const [helpOpen, setHelpOpen] = useState(false);
     const [name, setName] = useState(displayName ?? "");
+    const routes = useQuickWorkRoutes();
 
     useEffect(() => {
         if (displayName) {
@@ -131,31 +138,36 @@ export default function CommunityServiceHub({
 
             {attention?.length ? <AttentionRow items={attention} /> : null}
 
+            <QuickWorkRouteCards onQuick={routes.openIntro} onStructured={routes.goStructured} />
+
+            <div id={STRUCTURED_TOOLS_ANCHOR} className="scroll-mt-24">
             <MockupSectionHead
 
-                title="Community Service tools"
+                title="Your 16-hour project tools"
 
-                subtitle="Choose what you need to do next."
+                subtitle="Structured Community Service: use these for the structured project route."
 
                 action={
-
-                    <button
-
-                        type="button"
-
-                        onClick={() => setHelpOpen(true)}
-
-                        className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
-
-                    >
-
-                        How it works
-
-                    </button>
-
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={routes.openCompare}
+                            className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+                        >
+                            Which route should I use?
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setHelpOpen(true)}
+                            className="rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[11px] font-extrabold text-[#0e7d74] hover:border-[#0e7d74]"
+                        >
+                            How it works
+                        </button>
+                    </div>
                 }
 
             />
+            </div>
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 <MockupActionCard
@@ -251,6 +263,9 @@ export default function CommunityServiceHub({
                     Create opportunity
                 </Link>
             </p>
+
+            <QuickWorkRecordLink />
+            {routes.dialogs}
 
             {helpOpen ? (
                 <div
