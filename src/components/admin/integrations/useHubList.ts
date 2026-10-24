@@ -8,21 +8,23 @@ export const HUB_PAGE_SIZE = 25;
 
 /**
  * Server-side paginated list. Reloads when `path` or the serialized filters change, or on
- * `reload()`. No polling: the caller decides when to refresh.
+ * `reload()`. A filter change resets to page 1 in the same render, so exactly one request is
+ * issued per change. No polling: the caller decides when to refresh.
  */
 export function useHubList<T>(path: string, filters: Record<string, string | number | undefined | null>, limit = HUB_PAGE_SIZE) {
     const [rows, setRows] = useState<T[]>([]);
     const [total, setTotal] = useState(0);
-    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [tick, setTick] = useState(0);
     const { begin } = useAbortableFetch();
     const filterKey = useMemo(() => JSON.stringify(filters), [filters]);
+    const queryKey = `${path}|${filterKey}`;
 
-    useEffect(() => {
-        setPage(1);
-    }, [filterKey, path]);
+    // Page is stored together with the key it belongs to; a different key means page 1.
+    const [pageState, setPageState] = useState<{ key: string; page: number }>({ key: queryKey, page: 1 });
+    const page = pageState.key === queryKey ? pageState.page : 1;
+    const setPage = useCallback((p: number) => setPageState({ key: queryKey, page: Math.max(1, p) }), [queryKey]);
 
     useEffect(() => {
         const run = begin();

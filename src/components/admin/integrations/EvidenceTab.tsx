@@ -5,7 +5,7 @@ import { ExternalLink, RefreshCw } from "lucide-react";
 import { formatAdminDateTime } from "@/utils/adminDate";
 import { formatBytes, HUB_ADMIN_BASE, HUB_EVIDENCE_STATES, shortId, type HubEvidence } from "@/utils/integrationHub";
 import { openEvidence } from "./RecordsTab";
-import { btnSecondary, btnSmall, HubBadge, inputCls, Pager, TableShell, TD, TH } from "./HubUi";
+import { btnSecondary, btnSmall, HubBadge, inputCls, isUuid, Pager, TableShell, TD, TH } from "./HubUi";
 import { useHubList } from "./useHubList";
 
 /** Metadata-only evidence table. Originals open through a short-lived signed URL, on demand. */
@@ -13,6 +13,7 @@ export function EvidenceTable({ base, canOpen, initialConnectionId }: { base: st
     const [state, setState] = useState("");
     const [connectionId, setConnectionId] = useState(initialConnectionId ?? "");
     const [applied, setApplied] = useState(initialConnectionId ?? "");
+    const [filterError, setFilterError] = useState<string | null>(null);
     const filters = useMemo(() => ({ state, connectionId: applied }), [state, applied]);
     const list = useHubList<HubEvidence>(`${base}/evidence`, filters);
 
@@ -22,7 +23,13 @@ export function EvidenceTable({ base, canOpen, initialConnectionId }: { base: st
                 className="flex flex-wrap items-end gap-2"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    setApplied(connectionId.trim());
+                    const cid = connectionId.trim();
+                    if (cid && !isUuid(cid)) {
+                        setFilterError("Connection id must be a UUID (copy it from the connection detail page).");
+                        return;
+                    }
+                    setFilterError(null);
+                    setApplied(cid);
                 }}
             >
                 <select className={`${inputCls} w-40`} value={state} onChange={(e) => setState(e.target.value)}>
@@ -40,6 +47,7 @@ export function EvidenceTable({ base, canOpen, initialConnectionId }: { base: st
                 <button type="button" className={`${btnSecondary} ml-auto`} onClick={list.reload} disabled={list.loading}>
                     <RefreshCw className={`h-4 w-4 ${list.loading ? "animate-spin" : ""}`} /> Refresh
                 </button>
+                {filterError ? <p className="w-full text-xs text-red-700">{filterError}</p> : null}
             </form>
             <TableShell
                 loading={list.loading}

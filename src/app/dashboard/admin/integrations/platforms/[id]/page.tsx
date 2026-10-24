@@ -310,7 +310,7 @@ export default function PlatformDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                         </div>
                     </Modal>
-                    <Modal open={Boolean(issued)} title="Credential issued — copy the secret now" onClose={() => setIssued(null)}>
+                    <Modal open={Boolean(issued)} title="Credential issued — copy the secret now" onClose={() => setIssued(null)} dismissible={false}>
                         {issued ? (
                             <div className="space-y-3">
                                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -323,7 +323,7 @@ export default function PlatformDetailPage({ params }: { params: Promise<{ id: s
                                 <Field label="Secret (HMAC-SHA256 signing key)">
                                     <div className="flex gap-2">
                                         <input className={`${inputCls} font-mono`} readOnly value={issued.secret} onFocus={(e) => e.currentTarget.select()} />
-                                        <button type="button" className={btnSecondary} onClick={copySecret}>
+                                        <button type="button" className={btnSecondary} onClick={copySecret} aria-label={copied ? "Secret copied" : "Copy secret"} title="Copy secret">
                                             {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                                         </button>
                                     </div>
@@ -332,9 +332,10 @@ export default function PlatformDetailPage({ params }: { params: Promise<{ id: s
                                     {issued.label ? `Label ${issued.label}. ` : ""}
                                     {issued.expiresAt ? `Expires ${formatAdminDateTime(issued.expiresAt)}.` : "No expiry."} Canonical string: v1, METHOD, path, X-Hub-Timestamp, X-Hub-Nonce, sha256(body).
                                 </p>
-                                <div className="flex justify-end">
+                                <div className="flex items-center justify-end gap-3">
+                                    {!copied ? <span className="text-xs text-amber-700">Copy or note the secret before closing — it will not be shown again.</span> : null}
                                     <button type="button" className={btnPrimary} onClick={() => setIssued(null)}>
-                                        I have stored it
+                                        I have stored the secret
                                     </button>
                                 </div>
                             </div>

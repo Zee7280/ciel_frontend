@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { formatAdminDateTime } from "@/utils/adminDate";
 import { HUB_ADMIN_BASE, shortId, type HubAudit } from "@/utils/integrationHub";
-import { btnSecondary, inputCls, JsonBlock, Modal, Pager, TableShell, TD, TH } from "./HubUi";
+import { btnSecondary, inputCls, isUuid, JsonBlock, Modal, Pager, rowButtonProps, TableShell, TD, TH } from "./HubUi";
 import { useHubList } from "./useHubList";
 
 export function AuditTable({ base, lockedConnectionId }: { base: string; lockedConnectionId?: string }) {
@@ -12,6 +12,7 @@ export function AuditTable({ base, lockedConnectionId }: { base: string; lockedC
     const [action, setAction] = useState("");
     const [targetType, setTargetType] = useState("");
     const [applied, setApplied] = useState({ connectionId: lockedConnectionId ?? "", action: "", targetType: "" });
+    const [filterError, setFilterError] = useState<string | null>(null);
     const filters = useMemo(() => applied, [applied]);
     const list = useHubList<HubAudit>(`${base}/audit`, filters);
     const [open, setOpen] = useState<HubAudit | null>(null);
@@ -22,7 +23,13 @@ export function AuditTable({ base, lockedConnectionId }: { base: string; lockedC
                 className="flex flex-wrap items-end gap-2"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    setApplied({ connectionId: connectionId.trim(), action: action.trim().toUpperCase(), targetType: targetType.trim() });
+                    const cid = connectionId.trim();
+                    if (cid && !isUuid(cid)) {
+                        setFilterError("Connection id must be a UUID (copy it from the connection detail page).");
+                        return;
+                    }
+                    setFilterError(null);
+                    setApplied({ connectionId: cid, action: action.trim().toUpperCase(), targetType: targetType.trim() });
                 }}
             >
                 {!lockedConnectionId ? (
@@ -43,6 +50,7 @@ export function AuditTable({ base, lockedConnectionId }: { base: string; lockedC
                 <button type="button" className={`${btnSecondary} ml-auto`} onClick={list.reload} disabled={list.loading}>
                     <RefreshCw className={`h-4 w-4 ${list.loading ? "animate-spin" : ""}`} /> Refresh
                 </button>
+                {filterError ? <p className="w-full text-xs text-red-700">{filterError}</p> : null}
             </form>
             <TableShell
                 loading={list.loading}
@@ -63,7 +71,7 @@ export function AuditTable({ base, lockedConnectionId }: { base: string; lockedC
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {list.rows.map((a) => (
-                            <tr key={a.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => setOpen(a)}>
+                            <tr key={a.id} className="cursor-pointer hover:bg-slate-50/60 focus:outline-none focus-visible:bg-slate-100" {...rowButtonProps(() => setOpen(a))}>
                                 <TD className="whitespace-nowrap text-xs">{formatAdminDateTime(a.createdAt)}</TD>
                                 <TD className="text-xs">
                                     <span className="font-medium">{a.actorType}</span>

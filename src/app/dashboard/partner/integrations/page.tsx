@@ -21,7 +21,18 @@ import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { isAbortError, readErrorMessage, useAbortableFetch } from "@/components/admin/useAbortableFetch";
 import { HubDisabledNotice, useHubAvailability } from "@/components/admin/integrations/HubAvailability";
+import { openInNewTab, rowButtonProps } from "@/components/admin/integrations/HubUi";
 import { formatAdminDate, formatAdminDateTime } from "@/utils/adminDate";
+
+/** Debounced copy of a text value, so typed filters issue one request per pause instead of per key. */
+function useDebounced<T>(value: T, delayMs = 350): T {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const t = window.setTimeout(() => setDebounced(value), delayMs);
+        return () => window.clearTimeout(t);
+    }, [value, delayMs]);
+    return debounced;
+}
 
 /* ------------------------------------------------------------------------------------------------
  * Local API types (the organization-side External Records API: /api/v1/org/integrations/*)
@@ -55,6 +66,7 @@ type Connection = {
     validUntil: string | null;
     statusReason: string | null;
     createdAt: string;
+    updatedAt?: string;
 };
 
 type Summary = { scopeKey: string; period: string; recordCount: number; metricTotals: Record<string, number> };
@@ -226,26 +238,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-/** Opens an original evidence file via a short-lived URL; only offered when the connection allows it. */
+/**
+ * Opens an original evidence file via a short-lived URL; only offered when the connection allows it.
+ * Must run from the click handler: the tab is opened synchronously so popup blockers allow it.
+ */
 async function openEvidence(evidenceId: string) {
     try {
-        const res = await authenticatedFetch(`${BASE}/evidence/${evidenceId}/view-url`, {}, { redirectToLogin: true });
-        if (!res) return;
-        if (res.status === 404) {
-            toast.error("Opening originals is not enabled for this connection.");
-            return;
-        }
-        if (!res.ok) {
-            toast.error(await readErrorMessage(res, "Could not open evidence"));
-            return;
-        }
-        const j = (await res.json()) as { data?: { url?: string } };
-        const url = j.data?.url;
-        if (!url) {
-            toast.error("No view URL returned");
-            return;
-        }
-        window.open(url, "_blank", "noopener,noreferrer");
+        await openInNewTab(async () => {
+            const res = await authenticatedFetch(`${BASE}/evidence/${evidenceId}/view-url`, {}, { redirectToLogin: true });
+            if (!res) throw new Error("Not signed in");
+            if (res.status === 404) throw new Error("Opening originals is not enabled for this connection.");
+            if (!res.ok) throw new Error(await readErrorMessage(res, "Could not open evidence"));
+            const j = (await res.json()) as { data?: { url?: string } };
+            const url = j.data?.url;
+            if (!url) throw new Error("No view URL returned");
+            return url;
+        });
     } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not open evidence");
     }
@@ -321,6 +329,13 @@ function ConnectDialog({ open, onClose, onCreated }: { open: boolean; onClose: (
 
     useEffect(() => {
         if (!open) return;
+        // Fresh draft on every open: a cancelled attempt must not resurface later.
+        setPlatformId("");
+        setPurpose("");
+        setScopes([]);
+        setDpa("");
+        setRetention("");
+        setReferral("");
         let cancelled = false;
         setLoading(true);
         getJson<{ data: Platform[] }>(`${BASE}/platforms`)
@@ -483,7 +498,10 @@ function ConnectionDetail({ connection, onClose }: { connection: Connection; onC
             .finally(() => {
                 if (run.isCurrent()) setLoading(false);
             });
-    }, [begin, connection.id]);
+        // `connection.status` and `updatedAt` are deliberate deps: after approve / reject / suspend the
+        // parent reloads the row and the summaries + audit history must follow.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [begin, connection.id, connection.status, connection.updatedAt]);
 
     useEffect(() => {
         load();
@@ -665,8 +683,9 @@ function ConnectionsTab({ connections, loading, error, onReload }: { connections
                                 {connections.map((c) => (
                                     <tr
                                         key={c.id}
-                                        className={`cursor-pointer hover:bg-slate-50 ${selectedId === c.id ? "bg-blue-50/60" : ""}`}
-                                        onClick={() => setSelectedId(c.id === selectedId ? null : c.id)}
+                                        className={`cursor-pointer hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-100 ${selectedId === c.id ? "bg-blue-50/60" : ""}`}
+                                        aria-expanded={selectedId === c.id}
+                                        {...rowButtonProps(() => setSelectedId(c.id === selectedId ? null : c.id))}
                                     >
                                         <td className="px-4 py-3">
                                             <div className="font-medium text-slate-900">{connectionLabel(c)}</div>
@@ -902,6 +921,9 @@ function RecordsTab({ connections }: { connections: Connection[] }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    // Typed filters are debounced; selects and dates apply immediately.
+    const activityTypeQ = useDebounced(activityType.trim());
+    const qQ = useDebounced(q.trim());
 
     const load = useCallback(() => {
         const run = begin();
@@ -909,10 +931,10 @@ function RecordsTab({ connections }: { connections: Connection[] }) {
         setError(null);
         const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
         if (connectionId) params.set("connectionId", connectionId);
-        if (activityType.trim()) params.set("activityType", activityType.trim());
+        if (activityTypeQ) params.set("activityType", activityTypeQ);
         if (from) params.set("from", from);
         if (to) params.set("to", to);
-        if (q.trim()) params.set("q", q.trim());
+        if (qQ) params.set("q", qQ);
         getJson<unknown>(`${BASE}/records?${params.toString()}`, run.signal)
             .then((j) => {
                 if (run.isCurrent()) setData(readPaged<RecordRow>(j));
@@ -924,7 +946,7 @@ function RecordsTab({ connections }: { connections: Connection[] }) {
             .finally(() => {
                 if (run.isCurrent()) setLoading(false);
             });
-    }, [begin, page, connectionId, activityType, from, to, q]);
+    }, [begin, page, connectionId, activityTypeQ, from, to, qQ]);
 
     useEffect(() => {
         load();
@@ -976,7 +998,12 @@ function RecordsTab({ connections }: { connections: Connection[] }) {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {data.rows.map((r) => (
-                                        <tr key={r.id} className={`cursor-pointer hover:bg-slate-50 ${selectedId === r.id ? "bg-blue-50/60" : ""}`} onClick={() => setSelectedId(r.id === selectedId ? null : r.id)}>
+                                        <tr
+                                            key={r.id}
+                                            className={`cursor-pointer hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-100 ${selectedId === r.id ? "bg-blue-50/60" : ""}`}
+                                            aria-expanded={selectedId === r.id}
+                                            {...rowButtonProps(() => setSelectedId(r.id === selectedId ? null : r.id))}
+                                        >
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-slate-900">{r.title ?? r.externalActivityId}</div>
                                                 <div className="font-mono text-[11px] text-slate-500">{r.externalActivityId} · v{r.version}</div>

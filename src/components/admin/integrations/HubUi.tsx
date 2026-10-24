@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Loader2, X } from "lucide-react";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -159,48 +159,127 @@ export function KV({ items }: { items: Array<[string, ReactNode]> }) {
     );
 }
 
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
     open,
     title,
     onClose,
     children,
     wide,
+    dismissible = true,
 }: {
     open: boolean;
     title: string;
     onClose: () => void;
     children: ReactNode;
     wide?: boolean;
+    /** When false, backdrop clicks and Escape do not close the dialog (e.g. one-time secrets). */
+    dismissible?: boolean;
 }) {
+    const panelRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!open) return;
+        const prevFocus = document.activeElement as HTMLElement | null;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const t = window.setTimeout(() => {
+            const el = panelRef.current?.querySelector<HTMLElement>("[data-autofocus]") ?? panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+            el?.focus();
+        }, 0);
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") {
+                if (dismissible) {
+                    e.stopPropagation();
+                    onClose();
+                }
+            } else if (e.key === "Tab" && panelRef.current) {
+                const f = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+                if (f.length === 0) return;
+                const first = f[0];
+                const last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
         };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [open, onClose]);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            window.clearTimeout(t);
+            document.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prevOverflow;
+            prevFocus?.focus?.();
+        };
+    }, [open, onClose, dismissible]);
     if (!open || typeof document === "undefined") return null;
     return createPortal(
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onMouseDown={onClose}>
+        <div
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4"
+            onMouseDown={(e) => {
+                if (dismissible && e.target === e.currentTarget) onClose();
+            }}
+        >
             <div
+                ref={panelRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
-                onMouseDown={(e) => e.stopPropagation()}
                 className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-2xl ${wide ? "sm:max-w-4xl" : "sm:max-w-xl"}`}
             >
                 <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
                     <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-                    <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Close">
-                        <X className="h-4 w-4" />
-                    </button>
+                    {dismissible ? (
+                        <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Close">
+                            <X className="h-4 w-4" />
+                        </button>
+                    ) : null}
                 </div>
                 <div className="px-5 py-4">{children}</div>
             </div>
         </div>,
         document.body,
     );
+}
+
+/** Keyboard support for clickable table rows: Enter or Space activates like a click. */
+export function rowButtonProps(onActivate: () => void) {
+    return {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick: onActivate,
+        onKeyDown: (e: ReactKeyboardEvent<HTMLTableRowElement>) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onActivate();
+            }
+        },
+    };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(v: string): boolean {
+    return UUID_RE.test(v.trim());
+}
+
+/** Opens a new tab synchronously (inside the user gesture) and navigates it once the URL is known. */
+export async function openInNewTab(resolveUrl: () => Promise<string>): Promise<void> {
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    try {
+        const url = await resolveUrl();
+        if (w) {
+            w.location.href = url;
+        } else {
+            window.location.assign(url);
+        }
+    } catch (e) {
+        w?.close();
+        throw e;
+    }
 }
 
 export function SectionCard({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { formatAdminDate, formatAdminDateTime } from "@/utils/adminDate";
@@ -16,13 +16,16 @@ import {
     type HubRecord,
     type HubRecordDetail,
 } from "@/utils/integrationHub";
-import { btnPrimary, btnSecondary, btnSmall, HubBadge, inputCls, JsonBlock, KV, Modal, Pager, TableShell, TD, TH } from "./HubUi";
+import { btnPrimary, btnSecondary, btnSmall, HubBadge, inputCls, isUuid, JsonBlock, KV, Modal, openInNewTab, Pager, rowButtonProps, TableShell, TD, TH } from "./HubUi";
 import { useHubList, useHubResource } from "./useHubList";
 
+/** Must be called from a click handler: the tab is opened synchronously, then pointed at the signed URL. */
 export async function openEvidence(base: string, evidenceId: string) {
     try {
-        const j = await hubRequest<HubDataResponse<{ url: string }>>(`${base}/evidence/${evidenceId}/view-url`);
-        window.open(j.data.url, "_blank", "noopener,noreferrer");
+        await openInNewTab(async () => {
+            const j = await hubRequest<HubDataResponse<{ url: string }>>(`${base}/evidence/${evidenceId}/view-url`);
+            return j.data.url;
+        });
     } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not open evidence");
     }
@@ -35,6 +38,11 @@ export function RecordDetailModal({ recordId, mode, onClose, onChanged }: { reco
     const [reviewState, setReviewState] = useState<string>("reviewed");
     const [note, setNote] = useState("");
     const [saving, setSaving] = useState(false);
+    // The modal stays mounted; a different record must not inherit the previous review draft.
+    useEffect(() => {
+        setReviewState("reviewed");
+        setNote("");
+    }, [recordId]);
 
     const submitReview = async () => {
         if (!recordId) return;
@@ -190,6 +198,7 @@ export function RecordsTable({ base, filtersExtra, mode }: { base: string; filte
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
     const [applied, setApplied] = useState({ connectionId: filtersExtra?.connectionId ?? "", activityType: "", q: "", from: "", to: "" });
+    const [filterError, setFilterError] = useState<string | null>(null);
     const filters = useMemo(() => ({ status, reviewState, ...applied }), [status, reviewState, applied]);
     const list = useHubList<HubRecord>(`${base}/records`, filters);
     const [openId, setOpenId] = useState<string | null>(null);
@@ -200,7 +209,13 @@ export function RecordsTable({ base, filtersExtra, mode }: { base: string; filte
                 className="flex flex-wrap items-end gap-2"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    setApplied({ connectionId: connectionId.trim(), activityType: activityType.trim(), q: q.trim(), from, to });
+                    const cid = connectionId.trim();
+                    if (cid && !isUuid(cid)) {
+                        setFilterError("Connection id must be a UUID (copy it from the connection detail page).");
+                        return;
+                    }
+                    setFilterError(null);
+                    setApplied({ connectionId: cid, activityType: activityType.trim(), q: q.trim(), from, to });
                 }}
             >
                 <select className={`${inputCls} w-36`} value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -229,6 +244,7 @@ export function RecordsTable({ base, filtersExtra, mode }: { base: string; filte
                 <button type="button" className={`${btnSecondary} ml-auto`} onClick={list.reload} disabled={list.loading}>
                     <RefreshCw className={`h-4 w-4 ${list.loading ? "animate-spin" : ""}`} /> Refresh
                 </button>
+                {filterError ? <p className="w-full text-xs text-red-700">{filterError}</p> : null}
             </form>
 
             <TableShell
@@ -252,7 +268,7 @@ export function RecordsTable({ base, filtersExtra, mode }: { base: string; filte
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {list.rows.map((r) => (
-                            <tr key={r.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => setOpenId(r.id)}>
+                            <tr key={r.id} className="cursor-pointer hover:bg-slate-50/60 focus:outline-none focus-visible:bg-slate-100" {...rowButtonProps(() => setOpenId(r.id))}>
                                 <TD className="whitespace-nowrap text-xs">{formatAdminDate(r.occurredOn)}</TD>
                                 <TD>
                                     <p className="font-medium">{r.title ?? r.externalActivityId}</p>

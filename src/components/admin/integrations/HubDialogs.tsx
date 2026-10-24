@@ -117,6 +117,16 @@ function numOrUndef(v: string): number | undefined {
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
 }
 
+/**
+ * Optional text field for the request body. On create a blank field is omitted; on edit a blank
+ * field is sent as "" so the backend clears the stored value (`trim() || null`).
+ */
+function optText(v: string, editing: boolean): string | undefined {
+    const t = v.trim();
+    if (t) return t;
+    return editing ? "" : undefined;
+}
+
 export function PlatformFormDialog({
     open,
     platform,
@@ -142,18 +152,28 @@ export function PlatformFormDialog({
         }
         setBusy(true);
         try {
-            const settings: Record<string, number> = {};
+            const editing = Boolean(platform);
+            // On edit the backend merges settings, so a cleared override is sent as null (which
+            // effectiveSettings treats as "use the default").
+            const settings: Record<string, number | null> = {};
             for (const k of ["rate_limit_per_minute", "max_batch_size", "max_payload_bytes", "max_evidence_bytes", "retention_days", "log_retention_days"] as const) {
-                const n = numOrUndef(form[k]);
+                const raw = form[k].trim();
+                if (raw && numOrUndef(raw) === undefined) {
+                    toast.error(`${k.replace(/_/g, " ")} must be a positive whole number`);
+                    setBusy(false);
+                    return;
+                }
+                const n = numOrUndef(raw);
                 if (n !== undefined) settings[k] = n;
+                else if (editing && platform?.settings && k in platform.settings) settings[k] = null;
             }
             const body: Record<string, unknown> = {
                 name: form.name.trim(),
-                description: form.description.trim() || undefined,
+                description: optText(form.description, editing),
                 integrationMode: form.integrationMode,
                 approvedEventTypes: form.approvedEventTypes,
                 settings,
-                agreementReference: form.agreementReference.trim() || undefined,
+                agreementReference: optText(form.agreementReference, editing),
             };
             if (!platform && form.slug.trim()) body.slug = form.slug.trim().toLowerCase();
             const j = platform
@@ -295,7 +315,10 @@ export function ConnectionFormDialog({
     const set = <K extends keyof ConnectionForm>(k: K, v: ConnectionForm[K]) => setForm((f) => ({ ...f, [k]: v }));
 
     const selectedPlatform = platforms.find((p) => p.id === form.platformId);
-    const scopeOptions: readonly string[] = connection ? HUB_EVENT_TYPES : (selectedPlatform?.approvedEventTypes ?? [...HUB_EVENT_TYPES]);
+    // Editing: only the platform's approved types can be scopes (the backend drops the rest).
+    const scopeOptions: readonly string[] = connection
+        ? (connection.platform?.approvedEventTypes ?? platforms.find((p) => p.id === connection.platformId)?.approvedEventTypes ?? HUB_EVENT_TYPES)
+        : (selectedPlatform?.approvedEventTypes ?? [...HUB_EVENT_TYPES]);
 
     useEffect(() => {
         if (!open || connection) return;
@@ -319,17 +342,23 @@ export function ConnectionFormDialog({
             toast.error("Pick a platform and an organization");
             return;
         }
+        if (form.retentionDays.trim() && numOrUndef(form.retentionDays) === undefined) {
+            toast.error("Retention days must be a positive whole number");
+            return;
+        }
         setBusy(true);
         try {
+            const editing = Boolean(connection);
             const retention = numOrUndef(form.retentionDays);
             const common = {
-                purpose: form.purpose.trim() || undefined,
+                purpose: optText(form.purpose, editing),
                 scopes: form.scopes,
-                dpaReference: form.dpaReference.trim() || undefined,
+                dpaReference: optText(form.dpaReference, editing),
                 personalFieldsAllowed: form.personalFieldsAllowed,
                 orgEvidenceOpenAllowed: form.orgEvidenceOpenAllowed,
-                retentionDays: retention,
-                referralDomain: form.referralDomain.trim() || undefined,
+                // Edit: null clears the override; create: omitted.
+                retentionDays: retention ?? (editing ? null : undefined),
+                referralDomain: optText(form.referralDomain, editing),
             };
             const j = connection
                 ? await hubRequest<HubDataResponse<HubConnection>>(`${HUB_ADMIN_BASE}/connections/${connection.id}`, {
@@ -511,8 +540,12 @@ function metricToForm(m?: HubMetric | null): MetricForm {
 export function MetricFormDialog({ open, metric, onClose, onSaved }: { open: boolean; metric?: HubMetric | null; onClose: () => void; onSaved: (m: HubMetric) => void }) {
     const [form, setForm] = useState<MetricForm>(() => metricToForm(metric));
     const [busy, setBusy] = useState(false);
+    const [boundError, setBoundError] = useState<string | null>(null);
     useEffect(() => {
-        if (open) setForm(metricToForm(metric));
+        if (open) {
+            setForm(metricToForm(metric));
+            setBoundError(null);
+        }
     }, [open, metric]);
     const set = <K extends keyof MetricForm>(k: K, v: MetricForm[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -525,8 +558,26 @@ export function MetricFormDialog({ open, metric, onClose, onSaved }: { open: boo
             toast.error("Name and unit are required");
             return;
         }
+        const bound = (v: string): number | null | "invalid" => {
+            const t = v.trim();
+            if (t === "") return null;
+            const n = Number(t);
+            return Number.isFinite(n) ? n : "invalid";
+        };
+        const minValue = bound(form.minValue);
+        const maxValue = bound(form.maxValue);
+        if (minValue === "invalid" || maxValue === "invalid") {
+            setBoundError("Min and max must be numbers (leave empty for no bound)");
+            return;
+        }
+        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+            setBoundError("Min must not exceed max");
+            return;
+        }
+        setBoundError(null);
         setBusy(true);
         try {
+            const editing = Boolean(metric);
             const sdgs = form.sdgs
                 .split(",")
                 .map((s) => parseInt(s.trim(), 10))
@@ -538,11 +589,11 @@ export function MetricFormDialog({ open, metric, onClose, onSaved }: { open: boo
                 dataType: form.dataType,
                 aggregation: form.aggregation,
                 defaultClassification: form.defaultClassification,
-                minValue: form.minValue.trim() === "" ? null : Number(form.minValue),
-                maxValue: form.maxValue.trim() === "" ? null : Number(form.maxValue),
-                sector: form.sector.trim() || undefined,
+                minValue,
+                maxValue,
+                sector: optText(form.sector, editing),
                 sdgs,
-                methodologyNotes: form.methodologyNotes.trim() || undefined,
+                methodologyNotes: optText(form.methodologyNotes, editing),
                 active: form.active,
             };
             const j = metric
@@ -594,12 +645,13 @@ export function MetricFormDialog({ open, metric, onClose, onSaved }: { open: boo
                         ))}
                     </select>
                 </Field>
-                <Field label="Min value">
-                    <input className={inputCls} inputMode="decimal" value={form.minValue} onChange={(e) => set("minValue", e.target.value)} />
+                <Field label="Min value" hint="Empty = no lower bound">
+                    <input className={inputCls} inputMode="decimal" value={form.minValue} onChange={(e) => set("minValue", e.target.value)} aria-invalid={Boolean(boundError)} />
                 </Field>
-                <Field label="Max value">
-                    <input className={inputCls} inputMode="decimal" value={form.maxValue} onChange={(e) => set("maxValue", e.target.value)} />
+                <Field label="Max value" hint="Empty = no upper bound">
+                    <input className={inputCls} inputMode="decimal" value={form.maxValue} onChange={(e) => set("maxValue", e.target.value)} aria-invalid={Boolean(boundError)} />
                 </Field>
+                {boundError ? <p className="text-xs text-red-700 sm:col-span-2">{boundError}</p> : null}
                 <Field label="Sector">
                     <input className={inputCls} value={form.sector} onChange={(e) => set("sector", e.target.value)} />
                 </Field>

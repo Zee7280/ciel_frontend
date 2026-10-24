@@ -80,7 +80,7 @@ export default function MetricsTab() {
                                 </TD>
                                 <TD className="text-xs">{m.sdgs.length ? m.sdgs.join(", ") : "—"}</TD>
                                 <TD>
-                                    <HubBadge status={m.active ? "active" : "retired"} />
+                                    <HubBadge status={m.active ? "active" : "inactive"} />
                                 </TD>
                                 <TD className="text-right">
                                     <button type="button" className={`${btnSmall} inline-flex items-center gap-1`} onClick={() => setEdit(m)}>

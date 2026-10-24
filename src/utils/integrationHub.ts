@@ -82,7 +82,7 @@ export type HubIssuedCredential = {
 export type HubConnection = {
     id: string;
     platformId: string;
-    platform?: Pick<HubPlatform, "id" | "name" | "slug" | "status"> | null;
+    platform?: Pick<HubPlatform, "id" | "name" | "slug" | "status" | "approvedEventTypes"> | null;
     organizationId: string;
     organizationName: string;
     status: (typeof HUB_CONNECTION_STATUSES)[number];

@@ -16,7 +16,7 @@ import {
     type HubListResponse,
     type HubPlatform,
 } from "@/utils/integrationHub";
-import { btnPrimary, btnSecondary, HubBadge, inputCls, JsonBlock, KV, Modal, Pager, TableShell, TD, TH } from "./HubUi";
+import { btnPrimary, btnSecondary, HubBadge, inputCls, isUuid, JsonBlock, KV, Modal, Pager, rowButtonProps, TableShell, TD, TH } from "./HubUi";
 import { useHubList, useHubResource } from "./useHubList";
 
 export default function EventsTab({ initialConnectionId }: { initialConnectionId?: string }) {
@@ -32,6 +32,7 @@ export default function EventsTab({ initialConnectionId }: { initialConnectionId
     const [openId, setOpenId] = useState<string | null>(null);
     const detail = useHubResource<HubEvent>(openId ? `${HUB_ADMIN_BASE}/events/${openId}` : null);
     const [replaying, setReplaying] = useState(false);
+    const [filterError, setFilterError] = useState<string | null>(null);
 
     useEffect(() => {
         hubRequest<HubListResponse<HubPlatform>>(`${HUB_ADMIN_BASE}/platforms?limit=100`)
@@ -53,7 +54,15 @@ export default function EventsTab({ initialConnectionId }: { initialConnectionId
         }
     };
 
-    const applyText = () => setApplied({ connectionId: connectionId.trim(), q: q.trim() });
+    const applyText = () => {
+        const cid = connectionId.trim();
+        if (cid && !isUuid(cid)) {
+            setFilterError("Connection id must be a UUID (copy it from the connection detail page).");
+            return;
+        }
+        setFilterError(null);
+        setApplied({ connectionId: cid, q: q.trim() });
+    };
 
     return (
         <div className="space-y-3">
@@ -96,6 +105,7 @@ export default function EventsTab({ initialConnectionId }: { initialConnectionId
                 <button type="button" className={`${btnSecondary} ml-auto`} onClick={list.reload} disabled={list.loading}>
                     <RefreshCw className={`h-4 w-4 ${list.loading ? "animate-spin" : ""}`} /> Refresh
                 </button>
+                {filterError ? <p className="w-full text-xs text-red-700">{filterError}</p> : null}
             </form>
 
             <TableShell
@@ -119,7 +129,7 @@ export default function EventsTab({ initialConnectionId }: { initialConnectionId
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {list.rows.map((e) => (
-                            <tr key={e.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => setOpenId(e.id)}>
+                            <tr key={e.id} className="cursor-pointer hover:bg-slate-50/60 focus:outline-none focus-visible:bg-slate-100" {...rowButtonProps(() => setOpenId(e.id))}>
                                 <TD className="whitespace-nowrap text-xs">{formatAdminDateTime(e.receivedAt)}</TD>
                                 <TD>
                                     <code className="text-xs">{e.sourceEventId}</code>

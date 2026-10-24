@@ -31,36 +31,43 @@ export async function runConnectionAction(id: string, action: ConnectionAction, 
 
 export function ConnectionActionButtons({ connection, onDone, compact }: { connection: HubConnection; onDone: () => void; compact?: boolean }) {
     const [reason, setReason] = useState<"suspend" | "revoke" | null>(null);
+    const [busy, setBusy] = useState(false);
     const cls = compact ? btnSmall : btnSecondary;
-    const run = async (action: ConnectionAction, why?: string) => {
+    /** Runs an action; `rethrow` keeps a reason dialog open on failure so the typed reason survives. */
+    const run = async (action: ConnectionAction, why?: string, rethrow = false) => {
+        if (busy) return;
+        setBusy(true);
         try {
             const c = await runConnectionAction(connection.id, action, why);
             toast.success(`Connection ${c.status}`);
             onDone();
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Action failed");
+            if (rethrow) throw e;
+        } finally {
+            setBusy(false);
         }
     };
     return (
         <div className={`flex flex-wrap gap-1 ${compact ? "justify-end" : ""}`}>
             {connection.status === "org_approved" ? (
-                <button type="button" className={compact ? btnSmall : btnPrimary} onClick={() => run("authorize")}>
+                <button type="button" className={compact ? btnSmall : btnPrimary} disabled={busy} onClick={() => void run("authorize")}>
                     Authorize
                 </button>
             ) : null}
             {connection.status === "proposed" ? <span className="self-center text-xs text-slate-500">Waiting for organization approval</span> : null}
             {connection.status === "active" ? (
-                <button type="button" className={cls} onClick={() => setReason("suspend")}>
+                <button type="button" className={cls} disabled={busy} onClick={() => setReason("suspend")}>
                     Suspend
                 </button>
             ) : null}
             {connection.status === "suspended" ? (
-                <button type="button" className={cls} onClick={() => run("resume")}>
+                <button type="button" className={cls} disabled={busy} onClick={() => void run("resume")}>
                     Resume
                 </button>
             ) : null}
             {connection.status !== "revoked" ? (
-                <button type="button" className={`${cls} text-red-700`} onClick={() => setReason("revoke")}>
+                <button type="button" className={`${cls} text-red-700`} disabled={busy} onClick={() => setReason("revoke")}>
                     Revoke
                 </button>
             ) : null}
@@ -77,8 +84,12 @@ export function ConnectionActionButtons({ connection, onDone, compact }: { conne
                 onCancel={() => setReason(null)}
                 onConfirm={async (why) => {
                     if (!reason) return;
-                    await run(reason, why);
-                    setReason(null);
+                    try {
+                        await run(reason, why, true);
+                        setReason(null);
+                    } catch {
+                        // Error already toasted; the dialog stays open with the typed reason.
+                    }
                 }}
             />
         </div>

@@ -149,7 +149,13 @@ export default function ConnectionDetailPage({ params }: { params: Promise<{ id:
                         <SummaryTable rows={detail.data?.summaries ?? []} />
                     </SectionCard>
 
-                    <ConnectionFormDialog open={editOpen} connection={c} platforms={[]} onClose={() => setEditOpen(false)} onSaved={() => detail.reload()} />
+                    <ConnectionFormDialog
+                        open={editOpen}
+                        connection={c}
+                        platforms={c.platform ? [{ ...c.platform, approvedEventTypes: c.platform.approvedEventTypes ?? [] }] : []}
+                        onClose={() => setEditOpen(false)}
+                        onSaved={() => detail.reload()}
+                    />
                 </>
             ) : null}
         </div>
