@@ -6,4 +6,6 @@ export const REPORT_ATTACHMENT_ACCEPT =
     ".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv," +
     "video/*," +
     ".mp4,.m4v,.mov,.qt,.webm,.avi,.mkv,.wmv,.flv,.mpeg,.mpg,.mp2,.mpe,.mpv," +
-    ".3gp,.3g2,.ogv,.ogg,.mts,.m2ts,.ts,.vob,.asf,.rm,.rmvb,.f4v,.divx";
+    ".3gp,.3g2,.ogv,.ogg,.mts,.m2ts,.ts,.vob,.asf,.rm,.rmvb,.f4v,.divx," +
+    "audio/*," +
+    ".mp3,.m4a,.aac,.wav,.flac,.oga,.weba,.wma,.amr,.opus";
