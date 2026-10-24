@@ -44,6 +44,7 @@ const STATUS_OPTIONS = [
     "pending",
     "pending_membership_payment",
     "pending_subscription_payment",
+    "pending_org_verification",
     "inactive",
     "rejected",
     "suspended",

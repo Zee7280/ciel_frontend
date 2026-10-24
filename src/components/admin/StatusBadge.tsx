@@ -20,6 +20,7 @@ const STATUS_TONE: Record<string, Tone> = {
     pending: "amber",
     pending_membership_payment: "amber",
     pending_subscription_payment: "amber",
+    pending_org_verification: "amber",
     pending_approval: "amber",
     pending_review: "amber",
     revision_requested: "amber",
@@ -36,6 +37,7 @@ const STATUS_TONE: Record<string, Tone> = {
 const SHORT_LABEL: Record<string, string> = {
     pending_membership_payment: "Fee pending",
     pending_subscription_payment: "Fee pending",
+    pending_org_verification: "Awaiting verification",
 };
 
 export function statusLabel(status: string | null | undefined): string {

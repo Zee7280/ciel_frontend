@@ -29,6 +29,7 @@ import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import { isAbortError, readErrorMessage, useAbortableFetch } from "@/components/admin/useAbortableFetch";
 import { formatAdminDateTime } from "@/utils/adminDate";
 import {
+    CORPORATE_MEMBERSHIP_REQUIRED_KEY,
     FEE_PKR_MAX,
     FEE_PKR_MIN,
     isValidWholeNumberInRange,
@@ -39,6 +40,7 @@ import {
     parsePartnerMembershipRequiredSettingValue,
     PARTNER_MEMBERSHIP_REQUIRED_KEY,
     REPORTING_FEE_PKR_KEY,
+    UNIVERSITY_MEMBERSHIP_REQUIRED_KEY,
 } from "@/utils/partnerMembershipDisplay";
 import {
     parseStudentSubscriptionRequiredSettingValue,
@@ -480,6 +482,14 @@ export default function AdminSettingsPage() {
         server[PARTNER_MEMBERSHIP_REQUIRED_KEY],
         false,
     );
+    const universityMembershipRequired = parsePartnerMembershipRequiredSettingValue(
+        server[UNIVERSITY_MEMBERSHIP_REQUIRED_KEY],
+        false,
+    );
+    const corporateMembershipRequired = parsePartnerMembershipRequiredSettingValue(
+        server[CORPORATE_MEMBERSHIP_REQUIRED_KEY],
+        false,
+    );
     const studentSubscriptionRequired = parseStudentSubscriptionRequiredSettingValue(
         server[STUDENT_SUBSCRIPTION_REQUIRED_KEY],
         true,
@@ -510,6 +520,33 @@ export default function AdminSettingsPage() {
                     false,
                     "partner membership setting",
                     "Partner membership is no longer required. Pending NGOs are being activated.",
+                ),
+        });
+    };
+
+    /** University / corporate fee switch. Off sends pending accounts to admin verification, not straight in. */
+    const onOrgMembershipToggle = (key: string, kind: "University" | "Corporate") => (next: boolean) => {
+        const noun = kind.toLowerCase();
+        if (next) {
+            void saveToggle(
+                key,
+                true,
+                `${noun} membership setting`,
+                `${kind} membership is now required — new ${noun} signups must pay before full portal access.`,
+            );
+            return;
+        }
+        askConfirm({
+            title: `Stop requiring ${noun} membership?`,
+            description: `Turning this OFF stops charging the membership fee to new ${noun} accounts. ${kind} accounts currently pending payment move to admin verification: they get the portal once you approve their organisation (already-approved organisations get it right away).`,
+            confirmLabel: "Turn off",
+            variant: "warning",
+            run: () =>
+                saveToggle(
+                    key,
+                    false,
+                    `${noun} membership setting`,
+                    `${kind} membership is no longer required. New ${noun} accounts wait for organisation approval instead.`,
                 ),
         });
     };
@@ -1151,7 +1188,7 @@ export default function AdminSettingsPage() {
                                     When <strong>on</strong>, new partner signups start as pending membership payment and must
                                     submit bank proof (or wait for admin activation) before using the partner portal. When{" "}
                                     <strong>off</strong>, partners register without this step and any pending NGOs are
-                                    activated. University and corporate accounts always require a membership fee.
+                                    activated.
                                 </>
                             }
                             checked={partnerMembershipRequired}
@@ -1161,6 +1198,42 @@ export default function AdminSettingsPage() {
                             meta={meta[PARTNER_MEMBERSHIP_REQUIRED_KEY]}
                             stateLabel={partnerMembershipRequired ? "Required on signup" : "Not required on signup"}
                             onChange={onPartnerMembershipToggle}
+                        />
+                        <ToggleRow
+                            id="university-membership"
+                            title="Require membership fee for new universities"
+                            description={
+                                <>
+                                    When <strong>on</strong>, new university signups pay the university membership fee
+                                    (bank proof, reviewed by admin) before using the portal. When <strong>off</strong>, they
+                                    register without paying and get the portal once you approve their organisation.
+                                </>
+                            }
+                            checked={universityMembershipRequired}
+                            saving={!!saving[UNIVERSITY_MEMBERSHIP_REQUIRED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[UNIVERSITY_MEMBERSHIP_REQUIRED_KEY]}
+                            stateLabel={universityMembershipRequired ? "Required on signup" : "Not required on signup"}
+                            onChange={onOrgMembershipToggle(UNIVERSITY_MEMBERSHIP_REQUIRED_KEY, "University")}
+                        />
+                        <ToggleRow
+                            id="corporate-membership"
+                            title="Require membership fee for new corporates"
+                            description={
+                                <>
+                                    When <strong>on</strong>, new corporate signups pay the corporate membership fee before
+                                    using the portal. When <strong>off</strong>, they register without paying and get the
+                                    portal once you approve their organisation.
+                                </>
+                            }
+                            checked={corporateMembershipRequired}
+                            saving={!!saving[CORPORATE_MEMBERSHIP_REQUIRED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[CORPORATE_MEMBERSHIP_REQUIRED_KEY]}
+                            stateLabel={corporateMembershipRequired ? "Required on signup" : "Not required on signup"}
+                            onChange={onOrgMembershipToggle(CORPORATE_MEMBERSHIP_REQUIRED_KEY, "Corporate")}
                         />
                     </Section>
                 </div>
@@ -1193,7 +1266,7 @@ export default function AdminSettingsPage() {
                         {renderIntegerField({
                             key: MEMBERSHIP_FEE_UNIVERSITY_PKR_KEY,
                             label: "University membership fee (PKR)",
-                            help: "Charged to university accounts at registration.",
+                            help: "Used when university membership is required. Shown on the university bank-transfer screen.",
                             min: FEE_PKR_MIN,
                             max: FEE_PKR_MAX,
                             prefix: "PKR",
@@ -1204,7 +1277,7 @@ export default function AdminSettingsPage() {
                         {renderIntegerField({
                             key: MEMBERSHIP_FEE_CORPORATE_PKR_KEY,
                             label: "Corporate membership fee (PKR)",
-                            help: "Charged to corporate accounts at registration.",
+                            help: "Used when corporate membership is required. Shown on the corporate bank-transfer screen.",
                             min: FEE_PKR_MIN,
                             max: FEE_PKR_MAX,
                             prefix: "PKR",
