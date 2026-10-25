@@ -7,8 +7,8 @@ import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { prefetchCommunityServiceData, prefetchStudentBrowseOpportunities, fetchCommunityServiceRankings } from "@/utils/student-community-cache";
+import { QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 import {
-    QuickWorkRecordLink,
     QuickWorkRouteCards,
     STRUCTURED_TOOLS_ANCHOR,
     useQuickWorkRoutes,
@@ -264,7 +264,30 @@ export default function CommunityServiceHub({
                 </Link>
             </p>
 
-            <QuickWorkRecordLink />
+            <MockupSectionHead
+                title="Quick Community Service"
+                subtitle="Short university activities, recorded separately. They do not fulfil the 16-hour requirement."
+            />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <MockupActionCard
+                    onClick={routes.openIntro}
+                    emoji="⚡"
+                    ghost="⚡"
+                    title="Log a Quick Activity"
+                    subtitle="Record a short activity you have completed: your team, attendance and evidence, then submit it for faculty approval."
+                    badge="START HERE"
+                    background={MOCKUP_GRADIENTS.gold}
+                />
+                <MockupActionCard
+                    href={QUICK_WORK_HREF}
+                    emoji="📒"
+                    ghost="📒"
+                    title="Quick Impact Log"
+                    subtitle="Your drafts, activities in progress, submitted and approved quick work, with your approved hours."
+                    badge="DRAFT · SUBMITTED · APPROVED"
+                    background={MOCKUP_GRADIENTS.pink}
+                />
+            </div>
             {routes.dialogs}
 
             {helpOpen ? (

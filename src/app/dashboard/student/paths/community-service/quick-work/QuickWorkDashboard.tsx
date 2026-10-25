@@ -20,27 +20,24 @@ const HUB = "/dashboard/student/paths/community-service";
 
 type Stage = "draft" | "progress" | "submitted" | "approved";
 const STAGES: { key: Stage; label: string; empty: string }[] = [
-    { key: "draft", label: "Draft", empty: "No drafts. A log you start appears here until you name your faculty or add teammates." },
-    { key: "progress", label: "In progress", empty: "Nothing waiting. Logs appear here while your faculty and teammates confirm, or when faculty asks for changes." },
+    { key: "draft", label: "Draft", empty: "No drafts. A log you start appears here until you add teammates." },
+    { key: "progress", label: "In progress", empty: "Nothing waiting. Logs appear here while your teammates confirm, or when faculty asks for changes." },
     { key: "submitted", label: "Submitted", empty: "Nothing with faculty right now." },
     { key: "approved", label: "Approved", empty: "No approved activities yet." },
 ];
 
-/** Draft: nothing sent yet. In progress: faculty / teammates asked, or changes requested. Submitted: with faculty (or not approved). */
+/** Draft: nothing sent yet. In progress: teammates asked, or changes requested. Submitted: with faculty (or not approved). */
 function stageOf(r: QuickWorkLog): Stage {
     if (r.status === "approved") return "approved";
     if (r.status === "submitted" || r.status === "rejected") return "submitted";
     if (r.status === "changes" || !r.isLead) return "progress";
-    return r.facultyConfirmation || r.participants.length > 1 ? "progress" : "draft";
+    return r.participants.length > 1 ? "progress" : "draft";
 }
 
-/** One line on where a log being prepared stands: the faculty's answer and how many teammates confirmed. */
+/** One line on where a log being prepared stands: how many teammates confirmed. */
 function progressNote(r: QuickWorkLog): string {
     if (r.status !== "draft" && r.status !== "changes") return "";
     const parts: string[] = [];
-    if (r.facultyConfirmation === "pending") parts.push("Waiting for faculty to accept");
-    if (r.facultyConfirmation === "accepted") parts.push("Faculty accepted");
-    if (r.facultyConfirmation === "declined") parts.push("Faculty declined — name someone else");
     const mates = r.participants.filter((p) => !p.isLead);
     if (mates.length) parts.push(`${mates.filter((p) => p.joinStatus === "joined").length} of ${mates.length} teammates confirmed`);
     return parts.join(" · ");

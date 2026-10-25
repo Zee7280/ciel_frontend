@@ -8,7 +8,6 @@ import {
     evidenceErrors,
     evidenceKind,
     evidenceTypeOf,
-    facultyConfirmationErrors,
     formatHours,
     formFromLog,
     joinErrors,
@@ -129,13 +128,13 @@ test("evidence type comes from the extension when the browser reports none or an
     assert.equal(evidenceKind("application/pdf"), "pdf");
 });
 
-test("submit waits for the faculty to accept; a log that already went to review is exempt", () => {
-    const f = (over) => facultyConfirmationErrors({ facultyName: "Dr F", facultyConfirmation: "pending", submittedAt: null, ...over });
-    assert.match(f({}).join(" "), /has not accepted/);
-    assert.match(f({ facultyConfirmation: "declined" }).join(" "), /declined/);
-    assert.deepEqual(f({ facultyConfirmation: "accepted" }), []);
-    assert.deepEqual(f({ facultyConfirmation: null, submittedAt: "2026-10-20T10:00:00Z" }), []);
-    assert.match(f({ facultyConfirmation: null }).join(" "), /has not accepted/);
-    // An older API that does not send the field never blocks the student; the server decides.
-    assert.deepEqual(facultyConfirmationErrors({ facultyName: "Dr F", submittedAt: null }), []);
+test("partners round-trip with contacts, and older name-only responses still load", () => {
+    const base = { id: "l1", status: "draft", mode: "solo", university: "", department: "", facultyName: "", facultyEmail: "", title: "", activityType: "", activityDate: null, startTime: null, endTime: null, location: "", host: null, sdg: null, summary: "", peopleReached: null, visibility: "Faculty, University & CIEL PK only", evidence: [], consent: false, honest: false, participants: [{ id: "p1", userId: "u1", isLead: true, name: "A", email: "a@x.pk", studentId: "S1", joinStatus: "joined", present: true, startTime: null, endTime: null, breakMinutes: 0, minutes: 0 }] };
+    const fresh = formFromLog({ ...base, partners: ["Edhi"], partnerDetails: [{ name: "Edhi", email: "info@edhi.org", contact: "+923001234567" }] });
+    assert.deepEqual(fresh.partners, [{ name: "Edhi", email: "info@edhi.org", contact: "+923001234567" }]);
+    const body = payloadFromForm({ ...fresh, partners: [...fresh.partners, { name: "WWF", email: " ", contact: "" }] });
+    assert.deepEqual(body.partners, ["Edhi", "WWF"]);
+    assert.deepEqual(body.partnerDetails[1], { name: "WWF", email: null, contact: null });
+    const older = formFromLog({ ...base, partners: ["Edhi"] });
+    assert.deepEqual(older.partners, [{ name: "Edhi", email: "", contact: "" }]);
 });

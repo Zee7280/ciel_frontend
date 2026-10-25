@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 import {
     activityLabel,
     formatHours,
@@ -166,7 +167,7 @@ export function QuickWorkIntroDialog({
                 <h3 className="text-sm font-semibold">A short log for work you have completed</h3>
                 <ol className="my-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-[#6b7c86]">
                     <li>
-                        <b className="text-[#16313d]">Add yourself or your team.</b> Name the faculty member who will review your work; they and each teammate get an email to accept.
+                        <b className="text-[#16313d]">Add yourself or your team.</b> Name the faculty member who will review your work; each teammate gets an email to confirm.
                     </li>
                     <li>
                         <b className="text-[#16313d]">Record what you did.</b> Enter each person’s actual attendance and attach photos or supporting evidence.
@@ -176,7 +177,7 @@ export function QuickWorkIntroDialog({
                         <b className="text-[#16313d]">Quick Impact Log</b>.
                     </li>
                 </ol>
-                <p className="mb-4 mt-3 text-xs font-semibold text-[#0e7d74]">Faculty accept coordinating first; they approve the hours only after you submit.</p>
+                <p className="mb-4 mt-3 text-xs font-semibold text-[#0e7d74]">Faculty approval happens only after submission.</p>
             </div>
             <div className="rounded-md border-l-[3px] border-[#e3a72b] bg-[#fff6e1] px-4 py-3 text-xs leading-relaxed text-[#624b20]">
                 <b className="mb-1 block text-[13px]">Need to complete your 16-hour requirement?</b>
@@ -294,6 +295,11 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                 <Detail label="Venue & host">
                     {log.location || "—"}
                     {log.host ? ` · ${log.host}` : ""}
+                    {log.host && (log.hostEmail || log.hostContact) ? (
+                        <span className="block text-xs text-[#6b7c86]">
+                            {[log.hostEmail, log.hostContact ? formatInternationalPhoneDisplay(log.hostContact) : ""].filter(Boolean).join(" · ")}
+                        </span>
+                    ) : null}
                     {log.locationPin ? (
                         <a
                             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(log.locationPin)}`}
@@ -305,7 +311,21 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                         </a>
                     ) : null}
                 </Detail>
-                {log.partners?.length ? <Detail label="Partner organisations">{log.partners.join(" · ")}</Detail> : null}
+                {log.partners?.length ? (
+                    <Detail label="Partner organisations">
+                        {(log.partnerDetails ?? log.partners.map((name) => ({ name, email: null, contact: null }))).map((p) => (
+                            <span key={p.name} className="block">
+                                {p.name}
+                                {p.email || p.contact ? (
+                                    <span className="text-xs text-[#6b7c86]">
+                                        {" · "}
+                                        {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : ""].filter(Boolean).join(" · ")}
+                                    </span>
+                                ) : null}
+                            </span>
+                        ))}
+                    </Detail>
+                ) : null}
                 <Detail label="Coordinating faculty">
                     {log.facultyName || "—"}
                     <br />
@@ -349,9 +369,14 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                                 <td className="px-2 py-3 font-semibold">
                                     {p.name || p.email}
                                     <small className="block text-[11px] font-normal text-[#6b7c86]">
-                                        {p.studentId || "—"} · {p.email}
-                                        {p.contact ? ` · ${p.contact}` : ""}
-                                        {p.isLead ? " · Lead" : ""}
+                                        {[
+                                            p.studentId || (p.email ? "—" : ""),
+                                            p.email,
+                                            p.contact ? formatInternationalPhoneDisplay(p.contact) : "",
+                                            p.isLead ? "Lead" : "",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" · ")}
                                     </small>
                                 </td>
                                 <td className="px-2 py-3">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</td>

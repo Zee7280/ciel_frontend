@@ -9,6 +9,14 @@ import { Loader2 } from "lucide-react";
 import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi } from "@/utils/quickWorkApi";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    composeInternationalPhone,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    formatInternationalPhoneDisplay,
+    parsePhoneForDisplay,
+    validateOptionalNationalPhone,
+} from "@/utils/countryCallingCodes";
 import { facultyDepartmentOptionsForInstitution } from "@/utils/universityData";
 import { compressImageForUpload } from "@/utils/compressImageForUpload";
 import {
@@ -21,7 +29,6 @@ import {
     emptyAttendance,
     evidenceErrors,
     evidenceTypeOf,
-    facultyConfirmationErrors,
     formatHours,
     formFromLog,
     formPeople,
@@ -66,7 +73,6 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 const HUB = "/dashboard/student/paths/community-service";
 const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
 const STEPS = ["Team & faculty", "Activity details", "Attendance", "Evidence & submit"] as const;
-const PHONE_RE = /^\+?[0-9][0-9\s()-]{6,28}$/;
 
 const inputCls =
     "w-full min-w-0 rounded-lg border border-[#d3e3e6] bg-white px-3 py-2.5 text-[13px] text-[#16313d] outline-none focus:border-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74]/30 disabled:bg-[#f4f7f8] disabled:text-[#6b7c86]";
@@ -101,8 +107,10 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const [preview, setPreview] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [confirmSolo, setConfirmSolo] = useState(false);
-    const [mate, setMate] = useState({ name: "", email: "", studentId: "", contact: "" });
-    const [partnerDraft, setPartnerDraft] = useState("");
+    const [mate, setMate] = useState({ name: "", email: "", studentId: "", phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY, phoneNational: "" });
+    /** Host phone as picked (country + national); the form keeps the composed +92... number. */
+    const [hostPhone, setHostPhone] = useState({ phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY, national: "" });
+    const [partnerDraft, setPartnerDraft] = useState({ name: "", email: "", phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY, phoneNational: "" });
     const [uploading, setUploading] = useState(0);
     const errorBox = useRef<HTMLDivElement>(null);
     const panel = useRef<HTMLElement>(null);
@@ -132,6 +140,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                 loadedId.current = l.id;
                 setLog(l);
                 setForm(formFromLog(l));
+                if (l.hostContact) setHostPhone(parsePhoneForDisplay(l.hostContact));
                 if (logId === "new") router.replace(`${QUICK_WORK_HREF}?log=${encodeURIComponent(l.id)}`);
             } catch (e) {
                 if (!cancelled) setLoadError(apiMessages(e).join(" "));
@@ -243,7 +252,15 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 
     /* ---------------------------------------------------------------- actions */
 
-    const stepCheck = [teamErrors, activityErrors, (f: QuickWorkForm) => attendanceErrors(f)] as const;
+    /** Optional host email / phone must be valid when given. */
+    const hostErrors = (f: QuickWorkForm): string[] => {
+        const e: string[] = [];
+        if (f.hostEmail.trim() && !EMAIL_RE.test(f.hostEmail.trim())) e.push("Enter a valid email for the host organisation, or leave it empty.");
+        const phone = validateOptionalNationalPhone(hostPhone.phoneCountryKey, hostPhone.national);
+        if (phone) e.push(`Host contact number: ${phone}`);
+        return e;
+    };
+    const stepCheck = [teamErrors, (f: QuickWorkForm) => [...activityErrors(f), ...hostErrors(f)], (f: QuickWorkForm) => attendanceErrors(f)] as const;
 
     const goTo = async (target: number) => {
         if (target === step) return;
@@ -263,32 +280,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     };
 
     const review = async () => {
-        const e = [...teamErrors(form), ...activityErrors(form), ...attendanceErrors(form), ...evidenceErrors(form), ...joinErrors(form)];
+        const e = [...teamErrors(form), ...activityErrors(form), ...hostErrors(form), ...attendanceErrors(form), ...evidenceErrors(form), ...joinErrors(form)];
         if (e.length) return showErrors(Array.from(new Set(e)));
-        const saved = await persist();
-        if (!saved) return;
-        const waiting = facultyConfirmationErrors(saved);
-        if (waiting.length) return showErrors(waiting);
-        setPreview(true);
-    };
-
-    const resendFacultyRequest = async () => {
-        try {
-            setLog(await quickWorkApi.resendFacultyRequest(log.id));
-            toast.success(`Request sent to ${log.facultyEmail} again.`);
-        } catch (e) {
-            toast.error(apiMessages(e).join(" "));
-        }
-    };
-
-    const checkFaculty = async () => {
-        try {
-            const fresh = await quickWorkApi.get(log.id);
-            setLog(fresh);
-            if (fresh.facultyConfirmation === log.facultyConfirmation) toast.info("No answer from the faculty member yet.");
-        } catch (e) {
-            toast.error(apiMessages(e).join(" "));
-        }
+        if (await persist()) setPreview(true);
     };
 
     const submit = async () => {
@@ -310,9 +304,11 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         const name = mate.name.trim();
         const email = mate.email.trim().toLowerCase();
         const studentId = mate.studentId.trim();
-        const contact = mate.contact.trim();
+        // Same format as profiles: country code + national number, stored as +923001234567.
+        const contactError = validateOptionalNationalPhone(mate.phoneCountryKey, mate.phoneNational);
+        const contact = composeInternationalPhone(mate.phoneCountryKey, mate.phoneNational);
         if (!name || !EMAIL_RE.test(email) || !studentId) return toast.error("Enter the teammate's name, a valid email and their student ID.");
-        if (contact && !PHONE_RE.test(contact)) return toast.error("Enter the contact as a phone number, e.g. +92 300 1234567.");
+        if (contactError) return toast.error(`Contact number: ${contactError}`);
         if (formPeople(form).length >= QUICK_WORK_MAX_PARTICIPANTS) return toast.error(`This log allows up to ${QUICK_WORK_MAX_PARTICIPANTS} participants.`);
         if (formPeople(form).some((p) => p.email === email || p.studentId.trim().toLowerCase() === studentId.toLowerCase())) {
             return toast.error("That email or student ID is already on this team.");
@@ -325,7 +321,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         };
         setForm(nextForm);
         if (await persist(nextForm)) {
-            setMate({ name: "", email: "", studentId: "", contact: "" });
+            setMate({ name: "", email: "", studentId: "", phoneCountryKey: mate.phoneCountryKey, phoneNational: "" });
             toast.success("Join request sent. They confirm from their Quick Impact Log page.");
         } else {
             setForm((f) => (f ? { ...f, teammates: f.teammates.filter((t) => t.email !== email) } : f));
@@ -354,12 +350,17 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     };
 
     const addPartner = () => {
-        const name = partnerDraft.trim();
-        if (!name) return;
-        if (form.partners.some((p) => p.toLowerCase() === name.toLowerCase())) return toast.error("That partner is already added.");
+        const name = partnerDraft.name.trim();
+        const email = partnerDraft.email.trim().toLowerCase();
+        if (!name) return toast.error("Enter the organisation's name.");
+        if (email && !EMAIL_RE.test(email)) return toast.error("Enter a valid email for the organisation, or leave it empty.");
+        const phoneError = validateOptionalNationalPhone(partnerDraft.phoneCountryKey, partnerDraft.phoneNational);
+        if (phoneError) return toast.error(`Contact number: ${phoneError}`);
+        if (form.partners.some((p) => p.name.toLowerCase() === name.toLowerCase())) return toast.error("That partner is already added.");
         if (form.partners.length >= QUICK_WORK_MAX_PARTNERS) return toast.error(`Add up to ${QUICK_WORK_MAX_PARTNERS} partners.`);
-        patch({ partners: [...form.partners, name] });
-        setPartnerDraft("");
+        const contact = composeInternationalPhone(partnerDraft.phoneCountryKey, partnerDraft.phoneNational);
+        patch({ partners: [...form.partners, { name, email, contact }] });
+        setPartnerDraft((d) => ({ name: "", email: "", phoneCountryKey: d.phoneCountryKey, phoneNational: "" }));
     };
 
     const applyEventTimes = () => {
@@ -549,7 +550,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                         <b className="block break-words text-[13px]">{t.name || t.email}</b>
                                                         <small className="block break-words text-xs text-[#6b7c86]">
                                                             {t.email} · {t.studentId || "Student ID needed"}
-                                                            {t.contact ? ` · ${t.contact}` : ""}
+                                                            {t.contact ? ` · ${formatInternationalPhoneDisplay(t.contact)}` : ""}
                                                         </small>
                                                     </div>
                                                     <span
@@ -611,14 +612,14 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                     />
                                                 </Field>
                                                 <Field id="qwMateContact" label="Contact number" optional>
-                                                    <input
-                                                        id="qwMateContact"
-                                                        type="tel"
-                                                        className={inputCls}
-                                                        maxLength={30}
-                                                        placeholder="+92 300 1234567"
-                                                        value={mate.contact}
-                                                        onChange={(e) => setMate((m) => ({ ...m, contact: e.target.value }))}
+                                                    <PhoneConnectivityRow
+                                                        phoneCountryKey={mate.phoneCountryKey}
+                                                        nationalDigits={mate.phoneNational}
+                                                        onPhoneCountryKeyChange={(phoneCountryKey) => setMate((m) => ({ ...m, phoneCountryKey }))}
+                                                        onNationalDigitsChange={(phoneNational) => setMate((m) => ({ ...m, phoneNational }))}
+                                                        rowClassName="flex-nowrap"
+                                                        selectClassName="w-[6.5rem] max-w-none rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] focus:border-[#0e7d74] sm:w-[6.5rem] sm:max-w-none"
+                                                        inputClassName="min-w-0 basis-0 rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] placeholder:text-[#9aa8b0] focus:border-[#0e7d74] sm:px-3"
                                                     />
                                                 </Field>
                                             </div>
@@ -687,15 +688,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         </datalist>
                                     </>
                                 ) : null}
-                                <FacultyRequestStatus
-                                    log={log}
-                                    typedEmail={form.facultyEmail}
-                                    onResend={() => void resendFacultyRequest()}
-                                    onCheck={() => void checkFaculty()}
-                                />
                                 <p className="mt-2.5 text-xs text-[#6b7c86]">
-                                    When you save, this faculty member is emailed a request to coordinate your activity. You can submit only after they
-                                    accept and every teammate confirms; they then review your completed work from their CIEL dashboard.
+                                    This faculty member reviews your completed work after you submit, from their CIEL dashboard. Selecting them does not
+                                    send an approval request yet.
                                 </p>
                             </>
                         ) : null}
@@ -807,43 +802,98 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             ))}
                                         </select>
                                     </Field>
+                                    {form.host.trim() ? (
+                                        <Field id="qwHostEmail" label="Host organisation’s email and contact" optional full>
+                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                                <input
+                                                    id="qwHostEmail"
+                                                    type="email"
+                                                    className={inputCls}
+                                                    value={form.hostEmail}
+                                                    maxLength={120}
+                                                    placeholder="Email (optional)"
+                                                    onChange={(e) => patch({ hostEmail: e.target.value })}
+                                                />
+                                                <PhoneConnectivityRow
+                                                    phoneCountryKey={hostPhone.phoneCountryKey}
+                                                    nationalDigits={hostPhone.national}
+                                                    onPhoneCountryKeyChange={(phoneCountryKey) => {
+                                                        setHostPhone((h) => ({ ...h, phoneCountryKey }));
+                                                        patch({ hostContact: composeInternationalPhone(phoneCountryKey, hostPhone.national) });
+                                                    }}
+                                                    onNationalDigitsChange={(national) => {
+                                                        setHostPhone((h) => ({ ...h, national }));
+                                                        patch({ hostContact: composeInternationalPhone(hostPhone.phoneCountryKey, national) });
+                                                    }}
+                                                    placeholderNational="Contact (optional)"
+                                                    rowClassName="flex-nowrap"
+                                                    selectClassName="w-[6.5rem] max-w-none rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] focus:border-[#0e7d74] sm:w-[6.5rem] sm:max-w-none"
+                                                    inputClassName="min-w-0 basis-0 rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] placeholder:text-[#9aa8b0] focus:border-[#0e7d74] sm:px-3"
+                                                />
+                                            </div>
+                                        </Field>
+                                    ) : null}
                                     <Field id="qwPartner" label="Partner organisations" optional full>
-                                        <div className="flex gap-2">
-                                            <input
-                                                id="qwPartner"
-                                                className={inputCls}
-                                                value={partnerDraft}
-                                                maxLength={120}
-                                                placeholder="e.g. Edhi Foundation"
-                                                disabled={form.partners.length >= QUICK_WORK_MAX_PARTNERS}
-                                                onChange={(e) => setPartnerDraft(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        e.preventDefault();
-                                                        addPartner();
-                                                    }
-                                                }}
-                                            />
-                                            <button type="button" onClick={addPartner} disabled={!partnerDraft.trim()} className={`${btnCls} flex-none`}>
-                                                + Add
-                                            </button>
-                                        </div>
                                         {form.partners.length ? (
-                                            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Added partners">
+                                            <ul className="mb-2 space-y-1.5" aria-label="Added partners">
                                                 {form.partners.map((p) => (
-                                                    <li key={p} className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-[#e6f6f4] px-2.5 py-1.5 text-xs font-semibold text-[#0e7d74]">
-                                                        <span className="break-words">{p}</span>
+                                                    <li key={p.name} className="flex items-start gap-2 rounded-lg bg-[#e6f6f4] px-3 py-2 text-xs text-[#0e7d74]">
+                                                        <span className="min-w-0 flex-1 break-words">
+                                                            <b>{p.name}</b>
+                                                            {p.email || p.contact ? (
+                                                                <span className="block text-[#4d6b70]">
+                                                                    {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : ""].filter(Boolean).join(" · ")}
+                                                                </span>
+                                                            ) : null}
+                                                        </span>
                                                         <button
                                                             type="button"
-                                                            aria-label={`Remove ${p}`}
-                                                            onClick={() => patch({ partners: form.partners.filter((x) => x !== p) })}
-                                                            className="text-[#6b7c86] hover:text-[#ac3c3c]"
+                                                            aria-label={`Remove ${p.name}`}
+                                                            onClick={() => patch({ partners: form.partners.filter((x) => x.name !== p.name) })}
+                                                            className="font-semibold text-[#6b7c86] hover:text-[#ac3c3c]"
                                                         >
-                                                            ×
+                                                            Remove
                                                         </button>
                                                     </li>
                                                 ))}
                                             </ul>
+                                        ) : null}
+                                        {form.partners.length < QUICK_WORK_MAX_PARTNERS ? (
+                                            <div className="rounded-[10px] border border-dashed border-[#a8d3cd] bg-[#f8fbfc] p-3">
+                                                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                                    <input
+                                                        id="qwPartner"
+                                                        aria-label="Organisation name"
+                                                        className={`${inputCls} sm:col-span-2`}
+                                                        value={partnerDraft.name}
+                                                        maxLength={120}
+                                                        placeholder="Organisation name, e.g. Edhi Foundation"
+                                                        onChange={(e) => setPartnerDraft((d) => ({ ...d, name: e.target.value }))}
+                                                    />
+                                                    <input
+                                                        type="email"
+                                                        aria-label="Organisation email (optional)"
+                                                        className={inputCls}
+                                                        value={partnerDraft.email}
+                                                        maxLength={120}
+                                                        placeholder="Email (optional)"
+                                                        onChange={(e) => setPartnerDraft((d) => ({ ...d, email: e.target.value }))}
+                                                    />
+                                                    <PhoneConnectivityRow
+                                                        phoneCountryKey={partnerDraft.phoneCountryKey}
+                                                        nationalDigits={partnerDraft.phoneNational}
+                                                        onPhoneCountryKeyChange={(phoneCountryKey) => setPartnerDraft((d) => ({ ...d, phoneCountryKey }))}
+                                                        onNationalDigitsChange={(phoneNational) => setPartnerDraft((d) => ({ ...d, phoneNational }))}
+                                                        placeholderNational="Contact (optional)"
+                                                        rowClassName="flex-nowrap"
+                                                        selectClassName="w-[6.5rem] max-w-none rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] focus:border-[#0e7d74] sm:w-[6.5rem] sm:max-w-none"
+                                                        inputClassName="min-w-0 basis-0 rounded-lg border border-[#d3e3e6] bg-white py-2.5 text-[13px] font-normal text-[#16313d] placeholder:text-[#9aa8b0] focus:border-[#0e7d74] sm:px-3"
+                                                    />
+                                                </div>
+                                                <button type="button" onClick={addPartner} disabled={!partnerDraft.name.trim()} className={`${btnCls} mt-2.5 w-full sm:w-auto`}>
+                                                    + Add partner
+                                                </button>
+                                            </div>
                                         ) : null}
                                         <p className="mt-1.5 text-xs text-[#6b7c86]">
                                             Organisations you worked with on this activity. Add as many as apply (up to {QUICK_WORK_MAX_PARTNERS}).
@@ -1174,46 +1224,6 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 function pinLatLng(pin: string) {
     const [lat, lng] = pin.split(",").map((s) => parseFloat(s.trim()));
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
-}
-
-/** Where the faculty request stands, for the email saved on the log (not one still being typed). */
-function FacultyRequestStatus({ log, typedEmail, onResend, onCheck }: { log: QuickWorkLog; typedEmail: string; onResend: () => void; onCheck: () => void }) {
-    const typed = typedEmail.trim().toLowerCase();
-    if (typed && typed !== log.facultyEmail) {
-        return <p className="mt-2.5 rounded-lg bg-[#f4f8f9] px-3 py-2 text-xs text-[#6b7c86]">Save to send {typed} a request to accept.</p>;
-    }
-    const who = log.facultyName || log.facultyEmail;
-    if (log.facultyConfirmation === "accepted") {
-        return <p className="mt-2.5 rounded-lg bg-[#e6f6f4] px-3 py-2 text-xs font-semibold text-[#0e7d74]">✓ {who} accepted coordinating this activity.</p>;
-    }
-    if (log.facultyConfirmation === "declined") {
-        return (
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-[#fae9e7] px-3 py-2 text-xs text-[#ac3c3c]">
-                <span className="min-w-0 flex-1 break-words">
-                    <b>{who} declined.</b> Enter another faculty member and save, or ask them again.
-                </span>
-                <button type="button" onClick={onResend} className="font-semibold underline">
-                    Ask again
-                </button>
-            </div>
-        );
-    }
-    if (log.facultyConfirmation !== "pending") return null;
-    return (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-[#fff5de] px-3 py-2 text-xs text-[#79571c]">
-            <span className="min-w-0 flex-1 break-words">
-                Request emailed to <b>{log.facultyEmail}</b>
-                {log.facultyRequestedAt ? ` on ${new Date(log.facultyRequestedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}.
-                Waiting for them to accept.
-            </span>
-            <button type="button" onClick={onCheck} className="font-semibold underline">
-                Check again
-            </button>
-            <button type="button" onClick={onResend} className="font-semibold underline">
-                Re-send request
-            </button>
-        </div>
-    );
 }
 
 function StepHead({ title, n, intro }: { title: string; n: number; intro: string }) {

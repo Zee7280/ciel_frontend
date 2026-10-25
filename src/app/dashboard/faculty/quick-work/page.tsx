@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
-import { activityLabel, formatHours, shortDate, type QuickWorkLog } from "@/utils/quickWorkRules";
+import { activityLabel, formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
@@ -42,8 +42,6 @@ export default function FacultyQuickWorkPage() {
     }, []);
 
     const pending = queue?.pending ?? [];
-    const requests = queue?.requests ?? [];
-    const awaitingAnswer = requests.filter((r) => r.facultyConfirmation === "pending").length;
 
     return (
         <div className="mx-auto min-w-0 max-w-[1100px] pb-16 text-[#16313d]">
@@ -66,23 +64,6 @@ export default function FacultyQuickWorkPage() {
                 </div>
             ) : null}
 
-            {requests.length ? (
-                <section className="mb-8">
-                    <h2 className="mb-1 text-[15px] font-semibold">
-                        Requests to coordinate{awaitingAnswer ? ` · ${awaitingAnswer} awaiting your answer` : ""}
-                    </h2>
-                    <p className="mb-3 text-xs text-[#6b7c86]">
-                        Students named you as the coordinating faculty member for these activities. Accept only if you know the activity; they can
-                        submit their hours to you after you accept.
-                    </p>
-                    <div className="space-y-2.5">
-                        {requests.map((log) => (
-                            <RequestCard key={log.id} log={log} onDone={load} />
-                        ))}
-                    </div>
-                </section>
-            ) : null}
-
             <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className="text-[15px] font-semibold">
                     {pending.length} item{pending.length === 1 ? "" : "s"} awaiting review
@@ -99,7 +80,7 @@ export default function FacultyQuickWorkPage() {
                 <div className="rounded-2xl border border-[#dcebee] bg-white px-6 py-11 text-center text-[#6b7c86]">
                     <h3 className="mb-2 text-[15px] font-semibold text-[#16313d]">You’re all caught up.</h3>
                     <p className="mx-auto max-w-[440px] text-[13px]">
-                        Completed quick-work logs appear here once students submit an activity you accepted to coordinate.
+                        Requests appear here only after a student submits a completed quick-work log that names your email as coordinating faculty.
                     </p>
                 </div>
             ) : null}
@@ -139,62 +120,6 @@ export default function FacultyQuickWorkPage() {
                     </div>
                 </section>
             ) : null}
-        </div>
-    );
-}
-
-function RequestCard({ log, onDone }: { log: QuickWorkLog; onDone: () => Promise<void> }) {
-    const [busy, setBusy] = useState(false);
-    const [confirmDecline, setConfirmDecline] = useState(false);
-    const lead = log.participants.find((p) => p.isLead);
-    const answer = async (accept: boolean) => {
-        setBusy(true);
-        try {
-            await quickWorkApi.coordinate(log.id, accept);
-            toast.success(accept ? "Accepted. The students can submit to you when they are ready." : "Declined. The student will name someone else.");
-            await onDone();
-        } catch (e) {
-            toast.error(apiMessages(e).join(" "));
-        } finally {
-            setBusy(false);
-            setConfirmDecline(false);
-        }
-    };
-    return (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#dcebee] bg-white p-4">
-            <div className="min-w-0 flex-1">
-                <b className="block break-words text-[14px]">
-                    {log.title || <span className="font-normal italic text-[#6b7c86]">Activity details not added yet</span>}
-                </b>
-                <small className="block break-words text-xs text-[#6b7c86]">
-                    {lead?.name || lead?.email || "A student"} · {log.university || "University not set"}
-                    {log.activityDate ? ` · ${shortDate(log.activityDate)}` : ""} · {log.participants.length}{" "}
-                    {log.participants.length === 1 ? "participant" : "participants"}
-                </small>
-            </div>
-            {log.facultyConfirmation === "accepted" ? (
-                <span className="rounded-md bg-[#e6f6f4] px-2.5 py-1.5 text-[11px] font-semibold text-[#0e7d74]">Accepted · waiting for the students to submit</span>
-            ) : confirmDecline ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-[#6b7c86]">Decline this request?</span>
-                    <button type="button" disabled={busy} onClick={() => void answer(false)} className="rounded-lg border border-[#edccc5] bg-[#fff0ed] px-3 py-2 text-xs font-semibold text-[#9b3832] disabled:opacity-50">
-                        Yes, decline
-                    </button>
-                    <button type="button" disabled={busy} onClick={() => setConfirmDecline(false)} className="px-2 py-2 text-xs text-[#6b7c86]">
-                        Cancel
-                    </button>
-                </div>
-            ) : (
-                <div className="flex gap-2">
-                    <button type="button" disabled={busy} onClick={() => setConfirmDecline(true)} className="rounded-lg border border-[#dcebee] bg-white px-3 py-2 text-xs font-semibold text-[#6b7c86] hover:text-[#ac3c3c] disabled:opacity-50">
-                        Decline
-                    </button>
-                    <button type="button" disabled={busy} onClick={() => void answer(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0e7d74] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b6760] disabled:opacity-50">
-                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                        Accept
-                    </button>
-                </div>
-            )}
         </div>
     );
 }

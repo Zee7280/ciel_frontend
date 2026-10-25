@@ -41,6 +41,9 @@ const HISTORY_LABEL: Record<string, string> = {
     admin_changes: "CIEL PK admin requested changes",
     admin_rejected: "Declined by CIEL PK admin",
     admin_faculty_changed: "Reviewing faculty changed by CIEL PK admin",
+    email_approved: "Approved by faculty (from the email link)",
+    email_changes: "Faculty requested changes (from the email link)",
+    email_rejected: "Declined by faculty (from the email link)",
 };
 
 const inputCls = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50";

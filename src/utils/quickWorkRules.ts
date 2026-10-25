@@ -33,10 +33,6 @@ export type QuickWorkLog = {
     department: string;
     facultyName: string;
     facultyEmail: string;
-    /** pending | accepted | declined; null when no faculty is named yet (or on older logs). */
-    facultyConfirmation?: string | null;
-    facultyRequestedAt?: string | null;
-    facultyRespondedAt?: string | null;
     title: string;
     activityType: string;
     activityTypeOther: string | null;
@@ -47,8 +43,13 @@ export type QuickWorkLog = {
     /** Optional Google Maps pin for the venue (`lat,lng`). */
     locationPin: string | null;
     host: string | null;
+    /** Host organisation's optional email and phone (+92...). */
+    hostEmail?: string | null;
+    hostContact?: string | null;
     /** Optional partner organisations (names). */
     partners: string[];
+    /** Partners with optional email / contact (newer API); `partners` holds just the names. */
+    partnerDetails?: { name: string; email: string | null; contact: string | null }[];
     sdg: number | null;
     summary: string;
     peopleReached: number | null;
@@ -83,6 +84,9 @@ export const QUICK_WORK_ACTIVITY_TYPES = [
 
 export const QUICK_WORK_OTHER_ACTIVITY = "Other service activity";
 export const QUICK_WORK_MAX_PARTNERS = 10;
+
+/** A partner as edited in the form: blank strings for unknown email / contact. */
+export type QuickWorkPartnerForm = { name: string; email: string; contact: string };
 
 /** Activity type as shown to people: the student's own wording for “Other”. */
 export function activityLabel(log: { activityType: string; activityTypeOther?: string | null }): string {
@@ -251,7 +255,10 @@ export type QuickWorkForm = {
     location: string;
     locationPin: string;
     host: string;
-    partners: string[];
+    hostEmail: string;
+    /** Full number with country code (+923001234567), or empty. */
+    hostContact: string;
+    partners: QuickWorkPartnerForm[];
     sdg: string;
     attendance: Record<string, { present: boolean; startTime: string; endTime: string; breakMinutes: string }>;
     summary: string;
@@ -358,16 +365,6 @@ export function joinErrors(f: QuickWorkForm): string[] {
     );
 }
 
-/** The named faculty member must accept coordinating before the log can be submitted (older logs that already went to review are exempt). */
-export function facultyConfirmationErrors(log: Pick<QuickWorkLog, "facultyName" | "facultyConfirmation" | "submittedAt">): string[] {
-    // A server without faculty confirmations does not send the field: let the server decide.
-    if (log.facultyConfirmation === undefined) return [];
-    const who = log.facultyName || "Your coordinating faculty member";
-    if (log.facultyConfirmation === "declined") return [`${who} declined to coordinate this activity. Name another faculty member in Step 1.`];
-    if (log.facultyConfirmation === "accepted" || (!log.facultyConfirmation && log.submittedAt)) return [];
-    return [`${who} has not accepted coordinating this activity yet. They were emailed a request; you can re-send it from Step 1.`];
-}
-
 /** Server view → form state. */
 export function formFromLog(log: QuickWorkLog): QuickWorkForm {
     const lead = log.participants.find((p) => p.isLead);
@@ -401,7 +398,13 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
         location: log.location,
         locationPin: log.locationPin ?? "",
         host: log.host ?? "",
-        partners: log.partners ?? [],
+        hostEmail: log.hostEmail ?? "",
+        hostContact: log.hostContact ?? "",
+        partners: (log.partnerDetails ?? (log.partners ?? []).map((name) => ({ name, email: null, contact: null }))).map((p) => ({
+            name: p.name,
+            email: p.email ?? "",
+            contact: p.contact ?? "",
+        })),
         sdg: log.sdg ? String(log.sdg) : "",
         attendance,
         summary: log.summary,
@@ -435,7 +438,11 @@ export function payloadFromForm(f: QuickWorkForm) {
         location: f.location,
         locationPin: f.locationPin || null,
         host: f.host || null,
-        partners: f.partners,
+        hostEmail: f.hostEmail.trim().toLowerCase() || null,
+        hostContact: f.hostContact || null,
+        // Names for an older API, details for this one (it prefers partnerDetails).
+        partners: f.partners.map((p) => p.name),
+        partnerDetails: f.partners.map((p) => ({ name: p.name, email: p.email.trim() || null, contact: p.contact.trim() || null })),
         sdg: f.sdg ? Number(f.sdg) : null,
         attendance: formPeople(f).map((p) => {
             const a = attendanceFor(f, p.email);
