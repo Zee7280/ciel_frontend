@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import Link from "next/link";
 import {
     Save,
     Loader2,
@@ -63,6 +64,7 @@ import {
     STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY,
     STUDENT_PRIVATE_TEAM_ENABLED_KEY,
 } from "@/utils/publicPlatformConfig";
+import { UNIVERSITY_SSO_ENABLED_KEY } from "@/utils/universitySsoApi";
 
 /* ----------------------------- constants & types ----------------------------- */
 
@@ -478,6 +480,7 @@ export default function AdminSettingsPage() {
     const applyPaused = parseBool(server[STUDENT_APPLY_MAINTENANCE_ENABLED_KEY], false);
     const privateTeamEnabled = parseBool(server[STUDENT_PRIVATE_TEAM_ENABLED_KEY], false);
     const aiDraftEnabled = parseBool(server[STUDENT_AI_OPPORTUNITY_DRAFT_ENABLED_KEY], false);
+    const universitySsoEnabled = parseBool(server[UNIVERSITY_SSO_ENABLED_KEY], false);
     const partnerMembershipRequired = parsePartnerMembershipRequiredSettingValue(
         server[PARTNER_MEMBERSHIP_REQUIRED_KEY],
         false,
@@ -1529,6 +1532,37 @@ export default function AdminSettingsPage() {
                             meta={meta[ALLOW_REGISTRATIONS_KEY]}
                             stateLabel={allowRegistrations ? "Open" : "Closed"}
                             onChange={onRegistrationsToggle}
+                        />
+                        <ToggleRow
+                            id="university-sso"
+                            title="University single sign-on for students"
+                            description={
+                                <>
+                                    Master switch for student sign-in with a university Google or Microsoft account. Set up, test and
+                                    activate each university under{" "}
+                                    <Link href="/dashboard/admin/organizations" className="font-semibold text-blue-700 hover:underline">
+                                        Organizations
+                                    </Link>{" "}
+                                    → university → Student single sign-on. The student sign-in button is not live yet, so leave this
+                                    off until it is; testing a university works with it off. Password sign-in is unaffected.
+                                </>
+                            }
+                            checked={universitySsoEnabled}
+                            saving={!!saving[UNIVERSITY_SSO_ENABLED_KEY]}
+                            color="emerald"
+                            tone="bg-emerald-50/40"
+                            meta={meta[UNIVERSITY_SSO_ENABLED_KEY]}
+                            stateLabel={universitySsoEnabled ? "On" : "Off"}
+                            onChange={(next) =>
+                                void saveToggle(
+                                    UNIVERSITY_SSO_ENABLED_KEY,
+                                    next,
+                                    "university sign-on setting",
+                                    next
+                                        ? "University single sign-on switch is on."
+                                        : "University single sign-on is off. Students sign in with their password.",
+                                )
+                            }
                         />
                     </Section>
                 </div>

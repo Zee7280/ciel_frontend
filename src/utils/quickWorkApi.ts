@@ -76,6 +76,7 @@ export type AdminQuickWorkExportRow = {
     studentName: string;
     studentEmail: string;
     studentId: string;
+    contact: string;
     role: "lead" | "teammate";
     joinStatus: string;
     present: boolean;

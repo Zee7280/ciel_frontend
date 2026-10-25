@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi } from "@/utils/quickWorkApi";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import { facultyDepartmentOptionsForInstitution } from "@/utils/universityData";
 import { compressImageForUpload } from "@/utils/compressImageForUpload";
 import {
     activityErrors,
@@ -18,6 +20,7 @@ import {
     EMAIL_RE,
     emptyAttendance,
     evidenceErrors,
+    evidenceTypeOf,
     formatHours,
     formFromLog,
     formPeople,
@@ -25,7 +28,8 @@ import {
     payloadFromForm,
     pktNow,
     QUICK_WORK_ACTIVITY_TYPES,
-    QUICK_WORK_EVIDENCE_TYPES,
+    QUICK_WORK_EVIDENCE_ACCEPT,
+    QUICK_WORK_EVIDENCE_HINT,
     QUICK_WORK_MAX_EVIDENCE,
     QUICK_WORK_MAX_DAILY_MINUTES,
     QUICK_WORK_MAX_EVIDENCE_BYTES,
@@ -61,6 +65,7 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 const HUB = "/dashboard/student/paths/community-service";
 const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
 const STEPS = ["Team & faculty", "Activity details", "Attendance", "Evidence & submit"] as const;
+const PHONE_RE = /^\+?[0-9][0-9\s()-]{6,28}$/;
 
 const inputCls =
     "w-full min-w-0 rounded-lg border border-[#d3e3e6] bg-white px-3 py-2.5 text-[13px] text-[#16313d] outline-none focus:border-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74]/30 disabled:bg-[#f4f7f8] disabled:text-[#6b7c86]";
@@ -95,7 +100,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const [preview, setPreview] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [confirmSolo, setConfirmSolo] = useState(false);
-    const [mate, setMate] = useState({ email: "", studentId: "" });
+    const [mate, setMate] = useState({ name: "", email: "", studentId: "", contact: "" });
     const [partnerDraft, setPartnerDraft] = useState("");
     const [uploading, setUploading] = useState(0);
     const errorBox = useRef<HTMLDivElement>(null);
@@ -278,9 +283,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     };
 
     const addMate = async () => {
+        const name = mate.name.trim();
         const email = mate.email.trim().toLowerCase();
         const studentId = mate.studentId.trim();
-        if (!EMAIL_RE.test(email) || !studentId) return toast.error("Enter a student ID and a valid university email.");
+        const contact = mate.contact.trim();
+        if (!name || !EMAIL_RE.test(email) || !studentId) return toast.error("Enter the teammate's name, a valid email and their student ID.");
+        if (contact && !PHONE_RE.test(contact)) return toast.error("Enter the contact as a phone number, e.g. +92 300 1234567.");
         if (formPeople(form).length >= QUICK_WORK_MAX_PARTICIPANTS) return toast.error(`This log allows up to ${QUICK_WORK_MAX_PARTICIPANTS} participants.`);
         if (formPeople(form).some((p) => p.email === email || p.studentId.trim().toLowerCase() === studentId.toLowerCase())) {
             return toast.error("That email or student ID is already on this team.");
@@ -288,12 +296,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         const nextForm: QuickWorkForm = {
             ...form,
             mode: "team",
-            teammates: [...form.teammates, { email, studentId, name: "", joinStatus: "invited" }],
+            teammates: [...form.teammates, { email, studentId, name, contact, joinStatus: "invited" }],
             attendance: { ...form.attendance, [email]: attendanceFor(form, email) },
         };
         setForm(nextForm);
         if (await persist(nextForm)) {
-            setMate({ email: "", studentId: "" });
+            setMate({ name: "", email: "", studentId: "", contact: "" });
             toast.success("Join request sent. They confirm from their My Quick Work page.");
         } else {
             setForm((f) => (f ? { ...f, teammates: f.teammates.filter((t) => t.email !== email) } : f));
@@ -349,11 +357,14 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             }
             setUploading((n) => n + 1);
             try {
-                const file = await compressImageForUpload(original);
-                if (!(QUICK_WORK_EVIDENCE_TYPES as readonly string[]).includes(file.type)) {
-                    toast.error(`${original.name}: use JPG, PNG, WEBP or PDF files.`);
+                // Some phones and Windows report no type (or an alias) for HEIC / JPEG; use the extension.
+                const type = evidenceTypeOf(original);
+                if (!type) {
+                    toast.error(`${original.name}: use a photo, PDF, Word, Excel, PowerPoint, text, video or audio file.`);
                     continue;
                 }
+                const typed = type === original.type ? original : new File([original], original.name, { type, lastModified: original.lastModified });
+                const file = await compressImageForUpload(typed);
                 if (file.size > QUICK_WORK_MAX_EVIDENCE_BYTES) {
                     toast.error(`${original.name} exceeds ${MAX_EVIDENCE_MB} MB.`);
                     continue;
@@ -475,13 +486,14 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         <input id="qwUni" className={inputCls} value={form.university} maxLength={120} placeholder="Your university" onChange={(e) => patch({ university: e.target.value })} />
                                     </Field>
                                     <Field id="qwDept" label="Department / programme" required>
-                                        <input
-                                            id="qwDept"
-                                            className={inputCls}
+                                        <SearchableSelect
                                             value={form.department}
-                                            maxLength={120}
-                                            placeholder="Your department or programme"
-                                            onChange={(e) => patch({ department: e.target.value })}
+                                            onChange={(department) => patch({ department: department.slice(0, 120) })}
+                                            options={facultyDepartmentOptionsForInstitution(form.university)}
+                                            placeholder="Select your department"
+                                            searchPlaceholder="Search departments…"
+                                            ariaLabel="Department / programme"
+                                            variant="field"
                                         />
                                     </Field>
                                 </div>
@@ -513,6 +525,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                         <b className="block break-words text-[13px]">{t.name || t.email}</b>
                                                         <small className="block break-words text-xs text-[#6b7c86]">
                                                             {t.email} · {t.studentId || "Student ID needed"}
+                                                            {t.contact ? ` · ${t.contact}` : ""}
                                                         </small>
                                                     </div>
                                                     <span
@@ -541,8 +554,18 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             <p className="text-xs text-[#6b7c86]">Add each participant once. Their hours will appear on their own My Quick Work page.</p>
                                         )}
                                         <div className="mt-3 rounded-[10px] border border-dashed border-[#a8d3cd] bg-[#f8fbfc] p-3.5">
-                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-end">
-                                                <Field id="qwMateEmail" label="Teammate’s CIEL account email">
+                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:items-end">
+                                                <Field id="qwMateName" label="Teammate’s full name" required>
+                                                    <input
+                                                        id="qwMateName"
+                                                        className={inputCls}
+                                                        maxLength={100}
+                                                        placeholder="Full name"
+                                                        value={mate.name}
+                                                        onChange={(e) => setMate((m) => ({ ...m, name: e.target.value }))}
+                                                    />
+                                                </Field>
+                                                <Field id="qwMateEmail" label="Teammate’s CIEL account email" required>
                                                     <input
                                                         id="qwMateEmail"
                                                         type="email"
@@ -553,7 +576,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                         onChange={(e) => setMate((m) => ({ ...m, email: e.target.value }))}
                                                     />
                                                 </Field>
-                                                <Field id="qwMateSid" label="Student ID">
+                                                <Field id="qwMateSid" label="Student ID" required>
                                                     <input
                                                         id="qwMateSid"
                                                         className={inputCls}
@@ -563,10 +586,21 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                         onChange={(e) => setMate((m) => ({ ...m, studentId: e.target.value }))}
                                                     />
                                                 </Field>
-                                                <button type="button" onClick={() => void addMate()} disabled={saving} className={btnCls}>
-                                                    + Add teammate
-                                                </button>
+                                                <Field id="qwMateContact" label="Contact number" optional>
+                                                    <input
+                                                        id="qwMateContact"
+                                                        type="tel"
+                                                        className={inputCls}
+                                                        maxLength={30}
+                                                        placeholder="+92 300 1234567"
+                                                        value={mate.contact}
+                                                        onChange={(e) => setMate((m) => ({ ...m, contact: e.target.value }))}
+                                                    />
+                                                </Field>
                                             </div>
+                                            <button type="button" onClick={() => void addMate()} disabled={saving} className={`${btnCls} mt-2.5 w-full sm:w-auto`}>
+                                                + Add teammate
+                                            </button>
                                             <p className="mt-2 text-xs text-[#6b7c86]">
                                                 Teammates need a CIEL student account. They get a join request and confirm from their own My Quick Work page;
                                                 you can submit once everyone has confirmed.
@@ -931,13 +965,13 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     <PhotoIcon className="mx-auto mb-1.5 h-7 w-7 text-[#0e7d74]" />
                                     <b className="block text-[13px]">Add activity photos or supporting documents</b>
                                     <span className="mt-1 block text-xs text-[#6b7c86]">
-                                        JPG, PNG, WEBP or PDF · up to {QUICK_WORK_MAX_EVIDENCE} files · {MAX_EVIDENCE_MB} MB each
+                                        {QUICK_WORK_EVIDENCE_HINT} · up to {QUICK_WORK_MAX_EVIDENCE} files · {MAX_EVIDENCE_MB} MB each
                                     </span>
                                     <input
                                         id="qwFiles"
                                         type="file"
                                         multiple
-                                        accept={QUICK_WORK_EVIDENCE_TYPES.join(",")}
+                                        accept={QUICK_WORK_EVIDENCE_ACCEPT}
                                         disabled={uploading > 0 || form.evidence.length >= QUICK_WORK_MAX_EVIDENCE}
                                         className="mx-auto mt-3 block max-w-[240px] text-xs"
                                         onChange={(e) => {

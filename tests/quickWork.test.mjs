@@ -6,6 +6,8 @@ import {
     attendanceErrors,
     attendanceMinutes,
     evidenceErrors,
+    evidenceKind,
+    evidenceTypeOf,
     formatHours,
     formFromLog,
     joinErrors,
@@ -105,8 +107,23 @@ test("server view round-trips through the form into a save payload", () => {
         ],
     };
     const body = payloadFromForm(formFromLog(log));
-    assert.deepEqual(body.teammates, [{ email: "b@x.pk", studentId: "S2" }]);
+    assert.deepEqual(body.teammates, [{ email: "b@x.pk", studentId: "S2", name: "B", contact: null }]);
     assert.deepEqual(body.attendance[1], { email: "b@x.pk", present: false, startTime: null, endTime: null, breakMinutes: 0 });
     assert.equal(body.sdg, null);
     assert.equal(body.peopleReached, null);
+});
+
+test("evidence type comes from the extension when the browser reports none or an alias", () => {
+    assert.equal(evidenceTypeOf({ name: "IMG_1.JPEG", type: "" }), "image/jpeg");
+    assert.equal(evidenceTypeOf({ name: "photo.jfif", type: "image/pjpeg" }), "image/jpeg");
+    assert.equal(evidenceTypeOf({ name: "IMG_2.HEIC", type: "" }), "image/heic");
+    assert.equal(evidenceTypeOf({ name: "plan.docx", type: "" }), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    assert.equal(evidenceTypeOf({ name: "clip.mov", type: "video/quicktime" }), "video/quicktime");
+    assert.equal(evidenceTypeOf({ name: "page.html", type: "text/html" }), null);
+    assert.equal(evidenceTypeOf({ name: "logo.svg", type: "image/svg+xml" }), null);
+    assert.equal(evidenceTypeOf({ name: "all.zip", type: "application/zip" }), null);
+    assert.equal(evidenceKind("image/png"), "image");
+    assert.equal(evidenceKind("image/heic"), "document");
+    assert.equal(evidenceKind("video/mp4"), "video");
+    assert.equal(evidenceKind("application/pdf"), "pdf");
 });

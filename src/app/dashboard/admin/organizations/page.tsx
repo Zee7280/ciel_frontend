@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
+import UniversitySsoPanel from "@/components/admin/UniversitySsoPanel";
+import { SSO_STATUS_LABEL, universitySsoApi, type SsoStatus } from "@/utils/universitySsoApi";
 
 type OrgAction = "approve" | "suspend" | "unsuspend" | "reject" | "delete";
 
@@ -231,6 +233,18 @@ export default function AdminOrganizationsPage() {
     const [rejectNotes, setRejectNotes] = useState("");
 
     const actionMenuOrg = actionMenu == null ? null : orgs.find((o) => o.id === actionMenu.orgId) ?? null;
+
+    /** University id → single sign-on status, for the table chip (super admins only; others see no chip). */
+    const [ssoStatusByOrg, setSsoStatusByOrg] = useState<Record<string, SsoStatus>>({});
+    const loadSsoStatuses = useCallback(() => {
+        universitySsoApi
+            .list()
+            .then((d) => setSsoStatusByOrg(Object.fromEntries(d.universities.map((u) => [u.organizationId, u.status]))))
+            .catch(() => undefined);
+    }, []);
+    useEffect(() => {
+        loadSsoStatuses();
+    }, [loadSsoStatuses]);
 
     useEffect(() => {
         if (!actionMenu) return;
@@ -633,6 +647,20 @@ export default function AdminOrganizationsPage() {
                                                     Name not on university list · Rename
                                                 </button>
                                             ) : null}
+                                            {ssoStatusByOrg[org.id] ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openOrganizationDetails(org)}
+                                                    title="Student single sign-on"
+                                                    className={`mt-1 block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                                                        ssoStatusByOrg[org.id] === "active"
+                                                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                            : "border-slate-200 bg-slate-50 text-slate-600"
+                                                    }`}
+                                                >
+                                                    SSO · {SSO_STATUS_LABEL[ssoStatusByOrg[org.id]]}
+                                                </button>
+                                            ) : null}
                                         </td>
                                         <td className="p-4 sm:p-6 text-sm text-slate-600">
                                             {org.contact_person || "N/A"}
@@ -978,6 +1006,10 @@ export default function AdminOrganizationsPage() {
                                         </p>
                                     )}
                                 </div>
+
+                                {isUniversityOrganization(selectedOrg) && selectedOrg?.id ? (
+                                    <UniversitySsoPanel organizationId={String(selectedOrg.id)} onChange={loadSsoStatuses} />
+                                ) : null}
                             </>
                         )}
 

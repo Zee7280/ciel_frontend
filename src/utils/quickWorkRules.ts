@@ -13,6 +13,8 @@ export type QuickWorkParticipant = {
     name: string;
     email: string;
     studentId: string;
+    /** Optional phone number the lead gave for a teammate. */
+    contact?: string | null;
     joinStatus: "joined" | "invited" | "declined" | string;
     present: boolean;
     startTime: string | null;
@@ -116,12 +118,69 @@ export const SDG_NAMES = [
     "Partnerships for the Goals",
 ] as const;
 
-export const QUICK_WORK_MAX_PARTICIPANTS = 20;
+export const QUICK_WORK_MAX_PARTICIPANTS = 500;
 export const QUICK_WORK_MAX_DAILY_MINUTES = 9 * 60;
-export const QUICK_WORK_MAX_EVIDENCE = 5;
-export const QUICK_WORK_MAX_EVIDENCE_BYTES = 5 * 1024 * 1024;
-export const QUICK_WORK_EVIDENCE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
-export const QUICK_WORK_SUMMARY_MAX = 600;
+export const QUICK_WORK_MAX_EVIDENCE = 10;
+export const QUICK_WORK_MAX_EVIDENCE_BYTES = 100 * 1024 * 1024;
+
+/** Extension → accepted type. Same list as the API; no HTML, SVG, scripts, archives or executables. */
+const EVIDENCE_TYPE_BY_EXT: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    jfif: "image/jpeg",
+    pjpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    txt: "text/plain",
+    csv: "text/csv",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm",
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    wav: "audio/wav",
+};
+
+export const QUICK_WORK_EVIDENCE_TYPES = [
+    ...Array.from(new Set(Object.values(EVIDENCE_TYPE_BY_EXT))),
+    "audio/x-m4a",
+    "audio/x-wav",
+] as readonly string[];
+
+/** For the file picker: every accepted type plus its extensions (some phones send no type). */
+export const QUICK_WORK_EVIDENCE_ACCEPT = [...QUICK_WORK_EVIDENCE_TYPES, ...Object.keys(EVIDENCE_TYPE_BY_EXT).map((e) => `.${e}`)].join(",");
+
+export const QUICK_WORK_EVIDENCE_HINT = "Photos (JPG, JPEG, PNG, WEBP, GIF, HEIC), PDF, Word, Excel, PowerPoint, TXT/CSV, video (MP4, MOV, WEBM) or audio (MP3, M4A, WAV)";
+
+/** The accepted type for a picked file, from its extension when the browser reports none or an alias. */
+export function evidenceTypeOf(file: { name: string; type: string }): string | null {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const byExt = EVIDENCE_TYPE_BY_EXT[ext];
+    const type = file.type.toLowerCase();
+    if (type && QUICK_WORK_EVIDENCE_TYPES.includes(type)) return type;
+    return byExt ?? null;
+}
+
+/** What kind of evidence a stored file is, for its preview tile. */
+export function evidenceKind(type: string): "image" | "video" | "audio" | "pdf" | "document" {
+    if (["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type)) return "image";
+    if (type.startsWith("video/")) return "video";
+    if (type.startsWith("audio/")) return "audio";
+    if (type === "application/pdf") return "pdf";
+    return "document";
+}
+export const QUICK_WORK_SUMMARY_MAX = 1000;
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -178,7 +237,7 @@ export type QuickWorkForm = {
     department: string;
     facultyName: string;
     facultyEmail: string;
-    teammates: { email: string; studentId: string; name: string; joinStatus: string }[];
+    teammates: { email: string; studentId: string; name: string; contact: string; joinStatus: string }[];
     title: string;
     activityType: string;
     activityTypeOther: string;
@@ -318,7 +377,7 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
         facultyEmail: log.facultyEmail,
         teammates: log.participants
             .filter((p) => !p.isLead)
-            .map((p) => ({ email: p.email, studentId: p.studentId, name: p.name, joinStatus: p.joinStatus })),
+            .map((p) => ({ email: p.email, studentId: p.studentId, name: p.name, contact: p.contact ?? "", joinStatus: p.joinStatus })),
         title: log.title,
         activityType: log.activityType,
         activityTypeOther: log.activityTypeOther ?? "",
@@ -349,7 +408,10 @@ export function payloadFromForm(f: QuickWorkForm) {
         leadStudentId: f.leadStudentId,
         facultyName: f.facultyName,
         facultyEmail: f.facultyEmail,
-        teammates: f.mode === "team" ? f.teammates.map((t) => ({ email: t.email, studentId: t.studentId })) : [],
+        teammates:
+            f.mode === "team"
+                ? f.teammates.map((t) => ({ email: t.email, studentId: t.studentId, name: t.name, contact: t.contact.trim() || null }))
+                : [],
         title: f.title,
         activityType: f.activityType,
         activityTypeOther: f.activityType === QUICK_WORK_OTHER_ACTIVITY ? f.activityTypeOther.trim() || null : null,

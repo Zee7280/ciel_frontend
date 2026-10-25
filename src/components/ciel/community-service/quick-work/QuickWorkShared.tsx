@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import {
     activityLabel,
     formatHours,
-    QUICK_WORK_EVIDENCE_TYPES,
+    evidenceKind,
     SDG_NAMES,
     shortDate,
     STATUS_LABEL,
@@ -246,15 +246,23 @@ export function RouteChoiceDialog({
 /* ------------------------------------------------------------------ record details */
 
 export function EvidenceTile({ item, children }: { item: QuickWorkEvidence; children?: ReactNode }) {
-    const isPdf = item.type === "application/pdf";
-    const isImage = (QUICK_WORK_EVIDENCE_TYPES as readonly string[]).includes(item.type) && !isPdf;
+    const kind = evidenceKind(item.type);
+    const ext = item.name.split(".").pop()?.toUpperCase() ?? "";
     return (
         <div className="overflow-hidden rounded-[9px] border border-[#dcebee]">
-            {isImage ? (
+            {kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element -- user evidence from S3, any size
                 <img src={item.url} alt={item.caption || item.name} className="block h-[135px] w-full bg-[#e6f6f4] object-cover" />
+            ) : kind === "video" ? (
+                <video src={item.url} controls preload="metadata" className="block h-[135px] w-full bg-black object-contain" />
+            ) : kind === "audio" ? (
+                <div className="grid h-[135px] place-items-center bg-[#e6f6f4] px-2">
+                    <audio src={item.url} controls preload="none" className="w-full" />
+                </div>
             ) : (
-                <div className="grid h-[135px] place-items-center bg-[#e6f6f4] font-bold text-[#0b6760]">PDF evidence</div>
+                <div className="grid h-[135px] place-items-center bg-[#e6f6f4] font-bold text-[#0b6760]">
+                    {kind === "pdf" ? "PDF" : ext || "File"} evidence
+                </div>
             )}
             <div className="p-2.5">
                 <div className="truncate text-[11px] text-[#6b7c86]" title={item.name}>
@@ -340,6 +348,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                                     {p.name || p.email}
                                     <small className="block text-[11px] font-normal text-[#6b7c86]">
                                         {p.studentId || "—"} · {p.email}
+                                        {p.contact ? ` · ${p.contact}` : ""}
                                         {p.isLead ? " · Lead" : ""}
                                     </small>
                                 </td>
