@@ -70,6 +70,7 @@ export type AdminQuickWorkExportRow = {
     university: string;
     department: string;
     location: string;
+    partners: string;
     facultyName: string;
     facultyEmail: string;
     studentName: string;

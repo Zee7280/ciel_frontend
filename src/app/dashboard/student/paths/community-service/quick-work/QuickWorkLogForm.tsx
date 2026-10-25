@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -10,6 +11,7 @@ import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import { compressImageForUpload } from "@/utils/compressImageForUpload";
 import {
     activityErrors,
+    activityLabel,
     attendanceErrors,
     attendanceFor,
     attendanceMinutes,
@@ -28,6 +30,8 @@ import {
     QUICK_WORK_MAX_DAILY_MINUTES,
     QUICK_WORK_MAX_EVIDENCE_BYTES,
     QUICK_WORK_MAX_PARTICIPANTS,
+    QUICK_WORK_MAX_PARTNERS,
+    QUICK_WORK_OTHER_ACTIVITY,
     QUICK_WORK_SUMMARY_MAX,
     QUICK_WORK_TEMPLATES,
     QUICK_WORK_VISIBILITY,
@@ -46,6 +50,13 @@ import {
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
+
+const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-[180px] w-full animate-pulse items-center justify-center rounded-lg bg-[#f4f8f9] text-xs text-[#6b7c86]">Loading map…</div>
+    ),
+});
 
 const HUB = "/dashboard/student/paths/community-service";
 const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
@@ -85,6 +96,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const [submitting, setSubmitting] = useState(false);
     const [confirmSolo, setConfirmSolo] = useState(false);
     const [mate, setMate] = useState({ email: "", studentId: "" });
+    const [partnerDraft, setPartnerDraft] = useState("");
     const [uploading, setUploading] = useState(0);
     const errorBox = useRef<HTMLDivElement>(null);
     const panel = useRef<HTMLElement>(null);
@@ -307,6 +319,15 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         if (mode === form.mode) return;
         if (mode === "solo" && form.teammates.length) return setConfirmSolo(true);
         patch({ mode });
+    };
+
+    const addPartner = () => {
+        const name = partnerDraft.trim();
+        if (!name) return;
+        if (form.partners.some((p) => p.toLowerCase() === name.toLowerCase())) return toast.error("That partner is already added.");
+        if (form.partners.length >= QUICK_WORK_MAX_PARTNERS) return toast.error(`Add up to ${QUICK_WORK_MAX_PARTNERS} partners.`);
+        patch({ partners: [...form.partners, name] });
+        setPartnerDraft("");
     };
 
     const applyEventTimes = () => {
@@ -619,16 +640,27 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                             <>
                                 <StepHead title="What’s the activity?" n={2} intro="A brief event record is enough. Start with a type, then add the details." />
                                 <div className="mb-5 flex flex-wrap gap-1.5">
-                                    {QUICK_WORK_TEMPLATES.map((t) => (
-                                        <button
-                                            key={t.label}
-                                            type="button"
-                                            onClick={() => patch({ activityType: t.type, title: form.title || t.type, sdg: t.sdg ? String(t.sdg) : "" })}
-                                            className="rounded-md border border-[#dcebee] bg-[#f4f8f9] px-2.5 py-1.5 text-xs text-[#6b7c86] hover:border-[#0e7d74] hover:text-[#0e7d74]"
-                                        >
-                                            {t.label}
-                                        </button>
-                                    ))}
+                                    {QUICK_WORK_TEMPLATES.map((t) => {
+                                        const other = t.type === QUICK_WORK_OTHER_ACTIVITY;
+                                        const active = form.activityType === t.type;
+                                        return (
+                                            <button
+                                                key={t.label}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() => {
+                                                    // “Other” has no meaningful default title or SDG, so keep what the student has.
+                                                    patch(other ? { activityType: t.type } : { activityType: t.type, title: form.title || t.type, sdg: t.sdg ? String(t.sdg) : "" });
+                                                    if (other) requestAnimationFrame(() => document.getElementById("qwTypeOther")?.focus());
+                                                }}
+                                                className={`rounded-md border px-2.5 py-1.5 text-xs hover:border-[#0e7d74] hover:text-[#0e7d74] ${
+                                                    active ? "border-[#0e7d74] bg-[#e6f6f4] font-semibold text-[#0e7d74]" : "border-[#dcebee] bg-[#f4f8f9] text-[#6b7c86]"
+                                                }`}
+                                            >
+                                                {other ? "+ Other" : t.label}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
                                     <Field id="qwTitle" label="Activity title" required full>
@@ -642,6 +674,18 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             ))}
                                         </select>
                                     </Field>
+                                    {form.activityType === QUICK_WORK_OTHER_ACTIVITY ? (
+                                        <Field id="qwTypeOther" label="Describe the activity type" required>
+                                            <input
+                                                id="qwTypeOther"
+                                                className={inputCls}
+                                                value={form.activityTypeOther}
+                                                maxLength={60}
+                                                placeholder="e.g. Blood donation camp"
+                                                onChange={(e) => patch({ activityTypeOther: e.target.value })}
+                                            />
+                                        </Field>
+                                    ) : null}
                                     <Field id="qwDate" label="Activity date" required>
                                         <input id="qwDate" type="date" className={inputCls} value={form.activityDate} max={today} onChange={(e) => patch({ activityDate: e.target.value })} />
                                     </Field>
@@ -661,6 +705,31 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             onChange={(e) => patch({ location: e.target.value })}
                                         />
                                     </Field>
+                                    <Field id="qwLocationPin" label="Pin on map" optional full>
+                                        <div id="qwLocationPin" className="min-w-0 rounded-lg border border-[#d3e3e6] bg-white p-3">
+                                            <LocationPicker
+                                                initialLocation={pinLatLng(form.locationPin)}
+                                                onLocationSelect={(loc) =>
+                                                    patch({
+                                                        location: form.location.trim() ? form.location : (loc.address ?? "").slice(0, 180),
+                                                        locationPin: `${loc.lat},${loc.lng}`,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <p className="mt-1.5 text-xs text-[#6b7c86]">
+                                            {form.locationPin ? (
+                                                <>
+                                                    Pinned · GPS {form.locationPin} ·{" "}
+                                                    <button type="button" onClick={() => patch({ locationPin: "" })} className="font-semibold text-[#ac3c3c] underline">
+                                                        Remove pin
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                "Search the venue by name or drop a pin. Helps faculty verify where the work took place; skip for online activities."
+                                            )}
+                                        </p>
+                                    </Field>
                                     <Field id="qwHost" label="Host / organisation" optional>
                                         <input id="qwHost" className={inputCls} value={form.host} maxLength={120} placeholder="If hosted by an organisation" onChange={(e) => patch({ host: e.target.value })} />
                                     </Field>
@@ -673,6 +742,48 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 </option>
                                             ))}
                                         </select>
+                                    </Field>
+                                    <Field id="qwPartner" label="Partner organisations" optional full>
+                                        <div className="flex gap-2">
+                                            <input
+                                                id="qwPartner"
+                                                className={inputCls}
+                                                value={partnerDraft}
+                                                maxLength={120}
+                                                placeholder="e.g. Edhi Foundation"
+                                                disabled={form.partners.length >= QUICK_WORK_MAX_PARTNERS}
+                                                onChange={(e) => setPartnerDraft(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        addPartner();
+                                                    }
+                                                }}
+                                            />
+                                            <button type="button" onClick={addPartner} disabled={!partnerDraft.trim()} className={`${btnCls} flex-none`}>
+                                                + Add
+                                            </button>
+                                        </div>
+                                        {form.partners.length ? (
+                                            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Added partners">
+                                                {form.partners.map((p) => (
+                                                    <li key={p} className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-[#e6f6f4] px-2.5 py-1.5 text-xs font-semibold text-[#0e7d74]">
+                                                        <span className="break-words">{p}</span>
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Remove ${p}`}
+                                                            onClick={() => patch({ partners: form.partners.filter((x) => x !== p) })}
+                                                            className="text-[#6b7c86] hover:text-[#ac3c3c]"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
+                                        <p className="mt-1.5 text-xs text-[#6b7c86]">
+                                            Organisations you worked with on this activity. Add as many as apply (up to {QUICK_WORK_MAX_PARTNERS}).
+                                        </p>
                                     </Field>
                                 </div>
                                 <p className="mt-3 text-xs text-[#6b7c86]">Enter the actual date and times of work already completed, in Pakistan time (PKT).</p>
@@ -918,7 +1029,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         <QuickWorkStatusPill status={log.status} />
                     </div>
                     <dl className="mt-3 space-y-1.5 text-[13px]">
-                        <SummaryRow label="Activity" value={form.activityType} />
+                        <SummaryRow label="Activity" value={activityLabel(form)} />
                         <SummaryRow label="Date" value={form.activityDate ? shortDate(form.activityDate) : ""} />
                         <SummaryRow label="Time" value={form.startTime && form.endTime ? `${form.startTime}–${form.endTime}` : ""} />
                         <SummaryRow label="Venue" value={form.location} />
@@ -993,6 +1104,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             {routes.dialogs}
         </div>
     );
+}
+
+/** `lat,lng` → map centre, or undefined when no valid pin is stored. */
+function pinLatLng(pin: string) {
+    const [lat, lng] = pin.split(",").map((s) => parseFloat(s.trim()));
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
 }
 
 function StepHead({ title, n, intro }: { title: string; n: number; intro: string }) {

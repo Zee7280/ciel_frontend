@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
-import { formatHours, shortDate } from "@/utils/quickWorkRules";
+import { activityLabel, formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
@@ -104,7 +104,7 @@ export default function FacultyQuickWorkPage() {
                                         <td className="px-5 py-3.5">
                                             <span className="font-semibold">{r.title}</span>
                                             <small className="block text-xs text-[#6b7c86]">
-                                                {shortDate(r.activityDate)} · {r.activityType}
+                                                {shortDate(r.activityDate)} · {activityLabel(r)}
                                             </small>
                                         </td>
                                         <td className="px-5 py-3.5">{r.participants.find((p) => p.isLead)?.name ?? "—"}</td>

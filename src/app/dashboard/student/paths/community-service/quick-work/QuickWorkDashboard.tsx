@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, QUICK_WORK_HREF, quickWorkApi, type QuickWorkMine } from "@/utils/quickWorkApi";
-import { formatHours, shortDate, viewerRow, type QuickWorkLog } from "@/utils/quickWorkRules";
+import { activityLabel, formatHours, shortDate, viewerRow, type QuickWorkLog } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     ModalClose,
@@ -89,7 +89,7 @@ export default function QuickWorkDashboard() {
                 activity_id: r.id,
                 title: r.title,
                 date: r.activityDate,
-                type: r.activityType,
+                type: activityLabel(r),
                 location: r.location,
                 status: r.status,
                 participant: m
@@ -228,7 +228,7 @@ export default function QuickWorkDashboard() {
                                             <td className="px-5 py-4">
                                                 <span className="font-semibold">{r.title || "Untitled activity"}</span>
                                                 <small className="block text-xs text-[#6b7c86]">
-                                                    {shortDate(r.activityDate)} · {r.activityType || "Type not set"}
+                                                    {shortDate(r.activityDate)} · {activityLabel(r) || "Type not set"}
                                                     {!r.isLead ? " · Teammate" : ""}
                                                 </small>
                                             </td>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import {
+    activityLabel,
     formatHours,
     QUICK_WORK_EVIDENCE_TYPES,
     SDG_NAMES,
@@ -283,7 +284,18 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                 <Detail label="Venue & host">
                     {log.location || "—"}
                     {log.host ? ` · ${log.host}` : ""}
+                    {log.locationPin ? (
+                        <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(log.locationPin)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 block text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]"
+                        >
+                            View pin on map ↗
+                        </a>
+                    ) : null}
                 </Detail>
+                {log.partners?.length ? <Detail label="Partner organisations">{log.partners.join(" · ")}</Detail> : null}
                 <Detail label="Coordinating faculty">
                     {log.facultyName || "—"}
                     <br />
@@ -293,7 +305,7 @@ export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
                     {log.university || "—"} · {log.department || "—"}
                 </Detail>
                 <Detail label="Activity type">
-                    {log.activityType || "—"}
+                    {activityLabel(log) || "—"}
                     {log.sdg ? ` · SDG ${log.sdg} ${SDG_NAMES[log.sdg - 1] ?? ""}` : ""}
                 </Detail>
                 <Detail label="Evidence visibility">{log.visibility}</Detail>

@@ -33,11 +33,16 @@ export type QuickWorkLog = {
     facultyEmail: string;
     title: string;
     activityType: string;
+    activityTypeOther: string | null;
     activityDate: string | null;
     startTime: string | null;
     endTime: string | null;
     location: string;
+    /** Optional Google Maps pin for the venue (`lat,lng`). */
+    locationPin: string | null;
     host: string | null;
+    /** Optional partner organisations (names). */
+    partners: string[];
     sdg: number | null;
     summary: string;
     peopleReached: number | null;
@@ -70,6 +75,15 @@ export const QUICK_WORK_ACTIVITY_TYPES = [
     "Other service activity",
 ] as const;
 
+export const QUICK_WORK_OTHER_ACTIVITY = "Other service activity";
+export const QUICK_WORK_MAX_PARTNERS = 10;
+
+/** Activity type as shown to people: the student's own wording for “Other”. */
+export function activityLabel(log: { activityType: string; activityTypeOther?: string | null }): string {
+    const other = log.activityTypeOther?.trim();
+    return log.activityType === QUICK_WORK_OTHER_ACTIVITY && other ? `Other: ${other}` : log.activityType;
+}
+
 /** One-click starters: activity type plus a suggested SDG. */
 export const QUICK_WORK_TEMPLATES: { label: string; type: string; sdg: number | null }[] = [
     { label: "Tree drive", type: "Tree plantation drive", sdg: 15 },
@@ -77,6 +91,7 @@ export const QUICK_WORK_TEMPLATES: { label: string; type: string; sdg: number | 
     { label: "Pinktober", type: "Pinktober event", sdg: 3 },
     { label: "Clean-up", type: "Community clean-up", sdg: 11 },
     { label: "Donation drive", type: "Donation drive", sdg: 1 },
+    { label: "Other", type: QUICK_WORK_OTHER_ACTIVITY, sdg: null },
 ];
 
 export const QUICK_WORK_VISIBILITY = ["Faculty, University & CIEL PK only", "Public with consent"] as const;
@@ -166,11 +181,14 @@ export type QuickWorkForm = {
     teammates: { email: string; studentId: string; name: string; joinStatus: string }[];
     title: string;
     activityType: string;
+    activityTypeOther: string;
     activityDate: string;
     startTime: string;
     endTime: string;
     location: string;
+    locationPin: string;
     host: string;
+    partners: string[];
     sdg: string;
     attendance: Record<string, { present: boolean; startTime: string; endTime: string; breakMinutes: string }>;
     summary: string;
@@ -219,6 +237,7 @@ export function teamErrors(f: QuickWorkForm): string[] {
 export function activityErrors(f: QuickWorkForm): string[] {
     const e: string[] = [];
     if (!f.title.trim() || !f.activityType || !f.location.trim() || !f.activityDate) e.push("Enter the activity title, type, date and venue.");
+    if (f.activityType === QUICK_WORK_OTHER_ACTIVITY && !f.activityTypeOther.trim()) e.push("Describe the activity type for “Other”.");
     const s = minutesOfDay(f.startTime);
     const en = minutesOfDay(f.endTime);
     if (!Number.isFinite(s) || !Number.isFinite(en) || en <= s) e.push("Choose an end time after the start time on the same day.");
@@ -302,11 +321,14 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
             .map((p) => ({ email: p.email, studentId: p.studentId, name: p.name, joinStatus: p.joinStatus })),
         title: log.title,
         activityType: log.activityType,
+        activityTypeOther: log.activityTypeOther ?? "",
         activityDate: log.activityDate ?? "",
         startTime: log.startTime ?? "",
         endTime: log.endTime ?? "",
         location: log.location,
+        locationPin: log.locationPin ?? "",
         host: log.host ?? "",
+        partners: log.partners ?? [],
         sdg: log.sdg ? String(log.sdg) : "",
         attendance,
         summary: log.summary,
@@ -330,11 +352,14 @@ export function payloadFromForm(f: QuickWorkForm) {
         teammates: f.mode === "team" ? f.teammates.map((t) => ({ email: t.email, studentId: t.studentId })) : [],
         title: f.title,
         activityType: f.activityType,
+        activityTypeOther: f.activityType === QUICK_WORK_OTHER_ACTIVITY ? f.activityTypeOther.trim() || null : null,
         activityDate: f.activityDate || null,
         startTime: f.startTime || null,
         endTime: f.endTime || null,
         location: f.location,
+        locationPin: f.locationPin || null,
         host: f.host || null,
+        partners: f.partners,
         sdg: f.sdg ? Number(f.sdg) : null,
         attendance: formPeople(f).map((p) => {
             const a = attendanceFor(f, p.email);
