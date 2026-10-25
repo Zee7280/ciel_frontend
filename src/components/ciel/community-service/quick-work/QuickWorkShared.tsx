@@ -53,10 +53,12 @@ const PILL_TONE: Record<QuickWorkStatus, string> = {
     rejected: "bg-[#fae9e7] text-[#ac3c3c]",
 };
 
-export function QuickWorkStatusPill({ status }: { status: QuickWorkStatus }) {
+/** `inProgress` shows a draft whose faculty or teammates have already been asked as "In progress". */
+export function QuickWorkStatusPill({ status, inProgress = false }: { status: QuickWorkStatus; inProgress?: boolean }) {
+    const tone = inProgress && status === "draft" ? PILL_TONE.submitted : (PILL_TONE[status] ?? PILL_TONE.draft);
     return (
-        <span className={`inline-block rounded-md px-2.5 py-1.5 text-[11px] font-semibold leading-tight ${PILL_TONE[status] ?? PILL_TONE.draft}`}>
-            {STATUS_LABEL[status] ?? status}
+        <span className={`inline-block rounded-md px-2.5 py-1.5 text-[11px] font-semibold leading-tight ${tone}`}>
+            {inProgress && status === "draft" ? "In progress" : (STATUS_LABEL[status] ?? status)}
         </span>
     );
 }
@@ -164,17 +166,17 @@ export function QuickWorkIntroDialog({
                 <h3 className="text-sm font-semibold">A short log for work you have completed</h3>
                 <ol className="my-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-[#6b7c86]">
                     <li>
-                        <b className="text-[#16313d]">Add yourself or your team.</b> Select the faculty member who will review your work.
+                        <b className="text-[#16313d]">Add yourself or your team.</b> Name the faculty member who will review your work; they and each teammate get an email to accept.
                     </li>
                     <li>
                         <b className="text-[#16313d]">Record what you did.</b> Enter each person’s actual attendance and attach photos or supporting evidence.
                     </li>
                     <li>
                         <b className="text-[#16313d]">Submit for faculty approval.</b> Faculty reviews the completed work; approved individual hours appear in{" "}
-                        <b className="text-[#16313d]">My Quick Work</b>.
+                        <b className="text-[#16313d]">Quick Impact Log</b>.
                     </li>
                 </ol>
-                <p className="mb-4 mt-3 text-xs font-semibold text-[#0e7d74]">Faculty approval happens only after submission.</p>
+                <p className="mb-4 mt-3 text-xs font-semibold text-[#0e7d74]">Faculty accept coordinating first; they approve the hours only after you submit.</p>
             </div>
             <div className="rounded-md border-l-[3px] border-[#e3a72b] bg-[#fff6e1] px-4 py-3 text-xs leading-relaxed text-[#624b20]">
                 <b className="mb-1 block text-[13px]">Need to complete your 16-hour requirement?</b>

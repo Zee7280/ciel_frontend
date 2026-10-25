@@ -33,6 +33,10 @@ export type QuickWorkLog = {
     department: string;
     facultyName: string;
     facultyEmail: string;
+    /** pending | accepted | declined; null when no faculty is named yet (or on older logs). */
+    facultyConfirmation?: string | null;
+    facultyRequestedAt?: string | null;
+    facultyRespondedAt?: string | null;
     title: string;
     activityType: string;
     activityTypeOther: string | null;
@@ -352,6 +356,16 @@ export function joinErrors(f: QuickWorkForm): string[] {
               ? [`${t.name || t.email} has not confirmed joining yet.`]
               : [],
     );
+}
+
+/** The named faculty member must accept coordinating before the log can be submitted (older logs that already went to review are exempt). */
+export function facultyConfirmationErrors(log: Pick<QuickWorkLog, "facultyName" | "facultyConfirmation" | "submittedAt">): string[] {
+    // A server without faculty confirmations does not send the field: let the server decide.
+    if (log.facultyConfirmation === undefined) return [];
+    const who = log.facultyName || "Your coordinating faculty member";
+    if (log.facultyConfirmation === "declined") return [`${who} declined to coordinate this activity. Name another faculty member in Step 1.`];
+    if (log.facultyConfirmation === "accepted" || (!log.facultyConfirmation && log.submittedAt)) return [];
+    return [`${who} has not accepted coordinating this activity yet. They were emailed a request; you can re-send it from Step 1.`];
 }
 
 /** Server view → form state. */

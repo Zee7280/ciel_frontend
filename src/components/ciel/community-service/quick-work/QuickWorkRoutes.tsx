@@ -132,7 +132,7 @@ export function QuickWorkRecordLink() {
                 href={QUICK_WORK_HREF}
                 className="inline-flex w-full items-center justify-center rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74] hover:bg-[#f2faf9] sm:w-auto"
             >
-                View My Quick Work →
+                View Quick Impact Log →
             </Link>
         </section>
     );

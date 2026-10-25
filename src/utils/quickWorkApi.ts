@@ -11,6 +11,8 @@ export type QuickWorkMine = {
 
 /** `approveBlockedReason` is set when this faculty member may not approve (not authorised for the students' university). */
 export type FacultyQuickWorkQueue = {
+    /** Activities still being prepared that name this faculty member (accept / decline coordinating). */
+    requests?: QuickWorkLog[];
     pending: (QuickWorkLog & { approveBlockedReason?: string | null })[];
     reviewed: QuickWorkLog[];
 };
@@ -127,6 +129,9 @@ export const quickWorkApi = {
         call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
     remove: (id: string) => call<{ deleted: boolean }>(`/quick-work/logs/${encodeURIComponent(id)}`, { method: "DELETE" }),
     submit: (id: string) => call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}/submit`, { method: "POST" }),
+    resendFacultyRequest: (id: string) => call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}/faculty-request`, { method: "POST" }),
+    coordinate: (id: string, accept: boolean) =>
+        call<QuickWorkLog>(`/faculty/quick-work/${encodeURIComponent(id)}/coordination`, { method: "POST", body: JSON.stringify({ accept }) }),
     join: (id: string, accept: boolean) =>
         call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}/join`, { method: "POST", body: JSON.stringify({ accept }) }),
     facultyQueue: () => call<FacultyQuickWorkQueue>("/faculty/quick-work"),

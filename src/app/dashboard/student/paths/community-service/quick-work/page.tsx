@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import QuickWorkDashboard from "./QuickWorkDashboard";
 import QuickWorkLogForm from "./QuickWorkLogForm";
 
-/** Quick Community Work: `?log=new|<id>` opens the four-step log; otherwise My Quick Work. */
+/** Quick Community Work: `?log=new|<id>` opens the four-step log; otherwise Quick Impact Log. */
 function QuickWorkRoute() {
     const log = useSearchParams().get("log");
     return log ? <QuickWorkLogForm logId={log} /> : <QuickWorkDashboard />;

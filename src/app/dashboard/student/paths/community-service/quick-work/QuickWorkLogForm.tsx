@@ -21,6 +21,7 @@ import {
     emptyAttendance,
     evidenceErrors,
     evidenceTypeOf,
+    facultyConfirmationErrors,
     formatHours,
     formFromLog,
     formPeople,
@@ -210,7 +211,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     {loadError}
                 </div>
                 <Link href={QUICK_WORK_HREF} className={`${btnCls} mt-4`}>
-                    ← My Quick Work
+                    ← Quick Impact Log
                 </Link>
             </div>
         );
@@ -234,7 +235,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     {log.isLead ? "This log has been submitted, so it can no longer be edited." : "Only the activity lead can edit this log."}
                 </p>
                 <Link href={QUICK_WORK_HREF} className={`${btnCls} mt-4`}>
-                    ← My Quick Work
+                    ← Quick Impact Log
                 </Link>
             </div>
         );
@@ -264,7 +265,30 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const review = async () => {
         const e = [...teamErrors(form), ...activityErrors(form), ...attendanceErrors(form), ...evidenceErrors(form), ...joinErrors(form)];
         if (e.length) return showErrors(Array.from(new Set(e)));
-        if (await persist()) setPreview(true);
+        const saved = await persist();
+        if (!saved) return;
+        const waiting = facultyConfirmationErrors(saved);
+        if (waiting.length) return showErrors(waiting);
+        setPreview(true);
+    };
+
+    const resendFacultyRequest = async () => {
+        try {
+            setLog(await quickWorkApi.resendFacultyRequest(log.id));
+            toast.success(`Request sent to ${log.facultyEmail} again.`);
+        } catch (e) {
+            toast.error(apiMessages(e).join(" "));
+        }
+    };
+
+    const checkFaculty = async () => {
+        try {
+            const fresh = await quickWorkApi.get(log.id);
+            setLog(fresh);
+            if (fresh.facultyConfirmation === log.facultyConfirmation) toast.info("No answer from the faculty member yet.");
+        } catch (e) {
+            toast.error(apiMessages(e).join(" "));
+        }
     };
 
     const submit = async () => {
@@ -302,7 +326,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         setForm(nextForm);
         if (await persist(nextForm)) {
             setMate({ name: "", email: "", studentId: "", contact: "" });
-            toast.success("Join request sent. They confirm from their My Quick Work page.");
+            toast.success("Join request sent. They confirm from their Quick Impact Log page.");
         } else {
             setForm((f) => (f ? { ...f, teammates: f.teammates.filter((t) => t.email !== email) } : f));
         }
@@ -391,7 +415,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     return (
         <div className="mx-auto min-w-0 max-w-[1280px] pb-16 text-[#16313d]">
             <Link href={QUICK_WORK_HREF} className="text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]">
-                ← My Quick Work
+                ← Quick Impact Log
             </Link>
             <section className="flex flex-wrap items-end justify-between gap-3 pb-5 pt-4">
                 <div className="min-w-0">
@@ -551,7 +575,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 </div>
                                             ))
                                         ) : (
-                                            <p className="text-xs text-[#6b7c86]">Add each participant once. Their hours will appear on their own My Quick Work page.</p>
+                                            <p className="text-xs text-[#6b7c86]">Add each participant once. Their hours will appear on their own Quick Impact Log page.</p>
                                         )}
                                         <div className="mt-3 rounded-[10px] border border-dashed border-[#a8d3cd] bg-[#f8fbfc] p-3.5">
                                             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:items-end">
@@ -602,7 +626,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 + Add teammate
                                             </button>
                                             <p className="mt-2 text-xs text-[#6b7c86]">
-                                                Teammates need a CIEL student account. They get a join request and confirm from their own My Quick Work page;
+                                                Teammates need a CIEL student account. They get a join request and confirm from their own Quick Impact Log page;
                                                 you can submit once everyone has confirmed.
                                             </p>
                                         </div>
@@ -663,9 +687,15 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         </datalist>
                                     </>
                                 ) : null}
+                                <FacultyRequestStatus
+                                    log={log}
+                                    typedEmail={form.facultyEmail}
+                                    onResend={() => void resendFacultyRequest()}
+                                    onCheck={() => void checkFaculty()}
+                                />
                                 <p className="mt-2.5 text-xs text-[#6b7c86]">
-                                    This faculty member reviews your completed work after you submit, from their CIEL dashboard. Selecting them does not
-                                    send an approval request yet.
+                                    When you save, this faculty member is emailed a request to coordinate your activity. You can submit only after they
+                                    accept and every teammate confirms; they then review your completed work from their CIEL dashboard.
                                 </p>
                             </>
                         ) : null}
@@ -1144,6 +1174,46 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 function pinLatLng(pin: string) {
     const [lat, lng] = pin.split(",").map((s) => parseFloat(s.trim()));
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+}
+
+/** Where the faculty request stands, for the email saved on the log (not one still being typed). */
+function FacultyRequestStatus({ log, typedEmail, onResend, onCheck }: { log: QuickWorkLog; typedEmail: string; onResend: () => void; onCheck: () => void }) {
+    const typed = typedEmail.trim().toLowerCase();
+    if (typed && typed !== log.facultyEmail) {
+        return <p className="mt-2.5 rounded-lg bg-[#f4f8f9] px-3 py-2 text-xs text-[#6b7c86]">Save to send {typed} a request to accept.</p>;
+    }
+    const who = log.facultyName || log.facultyEmail;
+    if (log.facultyConfirmation === "accepted") {
+        return <p className="mt-2.5 rounded-lg bg-[#e6f6f4] px-3 py-2 text-xs font-semibold text-[#0e7d74]">✓ {who} accepted coordinating this activity.</p>;
+    }
+    if (log.facultyConfirmation === "declined") {
+        return (
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-[#fae9e7] px-3 py-2 text-xs text-[#ac3c3c]">
+                <span className="min-w-0 flex-1 break-words">
+                    <b>{who} declined.</b> Enter another faculty member and save, or ask them again.
+                </span>
+                <button type="button" onClick={onResend} className="font-semibold underline">
+                    Ask again
+                </button>
+            </div>
+        );
+    }
+    if (log.facultyConfirmation !== "pending") return null;
+    return (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-[#fff5de] px-3 py-2 text-xs text-[#79571c]">
+            <span className="min-w-0 flex-1 break-words">
+                Request emailed to <b>{log.facultyEmail}</b>
+                {log.facultyRequestedAt ? ` on ${new Date(log.facultyRequestedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}.
+                Waiting for them to accept.
+            </span>
+            <button type="button" onClick={onCheck} className="font-semibold underline">
+                Check again
+            </button>
+            <button type="button" onClick={onResend} className="font-semibold underline">
+                Re-send request
+            </button>
+        </div>
+    );
 }
 
 function StepHead({ title, n, intro }: { title: string; n: number; intro: string }) {

@@ -1,4 +1,5 @@
 "use client";
+import { QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 import { STUDENT_SUBSCRIPTION_PATH, studentNeedsSubscriptionPayment } from "@/utils/studentSubscription";
 
 import Link from "next/link";
@@ -1065,7 +1066,7 @@ export default function Sidebar() {
                                 href={path.href}
                                 label={path.label}
                                 emoji={path.emoji}
-                                active={isNavActive(path.href)}
+                                active={isNavActive(path.href) && !pathname.startsWith(QUICK_WORK_HREF)}
                                 needsAction={impactSummary?.pathsStatus?.[path.key]?.needsAction}
                                 countPill={path.key === "communityService" ? impactSummary?.activeEngagements : undefined}
                                 collapsed={collapsed}
@@ -1074,6 +1075,14 @@ export default function Sidebar() {
                                 }}
                             />
                         ))}
+                        <NavSectionLabel collapsed={collapsed}>Quick Community Service</NavSectionLabel>
+                        <NavRow
+                            href={QUICK_WORK_HREF}
+                            label="Quick Impact Log"
+                            emoji="⚡"
+                            active={pathname.startsWith(QUICK_WORK_HREF)}
+                            collapsed={collapsed}
+                        />
                         {!collapsed && <div className="mx-0 my-4 border-t border-white/[0.09]" />}
                         <NavSectionLabel collapsed={collapsed}>My Portfolio</NavSectionLabel>
                         <NavRow

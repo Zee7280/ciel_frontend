@@ -8,6 +8,7 @@ import {
     evidenceErrors,
     evidenceKind,
     evidenceTypeOf,
+    facultyConfirmationErrors,
     formatHours,
     formFromLog,
     joinErrors,
@@ -126,4 +127,15 @@ test("evidence type comes from the extension when the browser reports none or an
     assert.equal(evidenceKind("image/heic"), "document");
     assert.equal(evidenceKind("video/mp4"), "video");
     assert.equal(evidenceKind("application/pdf"), "pdf");
+});
+
+test("submit waits for the faculty to accept; a log that already went to review is exempt", () => {
+    const f = (over) => facultyConfirmationErrors({ facultyName: "Dr F", facultyConfirmation: "pending", submittedAt: null, ...over });
+    assert.match(f({}).join(" "), /has not accepted/);
+    assert.match(f({ facultyConfirmation: "declined" }).join(" "), /declined/);
+    assert.deepEqual(f({ facultyConfirmation: "accepted" }), []);
+    assert.deepEqual(f({ facultyConfirmation: null, submittedAt: "2026-10-20T10:00:00Z" }), []);
+    assert.match(f({ facultyConfirmation: null }).join(" "), /has not accepted/);
+    // An older API that does not send the field never blocks the student; the server decides.
+    assert.deepEqual(facultyConfirmationErrors({ facultyName: "Dr F", submittedAt: null }), []);
 });

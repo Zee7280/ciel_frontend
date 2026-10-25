@@ -18,6 +18,34 @@ import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-wo
 
 const HUB = "/dashboard/student/paths/community-service";
 
+type Stage = "draft" | "progress" | "submitted" | "approved";
+const STAGES: { key: Stage; label: string; empty: string }[] = [
+    { key: "draft", label: "Draft", empty: "No drafts. A log you start appears here until you name your faculty or add teammates." },
+    { key: "progress", label: "In progress", empty: "Nothing waiting. Logs appear here while your faculty and teammates confirm, or when faculty asks for changes." },
+    { key: "submitted", label: "Submitted", empty: "Nothing with faculty right now." },
+    { key: "approved", label: "Approved", empty: "No approved activities yet." },
+];
+
+/** Draft: nothing sent yet. In progress: faculty / teammates asked, or changes requested. Submitted: with faculty (or not approved). */
+function stageOf(r: QuickWorkLog): Stage {
+    if (r.status === "approved") return "approved";
+    if (r.status === "submitted" || r.status === "rejected") return "submitted";
+    if (r.status === "changes" || !r.isLead) return "progress";
+    return r.facultyConfirmation || r.participants.length > 1 ? "progress" : "draft";
+}
+
+/** One line on where a log being prepared stands: the faculty's answer and how many teammates confirmed. */
+function progressNote(r: QuickWorkLog): string {
+    if (r.status !== "draft" && r.status !== "changes") return "";
+    const parts: string[] = [];
+    if (r.facultyConfirmation === "pending") parts.push("Waiting for faculty to accept");
+    if (r.facultyConfirmation === "accepted") parts.push("Faculty accepted");
+    if (r.facultyConfirmation === "declined") parts.push("Faculty declined — name someone else");
+    const mates = r.participants.filter((p) => !p.isLead);
+    if (mates.length) parts.push(`${mates.filter((p) => p.joinStatus === "joined").length} of ${mates.length} teammates confirmed`);
+    return parts.join(" · ");
+}
+
 function downloadJson(data: unknown, name: string) {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     const a = document.createElement("a");
@@ -35,6 +63,7 @@ export default function QuickWorkDashboard() {
     const [busyId, setBusyId] = useState<string | null>(null);
     const [viewing, setViewing] = useState<QuickWorkLog | null>(null);
     const [deleting, setDeleting] = useState<QuickWorkLog | null>(null);
+    const [stage, setStage] = useState<Stage | null>(null);
 
     const load = useCallback(async () => {
         try {
@@ -54,6 +83,10 @@ export default function QuickWorkDashboard() {
         (l) => !l.isLead && (l.status === "draft" || l.status === "changes") && mine(l)?.joinStatus === "invited",
     );
     const records = (data?.logs ?? []).filter((l) => !invitations.includes(l));
+    const byStage = (key: Stage) => records.filter((r) => stageOf(r) === key);
+    // Until the student picks a tab, open the first one that has something in it.
+    const activeStage: Stage = stage ?? STAGES.find((st) => byStage(st.key).length)?.key ?? "draft";
+    const shown = byStage(activeStage);
 
     const respond = async (log: QuickWorkLog, accept: boolean) => {
         setBusyId(log.id);
@@ -119,11 +152,11 @@ export default function QuickWorkDashboard() {
             </Link>
             <section className="flex items-end justify-between gap-6 pb-6 pt-5">
                 <div>
-                    <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Community Service / My Quick Work</div>
-                    <h1 className="text-[21px] font-semibold leading-tight">Your quick work adds up.</h1>
+                    <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Service / Quick Impact Log</div>
+                    <h1 className="text-[21px] font-semibold leading-tight">Quick Impact Log</h1>
                     <p className="mt-3 max-w-[650px] text-[13px] text-[#6b7c86] sm:text-sm">
-                        A separate record of short university activities and faculty-approved hours. These totals do not show completion of your
-                        structured 16-hour requirement.
+                        Your short university activities, from draft to faculty approval. Drafts save on CIEL PK as you go, so you can continue
+                        from any device. These totals do not show completion of your structured 16-hour requirement.
                     </p>
                 </div>
                 <div className="hidden min-w-[155px] border-l-2 border-[#cbe3e0] pl-4 lg:block">
@@ -203,11 +236,33 @@ export default function QuickWorkDashboard() {
                 <Metric value={`${formatHours(data?.totals.pendingMinutes ?? 0)}`} unit="h" label="Pending faculty confirmation" />
             </div>
 
+            <div role="tablist" aria-label="Log status" className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+                {STAGES.map((st) => {
+                    const active = st.key === activeStage;
+                    return (
+                        <button
+                            key={st.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={active}
+                            onClick={() => setStage(st.key)}
+                            className={`flex-none rounded-full border px-3.5 py-1.5 text-xs font-semibold ${
+                                active ? "border-[#0e7d74] bg-[#0e7d74] text-white" : "border-[#dcebee] bg-white text-[#6b7c86] hover:border-[#0e7d74]"
+                            }`}
+                        >
+                            {st.label} <span className={active ? "text-[#cfeee9]" : "text-[#9aa8b0]"}>{byStage(st.key).length}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
             <div className="overflow-hidden rounded-2xl border border-[#dcebee] bg-white shadow-[0_3px_12px_#16313d12]">
                 {!data && !loadError ? (
                     <div className="flex justify-center py-12">
                         <Loader2 className="h-5 w-5 animate-spin text-[#6b7c86]" />
                     </div>
+                ) : records.length && !shown.length ? (
+                    <p className="px-6 py-10 text-center text-[13px] text-[#6b7c86]">{STAGES.find((st) => st.key === activeStage)?.empty}</p>
                 ) : records.length ? (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[640px] border-collapse text-[13px]">
@@ -220,8 +275,9 @@ export default function QuickWorkDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {records.map((r) => {
+                                {shown.map((r) => {
                                     const m = mine(r);
+                                    const note = r.isLead ? progressNote(r) : "";
                                     const editable = r.isLead && (r.status === "draft" || r.status === "changes");
                                     return (
                                         <tr key={r.id} className="border-b border-[#dcebee] align-top">
@@ -237,7 +293,8 @@ export default function QuickWorkDashboard() {
                                                 {r.status !== "approved" ? <small className="block text-xs text-[#6b7c86]">Not credited</small> : null}
                                             </td>
                                             <td className="px-5 py-4">
-                                                <QuickWorkStatusPill status={r.status} />
+                                                <QuickWorkStatusPill status={r.status} inProgress={stageOf(r) === "progress"} />
+                                                {note ? <small className="mt-1 block max-w-[260px] break-words text-xs text-[#79571c]">{note}</small> : null}
                                                 {r.reviewNote ? <small className="mt-1 block max-w-[260px] break-words text-xs text-[#6b7c86]">{r.reviewNote}</small> : null}
                                                 {!r.isLead && m?.joinStatus === "declined" ? (
                                                     <small className="mt-1 block text-xs text-[#ac3c3c]">You declined</small>
