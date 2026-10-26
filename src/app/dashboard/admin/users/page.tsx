@@ -37,6 +37,9 @@ import DataTable from "react-data-table-component";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import { pakistaniUniversities } from "@/utils/universityData";
+import { hecPrograms } from "@/utils/hecProgramsData";
 
 const STATUS_OPTIONS = [
     "active",
@@ -105,6 +108,9 @@ interface User {
     /** From backend `findAllForAdmin`; absent on older APIs */
     profile_complete?: boolean;
     profile_missing_fields?: string[];
+    /** Student profile university / programme (students cannot change these once saved). */
+    university?: string;
+    department?: string;
 }
 
 const ACTION_MENU_W = 224;
@@ -163,6 +169,8 @@ export default function AdminUsersPage() {
 
     // Form States
     const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "student", status: "active" });
+    // Edit only: a student's university / programme, which only an admin can correct after signup.
+    const [affiliation, setAffiliation] = useState({ university: "", department: "" });
 
     useEffect(() => {
         setCurrentAdmin(getCurrentAdmin());
@@ -267,6 +275,8 @@ export default function AdminUsersPage() {
                         : null,
                 profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
+                university: u.university || u.institution || "",
+                department: u.department || "",
             }));
             setUsers(mappedUsers);
             setTotalUsers(typeof data?.total === "number" ? data.total : mappedUsers.length);
@@ -405,6 +415,7 @@ export default function AdminUsersPage() {
     const openEditModal = (user: User) => {
         setSelectedUser(user);
         setFormData({ name: user.name, email: user.email, password: "", role: user.role, status: user.status });
+        setAffiliation({ university: user.university || "", department: user.department || "" });
         setFormError(null);
         setShowFormPassword(false);
         setIsEditModalOpen(true);
@@ -418,6 +429,16 @@ export default function AdminUsersPage() {
         try {
             const payload: any = { ...formData, name: formData.name.trim(), email: formData.email.trim() };
             if (!payload.password) delete payload.password; // Don't send empty password
+            if (payload.role === "student") {
+                // Only changed, non-empty values: same fields the student profile saves.
+                const university = affiliation.university.trim();
+                const department = affiliation.department.trim();
+                if (university && university !== (selectedUser.university || "")) {
+                    payload.university = university;
+                    payload.institution = university;
+                }
+                if (department && department !== (selectedUser.department || "")) payload.department = department;
+            }
             if (isSelf(selectedUser)) {
                 // Never let an admin change their own role/status from here.
                 payload.role = selectedUser.role;
@@ -1122,6 +1143,37 @@ export default function AdminUsersPage() {
                                     )}
                                 </div>
                             </div>
+                            {isEditModalOpen && formData.role === "student" ? (
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">University</label>
+                                        <SearchableSelect
+                                            accent="blue"
+                                            value={affiliation.university}
+                                            onChange={(v) => setAffiliation((a) => ({ ...a, university: v }))}
+                                            options={pakistaniUniversities}
+                                            placeholder="Select university"
+                                            searchPlaceholder="Search universities..."
+                                            ariaLabel="University"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">Program / Department</label>
+                                        <SearchableSelect
+                                            accent="blue"
+                                            value={affiliation.department}
+                                            onChange={(v) => setAffiliation((a) => ({ ...a, department: v }))}
+                                            options={hecPrograms}
+                                            placeholder="Select programme"
+                                            searchPlaceholder="Search HEC programs..."
+                                            ariaLabel="Program / Department"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-500 sm:col-span-2">
+                                        Students cannot change these after signup. Faculty approval of hours checks this university.
+                                    </p>
+                                </div>
+                            ) : null}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">
                                     {isAddModalOpen ? "Password" : "New Password (Optional)"}

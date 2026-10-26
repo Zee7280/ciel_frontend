@@ -1261,6 +1261,7 @@ export default function Sidebar() {
             <div className="shrink-0 space-y-1 border-t border-white/10 p-3">
                 {isStudent ? (
                     <>
+                        <NavRow href="/dashboard/student/profile" label="My Profile" icon={User} active={isNavActive("/dashboard/student/profile")} collapsed={collapsed} />
                         <NavRow href="/dashboard/student/settings" label="Settings" icon={Settings} active={isNavActive("/dashboard/student/settings")} collapsed={collapsed} />
                         <NavRow href="/dashboard/student/help" label="Help" icon={HelpCircle} active={isNavActive("/dashboard/student/help")} collapsed={collapsed} />
                     </>
