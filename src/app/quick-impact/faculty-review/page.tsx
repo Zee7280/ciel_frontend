@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import type { QuickWorkLog } from "@/utils/quickWorkRules";
 import { STATUS_LABEL } from "@/utils/quickWorkRules";
+import { FACULTY_QUICK_WORK_HREF, dashboardLink, hasStoredSession } from "@/utils/quickWorkApi";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
@@ -53,6 +54,9 @@ function FacultyReview() {
     const [busy, setBusy] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
+    const [signedIn, setSignedIn] = useState(false);
+    useEffect(() => setSignedIn(hasStoredSession()), []);
+    const dashboard = dashboardLink(FACULTY_QUICK_WORK_HREF, signedIn);
 
     useEffect(() => {
         if (!token) {
@@ -105,8 +109,8 @@ function FacultyReview() {
                 <AlertCircle className="h-8 w-8 text-amber-600" aria-hidden />
                 <h1 className="mt-3 text-lg font-bold text-slate-900">This link cannot be used</h1>
                 <p className="mt-2 text-sm text-slate-600">{error}</p>
-                <Link href="/login" className="mt-4 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
-                    Sign in to CIEL PK →
+                <Link href={dashboard} className="mt-4 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
+                    {signedIn ? "Open your CIEL PK dashboard →" : "Sign in to CIEL PK →"}
                 </Link>
             </Card>
         );
@@ -154,7 +158,7 @@ function FacultyReview() {
                         <Link href="/signup" className="rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-semibold text-white">
                             Sign up
                         </Link>
-                        <Link href="/login" className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2 text-sm font-semibold text-[#0e7d74]">
+                        <Link href={dashboardLink(FACULTY_QUICK_WORK_HREF, false)} className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2 text-sm font-semibold text-[#0e7d74]">
                             Log in
                         </Link>
                     </div>
@@ -229,7 +233,7 @@ function FacultyReview() {
                 </div>
             )}
 
-            <Link href="/dashboard/faculty/quick-work" className="mt-5 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
+            <Link href={dashboard} className="mt-5 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
                 Open your CIEL PK dashboard →
             </Link>
         </Card>

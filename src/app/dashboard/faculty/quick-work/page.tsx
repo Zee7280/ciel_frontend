@@ -17,6 +17,16 @@ type Action = "approve" | "changes" | "reject";
 export default function FacultyQuickWorkPage() {
     const [queue, setQueue] = useState<FacultyQuickWorkQueue | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
+    // Shown in the empty state (rendered only after the client fetch): logs reach this list only
+    // when the student typed exactly this email.
+    const [myEmail] = useState(() => {
+        try {
+            const u = JSON.parse(localStorage.getItem("ciel_user") || "null") as { email?: unknown } | null;
+            return typeof u?.email === "string" ? u.email : "";
+        } catch {
+            return "";
+        }
+    });
 
     const load = useCallback(async () => {
         // Called after a review (and on retry): the sidebar badge recounts too.
@@ -82,7 +92,9 @@ export default function FacultyQuickWorkPage() {
                 <div className="rounded-2xl border border-[#dcebee] bg-white px-6 py-11 text-center text-[#6b7c86]">
                     <h3 className="mb-2 text-[15px] font-semibold text-[#16313d]">You’re all caught up.</h3>
                     <p className="mx-auto max-w-[440px] text-[13px]">
-                        Requests appear here only after a student submits a completed quick-work log that names your email as coordinating faculty.
+                        Requests appear here only after a student submits a completed quick-work log that names your email
+                        {myEmail ? <b className="text-[#16313d]"> {myEmail}</b> : null} as coordinating faculty. If a student used another address,
+                        ask them or CIEL PK to correct it.
                     </p>
                 </div>
             ) : null}

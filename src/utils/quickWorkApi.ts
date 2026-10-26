@@ -2,6 +2,7 @@ import { authenticatedFetch } from "@/utils/api";
 import type { QuickWorkLog, QuickWorkStatus } from "@/utils/quickWorkRules";
 
 export const QUICK_WORK_HREF = "/dashboard/student/paths/community-service/quick-work";
+export const FACULTY_QUICK_WORK_HREF = "/dashboard/faculty/quick-work";
 export const QUICK_WORK_PRESIGN_PATH = "/api/v1/quick-work/evidence/presign";
 /** Fired by the faculty review page after a decision so the sidebar badge recounts. */
 export const QUICK_WORK_FACULTY_PENDING_EVENT = "ciel:quick-work-faculty-pending";
@@ -143,6 +144,20 @@ export const quickWorkApi = {
     adminReview: (id: string, body: QuickWorkReviewBody) =>
         call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
+
+/** Emailed pages are often opened signed out (e.g. inside a mail app): go through login, then back to `path`. */
+export function dashboardLink(path: string, signedIn: boolean): string {
+    return signedIn ? path : `/login?next=${encodeURIComponent(path)}`;
+}
+
+/** Whether this browser holds a CIEL session. Read after mount (false on the server). */
+export function hasStoredSession(): boolean {
+    try {
+        return Boolean(localStorage.getItem("ciel_token"));
+    } catch {
+        return false;
+    }
+}
 
 /** Faculty sidebar badge: logs awaiting this faculty member's review, or null when unavailable. */
 export async function fetchFacultyQuickWorkPending(): Promise<number | null> {

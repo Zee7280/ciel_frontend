@@ -380,10 +380,7 @@ export default function Sidebar() {
     // Faculty Quick Community Work badge: one count per page load, and again after a review on that page.
     const [facultyQuickWorkPending, setFacultyQuickWorkPending] = useState(0);
     useEffect(() => {
-        if (!isFaculty) {
-            setFacultyQuickWorkPending(0);
-            return;
-        }
+        if (!isFaculty) return; // the badge is shown to faculty only
         let cancelled = false;
         const load = () =>
             void fetchFacultyQuickWorkPending().then((n) => {

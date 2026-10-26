@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { FACULTY_QUICK_WORK_HREF, QUICK_WORK_HREF, dashboardLink, hasStoredSession } from "@/utils/quickWorkApi";
 
 type Preview = {
     kind: "faculty" | "member";
@@ -45,6 +46,8 @@ function Respond() {
     const [done, setDone] = useState(false);
     /** A failed answer keeps the card so the person can simply try again. */
     const [answerError, setAnswerError] = useState<string | null>(null);
+    const [signedIn, setSignedIn] = useState(false);
+    useEffect(() => setSignedIn(hasStoredSession()), []);
 
     useEffect(() => {
         if (!token) {
@@ -96,8 +99,8 @@ function Respond() {
                 <AlertCircle className="h-8 w-8 text-amber-600" aria-hidden />
                 <h1 className="mt-3 text-lg font-bold text-slate-900">This link cannot be used</h1>
                 <p className="mt-2 text-sm text-slate-600">{error}</p>
-                <Link href="/login" className="mt-4 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
-                    Sign in to CIEL PK →
+                <Link href={dashboardLink(QUICK_WORK_HREF, signedIn)} className="mt-4 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
+                    {signedIn ? "Open your CIEL PK dashboard →" : "Sign in to CIEL PK →"}
                 </Link>
             </Card>
         );
@@ -109,7 +112,7 @@ function Respond() {
     const faculty = preview.kind === "faculty";
     const acceptLabel = faculty ? "Accept" : "I took part";
     const title = preview.title || "Activity details not added yet";
-    const dashboard = faculty ? "/dashboard/faculty/quick-work" : "/dashboard/student/paths/community-service/quick-work";
+    const dashboard = dashboardLink(faculty ? FACULTY_QUICK_WORK_HREF : QUICK_WORK_HREF, signedIn);
     const answered = preview.answer === "accepted" || preview.answer === "declined";
 
     return (
