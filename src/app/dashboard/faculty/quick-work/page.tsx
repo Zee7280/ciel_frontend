@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
+import { QUICK_WORK_FACULTY_PENDING_EVENT, apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
 import { activityLabel, formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
@@ -19,6 +19,8 @@ export default function FacultyQuickWorkPage() {
     const [loadError, setLoadError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
+        // Called after a review (and on retry): the sidebar badge recounts too.
+        window.dispatchEvent(new CustomEvent(QUICK_WORK_FACULTY_PENDING_EVENT));
         try {
             setQueue(await quickWorkApi.facultyQueue());
             setLoadError(null);

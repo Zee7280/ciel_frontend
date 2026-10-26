@@ -41,6 +41,7 @@ import {
     type AdminPendingCounts,
 } from "@/utils/adminPendingCounts";
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
+import { QUICK_WORK_FACULTY_PENDING_EVENT, fetchFacultyQuickWorkPending } from "@/utils/quickWorkApi";
 import { refreshStoredUserFromMeApi } from "@/utils/membershipPayment";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
@@ -376,6 +377,26 @@ export default function Sidebar() {
         };
     }, [isAdmin, pathname]);
 
+    // Faculty Quick Community Work badge: one count per page load, and again after a review on that page.
+    const [facultyQuickWorkPending, setFacultyQuickWorkPending] = useState(0);
+    useEffect(() => {
+        if (!isFaculty) {
+            setFacultyQuickWorkPending(0);
+            return;
+        }
+        let cancelled = false;
+        const load = () =>
+            void fetchFacultyQuickWorkPending().then((n) => {
+                if (!cancelled && n !== null) setFacultyQuickWorkPending(n);
+            });
+        load();
+        window.addEventListener(QUICK_WORK_FACULTY_PENDING_EVENT, load);
+        return () => {
+            cancelled = true;
+            window.removeEventListener(QUICK_WORK_FACULTY_PENDING_EVENT, load);
+        };
+    }, [isFaculty, pathname]);
+
     const [partnerMembershipNav, setPartnerMembershipNav] = useState(false);
     useEffect(() => {
         if (!isPartner) {
@@ -579,6 +600,8 @@ export default function Sidebar() {
                     return adminCounts.issueLogsOpen;
                 case "/dashboard/admin/support":
                     return adminCounts.supportOpen;
+                case "/dashboard/admin/quick-work":
+                    return adminCounts.quickWork;
                 default:
                     return undefined;
             }
@@ -598,9 +621,11 @@ export default function Sidebar() {
                           ? notificationUnreadCount
                           : item.label === "Impact" && isStudent
                             ? impactHistoryBadge
-                            : undefined),
+                            : isFaculty && item.href === "/dashboard/faculty/quick-work"
+                              ? facultyQuickWorkPending
+                              : undefined),
             })),
-        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, adminHrefCount],
+        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, isFaculty, facultyQuickWorkPending, adminHrefCount],
     );
 
     const partnerWorkspace = useMemo(

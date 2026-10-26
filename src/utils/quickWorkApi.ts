@@ -3,6 +3,8 @@ import type { QuickWorkLog, QuickWorkStatus } from "@/utils/quickWorkRules";
 
 export const QUICK_WORK_HREF = "/dashboard/student/paths/community-service/quick-work";
 export const QUICK_WORK_PRESIGN_PATH = "/api/v1/quick-work/evidence/presign";
+/** Fired by the faculty review page after a decision so the sidebar badge recounts. */
+export const QUICK_WORK_FACULTY_PENDING_EVENT = "ciel:quick-work-faculty-pending";
 
 export type QuickWorkMine = {
     logs: QuickWorkLog[];
@@ -141,6 +143,19 @@ export const quickWorkApi = {
     adminReview: (id: string, body: QuickWorkReviewBody) =>
         call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
+
+/** Faculty sidebar badge: logs awaiting this faculty member's review, or null when unavailable. */
+export async function fetchFacultyQuickWorkPending(): Promise<number | null> {
+    try {
+        const res = await authenticatedFetch("/api/v1/faculty/quick-work/pending-count", {}, { redirectToLogin: false });
+        if (!res || !res.ok) return null;
+        const body = (await res.json().catch(() => null)) as { data?: { pending?: unknown } } | null;
+        const n = Number(body?.data?.pending);
+        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+    } catch {
+        return null;
+    }
+}
 
 export function apiMessages(err: unknown): string[] {
     if (err instanceof QuickWorkApiError) return err.messages;

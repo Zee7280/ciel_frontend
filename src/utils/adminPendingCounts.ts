@@ -12,6 +12,7 @@ export type AdminPendingCounts = {
     reportsAwaitingAdmin: number;
     issueLogsOpen: number;
     supportOpen: number;
+    quickWork: number;
 };
 
 export const EMPTY_ADMIN_PENDING_COUNTS: AdminPendingCounts = {
@@ -23,6 +24,7 @@ export const EMPTY_ADMIN_PENDING_COUNTS: AdminPendingCounts = {
     reportsAwaitingAdmin: 0,
     issueLogsOpen: 0,
     supportOpen: 0,
+    quickWork: 0,
 };
 
 const TTL_MS = 30_000;
