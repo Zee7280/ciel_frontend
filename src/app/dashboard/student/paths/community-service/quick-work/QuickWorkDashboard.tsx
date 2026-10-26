@@ -350,17 +350,15 @@ export default function QuickWorkDashboard() {
                 <QuickWorkModal labelledBy="quickRecordTitle" onClose={() => setViewing(null)} wide>
                     <header className="mb-3 flex items-start justify-between gap-5">
                         <div className="min-w-0">
-                            <div className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick service record</div>
+                            <div className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Log record</div>
                             <h2 id="quickRecordTitle" className="mt-1 break-words text-lg font-bold">
-                                {viewing.title || "Untitled activity"}
+                                Quick Community Log
                             </h2>
                         </div>
                         <ModalClose onClose={() => setViewing(null)} />
                     </header>
-                    <QuickWorkStatusPill status={viewing.status} />
                     {viewing.reviewNote ? <p className="mt-2 text-xs text-[#6b7c86]">Review note: {viewing.reviewNote}</p> : null}
-                    <QuickWorkRecordDetails log={viewing} />
-                    <EvidenceGallery evidence={viewing.evidence} />
+                    <QuickWorkRecordDetails log={viewing} evidence={<EvidenceGallery evidence={viewing.evidence} />} />
                     {viewing.reviewedAt ? (
                         <p className="text-xs text-[#6b7c86]">
                             Reviewed by {viewing.facultyName} ·{" "}

@@ -494,17 +494,7 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
                         </p>
                     </div>
 
-                    <QuickWorkRecordDetails log={log} />
-                    {log.evidence.length ? (
-                        <details open className="my-2">
-                            <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-                                Evidence ({log.evidence.length}) · {log.visibility}
-                            </summary>
-                            <EvidenceGallery evidence={log.evidence} />
-                        </details>
-                    ) : (
-                        <p className="my-2 text-sm text-slate-500">No evidence attached.</p>
-                    )}
+                    <QuickWorkRecordDetails log={log} evidence={log.evidence.length ? <EvidenceGallery evidence={log.evidence} /> : undefined} />
 
                     {log.history.length ? (
                         <div className="mt-4">

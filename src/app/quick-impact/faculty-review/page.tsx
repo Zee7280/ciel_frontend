@@ -9,7 +9,6 @@ import { STATUS_LABEL } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
-    QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
 
 type Action = "approve" | "changes" | "reject";
@@ -119,23 +118,22 @@ function FacultyReview() {
 
     return (
         <Card wide>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-[1.4px] text-[#0e7d74]">Quick Community Work · faculty review</p>
-                    <h1 className="mt-1 break-words text-lg font-bold text-slate-900">{log.title || "Untitled activity"}</h1>
-                </div>
-                <QuickWorkStatusPill status={log.status} />
+            <div>
+                <p className="text-xs font-bold uppercase tracking-[1.4px] text-[#0e7d74]">Complete Quick Community Log record</p>
+                <h1 className="mt-1 text-lg font-bold text-slate-900">Review Quick Community Log</h1>
+                <p className="mt-0.5 text-xs text-slate-500">Read the flashcard, attendance and evidence, then choose Approve, Request Revision or Reject.</p>
             </div>
 
-            <QuickWorkRecordDetails log={log} />
-            {preview.registered && preview.open ? (
-                <details open className="my-3">
-                    <summary className="cursor-pointer text-xs font-semibold text-[#0e7d74]">Evidence ({log.evidence.length})</summary>
-                    <EvidenceGallery evidence={log.evidence} />
-                </details>
-            ) : (
-                <p className="my-3 text-xs text-slate-500">Evidence and participants’ contact details are shown to the reviewing faculty account.</p>
-            )}
+            <QuickWorkRecordDetails
+                log={log}
+                evidence={
+                    preview.registered && preview.open ? (
+                        <EvidenceGallery evidence={log.evidence} />
+                    ) : (
+                        <p className="mt-1 text-xs text-slate-500">Evidence and participants’ contact details are shown to the reviewing faculty account.</p>
+                    )
+                }
+            />
 
             {done ? (
                 <p className="mt-2 flex items-start gap-2 rounded-lg bg-[#e6f6f4] px-3 py-2 text-sm font-semibold text-[#0e7d74]">

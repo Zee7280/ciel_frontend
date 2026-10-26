@@ -58,6 +58,7 @@ import {
     ModalClose,
     PhotoIcon,
     QuickWorkModal,
+    EvidenceGallery,
     QuickWorkRecordDetails,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
@@ -1163,14 +1164,15 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                 <QuickWorkModal labelledBy="quickPreviewTitle" onClose={() => !submitting && setPreview(false)} wide>
                     <header className="mb-3 flex items-start justify-between gap-5">
                         <div className="min-w-0">
-                            <span className="text-xs font-semibold text-[#0e7d74]">Review before submitting</span>
+                            <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Student pre-submission review</span>
                             <h2 id="quickPreviewTitle" className="mt-1 break-words text-lg font-bold">
-                                {form.title}
+                                Check your flashcard before submission
                             </h2>
+                            <p className="mt-0.5 text-xs text-[#6b7c86]">Nothing is submitted until you select Submit.</p>
                         </div>
                         <ModalClose onClose={() => !submitting && setPreview(false)} />
                     </header>
-                    <QuickWorkRecordDetails log={log} />
+                    <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />
                     <p className="mt-3 text-xs text-[#6b7c86]">
                         {form.evidence.length} evidence file(s) · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
                     </p>

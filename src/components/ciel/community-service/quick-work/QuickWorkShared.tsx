@@ -284,118 +284,151 @@ export function EvidenceTile({ item, children }: { item: QuickWorkEvidence; chil
     );
 }
 
-/** Date, venue, faculty, institution, description and the per-person attendance table. */
-export function QuickWorkRecordDetails({ log }: { log: QuickWorkLog }) {
+/**
+ * The Quick Community Log flashcard: a summary hero, the activity and faculty details, what was done
+ * (with declarations and the evidence the caller passes in), and each person's attendance. Used by the
+ * student, faculty, admin and emailed review views alike.
+ */
+export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; evidence?: ReactNode }) {
+    const present = log.participants.filter((p) => p.present);
+    const teamMinutes = present.reduce((a, p) => a + (p.minutes || 0), 0);
+    const partners = log.partnerDetails ?? (log.partners ?? []).map((name) => ({ name, email: null, contact: null }));
+    const reach = (email?: string | null, contact?: string | null) =>
+        [email, contact ? formatInternationalPhoneDisplay(contact) : ""].filter(Boolean).join(" · ");
     return (
-        <div>
-            <div className="my-3.5 grid grid-cols-1 gap-3 text-[13px] sm:grid-cols-2">
-                <Detail label="Activity date & time">
-                    {shortDate(log.activityDate)} · {log.startTime || "—"}–{log.endTime || "—"} PKT
-                </Detail>
-                <Detail label="Venue & host">
-                    {log.location || "—"}
-                    {log.host ? ` · ${log.host}` : ""}
-                    {log.host && (log.hostEmail || log.hostContact) ? (
-                        <span className="block text-xs text-[#6b7c86]">
-                            {[log.hostEmail, log.hostContact ? formatInternationalPhoneDisplay(log.hostContact) : ""].filter(Boolean).join(" · ")}
-                        </span>
-                    ) : null}
-                    {log.locationPin ? (
-                        <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(log.locationPin)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-0.5 block text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]"
-                        >
-                            View pin on map ↗
-                        </a>
-                    ) : null}
-                </Detail>
-                {log.partners?.length ? (
-                    <Detail label="Partner organisations">
-                        {(log.partnerDetails ?? log.partners.map((name) => ({ name, email: null, contact: null }))).map((p) => (
-                            <span key={p.name} className="block">
-                                {p.name}
-                                {p.email || p.contact ? (
-                                    <span className="text-xs text-[#6b7c86]">
-                                        {" · "}
-                                        {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : ""].filter(Boolean).join(" · ")}
-                                    </span>
-                                ) : null}
-                            </span>
-                        ))}
-                    </Detail>
-                ) : null}
-                <Detail label="Coordinating faculty">
-                    {log.facultyName || "—"}
-                    <br />
-                    <span className="text-xs text-[#6b7c86]">{log.facultyEmail}</span>
-                </Detail>
-                <Detail label="Institution">
-                    {log.university || "—"} · {log.department || "—"}
-                </Detail>
-                <Detail label="Activity type">
-                    {activityLabel(log) || "—"}
-                    {log.sdg ? ` · SDG ${log.sdg} ${SDG_NAMES[log.sdg - 1] ?? ""}` : ""}
-                </Detail>
-                <Detail label="Evidence visibility">{log.visibility}</Detail>
-            </div>
-            {log.summary ? (
-                <div className="rounded-lg bg-[#e6f6f4] px-3.5 py-3 text-xs leading-relaxed text-[#0b6760]">
-                    <b>Activity conducted</b>
-                    <br />
-                    <span className="whitespace-pre-wrap break-words">{log.summary}</span>
-                    {log.peopleReached != null ? (
-                        <>
-                            <br />
-                            Estimated people reached: {log.peopleReached}
-                        </>
-                    ) : null}
+        <div className="my-3.5 text-[#16313d]">
+            <section className="relative overflow-hidden rounded-2xl bg-[linear-gradient(125deg,#104a4b,#146e71)] p-5 text-white [print-color-adjust:exact] sm:p-6">
+                <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full border border-white/10" />
+                <p className="text-[10px] font-extrabold uppercase tracking-[1.35px] text-[#e4d9a2]">CIEL PK · Quick Community Log</p>
+                <h3 className="mt-3 break-words text-[21px] font-bold leading-tight sm:text-[25px]">{log.title || "Untitled activity"}</h3>
+                <p className="mt-2 text-xs text-[#d5eae7]">
+                    {[activityLabel(log) || "Community activity", shortDate(log.activityDate), log.university].filter(Boolean).join(" · ")}
+                </p>
+                <span className="mt-3.5 inline-flex items-center gap-1.5 rounded-[7px] bg-[#d4f4dc] px-2.5 py-1.5 text-[11px] font-bold text-[#0c4b4c]">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#0c4b4c]" />
+                    {STATUS_LABEL[log.status] ?? log.status}
+                </span>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/20 pt-3.5">
+                    <FlashStat value={`${formatHours(teamMinutes)} h`} label="Team person-hours" />
+                    <FlashStat value={String(present.length)} label="Participants" />
+                    <FlashStat value={log.sdg ? `SDG ${log.sdg}` : "—"} label="SDG linkage" />
                 </div>
-            ) : null}
-            <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[420px] border-collapse text-xs">
-                    <thead>
-                        <tr className="bg-[#f4f8f9] text-left text-[11px] tracking-[0.5px] text-[#6b7c86]">
-                            <th className="px-2 py-2.5 font-semibold">Participant</th>
-                            <th className="px-2 py-2.5 font-semibold">Attendance</th>
-                            <th className="px-2 py-2.5 font-semibold">Break</th>
-                            <th className="px-2 py-2.5 font-semibold">Hours</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {log.participants.map((p) => (
-                            <tr key={p.id} className="border-b border-[#dcebee]">
-                                <td className="px-2 py-3 font-semibold">
-                                    {p.name || p.email}
-                                    <small className="block text-[11px] font-normal text-[#6b7c86]">
-                                        {[
-                                            p.studentId || (p.email ? "—" : ""),
-                                            p.email,
-                                            p.contact ? formatInternationalPhoneDisplay(p.contact) : "",
-                                            p.isLead ? "Lead" : "",
-                                        ]
-                                            .filter(Boolean)
-                                            .join(" · ")}
-                                    </small>
-                                </td>
-                                <td className="px-2 py-3">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</td>
-                                <td className="px-2 py-3">{p.present ? p.breakMinutes : 0} min</td>
-                                <td className="whitespace-nowrap px-2 py-3 font-bold text-[#0e7d74]">{formatHours(p.minutes)} h</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            </section>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section className="min-w-0 rounded-[10px] border border-[#dfe9e8] p-4">
+                    <h4 className="mb-1.5 text-[15px] font-semibold">Activity & coordinating faculty</h4>
+                    <FlashRow label="Activity">
+                        {activityLabel(log) || "—"}
+                        {log.sdg ? <span className="block text-xs text-[#617980]">SDG {log.sdg} · {SDG_NAMES[log.sdg - 1] ?? ""}</span> : null}
+                    </FlashRow>
+                    <FlashRow label="Date & time">
+                        {shortDate(log.activityDate)} · {log.startTime || "—"}–{log.endTime || "—"} PKT
+                    </FlashRow>
+                    <FlashRow label="Venue / host">
+                        {log.location || "—"} · {log.host || "No host added"}
+                        {log.host && (log.hostEmail || log.hostContact) ? (
+                            <span className="block text-xs text-[#617980]">{reach(log.hostEmail, log.hostContact)}</span>
+                        ) : null}
+                        {log.locationPin ? (
+                            <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(log.locationPin)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-0.5 block text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]"
+                            >
+                                View pin on map ↗
+                            </a>
+                        ) : null}
+                    </FlashRow>
+                    {partners.length ? (
+                        <FlashRow label="Partner organisations">
+                            {partners.map((p) => (
+                                <span key={p.name} className="block">
+                                    {p.name}
+                                    {p.email || p.contact ? <span className="text-xs text-[#617980]"> · {reach(p.email, p.contact)}</span> : null}
+                                </span>
+                            ))}
+                        </FlashRow>
+                    ) : null}
+                    <FlashRow label="Faculty reviewer">
+                        {log.facultyName || "—"}
+                        {log.facultyEmail ? <span className="break-all"> · {log.facultyEmail}</span> : null}
+                    </FlashRow>
+                    <FlashRow label="University">
+                        {log.university || "—"} · {log.department || "—"}
+                    </FlashRow>
+                    <FlashRow label="People reached">{log.peopleReached != null ? String(log.peopleReached) : "Not recorded"}</FlashRow>
+                    <FlashRow label="Visibility" last>
+                        {log.visibility}
+                    </FlashRow>
+                </section>
+
+                <section className="min-w-0 rounded-[10px] border border-[#dfe9e8] p-4">
+                    <h4 className="mb-2 text-[15px] font-semibold">Activity conducted</h4>
+                    <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{log.summary || "Not provided yet."}</p>
+                    <p className="mt-3.5 rounded-[9px] bg-[#ecf6f6] px-3 py-3 text-xs text-[#48686e]">
+                        <b>Declarations:</b> Evidence consent {log.consent ? "✓" : "pending"} · Accurate attendance {log.honest ? "✓" : "pending"}
+                    </p>
+                    <h4 className="mt-4 text-[15px] font-semibold">Evidence ({log.evidence.length})</h4>
+                    {evidence ?? (log.evidence.length ? null : <p className="mt-1 text-xs text-[#617980]">No evidence yet.</p>)}
+                </section>
             </div>
+
+            <section className="mt-4 rounded-[10px] border border-[#dfe9e8] p-4">
+                <h4 className="mb-2 text-[15px] font-semibold">Individual participation & attendance</h4>
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] border-collapse text-left text-xs">
+                        <thead>
+                            <tr className="bg-[#f4f8f9] text-[11px] text-[#617980]">
+                                <th className="px-2 py-2.5 font-semibold">Student</th>
+                                <th className="px-2 py-2.5 font-semibold">Student ID</th>
+                                <th className="px-2 py-2.5 font-semibold">Time</th>
+                                <th className="px-2 py-2.5 font-semibold">Break</th>
+                                <th className="px-2 py-2.5 font-semibold">Hours</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {log.participants.map((p) => (
+                                <tr key={p.id} className="border-b border-[#dfe9e8]">
+                                    <td className="px-2 py-3">
+                                        <span className="font-semibold">{p.name || p.email || "—"}</span>
+                                        {p.email || p.contact || p.isLead ? (
+                                            <small className="block text-[11px] text-[#617980]">
+                                                {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : "", p.isLead ? "Lead" : ""]
+                                                    .filter(Boolean)
+                                                    .join(" · ")}
+                                            </small>
+                                        ) : null}
+                                    </td>
+                                    <td className="px-2 py-3">{p.studentId || "—"}</td>
+                                    <td className="px-2 py-3">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</td>
+                                    <td className="px-2 py-3">{p.present ? p.breakMinutes : 0} min</td>
+                                    <td className="whitespace-nowrap px-2 py-3 font-bold text-[#0e7d74]">{formatHours(p.minutes)} h</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     );
 }
 
-function Detail({ label, children }: { label: string; children: ReactNode }) {
+function FlashStat({ value, label }: { value: string; label: string }) {
     return (
-        <div className="min-w-0 break-words">
-            <small className="mb-0.5 block text-[11px] uppercase tracking-[0.6px] text-[#6b7c86]">{label}</small>
-            {children}
+        <div className="min-w-0">
+            <b className="block break-words text-lg leading-tight text-[#e5f0b9] sm:text-[22px]">{value}</b>
+            <span className="text-[10px] text-[#cee3e1]">{label}</span>
+        </div>
+    );
+}
+
+function FlashRow({ label, children, last = false }: { label: string; children: ReactNode; last?: boolean }) {
+    return (
+        <div className={`grid grid-cols-[110px_minmax(0,1fr)] gap-2 py-2 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)] ${last ? "" : "border-b border-[#eff3f2]"}`}>
+            <span className="font-semibold text-[#617980]">{label}</span>
+            <span className="min-w-0 break-words">{children}</span>
         </div>
     );
 }

@@ -156,20 +156,12 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
 
     return (
         <article className="mb-4 rounded-[13px] border border-[#dcebee] bg-white p-4 sm:p-6">
-            <header className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row">
-                <div className="min-w-0">
-                    <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Final · completed activity review</span>
-                    <h2 className="mt-1 break-words text-lg font-bold">{log.title}</h2>
-                </div>
-                <QuickWorkStatusPill status={log.status} />
+            <header className="mb-1">
+                <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Log record</span>
+                <h2 className="mt-1 text-lg font-bold">Review Quick Community Log</h2>
+                <p className="mt-0.5 text-xs text-[#6b7c86]">Read the flashcard, attendance and evidence, then approve, request changes or decline.</p>
             </header>
-            <QuickWorkRecordDetails log={log} />
-            <details open className="my-3.5">
-                <summary className="cursor-pointer text-xs font-semibold text-[#0e7d74]">
-                    Review evidence ({log.evidence.length}) · {log.visibility}
-                </summary>
-                <EvidenceGallery evidence={log.evidence} />
-            </details>
+            <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />
             {error.length ? (
                 <div role="alert" className="mb-3 rounded-[9px] border border-[#edccc5] bg-[#fff0ed] px-4 py-3 text-xs text-[#9b3832]">
                     <ul className="list-disc pl-4">
