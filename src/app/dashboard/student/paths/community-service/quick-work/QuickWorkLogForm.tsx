@@ -237,7 +237,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     if (!log.isLead || (log.status !== "draft" && log.status !== "changes")) {
         return (
             <div className="mx-auto max-w-[760px] py-10 text-[#16313d]">
-                <h1 className="text-2xl font-semibold">{log.title || "Quick Community Work log"}</h1>
+                <h1 className="text-2xl font-semibold">{log.title || "Quick Community Impact log"}</h1>
                 <div className="mt-3">
                     <QuickWorkStatusPill status={log.status} />
                 </div>
@@ -291,7 +291,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         try {
             await quickWorkApi.submit(log.id);
             setDirty(false);
-            toast.success("Quick-work log submitted. Hours remain pending until faculty approval.");
+            toast.success("Quick Community Impact log submitted. Hours remain pending until faculty approval.");
             router.push(QUICK_WORK_HREF);
         } catch (e) {
             setPreview(false);
@@ -421,7 +421,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             </Link>
             <section className="flex flex-wrap items-end justify-between gap-3 pb-5 pt-4">
                 <div className="min-w-0">
-                    <h1 className="break-words text-[21px] font-semibold leading-tight">{form.title.trim() || "Quick Community Work Log"}</h1>
+                    <h1 className="break-words text-[21px] font-semibold leading-tight">{form.title.trim() || "Quick Community Impact Log"}</h1>
                     <p className="mt-1 text-[13px] text-[#6b7c86]">
                         {log.status === "changes" ? "Changes requested" : "Draft"} · started {shortDate(log.createdAt.slice(0, 10))}
                         {log.facultyName ? ` · faculty: ${log.facultyName}` : ""}

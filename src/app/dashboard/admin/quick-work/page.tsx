@@ -24,7 +24,8 @@ import {
 const PAGE_SIZE = 20;
 const STATUS_TABS: { value: QuickWorkStatus | ""; label: string }[] = [
     { value: "", label: "All sent for review" },
-    { value: "submitted", label: "Awaiting review" },
+    { value: "submitted", label: "Awaiting faculty review" },
+    { value: "admin_review", label: "Awaiting CIEL PK approval" },
     { value: "changes", label: "Changes requested" },
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Not approved" },
@@ -37,7 +38,7 @@ const HISTORY_LABEL: Record<string, string> = {
     approved: "Approved by faculty",
     changes: "Faculty requested changes",
     rejected: "Declined by faculty",
-    admin_approved: "Approved by CIEL PK admin",
+    admin_approved: "Final approval by CIEL PK admin",
     admin_changes: "CIEL PK admin requested changes",
     admin_rejected: "Declined by CIEL PK admin",
     admin_faculty_changed: "Reviewing faculty changed by CIEL PK admin",
@@ -166,14 +167,15 @@ export default function AdminQuickWorkPage() {
     };
 
     const counts = list?.counts;
-    const sentForReview = counts ? counts.submitted + counts.changes + counts.approved + counts.rejected : 0;
+    // `admin_review` is absent from older API responses.
+    const sentForReview = counts ? counts.submitted + (counts.admin_review ?? 0) + counts.changes + counts.approved + counts.rejected : 0;
     const totalPages = list ? Math.max(1, Math.ceil(list.total / (list.limit || PAGE_SIZE))) : 1;
 
     return (
         <div className="mx-auto max-w-7xl space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Quick Community Work</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">Quick Community Impact</h1>
                     <p className="mt-1 max-w-3xl text-sm text-slate-600">
                         Short activity logs students submit for faculty review. Change the reviewer of a stuck log, or review it here when its faculty
                         cannot. Only approved hours count.
@@ -330,7 +332,7 @@ export default function AdminQuickWorkPage() {
                             ) : (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
-                                        No Quick Community Work logs match these filters.
+                                        No Quick Community Impact logs match these filters.
                                     </td>
                                 </tr>
                             )}
@@ -435,7 +437,7 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
         );
     };
 
-    const canReassign = log && log.status !== "approved" && log.status !== "rejected";
+    const canReassign = log && log.status !== "approved" && log.status !== "rejected" && log.status !== "admin_review";
 
     return (
         <QuickWorkModal labelledBy="qwAdminDetailTitle" onClose={onClose} wide>
@@ -563,10 +565,21 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
                         </form>
                     ) : null}
 
-                    {log.status === "submitted" ? (
+                    {log.status === "submitted" || log.status === "admin_review" ? (
                         <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
-                            <h3 className="text-sm font-bold text-slate-900">CIEL PK decision</h3>
-                            <p className="text-xs text-slate-500">Use this when the faculty member cannot review the log. The decision is recorded as yours.</p>
+                            {log.status === "admin_review" ? (
+                                <>
+                                    <h3 className="text-sm font-bold text-slate-900">CIEL PK final approval</h3>
+                                    <p className="text-xs text-slate-500">
+                                        The faculty member has approved this log. Approve to credit each participant’s hours, or return it to the student or decline it.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="text-sm font-bold text-slate-900">CIEL PK decision</h3>
+                                    <p className="text-xs text-slate-500">Use this when the faculty member cannot review the log. The decision is recorded as yours.</p>
+                                </>
+                            )}
                             <label className="flex items-start gap-2.5 text-sm text-slate-700">
                                 <input
                                     type="checkbox"
@@ -594,7 +607,7 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
                                     className="inline-flex items-center gap-2 rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b6760] disabled:opacity-60"
                                 >
                                     {busy === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                    Approve hours
+                                    {log.status === "admin_review" ? "Final approve & credit hours" : "Approve hours"}
                                 </button>
                                 <button
                                     type="button"

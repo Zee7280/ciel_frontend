@@ -22,14 +22,14 @@ type Stage = "draft" | "progress" | "submitted" | "approved";
 const STAGES: { key: Stage; label: string; empty: string }[] = [
     { key: "draft", label: "Draft", empty: "No drafts. A log you start appears here until you add teammates." },
     { key: "progress", label: "In progress", empty: "Nothing waiting. Logs appear here while your teammates confirm, or when faculty asks for changes." },
-    { key: "submitted", label: "Submitted", empty: "Nothing with faculty right now." },
+    { key: "submitted", label: "Submitted", empty: "Nothing under review right now." },
     { key: "approved", label: "Approved", empty: "No approved activities yet." },
 ];
 
 /** Draft: nothing sent yet. In progress: teammates asked, or changes requested. Submitted: with faculty (or not approved). */
 function stageOf(r: QuickWorkLog): Stage {
     if (r.status === "approved") return "approved";
-    if (r.status === "submitted" || r.status === "rejected") return "submitted";
+    if (r.status === "submitted" || r.status === "admin_review" || r.status === "rejected") return "submitted";
     if (r.status === "changes" || !r.isLead) return "progress";
     return r.participants.length > 1 ? "progress" : "draft";
 }
@@ -149,7 +149,7 @@ export default function QuickWorkDashboard() {
             </Link>
             <section className="flex items-end justify-between gap-6 pb-6 pt-5">
                 <div>
-                    <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Service / Quick Impact Log</div>
+                    <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Impact / Quick Impact Log</div>
                     <h1 className="text-[21px] font-semibold leading-tight">Quick Impact Log</h1>
                     <p className="mt-3 max-w-[650px] text-[13px] text-[#6b7c86] sm:text-sm">
                         Your short university activities, from draft to faculty approval. Drafts save on CIEL PK as you go, so you can continue
@@ -228,9 +228,9 @@ export default function QuickWorkDashboard() {
             ) : null}
 
             <div className="my-5 grid grid-cols-3 gap-2 sm:gap-4">
-                <Metric hero value={`${formatHours(data?.totals.approvedMinutes ?? 0)}`} unit="h" label="Approved quick-work hours" />
+                <Metric hero value={`${formatHours(data?.totals.approvedMinutes ?? 0)}`} unit="h" label="Approved Quick Community Impact hours" />
                 <Metric value={String(data?.totals.approvedActivities ?? 0)} label="Activities participated in" />
-                <Metric value={`${formatHours(data?.totals.pendingMinutes ?? 0)}`} unit="h" label="Pending faculty confirmation" />
+                <Metric value={`${formatHours(data?.totals.pendingMinutes ?? 0)}`} unit="h" label="Pending approval" />
             </div>
 
             <div role="tablist" aria-label="Log status" className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
@@ -341,8 +341,8 @@ export default function QuickWorkDashboard() {
             <div className="mt-4 rounded-lg bg-[#e6f6f4] px-3.5 py-3 text-xs leading-relaxed text-[#0b6760]">
                 <b>Separate pathways. One community-engagement journey.</b>
                 <br />
-                Quick Community Work tracks approved participation and hours. Structured Community Service uses the full report and CII rubric for the
-                16-hour requirement. Do not count the same activity twice. Quick-work hours do not automatically fulfil the 16-hour requirement. Any
+                Quick Community Impact tracks approved participation and hours. Structured Community Service uses the full report and CII rubric for the
+                16-hour requirement. Do not count the same activity twice. Quick Community Impact hours do not automatically fulfil the 16-hour requirement. Any
                 course-credit recognition must be confirmed by your university.
             </div>
 
@@ -350,9 +350,9 @@ export default function QuickWorkDashboard() {
                 <QuickWorkModal labelledBy="quickRecordTitle" onClose={() => setViewing(null)} wide>
                     <header className="mb-3 flex items-start justify-between gap-5">
                         <div className="min-w-0">
-                            <div className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Log record</div>
+                            <div className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Impact Log record</div>
                             <h2 id="quickRecordTitle" className="mt-1 break-words text-lg font-bold">
-                                Quick Community Log
+                                Quick Community Impact Log
                             </h2>
                         </div>
                         <ModalClose onClose={() => setViewing(null)} />

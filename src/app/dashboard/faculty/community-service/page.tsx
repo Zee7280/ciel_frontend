@@ -44,6 +44,7 @@ import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { PaginationControls } from "@/components/ui/PaginationControls";
+import { FACULTY_QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 
 const CS_VIEWS = [
     "home",
@@ -732,6 +733,22 @@ function FacultyCommunityServiceHub() {
                             subtitle="See person-hours, Community Dividend, reach, SDGs and CII patterns across your projects."
                             badge="INSIGHTS"
                             background={MOCKUP_GRADIENTS.gold}
+                        />
+                    </div>
+
+                    <MockupSectionHead
+                        title="Quick Community Impact"
+                        subtitle="Short university activities, recorded separately. They do not fulfil the 16-hour requirement."
+                    />
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+                        <MockupActionCard
+                            href={FACULTY_QUICK_WORK_HREF}
+                            emoji="⚡"
+                            ghost="⚡"
+                            title="Quick Community Impact"
+                            subtitle="Logs that name you as faculty: review the flashcard, each student's attendance and the evidence, then approve, request revision or reject."
+                            badge="FACULTY REVIEW"
+                            background={MOCKUP_GRADIENTS.pink}
                         />
                     </div>
                 </>

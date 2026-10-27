@@ -4,7 +4,8 @@
  * No imports, so `node --test` can load it directly.
  */
 
-export type QuickWorkStatus = "draft" | "submitted" | "changes" | "approved" | "rejected";
+/** `admin_review`: faculty approved; awaiting CIEL PK final approval (hours count once `approved`). */
+export type QuickWorkStatus = "draft" | "submitted" | "admin_review" | "changes" | "approved" | "rejected";
 
 export type QuickWorkParticipant = {
     id: string;
@@ -230,6 +231,7 @@ export function shortDate(value: string | null | undefined): string {
 export const STATUS_LABEL: Record<QuickWorkStatus, string> = {
     draft: "Draft",
     submitted: "Pending faculty review",
+    admin_review: "Awaiting CIEL PK approval",
     changes: "Changes requested",
     approved: "Approved",
     rejected: "Not approved",

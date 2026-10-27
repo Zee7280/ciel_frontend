@@ -49,6 +49,7 @@ export function PhotoIcon({ className = "h-7 w-7" }: { className?: string }) {
 const PILL_TONE: Record<QuickWorkStatus, string> = {
     draft: "bg-[#eef2f4] text-[#6b7c86]",
     submitted: "bg-[#fff5de] text-[#916b21]",
+    admin_review: "bg-[#eaf0ff] text-[#3d5ba9]",
     changes: "bg-[#fae9e7] text-[#ac3c3c]",
     approved: "bg-[#e6f6f4] text-[#0e7d74]",
     rejected: "bg-[#fae9e7] text-[#ac3c3c]",
@@ -148,7 +149,7 @@ export function QuickWorkIntroDialog({
                     </span>
                     <div className="mt-3 text-[11px] font-bold uppercase tracking-[1.2px] text-[#6b7c86]">Short university activities</div>
                     <h2 id="quickWorkIntroTitle" className="mt-1.5 text-[21px] font-bold leading-tight text-[#16313d] sm:text-[21px]">
-                        Quick Community Work
+                        Quick Community Impact
                     </h2>
                 </div>
                 <ModalClose onClose={onClose} label="Close explanation" />
@@ -181,7 +182,7 @@ export function QuickWorkIntroDialog({
             </div>
             <div className="rounded-md border-l-[3px] border-[#e3a72b] bg-[#fff6e1] px-4 py-3 text-xs leading-relaxed text-[#624b20]">
                 <b className="mb-1 block text-[13px]">Need to complete your 16-hour requirement?</b>
-                Choose <strong>Structured Community Service</strong>. Quick work is recorded separately and does not automatically fulfil that requirement.
+                Choose <strong>Structured Community Service</strong>. Quick Community Impact is recorded separately and does not automatically fulfil that requirement.
             </div>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                 <button
@@ -189,7 +190,7 @@ export function QuickWorkIntroDialog({
                     onClick={onContinue}
                     className="min-h-[43px] flex-1 rounded-lg bg-[#0e7d74] px-3 text-xs font-semibold text-white hover:bg-[#0b6760]"
                 >
-                    Continue to Quick Work <span aria-hidden="true">→</span>
+                    Continue to Quick Community Impact <span aria-hidden="true">→</span>
                 </button>
                 <button
                     type="button"
@@ -236,10 +237,10 @@ export function RouteChoiceDialog({
             <div className="my-3.5 rounded-[10px] border border-[#dcebee] bg-[#f8fbfc] p-[18px]">
                 <h3 className="text-[15px] font-semibold">Record a short university activity</h3>
                 <p className="mb-3.5 mt-2 text-[13px] text-[#6b7c86]">
-                    Choose Quick Community Work for a brief activity log, evidence and faculty approval after submission.
+                    Choose Quick Community Impact for a brief activity log, evidence and faculty approval after submission.
                 </p>
                 <button type="button" onClick={onQuick} className="rounded-lg bg-[#f4a51c] px-4 py-2.5 text-xs font-bold text-[#2e270e] hover:bg-[#e99a12]">
-                    Quick Community Work
+                    Quick Community Impact
                 </button>
             </div>
         </QuickWorkModal>
@@ -299,7 +300,7 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
         <div className="my-3.5 text-[#16313d]">
             <section className="relative overflow-hidden rounded-2xl bg-[linear-gradient(125deg,#104a4b,#146e71)] p-5 text-white [print-color-adjust:exact] sm:p-6">
                 <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full border border-white/10" />
-                <p className="text-[10px] font-extrabold uppercase tracking-[1.35px] text-[#e4d9a2]">CIEL PK · Quick Community Log</p>
+                <p className="text-[10px] font-extrabold uppercase tracking-[1.35px] text-[#e4d9a2]">CIEL PK · Quick Community Impact Log</p>
                 <h3 className="mt-3 break-words text-[21px] font-bold leading-tight sm:text-[25px]">{log.title || "Untitled activity"}</h3>
                 <p className="mt-2 text-xs text-[#d5eae7]">
                     {[activityLabel(log) || "Community activity", shortDate(log.activityDate), log.university].filter(Boolean).join(" · ")}

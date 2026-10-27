@@ -785,6 +785,22 @@ export function AdminCommunityServiceHub() {
                             background="linear-gradient(135deg,#455a78,#7088ad)"
                         />
                     </div>
+
+                    <MockupSectionHead
+                        title="Quick Community Impact"
+                        subtitle="Short university activities, recorded separately. They do not fulfil the 16-hour requirement."
+                    />
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+                        <MockupActionCard
+                            href="/dashboard/admin/quick-work"
+                            emoji="⚡"
+                            ghost="⚡"
+                            title="Quick Community Impact"
+                            subtitle="Final approval after faculty, then every Quick Community Impact log: status, faculty and evidence. Reassign a stuck review or export."
+                            badge="OVERSIGHT"
+                            background={MOCKUP_GRADIENTS.pink}
+                        />
+                    </div>
                 </>
             )}
 

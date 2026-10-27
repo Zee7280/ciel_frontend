@@ -87,7 +87,7 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                             SHORT UNIVERSITY ACTIVITIES
                         </span>
                     </div>
-                    <h2 className="mb-2.5 text-lg font-bold leading-tight text-[#16313d] sm:text-xl">Quick Community Work</h2>
+                    <h2 className="mb-2.5 text-lg font-bold leading-tight text-[#16313d] sm:text-xl">Quick Community Impact</h2>
                     <p className="max-w-[480px] text-[13px] leading-relaxed text-[#526d74]">
                         Took part in a short activity at university? Record what you did through a brief activity log.
                     </p>
@@ -100,7 +100,7 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                         onClick={onQuick}
                         className="mt-auto flex w-full items-center justify-between rounded-[9px] bg-[#f4a51c] px-[18px] py-[13px] text-sm font-extrabold text-[#2e270e] hover:bg-[#e99a12]"
                     >
-                        Quick Community Work <span aria-hidden="true">→</span>
+                        Quick Community Impact <span aria-hidden="true">→</span>
                     </button>
                     <small className="mt-2.5 text-xs leading-normal text-[#637875]">
                         Separate activity record · does not automatically fulfil 16 hours.
@@ -112,7 +112,7 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                     i
                 </span>
                 <p className="m-0">
-                    <b>Completing your 16-hour requirement?</b> Choose <b>Structured Community Service</b>. Use <b>Quick Community Work</b> for short
+                    <b>Completing your 16-hour requirement?</b> Choose <b>Structured Community Service</b>. Use <b>Quick Community Impact</b> for short
                     university activities, recorded separately.
                 </p>
             </div>
@@ -126,7 +126,7 @@ export function QuickWorkRecordLink() {
         <section className="my-5 flex flex-col items-start justify-between gap-4 rounded-[14px] border border-[#dcebee] bg-white px-5 py-5 sm:flex-row sm:items-center sm:px-6">
             <div>
                 <h3 className="text-[15px] font-semibold text-[#16313d]">Already submitted quick community work?</h3>
-                <p className="mt-1 text-xs text-[#6b7c86]">Track faculty decisions and your approved quick-work hours.</p>
+                <p className="mt-1 text-xs text-[#6b7c86]">Track faculty decisions and your approved Quick Community Impact hours.</p>
             </div>
             <Link
                 href={QUICK_WORK_HREF}

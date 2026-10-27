@@ -58,7 +58,7 @@ export default function FacultyQuickWorkPage() {
     return (
         <div className="mx-auto min-w-0 max-w-[1100px] pb-16 text-[#16313d]">
             <section className="pb-6 pt-2">
-                <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Work / Faculty review</div>
+                <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Impact / Faculty review</div>
                 <h1 className="text-[21px] font-semibold leading-tight">A quick check. A trusted record.</h1>
                 <p className="mt-3 max-w-[680px] text-[13px] text-[#6b7c86] sm:text-sm">
                     Students submit short university activities after they finish, naming you as the coordinating faculty member. Review the activity,
@@ -92,7 +92,7 @@ export default function FacultyQuickWorkPage() {
                 <div className="rounded-2xl border border-[#dcebee] bg-white px-6 py-11 text-center text-[#6b7c86]">
                     <h3 className="mb-2 text-[15px] font-semibold text-[#16313d]">You’re all caught up.</h3>
                     <p className="mx-auto max-w-[440px] text-[13px]">
-                        Requests appear here only after a student submits a completed quick-work log that names your email
+                        Requests appear here only after a student submits a completed Quick Community Impact log that names your email
                         {myEmail ? <b className="text-[#16313d]"> {myEmail}</b> : null} as coordinating faculty. If a student used another address,
                         ask them or CIEL PK to correct it.
                     </p>
@@ -152,10 +152,12 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
         setBusy(action);
         setError([]);
         try {
-            await quickWorkApi.review(log.id, { action, note: note.trim() || undefined, verified });
+            const saved = await quickWorkApi.review(log.id, { action, note: note.trim() || undefined, verified });
             toast.success(
                 action === "approve"
-                    ? "Confirmed. Each participant’s own hours now appear on their dashboard."
+                    ? saved?.status === "admin_review"
+                        ? "Approved. It now goes to CIEL PK for final approval; hours count after that."
+                        : "Confirmed. Each participant’s own hours now appear on their dashboard."
                     : action === "changes"
                       ? "Returned for correction. No hours have been credited."
                       : "Record declined. No hours have been credited.",
@@ -171,8 +173,8 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
     return (
         <article className="mb-4 rounded-[13px] border border-[#dcebee] bg-white p-4 sm:p-6">
             <header className="mb-1">
-                <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Log record</span>
-                <h2 className="mt-1 text-lg font-bold">Review Quick Community Log</h2>
+                <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Impact Log record</span>
+                <h2 className="mt-1 text-lg font-bold">Review Quick Community Impact Log</h2>
                 <p className="mt-0.5 text-xs text-[#6b7c86]">Read the flashcard, attendance and evidence, then approve, request changes or decline.</p>
             </header>
             <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />

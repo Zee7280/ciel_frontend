@@ -672,7 +672,7 @@ export default function Sidebar() {
             withCounts([
                 // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
-                { label: "Quick Community Work", href: "/dashboard/faculty/quick-work", icon: Leaf },
+                { label: "Quick Community Impact", href: "/dashboard/faculty/quick-work", icon: Leaf },
                 // { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
                 // { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             ]),
@@ -729,7 +729,7 @@ export default function Sidebar() {
                 { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
                 { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
-                { label: "Quick Community Work", href: "/dashboard/admin/quick-work", icon: Leaf },
+                { label: "Quick Community Impact", href: "/dashboard/admin/quick-work", icon: Leaf },
                 { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
                 { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
                 { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
@@ -1097,7 +1097,7 @@ export default function Sidebar() {
                                 }}
                             />
                         ))}
-                        <NavSectionLabel collapsed={collapsed}>Quick Community Service</NavSectionLabel>
+                        <NavSectionLabel collapsed={collapsed}>Quick Community Impact</NavSectionLabel>
                         <NavRow
                             href={QUICK_WORK_HREF}
                             label="Quick Impact Log"

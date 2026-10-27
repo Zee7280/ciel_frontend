@@ -123,8 +123,8 @@ function FacultyReview() {
     return (
         <Card wide>
             <div>
-                <p className="text-xs font-bold uppercase tracking-[1.4px] text-[#0e7d74]">Complete Quick Community Log record</p>
-                <h1 className="mt-1 text-lg font-bold text-slate-900">Review Quick Community Log</h1>
+                <p className="text-xs font-bold uppercase tracking-[1.4px] text-[#0e7d74]">Complete Quick Community Impact Log record</p>
+                <h1 className="mt-1 text-lg font-bold text-slate-900">Review Quick Community Impact Log</h1>
                 <p className="mt-0.5 text-xs text-slate-500">Read the flashcard, attendance and evidence, then choose Approve, Request Revision or Reject.</p>
             </div>
 
@@ -152,7 +152,7 @@ function FacultyReview() {
                 <div className="mt-2 rounded-lg border border-[#e8d9b7] bg-[#fff6e5] px-4 py-3 text-sm text-[#79571c]">
                     <p>
                         To review, sign up or log in at CIEL PK with <b>{preview.facultyEmail}</b> as a faculty member. The activity then appears under
-                        Quick Community Work on your dashboard, and this link works too.
+                        Quick Community Impact on your dashboard, and this link works too.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2.5">
                         <Link href="/signup" className="rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-semibold text-white">

@@ -265,7 +265,7 @@ export default function CommunityServiceHub({
             </p>
 
             <MockupSectionHead
-                title="Quick Community Service"
+                title="Quick Community Impact"
                 subtitle="Short university activities, recorded separately. They do not fulfil the 16-hour requirement."
             />
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -283,7 +283,7 @@ export default function CommunityServiceHub({
                     emoji="📒"
                     ghost="📒"
                     title="Quick Impact Log"
-                    subtitle="Your drafts, activities in progress, submitted and approved quick work, with your approved hours."
+                    subtitle="Your drafts, activities in progress, submitted and approved Quick Community Impact activities, with your approved hours."
                     badge="DRAFT · SUBMITTED · APPROVED"
                     background={MOCKUP_GRADIENTS.pink}
                 />
