@@ -68,6 +68,7 @@ export default function MarketplaceOpportunityCard({
         applyBlockedReason,
     };
     const status = classifyMarketplaceStatus(listing);
+    const live = status === "live";
     const cover = resolveMarketplaceCoverUrl(id, coverUrl);
     const range = formatMarketplaceDateRange(startDate, endDate);
     const tags = [organizationName, city, modeLabel, skillLabel].filter((tag): tag is string => Boolean(tag && tag.trim()));
@@ -86,9 +87,16 @@ export default function MarketplaceOpportunityCard({
                 style={{ backgroundImage: `url(${JSON.stringify(cover)})` }}
             >
                 <span
-                    className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.04em] ${STATUS_PILL[status]}`}
+                    className={`absolute left-3 top-3 isolate inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.04em] ${STATUS_PILL[status]} ${
+                        live ? "shadow-[0_0_0_3px_rgba(31,157,85,.25),0_6px_16px_rgba(31,157,85,.45)]" : ""
+                    }`}
                 >
-                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                    {/* Live listings pulse so they stand out; still when the visitor prefers reduced motion. */}
+                    {live ? <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-[#1f9d55] opacity-50 motion-safe:animate-ping" /> : null}
+                    <span className="relative flex h-1.5 w-1.5">
+                        {live ? <span aria-hidden className="absolute inline-flex h-full w-full rounded-full bg-white opacity-80 motion-safe:animate-ping" /> : null}
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+                    </span>
                     {marketplaceStatusLabel(status)}
                 </span>
                 <span className="absolute right-3 top-3 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-bold text-[#35545c]">

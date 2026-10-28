@@ -673,6 +673,7 @@ export default function Sidebar() {
                 // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
                 { label: "Quick Community Impact", href: "/dashboard/faculty/quick-work", icon: Leaf },
+                { label: "Report Supervision", href: "/dashboard/faculty/report-supervision", icon: CheckCircle },
                 // { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
                 // { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             ]),

@@ -18,8 +18,10 @@ import {
     EvidenceGallery,
     QuickWorkModal,
     QuickWorkRecordDetails,
+    QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
+import { facultyReminder, revisionReminder } from "@/utils/quickWorkReminders";
 
 const PAGE_SIZE = 20;
 const STATUS_TABS: { value: QuickWorkStatus | ""; label: string }[] = [
@@ -324,6 +326,30 @@ export default function AdminQuickWorkPage() {
                                             <td className="px-4 py-3 text-right tabular-nums text-slate-800">{formatHours(r.minutes)}</td>
                                             <td className="px-4 py-3">
                                                 <QuickWorkStatusPill status={r.status} />
+                                                {r.status === "submitted" && r.facultyEmail ? (
+                                                    // The row opens the detail; the reminder links must not.
+                                                    <div onClick={(e) => e.stopPropagation()}>
+                                                        <QuickWorkReminder
+                                                            label="Remind faculty:"
+                                                            email={r.facultyEmail}
+                                                            message={facultyReminder({
+                                                                facultyName: r.facultyName,
+                                                                title: r.title,
+                                                                leadName: r.leadName,
+                                                                submittedOn: r.submittedAt ? shortDate(r.submittedAt.slice(0, 10)) : null,
+                                                                from: "admin",
+                                                            })}
+                                                        />
+                                                    </div>
+                                                ) : r.status === "changes" && r.leadEmail ? (
+                                                    <div onClick={(e) => e.stopPropagation()}>
+                                                        <QuickWorkReminder
+                                                            label="Remind student:"
+                                                            email={r.leadEmail}
+                                                            message={revisionReminder({ leadName: r.leadName, title: r.title, from: "admin" })}
+                                                        />
+                                                    </div>
+                                                ) : null}
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{r.submittedAt ? shortDate(r.submittedAt.slice(0, 10)) : "—"}</td>
                                         </tr>
@@ -494,6 +520,32 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
                                   ? `CIEL faculty account, authorised for ${log.facultyAccount.authorisedUniversity}.`
                                   : "CIEL faculty account, but not authorised for any university, so they cannot approve hours."}
                         </p>
+                        {log.status === "submitted" && log.facultyEmail ? (
+                            <QuickWorkReminder
+                                label="Remind faculty:"
+                                email={log.facultyEmail}
+                                message={facultyReminder({
+                                    facultyName: log.facultyName,
+                                    title: log.title,
+                                    leadName: log.participants.find((p) => p.isLead)?.name,
+                                    submittedOn: log.submittedAt ? shortDate(log.submittedAt.slice(0, 10)) : null,
+                                    from: "admin",
+                                })}
+                            />
+                        ) : null}
+                        {log.status === "changes"
+                            ? (() => {
+                                  const lead = log.participants.find((p) => p.isLead);
+                                  return lead?.email ? (
+                                      <QuickWorkReminder
+                                          label="Remind student:"
+                                          email={lead.email}
+                                          phone={lead.contact}
+                                          message={revisionReminder({ leadName: lead.name, title: log.title, note: log.reviewNote, from: "admin" })}
+                                      />
+                                  ) : null;
+                              })()
+                            : null}
                     </div>
 
                     <QuickWorkRecordDetails log={log} evidence={log.evidence.length ? <EvidenceGallery evidence={log.evidence} /> : undefined} />

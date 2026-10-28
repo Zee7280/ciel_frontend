@@ -3,6 +3,8 @@ import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import { OpportunityWhatsAppLinks } from "@/components/opportunities/OpportunityWhatsAppLinks";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 function pickNestedStr(o: Record<string, unknown> | null, ...keys: string[]): string {
     if (!o) return "";
@@ -154,6 +156,12 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
                     {flashError || "Opportunity detail unavailable."}
                 </div>
             )}
+            <OpportunityWhatsAppLinks
+                title={pickNestedStr(d, "title")}
+                creatorName={studentRow.name}
+                // No link to yourself when you created the opportunity.
+                creatorPhone={studentRow.id && studentRow.id === readStoredCurrentUser()?.id ? undefined : studentRow.phone}
+            />
         </div>
     );
 }

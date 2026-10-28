@@ -60,9 +60,11 @@ import {
     QuickWorkModal,
     EvidenceGallery,
     QuickWorkRecordDetails,
+    QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
+import { teammateReminder } from "@/utils/quickWorkReminders";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -553,6 +555,14 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                             {t.email} · {t.studentId || "Student ID needed"}
                                                             {t.contact ? ` · ${formatInternationalPhoneDisplay(t.contact)}` : ""}
                                                         </small>
+                                                        {t.joinStatus !== "joined" && t.joinStatus !== "declined" ? (
+                                                            <QuickWorkReminder
+                                                                label="Remind:"
+                                                                email={t.email}
+                                                                phone={t.contact}
+                                                                message={teammateReminder({ teammateName: t.name, title: form.title, leadName: form.leadName })}
+                                                            />
+                                                        ) : null}
                                                     </div>
                                                     <span
                                                         className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${

@@ -8,8 +8,10 @@ import { activityLabel, formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     QuickWorkRecordDetails,
+    QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
+import { facultyQuestion, revisionReminder } from "@/utils/quickWorkReminders";
 
 type Action = "approve" | "changes" | "reject";
 
@@ -126,6 +128,19 @@ export default function FacultyQuickWorkPage() {
                                         <td className="px-5 py-3.5">
                                             <QuickWorkStatusPill status={r.status} />
                                             {r.reviewNote ? <small className="mt-1 block max-w-[260px] break-words text-xs text-[#6b7c86]">{r.reviewNote}</small> : null}
+                                            {r.status === "changes"
+                                                ? (() => {
+                                                      const lead = r.participants.find((p) => p.isLead);
+                                                      return lead?.email ? (
+                                                          <QuickWorkReminder
+                                                              label="Remind student:"
+                                                              email={lead.email}
+                                                              phone={lead.contact}
+                                                              message={revisionReminder({ leadName: lead.name, title: r.title, note: r.reviewNote, from: "faculty", senderName: r.facultyName })}
+                                                          />
+                                                      ) : null;
+                                                  })()
+                                                : null}
                                         </td>
                                     </tr>
                                 ))}
@@ -140,6 +155,7 @@ export default function FacultyQuickWorkPage() {
 
 function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][number]; onDone: () => Promise<void> }) {
     const blocked = log.approveBlockedReason || null;
+    const lead = log.participants.find((p) => p.isLead);
     const [verified, setVerified] = useState(false);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState<Action | null>(null);
@@ -176,6 +192,14 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
                 <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Impact Log record</span>
                 <h2 className="mt-1 text-lg font-bold">Review Quick Community Impact Log</h2>
                 <p className="mt-0.5 text-xs text-[#6b7c86]">Read the flashcard, attendance and evidence, then approve, request changes or decline.</p>
+                {lead?.email ? (
+                    <QuickWorkReminder
+                        label="Contact student:"
+                        email={lead.email}
+                        phone={lead.contact}
+                        message={facultyQuestion({ leadName: lead.name, title: log.title, facultyName: log.facultyName })}
+                    />
+                ) : null}
             </header>
             <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />
             {error.length ? (

@@ -49,6 +49,19 @@ export type ApplicationRosterRow = {
     impactReportAdminStatus: string | null;
     impactReportFacultyStatus: string | null;
     impactReportRawStatus: string | null;
+    impactReportStartedAt: string | null;
+    impactReportSubmittedAt: string | null;
+    /** Faculty the report goes to: the email the student gave (report Section 1, else when applying). */
+    reportFacultyEmail: string | null;
+    reportFacultySecondaryEmail: string | null;
+    /** Name on the CIEL account with that email; null when no account exists. */
+    reportFacultyName: string | null;
+    reportFacultyAccountRole: string | null;
+    /** False when the backend predates these report fields (then they are unknown, not empty). */
+    reportDetailsKnown: boolean;
+    /** Named faculty must confirm before a new report; null when the backend predates the rule. */
+    reportSupervisionRequired: boolean | null;
+    reportSupervisionConfirmedAt: string | null;
 };
 
 export type TrackerOpportunitySnapshot = {
@@ -252,6 +265,18 @@ export function extractApplicationsRoster(summaryRaw: Record<string, unknown> | 
             impactReportAdminStatus: etStr(["impact_report_admin_status", "impactReportAdminStatus"]),
             impactReportFacultyStatus: etStr(["impact_report_faculty_status", "impactReportFacultyStatus"]),
             impactReportRawStatus: etStr(["impact_report_status", "impactReportStatus"]),
+            impactReportStartedAt: etStr(["impact_report_started_at", "impactReportStartedAt"]),
+            impactReportSubmittedAt: etStr(["impact_report_submitted_at", "impactReportSubmittedAt"]),
+            reportFacultyEmail: etStr(["report_faculty_email", "reportFacultyEmail"]),
+            reportFacultySecondaryEmail: etStr(["report_faculty_secondary_email", "reportFacultySecondaryEmail"]),
+            reportFacultyName: etStr(["report_faculty_name", "reportFacultyName"]),
+            reportFacultyAccountRole: etStr(["report_faculty_account_role", "reportFacultyAccountRole"]),
+            reportDetailsKnown: Boolean(et && ("report_faculty_email" in et || "reportFacultyEmail" in et)),
+            reportSupervisionRequired:
+                et && typeof (et.report_supervision_required ?? et.reportSupervisionRequired) === "boolean"
+                    ? Boolean(et.report_supervision_required ?? et.reportSupervisionRequired)
+                    : null,
+            reportSupervisionConfirmedAt: etStr(["report_supervision_confirmed_at", "reportSupervisionConfirmedAt"]),
         });
     }
     return out;

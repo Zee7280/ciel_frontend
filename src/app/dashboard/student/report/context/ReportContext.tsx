@@ -1149,6 +1149,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 timeoutMs: 120000
             });
 
+            if (res && res.status === 403) {
+                // Faculty has not confirmed supervision yet: say so instead of a generic failure.
+                const body = (await res.clone().json().catch(() => null)) as { code?: string; message?: string } | null;
+                if (body?.code === 'faculty_supervision_pending') {
+                    if (!silent) toast.error(body.message || 'Your faculty supervisor must confirm you before the report can start.');
+                    return false;
+                }
+            }
             if (!res || !res.ok) throw new Error('Save failed');
             setData(dataForSave);
             if (!silent) toast.success('Progress saved!');

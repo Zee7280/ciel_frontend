@@ -12,8 +12,10 @@ import {
     ModalClose,
     QuickWorkModal,
     QuickWorkRecordDetails,
+    QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
+import { facultyReminder } from "@/utils/quickWorkReminders";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 
 const HUB = "/dashboard/student/paths/community-service";
@@ -295,6 +297,13 @@ export default function QuickWorkDashboard() {
                                                 {r.reviewNote ? <small className="mt-1 block max-w-[260px] break-words text-xs text-[#6b7c86]">{r.reviewNote}</small> : null}
                                                 {!r.isLead && m?.joinStatus === "declined" ? (
                                                     <small className="mt-1 block text-xs text-[#ac3c3c]">You declined</small>
+                                                ) : null}
+                                                {r.isLead && r.status === "submitted" && r.facultyEmail ? (
+                                                    <QuickWorkReminder
+                                                        label="Remind faculty:"
+                                                        email={r.facultyEmail}
+                                                        message={facultyReminder({ facultyName: r.facultyName, title: r.title, leadName: m?.name, from: "student" })}
+                                                    />
                                                 ) : null}
                                             </td>
                                             <td className="space-y-1 px-5 py-4">

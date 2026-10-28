@@ -4,6 +4,8 @@ import React, { Suspense } from 'react';
 import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
+import { fetchReportSupervision, type ReportSupervisionState } from "@/utils/reportSupervisionApi";
+import ReportSupervisionGate from "./components/ReportSupervisionGate";
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { Button } from './components/ui/button';
@@ -332,6 +334,19 @@ function ReportFormContent() {
         const rows = Array.isArray(myJson.data) ? myJson.data : [];
         return pickPreferredEngagementSeat(rows, projectId || "");
     }, [projectId]);
+
+    // A new report waits for the named faculty supervisor's confirmation (unknown on an older backend = no gate).
+    const [supervision, setSupervision] = React.useState<ReportSupervisionState | null>(null);
+    const [supervisionChecked, setSupervisionChecked] = React.useState(false);
+    const loadSupervision = React.useCallback(async () => {
+        if (!projectId) return;
+        const state = await fetchReportSupervision(projectId);
+        setSupervision(state);
+        setSupervisionChecked(true);
+    }, [projectId]);
+    React.useEffect(() => {
+        void loadSupervision();
+    }, [loadSupervision]);
 
     // Initial Load
     React.useEffect(() => {
@@ -1048,7 +1063,7 @@ function ReportFormContent() {
         if (activeStep !== FLASH_CARD_STEP) setStep(FLASH_CARD_STEP);
     }, [isLoading, showGuide, summaryOnlyWorkspace, ciiVerifiedSummaryLock, activeStep, setStep]);
 
-    if (isLoading) {
+    if (isLoading || (!supervisionChecked && Boolean(projectId))) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-8 h-8 animate-spin text-[#0e7d74]" />
@@ -1067,6 +1082,18 @@ function ReportFormContent() {
         ? `/dashboard/student/payment?projectId=${encodeURIComponent(projectPaymentId)}`
         : "";
     const onFlash = isFlashCardStep(activeStep);
+
+    if (supervision?.blocked && projectId && !memberAttendanceMode && !wantsPackageView) {
+        return (
+            <ReportSupervisionGate
+                state={supervision}
+                projectId={projectId}
+                projectTitle={projectTitle}
+                onBack={goBackToPreviousPage}
+                onRecheck={loadSupervision}
+            />
+        );
+    }
 
     const shareReport = async () => {
         await shareExhibitionFlashcard({

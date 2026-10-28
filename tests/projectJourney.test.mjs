@@ -78,6 +78,14 @@ const teamsSummary = (overrides = {}) => ({
                 impact_report_partner_status: "approved",
                 impact_report_admin_status: "pending",
                 impact_report_faculty_status: "pending",
+                impact_report_started_at: "2026-09-20T09:30:00.000Z",
+                impact_report_submitted_at: "2026-10-01T12:00:00.000Z",
+                report_faculty_email: "sana.malik@bnu.edu.pk",
+                report_faculty_secondary_email: null,
+                report_faculty_name: "Dr Sana Malik",
+                report_faculty_account_role: "faculty",
+                report_supervision_required: true,
+                report_supervision_confirmed_at: "2026-09-18T08:00:00.000Z",
             },
         },
     ],
@@ -134,6 +142,30 @@ test("parses the teams roster including the new report / student / participation
     assert.equal(a.attendanceSessionsPreview[0].sessionHours, 4);
     assert.equal(a.attendanceSessionsPreview[0].approvalStatus, "approved");
     assert.equal(a.createdAt, "2026-09-02T08:00:00.000Z");
+});
+
+test("parses when the report started and the faculty the student named for it", () => {
+    const [a] = extractApplicationsRoster(teamsSummary());
+    assert.equal(a.impactReportStartedAt, "2026-09-20T09:30:00.000Z");
+    assert.equal(a.impactReportSubmittedAt, "2026-10-01T12:00:00.000Z");
+    assert.equal(a.reportFacultyEmail, "sana.malik@bnu.edu.pk");
+    assert.equal(a.reportFacultySecondaryEmail, null);
+    assert.equal(a.reportFacultyName, "Dr Sana Malik");
+    assert.equal(a.reportFacultyAccountRole, "faculty");
+    assert.equal(a.reportSupervisionRequired, true);
+    assert.equal(a.reportSupervisionConfirmedAt, "2026-09-18T08:00:00.000Z");
+    // An older backend sends none of these: they read as null, nothing throws.
+    const summary = teamsSummary();
+    const et = summary.applications_roster[0].enrollment_tracking;
+    for (const k of ["impact_report_started_at", "impact_report_submitted_at", "report_faculty_email", "report_faculty_name", "report_faculty_account_role", "report_supervision_required", "report_supervision_confirmed_at"]) delete et[k];
+    const [old] = extractApplicationsRoster(summary);
+    assert.equal(a.reportDetailsKnown, true);
+    assert.equal(old.reportDetailsKnown, false);
+    assert.equal(old.impactReportStartedAt, null);
+    assert.equal(old.reportFacultyEmail, null);
+    assert.equal(old.reportFacultyName, null);
+    assert.equal(old.reportSupervisionRequired, null);
+    assert.equal(old.reportSupervisionConfirmedAt, null);
 });
 
 test("tolerates an older backend without the new ids and malformed rows", () => {

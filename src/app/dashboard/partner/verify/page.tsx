@@ -28,6 +28,7 @@ import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import { OpportunityWhatsAppLinks } from "@/components/opportunities/OpportunityWhatsAppLinks";
 import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 import { History } from "lucide-react";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
@@ -207,6 +208,9 @@ function detailStudentBlock(detail: Record<string, unknown>) {
             pickStr(student, "email") ||
             pickStr(user, "email") ||
             pickStr(profile, "email"),
+        phone:
+            pickStr(creator, "phone", "contact", "mobile") ||
+            pickStr(detail, "creator_phone", "student_contact", "student_phone"),
     };
 }
 
@@ -818,6 +822,12 @@ export default function VerifyWorkPage() {
                                     </li>
                                     <li><span className="text-slate-500">Email:</span> {studentBlock?.email || detailSourceRow?.studentEmail || "—"}</li>
                                 </ul>
+                                <OpportunityWhatsAppLinks
+                                    className="mt-3"
+                                    title={pickStr(detailRecord, "title")}
+                                    creatorName={studentBlock?.name || detailSourceRow?.studentName}
+                                    creatorPhone={studentBlock?.phone}
+                                />
                             </div>
 
                             {partnerBlock ? (

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
+import { groupTeamTrackingRows } from "@/utils/facultyTeamTracking";
 import { reportRowToAwardCard, type CommunityAwardCard } from "@/utils/communityAwardModel";
 import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
 import { normalizeFacultyApprovalsResponse, type FacultyApprovalRow } from "@/utils/facultyApprovals";
@@ -42,6 +43,10 @@ export type FacultyCsReportRow = {
     evidence_count?: number;
     participation_type?: string;
     member_hours?: Array<{ name: string; hours: number; required: number }>;
+    /** Seat's team (tracking rows); rows of one team fold into one project card. */
+    team_id?: string | null;
+    is_team_lead?: boolean;
+    team_members?: Array<{ name: string; email?: string; lead?: boolean }>;
     required_hours?: number;
     cii_analyser_run?: boolean;
     cii_provisional?: number | null;
@@ -316,6 +321,9 @@ export function useFacultyCommunityServiceData() {
                                 typeof item.sections_complete === "number" ? item.sections_complete : undefined,
                             sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
                             draft_locked: item.draft_locked === true,
+                            team_id: pickStr(item, "team_id", "teamId") || null,
+                            is_team_lead: item.is_team_lead === true,
+                            participation_type: pickStr(item, "participation_type", "participationType") || undefined,
                             member_hours: Array.isArray(item.member_hours)
                                 ? item.member_hours
                                       .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
@@ -367,7 +375,7 @@ export function useFacultyCommunityServiceData() {
 
     const liveRows = useMemo(() => rows.filter((r) => isFacultyCommunityLiveCard(r)), [rows]);
     const projectRows = useMemo(
-        () => (trackingRows.length ? trackingRows : rows),
+        () => (trackingRows.length ? groupTeamTrackingRows(trackingRows) : rows),
         [trackingRows, rows],
     );
     const revisionReports = useMemo(() => rows.filter(isFacultyCsReportRevision), [rows]);

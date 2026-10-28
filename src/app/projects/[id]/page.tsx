@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
+import { OpportunityWhatsAppLinks } from "@/components/opportunities/OpportunityWhatsAppLinks";
 import {
     buildOpportunityRecordFlashcard,
     flashcardCanApply,
@@ -376,6 +377,8 @@ export default function ProjectDetailsPage() {
                             </p>
                         </>
                     )}
+                    {/* The creator's number is not public; visitors reach CIEL PK admin instead. */}
+                    <OpportunityWhatsAppLinks title={project.title} className="mt-6 justify-center" />
                 </div>
             </div>
 

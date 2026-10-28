@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import { confirmReportSupervision } from "@/utils/reportSupervisionApi";
 import {
     AlertTriangle,
     Bell,
@@ -301,6 +302,81 @@ function AttendanceSessionsBreakdown({
                 ))}
             </ul>
         </details>
+    );
+}
+
+/** One enrolled seat's impact report: when it was started / submitted and the faculty it goes to. */
+function ReportStartRow({ a, onChanged }: { a: ApplicationRosterRow; onChanged: () => void }) {
+    const [confirming, setConfirming] = useState(false);
+    const started = fmtDate(a.impactReportStartedAt);
+    const supervisedOn = fmtDate(a.reportSupervisionConfirmedAt);
+    // A new report waits for the named faculty; CIEL PK can confirm on their behalf.
+    const waitingForFaculty = a.reportSupervisionRequired === true && !a.reportSupervisionConfirmedAt && !started;
+    const confirmForFaculty = async () => {
+        if (!a.participationId) return;
+        setConfirming(true);
+        const r = await confirmReportSupervision(a.participationId);
+        setConfirming(false);
+        if (r.ok) {
+            toast.success("Confirmed for the faculty. The student can start the report.");
+            onChanged();
+        } else toast.error(r.message);
+    };
+    const submitted = fmtDate(a.impactReportSubmittedAt);
+    const email = a.reportFacultyEmail;
+    const role = (a.reportFacultyAccountRole ?? "").toLowerCase();
+    return (
+        <li className="px-3 py-2.5 text-xs text-[#5b6b75]">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="font-bold text-[#16313d]">{a.studentName}</span>
+                <span>
+                    {started ? `Report started ${started}` : "Report not started"}
+                    {submitted ? ` · submitted ${submitted}` : ""}
+                    {submitted && a.impactReportFacultyStatus ? ` · faculty review: ${a.impactReportFacultyStatus}` : ""}
+                </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span className="font-semibold text-[#70808a]">Report faculty:</span>
+                {email ? (
+                    <>
+                        {a.reportFacultyName ? <span className="font-semibold text-[#16313d]">{a.reportFacultyName}</span> : null}
+                        <button
+                            type="button"
+                            onClick={() => void copyText(email, "Faculty email")}
+                            className="inline-flex items-center gap-1 hover:text-[#0e756e]"
+                            title="Copy email"
+                        >
+                            <Mail className="h-3 w-3" /> {email}
+                        </button>
+                        {role === "faculty" ? null : (
+                            <Chip tone="bg-amber-50 text-amber-900 border-amber-100">
+                                {role ? `CIEL account is ${role}, not faculty` : "No CIEL account with this email"}
+                            </Chip>
+                        )}
+                        {a.reportFacultySecondaryEmail ? <span>· second: {a.reportFacultySecondaryEmail}</span> : null}
+                    </>
+                ) : (
+                    <span className="font-semibold text-amber-800">Not entered</span>
+                )}
+            </div>
+            {supervisedOn ? (
+                <div className="mt-1 text-[11px] font-semibold text-emerald-700">Faculty confirmed supervision {supervisedOn}</div>
+            ) : waitingForFaculty ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <Chip tone="bg-amber-50 text-amber-900 border-amber-100">Waiting for faculty confirmation to start the report</Chip>
+                    {a.participationId ? (
+                        <button
+                            type="button"
+                            onClick={() => void confirmForFaculty()}
+                            disabled={confirming}
+                            className="rounded-md border border-[#cbe3e0] bg-white px-2 py-0.5 text-[11px] font-bold text-[#0e756e] hover:bg-[#f1f8f7] disabled:opacity-60"
+                        >
+                            {confirming ? "Confirming…" : "Confirm for faculty"}
+                        </button>
+                    ) : null}
+                </div>
+            ) : null}
+        </li>
     );
 }
 
@@ -1068,16 +1144,26 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
                         ) : undefined,
                 };
             }
-            case "reports":
+            case "reports": {
+                const reportSeats = roster.filter((a) => a.internalStatus === "approved" && a.reportDetailsKnown);
                 return {
                     detail:
                         stats.enrolledSeats > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                                <Chip tone="bg-emerald-50 text-emerald-800 border-emerald-100">Verified {r.verified}</Chip>
-                                {r.review ? <Chip tone="bg-amber-50 text-amber-900 border-amber-100">In review {r.review}</Chip> : null}
-                                {r.draft ? <Chip tone="bg-slate-50 text-slate-700 border-slate-200">Draft / revision {r.draft}</Chip> : null}
-                                {r.none ? <Chip tone="bg-slate-50 text-slate-500 border-slate-200">Not started {r.none}</Chip> : null}
-                                {r.rejected ? <Chip tone="bg-rose-50 text-rose-800 border-rose-100">Rejected {r.rejected}</Chip> : null}
+                            <div className="space-y-2.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                    <Chip tone="bg-emerald-50 text-emerald-800 border-emerald-100">Verified {r.verified}</Chip>
+                                    {r.review ? <Chip tone="bg-amber-50 text-amber-900 border-amber-100">In review {r.review}</Chip> : null}
+                                    {r.draft ? <Chip tone="bg-slate-50 text-slate-700 border-slate-200">Draft / revision {r.draft}</Chip> : null}
+                                    {r.none ? <Chip tone="bg-slate-50 text-slate-500 border-slate-200">Not started {r.none}</Chip> : null}
+                                    {r.rejected ? <Chip tone="bg-rose-50 text-rose-800 border-rose-100">Rejected {r.rejected}</Chip> : null}
+                                </div>
+                                {reportSeats.length ? (
+                                    <ul className="divide-y divide-[#e6eef1] overflow-hidden rounded-xl border border-[#e6eef1] bg-white">
+                                        {reportSeats.map((a) => (
+                                            <ReportStartRow key={a.id} a={a} onChanged={() => void load()} />
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </div>
                         ) : undefined,
                     action:
@@ -1087,6 +1173,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
                             </button>
                         ) : undefined,
                 };
+            }
             case "closed":
                 return {
                     action:

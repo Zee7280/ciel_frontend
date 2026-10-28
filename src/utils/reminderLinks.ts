@@ -49,3 +49,21 @@ export function whatsappHrefFromE164(phone: string | null | undefined, text: str
     if (digits.length < 10) return null;
     return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
+
+/** wa.me digits for a stored phone (+92…, 0092…, 03…, 3…); "" when the number is unusable. */
+export function whatsappDigits(value: unknown): string {
+    if (typeof value !== "string") return "";
+    let digits = value.trim().replace(/\D/g, "");
+    if (digits.startsWith("00")) digits = digits.slice(2);
+    else if (digits.startsWith("0") && digits.length === 11) digits = `92${digits.slice(1)}`;
+    // "+92 0300 1234567": the trunk 0 after the country code is not dialled.
+    if (digits.startsWith("920") && digits.length === 13) digits = `92${digits.slice(3)}`;
+    else if (digits.startsWith("3") && digits.length === 10) digits = `92${digits}`;
+    return digits.length >= 10 && digits.length <= 15 ? digits : "";
+}
+
+/** Like whatsappHrefFromE164, but also accepts Pakistani local formats (03…). Null when unusable. */
+export function whatsappHrefForPhone(phone: string | null | undefined, text: string): string | null {
+    const digits = whatsappDigits(phone);
+    return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null;
+}

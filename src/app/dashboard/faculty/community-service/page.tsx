@@ -355,6 +355,13 @@ function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
             ? row.member_hours
             : [{ name: row.student_name || "Student", hours, required }];
     const fillingReport = row.draft_locked === true && typeof row.sections_complete === "number";
+    const team = row.team_members && row.team_members.length > 1 ? row.team_members : null;
+    const remindTo = team
+        ? team
+              .map((m) => m.email)
+              .filter((e): e is string => Boolean(e && e.includes("@")))
+              .join(",")
+        : row.student_email;
     const status = live
         ? { title: "Verified", text: "Impact package is live for connected stakeholders.", nextTitle: "No action required from you", nextText: "Hours and the verified package stay available here.", nextCls: "" }
         : reportHref
@@ -399,13 +406,23 @@ function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
                     ) : null}
                 </div>
                 <div className="mt-2.5 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2eaed] bg-[#fbfcfd] py-1 pl-1 pr-2.5 text-[11.5px] text-slate-800">
-                        <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-[#dff1ed] text-[10px] font-black text-[#145a4f]">
-                            {personInitials(row.student_name || "Student")}
+                    {team ? (
+                        <span className="inline-flex items-center rounded-full bg-[#e8f1ff] px-2.5 py-1 text-[11px] font-black text-[#2f5ea8]">
+                            Team · {team.length} members
                         </span>
-                        {row.student_name || "Student"}
-                        <small className="text-[10px] text-slate-500">Student</small>
-                    </span>
+                    ) : null}
+                    {(team ?? [{ name: row.student_name || "Student" }]).map((person, index) => (
+                        <span
+                            key={`${person.name}-${index}`}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[#e2eaed] bg-[#fbfcfd] py-1 pl-1 pr-2.5 text-[11.5px] text-slate-800"
+                        >
+                            <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-[#dff1ed] text-[10px] font-black text-[#145a4f]">
+                                {personInitials(person.name || "Student")}
+                            </span>
+                            {person.name || "Student"}
+                            <small className="text-[10px] text-slate-500">{"lead" in person && person.lead ? "Team lead" : "Student"}</small>
+                        </span>
+                    ))}
                     {org ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2eaed] bg-[#fbfcfd] py-1 pl-1 pr-2.5 text-[11.5px] text-slate-800">
                             <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-[#e6e0f7] text-[10px] font-black text-[#5a2bb5]">
@@ -445,7 +462,7 @@ function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
                     <small className="mt-1 block text-[11.5px] leading-snug text-slate-500">{status.nextText}</small>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                    {live ? null : <FacultyRemindButtons email={row.student_email} title={row.project_title} />}
+                    {live ? null : <FacultyRemindButtons email={remindTo} title={row.project_title} />}
                     {reportHref ? (
                         <Link href={reportHref} className="rounded-[10px] bg-[#0e7d74] px-3 py-2 text-[12px] font-black text-white">
                             Open report

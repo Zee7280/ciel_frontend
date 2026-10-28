@@ -30,6 +30,7 @@ import {
     buildOpportunityRecordFlashcard,
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
+import { OpportunityWhatsAppLinks } from "@/components/opportunities/OpportunityWhatsAppLinks";
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
@@ -1756,6 +1757,16 @@ export default function AdminApprovalsPage() {
                                                                 {creatorPhone}
                                                             </a>
                                                         </span>
+                                                    </li>
+                                                ) : null}
+                                                {creatorPhone ? (
+                                                    <li>
+                                                        <OpportunityWhatsAppLinks
+                                                            title={pickDetailStr(v, "title")}
+                                                            creatorName={creatorName}
+                                                            creatorPhone={creatorPhone}
+                                                            showAdmin={false}
+                                                        />
                                                     </li>
                                                 ) : null}
                                             </ul>

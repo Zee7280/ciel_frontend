@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
+import { mailtoHref, whatsappHrefForPhone, whatsappShareHref } from "@/utils/reminderLinks";
+import type { ReminderMessage } from "@/utils/quickWorkReminders";
 import {
     activityLabel,
     formatHours,
@@ -41,6 +43,48 @@ export function PhotoIcon({ className = "h-7 w-7" }: { className?: string }) {
             <circle cx="8" cy="9" r="1.5" />
             <path d="m3 17 6-5 4 3 3-4 5 6" />
         </svg>
+    );
+}
+
+/* ------------------------------------------------------------------ reminders */
+
+/**
+ * Email / WhatsApp reminder buttons. They open a prefilled message on the sender's own device (no
+ * message is sent by CIEL PK). WhatsApp goes to `phone` when known, otherwise to the share sheet.
+ */
+export function QuickWorkReminder({
+    label,
+    email,
+    phone,
+    message,
+}: {
+    label: string;
+    email?: string | null;
+    phone?: string | null;
+    message: ReminderMessage;
+}) {
+    const text = `${message.subject}\n\n${message.body}`;
+    const whatsapp = whatsappHrefForPhone(phone, text) ?? whatsappShareHref(text);
+    return (
+        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-[#6b7c86]">{label}</span>
+            {email ? (
+                <a
+                    href={mailtoHref(email, message.subject, message.body)}
+                    className="rounded-md bg-[#edf4fb] px-2 py-1 text-[11px] font-bold text-[#376d9f] hover:bg-[#dfeaf6]"
+                >
+                    Email
+                </a>
+            ) : null}
+            <a
+                href={whatsapp}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md bg-[#e8f8ee] px-2 py-1 text-[11px] font-bold text-[#1f7a46] hover:bg-[#d6f1e0]"
+            >
+                WhatsApp
+            </a>
+        </span>
     );
 }
 
