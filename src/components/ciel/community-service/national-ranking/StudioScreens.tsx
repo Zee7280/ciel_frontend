@@ -166,7 +166,7 @@ export function PackagesScreen({
                                 <tr key={p.id}>
                                     <td><b>{p.title}</b><small className="pmeta">{p.id.slice(0, 8)} · {fmtDate(p.date)}</small></td>
                                     <td>{p.university}<small className="pmeta">{p.department}</small></td>
-                                    <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b><small className="pmeta">Locked approval</small></td>
+                                    <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b><small className="pmeta">{p.ciiSource === "legacy" ? "Legacy approval (pre-v4.5)" : "Locked approval"}</small></td>
                                     <td><span className={`labelchip ${p.ready ? "" : "red"}`}>{p.ready ? "Complete" : "Verification required"}</span>{!p.ready && p.reason ? <ReasonText text={p.reason} /> : null}</td>
                                     <td><span className={`labelchip ${p.evaluated ? "" : "gray"}`}>{p.evaluated ? "Read" : p.ready ? "Awaiting read" : "—"}</span></td>
                                     <td><button type="button" className="btn sm" onClick={() => onOpen(p.id)}>Open →</button></td>

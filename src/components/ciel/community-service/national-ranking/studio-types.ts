@@ -128,6 +128,8 @@ export type LibraryPackage = {
     sdg: string;
     date: string;
     cii: number | null;
+    /** `legacy`: approved before CII v4.5 locking — the original approved CII, not a v4.5 lock. */
+    ciiSource?: "v45" | "legacy" | null;
     ready: boolean;
     evaluated: boolean;
     reason: string;

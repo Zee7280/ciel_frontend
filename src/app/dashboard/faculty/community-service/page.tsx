@@ -377,7 +377,10 @@ function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
             : {
                   title: hoursPct >= 100 ? "Hours complete" : "Hours in progress",
                   text: hoursPct >= 100 ? "Minimum hours met." : "Live hours from assigned students.",
-                  nextTitle: hoursPct >= 100 ? "Student can submit the report" : "Student continues logging hours",
+                  nextTitle:
+                      hoursPct >= 100
+                          ? team ? "Students can submit the report" : "Student can submit the report"
+                          : team ? "Students continue logging hours" : "Student continues logging hours",
                   nextText: "Reminders are system-generated and logged.",
                   nextCls: hoursPct >= 100 ? "next" : "warn",
               };
@@ -408,7 +411,7 @@ function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
                 <div className="mt-2.5 flex flex-wrap gap-2">
                     {team ? (
                         <span className="inline-flex items-center rounded-full bg-[#e8f1ff] px-2.5 py-1 text-[11px] font-black text-[#2f5ea8]">
-                            Team · {team.length} members
+                            {row.participation_type === "team" ? `Team · ${team.length} members` : `${team.length} students`}
                         </span>
                     ) : null}
                     {(team ?? [{ name: row.student_name || "Student" }]).map((person, index) => (
