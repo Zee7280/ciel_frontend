@@ -732,6 +732,7 @@ export default function Sidebar() {
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
                 { label: "Quick Community Impact", href: "/dashboard/admin/quick-work", icon: Leaf },
                 { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
+                { label: "Community service reporting", href: "/dashboard/admin/cs-reporting", icon: FileBarChart },
                 { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
                 { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
             ]),

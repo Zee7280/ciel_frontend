@@ -130,6 +130,7 @@ function adminPageKicker(pathname: string, searchParams: { get(name: string): st
     if (p.startsWith("/dashboard/admin/settings")) return "Settings";
     if (p.startsWith("/dashboard/admin/faculty-university-scope")) return "Faculty ↔ University scope";
     if (p.startsWith("/dashboard/admin/project-evidence")) return "Project evidence export";
+    if (p.startsWith("/dashboard/admin/cs-reporting")) return "Community service reporting";
     if (p.startsWith("/dashboard/admin/tutorials")) return "Platform tutorial";
     if (p.startsWith("/dashboard/admin/email")) return "Send email";
     if (p.startsWith("/dashboard/admin/cep-feedback")) return "CEP feedback";
