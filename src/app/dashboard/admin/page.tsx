@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import {
     fetchAdminPendingCounts,
     readAdminPendingCountsCache,
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
     return (
         <div className="mx-auto min-w-0 max-w-[1500px]">
             <MockupHero
-                title={namedTimeGreeting("CIEL PK", "\u{1F44B}")}
+                title={<TimeGreeting name={"CIEL PK"} emoji={"\u{1F44B}"} />}
                 subtitle="Four impact areas. One command center. Monitor work, intervene when anyone is delayed, and turn approved projects into measurable impact intelligence."
                 stats={[
                     { value: fmt(totalUsers), label: "Total users", href: "/dashboard/admin/users" },

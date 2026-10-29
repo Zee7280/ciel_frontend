@@ -9,7 +9,7 @@ import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
 import { prefetchCommunityServiceData } from "@/utils/student-community-cache";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import {
     MOCKUP_GRADIENTS,
@@ -124,7 +124,7 @@ export default function StudentDashboardPage() {
     return (
         <div className="mx-auto min-w-0 max-w-[1500px]">
             <MockupHero
-                title={namedTimeGreeting(firstName, "👋")}
+                title={<TimeGreeting name={firstName} emoji={"👋"} />}
                 subtitle="Four impact areas. One portfolio. Start your work, track every approval, and build a verified record of your academic and community impact."
                 stats={[
                     { value: String(activeRecords), label: "Active Records" },

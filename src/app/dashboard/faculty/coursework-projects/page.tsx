@@ -28,7 +28,7 @@ import { currentAcademicYear } from "@/components/ciel/FypRankingStudio";
 import { isFacultyApproved, pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
 import { mergeCourseProjectEntry } from "@/utils/courseProjectTypes";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { normalizeReviewStatus } from "@/utils/reviewQueue";
 
@@ -206,7 +206,7 @@ function FacultyCourseworkHub() {
             {view === "home" ? (
                 <CourseworkHero
                     kicker="FACULTY · COURSEWORK"
-                    title={namedTimeGreeting(firstName, "📘")}
+                    title={<TimeGreeting name={firstName} emoji={"📘"} />}
                     subtitle="Students' coursework arrives as flashcards with the AI analysis already run. You keep final academic authority: edit any criterion level, add your comment, approve — and the final score, analysis and comment go to the student's flashcard and Impact Wall, your wall, the university and CIEL PK in one transaction."
                     stats={[
                         { value: String(pending.length), label: "AWAITING DECISION", href: `${BASE}?view=review` },

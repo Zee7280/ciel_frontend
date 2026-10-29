@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRegisterDashboardPageChrome } from "@/components/ciel/dashboard/DashboardChromeContext";
@@ -39,7 +40,7 @@ export function CourseworkHero({
     roleBadge,
 }: {
     kicker: string;
-    title: string;
+    title: ReactNode;
     subtitle: string;
     gradient?: string;
     stats: { value: string; label: string; href?: string }[];

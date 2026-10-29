@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { QUICK_WORK_FACULTY_PENDING_EVENT, apiMessages, quickWorkApi, type FacultyQuickWorkQueue } from "@/utils/quickWorkApi";
 import { activityLabel, formatHours, shortDate } from "@/utils/quickWorkRules";
 import {
+    ConfirmDecisionDialog,
     EvidenceGallery,
     QuickWorkRecordDetails,
     QuickWorkReminder,
@@ -160,11 +161,21 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState<Action | null>(null);
     const [error, setError] = useState<string[]>([]);
+    /** A return or decline is confirmed in a dialog before it is recorded. */
+    const [confirm, setConfirm] = useState<"changes" | "reject" | null>(null);
 
     const act = async (action: Action) => {
         if (action !== "approve" && !note.trim()) return setError(["Add a brief reason or correction first."]);
         if (action === "approve" && blocked) return setError([blocked]);
         if (action === "approve" && !verified) return setError(["Confirm you reviewed the attendance and evidence."]);
+        if (action !== "approve") {
+            setError([]);
+            return setConfirm(action);
+        }
+        await perform(action);
+    };
+
+    const perform = async (action: Action) => {
         setBusy(action);
         setError([]);
         try {
@@ -183,11 +194,22 @@ function ReviewCard({ log, onDone }: { log: FacultyQuickWorkQueue["pending"][num
             setError(apiMessages(e));
         } finally {
             setBusy(null);
+            setConfirm(null);
         }
     };
 
     return (
         <article className="mb-4 rounded-[13px] border border-[#dcebee] bg-white p-4 sm:p-6">
+            {confirm ? (
+                <ConfirmDecisionDialog
+                    action={confirm}
+                    title={log.title}
+                    note={note.trim()}
+                    busy={busy != null}
+                    onCancel={() => setConfirm(null)}
+                    onConfirm={() => void perform(confirm)}
+                />
+            ) : null}
             <header className="mb-1">
                 <span className="text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Complete Quick Community Impact Log record</span>
                 <h2 className="mt-1 text-lg font-bold">Review Quick Community Impact Log</h2>

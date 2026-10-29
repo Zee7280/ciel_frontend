@@ -21,7 +21,7 @@ import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathFilterBar,
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
 import { CourseworkMonitorRow } from "@/components/ciel/coursework/CourseworkMonitorRow";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { isPathEntryApproved, isPathEntryWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 
@@ -397,7 +397,7 @@ function UniversityShowcaseHub() {
                     mode === "course-project" ? (
                     <CourseworkHero
                         kicker="UNIVERSITY · COURSEWORK"
-                        title={namedTimeGreeting(firstName, "📘")}
+                        title={<TimeGreeting name={firstName} emoji={"📘"} />}
                         subtitle="Read-only oversight of every coursework record at your university. Institutional intelligence after faculty approval — the university never changes a score."
                         stats={[
                             { value: String(approved.length), label: "APPROVED" },

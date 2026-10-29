@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi, saveQuickWorkOnLeave } from "@/utils/quickWorkApi";
+import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi, saveQuickWorkOnLeave, type FacultyLookup } from "@/utils/quickWorkApi";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -128,6 +128,11 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const loadedId = useRef<string | null>(null);
     /** Faculty this student named on earlier logs, offered as suggestions in Step 1. */
     const [pastFaculty, setPastFaculty] = useState<{ name: string; email: string }[]>([]);
+    /** Step 1 hint: whether the typed faculty email has a CIEL PK account that can approve hours. */
+    const [facultyCheck, setFacultyCheck] = useState<{ email: string; result: FacultyLookup | null } | null>(null);
+    /** The last payload stored on CIEL PK, and any save of it still in flight: an identical repeat save reuses them. */
+    const lastSaved = useRef("");
+    const inFlight = useRef<{ json: string; promise: Promise<QuickWorkLog | null> } | null>(null);
 
     /* ---------------------------------------------------------------- load */
 
@@ -144,6 +149,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         (x) => x.isLead && x.status === "draft" && !x.title.trim() && x.participants.length === 1 && !x.evidence.length,
                     );
                     l = blank ?? (await quickWorkApi.create({ activityDate: pktNow().date }));
+                    if (blank && blank.createdAt.slice(0, 10) !== pktNow().date) {
+                        toast.info(`Continuing the empty draft you started on ${shortDate(blank.createdAt.slice(0, 10))}. Nothing else was in it.`);
+                    }
                 } else {
                     l = await quickWorkApi.get(logId);
                 }
@@ -220,35 +228,50 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
      */
     const persist = async (next: QuickWorkForm | null = form, { quiet = false }: { quiet?: boolean } = {}): Promise<QuickWorkLog | null> => {
         if (!log || !next) return null;
-        const startedAt = editRev.current;
-        setSaving(true);
+        const payload = payloadFromForm(next);
+        const json = JSON.stringify(payload);
+        // Continue / Review while an autosave of the same data is in flight, or with nothing new since
+        // the last save: one request, not one per button.
+        if (inFlight.current?.json === json) return inFlight.current.promise;
+        if (!dirty && json === lastSaved.current) return log;
+        const run = (async (): Promise<QuickWorkLog | null> => {
+            const startedAt = editRev.current;
+            setSaving(true);
+            try {
+                const saved = await quickWorkApi.save(log.id, payload);
+                lastSaved.current = json;
+                const fresh = formFromLog(saved);
+                setLog(saved);
+                setForm((f) =>
+                    f
+                        ? {
+                              ...f,
+                              teammates: fresh.teammates,
+                              leadName: fresh.leadName,
+                              leadEmail: fresh.leadEmail,
+                              evidence: withViewableEvidence(f.evidence, saved.evidence),
+                          }
+                        : fresh,
+                );
+                // Edits made while this save was in flight are still unsaved: autosave picks them up.
+                if (editRev.current === startedAt) setDirty(false);
+                setSaveError(null);
+                if (!quiet) setErrors([]);
+                return saved;
+            } catch (e) {
+                const messages = apiMessages(e);
+                setSaveError(messages.join(" "));
+                if (!quiet) showErrors(messages);
+                return null;
+            } finally {
+                setSaving(false);
+            }
+        })();
+        inFlight.current = { json, promise: run };
         try {
-            const saved = await quickWorkApi.save(log.id, payloadFromForm(next));
-            const fresh = formFromLog(saved);
-            setLog(saved);
-            setForm((f) =>
-                f
-                    ? {
-                          ...f,
-                          teammates: fresh.teammates,
-                          leadName: fresh.leadName,
-                          leadEmail: fresh.leadEmail,
-                          evidence: withViewableEvidence(f.evidence, saved.evidence),
-                      }
-                    : fresh,
-            );
-            // Edits made while this save was in flight are still unsaved: autosave picks them up.
-            if (editRev.current === startedAt) setDirty(false);
-            setSaveError(null);
-            if (!quiet) setErrors([]);
-            return saved;
-        } catch (e) {
-            const messages = apiMessages(e);
-            setSaveError(messages.join(" "));
-            if (!quiet) showErrors(messages);
-            return null;
+            return await run;
         } finally {
-            setSaving(false);
+            if (inFlight.current?.promise === run) inFlight.current = null;
         }
     };
 
@@ -275,6 +298,39 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         },
         [],
     );
+
+    // Step 1: shortly after the faculty email is typed, ask CIEL PK whether that account exists and
+    // may approve hours, and fill in the name when the student has not typed one.
+    const facultyEmail = form?.facultyEmail.trim().toLowerCase() ?? "";
+    const patchRef = useRef({ patch, form });
+    useEffect(() => {
+        patchRef.current = { patch, form };
+    });
+    useEffect(() => {
+        if (!editable || !EMAIL_RE.test(facultyEmail)) {
+            setFacultyCheck(null);
+            return;
+        }
+        let cancelled = false;
+        setFacultyCheck({ email: facultyEmail, result: null });
+        const timer = window.setTimeout(() => {
+            quickWorkApi
+                .facultyLookup(facultyEmail)
+                .then((result) => {
+                    if (cancelled) return;
+                    setFacultyCheck({ email: facultyEmail, result });
+                    const latest = patchRef.current;
+                    if (result.registered && result.name && latest.form && !latest.form.facultyName.trim()) {
+                        latest.patch({ facultyName: result.name });
+                    }
+                })
+                .catch(() => !cancelled && setFacultyCheck(null));
+        }, 600);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [facultyEmail, editable]);
 
     if (loadError) {
         return (
@@ -335,6 +391,10 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 
     const next = async () => {
         const e = stepCheck[step - 1](form);
+        // Details typed for a teammate but never added would be lost on Continue; say so plainly.
+        if (step === 1 && form.mode === "team" && (mate.name.trim() || mate.email.trim() || mate.studentId.trim())) {
+            e.unshift("You typed a teammate’s details but have not added them yet. Press “+ Add teammate” first, or clear those fields.");
+        }
         if (e.length) return showErrors(e);
         if (await persist()) {
             setStep(step + 1);
@@ -726,7 +786,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             }}
                                         />
                                     </Field>
-                                    <Field id="qwFacultyEmail" label="Faculty university email" required>
+                                    <Field id="qwFacultyEmail" label="Faculty email (their CIEL PK account)" required>
                                         <input
                                             id="qwFacultyEmail"
                                             type="email"
@@ -759,6 +819,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                         </datalist>
                                     </>
                                 ) : null}
+                                {facultyCheck ? <FacultyHint check={facultyCheck} /> : null}
                                 <p className="mt-2.5 text-xs text-[#6b7c86]">
                                     This faculty member reviews your completed work after you submit, from their CIEL dashboard. Selecting them does not
                                     send an approval request yet.
@@ -1255,7 +1316,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     </header>
                     <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />
                     <p className="mt-3 text-xs text-[#6b7c86]">
-                        {form.evidence.length} evidence file(s) · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
+                        {form.evidence.length} evidence {form.evidence.length === 1 ? "file" : "files"} · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dcebee] pt-4">
                         <button type="button" onClick={() => setPreview(false)} disabled={submitting} className={btnCls}>
@@ -1307,6 +1368,34 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
 function pinLatLng(pin: string) {
     const [lat, lng] = pin.split(",").map((s) => parseFloat(s.trim()));
     return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+}
+
+/** What CIEL PK knows about the typed faculty email: can this person review and approve the hours? */
+function FacultyHint({ check }: { check: { email: string; result: FacultyLookup | null } }) {
+    const r = check.result;
+    const tone = !r ? "bg-[#f4f8f9] text-[#6b7c86]" : r.registered && r.university ? "bg-[#e6f6f4] text-[#0b6760]" : "bg-[#fff6e5] text-[#79571c]";
+    return (
+        <p role="status" className={`mt-2.5 rounded-lg px-3 py-2 text-xs leading-relaxed ${tone}`}>
+            {!r ? (
+                "Checking this email on CIEL PK…"
+            ) : !r.registered ? (
+                <>
+                    <b>No CIEL PK faculty account uses {check.email} yet.</b> Your faculty member must sign up with this exact email before they can
+                    review. Check the address with them; you can still save and submit.
+                </>
+            ) : r.university ? (
+                <>
+                    <b>✓ {r.name || check.email} is registered on CIEL PK</b> and can approve hours for {r.university}.
+                </>
+            ) : (
+                <>
+                    <b>{r.name || check.email} is registered on CIEL PK but not yet linked to a university</b>, so they cannot approve hours yet. Ask
+                    them to get their university to authorise them on CIEL PK (or CIEL PK to set it on their profile). You can still submit; the log
+                    waits with them until then.
+                </>
+            )}
+        </p>
+    );
 }
 
 function StepHead({ title, n, intro }: { title: string; n: number; intro: string }) {

@@ -208,7 +208,8 @@ export function attendanceMinutes(a: AttendanceLike): number {
     const start = minutesOfDay(a.startTime);
     const end = minutesOfDay(a.endTime);
     if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
-    return Math.max(0, end - start - (Number(a.breakMinutes) || 0));
+    // A negative break (rejected on Continue) must not show as extra time in the preview.
+    return Math.max(0, end - start - Math.max(0, Number(a.breakMinutes) || 0));
 }
 
 /** Minutes → "1.5" style hours (max two decimals). */
@@ -386,9 +387,11 @@ export function teamErrors(f: QuickWorkForm): string[] {
     return e;
 }
 
-export function activityErrors(f: QuickWorkForm): string[] {
+export function activityErrors(f: QuickWorkForm, now: Date = new Date()): string[] {
     const e: string[] = [];
     if (!f.title.trim() || !f.activityType || !f.location.trim() || !f.activityDate) e.push("Enter the activity title, type, date and venue.");
+    // The log records work already completed: a future date is caught here, not only on submit.
+    if (f.activityDate && f.activityDate > pktNow(now).date) e.push("Enter the actual date of work already completed (today or earlier, PKT).");
     if (f.activityType === QUICK_WORK_OTHER_ACTIVITY && !f.activityTypeOther.trim()) e.push("Describe the activity type for “Other”.");
     const s = minutesOfDay(f.startTime);
     const en = minutesOfDay(f.endTime);

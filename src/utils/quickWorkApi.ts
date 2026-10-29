@@ -122,8 +122,12 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     return json.data as T;
 }
 
+/** Step 1 hint: whether the typed faculty email has a CIEL PK faculty account, and the university it may approve for. */
+export type FacultyLookup = { email: string; registered: boolean; name: string | null; university: string | null };
+
 export const quickWorkApi = {
     mine: () => call<QuickWorkMine>("/quick-work/me"),
+    facultyLookup: (email: string) => call<FacultyLookup>(`/quick-work/faculty-lookup?email=${encodeURIComponent(email)}`),
     get: (id: string) => call<QuickWorkLog>(`/quick-work/logs/${encodeURIComponent(id)}`),
     create: (body: unknown) => call<QuickWorkLog>("/quick-work/logs", { method: "POST", body: JSON.stringify(body) }),
     save: (id: string, body: unknown) =>

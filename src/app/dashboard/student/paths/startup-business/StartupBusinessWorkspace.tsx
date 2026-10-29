@@ -14,7 +14,7 @@ import { getPathSessionCache } from "@/utils/student-path-session-cache";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import {
     BUYER_MODELS,
@@ -652,7 +652,7 @@ export default function StartupBusinessWorkspace() {
             <div className="mx-auto max-w-[1500px] pb-16">
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
-                    title={namedTimeGreeting(greetName, "🚀")}
+                    title={<TimeGreeting name={greetName} emoji={"🚀"} />}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
                     badge="🎓 STUDENT"
                     stats={heroStats}
@@ -698,7 +698,7 @@ export default function StartupBusinessWorkspace() {
             <div className="mx-auto max-w-[1500px] px-[18px]">
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
-                    title={namedTimeGreeting(greetName, "🚀")}
+                    title={<TimeGreeting name={greetName} emoji={"🚀"} />}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
                     badge="🎓 STUDENT"
                     stats={heroStats}

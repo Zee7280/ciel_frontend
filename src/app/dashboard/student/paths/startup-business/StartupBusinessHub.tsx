@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { CourseworkCrumb } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
@@ -1195,7 +1195,7 @@ export default function StartupBusinessHub({
             {view === "home" || view === "in-progress" || view === "under-review" || view === "wall" || view === "record" ? (
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
-                    title={namedTimeGreeting(name === "there" ? "" : name, "🚀")}
+                    title={<TimeGreeting name={name === "there" ? "" : name} emoji={"🚀"} />}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
                     badge="🎓 STUDENT"
                     stats={[

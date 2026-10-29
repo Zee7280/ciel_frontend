@@ -1,5 +1,7 @@
 /** Same greeting as the student dashboard: morning / afternoon / evening by local time. */
 
+import { useSyncExternalStore } from "react";
+
 export function timeOfDayGreeting(): "Good morning" | "Good afternoon" | "Good evening" {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -16,10 +18,28 @@ function displayFirstName(name?: string | null): string {
     return first;
 }
 
-/** e.g. `Good evening, Fatima 🌍` — omit name if empty. */
-export function namedTimeGreeting(name?: string | null, emoji?: string): string {
-    const phrase = timeOfDayGreeting();
+function withName(phrase: string, name?: string | null, emoji?: string): string {
     const first = displayFirstName(name);
     const base = first ? `${phrase}, ${first}` : phrase;
     return emoji ? `${base} ${emoji}` : base;
+}
+
+/** e.g. `Good evening, Fatima 🌍` — omit name if empty. */
+export function namedTimeGreeting(name?: string | null, emoji?: string): string {
+    return withName(timeOfDayGreeting(), name, emoji);
+}
+
+const subscribeNever = () => () => {};
+
+/**
+ * The greeting as page text. The server (and the first client render, while hydrating) cannot know
+ * the reader's local time, so both say "Welcome, …"; the time-of-day wording appears right after,
+ * instead of a hydration mismatch (React #418) that re-renders the whole page.
+ */
+export function TimeGreeting({ name, emoji }: { name?: string | null; emoji?: string }): string {
+    return useSyncExternalStore(
+        subscribeNever,
+        () => namedTimeGreeting(name, emoji),
+        () => withName("Welcome", name, emoji),
+    );
 }

@@ -30,7 +30,7 @@ export function MockupHero({
     gradient = COMMAND_HERO,
 }: {
     kicker?: string;
-    title: string;
+    title: ReactNode;
     subtitle: string;
     stats: { value: string; label: string; href?: string }[];
     rightStat?: { value: string; label: string };

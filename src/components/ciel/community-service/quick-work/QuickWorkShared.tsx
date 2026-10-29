@@ -64,7 +64,8 @@ export function QuickWorkReminder({
     message: ReminderMessage;
 }) {
     const text = `${message.subject}\n\n${message.body}`;
-    const whatsapp = whatsappHrefForPhone(phone, text) ?? whatsappShareHref(text);
+    const direct = whatsappHrefForPhone(phone, text);
+    const whatsapp = direct ?? whatsappShareHref(text);
     return (
         <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold text-[#6b7c86]">{label}</span>
@@ -80,11 +81,71 @@ export function QuickWorkReminder({
                 href={whatsapp}
                 target="_blank"
                 rel="noreferrer"
+                title={direct ? undefined : "No WhatsApp number on file: WhatsApp opens with the message so you can pick the contact"}
                 className="rounded-md bg-[#e8f8ee] px-2 py-1 text-[11px] font-bold text-[#1f7a46] hover:bg-[#d6f1e0]"
             >
-                WhatsApp
+                {direct ? "WhatsApp" : "WhatsApp (pick contact)"}
             </a>
         </span>
+    );
+}
+
+/**
+ * Returning or declining a log is recorded at once and a decline closes the record for good, so
+ * both ask once more and show the note that will go to the student.
+ */
+export function ConfirmDecisionDialog({
+    action,
+    title,
+    note,
+    busy,
+    onCancel,
+    onConfirm,
+}: {
+    action: "changes" | "reject";
+    title: string;
+    note: string;
+    busy: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+}) {
+    const decline = action === "reject";
+    const name = title.trim() || "This log";
+    return (
+        <QuickWorkModal labelledBy="confirmDecisionTitle" onClose={() => !busy && onCancel()}>
+            <header className="mb-3 flex items-start justify-between gap-5">
+                <h2 id="confirmDecisionTitle" className="text-lg font-bold">
+                    {decline ? "Decline this record?" : "Return this log for changes?"}
+                </h2>
+                <ModalClose onClose={onCancel} />
+            </header>
+            <p className="text-[13px] leading-relaxed text-[#6b7c86]">
+                {decline
+                    ? `“${name}” will be closed for good: no hours are credited, and the student cannot edit or resubmit it. They would have to start a new log.`
+                    : `“${name}” goes back to the student to correct and resubmit. No hours are credited until it is approved.`}
+            </p>
+            <p className="mt-3 rounded-lg bg-[#f4f8f9] px-3 py-2 text-xs leading-relaxed text-[#16313d]">
+                <b>Your note to the student:</b> {note}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2.5 border-t border-[#dcebee] pt-4">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={busy}
+                    className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74] disabled:opacity-50"
+                >
+                    Go back
+                </button>
+                <button
+                    type="button"
+                    onClick={onConfirm}
+                    disabled={busy}
+                    className={`rounded-lg px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50 ${decline ? "bg-[#ac3c3c]" : "bg-[#0e7d74]"}`}
+                >
+                    {busy ? "Saving…" : decline ? "Yes, decline record" : "Yes, send back for revision"}
+                </button>
+            </div>
+        </QuickWorkModal>
     );
 }
 
@@ -427,9 +488,35 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
                 </section>
             </div>
 
-            <section className="mt-4 rounded-[10px] border border-[#dfe9e8] p-4">
+            <section className="mt-4 min-w-0 rounded-[10px] border border-[#dfe9e8] p-4">
                 <h4 className="mb-2 text-[15px] font-semibold">Individual participation & attendance</h4>
-                <div className="overflow-x-auto">
+                {/* Phones: one card per person, hours first, so nothing sits off-screen in a 5-column table. */}
+                <ul className="space-y-2 sm:hidden" aria-label="Individual participation & attendance">
+                    {log.participants.map((p) => (
+                        <li key={p.id} className="rounded-[9px] border border-[#dfe9e8] p-3 text-xs">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <span className="block break-words font-semibold">{p.name || p.email || "—"}</span>
+                                    {p.email || p.contact || p.isLead ? (
+                                        <small className="block break-words text-[11px] text-[#617980]">
+                                            {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : "", p.isLead ? "Lead" : ""].filter(Boolean).join(" · ")}
+                                        </small>
+                                    ) : null}
+                                </div>
+                                <b className="whitespace-nowrap text-sm text-[#0e7d74]">{formatHours(p.minutes)} h</b>
+                            </div>
+                            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[#617980]">
+                                <dt>Student ID</dt>
+                                <dd className="break-words text-[#16313d]">{p.studentId || "—"}</dd>
+                                <dt>Time</dt>
+                                <dd className="text-[#16313d]">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</dd>
+                                <dt>Break</dt>
+                                <dd className="text-[#16313d]">{p.present ? p.breakMinutes : 0} min</dd>
+                            </dl>
+                        </li>
+                    ))}
+                </ul>
+                <div className="hidden overflow-x-auto sm:block">
                     <table className="w-full min-w-[520px] border-collapse text-left text-xs">
                         <thead>
                             <tr className="bg-[#f4f8f9] text-[11px] text-[#617980]">

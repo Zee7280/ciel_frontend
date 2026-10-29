@@ -2,12 +2,14 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import type { QuickWorkLog } from "@/utils/quickWorkRules";
 import { STATUS_LABEL } from "@/utils/quickWorkRules";
 import { FACULTY_QUICK_WORK_HREF, dashboardLink, hasStoredSession } from "@/utils/quickWorkApi";
+import { authenticatedFetch } from "@/utils/api";
 import {
+    ConfirmDecisionDialog,
     EvidenceGallery,
     QuickWorkRecordDetails,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
@@ -18,6 +20,8 @@ type Preview = {
     facultyEmail: string;
     open: boolean;
     registered: boolean;
+    /** The viewer is signed in as the named faculty account (older API: absent, treated as signed out). */
+    signedIn?: boolean;
     approveBlockedReason: string | null;
 };
 
@@ -38,12 +42,25 @@ function messageOf(body: { message?: string | string[] }, fallback: string) {
 }
 
 /**
- * Where the faculty "submitted for review" email's Approve / Request Revision / Reject buttons land:
- * the activity flashcard and the same decision as the faculty dashboard. Opening the page records
- * nothing; the named email needs a CIEL PK faculty account to act here.
+ * Calls the review API with this browser's CIEL PK session when it has one (so the named faculty
+ * member sees the full record and may act), and signed out otherwise (the activity card only).
+ */
+async function reviewFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    if (hasStoredSession()) {
+        const res = await authenticatedFetch(url, init, { redirectToLogin: false });
+        if (res) return res;
+    }
+    return fetch(url, init);
+}
+
+/**
+ * Where the faculty "submitted for review" email's Approve / Request Revision / Reject buttons land.
+ * Opening the page records nothing. Signed out it shows the activity card; the full record and the
+ * decision (the same as on the faculty dashboard) need the named faculty member signed in.
  */
 function FacultyReview() {
     const params = useSearchParams();
+    const pathname = usePathname();
     const token = params.get("token") ?? "";
     const asked = params.get("action");
     const [preview, setPreview] = useState<Preview | null>(null);
@@ -54,9 +71,13 @@ function FacultyReview() {
     const [busy, setBusy] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
+    /** A return or decline is confirmed in a dialog before it is recorded. */
+    const [confirm, setConfirm] = useState<"changes" | "reject" | null>(null);
     const [signedIn, setSignedIn] = useState(false);
     useEffect(() => setSignedIn(hasStoredSession()), []);
     const dashboard = dashboardLink(FACULTY_QUICK_WORK_HREF, signedIn);
+    /** Sign in (as the named faculty member), then come straight back to this link. */
+    const signInHere = `/login?next=${encodeURIComponent(`${pathname}?${params.toString()}`)}`;
 
     useEffect(() => {
         if (!token) {
@@ -64,7 +85,7 @@ function FacultyReview() {
             return;
         }
         let cancelled = false;
-        fetch(`${API}?token=${encodeURIComponent(token)}`)
+        reviewFetch(`${API}?token=${encodeURIComponent(token)}`)
             .then(async (res) => {
                 const body = await readJson(res);
                 if (cancelled) return;
@@ -80,10 +101,16 @@ function FacultyReview() {
     const submit = async () => {
         if (action !== "approve" && !note.trim()) return setFormError("Add a brief reason or correction for the student.");
         if (action === "approve" && !verified) return setFormError("Confirm you reviewed the attendance and evidence.");
+        setFormError(null);
+        if (action !== "approve") return setConfirm(action);
+        await perform();
+    };
+
+    const perform = async () => {
         setBusy(true);
         setFormError(null);
         try {
-            const res = await fetch(API, {
+            const res = await reviewFetch(API, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token, action, note: note.trim() || undefined, verified: action === "approve" ? verified : undefined }),
@@ -91,6 +118,7 @@ function FacultyReview() {
             const body = await readJson(res);
             if (!res.ok || !body.data) {
                 if (res.status === 404) setError(messageOf(body, "This link is no longer valid."));
+                else if (res.status === 401) setFormError(messageOf(body, "Sign in to CIEL PK to record your decision."));
                 else setFormError(messageOf(body, "Your decision could not be saved. Try again."));
                 return;
             }
@@ -100,6 +128,7 @@ function FacultyReview() {
             setFormError("Could not reach CIEL PK. Check your connection and try again.");
         } finally {
             setBusy(false);
+            setConfirm(null);
         }
     };
 
@@ -119,6 +148,7 @@ function FacultyReview() {
 
     const { log } = preview;
     const blocked = preview.approveBlockedReason;
+    const actsHere = Boolean(preview.signedIn);
 
     return (
         <Card wide>
@@ -131,10 +161,12 @@ function FacultyReview() {
             <QuickWorkRecordDetails
                 log={log}
                 evidence={
-                    preview.registered && preview.open ? (
+                    actsHere && preview.open ? (
                         <EvidenceGallery evidence={log.evidence} />
                     ) : (
-                        <p className="mt-1 text-xs text-slate-500">Evidence and participants’ contact details are shown to the reviewing faculty account.</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                            The student’s report, evidence and participants’ contact details are shown once you are signed in as the reviewing faculty member.
+                        </p>
                     )
                 }
             />
@@ -158,8 +190,21 @@ function FacultyReview() {
                         <Link href="/signup" className="rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-semibold text-white">
                             Sign up
                         </Link>
-                        <Link href={dashboardLink(FACULTY_QUICK_WORK_HREF, false)} className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2 text-sm font-semibold text-[#0e7d74]">
+                        <Link href={signInHere} className="rounded-lg border border-[#cbe3e0] bg-white px-4 py-2 text-sm font-semibold text-[#0e7d74]">
                             Log in
+                        </Link>
+                    </div>
+                </div>
+            ) : !actsHere ? (
+                <div className="mt-2 rounded-lg border border-[#e8d9b7] bg-[#fff6e5] px-4 py-3 text-sm text-[#79571c]">
+                    <p>
+                        A decision is recorded only by the signed-in faculty account. Sign in as <b>{preview.facultyEmail}</b> and you will come straight
+                        back here with the full record.
+                        {signedIn ? " You are signed in with a different account at the moment: log out first, then sign in with that email." : ""}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2.5">
+                        <Link href={signInHere} className="rounded-lg bg-[#0e7d74] px-4 py-2 text-sm font-semibold text-white">
+                            Sign in to review
                         </Link>
                     </div>
                 </div>
@@ -204,7 +249,14 @@ function FacultyReview() {
                     ) : null}
 
                     <label htmlFor="reviewNote" className="mb-1.5 mt-3 block text-xs font-semibold text-slate-700">
-                        Note for the student {action === "approve" ? <span className="font-normal text-slate-500">(optional)</span> : <span className="text-[#ac3c3c]">*</span>}
+                        Note for the student{" "}
+                        {action === "approve" ? (
+                            <span className="font-normal text-slate-500">(optional)</span>
+                        ) : (
+                            <span className="font-normal text-slate-500">
+                                (required when returning or declining) <span className="text-[#ac3c3c]">*</span>
+                            </span>
+                        )}
                     </label>
                     <textarea
                         id="reviewNote"
@@ -233,6 +285,17 @@ function FacultyReview() {
                 </div>
             )}
 
+            {confirm ? (
+                <ConfirmDecisionDialog
+                    action={confirm}
+                    title={log.title}
+                    note={note.trim()}
+                    busy={busy}
+                    onCancel={() => setConfirm(null)}
+                    onConfirm={() => void perform()}
+                />
+            ) : null}
+
             <Link href={dashboard} className="mt-5 inline-block text-sm font-bold text-[#0e7d74] hover:underline">
                 Open your CIEL PK dashboard →
             </Link>
@@ -242,7 +305,7 @@ function FacultyReview() {
 
 function Card({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
     return (
-        <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-2xl border border-slate-200 bg-white p-5 text-[#16313d] shadow-sm sm:p-6`}>
+        <div className={`w-full min-w-0 ${wide ? "max-w-2xl" : "max-w-md"} rounded-2xl border border-slate-200 bg-white p-5 text-[#16313d] shadow-sm sm:p-6`}>
             {children}
         </div>
     );

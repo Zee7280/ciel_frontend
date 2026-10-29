@@ -12,7 +12,7 @@ import Tabs, { type CielTab } from "@/components/ciel/Tabs";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved, pendingFacultyReview } from "@/utils/courseworkSectionReview";
 import { normalizeReviewStatus } from "@/utils/reviewQueue";
 import { CourseworkCrumb, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -125,7 +125,7 @@ function CourseProjectHub() {
             {view === "home" ? (
                 <MockupHero
                     kicker="MY PATHS · COURSEWORK"
-                    title={namedTimeGreeting(name === "there" ? "" : name, "📘")}
+                    title={<TimeGreeting name={name === "there" ? "" : name} emoji={"📘"} />}
                     subtitle="Fill the coursework form chapter by chapter, submit your flashcard to faculty, and collect your approved coursework here."
                     stats={[
                         { value: String(approved.length), label: "APPROVED" },

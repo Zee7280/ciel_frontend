@@ -13,7 +13,7 @@ import PendingAttendanceModal from "@/components/engagement/PendingAttendanceMod
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { useFacultyCommunityServiceData } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 
 type FacultyDashboardViewMode = FacultyDashboardViewClient;
@@ -130,7 +130,7 @@ export default function FacultyDashboard() {
 
             <MockupHero
                 kicker="CIEL PK · Faculty Dashboard"
-                title={namedTimeGreeting(firstName || "Faculty", "👩‍🏫")}
+                title={<TimeGreeting name={firstName || "Faculty"} emoji={"👩‍🏫"} />}
                 subtitle="Choose an impact area from the left. Each area keeps its workflows, approvals, projects and verified outcomes together."
                 gradient={FACULTY_HERO}
                 stats={[
