@@ -93,7 +93,7 @@ export function QuickWorkRouteCards({ onQuick, onStructured }: { onQuick: () => 
                     </p>
                     <ul className="mb-5 mt-3.5 list-disc pl-[18px] text-xs leading-[1.9] text-[#3c5961]">
                         <li>Tree drives, awareness events, clean-ups and more</li>
-                        <li>Actual attendance, evidence and final faculty approval</li>
+                        <li>Actual attendance, evidence, faculty approval and CIEL PK final approval</li>
                     </ul>
                     <button
                         type="button"

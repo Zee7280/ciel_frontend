@@ -274,7 +274,7 @@ export default function CommunityServiceHub({
                     emoji="⚡"
                     ghost="⚡"
                     title="Log a Quick Activity"
-                    subtitle="Record a short activity you have completed: your team, attendance and evidence, then submit it for faculty approval."
+                    subtitle="Record a short activity you have completed: your team, attendance and evidence, then submit it for faculty and CIEL PK approval."
                     badge="START HERE"
                     background={MOCKUP_GRADIENTS.gold}
                 />

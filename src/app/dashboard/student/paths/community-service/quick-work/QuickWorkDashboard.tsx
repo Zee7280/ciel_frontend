@@ -91,7 +91,7 @@ export default function QuickWorkDashboard() {
         setBusyId(log.id);
         try {
             await quickWorkApi.join(log.id, accept);
-            toast.success(accept ? "Confirmed. Your time will count once faculty approves the log." : "Declined. The activity lead has been told.");
+            toast.success(accept ? "Confirmed. Your time will count once faculty and then CIEL PK approve the log." : "Declined. The activity lead has been told.");
             await load();
         } catch (e) {
             toast.error(apiMessages(e).join(" "));
@@ -154,7 +154,7 @@ export default function QuickWorkDashboard() {
                     <div className="mb-3 text-xs font-bold uppercase tracking-[1.6px] text-[#0e7d74]">Quick Community Impact / Quick Impact Log</div>
                     <h1 className="text-[21px] font-semibold leading-tight">Quick Impact Log</h1>
                     <p className="mt-3 max-w-[650px] text-[13px] text-[#6b7c86] sm:text-sm">
-                        Your short university activities, from draft to faculty approval. Drafts save on CIEL PK as you go, so you can continue
+                        Your short university activities, from draft to final approval. Drafts save on CIEL PK as you go, so you can continue
                         from any device. These totals do not show completion of your structured 16-hour requirement.
                     </p>
                 </div>

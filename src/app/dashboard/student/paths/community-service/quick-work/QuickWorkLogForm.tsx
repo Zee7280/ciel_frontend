@@ -293,7 +293,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         try {
             await quickWorkApi.submit(log.id);
             setDirty(false);
-            toast.success("Quick Community Impact log submitted. Hours remain pending until faculty approval.");
+            toast.success("Quick Community Impact log submitted. Hours stay pending until faculty and then CIEL PK approve.");
             router.push(QUICK_WORK_HREF);
         } catch (e) {
             setPreview(false);
@@ -1166,7 +1166,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         {people.length > 1 ? <Stat value={`${formatHours(teamMinutes)} h`} label="team person-hours" /> : null}
                         <Stat value={`${form.evidence.length} / ${QUICK_WORK_MAX_EVIDENCE}`} label="evidence files" />
                     </div>
-                    <p className="mt-4 text-xs text-[#6b7c86]">Hours count only after faculty approval.</p>
+                    <p className="mt-4 text-xs text-[#6b7c86]">Hours count only after faculty approval and CIEL PK final approval.</p>
                 </aside>
             </div>
 

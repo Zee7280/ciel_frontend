@@ -218,7 +218,7 @@ export function QuickWorkIntroDialog({
                         <b className="text-[#16313d]">Record what you did.</b> Enter each person’s actual attendance and attach photos or supporting evidence.
                     </li>
                     <li>
-                        <b className="text-[#16313d]">Submit for faculty approval.</b> Faculty reviews the completed work; approved individual hours appear in{" "}
+                        <b className="text-[#16313d]">Submit for approval.</b> Faculty reviews the completed work, then CIEL PK gives final approval; approved individual hours appear in{" "}
                         <b className="text-[#16313d]">Quick Impact Log</b>.
                     </li>
                 </ol>
@@ -281,7 +281,7 @@ export function RouteChoiceDialog({
             <div className="my-3.5 rounded-[10px] border border-[#dcebee] bg-[#f8fbfc] p-[18px]">
                 <h3 className="text-[15px] font-semibold">Record a short university activity</h3>
                 <p className="mb-3.5 mt-2 text-[13px] text-[#6b7c86]">
-                    Choose Quick Community Impact for a brief activity log, evidence and faculty approval after submission.
+                    Choose Quick Community Impact for a brief activity log, evidence, and faculty then CIEL PK approval after submission.
                 </p>
                 <button type="button" onClick={onQuick} className="rounded-lg bg-[#f4a51c] px-4 py-2.5 text-xs font-bold text-[#2e270e] hover:bg-[#e99a12]">
                     Quick Community Impact
