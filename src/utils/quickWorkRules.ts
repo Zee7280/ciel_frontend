@@ -66,6 +66,8 @@ export type QuickWorkLog = {
     isLead: boolean;
     /** The viewing student's own participant row; null on the faculty side. */
     viewerParticipantId: string | null;
+    /** The viewing student's certificate once CIEL PK approved and they were credited (older API: absent). */
+    certificate?: { code: string } | null;
     participants: QuickWorkParticipant[];
 };
 
@@ -226,6 +228,84 @@ export function shortDate(value: string | null | undefined): string {
     const d = new Date(`${value}T12:00:00`);
     if (Number.isNaN(d.getTime())) return "Date not set";
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** UN SDG colours by goal number, as on the Quick Impact flashcard. */
+export const SDG_COLORS: Record<number, string> = {
+    1: "#e5243b",
+    2: "#dda63a",
+    3: "#4c9f38",
+    4: "#c5192d",
+    5: "#ff3a21",
+    6: "#26bde2",
+    7: "#fcc30b",
+    8: "#a21942",
+    9: "#fd6925",
+    10: "#dd1367",
+    11: "#fd9d24",
+    12: "#bf8b2e",
+    13: "#3f7e44",
+    14: "#0a97d9",
+    15: "#56c02b",
+    16: "#00689d",
+    17: "#19486a",
+};
+
+/** "SDG 3 · Good Health and Well-being", or null when no valid goal is set. */
+export function sdgLabel(sdg: number | null | undefined): string | null {
+    const n = Number(sdg);
+    return Number.isInteger(n) && n >= 1 && n <= 17 ? `SDG ${n} · ${SDG_NAMES[n - 1]}` : null;
+}
+
+/** Approved logs in which the viewing student was credited with time: their published Quick Impact flashcards. */
+export function quickImpactPublishedForViewer(logs: QuickWorkLog[]): QuickWorkLog[] {
+    return logs.filter((log) => {
+        const me = viewerRow(log);
+        return log.status === "approved" && Boolean(me?.present) && (me?.minutes ?? 0) > 0;
+    });
+}
+
+/** One evidence file's identity: its URL without the short-lived signature (`?X-Amz-...`) the API adds. */
+export function evidenceFileKey(url: string): string {
+    return String(url || "").split(/[?#]/)[0];
+}
+
+/**
+ * After a save, take the API's viewable (signed) link for files the form still shows by their raw
+ * upload URL. A file that already has a viewable link keeps it, so previews do not reload on every save.
+ */
+export function withViewableEvidence(
+    current: QuickWorkEvidence[],
+    saved: QuickWorkEvidence[],
+): QuickWorkEvidence[] {
+    const byKey = new Map(saved.map((e) => [evidenceFileKey(e.url), e.url]));
+    return current.map((e) => (e.url.includes("?") ? e : { ...e, url: byKey.get(evidenceFileKey(e.url)) ?? e.url }));
+}
+
+/** Public page behind a certificate's QR code and ID. */
+export function quickImpactVerifyPath(code: string): string {
+    return `/quick-impact/verify/${encodeURIComponent(code)}`;
+}
+
+/**
+ * What the Quick Impact flashcard shows. Only students credited with time (present, minutes > 0)
+ * count and are named; it is a verified credential only once CIEL PK has approved the log.
+ */
+export function quickImpactFlashcard(log: QuickWorkLog) {
+    const credited = log.participants.filter((p) => p.present && p.minutes > 0);
+    const people = credited.length ? credited : log.participants;
+    return {
+        published: log.status === "approved",
+        personMinutes: credited.reduce((a, p) => a + p.minutes, 0),
+        students: people.length,
+        names: people.map((p) => p.name || p.email).filter(Boolean),
+        peopleReached: log.peopleReached,
+        evidenceCount: log.evidence.length,
+        sdg: sdgLabel(log.sdg),
+        sdgColor: SDG_COLORS[Number(log.sdg)] ?? "#9656ac",
+        partners: log.partners.filter((p) => p.trim()),
+        host: log.host?.trim() || null,
+    };
 }
 
 export const STATUS_LABEL: Record<QuickWorkStatus, string> = {

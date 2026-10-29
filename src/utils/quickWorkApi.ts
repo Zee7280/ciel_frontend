@@ -145,6 +145,24 @@ export const quickWorkApi = {
         call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
 
+/** Browsers cap a keepalive request body at 64 KB; a larger draft relies on autosave and the leave warning. */
+const KEEPALIVE_MAX_BYTES = 60_000;
+
+/**
+ * Last-chance save while the tab is closing or reloading: `keepalive` lets the request finish after the
+ * page unloads. Best effort only (never awaited, errors ignored); returns whether it was sent.
+ */
+export function saveQuickWorkOnLeave(id: string, body: unknown): boolean {
+    const json = JSON.stringify(body);
+    if (json.length > KEEPALIVE_MAX_BYTES) return false;
+    void authenticatedFetch(
+        `/api/v1/quick-work/logs/${encodeURIComponent(id)}`,
+        { method: "PATCH", body: json, headers: { "Content-Type": "application/json" }, keepalive: true },
+        { redirectToLogin: false },
+    ).catch(() => undefined);
+    return true;
+}
+
 /** Emailed pages are often opened signed out (e.g. inside a mail app): go through login, then back to `path`. */
 export function dashboardLink(path: string, signedIn: boolean): string {
     return signedIn ? path : `/login?next=${encodeURIComponent(path)}`;
@@ -170,6 +188,38 @@ export async function fetchFacultyQuickWorkPending(): Promise<number | null> {
     } catch {
         return null;
     }
+}
+
+/** What the public certificate check returns: that certificate's own facts only. */
+export type QuickWorkCertificateCheck = {
+    code: string;
+    valid: true;
+    holderName: string;
+    title: string;
+    activityType: string;
+    activityDate: string | null;
+    minutes: number;
+    university: string;
+    participation: "team" | "individual";
+    teamSize: number;
+    sdg: number | null;
+    verifiedAt: string | null;
+};
+
+/** Signed-out check behind a certificate's QR code / ID. Throws with the API's reason (e.g. no such certificate). */
+export async function verifyQuickWorkCertificate(code: string): Promise<QuickWorkCertificateCheck> {
+    let res: Response;
+    try {
+        res = await fetch(`/api/v1/quick-work/certificates/${encodeURIComponent(code.trim())}`);
+    } catch {
+        throw new QuickWorkApiError(["Could not reach CIEL PK. Check your connection and try again."]);
+    }
+    const json = (await res.json().catch(() => ({}))) as { data?: QuickWorkCertificateCheck; message?: string | string[] };
+    if (!res.ok || !json.data) {
+        const raw = ([] as string[]).concat(json.message ?? []).filter((m) => typeof m === "string" && m.trim());
+        throw new QuickWorkApiError(raw.length ? raw : ["This certificate could not be verified. Check the ID and try again."]);
+    }
+    return json.data;
 }
 
 export function apiMessages(err: unknown): string[] {

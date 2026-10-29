@@ -1,0 +1,219 @@
+/* Quick Impact Flashcard — UN-blue design from the approved Quick Community Impact mockup. */
+
+.qif-card {
+    overflow: hidden;
+    border: 1px solid #cbdfee;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 5px 18px #123f6212;
+    color: #16313d;
+    break-inside: avoid;
+}
+
+.qif-top {
+    padding: 26px;
+    color: #fff;
+    background:
+        radial-gradient(circle at 90% 13%, #ffffff15 0 58px, transparent 60px),
+        linear-gradient(112deg, #164a78, #287fbb, #64b2e4);
+}
+
+.qif-eyebrow {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: #ecf8ff;
+    text-transform: uppercase;
+}
+
+.qif-title {
+    margin: 9px 0 8px;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.qif-sub {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #e0f2ff;
+}
+
+.qif-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-bottom: 1px solid #ddecf7;
+}
+
+.qif-metrics > div {
+    padding: 15px;
+    border-right: 1px solid #ddecf7;
+}
+
+.qif-metrics > div:last-child {
+    border-right: 0;
+}
+
+.qif-metrics small {
+    display: block;
+    font-size: 9px;
+    font-weight: 800;
+    color: #6f8fa5;
+    text-transform: uppercase;
+}
+
+.qif-metrics b {
+    display: block;
+    margin-top: 4px;
+    font-size: 18px;
+    color: #155a8b;
+}
+
+.qif-body {
+    padding: 19px 23px;
+}
+
+.qif-body h4 {
+    margin: 18px 0 8px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    color: #2476ae;
+    text-transform: uppercase;
+}
+
+.qif-body h4:first-child {
+    margin-top: 0;
+}
+
+.qif-body p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #51616b;
+    overflow-wrap: anywhere;
+}
+
+.qif-sdg {
+    display: inline-flex;
+    margin: 3px 6px 3px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #fff;
+}
+
+.qif-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 15px 22px;
+    border-top: 1px solid #d7eaf8;
+    font-size: 11px;
+    color: #55758f;
+    background: #f3faff;
+}
+
+/* Compact card on the Impact Wall. */
+.qif-card--compact {
+    font-size: 11px;
+}
+
+.qif-card--compact .qif-top {
+    padding: 17px 19px;
+}
+
+.qif-card--compact .qif-title {
+    font-size: 16px;
+}
+
+.qif-card--compact .qif-metrics > div {
+    padding: 10px 8px;
+}
+
+.qif-card--compact .qif-metrics small {
+    font-size: 8px;
+}
+
+.qif-card--compact .qif-metrics b {
+    font-size: 14px;
+}
+
+.qif-card--compact .qif-body {
+    padding: 11px 17px;
+}
+
+.qif-card--compact .qif-body h4 {
+    margin: 9px 0 5px;
+    font-size: 10px;
+}
+
+.qif-card--compact .qif-body p {
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+.qif-card--compact .qif-footer {
+    padding: 12px 14px;
+    font-size: 9px;
+}
+
+@media (max-width: 640px) {
+    .qif-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .qif-metrics > div:nth-child(2) {
+        border-right: 0;
+    }
+
+    .qif-metrics > div:nth-child(-n + 2) {
+        border-bottom: 1px solid #ddecf7;
+    }
+}
+
+/* "Print / Save PDF": only the open flashcard prints (see QuickImpactViewer). */
+@media print {
+    body.qif-printing > *:not(.qif-print-root) {
+        display: none !important;
+    }
+
+    body.qif-printing .qif-print-root {
+        position: static !important;
+        display: block !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body.qif-printing .qif-print-root .qif-noprint {
+        display: none !important;
+    }
+
+    body.qif-printing .qif-card {
+        box-shadow: none !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* Quick Impact certificate: additions to the shared certificate artwork (certificate-print.css). */
+.certificate-one-page .qci-cert-holder {
+    font-size: 1.9rem;
+    letter-spacing: 0.01em;
+}
+
+.certificate-one-page .qci-cert-note {
+    margin: 0 0 16px;
+    max-width: 92%;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.56rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--cert-muted);
+}

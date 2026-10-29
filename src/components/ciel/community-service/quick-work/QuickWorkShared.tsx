@@ -298,7 +298,12 @@ export function EvidenceTile({ item, children }: { item: QuickWorkEvidence; chil
     const ext = item.name.split(".").pop()?.toUpperCase() ?? "";
     return (
         <div className="overflow-hidden rounded-[9px] border border-[#dcebee]">
-            {kind === "image" ? (
+            {!item.url ? (
+                // The API sends a short-lived signed link; none means it could not be issued just now.
+                <div className="grid h-[135px] place-items-center bg-[#f4f8f9] px-3 text-center text-xs text-[#6b7c86]">
+                    Preview unavailable. Reopen this record to refresh it.
+                </div>
+            ) : kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element -- user evidence from S3, any size
                 <img src={item.url} alt={item.caption || item.name} className="block h-[135px] w-full bg-[#e6f6f4] object-cover" />
             ) : kind === "video" ? (
@@ -319,9 +324,11 @@ export function EvidenceTile({ item, children }: { item: QuickWorkEvidence; chil
                 {children ?? (
                     <>
                         <p className="mt-1 text-xs text-[#16313d]">{item.caption}</p>
-                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0e7d74] underline">
-                            Open evidence
-                        </a>
+                        {item.url ? (
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0e7d74] underline">
+                                Open evidence
+                            </a>
+                        ) : null}
                     </>
                 )}
             </div>
@@ -482,8 +489,8 @@ export function EvidenceGallery({ evidence }: { evidence: QuickWorkEvidence[] })
     if (!evidence.length) return null;
     return (
         <div className="my-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
-            {evidence.map((e) => (
-                <EvidenceTile key={e.url} item={e} />
+            {evidence.map((e, i) => (
+                <EvidenceTile key={`${i}-${e.name}`} item={e} />
             ))}
         </div>
     );

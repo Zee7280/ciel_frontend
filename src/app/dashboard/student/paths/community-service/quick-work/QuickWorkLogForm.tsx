@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi } from "@/utils/quickWorkApi";
+import { apiMessages, QUICK_WORK_HREF, QUICK_WORK_PRESIGN_PATH, quickWorkApi, saveQuickWorkOnLeave } from "@/utils/quickWorkApi";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -33,7 +33,9 @@ import {
     formFromLog,
     formPeople,
     joinErrors,
+    evidenceFileKey,
     payloadFromForm,
+    withViewableEvidence,
     pktNow,
     QUICK_WORK_ACTIVITY_TYPES,
     QUICK_WORK_EVIDENCE_ACCEPT,
@@ -76,6 +78,8 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 const HUB = "/dashboard/student/paths/community-service";
 const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
 const STEPS = ["Team & faculty", "Activity details", "Attendance", "Evidence & submit"] as const;
+/** Autosave waits this long after the last edit. */
+const AUTOSAVE_DELAY_MS = 1500;
 
 const inputCls =
     "w-full min-w-0 rounded-lg border border-[#d3e3e6] bg-white px-3 py-2.5 text-[13px] text-[#16313d] outline-none focus:border-[#0e7d74] focus:ring-2 focus:ring-[#0e7d74]/30 disabled:bg-[#f4f7f8] disabled:text-[#6b7c86]";
@@ -106,6 +110,10 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const [errors, setErrors] = useState<string[]>([]);
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
+    /** Why the last save failed (shown in the footer); autosave waits for the next edit before retrying. */
+    const [saveError, setSaveError] = useState<string | null>(null);
+    /** Bumped on every edit, so a save that started before an edit does not mark the form saved. */
+    const editRev = useRef(0);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [preview, setPreview] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -173,48 +181,100 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         };
     }, []);
 
+    const editable = Boolean(log?.isLead && (log.status === "draft" || log.status === "changes"));
+
+    // Closing or reloading the tab with unsaved edits: warn, and send them with a keepalive request.
     useEffect(() => {
-        if (!dirty) return;
+        if (!dirty || !editable || !log || !form) return;
         const warn = (e: BeforeUnloadEvent) => {
+            saveQuickWorkOnLeave(log.id, payloadFromForm(form));
             e.preventDefault();
+            e.returnValue = "";
         };
         window.addEventListener("beforeunload", warn);
         return () => window.removeEventListener("beforeunload", warn);
-    }, [dirty]);
+    }, [dirty, editable, log, form]);
 
     const showErrors = useCallback((list: string[]) => {
         setErrors(list);
         if (list.length) requestAnimationFrame(() => errorBox.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
     }, []);
 
+    const markDirty = () => {
+        editRev.current += 1;
+        setDirty(true);
+        setSaveError(null);
+    };
     const patch = (p: Partial<QuickWorkForm>) => {
         setForm((f) => (f ? { ...f, ...p } : f));
-        setDirty(true);
+        markDirty();
     };
     const setAttendance = (email: string, p: Partial<ReturnType<typeof emptyAttendance>>) => {
         setForm((f) => (f ? { ...f, attendance: { ...f.attendance, [email]: { ...attendanceFor(f, email), ...p } } } : f));
-        setDirty(true);
+        markDirty();
     };
 
-    /** Saves the draft; on success keeps the server's view of the team (names, join status). */
-    const persist = async (next: QuickWorkForm | null = form): Promise<QuickWorkLog | null> => {
+    /**
+     * Saves the draft; on success keeps the server's view of the team (names, join status) and viewable
+     * evidence links. `quiet` (autosave) reports a failure in the footer instead of the error list.
+     */
+    const persist = async (next: QuickWorkForm | null = form, { quiet = false }: { quiet?: boolean } = {}): Promise<QuickWorkLog | null> => {
         if (!log || !next) return null;
+        const startedAt = editRev.current;
         setSaving(true);
         try {
             const saved = await quickWorkApi.save(log.id, payloadFromForm(next));
             const fresh = formFromLog(saved);
             setLog(saved);
-            setForm((f) => (f ? { ...f, teammates: fresh.teammates, leadName: fresh.leadName, leadEmail: fresh.leadEmail } : fresh));
-            setDirty(false);
-            setErrors([]);
+            setForm((f) =>
+                f
+                    ? {
+                          ...f,
+                          teammates: fresh.teammates,
+                          leadName: fresh.leadName,
+                          leadEmail: fresh.leadEmail,
+                          evidence: withViewableEvidence(f.evidence, saved.evidence),
+                      }
+                    : fresh,
+            );
+            // Edits made while this save was in flight are still unsaved: autosave picks them up.
+            if (editRev.current === startedAt) setDirty(false);
+            setSaveError(null);
+            if (!quiet) setErrors([]);
             return saved;
         } catch (e) {
-            showErrors(apiMessages(e));
+            const messages = apiMessages(e);
+            setSaveError(messages.join(" "));
+            if (!quiet) showErrors(messages);
             return null;
         } finally {
             setSaving(false);
         }
     };
+
+    // Autosave: shortly after the last edit. After a failed save it waits for the next edit (no retry loop).
+    const persistRef = useRef(persist);
+    useEffect(() => {
+        persistRef.current = persist;
+    });
+    useEffect(() => {
+        if (!dirty || saving || saveError || !editable || !form) return;
+        const timer = window.setTimeout(() => void persistRef.current(undefined, { quiet: true }), AUTOSAVE_DELAY_MS);
+        return () => window.clearTimeout(timer);
+    }, [form, dirty, saving, saveError, editable]);
+
+    // Leaving the page inside the app (sidebar, links) unmounts the form: send any unsaved edits.
+    const unsaved = useRef<{ id: string; form: QuickWorkForm } | null>(null);
+    useEffect(() => {
+        unsaved.current = dirty && editable && log && form ? { id: log.id, form } : null;
+    }, [dirty, editable, log, form]);
+    useEffect(
+        () => () => {
+            const left = unsaved.current;
+            if (left) void quickWorkApi.save(left.id, payloadFromForm(left.form)).catch(() => undefined);
+        },
+        [],
+    );
 
     if (loadError) {
         return (
@@ -1081,12 +1141,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                 {form.evidence.length ? (
                                     <div className="my-4 grid grid-cols-1 gap-3 min-[481px]:grid-cols-2">
                                         {form.evidence.map((ev) => (
-                                            <EvidenceTile key={ev.url} item={ev}>
-                                                <label className="sr-only" htmlFor={`cap-${ev.url}`}>
+                                            <EvidenceTile key={evidenceFileKey(ev.url)} item={ev}>
+                                                <label className="sr-only" htmlFor={`cap-${evidenceFileKey(ev.url)}`}>
                                                     Evidence caption
                                                 </label>
                                                 <input
-                                                    id={`cap-${ev.url}`}
+                                                    id={`cap-${evidenceFileKey(ev.url)}`}
                                                     className={`${inputCls} my-1.5 px-2 py-1.5 text-xs`}
                                                     maxLength={160}
                                                     placeholder="What does this evidence show?"
@@ -1119,11 +1179,22 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                     </div>
 
                     <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#dcebee] bg-[#f8fbfc] px-4 py-4 sm:flex-row sm:items-center sm:px-7">
-                        <span className="text-xs text-[#6b7c86]">{saving
-                                ? "Saving…"
-                                : dirty
-                                  ? "Unsaved changes"
-                                  : `Draft saved · ${new Date(log.updatedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}</span>
+                        <span role="status" aria-live="polite" className={`text-xs ${saveError && !saving ? "text-[#ac3c3c]" : "text-[#6b7c86]"}`}>
+                            {saving ? (
+                                "Saving…"
+                            ) : saveError ? (
+                                <>
+                                    Save failed: {saveError}{" "}
+                                    <button type="button" onClick={() => void persist()} className="font-semibold underline">
+                                        Try again
+                                    </button>
+                                </>
+                            ) : dirty ? (
+                                "Unsaved changes · saving…"
+                            ) : (
+                                `Saved · ${new Date(log.updatedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                            )}
+                        </span>
                         <div className="flex w-full gap-2 sm:w-auto">
                             {step > 1 ? (
                                 <button type="button" onClick={() => void goTo(step - 1)} disabled={saving} className={`${btnCls} flex-1 sm:flex-none`}>

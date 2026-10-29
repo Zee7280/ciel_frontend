@@ -15,6 +15,7 @@ import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
 import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import ImpactWallCiiRing from "@/components/ciel/community-service/ImpactWallCiiRing";
+import QuickImpactWallSection from "@/components/ciel/community-service/quick-work/QuickImpactWallSection";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -1029,6 +1030,8 @@ export default function CommunityImpactWall(_props: {
                     )}
                 </>
             )}
+
+            <QuickImpactWallSection />
 
             {flash ? <CommunityFlashModal flash={flash} onClose={() => setFlash(null)} /> : null}
         </div>

@@ -15,6 +15,7 @@ import {
     QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
+import { QuickImpactViewer } from "@/components/ciel/community-service/quick-work/QuickImpactFlashcard";
 import { facultyReminder } from "@/utils/quickWorkReminders";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 
@@ -62,6 +63,8 @@ export default function QuickWorkDashboard() {
     const [busyId, setBusyId] = useState<string | null>(null);
     const [viewing, setViewing] = useState<QuickWorkLog | null>(null);
     const [deleting, setDeleting] = useState<QuickWorkLog | null>(null);
+    const [flashcard, setFlashcard] = useState<QuickWorkLog | null>(null);
+    const closeFlashcard = useCallback(() => setFlashcard(null), []);
     const [stage, setStage] = useState<Stage | null>(null);
 
     const load = useCallback(async () => {
@@ -310,6 +313,15 @@ export default function QuickWorkDashboard() {
                                                 <button type="button" onClick={() => setViewing(r)} className="block text-xs font-semibold text-[#0e7d74] underline underline-offset-[3px]">
                                                     View
                                                 </button>
+                                                {r.status === "approved" && (m?.minutes ?? 0) > 0 && m?.present ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFlashcard(r)}
+                                                        className="block text-xs font-semibold text-[#287db8] underline underline-offset-[3px]"
+                                                    >
+                                                        {r.certificate ? "Flashcard & certificate" : "Flashcard"}
+                                                    </button>
+                                                ) : null}
                                                 {editable ? (
                                                     <Link
                                                         href={`${QUICK_WORK_HREF}?log=${encodeURIComponent(r.id)}`}
@@ -417,6 +429,8 @@ export default function QuickWorkDashboard() {
                     </div>
                 </QuickWorkModal>
             ) : null}
+
+            {flashcard ? <QuickImpactViewer log={flashcard} onClose={closeFlashcard} /> : null}
 
             {routes.dialogs}
         </div>
