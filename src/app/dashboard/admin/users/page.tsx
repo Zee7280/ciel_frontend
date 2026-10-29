@@ -111,6 +111,8 @@ interface User {
     /** Student profile university / programme (students cannot change these once saved). */
     university?: string;
     department?: string;
+    /** Faculty: the university CIEL PK admin confirmed on this profile (Quick Community Impact approval). */
+    universityConfirmedByAdmin?: string | null;
 }
 
 const ACTION_MENU_W = 224;
@@ -277,6 +279,7 @@ export default function AdminUsersPage() {
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
                 university: u.university || u.institution || "",
                 department: u.department || "",
+                universityConfirmedByAdmin: u.universityConfirmedByAdmin ?? null,
             }));
             setUsers(mappedUsers);
             setTotalUsers(typeof data?.total === "number" ? data.total : mappedUsers.length);
@@ -438,6 +441,14 @@ export default function AdminUsersPage() {
                     payload.institution = university;
                 }
                 if (department && department !== (selectedUser.department || "")) payload.department = department;
+            }
+            if (payload.role === "faculty") {
+                // Saving a faculty member's university confirms it, even when unchanged.
+                const university = affiliation.university.trim();
+                if (university) {
+                    payload.university = university;
+                    payload.institution = university;
+                }
             }
             if (isSelf(selectedUser)) {
                 // Never let an admin change their own role/status from here.
@@ -1172,6 +1183,31 @@ export default function AdminUsersPage() {
                                     <p className="text-xs text-slate-500 sm:col-span-2">
                                         Students cannot change these after signup. Faculty approval of hours checks this university.
                                     </p>
+                                </div>
+                            ) : null}
+                            {isEditModalOpen && formData.role === "faculty" ? (
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">University</label>
+                                    <SearchableSelect
+                                        accent="blue"
+                                        value={affiliation.university}
+                                        onChange={(v) => setAffiliation((a) => ({ ...a, university: v }))}
+                                        options={pakistaniUniversities}
+                                        placeholder="Select university"
+                                        searchPlaceholder="Search universities..."
+                                        ariaLabel="University"
+                                    />
+                                    <p className="mt-1.5 text-xs text-slate-500">
+                                        Saving confirms this university: the faculty member can approve Quick Community Impact hours for its
+                                        students, without a university scope (which gives the university dashboard rights).
+                                    </p>
+                                    {selectedUser?.universityConfirmedByAdmin ? (
+                                        <p className="mt-1 text-xs font-semibold text-emerald-700">
+                                            Confirmed by CIEL PK: {selectedUser.universityConfirmedByAdmin}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-1 text-xs font-semibold text-amber-700">Not confirmed by CIEL PK yet.</p>
+                                    )}
                                 </div>
                             ) : null}
                             <div>
