@@ -124,6 +124,14 @@ export default function FacultyJoinApplicationsPage() {
         });
     }, [visible, search]);
 
+    /** The API's own reason (e.g. already decided, secondary supervisor cannot decide), or the fallback. */
+    const apiErrorMessage = async (res: Response | null, fallback: string): Promise<string> => {
+        if (!res) return "Could not reach the server. Check your connection and try again.";
+        const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
+        const m = ([] as string[]).concat(body?.message ?? []).filter((x) => typeof x === "string" && x.trim());
+        return m.length ? m.join(" ") : fallback;
+    };
+
     const handleApprove = async (applicationId: string) => {
         if (approveSubmittingId === applicationId) return;
         setApproveSubmittingId(applicationId);
@@ -132,16 +140,17 @@ export default function FacultyJoinApplicationsPage() {
                 method: "POST",
             });
             if (res?.ok) {
-                toast.success("Application approved");
+                toast.success("Approved. It now goes to CIEL PK for final enrollment; the student has been told.");
                 setPendingRows((prev) => prev.filter((r) => r.id !== applicationId));
-                void loadLists();
             } else {
-                toast.error("Failed to approve");
+                toast.error(await apiErrorMessage(res, "Failed to approve"));
             }
         } catch {
             toast.error("Error connecting to server");
         } finally {
             setApproveSubmittingId((p) => (p === applicationId ? null : p));
+            // Reload either way: a row decided elsewhere (or already past this step) must leave Pending.
+            void loadLists();
         }
     };
 
@@ -165,18 +174,18 @@ export default function FacultyJoinApplicationsPage() {
                 body: JSON.stringify({ reason }),
             });
             if (res?.ok) {
-                toast.success("Application rejected");
+                toast.success("Application rejected. The student has been sent your feedback.");
                 setPendingRows((prev) => prev.filter((r) => r.id !== rejectTargetId));
                 setRejectOpen(false);
                 setRejectTargetId(null);
-                void loadLists();
             } else {
-                toast.error("Failed to reject");
+                toast.error(await apiErrorMessage(res, "Failed to reject"));
             }
         } catch {
             toast.error("Error connecting to server");
         } finally {
             setRejectSubmitting(false);
+            void loadLists();
         }
     };
 

@@ -70,7 +70,7 @@ export function isJoinApplicationApprovedStatus(status: string): boolean {
 }
 
 export function isJoinApplicationRejectedStatus(status: string): boolean {
-    return ["rejected", "not_approved", "denied", "declined", "faculty_rejected", "admin_rejected"].includes(status);
+    return ["rejected", "not_approved", "denied", "declined", "faculty_rejected", "partner_rejected", "admin_rejected"].includes(status);
 }
 
 /**

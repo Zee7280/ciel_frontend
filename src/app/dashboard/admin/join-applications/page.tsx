@@ -318,9 +318,15 @@ export default function AdminJoinApplicationsPage() {
                                             App {formatDisplayId(row.id, "APP")}
                                         </Badge>
                                         {tab === "pending" ? (
-                                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                                <Clock className="w-3 h-3 mr-1" /> Pending admin
-                                            </Badge>
+                                            row.applicationStage === "faculty" ? (
+                                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                                    <Clock className="w-3 h-3 mr-1" /> Waiting for faculty
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                                    <Clock className="w-3 h-3 mr-1" /> Pending admin
+                                                </Badge>
+                                            )
                                         ) : null}
                                         {tab === "pending" ? (
                                             <AgingChip since={row.facultyApprovedAt || row.createdAt} />
@@ -379,7 +385,20 @@ export default function AdminJoinApplicationsPage() {
                                         </div>
                                     ) : null}
 
-                                    {tab === "pending" && hasFacultyData(row) ? (
+                                    {tab === "pending" && row.applicationStage === "faculty" ? (
+                                        <div className="rounded-lg border border-orange-100 bg-orange-50/70 px-3 py-2.5 space-y-1 text-xs text-orange-950">
+                                            <div className="flex items-start gap-2 font-semibold text-orange-900">
+                                                <GraduationCap className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <span>Still with the named faculty{row.primaryFacultyEmail ? `: ${row.primaryFacultyEmail}` : ""}</span>
+                                            </div>
+                                            <p className="text-orange-900/90 pl-6 leading-relaxed">
+                                                The faculty member has not decided yet (the student can re-send them the request). Approve or reject here only
+                                                if the faculty does not respond: the seat is created, and that faculty is still asked to confirm supervision
+                                                before the student can start the report.
+                                            </p>
+                                        </div>
+                                    ) : null}
+                                    {tab === "pending" && row.applicationStage !== "faculty" && hasFacultyData(row) ? (
                                         <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5 space-y-1.5 text-xs text-emerald-950">
                                             <div className="flex items-start gap-2 font-semibold text-emerald-900">
                                                 <GraduationCap className="w-4 h-4 shrink-0 mt-0.5" />

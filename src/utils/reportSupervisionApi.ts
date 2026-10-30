@@ -30,6 +30,8 @@ export type FacultySupervisionRow = {
     team_members: Array<{ name: string; email: string | null; lead: boolean }>;
     requested_at: string | null;
     confirmed_at: string | null;
+    /** The faculty email the seat waits on (newer API). */
+    faculty_email?: string | null;
 };
 
 async function readJson<T>(res: Response | null | undefined): Promise<T | null> {
@@ -55,10 +57,22 @@ export async function fetchReportSupervision(projectId: string): Promise<ReportS
     }
 }
 
+/** "30 Oct 2026, 14:05 (PKT)" for the throttle notice. */
+export function formatPktDateTime(iso: string): string {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? iso
+        : `${d.toLocaleString("en-GB", { timeZone: "Asia/Karachi", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} (PKT)`;
+}
+
 export async function remindReportSupervision(projectId: string): Promise<{ ok: boolean; message: string }> {
     try {
         const res = await authenticatedFetch(`/api/v1/student/reports/${encodeURIComponent(projectId)}/supervision/remind`, { method: "POST" });
-        const body = await readJson<{ sent?: boolean; message?: string }>(res);
+        const body = await readJson<{ sent?: boolean; message?: string; next_allowed_at?: string }>(res);
+        if (res?.ok && body?.sent === false && body.next_allowed_at) {
+            // Throttled, not failed: one email per 12 hours.
+            return { ok: true, message: `A reminder was already sent recently. You can send the next one after ${formatPktDateTime(body.next_allowed_at)}.` };
+        }
         return { ok: Boolean(res?.ok && body?.sent), message: messageOf(body, "The reminder could not be sent. Try again later.") };
     } catch {
         return { ok: false, message: "Could not reach CIEL PK. Check your connection and try again." };
@@ -71,6 +85,18 @@ export async function fetchFacultySupervisionRequests(): Promise<{ pending: Facu
         if (!res?.ok) return null;
         const body = await readJson<{ data?: { pending?: FacultySupervisionRow[]; confirmed?: FacultySupervisionRow[] } }>(res);
         return { pending: body?.data?.pending ?? [], confirmed: body?.data?.confirmed ?? [] };
+    } catch {
+        return null;
+    }
+}
+
+/** CIEL PK admin: every seat still waiting for its faculty's confirmation, across all faculty. */
+export async function fetchAdminSupervisionRequests(): Promise<FacultySupervisionRow[] | null> {
+    try {
+        const res = await authenticatedFetch("/api/v1/admin/report-supervision", {}, { redirectToLogin: false });
+        if (!res?.ok) return null;
+        const body = await readJson<{ data?: { pending?: FacultySupervisionRow[] } }>(res);
+        return body?.data?.pending ?? [];
     } catch {
         return null;
     }

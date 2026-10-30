@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
+import { formatPktDateTime } from "@/utils/reportSupervisionApi";
 import { resolveAttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import {
     extractOpportunityReturnRemarkSections,
@@ -126,6 +127,7 @@ export default function OpportunityDetailsPage() {
     const id = params.id as string;
 
     const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
+    const [remindingFaculty, setRemindingFaculty] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
@@ -324,6 +326,29 @@ export default function OpportunityDetailsPage() {
               ? "Back to My Opportunities"
               : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
+
+    /** Re-sends the faculty approval request for a join request still with the named faculty (server throttles to one per 12 h). */
+    const remindFaculty = async (applicationId: string) => {
+        setRemindingFaculty(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/students/applications/${encodeURIComponent(applicationId)}/remind-faculty`, { method: "POST" });
+            const body = (await res?.json().catch(() => null)) as
+                | { data?: { sent?: boolean; next_allowed_at?: string; faculty_email?: string }; message?: string | string[] }
+                | null;
+            if (res?.ok && body?.data?.sent) {
+                toast.success(`Request email re-sent to ${body.data.faculty_email ?? "your faculty member"}.`);
+            } else if (res?.ok && body?.data?.next_allowed_at) {
+                toast.info(`A reminder was sent recently. You can send the next one after ${formatPktDateTime(body.data.next_allowed_at)}.`);
+            } else {
+                const m = ([] as string[]).concat(body?.message ?? []).filter(Boolean).join(" ");
+                toast.error(m || "The reminder could not be sent. Try again later.");
+            }
+        } catch {
+            toast.error("Could not reach the server. Check your connection and try again.");
+        } finally {
+            setRemindingFaculty(false);
+        }
+    };
     const oppRecord = opportunity as Record<string, unknown>;
     const detailStatusBadgeLabel = formatOpportunityDetailStatusBadge(oppRecord);
     const detailWorkflowStageRaw =
@@ -466,6 +491,22 @@ export default function OpportunityDetailsPage() {
                             {joinApplicationPendingLabel(oppRecord)}
                         </p>
                     ) : null
+                ) : null}
+                {!hideStudentApplyActions &&
+                projectActions?.showJoinAppliedLocked &&
+                opportunity.application_id &&
+                pickJoinApplicationStage(oppRecord) === "faculty" ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                        <span>Faculty has not responded yet?</span>
+                        <button
+                            type="button"
+                            disabled={remindingFaculty}
+                            onClick={() => void remindFaculty(opportunity.application_id as string)}
+                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                            {remindingFaculty ? "Sending…" : "Re-send the request email"}
+                        </button>
+                    </div>
                 ) : null}
             </div>
 

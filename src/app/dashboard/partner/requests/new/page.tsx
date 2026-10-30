@@ -716,7 +716,11 @@ export default function OpportunityPostingPage() {
                 const data = await res.json();
                 // Check for success flag OR direct object return (id/title)
                 if (data.success || data.id || data.title) {
-                    toast.success("Submitted for review. Your opportunity will appear as Live after admin approval.");
+                    toast.success(
+                        formData.restrictedFacultyLinkage.hasFacultyLink
+                            ? "Submitted. The faculty member you named is emailed to acknowledge it first; CIEL PK then gives final approval and it goes Live."
+                            : "Submitted for review. Your opportunity will appear as Live after CIEL PK approval.",
+                    );
                     try {
                         localStorage.removeItem(PARTNER_OPPORTUNITY_DRAFT_KEY);
                     } catch {
@@ -1269,9 +1273,14 @@ export default function OpportunityPostingPage() {
             verification: formData.verification.join(", "),
             scopeLabel: scopeMap[formData.applyScope] || formData.applyScope,
             scopeDetail,
-            approvalText: partnerOn
-                ? "Pending co-host acknowledgement → CIEL PK final review"
-                : "Pending CIEL PK final review",
+            // In the order the server runs it: faculty acknowledgement (when named) → co-host → CIEL PK.
+            approvalText: [
+                facultyOn ? "Faculty acknowledgement" : "",
+                partnerOn ? "Co-host acknowledgement" : "",
+                "CIEL PK final review",
+            ]
+                .filter(Boolean)
+                .join(" → "),
             eligible: elig.eligible,
             eligibilityWhy: elig.why,
         };
@@ -2424,7 +2433,10 @@ export default function OpportunityPostingPage() {
 
                     <div className="rounded-xl border border-slate-200 p-6 space-y-4">
                         <h3 className="text-sm font-black text-orange-700 uppercase tracking-wide">Academic / faculty link <span className="normal-case tracking-normal text-[#7a919a]">optional</span></h3>
-                        <p className="text-xs text-slate-500">{creatorCopy.facultyHint}</p>
+                        <p className="text-xs text-slate-500">
+                            {creatorCopy.facultyHint} If you name one, that faculty member is emailed to acknowledge the link before CIEL PK reviews
+                            the opportunity.
+                        </p>
                         <div className="flex flex-wrap gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -2739,7 +2751,9 @@ export default function OpportunityPostingPage() {
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-2">
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">CIEL PK final review</h3>
                         <p className="text-sm text-slate-600">
-                            After you submit, a named co-host (if any) acknowledges first. CIEL PK then completes final review before the opportunity is published.
+                            {formData.restrictedFacultyLinkage.hasFacultyLink
+                                ? "After you submit, the faculty member you named is emailed to acknowledge the academic link first, then a named co-host (if any). CIEL PK then completes final review before the opportunity is published."
+                                : "After you submit, a named co-host (if any) acknowledges first. CIEL PK then completes final review before the opportunity is published."}
                         </p>
                     </div>
 

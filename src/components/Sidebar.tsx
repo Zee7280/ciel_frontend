@@ -377,6 +377,38 @@ export default function Sidebar() {
         };
     }, [isAdmin, pathname]);
 
+    // Faculty approval queues (join applications this faculty member can decide; report supervision
+    // requests): one count per page load, so a waiting student is visible from any page.
+    const [facultyQueueCounts, setFacultyQueueCounts] = useState({ joinApplications: 0, reportSupervision: 0 });
+    useEffect(() => {
+        if (!isFaculty) return;
+        let cancelled = false;
+        const count = async (path: string, pick: (data: unknown) => number): Promise<number> => {
+            try {
+                const res = await authenticatedFetch(path, {}, { redirectToLogin: false });
+                if (!res?.ok) return 0;
+                const body = (await res.json().catch(() => null)) as { data?: unknown } | null;
+                return pick(body?.data);
+            } catch {
+                return 0;
+            }
+        };
+        void Promise.all([
+            count("/api/v1/faculty/applications?status=pending", (d) =>
+                Array.isArray(d) ? d.filter((r) => (r as { can_decide?: boolean } | null)?.can_decide !== false).length : 0,
+            ),
+            count("/api/v1/faculty/report-supervision", (d) => {
+                const pending = (d as { pending?: unknown } | null)?.pending;
+                return Array.isArray(pending) ? pending.length : 0;
+            }),
+        ]).then(([joinApplications, reportSupervision]) => {
+            if (!cancelled) setFacultyQueueCounts({ joinApplications, reportSupervision });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [isFaculty, pathname]);
+
     // Faculty Quick Community Work badge: one count per page load, and again after a review on that page.
     const [facultyQuickWorkPending, setFacultyQuickWorkPending] = useState(0);
     useEffect(() => {
@@ -620,9 +652,13 @@ export default function Sidebar() {
                             ? impactHistoryBadge
                             : isFaculty && item.href === "/dashboard/faculty/quick-work"
                               ? facultyQuickWorkPending
-                              : undefined),
+                              : isFaculty && item.href === "/dashboard/faculty/join-applications"
+                                ? facultyQueueCounts.joinApplications
+                                : isFaculty && item.href === "/dashboard/faculty/report-supervision"
+                                  ? facultyQueueCounts.reportSupervision
+                                  : undefined),
             })),
-        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, isFaculty, facultyQuickWorkPending, adminHrefCount],
+        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, isFaculty, facultyQuickWorkPending, facultyQueueCounts, adminHrefCount],
     );
 
     const partnerWorkspace = useMemo(
@@ -671,7 +707,7 @@ export default function Sidebar() {
         () =>
             withCounts([
                 // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
-                { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
+                { label: "Join Application Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
                 { label: "Quick Community Impact", href: "/dashboard/faculty/quick-work", icon: Leaf },
                 { label: "Report Supervision", href: "/dashboard/faculty/report-supervision", icon: CheckCircle },
                 // { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
@@ -727,6 +763,7 @@ export default function Sidebar() {
                 { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
                 { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
                 { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
+                { label: "Report supervision", href: "/dashboard/admin/report-supervision", icon: CheckCircle },
                 { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
                 { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
                 { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },

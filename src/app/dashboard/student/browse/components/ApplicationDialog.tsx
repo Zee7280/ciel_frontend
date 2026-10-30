@@ -694,8 +694,8 @@ export default function ApplicationDialog({
                             />
                             <p className="text-[10px] text-indigo-500 font-medium">
                                 {attendanceApproverType === "partner"
-                                    ? "Attendance for this partner-created project will be reviewed by the partner. Faculty stays attached for academic supervision."
-                                    : "This faculty member will receive attendance approval requests for this project."}
+                                    ? "This faculty member approves your join request first (CIEL PK then gives final approval) and confirms your supervision before you start the report. Attendance for this partner-created project is reviewed by the partner."
+                                    : "This faculty member approves your join request first (CIEL PK then gives final approval), confirms your supervision before you start the report, and receives attendance approval requests."}
                             </p>
                         </div>
 

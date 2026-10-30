@@ -15,6 +15,7 @@ import {
     isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
     joinApplicationLocksApplyButton,
+    joinApplicationPendingLabel,
     mergeHasAppliedFields,
     pickJoinApplicationStatus,
 } from "@/utils/studentJoinApplication";
@@ -133,6 +134,18 @@ export function shouldShowJoinApplicationApplyUi(
     return true;
 }
 
+/** Who a pending join request is waiting on, in the order the server runs it (faculty, then CIEL PK). */
+function joinPendingHelper(raw: Record<string, unknown>): string {
+    const label = joinApplicationPendingLabel(raw);
+    if (label === "Pending faculty review") {
+        return `${label}: the faculty member you named approves your request first, then CIEL PK gives final approval.`;
+    }
+    if (label === "Pending CIEL admin review") {
+        return `${label}: faculty has approved; CIEL PK gives the final approval before you can start.`;
+    }
+    return `${label}: you will be notified when it is decided.`;
+}
+
 export function resolveStudentProjectActions(input: StudentProjectActionsInput): StudentProjectActions {
     const { raw, isStudentOwner, hasApplied, applyLocked, applicationStatus } = input;
     const live = input.live || isStudentOpportunityLiveForReporting(raw);
@@ -180,9 +193,11 @@ export function resolveStudentProjectActions(input: StudentProjectActionsInput):
             });
         }
         if (applyLocked || (hasApplied && !joinRejected)) {
+            // A pending join request is about the student's application, not the (already live)
+            // listing's own workflow: say which reviewer it is waiting on.
             return empty({
                 showJoinAppliedLocked: true,
-                helperMessage: joinPending ? workflow.queueMessage : null,
+                helperMessage: joinPending ? joinPendingHelper(raw) : null,
             });
         }
         if (hasApplied && joinRejected) {
