@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
 import { downloadCsv } from "@/app/dashboard/admin/_shared/csv";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
+import { extractDepartments } from "@/app/dashboard/admin/projects/projectJourney";
 import {
     ImpactConfirmDialog,
     RecentChangesPanel,
@@ -668,6 +669,15 @@ export default function AdminProjectsPage() {
         setActiveMenu(null);
         setTrackerModalRow(row);
     };
+
+    // The tracker edits listing values in place; after a silent refetch, show it the fresh row.
+    useEffect(() => {
+        setTrackerModalRow((current) => {
+            if (!current) return current;
+            const fresh = rows.find((r) => r.id === current.id);
+            return fresh && fresh !== current ? fresh : current;
+        });
+    }, [rows]);
 
     const openTeamOverviewModal = (row: AdminProjectRow) => {
         setActiveMenu(null);
@@ -1381,11 +1391,7 @@ export default function AdminProjectsPage() {
             const scope = raw.participation_scope && typeof raw.participation_scope === "object"
                 ? (raw.participation_scope as Record<string, unknown>)
                 : null;
-            const depts = Array.isArray(scope?.departments) ? (scope!.departments as unknown[]) : [];
-            depts.forEach((d) => {
-                const v = String(d ?? "").trim();
-                if (v) set.add(v);
-            });
+            extractDepartments(scope).forEach((v) => set.add(v));
         });
         return ["all", ...Array.from(set).sort()];
     }, [rows]);
@@ -1415,8 +1421,7 @@ export default function AdminProjectsPage() {
                 const scope = raw.participation_scope && typeof raw.participation_scope === "object"
                     ? (raw.participation_scope as Record<string, unknown>)
                     : null;
-                const depts = Array.isArray(scope?.departments) ? (scope!.departments as unknown[]) : [];
-                const match = depts.some((d) => String(d ?? "").trim() === degreeFilter);
+                const match = extractDepartments(scope).some((d) => d === degreeFilter);
                 if (!match) return false;
             }
             if (facultyEmailFilter !== "all") {
@@ -3796,6 +3801,7 @@ export default function AdminProjectsPage() {
                 <ProjectTrackerModal
                     row={trackerModalRow}
                     onClose={() => setTrackerModalRow(null)}
+                    onChanged={() => void loadProjects(true)}
                     onOpenTeamsEnrollments={openTeamOverviewFromTracker}
                     onOpenIncompleteReports={() => {
                         openApplicantsModal(trackerModalRow);

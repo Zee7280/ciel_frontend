@@ -78,6 +78,18 @@ export type TrackerOpportunitySnapshot = {
     pipelineTotal: number;
     timeline: Record<string, unknown> | null;
     mode: string | null;
+    title: string | null;
+    city: string | null;
+    venue: string | null;
+    /** Eligible departments (empty = any department). */
+    departments: string[];
+    /** Faculty ACCOUNT bound to the listing (may differ from the typed supervisor email). */
+    facultyUserId: string | null;
+    facultyUserName: string | null;
+    facultyUserEmail: string | null;
+    /** Organisation account the listing belongs to. */
+    organizationId: string | null;
+    isStudentCreated: boolean | null;
 };
 
 export type RosterStats = {
@@ -282,6 +294,26 @@ export function extractApplicationsRoster(summaryRaw: Record<string, unknown> | 
     return out;
 }
 
+/**
+ * Eligible departments from a `participation_scope` block. `department_restriction.departments`
+ * is canonical (only when its scope is `specific` or the rule is department-based); the flat
+ * `departments` key is a legacy spelling some old rows still carry.
+ */
+export function extractDepartments(scope: Record<string, unknown> | null): string[] {
+    if (!scope) return [];
+    const list = (v: unknown) => (Array.isArray(v) ? v.map((d) => String(d ?? "").trim()).filter(Boolean) : []);
+    const restriction = asRecord(scope.department_restriction);
+    if (restriction) {
+        const rule = String(scope.rule ?? "").toLowerCase();
+        const specific =
+            String(restriction.scope ?? "all").toLowerCase() === "specific" ||
+            rule === "departments_across_universities" ||
+            rule === "own_university_departments";
+        return specific ? list(restriction.departments) : [];
+    }
+    return list(scope.departments);
+}
+
 /** Opportunity-level block of GET admin/opportunities/:id/teams `summary`. */
 export function extractTrackerSnapshot(summaryRaw: Record<string, unknown> | null): TrackerOpportunitySnapshot {
     const pipeline: Record<string, number> = {
@@ -308,8 +340,21 @@ export function extractTrackerSnapshot(summaryRaw: Record<string, unknown> | nul
     const o = asRecord(summaryRaw?.opportunity) ?? {};
     const rawOverride = pickString(o, ["attendance_routing_override", "attendanceRoutingOverride"]);
     const str = (keys: string[]) => pickString(o, keys) || null;
+    const location = asRecord(o.location) ?? {};
+    const departments = Array.isArray(o.departments)
+        ? (o.departments as unknown[]).map((d) => String(d ?? "").trim()).filter(Boolean)
+        : extractDepartments(asRecord(o.participation_scope));
 
     return {
+        title: str(["title"]),
+        city: pickString(location, ["city"]) || null,
+        venue: pickString(location, ["venue"]) || null,
+        departments,
+        facultyUserId: str(["faculty_user_id", "facultyUserId"]),
+        facultyUserName: str(["faculty_user_name", "facultyUserName"]),
+        facultyUserEmail: str(["faculty_user_email", "facultyUserEmail"]),
+        organizationId: str(["organization_id", "organizationId"]),
+        isStudentCreated: typeof o.is_student_created === "boolean" ? o.is_student_created : null,
         organizationName: str(["organization_name", "organizationName"]),
         executingOrganizationName: str(["executing_organization_name", "executingOrganizationName"]),
         executingOrganizationEmail: str(["executing_organization_email", "executingOrganizationEmail"]),

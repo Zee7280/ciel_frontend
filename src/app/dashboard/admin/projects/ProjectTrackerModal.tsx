@@ -30,6 +30,7 @@ import {
     buildJourney,
     computeRosterStats,
     extractApplicationsRoster,
+    extractDepartments,
     extractTrackerSnapshot,
     fmtDate,
     fmtHours,
@@ -71,7 +72,56 @@ type Props = {
     onOpenTeamsEnrollments: () => void;
     onOpenIncompleteReports: () => void;
     onOpenDebug: () => void;
+    /** Listing values changed on the server — the caller should refetch its project rows. */
+    onChanged?: () => void;
 };
+
+type FacultyOption = { id: string; name: string; email: string; university: string | null };
+type OrgOption = { id: string; name: string; email: string | null; type: string | null; status: string | null };
+
+const MODE_OPTIONS = ["On site", "Remote", "Hybrid"] as const;
+
+/** `YYYY-MM-DD` for a date input from either a date-only or a full ISO string. */
+function dateInputValue(v: unknown): string {
+    if (typeof v !== "string") return "";
+    const m = v.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : "";
+}
+
+/** `HH:mm` for a time input. */
+function timeInputValue(v: unknown): string {
+    if (typeof v !== "string") return "";
+    const m = v.trim().match(/^(\d{2}:\d{2})/);
+    return m ? m[1] : "";
+}
+
+function intInputValue(v: unknown): string {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? String(Math.round(n)) : "";
+}
+
+function toFacultyOption(u: unknown): FacultyOption | null {
+    const r = asRecord(u);
+    if (!r || typeof r.id !== "string") return null;
+    return {
+        id: r.id,
+        name: pickString(r, ["name"]),
+        email: pickString(r, ["email"]),
+        university: pickString(r, ["university", "institution"]) || null,
+    };
+}
+
+function toOrgOption(u: unknown): OrgOption | null {
+    const r = asRecord(u);
+    if (!r || typeof r.id !== "string") return null;
+    return {
+        id: r.id,
+        name: pickString(r, ["name"]),
+        email: pickString(r, ["email"]) || null,
+        type: pickString(r, ["organization_type", "orgType"]) || null,
+        status: pickString(r, ["status"]) || null,
+    };
+}
 
 /** Support actions — every one maps to an existing, audited admin endpoint. */
 type SupportAction =
@@ -596,7 +646,7 @@ function StudentJourney({
     );
 }
 
-export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOpenIncompleteReports, onOpenDebug }: Props) {
+export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOpenIncompleteReports, onOpenDebug, onChanged }: Props) {
     const [loading, setLoading] = useState(true);
     const [roster, setRoster] = useState<ApplicationRosterRow[]>([]);
     const [snapshot, setSnapshot] = useState<TrackerOpportunitySnapshot | null>(null);
@@ -611,6 +661,31 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
     const [partnerContactPerson, setPartnerContactPerson] = useState("");
     const [partnerContactEmail, setPartnerContactEmail] = useState("");
     const [contactsSaving, setContactsSaving] = useState(false);
+    // "Listing details" editor (PATCH admin/opportunities/:id/details)
+    const [detailsSaving, setDetailsSaving] = useState(false);
+    const [dTitle, setDTitle] = useState("");
+    const [dMode, setDMode] = useState("");
+    const [dCity, setDCity] = useState("");
+    const [dVenue, setDVenue] = useState("");
+    const [dStart, setDStart] = useState("");
+    const [dEnd, setDEnd] = useState("");
+    const [dFrom, setDFrom] = useState("");
+    const [dTo, setDTo] = useState("");
+    const [dHours, setDHours] = useState("");
+    const [dSeats, setDSeats] = useState("");
+    const [dDepartments, setDDepartments] = useState("");
+    /** Faculty account change: null = unchanged; `{ id: null }` = remove; `{ id }` = bind that account. */
+    const [facultyPick, setFacultyPick] = useState<{ id: string | null; name: string; email: string } | null>(null);
+    const [facultyQuery, setFacultyQuery] = useState("");
+    const [facultyResults, setFacultyResults] = useState<FacultyOption[]>([]);
+    const [facultySearching, setFacultySearching] = useState(false);
+    /** Organisation account change: undefined = unchanged; null = unlink; string = bind that organisation. */
+    const [orgPick, setOrgPick] = useState<string | null | undefined>(undefined);
+    const [orgPickerOpen, setOrgPickerOpen] = useState(false);
+    const [orgOptions, setOrgOptions] = useState<OrgOption[] | null>(null);
+    const [orgsLoading, setOrgsLoading] = useState(false);
+    const [orgQuery, setOrgQuery] = useState("");
+    const [copyPartnerContacts, setCopyPartnerContacts] = useState(false);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
 
     const syncContactFormFromSnapshot = useCallback((nextSnapshot: TrackerOpportunitySnapshot | null) => {
@@ -620,6 +695,31 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
         setPartnerContactPerson(nextSnapshot?.partnerContactPerson ?? "");
         setPartnerContactEmail(nextSnapshot?.executingOrganizationEmail ?? nextSnapshot?.partnerOrganizationEmail ?? "");
     }, []);
+
+    const syncDetailsFormFromSnapshot = useCallback(
+        (nextSnapshot: TrackerOpportunitySnapshot | null) => {
+            const tl = nextSnapshot?.timeline ?? {};
+            setDTitle(nextSnapshot?.title ?? row.title ?? "");
+            setDMode(nextSnapshot?.mode ?? "");
+            setDCity(nextSnapshot?.city ?? "");
+            setDVenue(nextSnapshot?.venue ?? "");
+            setDStart(dateInputValue(tl.start_date ?? tl.startDate));
+            setDEnd(dateInputValue(tl.end_date ?? tl.endDate));
+            setDFrom(timeInputValue(tl.from_time));
+            setDTo(timeInputValue(tl.to_time));
+            setDHours(intInputValue(tl.expected_hours));
+            setDSeats(intInputValue(tl.volunteers_required));
+            setDDepartments((nextSnapshot?.departments ?? []).join(", "));
+            setFacultyPick(null);
+            setFacultyQuery("");
+            setFacultyResults([]);
+            setOrgPick(undefined);
+            setOrgPickerOpen(false);
+            setOrgQuery("");
+            setCopyPartnerContacts(false);
+        },
+        [row.title],
+    );
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -648,6 +748,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
             setSnapshot(nextSnapshot);
             setAttendanceRoutingOverride(nextSnapshot.attendanceRoutingOverride);
             syncContactFormFromSnapshot(nextSnapshot);
+            syncDetailsFormFromSnapshot(nextSnapshot);
         } catch {
             toast.error("Could not load project tracker");
             setRoster([]);
@@ -655,7 +756,157 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
         } finally {
             setLoading(false);
         }
-    }, [row.id, syncContactFormFromSnapshot]);
+    }, [row.id, syncContactFormFromSnapshot, syncDetailsFormFromSnapshot]);
+
+    // Faculty account search (debounced): registered FACULTY users by name / email / university.
+    useEffect(() => {
+        const q = facultyQuery.trim();
+        if (q.length < 2) {
+            setFacultyResults([]);
+            setFacultySearching(false);
+            return;
+        }
+        let cancelled = false;
+        setFacultySearching(true);
+        const timer = setTimeout(async () => {
+            try {
+                const res = await authenticatedFetch(
+                    `/api/v1/admin/users?role=faculty&limit=8&search=${encodeURIComponent(q)}`,
+                );
+                const data = res ? await res.json().catch(() => ({})) : {};
+                if (cancelled) return;
+                const list = Array.isArray((data as { data?: unknown }).data) ? ((data as { data: unknown[] }).data) : [];
+                setFacultyResults(list.map(toFacultyOption).filter((o): o is FacultyOption => !!o));
+            } catch {
+                if (!cancelled) setFacultyResults([]);
+            } finally {
+                if (!cancelled) setFacultySearching(false);
+            }
+        }, 300);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [facultyQuery]);
+
+    const openOrgPicker = useCallback(async () => {
+        setOrgPickerOpen(true);
+        if (orgOptions !== null || orgsLoading) return;
+        setOrgsLoading(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/organizations`);
+            const data = res ? await res.json().catch(() => ({})) : {};
+            const list = Array.isArray((data as { data?: unknown }).data) ? ((data as { data: unknown[] }).data) : [];
+            setOrgOptions(
+                list
+                    .map(toOrgOption)
+                    .filter((o): o is OrgOption => !!o)
+                    .sort((a, b) => a.name.localeCompare(b.name)),
+            );
+        } catch {
+            toast.error("Could not load organisations");
+            setOrgOptions([]);
+        } finally {
+            setOrgsLoading(false);
+        }
+    }, [orgOptions, orgsLoading]);
+
+    const filteredOrgOptions = useMemo(() => {
+        const q = orgQuery.trim().toLowerCase();
+        const all = orgOptions ?? [];
+        if (!q) return all.slice(0, 40);
+        return all.filter((o) => `${o.name} ${o.email ?? ""} ${o.type ?? ""}`.toLowerCase().includes(q)).slice(0, 40);
+    }, [orgOptions, orgQuery]);
+
+    /** Only the keys whose value differs from the loaded snapshot; `error` when a value is unusable. */
+    const detailsPatch = useMemo((): { body: Record<string, unknown>; error: string | null } => {
+        const body: Record<string, unknown> = {};
+        if (!snapshot) return { body, error: null };
+        const tl = snapshot.timeline ?? {};
+        const savedTitle = (snapshot.title ?? row.title ?? "").trim();
+        if (dTitle.trim() !== savedTitle) {
+            if (!dTitle.trim()) return { body, error: "Title cannot be blank." };
+            body.title = dTitle.trim();
+        }
+        if (dMode && dMode !== (snapshot.mode ?? "")) body.mode = dMode;
+        if (dCity.trim() !== (snapshot.city ?? "").trim()) body.city = dCity.trim();
+        if (dVenue.trim() !== (snapshot.venue ?? "").trim()) body.venue = dVenue.trim();
+        if (dStart !== dateInputValue(tl.start_date ?? tl.startDate)) body.start_date = dStart;
+        if (dEnd !== dateInputValue(tl.end_date ?? tl.endDate)) body.end_date = dEnd;
+        if (dFrom !== timeInputValue(tl.from_time)) body.from_time = dFrom;
+        if (dTo !== timeInputValue(tl.to_time)) body.to_time = dTo;
+        if (dHours.trim() !== intInputValue(tl.expected_hours)) {
+            const n = Number(dHours);
+            if (!Number.isInteger(n) || n < 1 || n > 500) return { body, error: "Hours per volunteer must be a whole number from 1 to 500." };
+            body.expected_hours = n;
+        }
+        if (dSeats.trim() !== intInputValue(tl.volunteers_required)) {
+            const n = Number(dSeats);
+            if (!Number.isInteger(n) || n < 1 || n > 5000) return { body, error: "Volunteers needed must be a whole number from 1 to 5000." };
+            body.volunteers_required = n;
+        }
+        const departments = Array.from(
+            new Set(
+                dDepartments
+                    .split(/[,;\n]+/)
+                    .map((s) => s.replace(/\s+/g, " ").trim())
+                    .filter(Boolean),
+            ),
+        );
+        if (departments.join("|") !== (snapshot.departments ?? []).join("|")) body.departments = departments;
+        if (facultyPick) body.faculty_user_id = facultyPick.id;
+        if (orgPick !== undefined) {
+            body.organization_id = orgPick;
+            if (orgPick && copyPartnerContacts) body.copy_partner_contacts_from_organization = true;
+        }
+        return { body, error: null };
+    }, [snapshot, row.title, dTitle, dMode, dCity, dVenue, dStart, dEnd, dFrom, dTo, dHours, dSeats, dDepartments, facultyPick, orgPick, copyPartnerContacts]);
+
+    const detailsDirty = Object.keys(detailsPatch.body).length > 0;
+
+    const saveDetails = useCallback(async () => {
+        if (detailsPatch.error) {
+            toast.error(detailsPatch.error);
+            return;
+        }
+        if (!Object.keys(detailsPatch.body).length) return;
+        setDetailsSaving(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(row.id)}/details`, {
+                method: "PATCH",
+                body: JSON.stringify(detailsPatch.body),
+            });
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                const payload = asRecord(asRecord(data)?.data) ?? {};
+                const changed = Array.isArray(payload.changed) ? (payload.changed as unknown[]).map(String) : [];
+                const propagation = asRecord(payload.propagation);
+                const rebound = [
+                    propagation?.participations_updated ? `${propagation.participations_updated} enrollment(s)` : null,
+                    propagation?.applications_updated ? `${propagation.applications_updated} application(s)` : null,
+                    propagation?.reports_updated ? `${propagation.reports_updated} report(s)` : null,
+                ].filter(Boolean);
+                toast.success(
+                    `Listing updated${changed.length ? ` — ${changed.join(", ")}` : ""}${rebound.length ? ` · rebound ${rebound.join(", ")}` : ""}`,
+                );
+                const stage = typeof payload.workflow_stage === "string" ? payload.workflow_stage : "";
+                if (stage.startsWith("pending_")) {
+                    toast.message(`The listing is now at "${stage.replace("_", " ")}" — the new reviewer has been emailed.`);
+                }
+                await load();
+                onChanged?.();
+            } else {
+                const msg = (data as { message?: unknown }).message;
+                toast.error(
+                    typeof msg === "string" ? msg : Array.isArray(msg) ? msg.map(String).join(" · ") : "Could not update listing details",
+                );
+            }
+        } catch {
+            toast.error("Could not update listing details");
+        } finally {
+            setDetailsSaving(false);
+        }
+    }, [detailsPatch, load, onChanged, row.id]);
 
     const contactsDirty = useMemo(() => {
         if (!snapshot) return false;
@@ -801,8 +1052,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
 
     const facts = useMemo(() => {
         const timeline = snapshot?.timeline ?? asRecord(raw.timeline) ?? {};
-        const scope = asRecord(raw.participation_scope);
-        const departments = Array.isArray(scope?.departments) ? scope.departments.map(String).filter(Boolean) : [];
+        const departments = snapshot?.departments ?? extractDepartments(asRecord(raw.participation_scope));
         const dateOf = (keys: string[]) => fmtDate(pickString(timeline, keys)) ?? (pickString(timeline, keys) || "—");
         const expected = Number(timeline.expected_hours);
         const committed = row.remainingHours != null ? row.verifiedHours + row.remainingHours : null;
@@ -842,9 +1092,21 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
                 copy: snapshot?.facultySupervisorEmail ?? "",
             },
             {
+                label: "Faculty account",
+                value: snapshot?.facultyUserId
+                    ? [snapshot.facultyUserName, snapshot.facultyUserEmail].filter(Boolean).join(" · ") || snapshot.facultyUserId
+                    : "Not linked — faculty hub access activates when a CIEL faculty account matches the supervisor email",
+                copy: snapshot?.facultyUserEmail ?? "",
+            },
+            {
                 label: "Partner organisation",
                 value: [partnerName, snapshot?.partnerContactPerson, partnerEmail].filter(Boolean).join(" · "),
                 copy: partnerEmail,
+            },
+            {
+                label: "Organisation account",
+                value: snapshot?.organizationId ? snapshot.organizationName || snapshot.organizationId : "Not linked",
+                copy: snapshot?.organizationId ?? "",
             },
             { label: "Attendance reviewed by", value: routing },
         ];
@@ -1448,11 +1710,325 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
                                 <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-[11px] font-black uppercase tracking-[0.08em] text-[#16313d]">
                                     <Settings className="h-4 w-4 text-[#70808a]" /> Fix wrong details
                                     <span className="ml-auto text-[10px] font-bold normal-case tracking-normal text-[#70808a] group-open:hidden">
-                                        Contacts, attendance routing
+                                        Listing values, faculty &amp; organisation accounts, contacts, routing
                                     </span>
                                 </summary>
                                 <div className="space-y-5 border-t border-[#eef2f4] px-4 pb-4 pt-3">
                                     <div>
+                                        <p className="mb-3 text-xs text-slate-500">
+                                            Wrong title, place, dates, hours, seats or departments? Correct the listing here. Only the
+                                            values you change are written; a live listing stays published and is not sent back for
+                                            review.
+                                        </p>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <label className="text-sm sm:col-span-2">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Title
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={dTitle}
+                                                    onChange={(e) => setDTitle(e.target.value)}
+                                                    maxLength={200}
+                                                    className={INPUT_CLASS}
+                                                />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Mode
+                                                </span>
+                                                <select value={dMode} onChange={(e) => setDMode(e.target.value)} className={INPUT_CLASS}>
+                                                    {!dMode || !MODE_OPTIONS.includes(dMode as (typeof MODE_OPTIONS)[number]) ? (
+                                                        <option value={dMode}>{dMode || "— not set —"}</option>
+                                                    ) : null}
+                                                    {MODE_OPTIONS.map((m) => (
+                                                        <option key={m} value={m}>
+                                                            {m}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    City
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={dCity}
+                                                    onChange={(e) => setDCity(e.target.value)}
+                                                    maxLength={120}
+                                                    className={INPUT_CLASS}
+                                                    placeholder="e.g. Lahore"
+                                                />
+                                            </label>
+                                            <label className="text-sm sm:col-span-2">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Venue
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={dVenue}
+                                                    onChange={(e) => setDVenue(e.target.value)}
+                                                    maxLength={300}
+                                                    className={INPUT_CLASS}
+                                                    placeholder="Optional"
+                                                />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Start date
+                                                </span>
+                                                <input type="date" value={dStart} onChange={(e) => setDStart(e.target.value)} className={INPUT_CLASS} />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    End date
+                                                </span>
+                                                <input type="date" value={dEnd} onChange={(e) => setDEnd(e.target.value)} className={INPUT_CLASS} />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Daily start time
+                                                </span>
+                                                <input type="time" value={dFrom} onChange={(e) => setDFrom(e.target.value)} className={INPUT_CLASS} />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Daily end time
+                                                </span>
+                                                <input type="time" value={dTo} onChange={(e) => setDTo(e.target.value)} className={INPUT_CLASS} />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Hours per volunteer
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min={1}
+                                                    max={500}
+                                                    value={dHours}
+                                                    onChange={(e) => setDHours(e.target.value)}
+                                                    className={INPUT_CLASS}
+                                                />
+                                            </label>
+                                            <label className="text-sm">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Volunteers needed
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min={1}
+                                                    max={5000}
+                                                    value={dSeats}
+                                                    onChange={(e) => setDSeats(e.target.value)}
+                                                    className={INPUT_CLASS}
+                                                />
+                                                <span className="mt-1 block text-[10px] text-slate-400">
+                                                    Cannot go below the {row.volunteers} seat{row.volunteers === 1 ? "" : "s"} already taken.
+                                                </span>
+                                            </label>
+                                            <label className="text-sm sm:col-span-2">
+                                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Eligible departments
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={dDepartments}
+                                                    onChange={(e) => setDDepartments(e.target.value)}
+                                                    className={INPUT_CLASS}
+                                                    placeholder="Comma-separated, e.g. Computer Science, Economics — leave blank for all"
+                                                />
+                                            </label>
+                                        </div>
+
+                                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                            <div className="rounded-xl border border-[#e6ecef] bg-[#f7fafb] p-3">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Faculty account</p>
+                                                <p className="mt-1 text-[12px] font-semibold text-[#16313d]">
+                                                    {facultyPick
+                                                        ? facultyPick.id
+                                                            ? `Will link: ${[facultyPick.name, facultyPick.email].filter(Boolean).join(" · ")}`
+                                                            : "Will remove the faculty supervisor"
+                                                        : snapshot?.facultyUserId
+                                                          ? [snapshot.facultyUserName, snapshot.facultyUserEmail].filter(Boolean).join(" · ")
+                                                          : snapshot?.facultySupervisorEmail
+                                                            ? `No account linked yet (${snapshot.facultySupervisorEmail})`
+                                                            : "No faculty supervisor"}
+                                                </p>
+                                                <p className="mt-1 text-[11px] leading-snug text-[#5b6b75]">
+                                                    Linking an account writes its name and email as the supervisor, binds it for approvals,
+                                                    reports and the faculty hub, and rebinds enrollments still pointing at the old supervisor.
+                                                </p>
+                                                <input
+                                                    type="search"
+                                                    value={facultyQuery}
+                                                    onChange={(e) => setFacultyQuery(e.target.value)}
+                                                    className={`${INPUT_CLASS} mt-2 bg-white`}
+                                                    placeholder="Search faculty by name, email or university…"
+                                                />
+                                                {facultyQuery.trim().length >= 2 ? (
+                                                    <ul className="mt-2 max-h-44 space-y-1 overflow-y-auto">
+                                                        {facultySearching ? (
+                                                            <li className="px-2 py-1 text-[11px] text-slate-500">Searching…</li>
+                                                        ) : facultyResults.length === 0 ? (
+                                                            <li className="px-2 py-1 text-[11px] text-slate-500">No faculty account matches.</li>
+                                                        ) : (
+                                                            facultyResults.map((f) => (
+                                                                <li key={f.id}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFacultyPick({ id: f.id, name: f.name, email: f.email });
+                                                                            setFacultyQuery("");
+                                                                        }}
+                                                                        className="w-full rounded-lg border border-[#e6ecef] bg-white px-2.5 py-1.5 text-left text-[12px] hover:border-[#0e756e]"
+                                                                    >
+                                                                        <span className="font-bold text-[#16313d]">{f.name || f.email}</span>
+                                                                        <span className="block text-[11px] text-[#5b6b75]">
+                                                                            {[f.email, f.university].filter(Boolean).join(" · ")}
+                                                                        </span>
+                                                                    </button>
+                                                                </li>
+                                                            ))
+                                                        )}
+                                                    </ul>
+                                                ) : null}
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {facultyPick ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFacultyPick(null)}
+                                                            className={`${SMALL_BTN} border-[#dde5ea] bg-white text-[#16313d]`}
+                                                        >
+                                                            Undo change
+                                                        </button>
+                                                    ) : null}
+                                                    {!facultyPick && (snapshot?.facultyUserId || snapshot?.facultySupervisorEmail) ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFacultyPick({ id: null, name: "", email: "" })}
+                                                            className={`${SMALL_BTN} border-rose-200 bg-white text-rose-700`}
+                                                        >
+                                                            Remove faculty supervisor
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-xl border border-[#e6ecef] bg-[#f7fafb] p-3">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Organisation account</p>
+                                                <p className="mt-1 text-[12px] font-semibold text-[#16313d]">
+                                                    {orgPick !== undefined
+                                                        ? orgPick
+                                                            ? `Will link: ${orgOptions?.find((o) => o.id === orgPick)?.name ?? orgPick}`
+                                                            : "Will unlink the organisation account"
+                                                        : snapshot?.organizationId
+                                                          ? snapshot.organizationName || snapshot.organizationId
+                                                          : "Not linked"}
+                                                </p>
+                                                <p className="mt-1 text-[11px] leading-snug text-[#5b6b75]">
+                                                    The partner / NGO / university account that owns this listing in its dashboard. Partner
+                                                    contact emails are separate — edit them below, or copy them from the account.
+                                                </p>
+                                                {orgPickerOpen ? (
+                                                    <>
+                                                        <input
+                                                            type="search"
+                                                            value={orgQuery}
+                                                            onChange={(e) => setOrgQuery(e.target.value)}
+                                                            className={`${INPUT_CLASS} mt-2 bg-white`}
+                                                            placeholder="Filter organisations…"
+                                                        />
+                                                        <ul className="mt-2 max-h-44 space-y-1 overflow-y-auto">
+                                                            {orgsLoading ? (
+                                                                <li className="px-2 py-1 text-[11px] text-slate-500">Loading organisations…</li>
+                                                            ) : filteredOrgOptions.length === 0 ? (
+                                                                <li className="px-2 py-1 text-[11px] text-slate-500">No organisation matches.</li>
+                                                            ) : (
+                                                                filteredOrgOptions.map((o) => (
+                                                                    <li key={o.id}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setOrgPick(o.id);
+                                                                                setOrgPickerOpen(false);
+                                                                            }}
+                                                                            className="w-full rounded-lg border border-[#e6ecef] bg-white px-2.5 py-1.5 text-left text-[12px] hover:border-[#0e756e]"
+                                                                        >
+                                                                            <span className="font-bold text-[#16313d]">{o.name}</span>
+                                                                            <span className="block text-[11px] text-[#5b6b75]">
+                                                                                {[o.type, o.email, o.status].filter(Boolean).join(" · ")}
+                                                                            </span>
+                                                                        </button>
+                                                                    </li>
+                                                                ))
+                                                            )}
+                                                        </ul>
+                                                    </>
+                                                ) : null}
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => (orgPickerOpen ? setOrgPickerOpen(false) : void openOrgPicker())}
+                                                        className={`${SMALL_BTN} border-[#dde5ea] bg-white text-[#0e756e]`}
+                                                    >
+                                                        {orgPickerOpen ? "Close list" : "Choose organisation"}
+                                                    </button>
+                                                    {orgPick !== undefined ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setOrgPick(undefined)}
+                                                            className={`${SMALL_BTN} border-[#dde5ea] bg-white text-[#16313d]`}
+                                                        >
+                                                            Undo change
+                                                        </button>
+                                                    ) : snapshot?.organizationId ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setOrgPick(null)}
+                                                            className={`${SMALL_BTN} border-rose-200 bg-white text-rose-700`}
+                                                        >
+                                                            Unlink organisation
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                                {orgPick ? (
+                                                    <label className="mt-2 flex items-start gap-2 text-[11px] text-[#16313d]">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={copyPartnerContacts}
+                                                            onChange={(e) => setCopyPartnerContacts(e.target.checked)}
+                                                            className="mt-0.5"
+                                                        />
+                                                        <span>
+                                                            Also copy this account&rsquo;s name and contact onto the partner fields (replaces the
+                                                            partner contact below; a listing still under review goes to that partner for
+                                                            approval).
+                                                        </span>
+                                                    </label>
+                                                ) : null}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center justify-end gap-3">
+                                            {detailsPatch.error ? (
+                                                <span className="text-[11px] font-semibold text-rose-700">{detailsPatch.error}</span>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                onClick={() => void saveDetails()}
+                                                disabled={detailsSaving || !detailsDirty || !!detailsPatch.error}
+                                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e756e] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 sm:w-auto"
+                                            >
+                                                {detailsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                                Save listing details
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-[#eef2f4] pt-4">
                                         <p className="mb-3 text-xs text-slate-500">
                                             Wrong faculty or partner contact? Correct it here. Pending attendance reviews and approval
                                             routing rebind to the new contacts; live listings stay published.
@@ -1576,8 +2152,8 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments, onOp
                                             <li>Wrong session date / time / hours → reject that session above; the student logs it again.</li>
                                             <li>Wrong values in an impact report → Send report back for correction on the student card.</li>
                                             <li>
-                                                Listing title, dates, hours per volunteer or location → only the creator can edit these. Send
-                                                them this link:{" "}
+                                                Description, SDG, objectives or safety declarations → the creator edits these. Send them this
+                                                link:{" "}
                                                 <button
                                                     type="button"
                                                     onClick={() => void copyText(`${origin}${STUDENT_PATHS.fixOpportunity(row.id)}`, "Link")}
