@@ -1206,7 +1206,7 @@ export default function AdminUsersPage() {
                                             Confirmed by CIEL PK: {selectedUser.universityConfirmedByAdmin}
                                         </p>
                                     ) : (
-                                        <p className="mt-1 text-xs font-semibold text-amber-700">Not confirmed by CIEL PK yet.</p>
+                                        <p className="mt-1 text-xs font-semibold text-amber-700">Not confirmed by CIEL PK yet. Choose the university and press Save Changes to confirm it.</p>
                                     )}
                                 </div>
                             ) : null}
