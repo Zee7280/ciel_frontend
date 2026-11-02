@@ -4,7 +4,7 @@ import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type React
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Loader2, X } from "lucide-react";
 import StatusBadge from "@/components/admin/StatusBadge";
-import { hubStatusLabel, hubStatusTone } from "@/utils/integrationHub";
+import { HUB_CAPABILITY_LABELS, hubStatusLabel, hubStatusTone } from "@/utils/integrationHub";
 
 export function HubBadge({ status }: { status: string | null | undefined }) {
     return <StatusBadge label={hubStatusLabel(status)} tone={hubStatusTone(status)} />;
@@ -324,7 +324,10 @@ export function ScopeChecklist({ options, value, onChange }: { options: readonly
                             checked={on}
                             onChange={(e) => onChange(e.target.checked ? [...value, o] : value.filter((x) => x !== o))}
                         />
-                        <code className="text-xs">{o}</code>
+                        <span className="flex min-w-0 flex-col">
+                            <code className="text-xs">{o}</code>
+                            {HUB_CAPABILITY_LABELS[o] ? <span className="text-[11px] text-slate-500">{HUB_CAPABILITY_LABELS[o]}</span> : null}
+                        </span>
                     </label>
                 );
             })}

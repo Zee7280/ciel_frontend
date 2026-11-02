@@ -19,6 +19,34 @@ export const HUB_EVENT_TYPES = [
 ] as const;
 export type HubEventType = (typeof HUB_EVENT_TYPES)[number];
 
+/** University Export API scopes (outbound, read-only); granted like event types. */
+export const HUB_EXPORT_SCOPES = [
+    "export:students",
+    "export:opportunities",
+    "export:community-service",
+    "export:fyp",
+    "export:ventures",
+    "export:summary",
+] as const;
+export type HubExportScope = (typeof HUB_EXPORT_SCOPES)[number];
+
+/** Everything a platform can be approved for: inbound event types + export scopes. */
+export const HUB_PLATFORM_CAPABILITIES = [...HUB_EVENT_TYPES, ...HUB_EXPORT_SCOPES] as const;
+
+export const HUB_CAPABILITY_LABELS: Record<string, string> = {
+    "activity.session": "Inbound: activity sessions",
+    "impact.metric": "Inbound: impact metrics",
+    "evidence.item": "Inbound: evidence items",
+    "activity.corrected": "Inbound: corrections",
+    "activity.voided": "Inbound: voids",
+    "export:students": "Export: students",
+    "export:opportunities": "Export: opportunities",
+    "export:community-service": "Export: verified community-service hours",
+    "export:fyp": "Export: approved FYPs",
+    "export:ventures": "Export: approved ventures",
+    "export:summary": "Export: period summary",
+};
+
 export const HUB_PLATFORM_STATUSES = ["sandbox", "live", "suspended", "retired"] as const;
 export const HUB_CONNECTION_STATUSES = ["proposed", "org_approved", "active", "suspended", "revoked"] as const;
 export const HUB_EVENT_STATUSES = ["received", "processed", "deferred", "dead", "rejected"] as const;

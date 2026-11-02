@@ -7,6 +7,7 @@ import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import {
     HUB_ADMIN_BASE,
     HUB_EVENT_TYPES,
+    HUB_PLATFORM_CAPABILITIES,
     HUB_METRIC_AGGREGATIONS,
     HUB_METRIC_CLASSIFICATIONS,
     hubRequest,
@@ -214,8 +215,11 @@ export function PlatformFormDialog({
                     <input className={inputCls} value={form.agreementReference} onChange={(e) => set("agreementReference", e.target.value)} />
                 </Field>
                 <div className="sm:col-span-2">
-                    <Field label="Approved event types">
-                        <ScopeChecklist options={HUB_EVENT_TYPES} value={form.approvedEventTypes} onChange={(v) => set("approvedEventTypes", v)} />
+                    <Field
+                        label="Approved capabilities"
+                        hint="Inbound event types the platform may send, and export scopes it may read (University Export API)."
+                    >
+                        <ScopeChecklist options={HUB_PLATFORM_CAPABILITIES} value={form.approvedEventTypes} onChange={(v) => set("approvedEventTypes", v)} />
                     </Field>
                 </div>
                 <Field label="Rate limit / minute" hint="Default 120">
@@ -317,8 +321,8 @@ export function ConnectionFormDialog({
     const selectedPlatform = platforms.find((p) => p.id === form.platformId);
     // Editing: only the platform's approved types can be scopes (the backend drops the rest).
     const scopeOptions: readonly string[] = connection
-        ? (connection.platform?.approvedEventTypes ?? platforms.find((p) => p.id === connection.platformId)?.approvedEventTypes ?? HUB_EVENT_TYPES)
-        : (selectedPlatform?.approvedEventTypes ?? [...HUB_EVENT_TYPES]);
+        ? (connection.platform?.approvedEventTypes ?? platforms.find((p) => p.id === connection.platformId)?.approvedEventTypes ?? HUB_PLATFORM_CAPABILITIES)
+        : (selectedPlatform?.approvedEventTypes ?? [...HUB_PLATFORM_CAPABILITIES]);
 
     useEffect(() => {
         if (!open || connection) return;
