@@ -11,6 +11,7 @@ import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils
 import { prefetchCommunityServiceData } from "@/utils/student-community-cache";
 import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import OpportunityApprovedModal from "@/components/ciel/community-service/OpportunityApprovedModal";
 import {
     MOCKUP_GRADIENTS,
     MockupActionCard,
@@ -123,6 +124,7 @@ export default function StudentDashboardPage() {
 
     return (
         <div className="mx-auto min-w-0 max-w-[1500px]">
+            <OpportunityApprovedModal />
             <MockupHero
                 title={<TimeGreeting name={firstName} emoji={"👋"} />}
                 subtitle="Four impact areas. One portfolio. Start your work, track every approval, and build a verified record of your academic and community impact."
