@@ -177,7 +177,7 @@ export default function QuickWorkDashboard() {
                     Export service record
                 </button>
                 <button type="button" onClick={routes.openIntro} className="rounded-lg bg-[#0e7d74] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0b6760]">
-                    + Log another activity
+                    + Create Quick Community Impact
                 </button>
             </div>
 
@@ -353,7 +353,7 @@ export default function QuickWorkDashboard() {
                             onClick={routes.openIntro}
                             className="mt-4 rounded-lg border border-[#cbe3e0] bg-white px-4 py-2.5 text-xs font-semibold text-[#0e7d74]"
                         >
-                            Create your first log →
+                            Create Quick Community Impact →
                         </button>
                     </div>
                 )}
