@@ -143,7 +143,7 @@ function collectPrivateCandidateErrors(form: {
 /** Options for a draft save: which step to reopen on resume, and whether to suppress toasts. */
 type DraftSaveOptions = { resumeStep?: string; silent?: boolean };
 
-/** Left-rail wizard steps — 9-step Opportunity Builder (private-candidate pathway included). */
+/** Left-rail wizard steps — 9-step Opportunity Builder (faculty approval is mandatory for students). */
 const WIZARD_STEPS = [
     { key: "A", label: "Creator", sub: "Profile & accountability", icon: "🎓", color: "#0d2b33" },
     { key: "B", label: "Opportunity", sub: "Title, type, mode", icon: "🚀", color: "#0891b2" },
@@ -1197,25 +1197,6 @@ function StudentOpportunityCreationPageInner() {
         setEmailConfirmOpen(true);
     };
 
-    const setPrivateCandidate = (on: boolean) => {
-        if (!on) setCreatorFieldErrors({});
-        setFormData((prev) => ({
-            ...prev,
-            privateCandidate: on,
-            applyScope: on
-                ? (prev.applyScope === "all" || prev.applyScope === "multi_all" || prev.applyScope === "multi_depts"
-                    ? prev.applyScope
-                    : "all")
-                : (prev.applyScope === "student_uni_all" || prev.applyScope === "student_own_dept" || prev.applyScope === "student_selected_depts"
-                    ? prev.applyScope
-                    : "student_uni_all"),
-            supervision: {
-                ...prev.supervision,
-                executingContext: on && !prev.supervision.executingContext ? "independent" : prev.supervision.executingContext,
-            },
-        }));
-    };
-
     const timelineStartWeekdayLabel = useMemo(
         () => weekdayLabelFromDateInput(formData.dates.start),
         [formData.dates.start],
@@ -1670,6 +1651,10 @@ function StudentOpportunityCreationPageInner() {
                         },
                         participation: { ...prev.participation, ...(p.participation as typeof prev.participation) },
                     };
+                    // A draft saved under the former private-candidate pathway cannot be submitted any
+                    // more (faculty approval is mandatory); reopen it on the faculty route. Submitted
+                    // legacy listings keep their stored route for edit / resubmit.
+                    if (String(d.status || "").toLowerCase() === "draft") merged.privateCandidate = false;
                     return normalizeSupervisionIndependentPhone(merged);
                 });
                 // Drafts reopen on the step the student left (Next / Back / rail / Save draft all move
@@ -1903,9 +1888,7 @@ function StudentOpportunityCreationPageInner() {
                     <p>
                         {editingOpportunityId
                             ? "Update your opportunity and submit again for review."
-                            : formData.privateCandidate
-                              ? "You are using the Private Candidate pathway. No faculty link is required. CIEL PK will contact you directly to verify your identity / programme status and the opportunity before approval."
-                              : "Choose the verification pathway that matches your status. University-linked students connect a faculty member; private / independent candidates are verified directly by CIEL PK."}
+                            : "Every student-created opportunity is approved by your faculty supervisor first, then verified by CIEL PK. You will connect a faculty member in Verification."}
                     </p>
                     <div className="co-hero-chips">
                         <span className="co-hero-chip">🧭 Guided 9-step form</span>
@@ -2049,26 +2032,14 @@ function StudentOpportunityCreationPageInner() {
                     </div>
                     </>
                 )}
+                {/* Legacy only: listings created under the former private / independent candidate pathway.
+                    New submissions always go through faculty approval, so the toggle no longer exists. */}
                 <div className="mt-4">
-                    <label className="co-label">Student verification pathway</label>
-                    <button
-                        type="button"
-                        className={`co-safe w-full text-left${formData.privateCandidate ? " on" : ""}`}
-                        onClick={() => setPrivateCandidate(!formData.privateCandidate)}
-                    >
-                        <span className="co-tick">{formData.privateCandidate ? "✓" : ""}</span>
-                        <span>
-                            <b>I am a Private / Independent Candidate</b>
-                            <span className="mt-1 block text-[10px] font-medium text-[#7a919a]">
-                                Use this if you are completing an undergraduate programme privately / independently and do not have a faculty member who can approve this opportunity.
-                            </span>
-                        </span>
-                    </button>
-                    <div className="co-note aqua mt-3">
-                        {formData.privateCandidate
-                            ? <span><b>Private candidate:</b> faculty is not required. CIEL PK will verify you directly using the details below.</span>
-                            : <span><b>University-linked student:</b> leave this unchecked. You will connect a faculty member in Verification.</span>}
-                    </div>
+                    {formData.privateCandidate ? (
+                        <div className="co-note aqua mb-3">
+                            <span><b>Legacy private-candidate listing:</b> created before faculty approval became mandatory. CIEL PK verifies it directly using the details below.</span>
+                        </div>
+                    ) : null}
                     {formData.privateCandidate ? (
                         <div className="mt-3 min-w-0 space-y-3 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
                             <p className="text-xs leading-relaxed text-amber-950">
