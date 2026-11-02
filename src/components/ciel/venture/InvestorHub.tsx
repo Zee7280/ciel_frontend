@@ -36,7 +36,12 @@ type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
         faculty?: string;
         courseCode?: string;
         founderName?: string;
+        founderEmail?: string;
+        founderWhatsappCode?: string;
+        founderWhatsappNumber?: string;
     } | null;
+    /** True only after CIEL PK screened and the founder accepted THIS investor's introduction. */
+    contactUnlocked?: boolean;
     ideaInfo?: { sector?: string; problem?: string; pitch?: string; payerWho?: string; userWho?: string } | null;
     solutionInfo?: { solution?: string; revenue?: string } | null;
     reviewPipeline?: { supervisorStatus?: string | null; studentDeclaredAt?: string } | null;
@@ -386,6 +391,15 @@ function InvestorHubInner() {
             const res = await authenticatedFetch("/api/v1/paths/startup-business/investor-hub");
             const json = res?.ok ? await res.json() : null;
             setEntries(Array.isArray(json?.data) ? json.data : []);
+            // Saved / interest / intro state is server-side (signals) so founders, faculty and CIEL PK
+            // see the same record; the local activity log + Deal Desk thread stay in settings.
+            const sigRes = await authenticatedFetch("/api/v1/paths/startup-business/investor-hub/signals");
+            const sigJson = sigRes?.ok ? await sigRes.json() : null;
+            const sigs = Array.isArray(sigJson?.data) ? (sigJson.data as { ventureId: string; kind: string; note: string | null; status: string | null; createdAt: string }[]) : [];
+            const toRow = (s: (typeof sigs)[number]): HubRow => ({ entryId: s.ventureId, note: s.note || "", at: s.createdAt, status: s.status || undefined });
+            const serverSaved = sigs.filter((s) => s.kind === "save").map((s) => s.ventureId);
+            const serverInterest = sigs.filter((s) => s.kind === "interest").map(toRow);
+            const serverIntros = sigs.filter((s) => s.kind === "intro").map(toRow);
             const meRes = await authenticatedFetch("/api/v1/users/me");
             const meJson = meRes?.ok ? await meRes.json() : null;
             const inv = meJson?.data?.investor && typeof meJson.data.investor === "object" ? meJson.data.investor : investorProfile;
@@ -394,9 +408,9 @@ function InvestorHubInner() {
             const hub = (inv?.hub && typeof inv.hub === "object" ? inv.hub : {}) as {
                 savedIds?: string[]; interest?: HubRow[]; intros?: HubRow[]; activity?: ActRow[]; deskMsgs?: DeskMsg[];
             };
-            setSavedIds(Array.isArray(hub.savedIds) ? hub.savedIds : []);
-            setInterest(Array.isArray(hub.interest) ? hub.interest : []);
-            setIntros(Array.isArray(hub.intros) ? hub.intros : []);
+            setSavedIds(sigRes?.ok ? serverSaved : Array.isArray(hub.savedIds) ? hub.savedIds : []);
+            setInterest(sigRes?.ok ? serverInterest : Array.isArray(hub.interest) ? hub.interest : []);
+            setIntros(sigRes?.ok ? serverIntros : Array.isArray(hub.intros) ? hub.intros : []);
             setActivity(Array.isArray(hub.activity) ? hub.activity : []);
             setDeskMsgs(Array.isArray(hub.deskMsgs) ? hub.deskMsgs : []);
             setMandate(mandateFrom(inv));
@@ -426,6 +440,25 @@ function InvestorHubInner() {
 
     const snapshot = () => ({ savedIds, interest, intros, activity, deskMsgs });
 
+    /** Records a Hub action on the server. Returns false (with a toast) when refused. */
+    const signal = async (ventureId: string, kind: "view" | "save" | "interest" | "intro", note?: string): Promise<boolean> => {
+        try {
+            const res = await authenticatedFetch(`/api/v1/paths/startup-business/investor-hub/${ventureId}/signals`, {
+                method: "POST",
+                body: JSON.stringify({ kind, note: note || undefined }),
+            });
+            if (res?.ok) return true;
+            if (kind !== "view") {
+                const body = (await res?.json().catch(() => null)) as { message?: string } | null;
+                toast.error(body?.message || "Could not record this action");
+            }
+            return false;
+        } catch {
+            if (kind !== "view") toast.error("Could not record this action");
+            return false;
+        }
+    };
+
     const logAct = (ev: string, ventureName?: string | null, vis = "CIEL PK") => {
         const row: ActRow = { when: nowStamp(), ev, v: ventureName || "—", vis };
         void persistHub({ ...snapshot(), activity: [row, ...activity].slice(0, 200) }, true);
@@ -439,14 +472,19 @@ function InvestorHubInner() {
         return "none";
     };
 
-    const toggleSave = (id: string, ventureName?: string | null) => {
-        const next = savedIds.includes(id) ? savedIds.filter((x) => x !== id) : [...savedIds, id];
-        const ev = savedIds.includes(id) ? "Removed from saved" : "Saved venture";
-        const row: ActRow = { when: nowStamp(), ev, v: ventureName || "—", vis: "You" };
+    const toggleSave = async (id: string, ventureName?: string | null) => {
+        const removing = savedIds.includes(id);
+        if (removing) {
+            await authenticatedFetch(`/api/v1/paths/startup-business/investor-hub/${id}/signals/save`, { method: "DELETE" });
+        } else if (!(await signal(id, "save"))) {
+            return;
+        }
+        const next = removing ? savedIds.filter((x) => x !== id) : [...savedIds, id];
+        const row: ActRow = { when: nowStamp(), ev: removing ? "Removed from saved" : "Saved venture", v: ventureName || "—", vis: "You" };
         void persistHub({ ...snapshot(), savedIds: next, activity: [row, ...activity].slice(0, 200) });
     };
 
-    const sendNote = () => {
+    const sendNote = async () => {
         if (!noteOpen) return;
         if (kycPending) {
             toast.error("CIEL PK verification is required before you can act on ventures.");
@@ -461,6 +499,8 @@ function InvestorHubInner() {
                 toast.error(`${plan.name} intro quota used this quarter. Upgrade to keep requesting introductions.`);
                 return;
             }
+            if (!(await signal(noteOpen.id, "interest", row.note))) return;
+            if (wouldIntro && !(await signal(noteOpen.id, "intro", row.note))) return;
             void persistHub({
                 ...snapshot(),
                 interest: [...interest, row],
@@ -474,6 +514,7 @@ function InvestorHubInner() {
                 return;
             }
             if (intros.some((r) => r.entryId === noteOpen.id)) return;
+            if (!(await signal(noteOpen.id, "intro", row.note))) return;
             void persistHub({
                 ...snapshot(),
                 intros: [...intros, { ...row, status: "pending" }],
@@ -551,6 +592,7 @@ function InvestorHubInner() {
     useEffect(() => {
         if (loading || screen !== "record" || !record?.id || viewedRef.current === record.id) return;
         viewedRef.current = record.id;
+        void signal(record.id, "view");
         logAct("Viewed venture detail", record.ventureName, "CIEL PK");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, screen, record?.id]);
@@ -1421,7 +1463,17 @@ function InvestorHubInner() {
                             <div className="space-y-2.5">
                                 <div className="rounded-xl bg-[#f6f8fa] p-3 text-[13px]"><b className="mb-1 block text-[11px] uppercase tracking-wide text-[#5d6c78]">Problem & solution</b><p><b>Problem:</b> {record.ideaInfo?.problem || "—"}</p><p><b>Solution:</b> {record.solutionInfo?.solution || "—"}</p>{customerOf(record) ? <p><b>Target customer:</b> {customerOf(record)}</p> : null}</div>
                                 <div className="rounded-xl bg-[#f6f8fa] p-3 text-[13px]"><b className="mb-1 block text-[11px] uppercase tracking-wide text-[#5d6c78]">Business model & traction</b><p><b>Model:</b> {record.solutionInfo?.revenue || "—"}</p><p><b>Traction:</b> {plan.traction ? tractionLine(record) : <>Hidden on Explorer — <a href={`${BASE}?view=membership`} className="font-bold text-[#0f8f8a]">Angel+ to see traction</a></>}</p></div>
-                                <div className="rounded-xl bg-[#f6f8fa] p-3 text-[13px]"><b className="mb-1 block text-[11px] uppercase tracking-wide text-[#5d6c78]">Founding team</b>🔒 {teamMasked(record)} — names, contacts and LinkedIn are revealed after CIEL screening and founder consent.</div>
+                                {record.contactUnlocked ? (
+                                    <div className="rounded-xl border border-[#b8e3c6] bg-[#e6f6ec] p-3 text-[13px]">
+                                        <b className="mb-1 block text-[11px] uppercase tracking-wide text-[#1f6b46]">Founder contact · introduction accepted</b>
+                                        {record.academicSetup?.founderName ? <span className="block font-bold">{record.academicSetup.founderName}</span> : null}
+                                        {record.academicSetup?.founderEmail ? <a className="block text-[#0b4b57] underline" href={`mailto:${record.academicSetup.founderEmail}`}>{record.academicSetup.founderEmail}</a> : null}
+                                        {record.academicSetup?.founderWhatsappNumber ? <span className="block">WhatsApp {record.academicSetup.founderWhatsappCode || ""} {record.academicSetup.founderWhatsappNumber}</span> : null}
+                                        <small className="mt-1 block text-[11px] text-[#5d6c78]">Shared because the founder accepted your introduction. CIEL non-circumvention terms apply.</small>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl bg-[#f6f8fa] p-3 text-[13px]"><b className="mb-1 block text-[11px] uppercase tracking-wide text-[#5d6c78]">Founding team</b>🔒 {teamMasked(record)} — names, contacts and LinkedIn are revealed after CIEL screening and founder consent.</div>
+                                )}
                                 <div className="rounded-xl bg-[#f6f8fa] p-3 text-[13px]">
                                     <b className="mb-1 block text-[11px] uppercase tracking-wide text-[#5d6c78]">SDG / impact lens</b>
                                     <div className="flex flex-wrap gap-1">

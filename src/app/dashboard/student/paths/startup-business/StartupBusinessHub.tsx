@@ -14,6 +14,8 @@ import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import { ventureStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
+import { investorTiles, type InvestorActivity } from "@/utils/investorActivity";
+import FounderIntroRequests from "@/components/ciel/venture/FounderIntroRequests";
 
 const BASE = "/dashboard/student/paths/startup-business";
 const WORKSPACE_HREF = `${BASE}?view=workspace`;
@@ -56,6 +58,7 @@ type HubTeamMember = {
 type HubVenture = {
     id?: string;
     ventureName?: string | null;
+    investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
     stepCompleted?: number;
     completenessPercent?: number;
@@ -1017,11 +1020,7 @@ function RecordView({
                         <div className="mt-3 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px]">
                             <b>Investor activity (via CIEL Investor Hub)</b>
                             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                {[
-                                    ["0", "Card views"],
-                                    ["0", "Interest received"],
-                                    ["0", "Introduction requests"],
-                                ].map(([n, l]) => (
+                                {investorTiles(entry.investorActivity).map(([n, l]) => (
                                     <div key={l} className="rounded-xl bg-white/70 px-3 py-2 text-center">
                                         <b className="block text-[18px] text-[#14212b]">{n}</b>
                                         <small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{l}</small>
@@ -1029,6 +1028,7 @@ function RecordView({
                                 ))}
                             </div>
                             <p className="mt-2 mb-0 text-[#5d6c78]">Verified investors see a curated card. Introductions need CIEL PK screening and your acceptance before any contact is shared.</p>
+                            <FounderIntroRequests compact />
                         </div>
                     ) : null}
                 </div>

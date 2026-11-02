@@ -1,5 +1,7 @@
 "use client";
 
+import { investorTiles, type InvestorActivity } from "@/utils/investorActivity";
+
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
@@ -35,6 +37,7 @@ const PIPE_TABS: { key: PipeTab; label: string }[] = [
 type FacultyVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
     userId?: string;
+    investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
     stepCompleted?: number;
     completenessPercent?: number;
@@ -907,7 +910,7 @@ function RecordView({
                         </p>
                         {isInvestorOpen(entry) ? (
                             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                {[["0", "Card views"], ["0", "Interest received"], ["0", "Founder-contact requests"]].map(([n, l]) => (
+                                {investorTiles(entry.investorActivity, "Founder-contact requests").map(([n, l]) => (
                                     <div key={l} className="rounded-xl bg-[#f6f8fa] px-3 py-2 text-center">
                                         <b className="block text-lg">{n}</b>
                                         <small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">{l}</small>

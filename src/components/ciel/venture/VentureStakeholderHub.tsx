@@ -16,6 +16,8 @@ import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/cie
 import VentureAiCriticalReviewPanel from "@/components/ciel/venture/VentureAiCriticalReviewPanel";
 import { analyseVentureCriticalReview } from "@/utils/ventureCriticalReview";
 import SignupProofDocuments, { readSignupProofDocuments } from "@/components/admin/SignupProofDocuments";
+import InvestorActivityLog from "@/components/ciel/venture/InvestorActivityLog";
+import { investorTiles, type InvestorActivity } from "@/utils/investorActivity";
 
 export type VentureHubVariant = "university" | "ciel";
 
@@ -38,6 +40,7 @@ const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Re
 type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
     userId?: string;
+    investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
     stepCompleted?: number;
     completenessPercent?: number;
@@ -944,7 +947,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                     <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                         <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{investorReady.length}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Live in Investor Hub</small></div>
                         <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{investorReady.filter(isFeatured).length}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Spotlighted</small></div>
-                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Investor interests received</small></div>
+                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">{investorReady.reduce((n, e) => n + (e.investorActivity?.interests ?? 0) + (e.investorActivity?.intros ?? 0), 0)}</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Investor interests received</small></div>
                     </div>
                     {filterBar(true)}
                     {investorReady.filter(matchesFilters).length === 0 ? (
@@ -994,15 +997,7 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
                             </p>
                         </div>
                     </div>
-                    <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Investor actions</small></div>
-                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Investor organisations active</small></div>
-                        <div className="rounded-[14px] bg-[#f6f8fa] px-4 py-3.5"><b className="block text-2xl">0</b><small className="text-[11px] font-bold uppercase tracking-wide text-[#5d6c78]">Contact requests awaiting CIEL PK</small></div>
-                    </div>
-                    {filterBar(true)}
-                    <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
-                        No investor activity yet. When verified investors view, save, or request an introduction from the Investor Hub, those events will appear here for CIEL PK screening (gate 1 of 3) — without changing student or faculty records.
-                    </div>
+                    <InvestorActivityLog recordHref={(id) => `${base}?view=record&id=${id}`} />
                 </div>
             )}
 
@@ -1385,9 +1380,9 @@ function RecordView({
                                 <div className="mt-3 rounded-[14px] bg-[#e8f7ef] px-4 py-3">
                                     <b>🤝 Investor activity via CIEL Investor Hub</b>
                                     <div className="mt-2 grid grid-cols-3 gap-2">
-                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Card views</small></div>
-                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Interest received</small></div>
-                                        <div className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">0</b><small className="text-[11px] text-[#5d6c78]">Founder-contact requests</small></div>
+                                        {investorTiles(entry.investorActivity, "Founder-contact requests").map(([n, l]) => (
+                                            <div key={l} className="rounded-[12px] bg-white px-3 py-2"><b className="block text-lg">{n}</b><small className="text-[11px] text-[#5d6c78]">{l}</small></div>
+                                        ))}
                                     </div>
                                     {variant === "ciel" && onSpotlight ? (
                                         <button type="button" disabled={spotlighting} onClick={onSpotlight} className={`mt-3 rounded-[10px] px-3 py-1.5 text-[12.5px] font-bold ${isFeatured(entry) ? "bg-[#eef3f6] text-[#0b4b57]" : "bg-[#f39c12] text-white"} disabled:opacity-50`}>
