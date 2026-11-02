@@ -482,7 +482,7 @@ export function ConnectionFormDialog({
                         checked={form.personalFieldsAllowed}
                         onChange={(v) => set("personalFieldsAllowed", v)}
                         label="Personal fields allowed"
-                        hint="Off: any personal field in a payload is rejected at intake. On: the vendor must attach a consent attestation per record."
+                        hint="Off: any personal field in a payload is rejected at intake, and exports carry no email / phone. On: the vendor must attach a consent attestation per record; exports include email / phone (live platforms only, never sandbox)."
                     />
                     <Toggle
                         checked={form.orgEvidenceOpenAllowed}
