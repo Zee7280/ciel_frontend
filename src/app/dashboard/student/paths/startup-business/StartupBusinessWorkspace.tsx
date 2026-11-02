@@ -555,7 +555,11 @@ export default function StartupBusinessWorkspace() {
         try {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const res = await authenticatedFetch("/api/v1/paths/startup-business/documents", { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) }, { redirectToLogin: true });
-            const result = res?.ok ? await res.json() : null;
+            if (!res?.ok) {
+                const body = res ? ((await res.json().catch(() => null)) as { message?: unknown } | null) : null;
+                throw new Error(typeof body?.message === "string" ? body.message : "Upload failed. Try again.");
+            }
+            const result = await res.json();
             if (result?.data?.documents) setEntry((e) => ({ ...e, documents: result.data.documents }));
         } catch (err) {
             setError(err instanceof Error ? err.message : "Upload failed. Try again.");

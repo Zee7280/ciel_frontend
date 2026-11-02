@@ -431,7 +431,10 @@ function VentureStakeholderHubInner({ variant }: { variant: VentureHubVariant })
             });
             if (res?.ok) {
                 const data = await res.json();
-                setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, ...data.data } : e)));
+                const merge = (prev: HubVenture[]) => prev.map((e) => (e.id === entry.id ? { ...e, ...data.data } : e));
+                setEntries(merge);
+                // The showcase list renders approvedEntries, so it must see the new flag too.
+                setApprovedEntries(merge);
                 toast.success(next ? "Spotlighted in the CIEL Investor Hub" : "Removed from spotlight");
             } else {
                 toast.error("Could not update spotlight");

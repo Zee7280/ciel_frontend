@@ -1086,7 +1086,7 @@ export default function FypThesisHub({
             )}
 
             {openFlashcard ? (
-                <FacultyFypFlashcardModal
+                <FacultyFypFlashcardModal showAiPanel={false}
                     entry={asMerit(openFlashcard)}
                     onClose={() => setOpenFlashcardId(null)}
                     onUpdate={updateEntry}

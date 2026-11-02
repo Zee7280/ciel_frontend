@@ -15,6 +15,7 @@ import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInb
 import { useFacultyCommunityServiceData } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { pathAreaBadge, usePathAreaCounts } from "@/utils/usePathAreaCounts";
 
 type FacultyDashboardViewMode = FacultyDashboardViewClient;
 
@@ -38,6 +39,7 @@ export default function FacultyDashboard() {
     // the whole page) for any returning visitor who already had a stored name. Set client-side in
     // the effect below instead, which only runs after hydration completes.
     const [firstName, setFirstName] = useState("");
+    const paths = usePathAreaCounts("faculty");
 
     useEffect(() => {
         const name = readStoredCurrentUser()?.name;
@@ -256,8 +258,9 @@ export default function FacultyDashboard() {
                     ghost="🎓"
                     title="FYP / Thesis"
                     subtitle="Final Year Projects and research with sustainability relevance."
-                    badge="IMPACT AREA"
+                    badge={pathAreaBadge(paths.fyp, paths.loading)}
                     background={MOCKUP_GRADIENTS.purple}
+                    hot={paths.fyp.pending > 0}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/startup-business"
@@ -265,8 +268,9 @@ export default function FacultyDashboard() {
                     ghost="🚀"
                     title="Startup / Venture"
                     subtitle="Student ventures and sustainability-linked entrepreneurship."
-                    badge="IMPACT AREA"
+                    badge={pathAreaBadge(paths.venture, paths.loading)}
                     background={MOCKUP_GRADIENTS.orange}
+                    hot={paths.venture.pending > 0}
                 />
             </div>
         </div>

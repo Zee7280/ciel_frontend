@@ -24,8 +24,10 @@ type Preview = {
 
 function destinationHref(kind: Preview["kind"], entryId: string): string {
     if (kind === "course_project") return `/dashboard/student/paths/course-project/${entryId}`;
-    if (kind === "fyp") return "/dashboard/student/paths/fyp-thesis?view=workspace";
-    return "/dashboard/student/paths/startup-business?view=workspace";
+    // Open the record the invitee just joined — never the "new record" view, which would create a
+    // blank FYP of their own instead of the shared one.
+    if (kind === "fyp") return entryId ? `/dashboard/student/paths/fyp-thesis/${entryId}` : "/dashboard/student/paths/fyp-thesis";
+    return "/dashboard/student/paths/startup-business";
 }
 
 function TeamInviteContent() {

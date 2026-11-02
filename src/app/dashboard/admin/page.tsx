@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import { TimeGreeting } from "@/utils/timeGreeting";
+import { pathAreaBadge, usePathAreaCounts } from "@/utils/usePathAreaCounts";
 import {
     fetchAdminPendingCounts,
     readAdminPendingCountsCache,
@@ -99,6 +100,8 @@ function AreaCard({
     subtitle,
     background,
     full,
+    badge,
+    hot,
 }: {
     href: string;
     emoji: string;
@@ -107,6 +110,9 @@ function AreaCard({
     subtitle: string;
     background: string;
     full?: boolean;
+    /** Live figure for the area (e.g. "2 TO REVIEW · 5 APPROVED"); amber when something is waiting. */
+    badge?: string;
+    hot?: boolean;
 }) {
     return (
         <Link
@@ -114,8 +120,17 @@ function AreaCard({
             style={{ background }}
             className={`relative min-h-[130px] min-w-0 overflow-hidden rounded-[24px] px-4 py-4 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] sm:min-h-[150px] sm:px-[22px] sm:py-5 ${full ? "sm:col-span-2" : ""}`}
         >
+            {badge ? (
+                <span
+                    className={`absolute right-4 top-3.5 rounded-[18px] px-2.5 py-1.5 text-[9.5px] font-[950] tracking-[0.04em] ${
+                        hot ? "bg-[#ffe7b3] text-[#7a4b00]" : "bg-white text-[#0e756e]"
+                    }`}
+                >
+                    {badge}
+                </span>
+            ) : null}
             <span className="mb-[14px] block text-[29px] leading-none">{emoji}</span>
-            <h3 className="m-0 text-[18px] font-[950] leading-tight sm:text-[21px]">{title}</h3>
+            <h3 className={`m-0 text-[18px] font-[950] leading-tight sm:text-[21px] ${badge ? "pr-20 sm:pr-24" : ""}`}>{title}</h3>
             <p className="mt-1.5 text-[12px] leading-[1.45] text-white/90 sm:max-w-[78%] sm:text-[12.5px]">{subtitle}</p>
             <span className="pointer-events-none absolute -bottom-6 -right-2 rotate-[-7deg] text-[92px] opacity-10" aria-hidden>
                 {ghost || emoji}
@@ -143,6 +158,7 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 
 export default function AdminDashboard() {
     const [data, setData] = useState<AdminDashboardData | null>(null);
+    const paths = usePathAreaCounts("admin");
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [counts, setCounts] = useState<AdminPendingCounts | null>(null);
@@ -286,9 +302,18 @@ export default function AdminDashboard() {
                 subtitle="Choose an area below to open its workflow."
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {AREA_CARDS.map((c) => (
-                    <AreaCard key={c.href} {...c} />
-                ))}
+                {AREA_CARDS.map((c) => {
+                    const live =
+                        c.href.includes("fyp-thesis") ? paths.fyp : c.href.includes("startup-business") ? paths.venture : null;
+                    return (
+                        <AreaCard
+                            key={c.href}
+                            {...c}
+                            badge={live ? pathAreaBadge(live, paths.loading, "") || undefined : undefined}
+                            hot={live ? live.pending > 0 : undefined}
+                        />
+                    );
+                })}
                 <AreaCard
                     href="/dashboard/admin/analytics"
                     emoji={"\u{1F4CA}"}

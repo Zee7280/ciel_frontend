@@ -217,6 +217,7 @@ export default function FacultyFypFlashcardModal({
     entry,
     onClose,
     onUpdate,
+    showAiPanel = true,
     onSupervisorReview,
     reviewing,
     onOpenReview,
@@ -224,6 +225,8 @@ export default function FacultyFypFlashcardModal({
     entry: FypMeritEntry;
     onClose: () => void;
     onUpdate: (id: string, patch: Partial<FypMeritEntry>) => void;
+    /** The AI analysis panel (run / edit / approve) is a faculty tool; student, university and admin viewers pass false. */
+    showAiPanel?: boolean;
     onSupervisorReview?: (action: "approve" | "reject" | "revision", note?: string) => void;
     reviewing?: boolean;
     onOpenReview?: () => void;
@@ -439,7 +442,7 @@ export default function FacultyFypFlashcardModal({
                         </div>
                     ) : null}
 
-                    {entry.id ? (
+                    {entry.id && showAiPanel ? (
                         <div className="mx-[22px] mt-3.5">
                             <FypAiAnalysisPanel entry={entry} onUpdate={onUpdate} defaultExpanded />
                         </div>

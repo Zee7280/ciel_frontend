@@ -3,6 +3,7 @@
 import Link from "next/link";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { pathAreaBadge, usePathAreaCounts } from "@/utils/usePathAreaCounts";
 import {
     UNI_CS_BASE,
     UNI_CS_COURSEWORK,
@@ -19,6 +20,7 @@ const TONE_CLASS = {
 
 export default function UniversityDashboardHome() {
     const cs = useUniversityCommunityServiceData();
+    const paths = usePathAreaCounts("university");
     const dash = (n: number) => (cs.loading ? "—" : String(n));
 
     return (
@@ -130,8 +132,9 @@ export default function UniversityDashboardHome() {
                     ghost="🎓"
                     title="FYP / Thesis"
                     subtitle="Institutional FYP/Thesis sustainability repository and oversight."
-                    badge="IMPACT AREA"
+                    badge={pathAreaBadge(paths.fyp, paths.loading)}
                     background={MOCKUP_GRADIENTS.purple}
+                    hot={paths.fyp.pending > 0}
                 />
                 <MockupActionCard
                     href={UNI_CS_STARTUP}
@@ -139,8 +142,9 @@ export default function UniversityDashboardHome() {
                     ghost="🚀"
                     title="Startup / Venture"
                     subtitle="Institutional startup and venture impact portfolio."
-                    badge="IMPACT AREA"
+                    badge={pathAreaBadge(paths.venture, paths.loading)}
                     background={MOCKUP_GRADIENTS.orange}
+                    hot={paths.venture.pending > 0}
                 />
             </div>
         </div>
