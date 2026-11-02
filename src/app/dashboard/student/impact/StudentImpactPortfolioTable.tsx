@@ -231,8 +231,13 @@ export default function StudentImpactPortfolioTable() {
                 authenticatedFetch("/api/v1/paths/fyp-theses", {}, { redirectToLogin: false })
                     .then((r) => (r?.ok ? r.json() : null))
                     .catch(() => null),
-                authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: false })
+                authenticatedFetch("/api/v1/paths/startup-ventures", {}, { redirectToLogin: false })
                     .then((r) => (r?.ok ? r.json() : null))
+                    .then((json) =>
+                        Array.isArray(json?.data)
+                            ? json
+                            : authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: false }).then((r) => (r?.ok ? r.json() : null)),
+                    )
                     .catch(() => null),
             ]);
             if (cancelled) return;
@@ -376,15 +381,17 @@ export default function StudentImpactPortfolioTable() {
                 });
             }
 
-            const startupEntry = startup?.data;
-            if (startupEntry && isPathEntryApproved(startupEntry)) {
+            // One portfolio row per approved venture — a student may run several.
+            const startupEntries = Array.isArray(startup?.data) ? startup.data : startup?.data ? [startup.data] : [];
+            for (const startupEntry of startupEntries) {
+                if (!isPathEntryApproved(startupEntry) || startupEntry.isOwner === false) continue;
                 const total = startupEntry.meritRibbon?.total;
                 const investorReady = !!startupEntry.gates?.investmentReadyOk;
                 const year = yearOf(startupEntry.updatedAt || startupEntry.createdAt);
                 const sdgs = sdgNumbers(startupEntry.sdgMapping?.entries);
                 const uni = startupEntry.academicSetup?.university || "Startup / Venture";
                 out.push({
-                    id: "startup",
+                    id: `startup-${startupEntry.id || "venture"}`,
                     title: startupEntry.ventureName || "Startup / Venture",
                     meta: uni,
                     area: "Startup",

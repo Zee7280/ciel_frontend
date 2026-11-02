@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -333,9 +333,25 @@ function workspaceVentureId(entry: { id?: string; createdAt?: string }) {
 export default function StartupBusinessWorkspace() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const cachedVenture = getPathSessionCache<Partial<VentureEntry>>("startup-venture");
-    const [loading, setLoading] = useState(!cachedVenture);
+    const view = searchParams.get("view");
+    /** Which venture this form edits. None + view=create = a brand-new venture, created on first save. */
+    const urlVentureId = searchParams.get("id") || "";
+    const isNewVenture = !urlVentureId && view === "create";
+    const cachedRaw = getPathSessionCache<Partial<VentureEntry>>("startup-venture");
+    const cachedVenture = isNewVenture
+        ? null
+        : urlVentureId
+          ? cachedRaw?.id === urlVentureId
+              ? cachedRaw
+              : null
+          : cachedRaw;
+    const [loading, setLoading] = useState(!cachedVenture && !isNewVenture);
     const [entry, setEntry] = useState<VentureEntry>(() => (cachedVenture ? mergeEntry(EMPTY, cachedVenture) : EMPTY));
+    const ventureIdRef = useRef<string>(urlVentureId || (cachedVenture?.id ?? ""));
+    /** In-flight create, so a second save during the first one PATCHes instead of creating a duplicate. */
+    const creatingRef = useRef<Promise<string> | null>(null);
+    /** Id this form just created itself — its URL update must not reload and reset the form. */
+    const selfCreatedIdRef = useRef<string | null>(null);
     const [step, setStep] = useState(0);
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<Record<string, { accepted: boolean; edited: boolean; text: string }>>({});
@@ -349,11 +365,34 @@ export default function StartupBusinessWorkspace() {
     const onTerm = (key: string) => setHelp({ kind: "term", key });
 
     useEffect(() => {
-        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
+        if (urlVentureId && urlVentureId === selfCreatedIdRef.current) {
+            // Our own create just put the new id in the URL — the form already holds this venture.
+            selfCreatedIdRef.current = null;
+            return;
+        }
+        ventureIdRef.current = urlVentureId;
+        creatingRef.current = null;
+        if (isNewVenture) {
+            setEntry(EMPTY);
+            setStep(0);
+            setReview({});
+            setRepoAck(false);
+            setError(null);
+            setLoading(false);
+            return;
+        }
+        let cancelled = false;
+        // With an id: that venture. Without (older links): the student's latest venture.
+        const url = urlVentureId
+            ? `/api/v1/paths/startup-ventures/${encodeURIComponent(urlVentureId)}`
+            : "/api/v1/paths/startup-business";
+        authenticatedFetch(url, {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
+                if (cancelled) return;
                 if (result?.data) {
                     const data = result.data as Partial<VentureEntry>;
+                    if (data.id) ventureIdRef.current = data.id;
                     const merged = mergeEntry(EMPTY, data);
                     setEntry(merged);
                     const raw = data.stepCompleted ?? 0;
@@ -362,10 +401,56 @@ export default function StartupBusinessWorkspace() {
                     const requested = stepRaw == null || stepRaw === "" ? Number.NaN : Number(stepRaw);
                     setStep(Number.isInteger(requested) && requested >= 0 && requested <= mapped ? requested : mapped);
                     if (merged.reviewPipeline?.declarationWork) setRepoAck(true);
+                } else if (urlVentureId) {
+                    toast.error("Venture not found.");
                 }
             })
-            .finally(() => setLoading(false));
-    }, []);
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [urlVentureId, isNewVenture]);
+
+    /** PATCH the venture being edited, or create it on the first save of a new one. */
+    const writeVenture = async (body: Record<string, unknown>): Promise<Response | null> => {
+        if (!ventureIdRef.current && creatingRef.current) {
+            ventureIdRef.current = await creatingRef.current.catch(() => "");
+        }
+        const id = ventureIdRef.current;
+        if (id) {
+            return authenticatedFetch(
+                `/api/v1/paths/startup-ventures/${encodeURIComponent(id)}`,
+                { method: "PATCH", body: JSON.stringify(body) },
+                { redirectToLogin: true },
+            );
+        }
+        const res = await authenticatedFetch(
+            "/api/v1/paths/startup-ventures",
+            { method: "POST", body: JSON.stringify(body) },
+            { redirectToLogin: true },
+        );
+        if (res?.ok) {
+            const created = (await res.clone().json().catch(() => null)) as { data?: { id?: string } } | null;
+            const newId = created?.data?.id || "";
+            if (newId) {
+                ventureIdRef.current = newId;
+                selfCreatedIdRef.current = newId;
+                creatingRef.current = Promise.resolve(newId);
+                router.replace(`/dashboard/student/paths/startup-business?view=workspace&id=${encodeURIComponent(newId)}`, { scroll: false });
+            }
+        }
+        return res;
+    };
+    const ensureVentureId = async (): Promise<string> => {
+        if (ventureIdRef.current) return ventureIdRef.current;
+        if (!creatingRef.current) {
+            creatingRef.current = writeVenture({}).then(() => ventureIdRef.current);
+        }
+        return creatingRef.current;
+    };
 
     const snap = useMemo(() => toSnap(entry), [entry]);
     const sums = useMemo(() => v11Summaries(snap), [snap]);
@@ -491,11 +576,15 @@ export default function StartupBusinessWorkspace() {
             ? Math.max(mapped, Math.min(V13_LAST_STEP, advanceTo))
             : Math.max(entry.stepCompleted, mapped);
         try {
-            const res = await authenticatedFetch(
-                "/api/v1/paths/startup-business",
-                { method: "PATCH", body: JSON.stringify({ ...patch, stepCompleted: nextStepCompleted }) },
-                { redirectToLogin: true },
-            );
+            const body = { ...patch, stepCompleted: nextStepCompleted };
+            let res: Response | null;
+            if (!ventureIdRef.current && !creatingRef.current) {
+                const pending = writeVenture(body);
+                creatingRef.current = pending.then(() => ventureIdRef.current);
+                res = await pending;
+            } else {
+                res = await writeVenture(body);
+            }
             if (!res) {
                 throw new Error("Could not reach the server. Check your connection and try again.");
             }
@@ -554,7 +643,13 @@ export default function StartupBusinessWorkspace() {
         setError(null);
         try {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
-            const res = await authenticatedFetch("/api/v1/paths/startup-business/documents", { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) }, { redirectToLogin: true });
+            const ventureId = await ensureVentureId();
+            if (!ventureId) throw new Error("Could not start this venture. Save the form once, then upload again.");
+            const res = await authenticatedFetch(
+                `/api/v1/paths/startup-ventures/${encodeURIComponent(ventureId)}/documents`,
+                { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) },
+                { redirectToLogin: true },
+            );
             if (!res?.ok) {
                 const body = res ? ((await res.json().catch(() => null)) as { message?: unknown } | null) : null;
                 throw new Error(typeof body?.message === "string" ? body.message : "Upload failed. Try again.");

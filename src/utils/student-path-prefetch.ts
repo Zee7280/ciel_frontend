@@ -58,6 +58,11 @@ export function prefetchStartupVenture(): void {
         const json = res?.ok ? await res.json().catch(() => null) : null;
         return json?.data ?? null;
     });
+    void cachedPath("startup-ventures", async () => {
+        const res = await authenticatedFetch("/api/v1/paths/startup-ventures", {}, { redirectToLogin: false });
+        const json = res?.ok ? await res.json().catch(() => null) : null;
+        return Array.isArray(json?.data) ? json.data : null;
+    });
 }
 
 export function prefetchStudentPathData(key: CielPathKey): void {

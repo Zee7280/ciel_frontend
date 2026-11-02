@@ -27,6 +27,9 @@ export type FounderSignal = {
     status: "pending" | "screened" | "accepted" | "declined" | null;
     note: string | null;
     created_at: string;
+    /** Which of the founder's ventures the request is on (a founder may run several). */
+    venture_id?: string;
+    venture_name?: string | null;
     investor: { organisation: string; name: string | null; type: string | null };
 };
 

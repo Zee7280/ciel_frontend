@@ -10,7 +10,7 @@ import { INTRO_STATUS_LABEL, type FounderSignal } from "@/utils/investorActivity
  * venture. Gate 2 lives here — a CIEL PK-screened request waits for the founder's accept / decline,
  * and nothing is shared with the investor until "accept".
  */
-export default function FounderIntroRequests({ compact = false }: { compact?: boolean }) {
+export default function FounderIntroRequests({ compact = false, ventureId }: { compact?: boolean; ventureId?: string }) {
     const [rows, setRows] = useState<FounderSignal[] | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
 
@@ -46,9 +46,11 @@ export default function FounderIntroRequests({ compact = false }: { compact?: bo
         }
     };
 
-    if (!rows || rows.length === 0) return null;
-    const intros = rows.filter((r) => r.kind === "intro");
-    const interests = rows.filter((r) => r.kind === "interest");
+    // Only this venture's requests when the founder runs several (older servers send no venture_id).
+    const scoped = (rows ?? []).filter((r) => !ventureId || !r.venture_id || r.venture_id === ventureId);
+    if (scoped.length === 0) return null;
+    const intros = scoped.filter((r) => r.kind === "intro");
+    const interests = scoped.filter((r) => r.kind === "interest");
     const waiting = intros.filter((r) => r.status === "screened");
 
     return (

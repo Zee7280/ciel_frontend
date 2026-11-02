@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -194,7 +194,7 @@ function trackLabel(entry: HubVenture) {
         : "No consent — investors cannot see this venture. Your repository record and impact-wall cards are unaffected.";
 }
 
-type ActivityRow = { who: string; action: string; at: string };
+type ActivityRow = { who: string; action: string; at: string; ventureId?: string };
 
 function deriveActivity(entry: HubVenture, me: string): ActivityRow[] {
     const faculty = entry.academicSetup?.supervisorName?.trim() || "Faculty";
@@ -245,7 +245,7 @@ function deriveActivity(entry: HubVenture, me: string): ActivityRow[] {
     return rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
-function ActivityLog({ rows, onOpen }: { rows: ActivityRow[]; onOpen?: () => void }) {
+function ActivityLog({ rows, onOpen }: { rows: ActivityRow[]; onOpen?: (row: ActivityRow) => void }) {
     if (!rows.length) {
         return <p className="mt-2 text-[13.5px] text-[#5d6c78]">No activity yet.</p>;
     }
@@ -261,7 +261,7 @@ function ActivityLog({ rows, onOpen }: { rows: ActivityRow[]; onOpen?: () => voi
                         {onOpen ? (
                             <>
                                 {" — "}
-                                <button type="button" onClick={onOpen} className="font-bold text-[#0f8f8a] hover:underline">
+                                <button type="button" onClick={() => onOpen(row)} className="font-bold text-[#0f8f8a] hover:underline">
                                     Open card
                                 </button>
                             </>
@@ -1028,7 +1028,7 @@ function RecordView({
                                 ))}
                             </div>
                             <p className="mt-2 mb-0 text-[#5d6c78]">Verified investors see a curated card. Introductions need CIEL PK screening and your acceptance before any contact is shared.</p>
-                            <FounderIntroRequests compact />
+                            <FounderIntroRequests compact ventureId={entry.id} />
                         </div>
                     ) : null}
                 </div>
@@ -1113,9 +1113,12 @@ export default function StartupBusinessHub({
     view: HubView;
 }) {
     const router = useRouter();
+    const selectedId = useSearchParams().get("id") || "";
+    const cachedEntries = usePathSessionCache<HubVenture[]>("startup-ventures");
     const cachedEntry = usePathSessionCache<HubVenture>("startup-venture");
-    const [, setLoading] = useState(!cachedEntry);
-    const [entry, setEntry] = useState<HubVenture | null>(cachedEntry);
+    const [, setLoading] = useState(!cachedEntries && !cachedEntry);
+    /** Every venture this student owns (plus ones they are a named teammate on), newest first. */
+    const [entries, setEntries] = useState<HubVenture[]>(() => cachedEntries ?? (cachedEntry ? [cachedEntry] : []));
     const [name, setName] = useState("there");
     const [filters, setFilters] = useState({ status: "", stage: "", sector: "", sdg: "", sort: "updated", q: "" });
     const [consentBusy, setConsentBusy] = useState(false);
@@ -1123,15 +1126,29 @@ export default function StartupBusinessHub({
 
     useEffect(() => {
         setName(firstName());
-        authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
+        const loadSingle = () =>
+            authenticatedFetch("/api/v1/paths/startup-business", {}, { redirectToLogin: true })
+                .then((res) => (res?.ok ? res.json() : null))
+                .then((result) => {
+                    if (result?.data) {
+                        const next = result.data as HubVenture;
+                        setEntries([next]);
+                        setPathSessionCache("startup-venture", next);
+                    }
+                });
+        authenticatedFetch("/api/v1/paths/startup-ventures", {}, { redirectToLogin: true })
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
-                if (result?.data) {
-                    const next = result.data as HubVenture;
-                    setEntry(next);
-                    setPathSessionCache("startup-venture", next);
+                if (Array.isArray(result?.data)) {
+                    const next = result.data as HubVenture[];
+                    setEntries(next);
+                    setPathSessionCache("startup-ventures", next);
+                    return;
                 }
+                // Server without the multi-venture list yet — show the single venture as before.
+                return loadSingle();
             })
+            .catch(() => loadSingle())
             .finally(() => setLoading(false));
     }, []);
 
@@ -1139,7 +1156,9 @@ export default function StartupBusinessHub({
         setFilters({ status: "", stage: "", sector: "", sdg: "", sort: "updated", q: "" });
     }, [view]);
 
-    const all = useMemo(() => (hasRecord(entry) && entry ? [entry] : []), [entry]);
+    const all = useMemo(() => entries.filter((e) => hasRecord(e)), [entries]);
+    /** The venture a record / card view is about: the one in the URL, else the most recent. */
+    const entry: HubVenture | null = all.find((e) => e.id === selectedId) ?? all[0] ?? null;
     const approved = all.filter(isPathEntryApproved);
     const underReview = all.filter(isPathEntryWaiting);
     const revision = all.filter(isRevision);
@@ -1149,8 +1168,9 @@ export default function StartupBusinessHub({
     const workspaceList = applyFilters(inProgress, filters, "workspace");
     const wallList = applyFilters(approved, filters, "wall");
 
-    const openForm = () => router.push(WORKSPACE_HREF);
-    const openRecord = () => router.push(RECORD_HREF);
+    const withId = (href: string, row?: HubVenture | null) => (row?.id ? `${href}&id=${encodeURIComponent(row.id)}` : href);
+    const openForm = (row?: HubVenture | null) => router.push(withId(WORKSPACE_HREF, row));
+    const openRecord = (row?: HubVenture | null) => router.push(withId(RECORD_HREF, row));
     const recordBack = () => {
         if (entry && isPathEntryApproved(entry)) router.push(WALL_HREF);
         else if (entry && isPathEntryWaiting(entry)) router.push(UNDER_REVIEW_HREF);
@@ -1160,7 +1180,10 @@ export default function StartupBusinessHub({
         if (!entry) return;
         setConsentBusy(true);
         try {
-            const response = await authenticatedFetch("/api/v1/paths/startup-business", {
+            const consentUrl = entry.id
+                ? `/api/v1/paths/startup-ventures/${encodeURIComponent(entry.id)}`
+                : "/api/v1/paths/startup-business";
+            const response = await authenticatedFetch(consentUrl, {
                 method: "PATCH",
                 body: JSON.stringify({
                     publishSettings: {
@@ -1172,7 +1195,10 @@ export default function StartupBusinessHub({
             });
             if (response?.ok) {
                 const data = await response.json();
-                if (data?.data) setEntry(data.data as HubVenture);
+                if (data?.data) {
+                    const updated = data.data as HubVenture;
+                    setEntries((prev) => prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e)));
+                }
                 toast.success(accept ? "Consent recorded — investors will see your venture once faculty approve it" : "Withdrawn — removed from the Investor Hub");
             } else {
                 toast.error("Could not update investor-track consent");
@@ -1183,7 +1209,15 @@ export default function StartupBusinessHub({
             setConsentBusy(false);
         }
     };
-    const feedRows = entry && hasRecord(entry) ? deriveActivity(entry, displayName()) : [];
+    const feedRows = all
+        .flatMap((v) =>
+            deriveActivity(v, displayName()).map((row) => ({
+                ...row,
+                ventureId: v.id,
+                action: all.length > 1 ? `${v.ventureName || "Untitled venture"}: ${row.action}` : row.action,
+            })),
+        )
+        .sort((a, b) => String(b.at).localeCompare(String(a.at)));
 
     return (
         <div className="mx-auto max-w-[1500px] pb-16">
@@ -1249,7 +1283,7 @@ export default function StartupBusinessHub({
                     <div className="flex flex-col gap-3.5">
                         {workspaceList.length ? (
                             workspaceList.map((row) => (
-                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={openForm} onDetails={openRecord} onSubmit={() => setSubmitFor(row)} />
+                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={() => openForm(row)} onDetails={() => openRecord(row)} onSubmit={() => setSubmitFor(row)} />
                             ))
                         ) : (
                             <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
@@ -1277,7 +1311,7 @@ export default function StartupBusinessHub({
                     </div>
                     <div className="flex flex-col gap-3.5">
                         {underReview.length ? (
-                            underReview.map((row) => <ReviewRow key={row.id || "review"} entry={row} onOpen={openRecord} />)
+                            underReview.map((row) => <ReviewRow key={row.id || "review"} entry={row} onOpen={() => openRecord(row)} />)
                         ) : (
                             <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
                                 Nothing under review right now.
@@ -1302,7 +1336,7 @@ export default function StartupBusinessHub({
                     {wallList.length ? (
                         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
                             {wallList.map((row) => (
-                                <WallCard key={row.id || "wall"} entry={row} onOpen={openRecord} />
+                                <WallCard key={row.id || "wall"} entry={row} onOpen={() => openRecord(row)} />
                             ))}
                         </div>
                     ) : (
@@ -1327,7 +1361,7 @@ export default function StartupBusinessHub({
                                             </p>
                                         </div>
                                         <div className="flex justify-start md:justify-end">
-                                            <button type="button" onClick={openRecord} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
+                                            <button type="button" onClick={() => openRecord(row)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
                                                 Details
                                             </button>
                                         </div>
@@ -1340,7 +1374,7 @@ export default function StartupBusinessHub({
             )}
 
             {view === "record" && entry && hasRecord(entry) ? (
-                <RecordView entry={entry} onBack={recordBack} onContinue={openForm} onConsent={(accept) => void patchConsent(accept)} consentBusy={consentBusy} />
+                <RecordView entry={entry} onBack={recordBack} onContinue={() => openForm(entry)} onConsent={(accept) => void patchConsent(accept)} consentBusy={consentBusy} />
             ) : null}
             {view === "record" && !(entry && hasRecord(entry)) ? (
                 <div className="mt-[22px] rounded-[22px] bg-white p-8 text-center text-[#5d6c78] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
@@ -1405,7 +1439,7 @@ export default function StartupBusinessHub({
                             <b className="text-[#14212b]">🔔 What happened on my ventures</b>
                             <span className="text-[13px] text-[#5d6c78]">auto-updates from every dashboard</span>
                         </div>
-                        <ActivityLog rows={feedRows} onOpen={entry && hasRecord(entry) ? openRecord : undefined} />
+                        <ActivityLog rows={feedRows} onOpen={all.length ? (row) => openRecord(all.find((v) => v.id === row.ventureId) ?? entry) : undefined} />
                     </div>
                 </>
             )}
@@ -1424,7 +1458,7 @@ export default function StartupBusinessHub({
                                 type="button"
                                 onClick={() => {
                                     setSubmitFor(null);
-                                    router.push(`${WORKSPACE_HREF}&step=8`);
+                                    router.push(`${withId(WORKSPACE_HREF, submitFor)}&step=8`);
                                 }}
                                 className="rounded-xl bg-[#2e9e5b] px-4 py-2.5 text-[13.5px] font-bold text-white"
                             >
