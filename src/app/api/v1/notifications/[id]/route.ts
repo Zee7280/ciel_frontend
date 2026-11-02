@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 export async function DELETE(
@@ -48,4 +49,13 @@ export async function DELETE(
             { status: 500 }
         );
     }
+}
+
+/**
+ * PUT /api/v1/notifications/:id — covers `read-all` (Nest `@Put('read-all')`), which this dynamic
+ * segment captures before the catch-all proxy can; without a PUT export Next answered 405.
+ */
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    return proxyToNest(req, `notifications/${encodeURIComponent(id)}`, { tryAlternatePaths: false });
 }

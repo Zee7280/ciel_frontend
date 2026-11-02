@@ -613,9 +613,12 @@ export default function AdminApprovalsPage() {
                 if (data.success) {
                     setPendingUsers(data.data || []);
                 }
+            } else {
+                toast.error("Could not load pending user approvals. Refresh to retry.");
             }
         } catch (error) {
             console.error("Failed to fetch users", error);
+            toast.error("Could not load pending user approvals. Refresh to retry.");
         } finally {
             if (options?.withLoading !== false) setIsLoading(false);
         }

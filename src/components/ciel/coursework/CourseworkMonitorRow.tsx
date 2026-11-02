@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, MessageCircle } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { courseworkStatusLabel, type CourseworkStatusTone } from "@/utils/courseworkSectionReview";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 
@@ -65,12 +65,17 @@ export function CourseworkMonitorRow({
     entry,
     contact,
     showStalled = false,
+    onDelete,
+    deleting = false,
 }: {
     entry: CourseworkMonitorEntry;
     /** Presence alone renders the Email/WhatsApp "reach in one tap" pair — omit for a strictly
      * read-only row (the University's Live Monitor must show no action buttons at all). */
     contact?: { name: string; to: string; subject: string; body: string } | null;
     showStalled?: boolean;
+    /** CIEL PK admin only: remove the record (Command Monitor clean-up). Omit everywhere else. */
+    onDelete?: () => void;
+    deleting?: boolean;
 }) {
     const si = entry.studentInfo || {};
     const studentName = entry.student?.name || si.studentName || "Student";
@@ -121,6 +126,18 @@ export function CourseworkMonitorRow({
                             <MessageCircle className="h-3.5 w-3.5" />
                         </a>
                     </>
+                ) : null}
+                {onDelete ? (
+                    <button
+                        type="button"
+                        onClick={onDelete}
+                        disabled={deleting}
+                        title="Delete this record (CIEL PK admin)"
+                        aria-label="Delete this record"
+                        className="rounded-full border border-[#dde5ea] bg-white p-1.5 text-[#b34c4c] hover:border-[#b34c4c] disabled:opacity-50"
+                    >
+                        {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </button>
                 ) : null}
             </div>
         </div>

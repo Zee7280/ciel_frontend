@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /** Proxies Nest `GET /admin/audit-logs` (forwards query string). */
@@ -36,4 +37,9 @@ export async function GET(request: Request) {
         console.error("admin/audit-logs GET proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
+}
+
+/** Proxies Nest `DELETE /admin/audit-logs` (bulk delete: ids / resolvedOnly / olderThanDays in the JSON body). */
+export async function DELETE(req: NextRequest) {
+    return proxyToNest(req, "admin/audit-logs", { tryAlternatePaths: false });
 }

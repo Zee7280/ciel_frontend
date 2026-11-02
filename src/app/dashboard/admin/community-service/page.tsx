@@ -438,6 +438,9 @@ export function AdminCommunityServiceHub() {
             ),
         ])
             .then(([award, reportsAll, projects, mineRes]) => {
+                if (!award || !projects || !mineRes) {
+                    toast.error("Part of the Community Service hub did not load. Refresh to retry.");
+                }
                 const reports = { data: reportsAll.rows as Record<string, unknown>[] };
                 setReportsTruncated(reportsAll.truncated);
                 setCards(Array.isArray(award?.data) ? award.data : []);
@@ -492,6 +495,7 @@ export function AdminCommunityServiceHub() {
                 setLoading(false);
             })
             .catch(() => {
+                toast.error("Could not load the Community Service hub. Check your connection and refresh.");
                 setReportsTruncated(true);
                 setCards([]);
                 setPipeline([]);

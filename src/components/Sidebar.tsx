@@ -752,44 +752,74 @@ export default function Sidebar() {
         [],
     );
 
-    const adminWorkspace = useMemo(
-        () =>
-            withCounts([
-                { label: "Users", href: "/dashboard/admin/users", icon: Users },
-                { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
-                { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
-                { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
-                { label: "Integration Hub", href: "/dashboard/admin/integrations", icon: Link2 },
-                { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
-                { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
-                { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
-                { label: "Report supervision", href: "/dashboard/admin/report-supervision", icon: CheckCircle },
-                { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
-                { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
-                { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
-                { label: "Quick Community Impact", href: "/dashboard/admin/quick-work", icon: Leaf },
-                { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
-                { label: "Community service reporting", href: "/dashboard/admin/cs-reporting", icon: FileBarChart },
-                { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
-                { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
-            ]),
+    /**
+     * Admin navigation in the order the work actually happens: approve accounts and organisations,
+     * then the opportunity / application / report queues, then money, then the links that make
+     * universities and vendors work, then records and exports, then communication, then the
+     * admin-only logs. Each group is a labelled section so the sidebar reads as a flow.
+     */
+    const adminGroups = useMemo<MenuSection[]>(
+        () => [
+            {
+                heading: "1 · Accounts & organisations",
+                items: withCounts([
+                    { label: "Users & account approvals", href: "/dashboard/admin/users", icon: Users },
+                    { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
+                    { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
+                ]),
+            },
+            {
+                heading: "2 · Approval queues",
+                items: withCounts([
+                    { label: "Opportunity approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
+                    { label: "Applications & report approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
+                    { label: "Student reports to verify", href: "/dashboard/admin/reports/verify", icon: FileText },
+                    { label: "Report supervision", href: "/dashboard/admin/report-supervision", icon: CheckCircle },
+                    { label: "Quick Community Impact", href: "/dashboard/admin/quick-work", icon: Leaf },
+                ]),
+            },
+            {
+                heading: "3 · Payments",
+                items: withCounts([
+                    { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
+                    { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
+                    { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
+                ]),
+            },
+            {
+                heading: "4 · Records & exports",
+                items: withCounts([
+                    { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
+                    { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
+                    { label: "Community service reporting", href: "/dashboard/admin/cs-reporting", icon: FileBarChart },
+                    { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
+                    { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
+                    { label: "Integration Hub · university export", href: "/dashboard/admin/integrations", icon: Link2 },
+                ]),
+            },
+            {
+                heading: "5 · Communication",
+                items: withCounts([
+                    { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
+                    { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
+                    { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
+                    { label: "CEP feedback", href: "/dashboard/admin/cep-feedback", icon: MessageSquare },
+                    { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
+                ]),
+            },
+            {
+                heading: "6 · Logs & system",
+                items: withCounts([
+                    { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
+                    { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
+                    { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
+                ]),
+            },
+        ],
         [withCounts],
     );
-
-    const adminMore = useMemo(
-        () =>
-            withCounts([
-                { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
-                { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
-                { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
-                { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
-                { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
-                { label: "CEP feedback", href: "/dashboard/admin/cep-feedback", icon: MessageSquare },
-                { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
-                { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
-            ]),
-        [withCounts],
-    );
+    const adminWorkspace = useMemo(() => adminGroups.flatMap((g) => g.items), [adminGroups]);
+    const adminMore = useMemo<NavItem[]>(() => [], []);
 
     const investorPaths = useMemo(
         () => [
@@ -980,8 +1010,7 @@ export default function Sidebar() {
                       { label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: Users },
                   ],
               },
-              { heading: "Workspace", items: workspaceLinks },
-              { heading: "More", items: moreLinksRole },
+              ...adminGroups,
               { heading: "Account", items: footerLinks },
           ]
         : undefined;
@@ -1263,30 +1292,51 @@ export default function Sidebar() {
                                 ) : null}
                             </>
                         ) : null}
-                        <NavSectionLabel collapsed={collapsed}>{isInvestor ? "Organisation" : "Workspace"}</NavSectionLabel>
-                        {workspaceLinks.map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                icon={link.icon}
-                                active={isNavActive(link.href)}
-                                countPill={link.countPill}
-                                collapsed={collapsed}
-                            />
-                        ))}
-                        <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
-                        {moreLinksRole.map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                icon={link.icon}
-                                active={isNavActive(link.href)}
-                                countPill={link.countPill}
-                                collapsed={collapsed}
-                            />
-                        ))}
+                        {isAdmin ? (
+                            adminGroups.map((group) => (
+                                <div key={group.heading}>
+                                    <NavSectionLabel collapsed={collapsed}>{group.heading}</NavSectionLabel>
+                                    {group.items.map((link) => (
+                                        <NavRow
+                                            key={link.href}
+                                            href={link.href}
+                                            label={link.label}
+                                            icon={link.icon}
+                                            active={isNavActive(link.href)}
+                                            countPill={link.countPill}
+                                            collapsed={collapsed}
+                                        />
+                                    ))}
+                                </div>
+                            ))
+                        ) : (
+                            <>
+                                <NavSectionLabel collapsed={collapsed}>{isInvestor ? "Organisation" : "Workspace"}</NavSectionLabel>
+                                {workspaceLinks.map((link) => (
+                                    <NavRow
+                                        key={link.href}
+                                        href={link.href}
+                                        label={link.label}
+                                        icon={link.icon}
+                                        active={isNavActive(link.href)}
+                                        countPill={link.countPill}
+                                        collapsed={collapsed}
+                                    />
+                                ))}
+                                <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
+                                {moreLinksRole.map((link) => (
+                                    <NavRow
+                                        key={link.href}
+                                        href={link.href}
+                                        label={link.label}
+                                        icon={link.icon}
+                                        active={isNavActive(link.href)}
+                                        countPill={link.countPill}
+                                        collapsed={collapsed}
+                                    />
+                                ))}
+                            </>
+                        )}
                     </>
                 )}
                 {/* Overlay scrollbars stay hidden until you scroll, so fade the bottom edge to show

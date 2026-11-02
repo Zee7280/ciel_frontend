@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Download, Loader2, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
+import { deleteAdminLogs, downloadAdminCsv, num } from "@/utils/adminLogTools";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
@@ -31,6 +32,9 @@ type IssueLog = {
     resolvedAt?: string | null;
     userAgent?: string | null;
     metadata?: unknown;
+    /** List rows are summaries; these say whether the detail route has a payload to show. */
+    hasMetadata?: boolean;
+    hasStack?: boolean;
     createdAt?: string;
 };
 
@@ -60,6 +64,17 @@ const METHOD_OPTIONS = ["all", "GET", "POST", "PUT", "PATCH", "DELETE"] as const
 const SEVERITY_OPTIONS = ["all", "error", "warning", "info"] as const;
 
 const SEARCH_DEBOUNCE_MS = 350;
+
+type IssueSummary = {
+    open_total: number;
+    resolved_total: number;
+    last_24h: number;
+    last_7d: number;
+    open_by_severity: { key: string; count: number }[];
+    open_by_module: { key: string; count: number }[];
+    open_by_status: { key: string; count: number }[];
+    top_open_messages: { key: string; count: number }[];
+};
 
 function formatWhen(value?: string) {
     if (!value) return "N/A";
@@ -97,6 +112,43 @@ export default function AdminIssueLogsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    /** Detail payloads (metadata + stack) fetched on expand, keyed by log id. */
+    const [details, setDetails] = useState<Record<string, { metadata?: unknown; stack?: string | null; error?: string }>>({});
+    const loadDetail = async (id: string) => {
+        if (details[id]) return;
+        try {
+            const res = await authenticatedFetch(
+                resolveSameOriginApiPath(`/api/v1/admin/issue-logs/${encodeURIComponent(id)}`),
+                {},
+                { redirectToLogin: false },
+            );
+            const body = res?.ok ? ((await res.json()) as { data?: { metadata?: unknown; stack?: string | null } }) : null;
+            setDetails((prev) => ({
+                ...prev,
+                [id]: body?.data ? { metadata: body.data.metadata, stack: body.data.stack } : { error: `Could not load details (HTTP ${res?.status ?? "network"}).` },
+            }));
+        } catch {
+            setDetails((prev) => ({ ...prev, [id]: { error: "Could not load details." } }));
+        }
+    };
+
+    const [summary, setSummary] = useState<IssueSummary | null>(null);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [busy, setBusy] = useState(false);
+    const [notice, setNotice] = useState("");
+    const [purgeDays, setPurgeDays] = useState("30");
+    const loadSummary = useCallback(async () => {
+        try {
+            const res = await authenticatedFetch(resolveSameOriginApiPath("/api/v1/admin/issue-logs/summary"), {}, { redirectToLogin: false });
+            const body = res?.ok ? ((await res.json()) as { data?: IssueSummary }) : null;
+            setSummary(body?.data ?? null);
+        } catch {
+            setSummary(null);
+        }
+    }, []);
+    useEffect(() => {
+        void loadSummary();
+    }, [loadSummary]);
 
     const [searchInput, setSearchInput] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -173,7 +225,9 @@ export default function AdminIssueLogsPage() {
             if (!res?.ok) {
                 setLogs([]);
                 setTotalItems(0);
-                setError("Could not load issue logs. Please check backend/admin permissions.");
+                const body = res ? ((await res.json().catch(() => null)) as { message?: string } | null) : null;
+                const why = res ? `HTTP ${res.status}${body?.message ? ` · ${body.message}` : ""}` : "network error";
+                setError(`Could not load issue logs (${why}). Check the backend deployment and your admin session.`);
                 return;
             }
             const body = (await res.json()) as IssueLogsResponse;
@@ -222,6 +276,60 @@ export default function AdminIssueLogsPage() {
 
     useEffect(() => () => abortRef.current?.abort(), []);
 
+    const refreshAll = () => {
+        void loadLogs();
+        void loadSummary();
+    };
+
+    const runDelete = async (body: Record<string, unknown>, confirmText: string) => {
+        if (!window.confirm(confirmText)) return;
+        setBusy(true);
+        setNotice("");
+        const r = await deleteAdminLogs("/api/v1/admin/issue-logs", body);
+        setBusy(false);
+        if (r.error) {
+            setError(r.error);
+            return;
+        }
+        setNotice(`${num(r.deleted)} issue log${r.deleted === 1 ? "" : "s"} deleted.`);
+        setSelected(new Set());
+        refreshAll();
+    };
+
+    const deleteOne = async (id: string) => {
+        if (!window.confirm("Delete this issue log? This cannot be undone.")) return;
+        setBusy(true);
+        try {
+            const res = await authenticatedFetch(resolveSameOriginApiPath(`/api/v1/admin/issue-logs/${encodeURIComponent(id)}`), { method: "DELETE" }, { redirectToLogin: false });
+            if (!res?.ok) {
+                setError(`Could not delete (HTTP ${res?.status ?? "network"}).`);
+                return;
+            }
+            setNotice("Issue log deleted.");
+            setExpandedId(null);
+            refreshAll();
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const exportCsv = async () => {
+        setBusy(true);
+        const err = await downloadAdminCsv(`/api/v1/admin/issue-logs/export?${queryString}`, `issue-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+        setBusy(false);
+        if (err) setError(err);
+    };
+
+    const toggleSelect = (id: string) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    const allOnPageSelected = logs.length > 0 && logs.every((l) => selected.has(l.id));
+    const purgeDaysNum = Number(purgeDays);
+
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
     return (
@@ -239,11 +347,49 @@ export default function AdminIssueLogsPage() {
                         </p>
                     </div>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => void loadLogs()} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => void exportCsv()} disabled={busy || isLoading}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export CSV
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={refreshAll} disabled={isLoading}>
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                        Refresh
+                    </Button>
+                </div>
             </div>
+
+            {summary ? (
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                    {[
+                        ["Open issues", num(summary.open_total), summary.open_total ? "text-red-700" : "text-slate-900"],
+                        ["Resolved", num(summary.resolved_total), "text-slate-900"],
+                        ["New · 24 h", num(summary.last_24h), "text-slate-900"],
+                        ["New · 7 days", num(summary.last_7d), "text-slate-900"],
+                    ].map(([label, value, tone]) => (
+                        <div key={label} className="rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                            <p className={`mt-1 text-2xl font-semibold ${tone}`}>{value}</p>
+                        </div>
+                    ))}
+                    <div className="rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Open by module</p>
+                        <ul className="mt-1 space-y-0.5 text-xs text-slate-700">
+                            {summary.open_by_module.length ? summary.open_by_module.slice(0, 3).map((m) => (
+                                <li key={m.key} className="flex justify-between gap-2"><button type="button" className="truncate text-left hover:underline" onClick={() => changeFilter(setModuleFilter)(m.key)}>{m.key}</button><b>{num(m.count)}</b></li>
+                            )) : <li className="text-slate-400">Nothing open</li>}
+                        </ul>
+                    </div>
+                    <div className="rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Most repeated · open</p>
+                        <ul className="mt-1 space-y-0.5 text-xs text-slate-700">
+                            {summary.top_open_messages.length ? summary.top_open_messages.slice(0, 3).map((m) => (
+                                <li key={m.key} className="flex justify-between gap-2" title={m.key}><span className="truncate">{m.key}</span><b>{num(m.count)}</b></li>
+                            )) : <li className="text-slate-400">Nothing open</li>}
+                        </ul>
+                    </div>
+                </div>
+            ) : null}
 
             <Card className="p-4 shadow-sm">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
@@ -323,6 +469,7 @@ export default function AdminIssueLogsPage() {
                     <span>{error}</span>
                 </div>
             ) : null}
+            {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status">{notice}</div> : null}
 
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center gap-3 py-24">
@@ -344,9 +491,30 @@ export default function AdminIssueLogsPage() {
                         <span>User / Request</span>
                         <span>Details</span>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-xs text-slate-600">
+                        <label className="flex items-center gap-2 font-semibold">
+                            <input type="checkbox" checked={allOnPageSelected} onChange={() => setSelected(allOnPageSelected ? new Set() : new Set(logs.map((l) => l.id)))} aria-label="Select all on this page" />
+                            {selected.size ? `${selected.size} selected` : `${logs.length} on this page`}
+                        </label>
+                        <Button type="button" variant="outline" size="sm" disabled={busy || selected.size === 0} onClick={() => void runDelete({ ids: [...selected] }, `Delete ${selected.size} selected issue log${selected.size === 1 ? "" : "s"}? This cannot be undone.`)}>
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            Delete selected
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" disabled={busy || !(summary?.resolved_total)} onClick={() => void runDelete({ resolvedOnly: true }, `Delete all ${num(summary?.resolved_total)} resolved issue logs? This cannot be undone.`)}>
+                            Delete all resolved
+                        </Button>
+                        <span className="ml-auto flex items-center gap-2">
+                            <span>Purge older than</span>
+                            <Input inputMode="numeric" className="h-8 w-16" value={purgeDays} onChange={(e) => setPurgeDays(e.target.value.replace(/\D/g, ""))} aria-label="Purge older than days" />
+                            <span>days</span>
+                            <Button type="button" variant="outline" size="sm" disabled={busy || !Number.isFinite(purgeDaysNum) || purgeDaysNum < 1} onClick={() => void runDelete({ olderThanDays: purgeDaysNum }, `Purge every issue log older than ${purgeDaysNum} days, resolved or not? This cannot be undone.`)}>
+                                Purge
+                            </Button>
+                        </span>
+                    </div>
                     {logs.length > 0 || resolveMessage ? (
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-xs text-slate-600">
-                            <span role="status">{resolveMessage || `${logs.length} on this page`}</span>
+                            <span role="status">{resolveMessage || "Resolve keeps the record; delete removes it."}</span>
                             {logs.some((l) => !l.resolvedAt) ? (
                                 <Button
                                     type="button"
@@ -365,11 +533,18 @@ export default function AdminIssueLogsPage() {
                         {logs.map((log) => {
                             const isExpanded = expandedId === log.id;
                             return (
-                                <li key={log.id} className="border-b border-slate-100 last:border-0">
+                                <li key={log.id} className="flex items-start border-b border-slate-100 last:border-0">
+                                    <label className="flex items-center px-3 py-4 lg:px-4">
+                                        <input type="checkbox" checked={selected.has(log.id)} onChange={() => toggleSelect(log.id)} aria-label="Select issue" />
+                                    </label>
+                                    <div className="min-w-0 flex-1">
                                     <button
                                         type="button"
-                                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                                        className="grid w-full gap-3 px-4 py-4 text-left transition hover:bg-slate-50/90 lg:grid-cols-[170px_120px_1fr_220px_90px] lg:items-center lg:gap-4"
+                                        onClick={() => {
+                                            setExpandedId(isExpanded ? null : log.id);
+                                            if (!isExpanded) void loadDetail(log.id);
+                                        }}
+                                        className="grid w-full gap-3 py-4 pr-4 text-left transition hover:bg-slate-50/90 lg:grid-cols-[170px_120px_1fr_220px_90px] lg:items-center lg:gap-4"
                                     >
                                         <div className="text-xs tabular-nums text-slate-500">{formatWhen(log.createdAt)}</div>
                                         <div className="flex flex-wrap items-center gap-2">
@@ -415,6 +590,14 @@ export default function AdminIssueLogsPage() {
                                                         Mark resolved
                                                     </button>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => void deleteOne(log.id)}
+                                                    className="rounded-md bg-red-500/90 px-3 py-1 font-bold text-white hover:bg-red-400 disabled:opacity-60"
+                                                >
+                                                    Delete
+                                                </button>
                                             </div>
                                             <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                                                 <div>
@@ -435,10 +618,17 @@ export default function AdminIssueLogsPage() {
                                                 </div>
                                             </div>
                                             <pre className="mt-4 max-h-96 overflow-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-slate-300">
-                                                {prettyJson({ metadata: log.metadata, stack: log.stack })}
+                                                {details[log.id]?.error
+                                                    ? details[log.id].error
+                                                    : details[log.id]
+                                                      ? prettyJson({ metadata: details[log.id].metadata, stack: details[log.id].stack })
+                                                      : log.hasMetadata || log.hasStack
+                                                        ? "Loading details…"
+                                                        : prettyJson({ metadata: log.metadata ?? null, stack: log.stack ?? null })}
                                             </pre>
                                         </div>
                                     ) : null}
+                                    </div>
                                 </li>
                             );
                         })}

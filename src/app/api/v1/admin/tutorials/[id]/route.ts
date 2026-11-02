@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /** Proxies Nest `DELETE /admin/tutorials/:id`. */
@@ -33,4 +34,10 @@ export async function DELETE(
         console.error("admin/tutorials DELETE proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
+}
+
+/** Proxies Nest `PATCH /admin/tutorials/:id` (edit a tutorial). */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    return proxyToNest(req, `admin/tutorials/${encodeURIComponent(id)}`, { tryAlternatePaths: false });
 }

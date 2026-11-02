@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { toast } from "sonner";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
@@ -257,6 +258,31 @@ function AdminPathSubmissionsHub() {
     const setPathTab = (tab: PathTab) => router.push(tabHref(tab));
 
     const [courseRows, setCourseRows] = useState<AdminCourseProjectRow[]>([]);
+    const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
+    /** Command Monitor clean-up: admin removes a coursework record after an explicit confirm. */
+    const deleteCourseRow = async (row: AdminCourseProjectRow) => {
+        const title = row.projectTitle?.trim() || "Untitled coursework";
+        const who = row.student?.name || row.studentInfo?.studentName || "the student";
+        const stage = row.status === "draft" ? "a draft" : `submitted (${row.facultyApprovalStatus || "pending"})`;
+        const ok = window.confirm(`Delete “${title}” by ${who}?\n\nThis record is ${stage}. Deleting removes it for the student, the faculty and every wall. This cannot be undone.`);
+        if (!ok) return;
+        setDeletingCourseId(row.id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/paths/course-projects/${row.id}`, { method: "DELETE" });
+            if (!res?.ok) {
+                const body = await res?.json().catch(() => null);
+                window.alert(body?.message || "Could not delete this record.");
+                return;
+            }
+            setCourseRows((prev) => prev.filter((r) => r.id !== row.id));
+            setMeritEntries((prev) => prev.filter((r) => r.id !== row.id));
+            setApprovedMeritEntries((prev) => prev.filter((r) => r.id !== row.id));
+        } catch {
+            window.alert("Could not delete this record.");
+        } finally {
+            setDeletingCourseId(null);
+        }
+    };
     const [fypRows, setFypRows] = useState<AdminFypRow[]>([]);
     const [ventureRows, setVentureRows] = useState<AdminVentureRow[]>([]);
     const [courseFilter, setCourseFilter] = useState<"all" | "waiting" | "approved" | "draft">("all");
@@ -281,7 +307,10 @@ function AdminPathSubmissionsHub() {
         let cancelled = false;
         setMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/course-projects")
-            .then((res) => (res?.ok ? res.json() : null))
+            .then((res) => {
+                if (!res?.ok && !cancelled) toast.error("Could not load coursework records. Refresh to retry.");
+                return res?.ok ? res.json() : null;
+            })
             .then((payload) => {
                 if (!cancelled) setMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
             })
@@ -292,7 +321,10 @@ function AdminPathSubmissionsHub() {
         // records (enforced server-side), kept separate from meritEntries above since that list
         // stays unfiltered for the analytics panel's full status breakdown.
         authenticatedFetch("/api/v1/admin/paths/course-projects?approvalStatus=approved")
-            .then((res) => (res?.ok ? res.json() : null))
+            .then((res) => {
+                if (!res?.ok && !cancelled) toast.error("Could not load the approved coursework wall. Refresh to retry.");
+                return res?.ok ? res.json() : null;
+            })
             .then((payload) => {
                 if (!cancelled) setApprovedMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
             });
@@ -731,7 +763,14 @@ function AdminPathSubmissionsHub() {
                     ) : (
                         <div className="space-y-2">
                             {commandRows.map((row) => (
-                                <CourseworkMonitorRow key={row.id} entry={row} showStalled contact={commandContactFor(row)} />
+                                <CourseworkMonitorRow
+                                    key={row.id}
+                                    entry={row}
+                                    showStalled
+                                    contact={commandContactFor(row)}
+                                    onDelete={() => void deleteCourseRow(row)}
+                                    deleting={deletingCourseId === row.id}
+                                />
                             ))}
                         </div>
                     )}

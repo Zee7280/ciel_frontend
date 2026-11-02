@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 
 /**
  * Next: DELETE /api/v1/admin/opportunities/:opportunityId/teams/:teamId
@@ -50,4 +51,13 @@ export async function DELETE(
         console.error("admin/opportunities/[id]/teams/[teamId] DELETE proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
+}
+
+/**
+ * POST /api/v1/admin/opportunities/:id/teams/merge-preview lands here with teamId = "merge-preview";
+ * forward it (and any other nested POST) to the same Nest path.
+ */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; teamId: string }> }) {
+    const { id, teamId } = await params;
+    return proxyToNest(req, `admin/opportunities/${encodeURIComponent(id)}/teams/${encodeURIComponent(teamId)}`, { tryAlternatePaths: false });
 }

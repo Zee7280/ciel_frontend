@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /** Proxies Nest `GET /admin/support/faqs`. */
@@ -30,4 +31,9 @@ export async function GET(request: Request) {
         console.error("admin/support/faqs GET proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
+}
+
+/** Proxies Nest `POST /admin/support/faqs` (create an FAQ). */
+export async function POST(req: NextRequest) {
+    return proxyToNest(req, "admin/support/faqs", { tryAlternatePaths: false });
 }
