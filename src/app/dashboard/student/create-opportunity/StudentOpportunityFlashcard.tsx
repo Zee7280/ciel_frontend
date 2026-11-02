@@ -9,6 +9,7 @@ import {
 } from "@/utils/studentApplyMaintenance";
 import "@/components/opportunities/create-opportunity.css";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
+import { whatsappDigits } from "@/utils/reminderLinks";
 import { flowSteps } from "./opportunityFlashcardSteps";
 
 function flashOrgLabel(value: unknown): string {
@@ -49,6 +50,9 @@ export type StudentFlashcardModel = {
     objective: string;
     outputs: string;
     creatorName: string;
+    /** Creator contact, present only when the API returned it for this viewer (signed-in users). */
+    creatorEmail?: string;
+    creatorWhatsapp?: string;
     orgLabel: string;
     unitLabel: string;
     badgeLabel: string;
@@ -175,6 +179,8 @@ export function buildOpportunityRecordFlashcard(
     raw: Record<string, unknown>,
     people?: {
         studentName?: string;
+        creatorEmail?: string;
+        creatorPhone?: string;
         facultyName?: string;
         facultyEmail?: string;
         partnerOrg?: string;
@@ -189,6 +195,8 @@ export function buildOpportunityRecordFlashcard(
     const cityFromString = typeof raw.location === "string" ? raw.location.trim() : "";
     const activity = asRecord(raw.activity_details);
     const supervision = asRecord(raw.supervision);
+    // `creator` carries email / phone only when the API allowed it for this viewer.
+    const creator = asRecord(raw.creator);
     const sdgInfo = asRecord(raw.sdg_info);
     const secondary = Array.isArray(raw.secondary_sdgs) ? asRecord(raw.secondary_sdgs[0]) : {};
     const types = Array.isArray(raw.types) ? raw.types.map((t) => String(t)).filter(Boolean) : [];
@@ -221,7 +229,9 @@ export function buildOpportunityRecordFlashcard(
         secondaryTarget: pickStr(secondary.target_id),
         objective: pickStr(objectives.description, sdgInfo.why_relevant),
         outputs: pickStr(objectives.outputs, objectives.outcome),
-        creatorName: pickStr(people?.studentName, supervision.supervisor_name) || "Creator",
+        creatorName: pickStr(people?.studentName, creator.name, supervision.supervisor_name) || "Creator",
+        creatorEmail: pickStr(people?.creatorEmail, creator.email),
+        creatorWhatsapp: pickStr(people?.creatorPhone, creator.phone),
         orgLabel: flashOrgLabel(pickStr(people?.university, supervision.faculty_university_name)),
         unitLabel: pickStr(supervision.faculty_department, supervision.role),
         badgeLabel: "Student created",
@@ -386,6 +396,14 @@ export function StudentOpportunityFlashcard({
     const skillChips = splitBits(String(model.skills || ""));
     const orgLabel = flashOrgLabel(model.orgLabel);
     const host = flashHost(model.host);
+    const creatorEmail = String(model.creatorEmail || "").trim();
+    const creatorWa = whatsappDigits(model.creatorWhatsapp);
+    const creatorFirstName = String(model.creatorName || "").trim().split(/\s+/)[0] || "";
+    const creatorWaHref = creatorWa
+        ? `https://wa.me/${creatorWa}?text=${encodeURIComponent(
+              `Hi${creatorFirstName && creatorFirstName !== "You" ? ` ${creatorFirstName}` : ""}, I am contacting you about "${String(model.title || "").trim() || "your opportunity"}" on CIEL PK.`,
+          )}`
+        : "";
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
     const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
     const canApply = flashcardCanApply(model);
@@ -637,6 +655,26 @@ export function StudentOpportunityFlashcard({
                             <small>Created by</small>
                             <b>{esc(model.creatorName)}</b>
                             <em>{esc(orgLabel)}</em>
+                            {creatorEmail || creatorWaHref ? (
+                                <span className="co-flash-contact">
+                                    {creatorEmail ? (
+                                        <a href={`mailto:${creatorEmail}`} title="Email the creator">
+                                            {creatorEmail}
+                                        </a>
+                                    ) : null}
+                                    {creatorWaHref ? (
+                                        <a
+                                            href={creatorWaHref}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="co-flash-contact-wa"
+                                            title="WhatsApp the creator"
+                                        >
+                                            WhatsApp
+                                        </a>
+                                    ) : null}
+                                </span>
+                            ) : null}
                         </div>
                         <div className="co-flash-chain-item">
                             <small>{model.privateCandidate ? "Verification" : "Faculty"}</small>
@@ -679,7 +717,7 @@ export function StudentOpportunityFlashcard({
             {note ? <p className="co-flash-note">{note}</p> : null}
             <footer className="co-flash-foot">
                 <span>CIEL PK</span>
-                <span>Phone numbers stay off this card</span>
+                <span>{creatorWaHref || creatorEmail ? "Reach the creator through the links in Accountability" : "Phone numbers stay off this card"}</span>
             </footer>
         </article>
     );
