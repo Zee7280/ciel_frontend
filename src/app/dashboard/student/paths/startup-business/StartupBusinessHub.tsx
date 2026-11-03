@@ -16,6 +16,8 @@ import { mailtoHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import { SDG_COLORS, SDG_SHORT, V11_STAGES, V11_STEPS, hubProgressIndex } from "@/utils/ventureStudioV11";
 import { investorTiles, type InvestorActivity } from "@/utils/investorActivity";
 import FounderIntroRequests from "@/components/ciel/venture/FounderIntroRequests";
+import { LEGACY_VENTURE_URL, SERVER_UPDATE_NEEDED, fetchLegacyVenture, isMissingRoute, ventureUrl } from "@/utils/ventureApi";
+import { canDeleteVenture, canWithdrawVenture, ventureBucket, ventureBucketStats } from "@/utils/ventureBuckets";
 
 const BASE = "/dashboard/student/paths/startup-business";
 const WORKSPACE_HREF = `${BASE}?view=workspace`;
@@ -29,6 +31,9 @@ const HUB_VIEW_LABEL: Record<string, string> = {
     guide: "How the loop works",
     wall: "Impact Wall",
     "in-progress": "Startup Workspace",
+    drafts: "Drafts",
+    revision: "Revision Requested",
+    rejected: "Rejected",
     "under-review": "Under Review",
     record: "Venture Card",
 };
@@ -102,7 +107,7 @@ type HubVenture = {
     evidenceInfo?: { customers?: number; revenueToDate?: number; interviews?: number; pilotPartners?: number } | null;
 };
 
-type HubView = "home" | "guide" | "wall" | "in-progress" | "under-review" | "record";
+export type HubView = "home" | "guide" | "wall" | "in-progress" | "drafts" | "revision" | "rejected" | "under-review" | "record";
 type TimelineState = "done" | "now" | "warn" | "bad" | "";
 
 function firstName() {
@@ -713,11 +718,14 @@ function WorkspaceRow({
     onContinue,
     onDetails,
     onSubmit,
+    onDelete,
 }: {
     entry: HubVenture;
     onContinue: () => void;
     onDetails: () => void;
     onSubmit: () => void;
+    /** Drafts only — never-submitted or withdrawn ventures. */
+    onDelete?: () => void;
 }) {
     const rev = isRevision(entry);
     const metaRest = [
@@ -764,12 +772,17 @@ function WorkspaceRow({
                 <button type="button" onClick={onDetails} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57] hover:bg-[#e1eaef]">
                     Details
                 </button>
+                {onDelete ? (
+                    <button type="button" onClick={onDelete} className="rounded-[10px] border border-[#f5c2be] bg-white px-3 py-1.5 text-[12.5px] font-bold text-[#c0392b] hover:bg-[#fdecea]">
+                        🗑 Delete draft
+                    </button>
+                ) : null}
             </div>
         </div>
     );
 }
 
-function ReviewRow({ entry, onOpen }: { entry: HubVenture; onOpen: () => void }) {
+function ReviewRow({ entry, onOpen, onWithdraw }: { entry: HubVenture; onOpen: () => void; onWithdraw?: () => void }) {
     const faculty = facultyReminders(entry);
     return (
         <div className="grid grid-cols-1 items-center gap-[18px] rounded-[18px] border border-[#e3e9ee] bg-white p-[18px_20px] md:grid-cols-[1.6fr_1fr]">
@@ -793,7 +806,39 @@ function ReviewRow({ entry, onOpen }: { entry: HubVenture; onOpen: () => void })
                 <button type="button" onClick={onOpen} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57] hover:bg-[#e1eaef]">
                     View Venture Card
                 </button>
+                {onWithdraw ? (
+                    <button type="button" onClick={onWithdraw} className="rounded-[10px] border border-[#f1c27d] bg-white px-3 py-1.5 text-[12.5px] font-bold text-[#a8630b] hover:bg-[#fff6e6]">
+                        ↩ Withdraw to edit
+                    </button>
+                ) : null}
             </div>
+        </div>
+    );
+}
+
+/** Rejected ventures — kept for the student's record, never published. */
+function RejectedList({ rows, onOpen }: { rows: HubVenture[]; onOpen: (row: HubVenture) => void }) {
+    return (
+        <div className="mt-2.5 flex flex-col gap-3.5">
+            {rows.map((row) => (
+                <div key={row.id || "rej"} className="grid grid-cols-1 items-center gap-4 rounded-[18px] border border-[#e3e9ee] p-5 md:grid-cols-[1.6fr_1fr]">
+                    <div>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <p className="m-0 text-[17px] font-extrabold">{row.ventureName || "Untitled venture"}</p>
+                            <StatusChip entry={row} />
+                        </div>
+                        <p className="mt-1 text-[13px] text-[#5d6c78]">
+                            <b className="font-semibold text-[#14212b]">{displayVentureId(row)}</b>
+                            {row.reviewPipeline?.supervisorNote ? ` · ${row.reviewPipeline.supervisorNote}` : ""}
+                        </p>
+                    </div>
+                    <div className="flex justify-start md:justify-end">
+                        <button type="button" onClick={() => onOpen(row)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
+                            Details
+                        </button>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
@@ -1123,6 +1168,9 @@ export default function StartupBusinessHub({
     const [filters, setFilters] = useState({ status: "", stage: "", sector: "", sdg: "", sort: "updated", q: "" });
     const [consentBusy, setConsentBusy] = useState(false);
     const [submitFor, setSubmitFor] = useState<HubVenture | null>(null);
+    /** Pending "Delete draft" / "Withdraw to edit" confirmation. */
+    const [confirmAction, setConfirmAction] = useState<{ kind: "delete" | "withdraw"; row: HubVenture } | null>(null);
+    const [acting, setActing] = useState(false);
 
     useEffect(() => {
         setName(firstName());
@@ -1159,11 +1207,15 @@ export default function StartupBusinessHub({
     const all = useMemo(() => entries.filter((e) => hasRecord(e)), [entries]);
     /** The venture a record / card view is about: the one in the URL, else the most recent. */
     const entry: HubVenture | null = all.find((e) => e.id === selectedId) ?? all[0] ?? null;
-    const approved = all.filter(isPathEntryApproved);
-    const underReview = all.filter(isPathEntryWaiting);
-    const revision = all.filter(isRevision);
-    const rejected = all.filter(isRejected);
-    const inProgress = all.filter((e) => (e.status !== "submitted" || isRevision(e)) && !isPathEntryApproved(e) && !isPathEntryWaiting(e) && !isRejected(e));
+    // One tab per venture (shared with the form page via ventureBucket).
+    const drafts = all.filter((e) => ventureBucket(e) === "draft");
+    const revision = all.filter((e) => ventureBucket(e) === "revision");
+    const underReview = all.filter((e) => ventureBucket(e) === "review");
+    const approved = all.filter((e) => ventureBucket(e) === "approved");
+    const rejected = all.filter((e) => ventureBucket(e) === "rejected");
+    const inProgress = [...drafts, ...revision];
+    const draftList = applyFilters(drafts, filters, "workspace");
+    const revisionList = applyFilters(revision, filters, "workspace");
     const investorOpen = approved.some(isInvestorOpen);
     const workspaceList = applyFilters(inProgress, filters, "workspace");
     const wallList = applyFilters(approved, filters, "wall");
@@ -1180,19 +1232,18 @@ export default function StartupBusinessHub({
         if (!entry) return;
         setConsentBusy(true);
         try {
-            const consentUrl = entry.id
-                ? `/api/v1/paths/startup-ventures/${encodeURIComponent(entry.id)}`
-                : "/api/v1/paths/startup-business";
-            const response = await authenticatedFetch(consentUrl, {
-                method: "PATCH",
-                body: JSON.stringify({
-                    publishSettings: {
-                        ...(entry.publishSettings || {}),
-                        acceptIntros: accept,
-                        audience: accept ? "investors" : "university",
-                    },
-                }),
+            const consentBody = JSON.stringify({
+                publishSettings: {
+                    ...(entry.publishSettings || {}),
+                    acceptIntros: accept,
+                    audience: accept ? "investors" : "university",
+                },
             });
+            let response = await authenticatedFetch(entry.id ? ventureUrl(entry.id) : LEGACY_VENTURE_URL, { method: "PATCH", body: consentBody });
+            // Older server without per-venture routes: its single venture must be this one.
+            if (entry.id && (await isMissingRoute(response)) && (await fetchLegacyVenture())?.id === entry.id) {
+                response = await authenticatedFetch(LEGACY_VENTURE_URL, { method: "PATCH", body: consentBody });
+            }
             if (response?.ok) {
                 const data = await response.json();
                 if (data?.data) {
@@ -1209,6 +1260,43 @@ export default function StartupBusinessHub({
             setConsentBusy(false);
         }
     };
+    const runConfirmedAction = async () => {
+        const target = confirmAction;
+        if (!target?.row.id) return;
+        const { kind, row } = target;
+        setActing(true);
+        try {
+            const res = await authenticatedFetch(
+                kind === "delete" ? ventureUrl(row.id!) : `${ventureUrl(row.id!)}/withdraw`,
+                kind === "delete" ? { method: "DELETE" } : { method: "POST", body: "{}" },
+            );
+            if (await isMissingRoute(res)) {
+                toast.error(SERVER_UPDATE_NEEDED);
+                return;
+            }
+            const json = res ? ((await res.json().catch(() => null)) as { message?: unknown; data?: HubVenture } | null) : null;
+            if (!res?.ok) {
+                toast.error(typeof json?.message === "string" ? json.message : kind === "delete" ? "Could not delete this draft." : "Could not withdraw this venture.");
+                return;
+            }
+            setEntries((prev) => {
+                const next =
+                    kind === "delete"
+                        ? prev.filter((e) => e.id !== row.id)
+                        : prev.map((e) => (e.id === row.id && json?.data ? { ...e, ...json.data } : e));
+                setPathSessionCache("startup-ventures", next);
+                return next;
+            });
+            toast.success(kind === "delete" ? "Draft deleted." : "Withdrawn — it is back in Drafts. Edit it and submit again when ready.");
+            setConfirmAction(null);
+        } catch {
+            toast.error(kind === "delete" ? "Could not delete this draft." : "Could not withdraw this venture.");
+        } finally {
+            setActing(false);
+        }
+    };
+    const askDelete = (row: HubVenture) => (canDeleteVenture(row) ? () => setConfirmAction({ kind: "delete", row }) : undefined);
+    const askWithdraw = (row: HubVenture) => (canWithdrawVenture(row) ? () => setConfirmAction({ kind: "withdraw", row }) : undefined);
     const feedRows = all
         .flatMap((v) =>
             deriveActivity(v, displayName()).map((row) => ({
@@ -1226,17 +1314,13 @@ export default function StartupBusinessHub({
                 pathLabel="Startup / Venture"
                 view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
             />
-            {view === "home" || view === "in-progress" || view === "under-review" || view === "wall" || view === "record" ? (
+            {view !== "guide" ? (
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
                     title={<TimeGreeting name={name === "there" ? "" : name} emoji={"🚀"} />}
                     subtitle="Build your venture profile section by section, submit your venture card to faculty, collect your approved ventures here — and open the door to investors when you are ready."
                     badge="🎓 STUDENT"
-                    stats={[
-                        { value: String(approved.length), label: "APPROVED", href: WALL_HREF },
-                        { value: String(underReview.length), label: "UNDER REVIEW", href: UNDER_REVIEW_HREF },
-                        { value: String(inProgress.length), label: "IN PROGRESS", href: IN_PROGRESS_HREF },
-                    ]}
+                    stats={ventureBucketStats(all)}
                 />
             ) : null}
 
@@ -1276,14 +1360,14 @@ export default function StartupBusinessHub({
                             onClick={() => router.push(CREATE_HREF)}
                             className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white hover:brightness-105"
                         >
-                            ＋ Create New Opportunity
+                            ＋ New Startup Record
                         </button>
                     </div>
                     <FilterBar entries={inProgress} showStatus filters={filters} onChange={setFilters} />
                     <div className="flex flex-col gap-3.5">
                         {workspaceList.length ? (
                             workspaceList.map((row) => (
-                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={() => openForm(row)} onDetails={() => openRecord(row)} onSubmit={() => setSubmitFor(row)} />
+                                <WorkspaceRow key={row.id || "row"} entry={row} onContinue={() => openForm(row)} onDetails={() => openRecord(row)} onSubmit={() => setSubmitFor(row)} onDelete={askDelete(row)} />
                             ))
                         ) : (
                             <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
@@ -1295,6 +1379,81 @@ export default function StartupBusinessHub({
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {view === "drafts" || view === "revision" ? (
+                <div className="mt-[22px] rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                    <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                        <PanelBack onClick={() => router.push(BASE)} />
+                        <div className="min-w-0 flex-1">
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">
+                                {view === "drafts" ? `📝 Drafts — ${drafts.length}` : `↩ Revision Requested — ${revision.length}`}
+                            </h3>
+                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                                {view === "drafts"
+                                    ? "Ventures you have not submitted yet, including any you withdrew to edit. Continue filling, submit when ready, or delete a draft you no longer need."
+                                    : "Your faculty returned these ventures with a note. Open one, fix what was asked and resubmit — nothing is penalised."}
+                            </p>
+                        </div>
+                        {view === "drafts" ? (
+                            <button
+                                type="button"
+                                onClick={() => router.push(CREATE_HREF)}
+                                className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white hover:brightness-105"
+                            >
+                                ＋ New Startup Record
+                            </button>
+                        ) : null}
+                    </div>
+                    <FilterBar entries={view === "drafts" ? drafts : revision} filters={filters} onChange={setFilters} />
+                    <div className="flex flex-col gap-3.5">
+                        {(view === "drafts" ? draftList : revisionList).length ? (
+                            (view === "drafts" ? draftList : revisionList).map((row) => (
+                                <WorkspaceRow
+                                    key={row.id || "row"}
+                                    entry={row}
+                                    onContinue={() => openForm(row)}
+                                    onDetails={() => openRecord(row)}
+                                    onSubmit={() => setSubmitFor(row)}
+                                    onDelete={askDelete(row)}
+                                />
+                            ))
+                        ) : (
+                            <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
+                                {view === "drafts" ? (
+                                    <>
+                                        No drafts —{" "}
+                                        <Link href={CREATE_HREF} className="font-bold text-[#0f8f8a] hover:underline">
+                                            create a startup record
+                                        </Link>{" "}
+                                        to begin.
+                                    </>
+                                ) : (
+                                    "No ventures are waiting for your revision."
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : null}
+
+            {view === "rejected" && (
+                <div className="mt-[22px] rounded-[22px] bg-white p-[26px_30px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
+                    <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
+                        <PanelBack onClick={() => router.push(BASE)} />
+                        <div className="min-w-0 flex-1">
+                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">✖ Rejected — {rejected.length}</h3>
+                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                                Not published. Rejected ventures stay on your record with your faculty&apos;s note so you can see what to change next time.
+                            </p>
+                        </div>
+                    </div>
+                    {rejected.length ? (
+                        <RejectedList rows={rejected} onOpen={openRecord} />
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">No rejected ventures.</div>
+                    )}
                 </div>
             )}
 
@@ -1311,7 +1470,7 @@ export default function StartupBusinessHub({
                     </div>
                     <div className="flex flex-col gap-3.5">
                         {underReview.length ? (
-                            underReview.map((row) => <ReviewRow key={row.id || "review"} entry={row} onOpen={() => openRecord(row)} />)
+                            underReview.map((row) => <ReviewRow key={row.id || "review"} entry={row} onOpen={() => openRecord(row)} onWithdraw={askWithdraw(row)} />)
                         ) : (
                             <div className="rounded-2xl border border-dashed border-[#e3e9ee] px-8 py-8 text-center text-[#5d6c78]">
                                 Nothing under review right now.
@@ -1347,27 +1506,7 @@ export default function StartupBusinessHub({
                     {rejected.length ? (
                         <>
                             <h3 className="mt-[26px] text-[17px] font-bold text-[#5d6c78]">Not published (rejected — kept for your record)</h3>
-                            <div className="mt-2.5 flex flex-col gap-3.5">
-                                {rejected.map((row) => (
-                                    <div key={row.id || "rej"} className="grid grid-cols-1 items-center gap-4 rounded-[18px] border border-[#e3e9ee] p-5 md:grid-cols-[1.6fr_1fr]">
-                                        <div>
-                                            <div className="flex flex-wrap items-center gap-2.5">
-                                                <p className="m-0 text-[17px] font-extrabold">{row.ventureName || "Untitled venture"}</p>
-                                                <StatusChip entry={row} />
-                                            </div>
-                                            <p className="mt-1 text-[13px] text-[#5d6c78]">
-                                                <b className="font-semibold text-[#14212b]">{displayVentureId(row)}</b>
-                                                {row.reviewPipeline?.supervisorNote ? ` · ${row.reviewPipeline.supervisorNote}` : ""}
-                                            </p>
-                                        </div>
-                                        <div className="flex justify-start md:justify-end">
-                                            <button type="button" onClick={() => openRecord(row)} className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
-                                                Details
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <RejectedList rows={rejected} onOpen={openRecord} />
                         </>
                     ) : null}
                 </div>
@@ -1443,6 +1582,35 @@ export default function StartupBusinessHub({
                     </div>
                 </>
             )}
+            {confirmAction ? (
+                <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5" role="dialog" aria-modal="true">
+                    <div className="w-full max-w-[560px] rounded-[22px] bg-white p-7">
+                        <h3 className="m-0 text-[21px] font-bold">
+                            {confirmAction.kind === "delete"
+                                ? `🗑 Delete “${confirmAction.row.ventureName || "Untitled venture"}”?`
+                                : `↩ Withdraw “${confirmAction.row.ventureName || "Untitled venture"}”?`}
+                        </h3>
+                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            {confirmAction.kind === "delete"
+                                ? "This draft and everything typed in it will be removed permanently. Your other ventures are not affected."
+                                : "It leaves your faculty's review queue and goes back to Drafts. Edit it and submit again when ready."}
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2.5">
+                            <button type="button" disabled={acting} onClick={() => setConfirmAction(null)} className="rounded-xl bg-[#eef3f6] px-4 py-2.5 text-[13.5px] font-bold text-[#0b4b57]">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={acting}
+                                onClick={() => void runConfirmedAction()}
+                                className={`rounded-xl px-4 py-2.5 text-[13.5px] font-bold text-white disabled:opacity-60 ${confirmAction.kind === "delete" ? "bg-[#d64545]" : "bg-[#f39c12]"}`}
+                            >
+                                {acting ? "Working…" : confirmAction.kind === "delete" ? "Delete draft" : "Withdraw to edit"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
             {submitFor ? (
                 <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
                     <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">

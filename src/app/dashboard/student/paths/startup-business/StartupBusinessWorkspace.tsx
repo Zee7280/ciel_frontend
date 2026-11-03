@@ -16,6 +16,8 @@ import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { canWithdrawVenture, ventureBucketStats } from "@/utils/ventureBuckets";
+import { LEGACY_VENTURE_URL, SECOND_VENTURE_UNAVAILABLE, SERVER_UPDATE_NEEDED, VENTURES_URL, fetchLegacyVenture, isMissingRoute, ventureUrl } from "@/utils/ventureApi";
 import {
     BUYER_MODELS,
     CHANNELS,
@@ -352,6 +354,21 @@ export default function StartupBusinessWorkspace() {
     const creatingRef = useRef<Promise<string> | null>(null);
     /** Id this form just created itself — its URL update must not reload and reset the form. */
     const selfCreatedIdRef = useRef<string | null>(null);
+    /** Older backend without the multi-venture routes: use the single-venture route for this venture. */
+    const legacyApiRef = useRef(false);
+    /** All of this student's ventures — the hero counters cover every venture, not just this one. */
+    const [allVentures, setAllVentures] = useState<VentureEntry[] | null>(null);
+    const loadAllVentures = () => {
+        authenticatedFetch("/api/v1/paths/startup-ventures", {}, { redirectToLogin: false })
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((json) => {
+                if (Array.isArray(json?.data)) setAllVentures(json.data as VentureEntry[]);
+            })
+            .catch(() => undefined);
+    };
+    useEffect(() => {
+        loadAllVentures();
+    }, []);
     const [step, setStep] = useState(0);
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<Record<string, { accepted: boolean; edited: boolean; text: string }>>({});
@@ -383,11 +400,22 @@ export default function StartupBusinessWorkspace() {
         }
         let cancelled = false;
         // With an id: that venture. Without (older links): the student's latest venture.
-        const url = urlVentureId
-            ? `/api/v1/paths/startup-ventures/${encodeURIComponent(urlVentureId)}`
-            : "/api/v1/paths/startup-business";
-        authenticatedFetch(url, {}, { redirectToLogin: true })
-            .then((res) => (res?.ok ? res.json() : null))
+        const load = async (): Promise<{ data?: Partial<VentureEntry> } | null> => {
+            if (!urlVentureId) {
+                const res = await authenticatedFetch(LEGACY_VENTURE_URL, {}, { redirectToLogin: true });
+                return res?.ok ? res.json() : null;
+            }
+            const res = await authenticatedFetch(ventureUrl(urlVentureId), {}, { redirectToLogin: true });
+            if (await isMissingRoute(res)) {
+                // Older server: its single venture is the only one there is — use it if it is this one.
+                const legacy = await fetchLegacyVenture();
+                if (legacy?.id !== urlVentureId) return null;
+                legacyApiRef.current = true;
+                return { data: legacy as Partial<VentureEntry> };
+            }
+            return res?.ok ? res.json() : null;
+        };
+        load()
             .then((result) => {
                 if (cancelled) return;
                 if (result?.data) {
@@ -420,18 +448,27 @@ export default function StartupBusinessWorkspace() {
             ventureIdRef.current = await creatingRef.current.catch(() => "");
         }
         const id = ventureIdRef.current;
+        const patchLegacy = () =>
+            authenticatedFetch(LEGACY_VENTURE_URL, { method: "PATCH", body: JSON.stringify(body) }, { redirectToLogin: true });
         if (id) {
-            return authenticatedFetch(
-                `/api/v1/paths/startup-ventures/${encodeURIComponent(id)}`,
-                { method: "PATCH", body: JSON.stringify(body) },
-                { redirectToLogin: true },
-            );
+            if (legacyApiRef.current) return patchLegacy();
+            const res = await authenticatedFetch(ventureUrl(id), { method: "PATCH", body: JSON.stringify(body) }, { redirectToLogin: true });
+            if (!(await isMissingRoute(res))) return res;
+            // Older server: only safe when its single venture is exactly this one.
+            const legacy = await fetchLegacyVenture();
+            if (legacy?.id !== id) throw new Error("Could not save this venture — please refresh the page and try again.");
+            legacyApiRef.current = true;
+            return patchLegacy();
         }
-        const res = await authenticatedFetch(
-            "/api/v1/paths/startup-ventures",
-            { method: "POST", body: JSON.stringify(body) },
-            { redirectToLogin: true },
-        );
+        let res = await authenticatedFetch(VENTURES_URL, { method: "POST", body: JSON.stringify(body) }, { redirectToLogin: true });
+        if (await isMissingRoute(res)) {
+            // Older server: it can hold one venture per student. Create it only if the student has none —
+            // the single-venture save would otherwise overwrite their existing venture with this form.
+            const legacy = await fetchLegacyVenture();
+            if (legacy?.id) throw new Error(SECOND_VENTURE_UNAVAILABLE);
+            legacyApiRef.current = true;
+            res = await patchLegacy();
+        }
         if (res?.ok) {
             const created = (await res.clone().json().catch(() => null)) as { data?: { id?: string } } | null;
             const newId = created?.data?.id || "";
@@ -447,7 +484,13 @@ export default function StartupBusinessWorkspace() {
     const ensureVentureId = async (): Promise<string> => {
         if (ventureIdRef.current) return ventureIdRef.current;
         if (!creatingRef.current) {
-            creatingRef.current = writeVenture({}).then(() => ventureIdRef.current);
+            creatingRef.current = writeVenture({}).then(
+                () => ventureIdRef.current,
+                () => {
+                    creatingRef.current = null;
+                    return "";
+                },
+            );
         }
         return creatingRef.current;
     };
@@ -580,7 +623,14 @@ export default function StartupBusinessWorkspace() {
             let res: Response | null;
             if (!ventureIdRef.current && !creatingRef.current) {
                 const pending = writeVenture(body);
-                creatingRef.current = pending.then(() => ventureIdRef.current);
+                // A failed create resolves to "" (and is cleared) so the next save simply tries again.
+                creatingRef.current = pending.then(
+                    () => ventureIdRef.current,
+                    () => {
+                        creatingRef.current = null;
+                        return "";
+                    },
+                );
                 res = await pending;
             } else {
                 res = await writeVenture(body);
@@ -604,6 +654,7 @@ export default function StartupBusinessWorkspace() {
             if (!result?.data) throw new Error("Could not save your progress — unexpected response.");
             setEntry((e) => mergeEntry(e, result.data as Partial<VentureEntry>));
             if (advanceTo !== undefined) setStep(Math.min(V13_LAST_STEP, advanceTo));
+            loadAllVentures();
             return true;
         } catch (err) {
             const message = err instanceof Error ? err.message : "Could not save your progress";
@@ -645,11 +696,17 @@ export default function StartupBusinessWorkspace() {
             const publicUrl = await uploadFileViaPresign("/api/v1/paths/evidence/presign", file);
             const ventureId = await ensureVentureId();
             if (!ventureId) throw new Error("Could not start this venture. Save the form once, then upload again.");
-            const res = await authenticatedFetch(
-                `/api/v1/paths/startup-ventures/${encodeURIComponent(ventureId)}/documents`,
-                { method: "POST", body: JSON.stringify({ type, fileUrl: publicUrl }) },
-                { redirectToLogin: true },
-            );
+            const docBody = JSON.stringify({ type, fileUrl: publicUrl });
+            const postLegacyDoc = () => authenticatedFetch(`${LEGACY_VENTURE_URL}/documents`, { method: "POST", body: docBody }, { redirectToLogin: true });
+            let res = legacyApiRef.current
+                ? await postLegacyDoc()
+                : await authenticatedFetch(`${ventureUrl(ventureId)}/documents`, { method: "POST", body: docBody }, { redirectToLogin: true });
+            if (!legacyApiRef.current && (await isMissingRoute(res))) {
+                const legacy = await fetchLegacyVenture();
+                if (legacy?.id !== ventureId) throw new Error("Upload failed — please refresh the page and try again.");
+                legacyApiRef.current = true;
+                res = await postLegacyDoc();
+            }
             if (!res?.ok) {
                 const body = res ? ((await res.json().catch(() => null)) as { message?: unknown } | null) : null;
                 throw new Error(typeof body?.message === "string" ? body.message : "Upload failed. Try again.");
@@ -677,6 +734,33 @@ export default function StartupBusinessWorkspace() {
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step]);
+
+    const saveDraft = async () => {
+        if (await save(saveAllFields())) toast.success("Draft saved.");
+    };
+    const [withdrawing, setWithdrawing] = useState(false);
+    const withdrawSubmission = async () => {
+        if (!entry.id || withdrawing) return;
+        if (!window.confirm("Withdraw this venture from your faculty's review queue? It goes back to Drafts so you can edit and submit again.")) return;
+        setWithdrawing(true);
+        try {
+            const res = await authenticatedFetch(`${ventureUrl(entry.id)}/withdraw`, { method: "POST", body: "{}" }, { redirectToLogin: true });
+            if (await isMissingRoute(res)) {
+                toast.error(SERVER_UPDATE_NEEDED);
+                return;
+            }
+            const json = res ? ((await res.json().catch(() => null)) as { message?: unknown; data?: Partial<VentureEntry> } | null) : null;
+            if (!res?.ok || !json?.data) {
+                toast.error(typeof json?.message === "string" ? json.message : "Could not withdraw this venture.");
+                return;
+            }
+            setEntry((e) => mergeEntry(e, json.data as Partial<VentureEntry>));
+            loadAllVentures();
+            toast.success("Withdrawn — back in Drafts. Edit and submit again when ready.");
+        } finally {
+            setWithdrawing(false);
+        }
+    };
 
     const goNext = async (to: number) => {
         await save(saveAllFields(), to);
@@ -726,12 +810,12 @@ export default function StartupBusinessWorkspace() {
         return n || "";
     })();
     const hasDraft = !!(entry.ventureName || (entry.stepCompleted ?? 0) > 0 || entry.status === "submitted");
-    const sup = entry.reviewPipeline?.supervisorStatus;
-    const heroStats = [
-        { value: String(entry.status === "submitted" && sup === "approved" ? 1 : 0), label: "APPROVED", href: "/dashboard/student/paths/startup-business?view=wall" },
-        { value: String(entry.status === "submitted" && (!sup || sup === "pending") ? 1 : 0), label: "UNDER REVIEW", href: "/dashboard/student/paths/startup-business?view=under-review" },
-        { value: String((entry.status !== "submitted" || sup === "revisions_requested") && hasDraft ? 1 : 0), label: "IN PROGRESS", href: "/dashboard/student/paths/startup-business?view=in-progress" },
-    ];
+    // Same tabs as the Startup hub, counted over every venture (this one with its unsaved edits).
+    const heroStats = (() => {
+        const isRecord = (v: VentureEntry) => !!(v.ventureName || (v.stepCompleted ?? 0) > 0 || v.status === "submitted");
+        const others = (allVentures ?? []).filter((v) => v.id !== entry.id);
+        return ventureBucketStats([...others, entry].filter(isRecord));
+    })();
     const createTitle = isRevision
         ? `🚀 Revise venture — ${entry.ventureName || "Untitled venture"}`
         : hasDraft
@@ -739,7 +823,7 @@ export default function StartupBusinessWorkspace() {
             : "🚀 Create Startup Record";
     const createSub = hasDraft
         ? `${workspaceVentureId(entry)} · every change auto-saves to your Startup Workspace and updates the completion bar your faculty, university and CIEL PK see.`
-        : "Saving your first fields issues a Venture ID and creates one master record shared with your team, faculty, university and CIEL PK — never duplicated. Investor-track consent (Step 8) is recorded with a date and version.";
+        : "Saving your first fields issues a new Venture ID. Each venture keeps one master record shared with your team, faculty, university and CIEL PK. Investor-track consent (Step 8) is recorded with a date and version.";
 
     if (loading) return <WorkspaceSkeleton />;
     const gates = entry.gates || { academicOk: false, showcaseOk: false, investmentReadyOk: false };
@@ -779,9 +863,19 @@ export default function StartupBusinessWorkspace() {
                         <p className="rounded-[13px] border border-[#f2dfa6] bg-[#fff3dc] px-3 py-2 text-xs leading-relaxed text-[#805b13]">📝 Faculty note: “{entry.reviewPipeline.supervisorNote}”</p>
                     )}
                     <div className="flex flex-wrap gap-2 pt-2">
-                        <Link href="/dashboard/student/paths/startup-business?view=record" className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">
+                        <Link href={`/dashboard/student/paths/startup-business?view=record${entry.id ? `&id=${encodeURIComponent(entry.id)}` : ""}`} className="rounded-[10px] bg-[#0f8f8a] px-3 py-1.5 text-[12.5px] font-bold text-white">
                             View Venture Card
                         </Link>
+                        {isOwner && canWithdrawVenture(entry) ? (
+                            <button
+                                type="button"
+                                disabled={withdrawing}
+                                onClick={() => void withdrawSubmission()}
+                                className="rounded-[10px] border border-[#f1c27d] bg-white px-3 py-1.5 text-[12.5px] font-bold text-[#a8630b] disabled:opacity-60"
+                            >
+                                {withdrawing ? "Withdrawing…" : "↩ Withdraw to edit"}
+                            </button>
+                        ) : null}
                         <Link href="/dashboard/student/paths/startup-business" className="rounded-[10px] bg-[#eef3f6] px-3 py-1.5 text-[12.5px] font-bold text-[#0b4b57]">
                             ← Back to Startup / Venture
                         </Link>
@@ -810,13 +904,16 @@ export default function StartupBusinessWorkspace() {
                     <span className="inline-flex items-center rounded-full bg-[#eef3f6] px-2.5 py-1 text-[12px] font-bold text-[#0b4b57]">
                         {pct}% · {formCategory(pct)}
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => router.push("/dashboard/student/paths/startup-business?view=create")}
-                        className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white hover:brightness-105"
-                    >
-                        ＋ Create New Opportunity
-                    </button>
+                    {/* Only once this venture is saved — on a brand-new form it would just reopen the same blank form. */}
+                    {entry.id && isOwner ? (
+                        <button
+                            type="button"
+                            onClick={() => router.push("/dashboard/student/paths/startup-business?view=create")}
+                            className="rounded-xl bg-[#0f8f8a] px-4 py-2.5 text-[13.5px] font-bold text-white hover:brightness-105"
+                        >
+                            ＋ Start another venture
+                        </button>
+                    ) : null}
                 </div>
                 {isRevision && entry.reviewPipeline?.supervisorNote ? (
                     <div className="mb-4 rounded-[14px] border border-[#f5c2be] bg-[#fdecea] px-4 py-3 text-[13.5px] leading-relaxed">
@@ -824,7 +921,7 @@ export default function StartupBusinessWorkspace() {
                     </div>
                 ) : null}
             </div>
-        <div className="mx-auto max-w-[1260px] px-[18px] pt-0 [&_h3.sec]:flex [&_h3.sec]:items-center [&_h3.sec]:gap-2 [&_h3.sec]:rounded-r-[10px] [&_h3.sec]:border-l-4 [&_h3.sec]:border-[#e2cbd7] [&_h3.sec]:bg-[#faf6f8] [&_h3.sec]:px-3 [&_h3.sec]:py-2.5">
+        <div className="mx-auto max-w-[1500px] px-[18px] pt-0 [&_h3.sec]:flex [&_h3.sec]:items-center [&_h3.sec]:gap-2 [&_h3.sec]:rounded-r-[10px] [&_h3.sec]:border-l-4 [&_h3.sec]:border-[#e2cbd7] [&_h3.sec]:bg-[#faf6f8] [&_h3.sec]:px-3 [&_h3.sec]:py-2.5">
             <header className="sticky top-0 z-[40] mb-4 rounded-b-[18px] bg-gradient-to-br from-[#32133a] to-[#5a244f] text-white shadow-[0_8px_24px_rgba(50,19,58,.2)]">
                 <div className="flex items-center gap-3.5 px-[18px] pb-2 pt-2.5">
                     <div className="flex min-w-0 items-center gap-2.5">
@@ -884,7 +981,7 @@ export default function StartupBusinessWorkspace() {
                         </div>
                         <div className="mt-3 rounded-[12px] border border-[#ecd9e3] bg-white px-3.5 py-2.5 text-xs leading-relaxed text-[#5b4a55]"><b>University Venture Repository — Mandatory:</b> this Venture Profile is part of your university record and must be submitted whether the venture is early, average, high-potential, SDG-linked or not. <b>Investor / VC exposure is completely optional</b> and controlled separately by you. <b>Do not guess:</b> leave optional figures blank when they are not yet known — “not known yet” scores better than invented numbers.</div>
                         <div className="mt-3 h-[9px] overflow-hidden rounded-full bg-[#ece7ea]"><span className="block h-full bg-gradient-to-r from-[#a63d65] to-[#d98aa8]" style={{ width: `${pct}%` }} /></div>
-                        <p className="mt-2 text-right text-[10.5px] text-[#8b93a3]">{saving ? "Saving…" : "Draft autosaves in this browser and to your university record."}</p>
+                        <p className="mt-2 text-right text-[10.5px] text-[#8b93a3]">{saving ? "Saving…" : "Your progress is saved when you click Save draft or Next."}</p>
                     </Card>
                     ) : null}
 
@@ -986,7 +1083,7 @@ export default function StartupBusinessWorkspace() {
                                 ))}
                                 <button type="button" className="bg-transparent p-1 text-xs font-black text-[#a63d65]" onClick={() => setEntry((s) => ({ ...s, team: [...(s.team.length ? s.team : []), { name: "", role: "", email: "", whatsappCode: "+92", whatsappNumber: "" }] }))}>+ Add another team member</button>
                                 <VsAiBox title="✨ AI summary building live" text={sums.founder} empty="Your venture identity and team summary will appear here." />
-                                <VsNav hideBack saving={saving} onNext={() => goNext(1)} nextLabel="Next: Problem & customer →" />
+                                <VsNav onSaveDraft={() => void saveDraft()} hideBack saving={saving} onNext={() => goNext(1)} nextLabel="Next: Problem & customer →" />
                             </Card>
                         </>
                     )}
@@ -1042,7 +1139,7 @@ export default function StartupBusinessWorkspace() {
                             <VsField label="Strongest thing a customer said to you (quote)" optional><input className={vsField} maxLength={240} value={idea.customerQuote || ""} onChange={(e) => patchGroup("ideaInfo", { customerQuote: e.target.value })} placeholder='e.g. “If you can deliver 500 boxes a week, I’ll switch tomorrow.”' /></VsField>
                             <VsField label="Evidence they would pay (not just “like it”)" optional term="willingness-to-pay" onTerm={onTerm}><VsSelectOther value={idea.wtpEvidence || ""} options={WTP_EVIDENCE} onChange={(v) => patchGroup("ideaInfo", { wtpEvidence: v })} /></VsField>
                             <VsAiBox title="✨ AI summary building live" text={sums.opportunity} empty="Your problem, customer and evidence summary will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(0)} onNext={() => goNext(2)} nextLabel="Next: Market & competition →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(0)} onNext={() => goNext(2)} nextLabel="Next: Market & competition →" />
                         </Card>
                     )}
 
@@ -1095,7 +1192,7 @@ export default function StartupBusinessWorkspace() {
                             </div>
                             <VsField label="Positioning statement" optional term="positioning" onTerm={onTerm}><input className={vsField} maxLength={260} value={idea.positioning || ""} onChange={(e) => patchGroup("ideaInfo", { positioning: e.target.value })} placeholder="For [customer] who [need], [venture] is a [category] that [key benefit]." /></VsField>
                             <VsAiBox title="✨ AI summary building live" text={sums.opportunity} empty="Your market and competition summary will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(1)} onNext={() => goNext(3)} nextLabel="Next: Solution & product →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(1)} onNext={() => goNext(3)} nextLabel="Next: Solution & product →" />
                         </Card>
                     )}
 
@@ -1157,7 +1254,7 @@ export default function StartupBusinessWorkspace() {
                                 </div></>
                             )}
                             <VsAiBox title="✨ AI summary building live" text={sums.business} empty="Your solution and product summary will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(2)} onNext={() => goNext(4)} nextLabel="Next: Business model & marketing →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(2)} onNext={() => goNext(4)} nextLabel="Next: Business model & marketing →" />
                         </Card>
                     )}
 
@@ -1215,7 +1312,7 @@ export default function StartupBusinessWorkspace() {
                             <VsField label="Key partners needed to deliver (suppliers, logistics, platforms)" optional><input className={vsField} maxLength={240} value={sol.partners || ""} onChange={(e) => patchGroup("solutionInfo", { partners: e.target.value })} placeholder="e.g. bagasse mill (Kasur), TCS for delivery, JazzCash for payments" /></VsField>
                             <VsField label="Your most important 12-month business milestone" tag="core" term="milestone" onTerm={onTerm}><input className={vsField} maxLength={220} value={sol.milestone12mo || ""} onChange={(e) => patchGroup("solutionInfo", { milestone12mo: e.target.value })} placeholder="e.g. 30 paying factories and PKR 600,000 monthly revenue by September" /></VsField>
                             <VsAiBox title="✨ AI summary building live" text={sums.business} empty="Your business model and marketing summary will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(3)} onNext={() => goNext(5)} nextLabel="Next: Finance & budget →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(3)} onNext={() => goNext(5)} nextLabel="Next: Finance & budget →" />
                         </Card>
                     )}
 
@@ -1352,7 +1449,7 @@ export default function StartupBusinessWorkspace() {
                                 </>
                             ) : null}
                             <VsAiBox title="✨ AI summary building live" text={sums.business} empty="Your finance and budget summary will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(4)} onNext={() => goNext(6)} nextLabel="Next: Impact / SDG →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(4)} onNext={() => goNext(6)} nextLabel="Next: Impact / SDG →" />
                         </Card>
                     )}
 
@@ -1421,7 +1518,7 @@ export default function StartupBusinessWorkspace() {
                                 </>
                             )}
                             <VsAiBox title="✨ Sustainability summary" text={sums.impact} empty="Choose one of the three SDG options above." />
-                            <VsNav saving={saving} onBack={() => setStep(5)} onNext={() => goNext(7)} nextLabel="Next: Risk, team health & next step →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(5)} onNext={() => goNext(7)} nextLabel="Next: Risk, team health & next step →" />
                         </Card>
                     )}
 
@@ -1487,7 +1584,7 @@ export default function StartupBusinessWorkspace() {
                                 )}
                             </div>
                             <VsAiBox title="✨ Risk & next-step summary" text={sums.ask} empty="Your risks, team health, support needs and opportunity preference will appear here." />
-                            <VsNav saving={saving} onBack={() => setStep(6)} onNext={() => goNext(8)} nextLabel="Review →" />
+                            <VsNav onSaveDraft={() => void saveDraft()} saving={saving} onBack={() => setStep(6)} onNext={() => goNext(8)} nextLabel="Review →" />
                         </Card>
                     )}
 

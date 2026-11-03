@@ -26,7 +26,14 @@ function StartupBusinessRouter() {
     return (
         <StartupBusinessHub
             view={
-                view === "guide" || view === "wall" || view === "in-progress" || view === "under-review" || view === "record"
+                view === "guide" ||
+                view === "wall" ||
+                view === "in-progress" ||
+                view === "drafts" ||
+                view === "revision" ||
+                view === "rejected" ||
+                view === "under-review" ||
+                view === "record"
                     ? view
                     : "home"
             }

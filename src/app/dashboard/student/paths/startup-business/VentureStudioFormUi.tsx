@@ -315,12 +315,15 @@ export function VsNav({
     nextLabel,
     saving,
     hideBack,
+    onSaveDraft,
 }: {
     onBack?: () => void;
     onNext: () => void;
     nextLabel: string;
     saving?: boolean;
     hideBack?: boolean;
+    /** Saves this step without moving on. */
+    onSaveDraft?: () => void;
 }) {
     return (
         <div className="mt-4 flex items-center justify-between gap-2.5">
@@ -335,6 +338,16 @@ export function VsNav({
                     ← Back
                 </button>
             )}
+            {onSaveDraft ? (
+                <button
+                    type="button"
+                    disabled={saving}
+                    onClick={onSaveDraft}
+                    className="ml-auto rounded-xl border border-[#d6c4cf] bg-white px-4 py-3 text-[13px] font-extrabold text-[#7d2b4d] disabled:opacity-50"
+                >
+                    💾 Save draft
+                </button>
+            ) : null}
             <button
                 type="button"
                 disabled={saving}
