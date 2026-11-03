@@ -912,3 +912,193 @@
     margin: 7px 0;
     letter-spacing: 0;
 }
+
+/* ---- Analyser additions: criterion table, gallery, gate pills, checklist, consolidated feedback ---- */
+.cii-final .crit-table-wrap {
+    margin-top: 14px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.cii-final .crit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+.cii-final .crit-table th,
+.cii-final .crit-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+}
+.cii-final .crit-table th {
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: #f7f9f4;
+}
+.cii-final .crit-table tr:last-child td {
+    border-bottom: 0;
+}
+.cii-final .crit-table td em {
+    color: var(--muted);
+}
+.cii-final .crit-pts {
+    white-space: nowrap;
+    font-weight: 900;
+}
+.cii-final .evidence-gallery {
+    margin-bottom: 18px;
+}
+.cii-final .gate-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.cii-final .gate-pill {
+    font-size: 9.5px;
+    font-weight: 900;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--goldbg);
+    color: var(--gold);
+    border: 1px solid #ead4aa;
+}
+.cii-final .gate-pill.ok {
+    background: var(--greenbg);
+    color: #315f2d;
+    border-color: #d3e7c9;
+}
+.cii-final .gate-cap {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--gold);
+}
+.cii-final .gate-cap.muted {
+    color: var(--muted);
+    font-weight: 600;
+}
+.cii-final .checklist {
+    background: #f7f9f4;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 13px;
+}
+.cii-final .checklist-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.cii-final .checklist-head .optional {
+    display: inline;
+    margin: 0;
+    font-size: 9.5px;
+}
+.cii-final .checklist-row {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    column-gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: #744c10;
+}
+.cii-final .checklist-row.ok {
+    color: var(--ink);
+}
+.cii-final .checklist-mark {
+    font-weight: 900;
+    color: var(--gold);
+}
+.cii-final .checklist-row.ok .checklist-mark {
+    color: var(--green);
+}
+.cii-final .checklist-label {
+    font-weight: 700;
+}
+.cii-final .checklist-detail {
+    grid-column: 2;
+    font-size: 10px;
+    color: var(--muted);
+}
+.cii-final .feedback-wrap {
+    margin-bottom: 18px;
+}
+.cii-final .feedback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.cii-final .feedback-overall {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #f7f9f4;
+    padding: 12px 14px;
+    font-size: 12px;
+    margin-bottom: 12px;
+}
+.cii-final .feedback-overall p {
+    margin: 6px 0 0;
+}
+.cii-final .feedback-scores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 11px;
+    color: var(--muted);
+}
+.cii-final .feedback-scores b {
+    color: var(--ink);
+    margin-left: 4px;
+}
+.cii-final .feedback-entry {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 10px;
+    font-size: 12px;
+    background: #fff;
+    break-inside: avoid;
+}
+.cii-final .feedback-entry p {
+    margin: 6px 0 0;
+}
+.cii-final .feedback-entry-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 12px;
+}
+.cii-final .feedback-entry-head b {
+    font-size: 13px;
+}
+.cii-final .feedback-entry-score {
+    white-space: nowrap;
+    font-size: 15px !important;
+}
+@media (max-width: 850px) {
+    .cii-final .crit-table {
+        font-size: 11px;
+    }
+}
+@media print {
+    body[data-cii-print="feedback"] .cii-final .analyser-work {
+        display: block !important;
+    }
+    body[data-cii-print="feedback"] .cii-final .analyser-work > *:not(.feedback-print),
+    body[data-cii-print="feedback"] .cii-final .onepage,
+    body[data-cii-print="feedback"] .cii-final .feedback-actions {
+        display: none !important;
+    }
+    body[data-cii-print="feedback"] .cii-final .feedback-wrap,
+    body[data-cii-print="feedback"] .cii-final .feedback-entry {
+        border: 1px solid #bbb;
+        box-shadow: none;
+    }
+}

@@ -16,6 +16,19 @@ import {
     type CiiV45Result,
 } from "@/utils/communityCiiAnalyser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import {
+    anchorName,
+    anchorOptionLabel,
+    anchorPoints,
+    badgeCapNote,
+    buildFeedbackSections,
+    feedbackPlainText,
+    finalChecklist,
+    formatPts,
+    gatePills,
+    type AnchorIndex,
+} from "@/utils/ciiAnalyserView";
+import ReportEvidenceGallery from "@/components/ciel/community-service/ReportEvidenceGallery";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/report/impact-package/impactPackagePacket";
 import { CiiFinalOnePageSheet, CII_FINAL_BADGE_SRC, CII_FINAL_LOGO_SRC } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
@@ -536,6 +549,56 @@ export default function CommunityCiiAnalyser({
     const aiSections = (ciiV45?.sectionScores ?? []).filter((s) => s.dimension !== "7");
     const badgeSrc = currentBadge?.numericLevel ? BADGE_SRC[currentBadge.numericLevel] : undefined;
     const analysisByDim = new Map((ciiV45?.sectionAnalyses ?? []).map((row) => [row.dimension, row]));
+    const dim7RatedCount = DIM7.criteria.filter((c) => anchorPoints(c.weight, dim7Anchors[c.key]) != null).length;
+    const gateRow = gatePills(ciiV45);
+    const capNote = badgeCapNote(currentBadge);
+    const checklist = finalChecklist({ result: ciiV45, dim7Complete, packetOk: packet.ok, locked });
+    const feedbackSections = buildFeedbackSections(ciiV45, {
+        anchors: dim7Anchors,
+        comments: dim7Reasons,
+        confirmed: locked || ciiV45?.adminEvidenceAssessment?.status === "ASSESSED",
+    });
+    const feedbackText = feedbackPlainText(
+        {
+            projectTitle,
+            studentName,
+            university,
+            reportId,
+            aiScore: aiPts,
+            evidenceScore: evPts,
+            compositeScore: previewComposite,
+            badgeLabel: badgeLabel(currentBadge),
+            locked,
+            overallSummary: ciiV45?.analysisSummary || "",
+            overallStrengths: ciiV45?.strengths || [],
+            overallPriorities: ciiV45?.developmentPriorities || [],
+            adminComment: note || ciiV45Lock?.adminNote || "",
+        },
+        feedbackSections,
+    );
+    const copyFeedback = async () => {
+        try {
+            await navigator.clipboard.writeText(feedbackText);
+        } catch {
+            const area = document.createElement("textarea");
+            area.value = feedbackText;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+        }
+        toast.success("Feedback copied");
+    };
+    const printFeedback = () => {
+        document.body.setAttribute("data-cii-print", "feedback");
+        const cleanup = () => {
+            document.body.removeAttribute("data-cii-print");
+            window.removeEventListener("afterprint", cleanup);
+        };
+        window.addEventListener("afterprint", cleanup);
+        window.print();
+        window.setTimeout(cleanup, 2000);
+    };
     const packetFlashLabel = flashOk ? "Read" : "Waiting";
     const packetDetailLabel = detailOk ? `${packet.content_sections}/9` : "HOLD";
     const packetInventoryLabel = `${evidenceFiles.length}`;
@@ -751,15 +814,35 @@ export default function CommunityCiiAnalyser({
                                                 </ul>
                                             </div>
                                         </div>
-                                        <div style={{ marginTop: 12, fontSize: 11.5, color: "#61716c" }}>
-                                            {section.criterionScores.map((criterion) => (
-                                                <div key={criterion.criterion} style={{ marginTop: 6 }}>
-                                                    <strong>{criterionLabel(section.dimension, criterion.criterion)}</strong>
-                                                    {" · "}
-                                                    {criterion.anchor === "P" ? "Pending" : `${criterion.anchor}/4`}
-                                                    {criterion.reasoningSummary ? ` — ${criterion.reasoningSummary}` : ""}
-                                                </div>
-                                            ))}
+                                        <div className="crit-table-wrap">
+                                            <table className="crit-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Locked criterion</th>
+                                                        <th>Anchor</th>
+                                                        <th>Marks</th>
+                                                        <th>AI reasoning</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {section.criterionScores.map((criterion) => {
+                                                        const weight = criterion.maximumPoints || 0;
+                                                        const pts = typeof criterion.score === "number" ? criterion.score : anchorPoints(weight, criterion.anchor);
+                                                        return (
+                                                            <tr key={criterion.criterion}>
+                                                                <td>
+                                                                    <strong>{criterionLabel(section.dimension, criterion.criterion)}</strong>
+                                                                </td>
+                                                                <td>{criterion.anchor === "P" ? "Pending" : `${criterion.anchor} · ${anchorName(criterion.anchor)}`}</td>
+                                                                <td className="crit-pts">
+                                                                    {formatPts(pts)} / {weight}
+                                                                </td>
+                                                                <td>{criterion.reasoningSummary?.trim() ? criterion.reasoningSummary : <em>No reasoning supplied by the AI</em>}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </article>
@@ -797,33 +880,11 @@ export default function CommunityCiiAnalyser({
                             </div>
                         </div>
 
-                        <div className="evidence-grid">
-                            {evidenceFiles.length ? (
-                                evidenceFiles.map((file) => (
-                                    <div key={file.id} className="file-card">
-                                        <div className="top">
-                                            <b>{file.name}</b>
-                                            <span className="pill">{file.visibility}</span>
-                                        </div>
-                                        <div className="admin-full">CIEL PK ADMIN ACCESS · FULL</div>
-                                        <p>
-                                            {file.section} · {file.claim}
-                                        </p>
-                                        <div className="actions">
-                                            {file.url ? (
-                                                <a className="secondary" href={file.url} target="_blank" rel="noreferrer">
-                                                    View original
-                                                </a>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="file-card">
-                                    <b>No evidence files listed</b>
-                                    <p>The inventory is empty. Admin can still complete the seven evidence marks from the written report.</p>
-                                </div>
-                            )}
+                        <div className="evidence-gallery">
+                            <ReportEvidenceGallery
+                                files={evidenceFiles.map((file) => ({ url: file.url, name: file.name, meta: `${file.section} · ${file.visibility}` }))}
+                                emptyLabel="No evidence files listed. Admin can still complete the seven evidence marks from the written report."
+                            />
                         </div>
 
                         <div className={`evidence-form${locked || readOnly ? " locked-form" : ""}`}>
@@ -844,7 +905,7 @@ export default function CommunityCiiAnalyser({
                                             <option value="">Select mark level</option>
                                             {CII_V45_ANCHOR_NAMES.map((name, i) => (
                                                 <option key={name} value={String(i)}>
-                                                    {i} · {name}
+                                                    {anchorOptionLabel(c.weight, i as AnchorIndex)}
                                                 </option>
                                             ))}
                                         </select>
@@ -869,13 +930,88 @@ export default function CommunityCiiAnalyser({
                         <div className="evidence-total">
                             <div>
                                 <strong>Evidence Score</strong>
-                                <div className="optional">Complete all seven marks. Comments remain optional.</div>
+                                <div className="optional">
+                                    {dim7RatedCount} of 7 rated · {formatPts(dim7PreviewPts)} / 15 so far. Complete all seven marks; comments remain optional.
+                                </div>
                             </div>
                             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                <strong>{dim7Complete ? `${dim7PreviewPts.toFixed(2)} / 15` : "Pending / 15"}</strong>
+                                <strong>{dim7Complete ? `${dim7PreviewPts.toFixed(2)} / 15` : `${dim7RatedCount} / 7 rated`}</strong>
                                 <a className="secondary" href="#approvalAnchor">
                                     Continue
                                 </a>
+                            </div>
+                        </div>
+
+                        <div className="feedback-print">
+                            <div className="section-title">
+                                <div>
+                                    <div className="eyebrow">FINAL FEEDBACK</div>
+                                    <h2>Consolidated ten-section feedback</h2>
+                                </div>
+                                <p>Strengths, limitations and a recommendation for every dimension, in rubric order. Dimension 7 reflects the Admin evidence ratings above. Copy or print it for the review file.</p>
+                            </div>
+                            <div className="card feedback-wrap">
+                                <div className="feedback-actions">
+                                    <button type="button" className="secondary" onClick={() => void copyFeedback()}>
+                                        Copy feedback
+                                    </button>
+                                    <button type="button" className="secondary" onClick={printFeedback}>
+                                        Print feedback
+                                    </button>
+                                </div>
+                                <div className="feedback-overall">
+                                    <div className="feedback-scores">
+                                        <span>
+                                            AI <b>{formatPts(aiPts)} / 85</b>
+                                        </span>
+                                        <span>
+                                            Evidence <b>{formatPts(evPts)} / 15</b>
+                                        </span>
+                                        <span>
+                                            Composite CII <b>{formatPts(previewComposite)} / 100</b>
+                                        </span>
+                                        <span>
+                                            Badge <b>{badgeLabel(currentBadge)}</b>
+                                        </span>
+                                    </div>
+                                    <p>{ciiV45.analysisSummary || "Overall analysis not supplied by the AI."}</p>
+                                    <p>
+                                        <strong>Overall strengths:</strong> {(ciiV45.strengths || []).join("; ") || "Not supplied"}
+                                    </p>
+                                    <p>
+                                        <strong>Development priorities:</strong> {(ciiV45.developmentPriorities || []).join("; ") || "Not supplied"}
+                                    </p>
+                                </div>
+                                {feedbackSections.map((fs, i) => (
+                                    <article key={fs.dimension} className="feedback-entry">
+                                        <div className="feedback-entry-head">
+                                            <div>
+                                                <div className="eyebrow">
+                                                    SECTION {i + 1} · D{fs.dimension}
+                                                </div>
+                                                <b>{fs.name}</b>
+                                            </div>
+                                            <b className="feedback-entry-score">
+                                                {formatPts(fs.score)} / {fs.max}
+                                            </b>
+                                        </div>
+                                        <p>{fs.summary}</p>
+                                        <p>
+                                            <strong>Strengths:</strong> {fs.strengths.join("; ") || "Not specified"}
+                                        </p>
+                                        <p>
+                                            <strong>Limitations:</strong> {fs.limitations.join("; ") || "Not specified"}
+                                        </p>
+                                        {fs.evidenceNotes.length ? (
+                                            <p>
+                                                <strong>Evidence ratings:</strong> {fs.evidenceNotes.join("; ")}
+                                            </p>
+                                        ) : null}
+                                        <p>
+                                            <strong>Recommendation:</strong> {fs.recommendation}
+                                        </p>
+                                    </article>
+                                ))}
                             </div>
                         </div>
 
@@ -917,6 +1053,28 @@ export default function CommunityCiiAnalyser({
                                     <h3>{currentBadge?.name || "Badge will appear here"}</h3>
                                     <div className="final-status">The backend-approved CII is the authoritative score. The client preview cannot override it.</div>
                                 </div>
+                            </div>
+                            <div className="full gate-row">
+                                {gateRow.map((g) => (
+                                    <span key={g.code} className={`gate-pill${g.passed ? " ok" : ""}`} title={g.note}>
+                                        {g.code} gate · {g.passed ? "passed" : "not met"}
+                                    </span>
+                                ))}
+                                {capNote ? <span className="gate-cap">{capNote}</span> : null}
+                                {!capNote && currentBadge ? <span className="gate-cap muted">Badge level matches the score band</span> : null}
+                            </div>
+                            <div className="full checklist">
+                                <div className="checklist-head">
+                                    <strong>Readiness check</strong>
+                                    <span className="optional">Display only — it does not block Approve. Flagged items are published as warnings, as today.</span>
+                                </div>
+                                {checklist.map((item) => (
+                                    <div key={item.label} className={`checklist-row${item.ok ? " ok" : ""}`}>
+                                        <span className="checklist-mark">{item.ok ? "✓" : "•"}</span>
+                                        <span className="checklist-label">{item.label}</span>
+                                        <span className="checklist-detail">{item.detail}</span>
+                                    </div>
+                                ))}
                             </div>
                             <div className="full">
                                 <label>
