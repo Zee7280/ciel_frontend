@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Download, Loader2, Search, X } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Search, Trash2, X } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { downloadCsv } from "../_shared/csv";
 import {
@@ -60,6 +60,101 @@ function daysSince(iso: string | null): number | null {
 const dateTime = (iso: string | null) =>
     iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
+/** The log a delete confirmation is about; hours / people are only used to word the approved-log warning. */
+type DeleteTarget = { id: string; title: string; status: QuickWorkStatus; participants: number; minutes: number };
+
+/**
+ * Confirm deleting a log. Any status can go, but an APPROVED log takes its credited hours and issued
+ * certificates with it, so that case needs an explicit tick before the button works.
+ */
+function DeleteLogDialog({ target, onClose, onDeleted }: { target: DeleteTarget; onClose: () => void; onDeleted: (title: string) => void }) {
+    const [needsTick, setNeedsTick] = useState(target.status === "approved");
+    const [ticked, setTicked] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string[]>([]);
+    const title = target.title || "Untitled activity";
+
+    const confirm = async () => {
+        setBusy(true);
+        setError([]);
+        try {
+            await quickWorkApi.adminDelete(target.id, needsTick && ticked);
+            onDeleted(title);
+        } catch (e) {
+            const msgs = apiMessages(e);
+            if (msgs.some((m) => /^Cannot DELETE\b/i.test(m))) {
+                setError(["Deleting logs needs the latest CIEL PK server update, which is not live yet. Nothing was deleted."]);
+            } else {
+                // The log was approved after the list loaded: ask for the stronger confirmation.
+                if (msgs.some((m) => /is approved/i.test(m))) setNeedsTick(true);
+                setError(msgs);
+            }
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <QuickWorkModal labelledBy="qwAdminDeleteTitle" onClose={busy ? () => undefined : onClose}>
+            <header className="mb-3 flex items-start justify-between gap-4">
+                <h2 id="qwAdminDeleteTitle" className="text-lg font-bold text-slate-900">
+                    Delete this log?
+                </h2>
+                <button type="button" aria-label="Close" onClick={onClose} disabled={busy} className="text-slate-400 hover:text-slate-600 disabled:opacity-50">
+                    <X className="h-6 w-6" />
+                </button>
+            </header>
+            <p className="text-sm text-slate-700">
+                <b className="break-words">{title}</b> and its {target.participants} participant record{target.participants === 1 ? "" : "s"} will be permanently
+                removed. This cannot be undone.
+            </p>
+            {needsTick ? (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                    <p className="font-bold">This log is approved.</p>
+                    <p className="mt-1">
+                        Deleting it takes back the hours already credited to its participants{target.minutes > 0 ? ` (${formatHours(target.minutes)} in total)` : ""}, and
+                        the certificate IDs issued for it will stop verifying.
+                    </p>
+                    <label className="mt-3 flex items-start gap-2.5">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
+                        <span className="font-semibold">I understand and want to delete this approved log.</span>
+                    </label>
+                </div>
+            ) : (
+                <p className="mt-3 text-xs text-slate-500">No hours have been credited for this log, so no student’s total changes.</p>
+            )}
+            {error.length ? (
+                <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <ul className="list-disc pl-4">
+                        {error.map((x) => (
+                            <li key={x}>{x}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={busy}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={() => void confirm()}
+                    disabled={busy || (needsTick && !ticked)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Delete log
+                </button>
+            </div>
+        </QuickWorkModal>
+    );
+}
+
 /** CIEL PK admin oversight of Quick Community Work: every log, stuck reviews, faculty reassignment and export. */
 export default function AdminQuickWorkPage() {
     const [filters, setFilters] = useState<AdminQuickWorkFilters>({ status: "", page: 1, limit: PAGE_SIZE });
@@ -69,6 +164,7 @@ export default function AdminQuickWorkPage() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
     const [openId, setOpenId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
     const load = useCallback(async (f: AdminQuickWorkFilters) => {
         setLoading(true);
@@ -85,6 +181,15 @@ export default function AdminQuickWorkPage() {
     useEffect(() => {
         void load(filters);
     }, [filters, load]);
+
+    const afterDelete = (title: string) => {
+        toast.success(`Deleted “${title}”.`);
+        setDeleteTarget(null);
+        setOpenId(null);
+        // Deleting the last row of a later page would leave an empty page: step back one.
+        if (list && list.rows.length === 1 && (filters.page ?? 1) > 1) setFilters((f) => ({ ...f, page: (f.page ?? 1) - 1 }));
+        else void load(filters);
+    };
 
     const applyText = (e: React.FormEvent) => {
         e.preventDefault();
@@ -286,12 +391,15 @@ export default function AdminQuickWorkPage() {
                                 <th className="px-4 py-3 text-right">Hours</th>
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3">Submitted</th>
+                                <th className="px-4 py-3 text-right">
+                                    <span className="sr-only">Actions</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading && !list ? (
                                 <tr>
-                                    <td colSpan={7} className="py-16 text-center">
+                                    <td colSpan={8} className="py-16 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin text-blue-600" />
                                     </td>
                                 </tr>
@@ -352,12 +460,27 @@ export default function AdminQuickWorkPage() {
                                                 ) : null}
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{r.submittedAt ? shortDate(r.submittedAt.slice(0, 10)) : "—"}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    title="Delete this log"
+                                                    aria-label={`Delete ${r.title || "untitled activity"}`}
+                                                    onClick={(e) => {
+                                                        // The row opens the detail; the delete button must not.
+                                                        e.stopPropagation();
+                                                        setDeleteTarget({ id: r.id, title: r.title, status: r.status, participants: r.participantCount, minutes: r.minutes });
+                                                    }}
+                                                    className="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500"
+                                                >
+                                                    <Trash2 className="h-4 w-4" aria-hidden />
+                                                </button>
+                                            </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
+                                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-500">
                                         No Quick Community Impact logs match these filters.
                                     </td>
                                 </tr>
@@ -381,10 +504,13 @@ export default function AdminQuickWorkPage() {
             {openId ? (
                 <LogDetail
                     id={openId}
-                    onClose={() => setOpenId(null)}
+                    // While the delete confirmation is open, Esc / backdrop must close only that.
+                    onClose={() => (deleteTarget ? undefined : setOpenId(null))}
                     onChanged={() => void load(filters)}
+                    onDelete={setDeleteTarget}
                 />
             ) : null}
+            {deleteTarget ? <DeleteLogDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={afterDelete} /> : null}
         </div>
     );
 }
@@ -399,7 +525,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "am
     );
 }
 
-function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+function LogDetail({ id, onClose, onChanged, onDelete }: { id: string; onClose: () => void; onChanged: () => void; onDelete: (t: DeleteTarget) => void }) {
     const [log, setLog] = useState<AdminQuickWorkDetail | null>(null);
     const [error, setError] = useState<string[]>([]);
     const [busy, setBusy] = useState<string | null>(null);
@@ -680,6 +806,30 @@ function LogDetail({ id, onClose, onChanged }: { id: string; onClose: () => void
                             </div>
                         </div>
                     ) : null}
+
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                        <p className="max-w-md text-xs text-slate-500">
+                            Remove this log for clean-up (a test entry, a duplicate or a wrong submission).
+                            {log.status === "approved" ? " It is approved, so its credited hours and certificates would be removed too." : ""}
+                        </p>
+                        <button
+                            type="button"
+                            disabled={busy != null}
+                            onClick={() =>
+                                onDelete({
+                                    id: log.id,
+                                    title: log.title,
+                                    status: log.status,
+                                    participants: log.participants.length,
+                                    minutes: log.participants.reduce((sum, p) => sum + (p.present ? p.minutes || 0 : 0), 0),
+                                })
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                            Delete log
+                        </button>
+                    </div>
                 </>
             )}
         </QuickWorkModal>

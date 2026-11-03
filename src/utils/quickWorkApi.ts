@@ -64,6 +64,17 @@ export type AdminQuickWorkDetail = QuickWorkLog & {
     history: { action: string; at: string; byUserId: string; note?: string; byName: string | null; byRole: string | null }[];
 };
 
+/** What the admin delete removed (the log, its participants, any credited hours and certificates). */
+export type AdminQuickWorkDeleted = {
+    id: string;
+    title: string;
+    status: QuickWorkStatus;
+    participants: number;
+    creditedParticipants: number;
+    creditedMinutes: number;
+    certificates: number;
+};
+
 export type AdminQuickWorkExportRow = {
     logId: string;
     title: string;
@@ -147,6 +158,9 @@ export const quickWorkApi = {
         call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/faculty`, { method: "PATCH", body: JSON.stringify(body) }),
     adminReview: (id: string, body: QuickWorkReviewBody) =>
         call<AdminQuickWorkDetail>(`/admin/quick-work/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(body) }),
+    /** Delete a log of any status. An approved log (credited hours, issued certificates) needs `confirmApproved`. */
+    adminDelete: (id: string, confirmApproved = false) =>
+        call<AdminQuickWorkDeleted>(`/admin/quick-work/${encodeURIComponent(id)}${confirmApproved ? "?confirmApproved=true" : ""}`, { method: "DELETE" }),
 };
 
 /** Browsers cap a keepalive request body at 64 KB; a larger draft relies on autosave and the leave warning. */
