@@ -1334,3 +1334,62 @@
 }
 
 } /* @layer components */
+
+/* Venue strip: where the project happens + a Google Maps button. */
+.co-flash-where {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 0;
+    padding: 12px 16px;
+    border: 1px solid #d6e7e3;
+    border-radius: 14px;
+    background: #f4fbf9;
+}
+.co-flash-where-ico {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: #fff;
+    font-size: 18px;
+    box-shadow: 0 1px 4px rgba(15, 42, 48, 0.08);
+}
+.co-flash-where-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.co-flash-where-copy small {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5d7278;
+}
+.co-flash-where-copy b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: #16313d;
+}
+.co-flash-where-btn {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: #0e7d74;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.co-flash-where-btn:hover { background: #0c6b64; }
+@media (max-width: 560px) {
+    .co-flash-where { flex-wrap: wrap; }
+    .co-flash-where-btn { width: 100%; text-align: center; }
+}

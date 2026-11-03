@@ -10,6 +10,7 @@ import {
 import "@/components/opportunities/create-opportunity.css";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { whatsappDigits } from "@/utils/reminderLinks";
+import { resolveOpportunityMap } from "@/utils/opportunityMapLink";
 import { flowSteps } from "./opportunityFlashcardSteps";
 
 function flashOrgLabel(value: unknown): string {
@@ -61,6 +62,12 @@ export type StudentFlashcardModel = {
     facultyEmail: string;
     host: string;
     partnerEmail: string;
+    /** Partner / NGO organisation WhatsApp — present only when the API returned it for this viewer. */
+    partnerWhatsapp?: string;
+    /** Google Maps link for the venue (creator's link, else pin, else venue + city search). */
+    mapUrl?: string;
+    /** "Venue, City" shown next to the map button. */
+    mapPlace?: string;
     verification: string;
     scopeLabel: string;
     scopeDetail: string;
@@ -200,9 +207,21 @@ export function buildOpportunityRecordFlashcard(
     const sdgInfo = asRecord(raw.sdg_info);
     const secondary = Array.isArray(raw.secondary_sdgs) ? asRecord(raw.secondary_sdgs[0]) : {};
     const types = Array.isArray(raw.types) ? raw.types.map((t) => String(t)).filter(Boolean) : [];
+    // `partner_contact` is the creating organisation's own email / WhatsApp; the API sends it only
+    // to signed-in viewers of a partner-created opportunity.
+    const partnerContact = asRecord(raw.partner_contact);
+    const hasPartnerContact = Boolean(pickStr(partnerContact.email, partnerContact.whatsapp));
     const host = flashHost(
-        pickStr(people?.partnerOrg, supervision.partner_org_name, supervision.external_partner_org_name),
+        pickStr(
+            people?.partnerOrg,
+            partnerContact.organization_name,
+            supervision.partner_org_name,
+            supervision.external_partner_org_name,
+            // The API shared an organisation contact but no organisation name — keep the contact visible.
+            hasPartnerContact ? "Partner organisation" : "",
+        ),
     );
+    const map = resolveOpportunityMap(raw.location, raw.mode);
     return {
         title: pickStr(raw.title),
         hook: pickStr(objectives.hook, objectives.summary),
@@ -239,7 +258,15 @@ export function buildOpportunityRecordFlashcard(
         facultyName: pickStr(people?.facultyName, supervision.supervisor_name),
         facultyEmail: pickStr(people?.facultyEmail, supervision.contact),
         host,
-        partnerEmail: pickStr(people?.partnerEmail, supervision.partner_email, supervision.external_partner_email),
+        partnerEmail: pickStr(
+            people?.partnerEmail,
+            partnerContact.email,
+            supervision.partner_email,
+            supervision.external_partner_email,
+        ),
+        partnerWhatsapp: pickStr(partnerContact.whatsapp),
+        mapUrl: map?.url || "",
+        mapPlace: map?.place || "",
         verification: listText(raw.verification_method) || "Photos / attendance / reflection",
         scopeLabel: pickStr(raw.visibility) === "public" ? "Open application" : "Scoped application",
         scopeDetail: "Apply Now follows the scope set when this opportunity was created.",
@@ -404,6 +431,16 @@ export function StudentOpportunityFlashcard({
               `Hi${creatorFirstName && creatorFirstName !== "You" ? ` ${creatorFirstName}` : ""}, I am contacting you about "${String(model.title || "").trim() || "your opportunity"}" on CIEL PK.`,
           )}`
         : "";
+    const partnerEmail = String(model.partnerEmail || "").trim();
+    const partnerWa = whatsappDigits(model.partnerWhatsapp);
+    const hasHost = host !== "No external partner" && host !== "Partner";
+    const partnerWaHref = partnerWa
+        ? `https://wa.me/${partnerWa}?text=${encodeURIComponent(
+              `Hi, I am contacting you about "${String(model.title || "").trim() || "your opportunity"}" on CIEL PK.`,
+          )}`
+        : "";
+    const mapUrl = String(model.mapUrl || "").trim();
+    const mapPlace = String(model.mapPlace || "").trim() || String(model.city || "").trim();
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
     const hook = String(model.hook || "").trim() || "A practical opportunity to contribute, learn and build verified community impact.";
     const canApply = flashcardCanApply(model);
@@ -521,6 +558,20 @@ export function StudentOpportunityFlashcard({
                     <em>{esc(model.beneficiaryType)}</em>
                 </div>
             </div>
+            {mapUrl ? (
+                <section className="co-flash-where" aria-label="Venue">
+                    <span className="co-flash-where-ico" aria-hidden>
+                        📍
+                    </span>
+                    <div className="co-flash-where-copy">
+                        <small>Where</small>
+                        <b title={mapPlace}>{esc(mapPlace || "Venue on the map")}</b>
+                    </div>
+                    <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="co-flash-where-btn">
+                        Open in Google Maps
+                    </a>
+                </section>
+            ) : null}
             <div className="co-flash-duo">
                 <section className="co-flash-need">
                     <span className="co-flash-tag">The need & the plan</span>
@@ -684,7 +735,28 @@ export function StudentOpportunityFlashcard({
                         <div className="co-flash-chain-item">
                             <small>Host</small>
                             <b>{esc(host)}</b>
-                            <em>{host !== "No external partner" && host !== "Partner" ? esc(model.partnerEmail) : "No partner on this card"}</em>
+                            {hasHost && (partnerEmail || partnerWaHref) ? (
+                                <span className="co-flash-contact">
+                                    {partnerEmail ? (
+                                        <a href={`mailto:${partnerEmail}`} title="Email the organisation">
+                                            {partnerEmail}
+                                        </a>
+                                    ) : null}
+                                    {partnerWaHref ? (
+                                        <a
+                                            href={partnerWaHref}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="co-flash-contact-wa"
+                                            title="WhatsApp the organisation"
+                                        >
+                                            WhatsApp
+                                        </a>
+                                    ) : null}
+                                </span>
+                            ) : (
+                                <em>{hasHost ? "Contact not shared" : "No partner on this card"}</em>
+                            )}
                         </div>
                         <div className="co-flash-chain-item">
                             <small>CIEL PK</small>
@@ -717,7 +789,7 @@ export function StudentOpportunityFlashcard({
             {note ? <p className="co-flash-note">{note}</p> : null}
             <footer className="co-flash-foot">
                 <span>CIEL PK</span>
-                <span>{creatorWaHref || creatorEmail ? "Reach the creator through the links in Accountability" : "Phone numbers stay off this card"}</span>
+                <span>{creatorWaHref || creatorEmail || partnerWaHref || partnerEmail ? "Reach the team through the links in Accountability" : "Phone numbers stay off this card"}</span>
             </footer>
         </article>
     );
