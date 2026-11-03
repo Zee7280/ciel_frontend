@@ -38,13 +38,98 @@ const HUB_VIEW_LABEL: Record<string, string> = {
     record: "Venture Card",
 };
 
-const LOOP_STEPS = [
-    "Create → fill the 6 sections (auto-saved as a draft in your Startup Workspace; your faculty and university see your progress live).",
-    "Reach 100% → Submit. Your record locks, a Venture Card (flashcard) is generated and it moves to Ventures Under Review. Separately, CIEL AI prepares an analysis report for your faculty, university and CIEL PK only — it is not shown to you or to investors.",
-    "Faculty accepts, requests revision (it comes back to your workspace — fix and resubmit) or rejects (record kept, never published).",
-    "Accepted ventures publish to every Ventures Impact Wall. Only if you gave investor-track consent does the card also appear in the CIEL Investor Hub — verified investors see a curated card, and any introduction needs CIEL PK screening and your acceptance before contact is shared. You can withdraw consent at any time.",
-    "You receive your faculty score and remarks. Rankings from faculty / university / CIEL PK graders appear as badges on your card.",
+const LOOP_STEPS: { emoji: string; title: string; body: string }[] = [
+    {
+        emoji: "✍️",
+        title: "Create and fill your venture",
+        body: "Open the Venture Studio form and work through its nine steps. Your progress is saved when you click Save draft or Next, and your faculty and university can follow it in their dashboards.",
+    },
+    {
+        emoji: "📤",
+        title: "Submit at 100%",
+        body: "Your record locks, a Venture Card is generated and it moves to Ventures Under Review. CIEL AI also prepares an analysis report for your faculty, university and CIEL PK only — it is not shown to you or to investors. Until faculty decides, you can withdraw it to edit.",
+    },
+    {
+        emoji: "🧑‍🏫",
+        title: "Faculty decides",
+        body: "Faculty accepts, requests a revision (it comes back to your workspace — fix it and resubmit) or rejects it (the record is kept but never published).",
+    },
+    {
+        emoji: "🏅",
+        title: "Published to the Impact Walls",
+        body: "Accepted ventures appear on every Ventures Impact Wall. Only if you gave investor-track consent does the card also appear in the CIEL Investor Hub — verified investors see a curated card, and any introduction needs CIEL PK screening and your acceptance before contact is shared. You can withdraw consent at any time.",
+    },
+    {
+        emoji: "⭐",
+        title: "Score, remarks and badges",
+        body: "You receive your faculty score and remarks. Rankings from faculty, university and CIEL PK graders appear as badges on your card.",
+    },
 ];
+
+function VentureGuideModal({ onClose }: { onClose: () => void }) {
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            window.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prev;
+        };
+    }, [onClose]);
+    return (
+        <div
+            className="fixed inset-0 z-[90] flex items-end justify-center bg-[rgba(8,20,28,.55)] p-0 sm:items-center sm:p-5"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="venture-guide-title"
+            onClick={onClose}
+        >
+            <div
+                className="flex max-h-[92vh] w-full max-w-[680px] flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_24px_60px_rgba(8,20,28,.25)] sm:rounded-[22px]"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="relative px-5 pb-5 pt-6 text-white sm:px-7" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}>
+                    <button
+                        type="button"
+                        autoFocus
+                        onClick={onClose}
+                        aria-label="Close guide"
+                        className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-[18px] leading-none text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    >
+                        ×
+                    </button>
+                    <p className="m-0 text-[11px] font-black tracking-[0.13em] text-white/80">GUIDE · STARTUP / VENTURE</p>
+                    <h3 id="venture-guide-title" className="m-0 mt-1 pr-10 text-[20px] font-semibold leading-tight sm:text-[22px]">
+                        How the venture loop works
+                    </h3>
+                    <p className="m-0 mt-1.5 text-[13px] leading-[1.55] text-white/85">Five steps from your first draft to the Impact Wall.</p>
+                </div>
+                <ol className="m-0 list-none overflow-y-auto px-5 py-5 sm:px-7">
+                    {LOOP_STEPS.map((step, i) => (
+                        <li key={step.title} className="relative flex gap-3.5 pb-5 last:pb-0">
+                            {i < LOOP_STEPS.length - 1 ? <span className="absolute bottom-0 left-[17px] top-9 w-px bg-[#e3dcf5]" aria-hidden /> : null}
+                            <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f1ebfd] text-[13px] font-bold text-[#6a35c8]">{i + 1}</span>
+                            <div className="min-w-0 pt-1.5">
+                                <h4 className="m-0 text-[15px] font-semibold text-[#16313d]">
+                                    {step.title} <span aria-hidden>{step.emoji}</span>
+                                </h4>
+                                <p className="m-0 mt-1 text-[13.5px] leading-[1.6] text-[#5d6c78]">{step.body}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ol>
+                <div className="flex justify-end border-t border-[#eef1f4] px-5 py-3.5 sm:px-7">
+                    <button type="button" onClick={onClose} className="rounded-xl bg-[#6a35c8] px-5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-[#5a2bb0]">
+                        Got it
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 const CONSENT_VERSION = "CIEL-PK Investor Track Consent v1 (Sep 2026)";
 const CONSENT_TEXT =
@@ -258,10 +343,8 @@ function ActivityLog({ rows, onOpen }: { rows: ActivityRow[]; onOpen?: (row: Act
         <div className="mt-2 border-t border-[#e3e9ee]">
             {rows.map((row, i) => (
                 <div key={`${row.at}-${i}`} className="grid grid-cols-1 gap-1 border-b border-[#e3e9ee] py-2.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_170px] sm:gap-3">
-                    <span>
-                        <b className="text-[#14212b]">{row.who}</b>
-                    </span>
-                    <span>
+                    <span className="font-semibold text-[#435660]">{row.who}</span>
+                    <span className="text-[#16313d]">
                         {row.action}
                         {onOpen ? (
                             <>
@@ -902,7 +985,7 @@ function VentureDetailCard({ entry }: { entry: HubVenture }) {
                     <div className="text-[12px] font-bold tracking-wide text-[#bfe8e4]">
                         {displayVentureId(entry)} · {entry.academicSetup?.university || "Venture"}
                     </div>
-                    <h4 className="m-0 mt-1 text-[22px] font-bold">{entry.ventureName || "Untitled venture"}</h4>
+                    <h4 className="m-0 mt-1 text-[18px] font-semibold sm:text-[21px]">{entry.ventureName || "Untitled venture"}</h4>
                     <div className="mt-1.5 text-[13px] text-[#dff3f1]">
                         {displayName()}
                         {team.length > 1 ? ` + ${team.length - 1} team member${team.length > 2 ? "s" : ""}` : ""}
@@ -969,8 +1052,8 @@ function RecordView({
             <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                 <PanelBack onClick={onBack} />
                 <div className="min-w-0 flex-1">
-                    <h3 className="m-0 text-[22px] font-bold text-[#14212b]">{entry.ventureName || "Untitled venture"}</h3>
-                    <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                    <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">{entry.ventureName || "Untitled venture"}</h3>
+                    <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                         {displayVentureId(entry)} · {ventureStatusLabel(entry).label} · Action with: {actionWithLabel(entry)}
                     </p>
                 </div>
@@ -1018,7 +1101,7 @@ function RecordView({
                     </div>
                     <div className="rounded-[18px] border border-[#e3e9ee] p-5">
                         <b>Section remarks</b>
-                        <p className="mt-2 mb-0 text-[14.5px] text-[#5d6c78]">{note || "No section-level remarks."}</p>
+                        <p className="mt-2 mb-0 text-[13.5px] text-[#5d6c78]">{note || "No section-level remarks."}</p>
                     </div>
                 </div>
             ) : null}
@@ -1029,7 +1112,7 @@ function RecordView({
                         {score != null ? `${classifyScore(score)} venture — faculty score ${score}/100. ` : "Approved venture. "}
                         Ranking badges from faculty, university and CIEL PK graders appear below when published.
                     </p>
-                    {ribbon ? <RankBadges entry={entry} /> : <p className="mb-0 text-[14.5px] text-[#5d6c78]">No ranking badges yet.</p>}
+                    {ribbon ? <RankBadges entry={entry} /> : <p className="mb-0 text-[13.5px] text-[#5d6c78]">No ranking badges yet.</p>}
                 </div>
             ) : null}
             {entry.status !== "draft" ? (
@@ -1090,8 +1173,8 @@ function RecordView({
             {consentOpen ? (
                 <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
                     <div className="max-h-[92vh] w-full max-w-[760px] overflow-auto rounded-[22px] bg-white p-7">
-                        <h3 className="m-0 text-[22px] font-bold">🤝 Investor track — your consent</h3>
-                        <p className="mt-1 text-[14.5px] text-[#5d6c78]">
+                        <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">🤝 Investor track — your consent</h3>
+                        <p className="mt-1 text-[13.5px] text-[#5d6c78]">
                             {entry.ventureName} · {displayVentureId(entry)}
                         </p>
                         <div className="mt-2.5 rounded-[14px] border border-[#b8e3c6] bg-[#e6f6ec] px-4 py-3 text-[13.5px] leading-relaxed">{CONSENT_TEXT}</div>
@@ -1125,8 +1208,8 @@ function RecordView({
             {withdrawOpen ? (
                 <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
                     <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">
-                        <h3 className="m-0 text-[22px] font-bold">✖ Withdraw from the investor track?</h3>
-                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                        <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">✖ Withdraw from the investor track?</h3>
+                        <p className="mt-2 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                             {entry.ventureName} will be removed from the CIEL Investor Hub immediately. Your repository record and impact-wall cards are unaffected. You can opt in again later.
                         </p>
                         <div className="mt-4 flex justify-end gap-2.5">
@@ -1171,6 +1254,17 @@ export default function StartupBusinessHub({
     /** Pending "Delete draft" / "Withdraw to edit" confirmation. */
     const [confirmAction, setConfirmAction] = useState<{ kind: "delete" | "withdraw"; row: HubVenture } | null>(null);
     const [acting, setActing] = useState(false);
+    /** "How the venture loop works" popup — also opened by ?view=guide links. */
+    const [guideOpen, setGuideOpen] = useState(view === "guide");
+    useEffect(() => {
+        if (view === "guide") setGuideOpen(true);
+    }, [view]);
+    const closeGuide = () => {
+        setGuideOpen(false);
+        if (view === "guide") router.replace(BASE);
+    };
+    /** ?view=guide shows the home page underneath the guide popup. */
+    const page: HubView = view === "guide" ? "home" : view;
 
     useEffect(() => {
         setName(firstName());
@@ -1312,9 +1406,9 @@ export default function StartupBusinessHub({
             <CourseworkCrumb
                 role="Student"
                 pathLabel="Startup / Venture"
-                view={view === "home" ? undefined : HUB_VIEW_LABEL[view] ?? view}
+                view={page === "home" ? undefined : HUB_VIEW_LABEL[page] ?? page}
             />
-            {view !== "guide" ? (
+            {(
                 <MockupHero
                     kicker="MY PATHS · STARTUP / VENTURE"
                     title={<TimeGreeting name={name === "there" ? "" : name} emoji={"🚀"} />}
@@ -1322,27 +1416,6 @@ export default function StartupBusinessHub({
                     badge="🎓 STUDENT"
                     stats={ventureBucketStats(all)}
                 />
-            ) : null}
-
-            {view === "guide" && (
-                <div className="mt-[22px] rounded-[22px] p-7 text-white shadow-[0_8px_30px_rgba(10,30,40,.08)]" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}>
-                    <button
-                        type="button"
-                        onClick={() => router.push(BASE)}
-                        className="mb-4 rounded-full bg-white/15 px-4 py-2 text-[13.5px] font-bold text-white hover:bg-white/25"
-                    >
-                        ← Back
-                    </button>
-                    <span className="float-right rounded-full bg-white px-4 py-2 text-[11.5px] font-extrabold tracking-wide text-[#6a35c8]">
-                        GUIDE INSIDE
-                    </span>
-                    <h3 className="m-0 text-[22px] font-bold">📘 How the venture loop works</h3>
-                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14.5px] leading-relaxed">
-                        {LOOP_STEPS.map((step) => (
-                            <li key={step}>{step}</li>
-                        ))}
-                    </ol>
-                </div>
             )}
 
             {view === "in-progress" && (
@@ -1350,9 +1423,9 @@ export default function StartupBusinessHub({
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack onClick={() => router.push(BASE)} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🧩 Startup Workspace — {inProgress.length} in progress</h3>
-                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
-                                Everything you type in the form lands here automatically. Your faculty and university see the same completion bar in their &quot;Startups in Process&quot; screens, so reminders come from them too. You can run as many startups as you like — each gets its own Venture ID.
+                            <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">🧩 Startup Workspace — {inProgress.length} in progress</h3>
+                            <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
+                                Everything you save in the form (Save draft or Next) shows up here. Your faculty and university see the same completion bar in their &quot;Startups in Process&quot; screens, so reminders come from them too. You can run as many startups as you like — each gets its own Venture ID.
                             </p>
                         </div>
                         <button
@@ -1387,10 +1460,10 @@ export default function StartupBusinessHub({
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack onClick={() => router.push(BASE)} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">
+                            <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">
                                 {view === "drafts" ? `📝 Drafts — ${drafts.length}` : `↩ Revision Requested — ${revision.length}`}
                             </h3>
-                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                                 {view === "drafts"
                                     ? "Ventures you have not submitted yet, including any you withdrew to edit. Continue filling, submit when ready, or delete a draft you no longer need."
                                     : "Your faculty returned these ventures with a note. Open one, fix what was asked and resubmit — nothing is penalised."}
@@ -1443,8 +1516,8 @@ export default function StartupBusinessHub({
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack onClick={() => router.push(BASE)} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">✖ Rejected — {rejected.length}</h3>
-                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">✖ Rejected — {rejected.length}</h3>
+                            <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                                 Not published. Rejected ventures stay on your record with your faculty&apos;s note so you can see what to change next time.
                             </p>
                         </div>
@@ -1462,8 +1535,8 @@ export default function StartupBusinessHub({
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack onClick={() => router.push(BASE)} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">📬 Ventures Under Review — {underReview.length}</h3>
-                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">📬 Ventures Under Review — {underReview.length}</h3>
+                            <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                                 Your venture card is locked and with your faculty. You can nudge them by Email or WhatsApp.
                             </p>
                         </div>
@@ -1485,8 +1558,8 @@ export default function StartupBusinessHub({
                     <div className="mb-[18px] flex flex-wrap items-start gap-3.5">
                         <PanelBack onClick={() => router.push(BASE)} />
                         <div className="min-w-0 flex-1">
-                            <h3 className="m-0 text-[22px] font-bold text-[#14212b]">🏅 My Ventures Impact Wall — {approved.length} approved</h3>
-                            <p className="mt-1.5 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                            <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">🏅 My Ventures Impact Wall — {approved.length} approved</h3>
+                            <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                                 Approved ventures only. Open a card to see your faculty score, remarks and analysis, ranking badges and investor interest.
                             </p>
                         </div>
@@ -1522,7 +1595,7 @@ export default function StartupBusinessHub({
                 </div>
             ) : null}
 
-            {view === "home" && (
+            {page === "home" && (
                 <>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <MockupActionCard
@@ -1530,7 +1603,7 @@ export default function StartupBusinessHub({
                             emoji="🚀"
                             ghost="🚀"
                             title="Create Startup Record"
-                            subtitle="Open the CIEL PK Venture Studio form. Nine steps — each drafts its own summary for you to accept; your first saved fields issue a Venture ID and auto-save one master record shared with your faculty, university and CIEL PK."
+                            subtitle="Open the CIEL PK Venture Studio form. Nine steps — each drafts its own summary for you to accept; your first saved fields issue a Venture ID — one master record shared with your faculty, university and CIEL PK."
                             badge="START"
                             background={MOCKUP_GRADIENTS.teal}
                         />
@@ -1562,35 +1635,37 @@ export default function StartupBusinessHub({
                             background={MOCKUP_GRADIENTS.green}
                         />
                     </div>
-                    <div className="mt-[22px] rounded-[22px] p-7 text-white shadow-[0_8px_30px_rgba(10,30,40,.08)]" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }}>
-                        <span className="float-right rounded-full bg-white px-4 py-2 text-[11.5px] font-extrabold tracking-wide text-[#6a35c8]">
-                            GUIDE INSIDE
+                    <button
+                        type="button"
+                        onClick={() => setGuideOpen(true)}
+                        className="mt-4 flex w-full items-center gap-3.5 rounded-[18px] border border-[#e3dcf5] bg-[#faf7ff] px-4 py-3.5 text-left transition hover:border-[#c9b5f2] hover:bg-[#f4eefe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8f5bea] sm:px-5"
+                    >
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] text-[19px] text-white" style={{ background: "linear-gradient(135deg,#8f5bea,#6a35c8)" }} aria-hidden>
+                            📘
                         </span>
-                        <h3 className="m-0 text-[22px] font-bold">📘 How the venture loop works</h3>
-                        <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14.5px] leading-relaxed">
-                            {LOOP_STEPS.map((step) => (
-                                <li key={step}>{step}</li>
-                            ))}
-                        </ol>
-                    </div>
-                    <div className="mt-[18px] rounded-[22px] border border-[#e3e9ee] bg-white p-[22px_26px] shadow-[0_8px_30px_rgba(10,30,40,.08)]">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <b className="text-[#14212b]">🔔 What happened on my ventures</b>
-                            <span className="text-[13px] text-[#5d6c78]">auto-updates from every dashboard</span>
-                        </div>
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-semibold text-[#16313d]">How the venture loop works</span>
+                            <span className="block text-[12.5px] text-[#70808a]">Five steps from your first draft to the Impact Wall and investors.</span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-[#6a35c8] px-3.5 py-1.5 text-[12px] font-semibold text-white">Open guide</span>
+                    </button>
+                    <div className="mt-4 rounded-[22px] border border-[#dde5ea] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:px-5 sm:py-[18px]">
+                        <h3 className="m-0 text-[16px] font-semibold text-[#16313d] sm:text-[18px]">🔔 What happened on my ventures</h3>
+                        <p className="m-0 mt-1 text-xs text-[#70808a]">Updates automatically from your faculty, university and CIEL PK dashboards.</p>
                         <ActivityLog rows={feedRows} onOpen={all.length ? (row) => openRecord(all.find((v) => v.id === row.ventureId) ?? entry) : undefined} />
                     </div>
                 </>
             )}
+            {guideOpen ? <VentureGuideModal onClose={closeGuide} /> : null}
             {confirmAction ? (
                 <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5" role="dialog" aria-modal="true">
                     <div className="w-full max-w-[560px] rounded-[22px] bg-white p-7">
-                        <h3 className="m-0 text-[21px] font-bold">
+                        <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">
                             {confirmAction.kind === "delete"
                                 ? `🗑 Delete “${confirmAction.row.ventureName || "Untitled venture"}”?`
                                 : `↩ Withdraw “${confirmAction.row.ventureName || "Untitled venture"}”?`}
                         </h3>
-                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                        <p className="mt-2 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                             {confirmAction.kind === "delete"
                                 ? "This draft and everything typed in it will be removed permanently. Your other ventures are not affected."
                                 : "It leaves your faculty's review queue and goes back to Drafts. Edit it and submit again when ready."}
@@ -1614,8 +1689,8 @@ export default function StartupBusinessHub({
             {submitFor ? (
                 <div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(8,20,28,.55)] p-5">
                     <div className="w-full max-w-[760px] rounded-[22px] bg-white p-7">
-                        <h3 className="m-0 text-[22px] font-bold">📤 Submit “{submitFor.ventureName || "Untitled venture"}” to faculty?</h3>
-                        <p className="mt-2 text-[14.5px] leading-relaxed text-[#5d6c78]">
+                        <h3 className="m-0 text-[18px] font-semibold text-[#16313d] sm:text-[21px]">📤 Submit “{submitFor.ventureName || "Untitled venture"}” to faculty?</h3>
+                        <p className="mt-2 text-[13.5px] leading-[1.6] text-[#5d6c78]">
                             Submit happens on form step 9 after core fields, five accepted summaries and the repository acknowledgement. This does not skip those checks.
                         </p>
                         <div className="mt-4 flex justify-end gap-2.5">
