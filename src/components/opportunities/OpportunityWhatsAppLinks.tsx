@@ -8,6 +8,9 @@ type Props = {
     creatorName?: string;
     /** Present in API responses for signed-in viewers who may open the record. */
     creatorPhone?: string;
+    /** Partner / NGO organisation (name + WhatsApp) — only when the API shared it for this viewer. */
+    partnerName?: string;
+    partnerPhone?: string;
     showAdmin?: boolean;
     className?: string;
 };
@@ -25,10 +28,21 @@ function WhatsAppGlyph({ className = "" }: { className?: string }) {
  * WhatsApp buttons on an opportunity's detail: the person who created it (when the viewer may see
  * their number) and CIEL PK admin. Each opens a prefilled chat naming the opportunity.
  */
-export function OpportunityWhatsAppLinks({ title, creatorName, creatorPhone, showAdmin = true, className = "" }: Props) {
+export function OpportunityWhatsAppLinks({
+    title,
+    creatorName,
+    creatorPhone,
+    partnerName,
+    partnerPhone,
+    showAdmin = true,
+    className = "",
+}: Props) {
     const about = title?.trim() ? `"${title.trim()}"` : "an opportunity";
     const name = creatorName?.trim() ?? "";
     const creator = whatsappDigits(creatorPhone);
+    const org = partnerName?.trim() ?? "";
+    // The same number as the creator's is one chat, not two buttons.
+    const partner = whatsappDigits(partnerPhone) !== creator ? whatsappDigits(partnerPhone) : "";
     const links: { key: string; label: string; hint: string; href: string }[] = [];
     if (creator) {
         links.push({
@@ -36,6 +50,14 @@ export function OpportunityWhatsAppLinks({ title, creatorName, creatorPhone, sho
             label: name ? `WhatsApp ${name}` : "WhatsApp creator",
             hint: "Project creator",
             href: `https://wa.me/${creator}?text=${encodeURIComponent(`Hi${name ? ` ${name.split(/\s+/)[0]}` : ""}, I am contacting you about ${about} on CIEL PK.`)}`,
+        });
+    }
+    if (partner) {
+        links.push({
+            key: "partner",
+            label: org ? `WhatsApp ${org}` : "WhatsApp partner organisation",
+            hint: "Partner organisation",
+            href: `https://wa.me/${partner}?text=${encodeURIComponent(`Hi${org ? ` ${org}` : ""}, I am contacting you about ${about} on CIEL PK.`)}`,
         });
     }
     if (showAdmin) {

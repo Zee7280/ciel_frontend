@@ -640,12 +640,17 @@ export default function OpportunityDetailsPage() {
                 // The API includes the creator's phone only for the owner, designated reviewers and admin.
                 const creator = (opportunity as Record<string, unknown>).creator;
                 const cr = creator && typeof creator === "object" ? (creator as Record<string, unknown>) : null;
+                // `partner_contact` is the creating organisation's own contact (signed-in viewers of a partner listing).
+                const pcRaw = (opportunity as Record<string, unknown>).partner_contact;
+                const pc = pcRaw && typeof pcRaw === "object" ? (pcRaw as Record<string, unknown>) : null;
                 return (
                     <OpportunityWhatsAppLinks
                         className="print:hidden"
                         title={opportunity.title}
                         creatorName={typeof cr?.name === "string" ? cr.name : undefined}
                         creatorPhone={!opportunity.isStudentOwner && typeof cr?.phone === "string" ? cr.phone : undefined}
+                        partnerName={typeof pc?.organization_name === "string" ? pc.organization_name : undefined}
+                        partnerPhone={typeof pc?.whatsapp === "string" ? pc.whatsapp : undefined}
                         showAdmin={viewerNavRole !== "admin"}
                     />
                 );

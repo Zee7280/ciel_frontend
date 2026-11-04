@@ -109,6 +109,50 @@ function coerceProjectDetailsFromStudentApi(raw: unknown): ProjectDetails | null
     return base;
 }
 
+const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+
+/**
+ * The public payload carries no contact details. For a signed-in viewer, ask the signed-in detail API
+ * (the same ones the dashboard card uses) and merge in ONLY the creator and the partner organisation's
+ * contact, so the card can show their WhatsApp. Any failure just leaves the public record as it was.
+ */
+async function withSignedInContacts(project: ProjectDetails, id: string): Promise<ProjectDetails> {
+    try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
+        if (!isTokenValid(token)) return project;
+        const quiet = { redirectToLogin: false };
+        const role = String(readStoredCurrentUser()?.role ?? "").trim().toLowerCase();
+        let data: Record<string, unknown> | null = null;
+        if (role === "student") {
+            const res = await authenticatedFetch(`/api/v1/students/opportunities/${encodeURIComponent(id)}`, {}, quiet);
+            if (res?.ok) {
+                const body = await res.json().catch(() => ({}));
+                if (body?.success && body.data) data = asRecord(body.data);
+            }
+        }
+        if (!data) {
+            const res = await authenticatedFetch(`/api/v1/opportunities/detail`, { method: "POST", body: JSON.stringify({ id }) }, quiet);
+            if (res?.ok) {
+                const body = await res.json().catch(() => ({}));
+                if (body?.success && body.data) data = asRecord(body.data);
+            }
+        }
+        if (!data) return project;
+        const next: Record<string, unknown> = { ...(project as unknown as Record<string, unknown>) };
+        const creator = asRecord(data.creator);
+        if (Object.keys(creator).length) {
+            next.creator = { id: creator.id, name: creator.name, email: creator.email, phone: creator.phone };
+        }
+        const partner = asRecord(data.partner_contact);
+        if (Object.keys(partner).length) {
+            next.partner_contact = { organization_name: partner.organization_name, email: partner.email, whatsapp: partner.whatsapp };
+        }
+        return next as unknown as ProjectDetails;
+    } catch {
+        return project;
+    }
+}
+
 export default function ProjectDetailsPage() {
     const params = useParams();
     const projectId = params.id as string;
@@ -165,7 +209,14 @@ export default function ProjectDetailsPage() {
                 }
 
                 if (resolved) {
-                    setProject(resolved);
+                    // The page shows as soon as the public record is in; a signed-in viewer's creator / partner
+                    // contact is merged in when it arrives (the page never waits for it).
+                    const publicRecord = resolved;
+                    setProject(publicRecord);
+                    void withSignedInContacts(publicRecord, projectId).then((enriched) => {
+                        if (enriched === publicRecord) return;
+                        setProject((current) => (current && String(current.id) === String(publicRecord.id) ? enriched : current));
+                    });
                 }
             } catch (err) {
                 console.error("Failed to fetch project details:", err);
@@ -377,8 +428,23 @@ export default function ProjectDetailsPage() {
                             </p>
                         </>
                     )}
-                    {/* The creator's number is not public; visitors reach CIEL PK admin instead. */}
-                    <OpportunityWhatsAppLinks title={project.title} className="mt-6 justify-center" />
+                    {/* Visitors reach CIEL PK admin; signed-in viewers also get the creator's and the partner organisation's WhatsApp. */}
+                    {(() => {
+                        const creator = asRecord(projectRecord.creator);
+                        const partnerContact = asRecord(projectRecord.partner_contact);
+                        const me = readStoredCurrentUser();
+                        const isOwn = Boolean(me?.id && creator.id && String(me.id) === String(creator.id));
+                        return (
+                            <OpportunityWhatsAppLinks
+                                title={project.title}
+                                creatorName={typeof creator.name === "string" ? creator.name : undefined}
+                                creatorPhone={!isOwn && typeof creator.phone === "string" ? creator.phone : undefined}
+                                partnerName={typeof partnerContact.organization_name === "string" ? partnerContact.organization_name : partnerName}
+                                partnerPhone={typeof partnerContact.whatsapp === "string" ? partnerContact.whatsapp : undefined}
+                                className="mt-6 justify-center"
+                            />
+                        );
+                    })()}
                 </div>
             </div>
 
