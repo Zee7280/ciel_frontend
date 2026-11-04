@@ -18,6 +18,7 @@ import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChr
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
+import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-work/QuickImpactPartnerWall";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
@@ -689,6 +690,7 @@ export default function NgoCommunityServiceHub() {
                             ))}
                         </div>
                     )}
+                    <QuickImpactPartnerWall />
                 </div>
             )}
 

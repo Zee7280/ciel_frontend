@@ -10,6 +10,7 @@ import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSec
 import NationalRankingStudio from "@/components/ciel/community-service/national-ranking/NationalRankingStudio";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
+import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-work/QuickImpactPartnerWall";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import OpportunityApprovalCard, {
@@ -1117,6 +1118,7 @@ export default function UniversityCommunityServiceHub() {
                             ))}
                         </div>
                     )}
+                    <QuickImpactPartnerWall />
                 </div>
             )}
 
