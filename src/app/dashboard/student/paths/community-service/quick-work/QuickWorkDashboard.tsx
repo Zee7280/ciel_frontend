@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { apiMessages, QUICK_WORK_HREF, quickWorkApi, type QuickWorkMine } from "@/utils/quickWorkApi";
-import { activityLabel, formatHours, shortDate, viewerRow, type QuickWorkLog } from "@/utils/quickWorkRules";
+import { activityLabel, formatHours, QUICK_WORK_CONFIRMABLE_STATUSES, shortDate, viewerRow, type QuickWorkLog } from "@/utils/quickWorkRules";
 import {
     EvidenceGallery,
     ModalClose,
@@ -39,7 +39,7 @@ function stageOf(r: QuickWorkLog): Stage {
 
 /** One line on where a log being prepared stands: how many teammates confirmed. */
 function progressNote(r: QuickWorkLog): string {
-    if (r.status !== "draft" && r.status !== "changes") return "";
+    if (!["draft", "changes", "submitted", "admin_review"].includes(r.status)) return "";
     const parts: string[] = [];
     const mates = r.participants.filter((p) => !p.isLead);
     if (mates.length) parts.push(`${mates.filter((p) => p.joinStatus === "joined").length} of ${mates.length} teammates confirmed`);
@@ -82,7 +82,7 @@ export default function QuickWorkDashboard() {
     const mine = viewerRow;
 
     const invitations = (data?.logs ?? []).filter(
-        (l) => !l.isLead && (l.status === "draft" || l.status === "changes") && mine(l)?.joinStatus === "invited",
+        (l) => !l.isLead && QUICK_WORK_CONFIRMABLE_STATUSES.includes(l.status) && mine(l)?.joinStatus === "invited",
     );
     const records = (data?.logs ?? []).filter((l) => !invitations.includes(l));
     const byStage = (key: Stage) => records.filter((r) => stageOf(r) === key);

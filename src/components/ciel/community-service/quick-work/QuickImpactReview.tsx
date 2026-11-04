@@ -7,8 +7,8 @@ import {
     activityLabel,
     evidenceKind,
     formatHours,
-    SDG_COLORS,
-    SDG_NAMES,
+    logSdgs,
+    sdgChip,
     shortDate,
     type QuickWorkEvidence,
     type QuickWorkLog,
@@ -41,8 +41,8 @@ function SummaryCard({ log }: { log: QuickWorkLog }) {
     const reached = log.peopleReached ?? null;
     const target = log.peopleTarget && log.peopleTarget > 0 ? log.peopleTarget : null;
     const rate = target && reached !== null ? Math.round((reached / target) * 100) : null;
-    const sdgNum = Number(log.sdg) || 0;
-    const sdgName = sdgNum >= 1 && sdgNum <= 17 ? SDG_NAMES[sdgNum - 1] : null;
+    const goals = logSdgs(log).map(sdgChip);
+    const mainGoal = goals[0] ?? null;
     const allPoints = impactPoints(log.summary);
     const points = allPoints.slice(0, MAX_HIGHLIGHTS);
     const morePoints = allPoints.length - points.length;
@@ -79,14 +79,27 @@ function SummaryCard({ log }: { log: QuickWorkLog }) {
                 </div>
 
                 <div className="qcr-sdg">
-                    <div className="qcr-sdg-mark" style={{ background: sdgNum ? SDG_COLORS[sdgNum] ?? "#607d8b" : "#607d8b" }}>
-                        {sdgNum || "—"}
+                    <div className="qcr-sdg-mark" style={{ background: mainGoal?.color ?? "#607d8b" }}>
+                        {mainGoal?.n ?? "—"}
                     </div>
                     <div className="qcr-sdg-copy">
-                        <b>{sdgName ?? "SDG not selected"}</b>
-                        <span>{sdgName ? "United Nations Sustainable Development Goal" : "Select a relevant SDG to show alignment"}</span>
+                        <b>{mainGoal?.name ?? "SDG not selected"}</b>
+                        <span>
+                            {mainGoal
+                                ? `${goals.length > 1 ? "Main goal · " : ""}United Nations Sustainable Development Goal`
+                                : "Select a relevant SDG to show alignment"}
+                        </span>
                     </div>
                 </div>
+                {goals.length > 1 ? (
+                    <ul className="qcr-sdg-more" aria-label="Other SDGs">
+                        {goals.slice(1).map((g) => (
+                            <li key={g.n} style={{ background: g.color }}>
+                                {g.label}
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
 
                 {target ? (
                     <div className="qcr-section">

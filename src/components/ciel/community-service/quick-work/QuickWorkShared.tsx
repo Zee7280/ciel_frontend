@@ -8,7 +8,10 @@ import {
     activityLabel,
     formatHours,
     evidenceKind,
-    SDG_NAMES,
+    joinNote,
+    logSdgs,
+    sdgChip,
+    sdgShort,
     shortDate,
     STATUS_LABEL,
     type QuickWorkEvidence,
@@ -424,7 +427,7 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/20 pt-3.5">
                     <FlashStat value={`${formatHours(teamMinutes)} h`} label="Team person-hours" />
                     <FlashStat value={String(present.length)} label="Participants" />
-                    <FlashStat value={log.sdg ? `SDG ${log.sdg}` : "—"} label="SDG linkage" />
+                    <FlashStat value={sdgShort(log) ?? "—"} label={logSdgs(log).length > 1 ? "SDG linkages" : "SDG linkage"} />
                 </div>
             </section>
 
@@ -433,7 +436,12 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
                     <h4 className="mb-1.5 text-[15px] font-semibold">Activity & coordinating faculty</h4>
                     <FlashRow label="Activity">
                         {activityLabel(log) || "—"}
-                        {log.sdg ? <span className="block text-xs text-[#617980]">SDG {log.sdg} · {SDG_NAMES[log.sdg - 1] ?? ""}</span> : null}
+                        {logSdgs(log).map((n, i) => (
+                            <span key={n} className="block text-xs text-[#617980]">
+                                {sdgChip(n).label}
+                                {i === 0 && logSdgs(log).length > 1 ? " (main)" : ""}
+                            </span>
+                        ))}
                     </FlashRow>
                     <FlashRow label="Date & time">
                         {shortDate(log.activityDate)} · {log.startTime || "—"}–{log.endTime || "—"} PKT
@@ -502,6 +510,7 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
                                             {[p.email, p.contact ? formatInternationalPhoneDisplay(p.contact) : "", p.isLead ? "Lead" : ""].filter(Boolean).join(" · ")}
                                         </small>
                                     ) : null}
+                                    {joinNote(p, log.status) ? <small className="block text-[11px] font-semibold text-[#9b6a1a]">{joinNote(p, log.status)}</small> : null}
                                 </div>
                                 <b className="whitespace-nowrap text-sm text-[#0e7d74]">{formatHours(p.minutes)} h</b>
                             </div>
@@ -539,6 +548,7 @@ export function QuickWorkRecordDetails({ log, evidence }: { log: QuickWorkLog; e
                                                     .join(" · ")}
                                             </small>
                                         ) : null}
+                                        {joinNote(p, log.status) ? <small className="block text-[11px] font-semibold text-[#9b6a1a]">{joinNote(p, log.status)}</small> : null}
                                     </td>
                                     <td className="px-2 py-3">{p.studentId || "—"}</td>
                                     <td className="px-2 py-3">{p.present ? `${p.startTime ?? "—"}–${p.endTime ?? "—"}` : "Absent"}</td>

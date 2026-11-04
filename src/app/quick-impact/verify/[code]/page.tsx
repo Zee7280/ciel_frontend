@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { apiMessages, verifyQuickWorkCertificate, type QuickWorkCertificateCheck } from "@/utils/quickWorkApi";
-import { formatHours, sdgLabel, shortDate } from "@/utils/quickWorkRules";
+import { formatHours, logSdgs, sdgChip, shortDate } from "@/utils/quickWorkRules";
 
 type PageProps = { params: Promise<{ code: string }> };
 
@@ -82,7 +82,9 @@ export default function QuickImpactVerifyPage({ params }: PageProps) {
                                 label="Participation"
                                 value={result.participation === "team" ? `Team of ${result.teamSize} students` : "Individual"}
                             />
-                            {sdgLabel(result.sdg) ? <Row label="SDG" value={sdgLabel(result.sdg) as string} /> : null}
+                            {logSdgs(result).length ? (
+                                <Row label={logSdgs(result).length > 1 ? "SDGs" : "SDG"} value={logSdgs(result).map((n) => sdgChip(n).label).join(" · ")} />
+                            ) : null}
                             <Row label="Verified on" value={verifiedOn} />
                         </dl>
                         <p className="mt-4 text-xs leading-relaxed text-slate-500">

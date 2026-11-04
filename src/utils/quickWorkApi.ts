@@ -221,6 +221,8 @@ export type QuickWorkCertificateCheck = {
     participation: "team" | "individual";
     teamSize: number;
     sdg: number | null;
+    /** Other goals besides the main one (older API: absent). */
+    secondarySdgs?: number[];
     verifiedAt: string | null;
 };
 

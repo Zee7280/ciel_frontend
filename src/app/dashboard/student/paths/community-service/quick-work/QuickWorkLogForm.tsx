@@ -31,6 +31,7 @@ import {
     evidenceTypeOf,
     formatHours,
     formFromLog,
+    attendees,
     formPeople,
     joinErrors,
     evidenceFileKey,
@@ -41,17 +42,21 @@ import {
     QUICK_WORK_EVIDENCE_ACCEPT,
     QUICK_WORK_EVIDENCE_HINT,
     QUICK_WORK_MAX_EVIDENCE,
+    QUICK_WORK_MAX_BREAK_MINUTES,
     QUICK_WORK_MAX_DAILY_MINUTES,
     QUICK_WORK_MAX_EVIDENCE_BYTES,
+    QUICK_WORK_MAX_PEOPLE,
     QUICK_WORK_MAX_PARTICIPANTS,
     QUICK_WORK_MAX_PARTNERS,
     QUICK_WORK_OTHER_ACTIVITY,
     QUICK_WORK_SUMMARY_MAX,
     QUICK_WORK_TEMPLATES,
     QUICK_WORK_VISIBILITY,
-    SDG_NAMES,
+    formSdgFields,
+    formSdgs,
     shortDate,
     teamErrors,
+    unconfirmedTeammates,
     type QuickWorkForm,
     type QuickWorkLog,
 } from "@/utils/quickWorkRules";
@@ -64,6 +69,7 @@ import {
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
 import { QuickImpactReview } from "@/components/ciel/community-service/quick-work/QuickImpactReview";
+import QuickSdgPicker from "@/components/ciel/community-service/quick-work/QuickSdgPicker";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 import { teammateReminder } from "@/utils/quickWorkReminders";
 
@@ -76,7 +82,10 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 
 const HUB = "/dashboard/student/paths/community-service";
 const MAX_EVIDENCE_MB = Math.round(QUICK_WORK_MAX_EVIDENCE_BYTES / (1024 * 1024));
-const STEPS = ["Team & faculty", "Activity details", "Attendance", "Evidence & submit"] as const;
+/** Step order: the activity comes first; the team and the coordinating faculty second. */
+const STEP_KEYS = ["activity", "team", "attendance", "evidence"] as const;
+type StepKey = (typeof STEP_KEYS)[number];
+const STEPS = ["Activity details", "Team & faculty", "Attendance", "Evidence & submit"] as const;
 /** Autosave waits this long after the last edit. */
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -378,7 +387,12 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         if (phone) e.push(`Host contact number: ${phone}`);
         return e;
     };
-    const stepCheck = [teamErrors, (f: QuickWorkForm) => [...activityErrors(f), ...hostErrors(f)], (f: QuickWorkForm) => attendanceErrors(f)] as const;
+    const stepCheck: Record<Exclude<StepKey, "evidence">, (f: QuickWorkForm) => string[]> = {
+        activity: (f) => [...activityErrors(f), ...hostErrors(f)],
+        team: teamErrors,
+        attendance: (f) => attendanceErrors(f),
+    };
+    const stepKey: StepKey = STEP_KEYS[step - 1] ?? "activity";
 
     const goTo = async (target: number) => {
         if (target === step) return;
@@ -389,9 +403,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     };
 
     const next = async () => {
-        const e = stepCheck[step - 1](form);
+        const e: string[] = stepKey === "evidence" ? [] : stepCheck[stepKey](form);
         // Details typed for a teammate but never added would be lost on Continue; say so plainly.
-        if (step === 1 && form.mode === "team" && (mate.name.trim() || mate.email.trim() || mate.studentId.trim())) {
+        if (stepKey === "team" && form.mode === "team" && (mate.name.trim() || mate.email.trim() || mate.studentId.trim())) {
             e.unshift("You typed a teammate’s details but have not added them yet. Press “+ Add teammate” first, or clear those fields.");
         }
         if (e.length) return showErrors(e);
@@ -399,6 +413,11 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
             setStep(step + 1);
             panel.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
+    };
+
+    /** "Save draft": saves now (autosave may already have) and says so, so the button never looks dead. */
+    const saveDraft = async () => {
+        if (await persist()) toast.success("Draft saved.");
     };
 
     const review = async () => {
@@ -431,6 +450,8 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         const contact = composeInternationalPhone(mate.phoneCountryKey, mate.phoneNational);
         if (!name || !EMAIL_RE.test(email) || !studentId) return toast.error("Enter the teammate's name, a valid email and their student ID.");
         if (contactError) return toast.error(`Contact number: ${contactError}`);
+        // The invitation email names the activity, so the activity comes first (Activity details).
+        if (!form.title.trim()) return toast.error("Add the activity title in Activity details first, so your teammate's invitation email names the activity.");
         if (formPeople(form).length >= QUICK_WORK_MAX_PARTICIPANTS) return toast.error(`This log allows up to ${QUICK_WORK_MAX_PARTICIPANTS} participants.`);
         if (formPeople(form).some((p) => p.email === email || p.studentId.trim().toLowerCase() === studentId.toLowerCase())) {
             return toast.error("That email or student ID is already on this team.");
@@ -444,7 +465,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
         setForm(nextForm);
         if (await persist(nextForm)) {
             setMate({ name: "", email: "", studentId: "", phoneCountryKey: mate.phoneCountryKey, phoneNational: "" });
-            toast.success("Join request sent. They confirm from their Quick Impact Log page.");
+            toast.success("Join request sent by email. If they are new to CIEL they sign up first, then confirm from their Quick Impact Log page.");
         } else {
             setForm((f) => (f ? { ...f, teammates: f.teammates.filter((t) => t.email !== email) } : f));
         }
@@ -488,7 +509,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     const applyEventTimes = () => {
         if (activityErrors(form).length) return toast.error("Set a valid activity time window in Step 2 first.");
         const attendance = { ...form.attendance };
-        for (const p of formPeople(form)) {
+        for (const p of attendees(form)) {
             const a = attendanceFor(form, p.email);
             if (a.present) attendance[p.email] = { ...a, startTime: form.startTime, endTime: form.endTime, breakMinutes: "0" };
         }
@@ -531,7 +552,8 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
     /* ---------------------------------------------------------------- render */
 
     const people = formPeople(form);
-    const teamMinutes = people.reduce((a, p) => a + attendanceMinutes(attendanceFor(form, p.email)), 0);
+    const attending = attendees(form);
+    const teamMinutes = attending.reduce((a, p) => a + attendanceMinutes(attendanceFor(form, p.email)), 0);
     const myMinutes = attendanceMinutes(attendanceFor(form, form.leadEmail));
     const today = pktNow().date;
 
@@ -595,9 +617,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                             </div>
                         ) : null}
 
-                        {step === 1 ? (
+                        {stepKey === "team" ? (
                             <>
-                                <StepHead title="Who’s taking part?" n={1} intro="Add yourself, your teammates and one coordinating faculty member." />
+                                <StepHead title="Who’s taking part?" n={2} intro="Add yourself, your teammates and one coordinating faculty member." />
                                 <div className="mb-4 inline-flex rounded-lg border border-[#dcebee] bg-[#eef4f5] p-[3px]" aria-label="Participation mode">
                                     {(["solo", "team"] as const).map((m) => (
                                         <button
@@ -692,7 +714,13 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                                   : "bg-[#fff5de] text-[#916b21]"
                                                         }`}
                                                     >
-                                                        {t.joinStatus === "joined" ? "Joined" : t.joinStatus === "declined" ? "Declined" : "Waiting for confirmation"}
+                                                        {t.joinStatus === "joined"
+                                                            ? "Joined"
+                                                            : t.joinStatus === "declined"
+                                                              ? "Declined"
+                                                              : t.joinStatus === "awaiting_signup"
+                                                                ? "Waiting to sign up"
+                                                                : "Waiting for confirmation"}
                                                     </span>
                                                     <button
                                                         type="button"
@@ -756,9 +784,15 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             <button type="button" onClick={() => void addMate()} disabled={saving} className={`${btnCls} mt-2.5 w-full sm:w-auto`}>
                                                 + Add teammate
                                             </button>
+                                            {!form.title.trim() ? (
+                                                <p className="mt-2 rounded-md bg-[#fff6e5] px-3 py-2 text-xs text-[#79571c]">
+                                                    Add the activity title in <b>Activity details</b> first. Your teammate’s invitation email names the activity.
+                                                </p>
+                                            ) : null}
                                             <p className="mt-2 text-xs text-[#6b7c86]">
-                                                Teammates need a CIEL student account. They get a join request and confirm from their own Quick Impact Log page;
-                                                you can submit once everyone has confirmed.
+                                                Teammates need a CIEL student account. They get a join request and confirm from their own Quick Impact Log page.
+                                                You can submit without waiting: they can confirm until CIEL PK’s final approval, and hours are credited only to
+                                                teammates who confirm.
                                             </p>
                                         </div>
                                     </>
@@ -826,9 +860,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                             </>
                         ) : null}
 
-                        {step === 2 ? (
+                        {stepKey === "activity" ? (
                             <>
-                                <StepHead title="What’s the activity?" n={2} intro="A brief event record is enough. Start with a type, then add the details." />
+                                <StepHead title="What’s the activity?" n={1} intro="A brief event record is enough. Start with a type, then add the details." />
                                 <div className="mb-5 flex flex-wrap gap-1.5">
                                     {QUICK_WORK_TEMPLATES.map((t) => {
                                         const other = t.type === QUICK_WORK_OTHER_ACTIVITY;
@@ -840,7 +874,9 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                 aria-pressed={active}
                                                 onClick={() => {
                                                     // “Other” has no meaningful default title or SDG, so keep what the student has.
-                                                    patch(other ? { activityType: t.type } : { activityType: t.type, title: form.title || t.type, sdg: t.sdg ? String(t.sdg) : "" });
+                                                    // A template replaces the main goal with its own (or none); goals the student added stay.
+                                                    const others = formSdgs(form).slice(1).filter((n) => n !== String(t.sdg));
+                                                    patch(other ? { activityType: t.type } : { activityType: t.type, title: form.title || t.type, ...formSdgFields(t.sdg ? [String(t.sdg), ...others] : others) });
                                                     if (other) requestAnimationFrame(() => document.getElementById("qwTypeOther")?.focus());
                                                 }}
                                                 className={`rounded-md border px-2.5 py-1.5 text-xs hover:border-[#0e7d74] hover:text-[#0e7d74] ${
@@ -923,15 +959,8 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     <Field id="qwHost" label="Host / organisation" optional>
                                         <input id="qwHost" className={inputCls} value={form.host} maxLength={120} placeholder="If hosted by an organisation" onChange={(e) => patch({ host: e.target.value })} />
                                     </Field>
-                                    <Field id="qwSdg" label="Main SDG" optional>
-                                        <select id="qwSdg" className={inputCls} value={form.sdg} onChange={(e) => patch({ sdg: e.target.value })}>
-                                            <option value="">Select if relevant</option>
-                                            {SDG_NAMES.map((n, i) => (
-                                                <option key={n} value={String(i + 1)}>
-                                                    {i + 1} · {n}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <Field id="qwSdg" label="SDGs" optional>
+                                        <QuickSdgPicker id="qwSdg" goals={formSdgs(form)} onChange={(goals) => patch(formSdgFields(goals))} selectClassName={inputCls} />
                                     </Field>
                                     {form.host.trim() ? (
                                         <Field id="qwHostEmail" label="Host organisation’s email and contact" optional full>
@@ -1066,7 +1095,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {people.map((p) => {
+                                            {attending.map((p) => {
                                                 const a = attendanceFor(form, p.email);
                                                 return (
                                                     <tr key={p.email} className="border-b border-[#dcebee] text-xs">
@@ -1109,6 +1138,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                                             <input
                                                                 type="number"
                                                                 min={0}
+                                                                max={QUICK_WORK_MAX_BREAK_MINUTES}
                                                                 step={1}
                                                                 aria-label={`${p.name || p.email} break minutes`}
                                                                 className={`${inputCls} max-w-[64px] px-2 py-1.5 text-xs`}
@@ -1128,6 +1158,11 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     Record actual service time, excluding breaks. Up to {formatHours(QUICK_WORK_MAX_DAILY_MINUTES)} hours per student per day;
                                     the same time cannot be claimed twice, including time logged in a structured project.
                                 </p>
+                                {form.teammates.some((t) => t.joinStatus === "awaiting_signup") ? (
+                                    <p className="mt-2 rounded-md bg-[#fff6e5] px-3 py-2 text-xs text-[#79571c]">
+                                        Teammates who have not signed up on CIEL yet are not in this table: no hours can be recorded for them. You can still submit.
+                                    </p>
+                                ) : null}
                             </>
                         ) : null}
 
@@ -1154,6 +1189,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             id="qwTarget"
                                             type="number"
                                             min={1}
+                                            max={QUICK_WORK_MAX_PEOPLE}
                                             step={1}
                                             className={inputCls}
                                             placeholder="e.g. 40"
@@ -1166,6 +1202,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             id="qwReach"
                                             type="number"
                                             min={0}
+                                            max={QUICK_WORK_MAX_PEOPLE}
                                             step={1}
                                             className={inputCls}
                                             placeholder="e.g. 30"
@@ -1273,8 +1310,8 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     ← Back
                                 </button>
                             ) : null}
-                            {dirty ? (
-                                <button type="button" onClick={() => void persist()} disabled={saving} className={`${btnCls} flex-1 sm:flex-none`}>
+                            {editable ? (
+                                <button type="button" onClick={() => void saveDraft()} disabled={saving} className={`${btnCls} flex-1 sm:flex-none`}>
                                     Save draft
                                 </button>
                             ) : null}
@@ -1301,6 +1338,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         <SummaryRow label="Date" value={form.activityDate ? shortDate(form.activityDate) : ""} />
                         <SummaryRow label="Time" value={form.startTime && form.endTime ? `${form.startTime}–${form.endTime}` : ""} />
                         <SummaryRow label="Venue" value={form.location} />
+                        <SummaryRow label="SDGs" value={formSdgs(form).length ? `SDG ${formSdgs(form).join(", ")}` : ""} />
                         <SummaryRow label="Faculty" value={form.facultyName} />
                     </dl>
                     <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#dcebee] pt-4">
@@ -1326,6 +1364,20 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         <ModalClose onClose={() => !submitting && setPreview(false)} />
                     </header>
                     <QuickImpactReview log={log} />
+                    {unconfirmedTeammates(form).length ? (
+                        <p className="mt-3 rounded-lg bg-[#fff6e5] px-3.5 py-3 text-xs leading-relaxed text-[#79571c]">
+                            <b>
+                                {unconfirmedTeammates(form).length === 1
+                                    ? "1 teammate has not confirmed yet"
+                                    : `${unconfirmedTeammates(form).length} teammates have not confirmed yet`}
+                                :
+                            </b>{" "}
+                            {unconfirmedTeammates(form)
+                                .map((t) => t.name || t.email)
+                                .join(", ")}
+                            . You can still submit. They can confirm until CIEL PK’s final approval; hours are credited only to teammates who confirm.
+                        </p>
+                    ) : null}
                     <p className="mt-3 text-xs text-[#6b7c86]">
                         {form.evidence.length} evidence {form.evidence.length === 1 ? "file" : "files"} · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
                     </p>

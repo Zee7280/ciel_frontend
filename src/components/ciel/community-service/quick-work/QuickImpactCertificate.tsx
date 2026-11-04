@@ -6,7 +6,7 @@ import { Calendar, Clock, Globe, Lock, Tag, Target } from "lucide-react";
 import "@/app/dashboard/student/report/components/certificate-print.css";
 import "./quick-impact-flashcard.css";
 import CertificateScaleShell from "@/app/dashboard/student/report/components/CertificateScaleShell";
-import { activityLabel, formatHours, quickImpactVerifyPath, SDG_NAMES, shortDate, type QuickWorkLog, type QuickWorkParticipant } from "@/utils/quickWorkRules";
+import { activityLabel, formatHours, logSdgs, quickImpactVerifyPath, SDG_NAMES, shortDate, type QuickWorkLog, type QuickWorkParticipant } from "@/utils/quickWorkRules";
 
 function CertFlourish() {
     return (
@@ -55,6 +55,7 @@ export default function QuickImpactCertificate({
     const credited = log.participants.filter((p) => p.present && p.minutes > 0).length;
     const sdg = Number(log.sdg);
     const sdgOk = Number.isInteger(sdg) && sdg >= 1 && sdg <= 17;
+    const otherGoals = logSdgs(log).filter((n) => n !== sdg);
     const dated = verifiedDate(log.reviewedAt);
 
     return (
@@ -110,6 +111,7 @@ export default function QuickImpactCertificate({
                                     <p className="cert-metric-label">SDG Alignment</p>
                                     <p className="cert-metric-value">{sdgOk ? `Goal ${sdg}` : "—"}</p>
                                     {sdgOk ? <p className="cert-metric-sdg-sub">{SDG_NAMES[sdg - 1]}</p> : null}
+                                    {sdgOk && otherGoals.length ? <p className="cert-metric-sdg-sub">Also SDG {otherGoals.join(", ")}</p> : null}
                                 </div>
                             </div>
 

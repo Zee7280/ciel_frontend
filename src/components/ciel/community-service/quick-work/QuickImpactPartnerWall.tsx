@@ -20,6 +20,8 @@ type PartnerImpactRow = {
     sdg: number | null;
     sdgName: string | null;
     sdgColor: string | null;
+    /** Every goal, the main one first (an older API sends only the main one above). */
+    sdgs?: { n: number; name: string; color: string; main: boolean }[];
     host: string | null;
     partners: string[];
 };
@@ -58,6 +60,7 @@ export default function QuickImpactPartnerWall() {
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {rows.map((r) => {
                     const hosts = [r.host, ...r.partners].filter(Boolean).join(" · ");
+                    const goals = r.sdgs ?? (r.sdg ? [{ n: r.sdg, name: r.sdgName ?? "", color: r.sdgColor ?? "#607d8b", main: true }] : []);
                     return (
                         <article key={r.id} className="qif-card">
                             <div className="qif-top">
@@ -86,11 +89,13 @@ export default function QuickImpactPartnerWall() {
                                 </div>
                             </div>
                             <div className="qif-body">
-                                <h4>Sustainable Development Goal</h4>
-                                {r.sdg ? (
-                                    <span className="qif-sdg" style={{ background: r.sdgColor ?? "#607d8b" }}>
-                                        SDG {r.sdg} · {r.sdgName}
-                                    </span>
+                                <h4>{goals.length > 1 ? "Sustainable Development Goals" : "Sustainable Development Goal"}</h4>
+                                {goals.length ? (
+                                    goals.map((g) => (
+                                        <span key={g.n} className="qif-sdg" style={{ background: g.color }}>
+                                            SDG {g.n} · {g.name}
+                                        </span>
+                                    ))
                                 ) : (
                                     <p>SDG not selected.</p>
                                 )}

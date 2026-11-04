@@ -18,6 +18,9 @@ type Preview = {
     participants: number;
     answer: "pending" | "accepted" | "declined" | null;
     open: boolean;
+    /** The invited email has no CIEL student account yet: sign up first, then approve. */
+    needsSignup?: boolean;
+    signupEmail?: string | null;
 };
 
 const API = "/api/v1/quick-work/email-response";
@@ -160,7 +163,33 @@ function Respond() {
                 </p>
             ) : null}
 
-            {preview.open ? (
+            {preview.needsSignup && preview.open ? (
+                <div className="mt-5 rounded-lg border border-[#cfe9e5] bg-[#f2fbf9] px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">Create your CIEL student account first</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                        There is no CIEL student account for <b>{preview.signupEmail}</b> yet. Sign up as a student with this same email. Once you are
+                        in, this activity waits in your Quick Impact Log for you to approve or reject.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <Link
+                            href={`/signup?${new URLSearchParams({
+                                role: "student",
+                                ...(preview.signupEmail ? { email: preview.signupEmail } : {}),
+                                next: QUICK_WORK_HREF,
+                            }).toString()}`}
+                            className="inline-flex items-center rounded-lg bg-[#0e7d74] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0b6760]"
+                        >
+                            Create your student account
+                        </Link>
+                        <Link
+                            href={`/login?${new URLSearchParams({ next: QUICK_WORK_HREF }).toString()}`}
+                            className="text-sm font-bold text-[#0e7d74] hover:underline"
+                        >
+                            Already have an account? Sign in
+                        </Link>
+                    </div>
+                </div>
+            ) : preview.open ? (
                 <div className="mt-5 flex flex-wrap gap-2.5">
                     <button
                         type="button"
@@ -186,7 +215,7 @@ function Respond() {
                 </div>
             ) : (
                 <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    This request is closed (the activity was submitted or its details changed), so answers can no longer change here.
+                    This request is closed (CIEL PK has already decided on this activity, or this link no longer applies), so answers can no longer change here.
                 </p>
             )}
 

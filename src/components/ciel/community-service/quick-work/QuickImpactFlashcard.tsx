@@ -60,10 +60,12 @@ export function QuickImpactFlashcard({ log, compact = false }: { log: QuickWorkL
             </div>
             <div className="qif-body">
                 <h4>Sustainable Development Goals</h4>
-                {card.sdg ? (
-                    <span className="qif-sdg" style={{ background: card.sdgColor }}>
-                        {card.sdg}
-                    </span>
+                {card.sdgs.length ? (
+                    card.sdgs.map((g) => (
+                        <span key={g.n} className="qif-sdg" style={{ background: g.color }}>
+                            {g.label}
+                        </span>
+                    ))
                 ) : (
                     <p>SDG not selected.</p>
                 )}

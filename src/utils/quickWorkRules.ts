@@ -52,6 +52,8 @@ export type QuickWorkLog = {
     /** Partners with optional email / contact (newer API); `partners` holds just the names. */
     partnerDetails?: { name: string; email: string | null; contact: string | null }[];
     sdg: number | null;
+    /** Other goals besides the main `sdg` (older API: absent). */
+    secondarySdgs?: number[];
     summary: string;
     peopleReached: number | null;
     /** Optional target for "Reach against target" on the review flashcard (older API: absent; the card hides it). */
@@ -71,6 +73,8 @@ export type QuickWorkLog = {
     /** The viewing student's certificate once CIEL PK approved and they were credited (older API: absent). */
     certificate?: { code: string } | null;
     participants: QuickWorkParticipant[];
+    /** Lead only: teammates named by email who have no CIEL student account yet (they were emailed a sign-up link). */
+    pendingInvites?: { id: string; email: string; name: string; studentId: string; contact: string | null }[];
 };
 
 export function viewerRow(log: QuickWorkLog): QuickWorkParticipant | undefined {
@@ -133,6 +137,11 @@ export const SDG_NAMES = [
 
 export const QUICK_WORK_MAX_PARTICIPANTS = 500;
 export const QUICK_WORK_MAX_DAILY_MINUTES = 9 * 60;
+/** The server's limits: a break is at most a day, and a head count at most ten million (a bigger value would fail an autosave). */
+export const QUICK_WORK_MAX_BREAK_MINUTES = 24 * 60;
+export const QUICK_WORK_MAX_PEOPLE = 10_000_000;
+/** An activity links to up to five goals: the main one plus four more. */
+export const QUICK_WORK_MAX_SDGS = 5;
 export const QUICK_WORK_MAX_EVIDENCE = 10;
 export const QUICK_WORK_MAX_EVIDENCE_BYTES = 100 * 1024 * 1024;
 
@@ -260,6 +269,27 @@ export function sdgLabel(sdg: number | null | undefined): string | null {
     return Number.isInteger(n) && n >= 1 && n <= 17 ? `SDG ${n} · ${SDG_NAMES[n - 1]}` : null;
 }
 
+/** Every goal of a log, the main one first: goals 1-17 only, no repeats, at most five. Works for older records (no `secondarySdgs`). */
+export function logSdgs(log: { sdg?: number | null; secondarySdgs?: number[] | null }): number[] {
+    const out: number[] = [];
+    for (const v of [log.sdg, ...(log.secondarySdgs ?? [])]) {
+        const n = Number(v);
+        if (v != null && Number.isInteger(n) && n >= 1 && n <= 17 && !out.includes(n)) out.push(n);
+    }
+    return out.slice(0, QUICK_WORK_MAX_SDGS);
+}
+
+/** A goal as a chip: its number, name, "SDG 3 · Good Health…" label and colour. */
+export function sdgChip(n: number): { n: number; name: string; label: string; color: string } {
+    return { n, name: SDG_NAMES[n - 1] ?? "", label: `SDG ${n} · ${SDG_NAMES[n - 1] ?? ""}`, color: SDG_COLORS[n] ?? "#9656ac" };
+}
+
+/** "SDG 3, 13" (or "SDG 3"), or null when the log has no goal. */
+export function sdgShort(log: { sdg?: number | null; secondarySdgs?: number[] | null }): string | null {
+    const list = logSdgs(log);
+    return list.length ? `SDG ${list.join(", ")}` : null;
+}
+
 /** Approved logs in which the viewing student was credited with time: their published Quick Impact flashcards. */
 export function quickImpactPublishedForViewer(logs: QuickWorkLog[]): QuickWorkLog[] {
     return logs.filter((log) => {
@@ -306,6 +336,8 @@ export function quickImpactFlashcard(log: QuickWorkLog) {
         evidenceCount: log.evidence.length,
         sdg: sdgLabel(log.sdg),
         sdgColor: SDG_COLORS[Number(log.sdg)] ?? "#9656ac",
+        /** Every goal, the main one first. */
+        sdgs: logSdgs(log).map(sdgChip),
         partners: log.partners.filter((p) => p.trim()),
         host: log.host?.trim() || null,
     };
@@ -344,7 +376,9 @@ export type QuickWorkForm = {
     /** Full number with country code (+923001234567), or empty. */
     hostContact: string;
     partners: QuickWorkPartnerForm[];
+    /** The main goal ("" for none) and the other goals, as goal-number strings. */
     sdg: string;
+    secondarySdgs: string[];
     attendance: Record<string, { present: boolean; startTime: string; endTime: string; breakMinutes: string }>;
     summary: string;
     peopleReached: string;
@@ -400,6 +434,8 @@ export function activityErrors(f: QuickWorkForm, now: Date = new Date()): string
     const s = minutesOfDay(f.startTime);
     const en = minutesOfDay(f.endTime);
     if (!Number.isFinite(s) || !Number.isFinite(en) || en <= s) e.push("Choose an end time after the start time on the same day.");
+    // Up to five goals: the main one and four more (the picker stops there; this guards a restored draft).
+    if ((f.secondarySdgs ?? []).length + (f.sdg ? 1 : 0) > QUICK_WORK_MAX_SDGS) e.push(`Choose up to ${QUICK_WORK_MAX_SDGS} SDGs.`);
     return e;
 }
 
@@ -408,7 +444,7 @@ export function attendanceErrors(f: QuickWorkForm, now: Date = new Date()): stri
     const { date: today, time } = pktNow(now);
     if (f.activityDate > today) e.push("Attendance can only be submitted for today or a past activity.");
     else if (f.activityDate === today && minutesOfDay(f.endTime) > minutesOfDay(time)) e.push("Submit after the activity has finished (PKT).");
-    const people = formPeople(f);
+    const people = attendees(f);
     if (!people.some((p) => attendanceFor(f, p.email).present)) e.push("Mark at least one participant as present.");
     const evStart = minutesOfDay(f.startTime);
     const evEnd = minutesOfDay(f.endTime);
@@ -438,32 +474,78 @@ export function evidenceErrors(f: QuickWorkForm): string[] {
     if (!f.consent || !f.honest) e.push("Confirm evidence consent and the attendance declaration.");
     if (f.peopleReached !== "" && (!Number.isInteger(Number(f.peopleReached)) || Number(f.peopleReached) < 0)) {
         e.push("People reached must be a non-negative whole number.");
+    } else if (Number(f.peopleReached) > QUICK_WORK_MAX_PEOPLE) {
+        e.push(`People reached cannot be more than ${QUICK_WORK_MAX_PEOPLE.toLocaleString("en-US")}.`);
     }
     const target = String(f.peopleTarget ?? "").trim(); // older drafts / callers may not carry the field
     if (target !== "" && (!Number.isInteger(Number(target)) || Number(target) < 1)) {
         e.push("People target must be a whole number of 1 or more, or leave it empty.");
+    } else if (Number(target) > QUICK_WORK_MAX_PEOPLE) {
+        e.push(`People target cannot be more than ${QUICK_WORK_MAX_PEOPLE.toLocaleString("en-US")}.`);
     }
     return e;
 }
 
-/** Teammates who still have to confirm (or who declined): submit is blocked until resolved. */
+/**
+ * The people whose time is recorded: everyone on the log. A teammate still to sign up on CIEL is not on the
+ * log yet (only invited by email), so there is no attendance to enter for them.
+ */
+export function attendees(f: QuickWorkForm): ReturnType<typeof formPeople> {
+    return formPeople(f).filter((p) => p.joinStatus !== "awaiting_signup");
+}
+
+/** Teammates who declined: submit is blocked until the lead removes them. */
 export function joinErrors(f: QuickWorkForm): string[] {
     if (f.mode !== "team") return [];
-    return f.teammates.flatMap((t) =>
-        t.joinStatus === "declined"
-            ? [`${t.name || t.email} declined to join. Remove them before submitting.`]
-            : t.joinStatus !== "joined"
-              ? [`${t.name || t.email} has not confirmed joining yet.`]
-              : [],
-    );
+    // A teammate who has not answered (or has not signed up) does not hold the log back; they can confirm until
+    // CIEL PK's final decision, and only confirmed teammates are credited. One who declined must be removed.
+    return f.teammates.flatMap((t) => (t.joinStatus === "declined" ? [`${t.name || t.email} declined to join. Remove them before submitting.`] : []));
+}
+
+/** Statuses in which a teammate can still confirm or decline (the lead's own edits, then until CIEL PK decides). */
+export const QUICK_WORK_CONFIRMABLE_STATUSES: readonly string[] = ["draft", "changes", "submitted", "admin_review"];
+
+/** Teammates who have not answered yet (not joined, not declined), including those still to sign up. */
+export function unconfirmedTeammates(f: Pick<QuickWorkForm, "mode" | "teammates">): QuickWorkForm["teammates"] {
+    return f.mode === "team" ? f.teammates.filter((t) => t.joinStatus !== "joined" && t.joinStatus !== "declined") : [];
+}
+
+/** A reviewer's note on a participant who is not confirmed ("" for the lead and for confirmed teammates). */
+export function joinNote(p: { isLead: boolean; joinStatus: string }, status: string): string {
+    if (p.isLead || p.joinStatus === "joined") return "";
+    if (p.joinStatus === "declined") return "Declined to take part";
+    return status === "approved"
+        ? "Did not confirm: not credited"
+        : "Has not confirmed: credited only if they confirm before CIEL PK's final approval";
 }
 
 /** Server view → form state. */
 /** The people target to save: a whole number of 1 or more, else null (empty, missing, 0 or not a number). */
 function payloadTarget(value: unknown): number | null {
+    return payloadCount(value, 1);
+}
+
+/** A whole number from `min` to ten million, else null (empty, missing, out of range or not a number). */
+function payloadCount(value: unknown, min: number): number | null {
     const text = String(value ?? "").trim();
     const n = Number(text);
-    return text !== "" && Number.isInteger(n) && n >= 1 ? n : null;
+    return text !== "" && Number.isInteger(n) && n >= min && n <= QUICK_WORK_MAX_PEOPLE ? n : null;
+}
+
+/** The goals as the form holds them: the first is the main one. */
+export function formSdgFields(list: string[]): { sdg: string; secondarySdgs: string[] } {
+    return { sdg: list[0] ?? "", secondarySdgs: list.slice(1) };
+}
+
+/** The form's goals as one ordered list (main first); a missing main promotes the first other, as the server does. */
+export function formSdgs(f: Pick<QuickWorkForm, "sdg"> & { secondarySdgs?: string[] }): string[] {
+    return logSdgs({ sdg: f.sdg ? Number(f.sdg) : null, secondarySdgs: (f.secondarySdgs ?? []).map(Number) }).map(String);
+}
+
+/** `sdg` + `secondarySdgs` for the PATCH body. */
+function payloadSdgs(f: QuickWorkForm): { sdg: number | null; secondarySdgs: number[] } {
+    const list = formSdgs(f).map(Number);
+    return { sdg: list[0] ?? null, secondarySdgs: list.slice(1) };
 }
 
 export function formFromLog(log: QuickWorkLog): QuickWorkForm {
@@ -486,9 +568,19 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
         department: log.department,
         facultyName: log.facultyName,
         facultyEmail: log.facultyEmail,
-        teammates: log.participants
-            .filter((p) => !p.isLead)
-            .map((p) => ({ email: p.email, studentId: p.studentId, name: p.name, contact: p.contact ?? "", joinStatus: p.joinStatus })),
+        teammates: [
+            ...log.participants
+                .filter((p) => !p.isLead)
+                .map((p) => ({ email: p.email, studentId: p.studentId, name: p.name, contact: p.contact ?? "", joinStatus: p.joinStatus })),
+            // Not on CIEL yet: kept in the list so saving the form never drops them, and submit stays blocked.
+            ...(log.pendingInvites ?? []).map((p) => ({
+                email: p.email,
+                studentId: p.studentId,
+                name: p.name,
+                contact: p.contact ?? "",
+                joinStatus: "awaiting_signup",
+            })),
+        ],
         title: log.title,
         activityType: log.activityType,
         activityTypeOther: log.activityTypeOther ?? "",
@@ -505,7 +597,7 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
             email: p.email ?? "",
             contact: p.contact ?? "",
         })),
-        sdg: log.sdg ? String(log.sdg) : "",
+        ...formSdgFields(logSdgs(log).map(String)),
         attendance,
         summary: log.summary,
         peopleReached: log.peopleReached == null ? "" : String(log.peopleReached),
@@ -544,8 +636,8 @@ export function payloadFromForm(f: QuickWorkForm) {
         // Names for an older API, details for this one (it prefers partnerDetails).
         partners: f.partners.map((p) => p.name),
         partnerDetails: f.partners.map((p) => ({ name: p.name, email: p.email.trim() || null, contact: p.contact.trim() || null })),
-        sdg: f.sdg ? Number(f.sdg) : null,
-        attendance: formPeople(f).map((p) => {
+        ...payloadSdgs(f),
+        attendance: attendees(f).map((p) => {
             const a = attendanceFor(f, p.email);
             const br = Number(a.breakMinutes);
             return {
@@ -553,11 +645,12 @@ export function payloadFromForm(f: QuickWorkForm) {
                 present: a.present,
                 startTime: a.startTime || null,
                 endTime: a.endTime || null,
-                breakMinutes: Number.isInteger(br) && br >= 0 ? br : 0,
+                // A break over a day would be refused by the server (the step check reports it), so an autosave never fails on it.
+                breakMinutes: Number.isInteger(br) && br >= 0 && br <= QUICK_WORK_MAX_BREAK_MINUTES ? br : 0,
             };
         }),
         summary: f.summary,
-        peopleReached: f.peopleReached === "" || !Number.isInteger(Number(f.peopleReached)) ? null : Number(f.peopleReached),
+        peopleReached: payloadCount(f.peopleReached, 0),
         // Only a whole number of 1 or more is saved (the step check reports anything else), so an autosave never fails on it.
         peopleTarget: payloadTarget(f.peopleTarget),
         visibility: f.visibility,
