@@ -13,6 +13,7 @@ import {
     type QuickWorkEvidence,
     type QuickWorkLog,
 } from "@/utils/quickWorkRules";
+import { impactPoints } from "@/utils/quickImpactPoints";
 import { EvidenceTile } from "./QuickWorkShared";
 import "./quick-impact-review.css";
 
@@ -22,19 +23,7 @@ import "./quick-impact-review.css";
  * what the saved log already holds, so nothing here changes what is submitted.
  */
 
-const ABBREVIATIONS = /^(dr|mr|mrs|ms|prof|st|vs|no|e\.g|i\.e)$/i;
 const MAX_HIGHLIGHTS = 5;
-
-/** Splits the activity description into short highlight lines (no regex look-behind: older Safari). */
-export function impactPoints(text: string | null | undefined): string[] {
-    const marked = String(text ?? "").replace(/(\S+?)([.!?]+)\s+/g, (m: string, word: string, punct: string) =>
-        ABBREVIATIONS.test(word) ? m : `${word}${punct}\n`,
-    );
-    return marked
-        .split(/\n+/)
-        .map((v) => v.trim().replace(/[.!?]+$/, ""))
-        .filter(Boolean);
-}
 
 function contactLine(email?: string | null, contact?: string | null): string {
     return [email, contact ? formatInternationalPhoneDisplay(contact) : ""].filter(Boolean).join(" · ");

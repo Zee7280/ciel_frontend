@@ -138,3 +138,29 @@ test("partners round-trip with contacts, and older name-only responses still loa
     const older = formFromLog({ ...base, partners: ["Edhi"] });
     assert.deepEqual(older.partners, [{ name: "Edhi", email: "", contact: "" }]);
 });
+
+test("people target is optional: empty, missing or a whole number of 1+ passes; 0, decimals and text are reported", () => {
+    const errs = (over) => evidenceErrors(form(over));
+    const msg = "People target must be a whole number of 1 or more, or leave it empty.";
+    assert.ok(!errs({ peopleTarget: "" }).includes(msg));
+    assert.ok(!errs({ peopleTarget: "40" }).includes(msg));
+    // Older drafts / callers do not carry the field at all.
+    const { peopleTarget: _omit, ...without } = form({ peopleTarget: "5" });
+    assert.ok(!evidenceErrors(without).includes(msg));
+    assert.ok(!errs({ peopleTarget: null }).includes(msg));
+    for (const bad of ["0", "-3", "2.5", "abc"]) assert.ok(errs({ peopleTarget: bad }).includes(msg), `"${bad}" should be reported`);
+});
+
+test("the saved payload carries the people target only when it is a whole number of 1 or more", () => {
+    const log = { id: "l1", status: "draft", mode: "solo", university: "", department: "", facultyName: "", facultyEmail: "", title: "", activityType: "", activityDate: null, startTime: null, endTime: null, location: "", host: null, sdg: null, summary: "", peopleReached: null, visibility: "Faculty, University & CIEL PK only", evidence: [], consent: false, honest: false, participants: [{ id: "p1", userId: "u1", isLead: true, name: "A", email: "a@x.pk", studentId: "S1", joinStatus: "joined", present: true, startTime: null, endTime: null, breakMinutes: 0, minutes: 0 }] };
+    const saved = (peopleTarget) => payloadFromForm({ ...formFromLog(log), peopleTarget }).peopleTarget;
+    assert.equal(saved("40"), 40);
+    for (const v of ["", undefined, null, "0", "-1", "2.5", "abc"]) assert.equal(saved(v), null, `${String(v)} must save as null`);
+});
+
+test("formFromLog reads the people target, and an older server record without it gives an empty field", () => {
+    const base = { id: "l1", status: "draft", mode: "solo", university: "", department: "", facultyName: "", facultyEmail: "", title: "", activityType: "", activityDate: null, startTime: null, endTime: null, location: "", host: null, sdg: null, summary: "", peopleReached: null, visibility: "Faculty, University & CIEL PK only", evidence: [], consent: false, honest: false, participants: [{ id: "p1", userId: "u1", isLead: true, name: "A", email: "a@x.pk", studentId: "S1", joinStatus: "joined", present: true, startTime: null, endTime: null, breakMinutes: 0, minutes: 0 }] };
+    assert.equal(formFromLog({ ...base, peopleTarget: 35 }).peopleTarget, "35");
+    assert.equal(formFromLog({ ...base, peopleTarget: null }).peopleTarget, "");
+    assert.equal(formFromLog(base).peopleTarget, "");
+});

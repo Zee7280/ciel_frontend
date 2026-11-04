@@ -1157,7 +1157,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                             step={1}
                                             className={inputCls}
                                             placeholder="e.g. 40"
-                                            value={form.peopleTarget}
+                                            value={form.peopleTarget ?? ""}
                                             onChange={(e) => patch({ peopleTarget: e.target.value })}
                                         />
                                     </Field>

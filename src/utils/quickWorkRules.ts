@@ -439,7 +439,8 @@ export function evidenceErrors(f: QuickWorkForm): string[] {
     if (f.peopleReached !== "" && (!Number.isInteger(Number(f.peopleReached)) || Number(f.peopleReached) < 0)) {
         e.push("People reached must be a non-negative whole number.");
     }
-    if (f.peopleTarget !== "" && (!Number.isInteger(Number(f.peopleTarget)) || Number(f.peopleTarget) < 1)) {
+    const target = String(f.peopleTarget ?? "").trim(); // older drafts / callers may not carry the field
+    if (target !== "" && (!Number.isInteger(Number(target)) || Number(target) < 1)) {
         e.push("People target must be a whole number of 1 or more, or leave it empty.");
     }
     return e;
@@ -458,6 +459,13 @@ export function joinErrors(f: QuickWorkForm): string[] {
 }
 
 /** Server view → form state. */
+/** The people target to save: a whole number of 1 or more, else null (empty, missing, 0 or not a number). */
+function payloadTarget(value: unknown): number | null {
+    const text = String(value ?? "").trim();
+    const n = Number(text);
+    return text !== "" && Number.isInteger(n) && n >= 1 ? n : null;
+}
+
 export function formFromLog(log: QuickWorkLog): QuickWorkForm {
     const lead = log.participants.find((p) => p.isLead);
     const attendance: QuickWorkForm["attendance"] = {};
@@ -550,7 +558,8 @@ export function payloadFromForm(f: QuickWorkForm) {
         }),
         summary: f.summary,
         peopleReached: f.peopleReached === "" || !Number.isInteger(Number(f.peopleReached)) ? null : Number(f.peopleReached),
-        peopleTarget: f.peopleTarget === "" || !Number.isInteger(Number(f.peopleTarget)) ? null : Number(f.peopleTarget),
+        // Only a whole number of 1 or more is saved (the step check reports anything else), so an autosave never fails on it.
+        peopleTarget: payloadTarget(f.peopleTarget),
         visibility: f.visibility,
         evidence: f.evidence,
         consent: f.consent,
