@@ -60,11 +60,10 @@ import {
     ModalClose,
     PhotoIcon,
     QuickWorkModal,
-    EvidenceGallery,
-    QuickWorkRecordDetails,
     QuickWorkReminder,
     QuickWorkStatusPill,
 } from "@/components/ciel/community-service/quick-work/QuickWorkShared";
+import { QuickImpactReview } from "@/components/ciel/community-service/quick-work/QuickImpactReview";
 import { useQuickWorkRoutes } from "@/components/ciel/community-service/quick-work/QuickWorkRoutes";
 import { teammateReminder } from "@/utils/quickWorkReminders";
 
@@ -1150,6 +1149,18 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                                     {form.summary.length} / {QUICK_WORK_SUMMARY_MAX} characters · 2–3 sentences are enough
                                 </div>
                                 <div className="my-4 grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
+                                    <Field id="qwTarget" label="Target people to reach" optional>
+                                        <input
+                                            id="qwTarget"
+                                            type="number"
+                                            min={1}
+                                            step={1}
+                                            className={inputCls}
+                                            placeholder="e.g. 40"
+                                            value={form.peopleTarget}
+                                            onChange={(e) => patch({ peopleTarget: e.target.value })}
+                                        />
+                                    </Field>
                                     <Field id="qwReach" label="People reached" optional>
                                         <input
                                             id="qwReach"
@@ -1314,7 +1325,7 @@ export default function QuickWorkLogForm({ logId }: { logId: string }) {
                         </div>
                         <ModalClose onClose={() => !submitting && setPreview(false)} />
                     </header>
-                    <QuickWorkRecordDetails log={log} evidence={<EvidenceGallery evidence={log.evidence} />} />
+                    <QuickImpactReview log={log} />
                     <p className="mt-3 text-xs text-[#6b7c86]">
                         {form.evidence.length} evidence {form.evidence.length === 1 ? "file" : "files"} · {form.visibility}. {log.facultyName} reviews the complete record before any hours count.
                     </p>

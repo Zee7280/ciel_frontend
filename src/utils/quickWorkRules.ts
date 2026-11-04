@@ -54,6 +54,8 @@ export type QuickWorkLog = {
     sdg: number | null;
     summary: string;
     peopleReached: number | null;
+    /** Optional target for "Reach against target" on the review flashcard (older API: absent; the card hides it). */
+    peopleTarget?: number | null;
     visibility: string;
     evidence: QuickWorkEvidence[];
     consent: boolean;
@@ -346,6 +348,8 @@ export type QuickWorkForm = {
     attendance: Record<string, { present: boolean; startTime: string; endTime: string; breakMinutes: string }>;
     summary: string;
     peopleReached: string;
+    /** Optional; shown as "Reach against target" on the review flashcard. */
+    peopleTarget: string;
     visibility: string;
     evidence: QuickWorkEvidence[];
     consent: boolean;
@@ -435,6 +439,9 @@ export function evidenceErrors(f: QuickWorkForm): string[] {
     if (f.peopleReached !== "" && (!Number.isInteger(Number(f.peopleReached)) || Number(f.peopleReached) < 0)) {
         e.push("People reached must be a non-negative whole number.");
     }
+    if (f.peopleTarget !== "" && (!Number.isInteger(Number(f.peopleTarget)) || Number(f.peopleTarget) < 1)) {
+        e.push("People target must be a whole number of 1 or more, or leave it empty.");
+    }
     return e;
 }
 
@@ -494,6 +501,7 @@ export function formFromLog(log: QuickWorkLog): QuickWorkForm {
         attendance,
         summary: log.summary,
         peopleReached: log.peopleReached == null ? "" : String(log.peopleReached),
+        peopleTarget: log.peopleTarget == null ? "" : String(log.peopleTarget),
         visibility: log.visibility,
         evidence: log.evidence,
         consent: log.consent,
@@ -542,6 +550,7 @@ export function payloadFromForm(f: QuickWorkForm) {
         }),
         summary: f.summary,
         peopleReached: f.peopleReached === "" || !Number.isInteger(Number(f.peopleReached)) ? null : Number(f.peopleReached),
+        peopleTarget: f.peopleTarget === "" || !Number.isInteger(Number(f.peopleTarget)) ? null : Number(f.peopleTarget),
         visibility: f.visibility,
         evidence: f.evidence,
         consent: f.consent,
