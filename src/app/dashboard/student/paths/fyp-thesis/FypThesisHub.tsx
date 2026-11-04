@@ -899,7 +899,7 @@ export default function FypThesisHub({
                         subtitle="Your draft saves automatically; your supervisor only sees it after you submit."
                         action={<LoopBack />}
                     />
-                    <MockupPanel title="Create FYP Record" subtitle="No pre-approval. Saving Section 1 creates your FYP ID and master record.">
+                    <MockupPanel title="Start your final year project" subtitle="No pre-approval. Saving Section 1 creates your FYP ID and master record.">
                         {createError ? <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{createError}</p> : null}
                         <div className="mb-3.5 rounded-xl border border-[#ead8b8] bg-[#fff8ec] px-3 py-3 text-[11.5px] leading-relaxed text-[#715a2d]">
                             No pre-approval is required. The button opens the <b>CIEL PK Final Year Projects Form</b> — eight sections (Route → Roadmap → Pathway → Evidence → Outcome → Sustainability → Reflection → Review).{" "}
@@ -911,7 +911,7 @@ export default function FypThesisHub({
                                     disabled={creating}
                             className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#174b43] px-4 py-3 text-xs font-black text-white disabled:cursor-wait disabled:opacity-70"
                                 >
-                                    🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
+                                    🎓 {creating ? "Creating…" : "CREATE FYP RECORD"}
                                 </button>
                         <div className="mt-4 rounded-xl border border-[#d5eee8] bg-[#eef8f6] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#4b6f68]">
                             Once you start, the record appears under <b>Final Year Project (FYP) → FYP in Progress</b> with a live progress bar and “Sections Completed” count. Your supervisor, university and CIEL PK see the same progress % in real time and can send reminders — never your unfinished text.
@@ -976,7 +976,7 @@ export default function FypThesisHub({
                                     disabled={creating}
                                     className="mt-4 inline-flex items-center gap-1.5 rounded-[9px] bg-[#174b43] px-4 py-3 text-xs font-black text-white disabled:opacity-70"
                                 >
-                                    🎓 {creating ? "Opening…" : "OPEN FYP FORM"}
+                                    🎓 {creating ? "Creating…" : "CREATE FYP RECORD"}
                                         </button>
                                 </div>
                         ) : (

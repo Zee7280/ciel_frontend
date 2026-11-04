@@ -14,6 +14,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import { mailtoHref } from "@/utils/reminderLinks";
+import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -498,6 +499,12 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 setError(`Please complete Name, Roll No., Email, Country Code and WhatsApp Number for Group Member ${incomplete + 1}.`);
                 return;
             }
+            const ownEmail = getStoredCurrentUserEmail();
+            const ownIdx = ownEmail ? members.findIndex((m) => (m.email ?? "").trim().toLowerCase() === ownEmail) : -1;
+            if (ownIdx >= 0) {
+                setError(`Group Member ${ownIdx + 1} uses your own email. Add your teammates' emails here — you are already on this record.`);
+                return;
+            }
             const badPhone = members.findIndex(
                 (m) =>
                     !/^\+\d{1,4}$/.test(normalizeCountryCode(m.whatsappCode)) ||
@@ -766,7 +773,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                     <span className="rounded-full bg-ciel-purple-soft px-2 py-1 text-[9px] font-black text-ciel-purple">SHARED PROJECT RECORD</span>
                                 </div>
                                 {(team.length ? team : [emptyTeamMember(), emptyTeamMember()]).map((m, i) => (
-                                    <div key={i} className="mb-2 grid gap-2 border-t border-dashed border-ciel-border pt-2 sm:grid-cols-2 lg:grid-cols-6">
+                                    <div key={i} className="mb-2 grid items-end gap-2 border-t border-dashed border-ciel-border pt-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.5fr)_5rem_minmax(0,1.1fr)_auto]">
                                         <div>
                                             <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Name *</label>
                                             <input value={m.name} onChange={(e) => updateTeam(i, { name: e.target.value })} placeholder="Full name" className={fieldClass} />
@@ -778,7 +785,6 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                         <div>
                                             <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Email *</label>
                                             <input type="email" value={m.email ?? ""} onChange={(e) => updateTeam(i, { email: e.target.value })} placeholder="student@university.edu.pk" className={fieldClass} />
-                                            <TeamInviteBadge kind="fyp" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                         </div>
                                         <div>
                                             <label className="mb-1 block text-[8.5px] font-black uppercase tracking-wide text-ciel-text-soft">Country Code *</label>
@@ -796,12 +802,13 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                                 const next = (team.length ? team : [emptyTeamMember(), emptyTeamMember()]).filter((_, j) => j !== i);
                                                 setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, teamMembers: next } }));
                                             }}
-                                            className="self-end rounded-[9px] border border-red-200 bg-red-50 px-3 py-2.5 text-red-600"
+                                            className="flex h-[42px] items-center justify-center rounded-[9px] border border-red-200 bg-red-50 px-3 text-red-600 sm:justify-self-end"
                                         >
                                             <X className="h-4 w-4" aria-hidden />
                                         </button>
                                         {(m.email?.trim() || (normalizeCountryCode(m.whatsappCode) && normalizeLocalNumber(m.whatsappNumber))) ? (
-                                            <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-6">
+                                            <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-6">
+                                                <TeamInviteBadge kind="fyp" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                                 {m.email?.trim() ? (
                                                     <a
                                                         href={mailtoHref(
