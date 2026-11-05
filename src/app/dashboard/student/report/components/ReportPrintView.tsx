@@ -754,9 +754,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
           })
             : submissionDateRaw || "—";
     const printHeaderReportIdSource = firstNonBlank(data.report_id, data.id, data.project_id);
-    const printHeaderReportIdDisplay = printHeaderReportIdSource
-        ? formatDisplayId(printHeaderReportIdSource, "CPK")
-        : "—";
+    const printHeaderPublicId = firstNonBlank(data.public_id, data.publicId);
+    const printHeaderReportIdDisplay = printHeaderPublicId
+        ? printHeaderPublicId
+        : printHeaderReportIdSource
+          ? formatDisplayId(printHeaderReportIdSource, "CPK")
+          : "—";
 
     const sectionInk = "#071A33";
     const tealInk = "#0F8F83";

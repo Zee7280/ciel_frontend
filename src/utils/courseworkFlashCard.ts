@@ -39,6 +39,7 @@ export function formatFlashDate(iso?: string | null): string {
 }
 
 export function courseworkRecordCode(entry: CourseProjectEntry): string {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const raw = (entry.verificationPublicSlug || entry.id || "").replace(/-/g, "");
     const tail = raw.slice(-4).toUpperCase().padStart(4, "0");

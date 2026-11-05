@@ -58,6 +58,7 @@ type ReviewTab = "all" | "pending" | "revision" | "rejected";
 type DashHero = { active: number; hours: string; portfolio: number; completion: number };
 
 function displayFypId(entry: FypEntry) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `FYP-${year}-${tail}`;

@@ -25,6 +25,7 @@ const BASE = "/dashboard/investor";
 
 type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
+    publicId?: string | null;
     ventureName?: string | null;
     createdAt?: string;
     updatedAt?: string;
@@ -102,6 +103,7 @@ function nowStamp() {
     return `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} · ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 }
 function displayVentureId(entry: HubVenture) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `VEN-${year}-${tail}`;

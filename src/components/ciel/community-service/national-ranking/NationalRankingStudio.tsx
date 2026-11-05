@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { recordIdLabel } from "@/utils/recordId";
 import "./ranking-studio.css";
 import {
     FALLBACK_GROUPS,
@@ -871,7 +872,7 @@ export default function NationalRankingStudio({
                                                         <td><span className="rank">#{r.rank}</span></td>
                                                         <td>
                                                             <span className="pname">{r.label}</span>
-                                                            <span className="pmeta">{isProject ? `${r.id.slice(0, 8)} · ${fmtDate(p?.date ?? "")}` : `${result?.groupBy} · ${r.projectCount} included`}</span>
+                                                            <span className="pmeta">{isProject ? `${recordIdLabel(p?.publicId, r.id)} · ${fmtDate(p?.date ?? "")}` : `${result?.groupBy} · ${r.projectCount} included`}</span>
                                                         </td>
                                                         <td>
                                                             {isProject ? (

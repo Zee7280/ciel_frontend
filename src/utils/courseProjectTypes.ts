@@ -202,6 +202,8 @@ export interface CourseProjectSectionSummaries {
 
 export interface CourseProjectEntry {
     id?: string;
+    /** Public record id (CIEL-BNU-2026-0421), issued when the record gets its title. */
+    publicId?: string | null;
     userId?: string;
     course: string | null;
     projectTitle: string | null;

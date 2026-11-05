@@ -27,6 +27,9 @@ export interface ReportData {
     /** Display code on printed certificate (from backend). */
     certificate_verification_code?: string | null;
     certificateVerificationCode?: string | null;
+    /** Public record id (CIEL-BNU-2026-0421) once the report has been submitted. */
+    public_id?: string | null;
+    publicId?: string | null;
     /** Backend impact report row id when distinct from `project_id`. */
     report_id?: string;
     /** Report document id from API when present. */

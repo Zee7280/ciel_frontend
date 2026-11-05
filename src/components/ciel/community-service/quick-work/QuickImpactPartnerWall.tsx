@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
+import { recordIdLabel } from "@/utils/recordId";
 import "./quick-impact-flashcard.css";
 
 /** One approved Quick Community Impact activity that names this organisation (counts only: no student names or contacts). */
 type PartnerImpactRow = {
     id: string;
+    publicId?: string | null;
     title: string;
     activityType: string;
     date: string;
@@ -119,7 +121,7 @@ export default function QuickImpactPartnerWall() {
                             </div>
                             <div className="qif-footer">
                                 <span>✓ Faculty verified · ✓ CIEL PK published</span>
-                                <b>Ref {r.id.slice(0, 8).toUpperCase()}</b>
+                                <b>Ref {recordIdLabel(r.publicId, r.id)}</b>
                             </div>
                         </article>
                     );

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { recordIdLabel } from "@/utils/recordId";
 import { FilterChips } from "./StudioParts";
 import {
     fmtDate,
@@ -164,7 +165,7 @@ export function PackagesScreen({
                         <tbody>
                             {list.map((p) => (
                                 <tr key={p.id}>
-                                    <td><b>{p.title}</b><small className="pmeta">{p.id.slice(0, 8)} · {fmtDate(p.date)}</small></td>
+                                    <td><b>{p.title}</b><small className="pmeta">{recordIdLabel(p.publicId, p.id)} · {fmtDate(p.date)}</small></td>
                                     <td>{p.university}<small className="pmeta">{p.department}</small></td>
                                     <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b><small className="pmeta">{p.ciiSource === "legacy" ? "Legacy approval (pre-v4.5)" : "Locked approval"}</small></td>
                                     <td><span className={`labelchip ${p.ready ? "" : "red"}`}>{p.ready ? "Complete" : "Verification required"}</span>{!p.ready && p.reason ? <ReasonText text={p.reason} /> : null}</td>
@@ -262,7 +263,7 @@ export function AllProjectsPanel({
                             const st = standings.get(p.id);
                             return (
                                 <tr key={p.id}>
-                                    <td><b>{p.title}</b><small className="pmeta">{p.id.slice(0, 8)} · {fmtDate(p.date)}</small></td>
+                                    <td><b>{p.title}</b><small className="pmeta">{recordIdLabel(p.publicId, p.id)} · {fmtDate(p.date)}</small></td>
                                     <td>{p.university || "—"}<small className="pmeta">{p.department}</small></td>
                                     <td>{p.sdg ? <span className="labelchip gray">{p.sdg}</span> : "—"}</td>
                                     <td><b>{p.cii == null ? "—" : `${fmtNum(p.cii)}/100`}</b></td>
@@ -339,7 +340,7 @@ export function PublishedScreen({
                 <div className="actions">
                     <label className="smallnote" htmlFor="rs-wall-project">Project</label>
                     <select id="rs-wall-project" value={project.id} onChange={(e) => onProject(e.target.value)} style={{ maxWidth: 300, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
-                        {packages.map((p) => <option key={p.id} value={p.id}>{p.title} · {p.id.slice(0, 8)}</option>)}
+                        {packages.map((p) => <option key={p.id} value={p.id}>{p.title} · {recordIdLabel(p.publicId, p.id)}</option>)}
                     </select>
                     <label className="smallnote" htmlFor="rs-wall-viewer">Preview as</label>
                     <select id="rs-wall-viewer" value={viewer} onChange={(e) => setViewer(e.target.value as typeof viewer)} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}>
@@ -360,7 +361,7 @@ export function PublishedScreen({
                     </div>
                     <div className="flashbody">
                         <div className="flashline"><span>Admin-approved CII</span><strong>{project.cii == null ? "—" : `${fmtNum(project.cii)} / 100`}</strong></div>
-                        <div className="flashline"><span>Report ID</span><strong>{project.id.slice(0, 8)}</strong></div>
+                        <div className="flashline"><span>Report ID</span><strong>{recordIdLabel(project.publicId, project.id)}</strong></div>
                         <div className="flashline"><span>Complete package</span><span className={`labelchip ${project.ready ? "" : "red"}`}>{project.ready ? "Approved" : "Needs verification"}</span></div>
                         <button type="button" className="btn sm block" style={{ marginTop: 12 }} onClick={() => onOpen(project.id)}>
                             {viewer === "Partner / NGO" ? "View permitted report summary" : "View combined package"} →

@@ -36,6 +36,7 @@ const PIPE_TABS: { key: PipeTab; label: string }[] = [
 
 type FacultyVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
+    publicId?: string | null;
     userId?: string;
     investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
@@ -92,6 +93,7 @@ function isInvestorOpen(entry: FacultyVenture) {
     return entry.publishSettings?.acceptIntros === true || entry.publishSettings?.audience === "investors";
 }
 function displayVentureId(entry: FacultyVenture) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `VEN-${year}-${tail}`;

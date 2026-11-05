@@ -212,6 +212,7 @@ export default function AdminQuickWorkPage() {
             downloadCsv(`quick-community-work-${new Date().toISOString().slice(0, 10)}.csv`, [
                 [
                     "Log ID",
+                    "Public ID",
                     "Activity",
                     "Status",
                     "Activity type",
@@ -239,6 +240,7 @@ export default function AdminQuickWorkPage() {
                 ],
                 ...rows.map((r) => [
                     r.logId,
+                    r.publicId ?? "",
                     r.title,
                     STATUS_LABEL[r.status] ?? r.status,
                     r.activityType,
@@ -411,6 +413,7 @@ export default function AdminQuickWorkPage() {
                                         <tr key={r.id} onClick={() => setOpenId(r.id)} className="cursor-pointer hover:bg-slate-50">
                                             <td className="px-4 py-3">
                                                 <div className="font-semibold text-slate-900">{r.title || "Untitled activity"}</div>
+                                                {r.publicId ? <div className="font-mono text-[11px] text-slate-500">{r.publicId}</div> : null}
                                                 <div className="text-xs text-slate-500">
                                                     {shortDate(r.activityDate)} · {r.participantCount} participant{r.participantCount === 1 ? "" : "s"} · {r.evidenceCount} file
                                                     {r.evidenceCount === 1 ? "" : "s"}

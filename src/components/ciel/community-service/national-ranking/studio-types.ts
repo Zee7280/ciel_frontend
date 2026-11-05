@@ -122,6 +122,8 @@ export type LensMeta = {
 
 export type LibraryPackage = {
     id: string;
+    /** Public record id (CIEL-BNU-2026-0421); absent for older reports not yet stamped. */
+    publicId?: string | null;
     title: string;
     university: string;
     department: string;

@@ -32,6 +32,7 @@ export type AdminQuickWorkFilters = {
 
 export type AdminQuickWorkRow = {
     id: string;
+    publicId?: string | null;
     title: string;
     status: QuickWorkStatus;
     activityDate: string | null;
@@ -77,6 +78,7 @@ export type AdminQuickWorkDeleted = {
 
 export type AdminQuickWorkExportRow = {
     logId: string;
+    publicId?: string;
     title: string;
     status: QuickWorkStatus;
     activityType: string;

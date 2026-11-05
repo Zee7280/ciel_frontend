@@ -15,6 +15,7 @@ import { FYP_V9_STEP_NAMES } from "@/utils/fypV9Catalog";
 import { toast } from "sonner";
 
 export function displayFypId(entry: FypMeritEntry) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `FYP-${year}-${tail}`;

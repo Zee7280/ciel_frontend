@@ -44,7 +44,7 @@ import {
     normalizeReviewStatus,
 } from "@/utils/reviewQueue";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
-import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { displayRecordId, formatOpportunityCode } from "@/utils/displayIds";
 import { uniMineBucket, type UniOppRow } from "@/app/dashboard/partner/community-service/useUniversityCommunityServiceData";
 import {
     isFacultyCsReportRevision,
@@ -598,7 +598,7 @@ export function AdminCommunityServiceHub() {
         const rows = deckCards.map((c) =>
             [
                 c.project_title,
-                formatDisplayId(c.id, "RPT"),
+                displayRecordId(c, "RPT"),
                 c.student_name,
                 c.faculty_name,
                 c.university,
@@ -1125,7 +1125,7 @@ export function AdminCommunityServiceHub() {
                                             <td className="px-3 py-3">
                                                 <b className="block text-[#16313d]">{c.project_title}</b>
                                                 <span className="text-[11px] text-[#6b7c86]">
-                                                    {formatDisplayId(c.id, "RPT")} · {c.department}
+                                                    {displayRecordId(c, "RPT")} · {c.department}
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 text-[#4f6068]">

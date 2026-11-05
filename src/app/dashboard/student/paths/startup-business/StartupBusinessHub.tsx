@@ -147,6 +147,7 @@ type HubTeamMember = {
 
 type HubVenture = {
     id?: string;
+    publicId?: string | null;
     ventureName?: string | null;
     investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
@@ -224,6 +225,7 @@ function hasRecord(entry: HubVenture | null) {
 }
 
 function displayVentureId(entry: HubVenture) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `VEN-${year}-${tail}`;

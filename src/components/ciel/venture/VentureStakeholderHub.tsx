@@ -39,6 +39,7 @@ const SECTION_SHORT = ["Venture", "Problem", "Business", "SDG", "Next step", "Re
 
 type HubVenture = Omit<VentureMeritEntry, "team" | "sdgMapping"> & {
     id?: string;
+    publicId?: string | null;
     userId?: string;
     investorActivity?: InvestorActivity | null;
     status?: "draft" | "submitted";
@@ -108,6 +109,7 @@ function isFacultyVenture(entry: HubVenture) {
     return hay.includes("faculty");
 }
 function displayVentureId(entry: HubVenture) {
+    if (entry.publicId) return entry.publicId;
     const year = entry.createdAt ? new Date(entry.createdAt).getFullYear() : new Date().getFullYear();
     const tail = (entry.id || "").replace(/-/g, "").slice(-5).toUpperCase() || "00000";
     return `VEN-${year}-${tail}`;

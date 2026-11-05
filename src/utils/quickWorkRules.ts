@@ -28,6 +28,8 @@ export type QuickWorkEvidence = { url: string; name: string; type: string; size:
 
 export type QuickWorkLog = {
     id: string;
+    /** Public record id (CIEL-BNU-2026-0421), issued on first submit. */
+    publicId?: string | null;
     status: QuickWorkStatus;
     mode: "solo" | "team" | string;
     university: string;

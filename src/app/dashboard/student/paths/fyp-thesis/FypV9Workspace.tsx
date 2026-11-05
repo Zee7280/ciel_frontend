@@ -567,7 +567,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     title="Your FYP record"
                     subtitle={submittedSubtitle}
                     gradient="linear-gradient(125deg,#0e2a3a,#322866 58%,#126783 120%)"
-                    stats={[{ value: statusChip.label, label: "STATUS" }]}
+                    stats={[...(entry.publicId ? [{ value: entry.publicId, label: "FYP ID" }] : []), { value: statusChip.label, label: "STATUS" }]}
                 />
                 <div className="mt-5">
                     <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← FYP hub" />
@@ -618,6 +618,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 subtitle="Whatever you create — thesis, prototype, product, software, collection, film, design, professional project or something completely new — CIEL builds your route, captures the evidence, highlights your results and turns the work into a verified FYP Passport."
                 gradient="linear-gradient(125deg,#0e2a3a,#322866 58%,#126783 120%)"
                 stats={[
+                    ...(entry.publicId ? [{ value: entry.publicId, label: "FYP ID" }] : []),
                     { value: `${entry.stepCompleted}/8`, label: "STEPS" },
                     { value: entry.status === "submitted" ? "Submitted" : "Draft", label: "STATUS" },
                 ]}

@@ -12,7 +12,7 @@ import {
 import EmptyState from "@/components/ciel/EmptyState";
 import { Loader2 } from "lucide-react";
 import type { CommunityAwardBadge, CommunityAwardKind } from "@/utils/communityAwardModel";
-import { formatDisplayId } from "@/utils/displayIds";
+import { displayRecordId } from "@/utils/displayIds";
 
 const HUB = "/dashboard/student/paths/community-service";
 
@@ -313,7 +313,7 @@ export default function CommunityServiceRankings() {
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
                                     <h4 className="m-0 text-[15px] font-bold text-[#16313d]">{r.title}</h4>
-                                    <p className="mt-0.5 text-[11px] text-[#6b7c86]">{formatDisplayId(r.id, "RPT")} · Verified CII {r.cii}</p>
+                                    <p className="mt-0.5 text-[11px] text-[#6b7c86]">{displayRecordId(r, "RPT")} · Verified CII {r.cii}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="rounded-full bg-[#e6f6f4] px-3 py-1 text-[11px] font-extrabold text-[#0e7d74]">

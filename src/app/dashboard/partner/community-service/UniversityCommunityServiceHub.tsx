@@ -19,7 +19,7 @@ import OpportunityApprovalCard, {
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions, ContactStudentActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
-import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { displayRecordId, formatOpportunityCode } from "@/utils/displayIds";
 import { resolveStudentOpportunityWorkflow } from "@/utils/opportunityWorkflow";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
@@ -493,7 +493,7 @@ export default function UniversityCommunityServiceHub() {
         const rows = deckCards.map((c) =>
             [
                 c.project_title,
-                formatDisplayId(c.id, "RPT"),
+                displayRecordId(c, "RPT"),
                 c.student_name,
                 c.faculty_name,
                 c.department,
@@ -1071,7 +1071,7 @@ export default function UniversityCommunityServiceHub() {
                                         <tr key={c.id} className="border-t border-[#edf2f4]">
                                             <td className="px-3 py-3">
                                                 <b className="block text-[#16313d]">{c.project_title}</b>
-                                                <span className="text-[11px] text-[#6b7c86]">{formatDisplayId(c.id, "RPT")} · {c.department}</span>
+                                                <span className="text-[11px] text-[#6b7c86]">{displayRecordId(c, "RPT")} · {c.department}</span>
                                             </td>
                                             <td className="px-3 py-3 text-[#4f6068]">
                                                 {c.student_name}

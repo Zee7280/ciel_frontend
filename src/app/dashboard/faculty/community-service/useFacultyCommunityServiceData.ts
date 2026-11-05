@@ -12,7 +12,7 @@ import {
     type OpportunityApplicationListRow,
 } from "@/utils/opportunityApplicationsAdmin";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
-import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
+import { displayRecordId, formatOpportunityCode } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
@@ -423,7 +423,7 @@ export function useFacultyCommunityServiceData() {
                 key: `rep-${row.id}`,
                 kind: "report" as const,
                 title: row.project_title,
-                meta: `${formatDisplayId(row.id, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · ${
+                meta: `${displayRecordId(row, "RPT")} · ${row.student_name}${row.hours ? ` · ${row.hours}h` : ""} · ${
                     typeof row.cii_provisional === "number"
                         ? `System CII ${Math.round(row.cii_provisional)} (Provisional)`
                         : row.cii_analyser_run

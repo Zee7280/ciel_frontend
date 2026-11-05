@@ -203,6 +203,7 @@ export default function QuickWorkDashboard() {
                                 <div key={log.id} className="flex flex-col gap-3 rounded-[10px] border border-[#dcebee] bg-white p-3.5 sm:flex-row sm:items-center">
                                     <div className="min-w-0 flex-1">
                                         <b className="block break-words text-[13px]">{log.title || "Untitled activity"}</b>
+                                        {log.publicId ? <small className="block font-mono text-[11px] text-[#6b7c86]">{log.publicId}</small> : null}
                                         <small className="text-xs text-[#6b7c86]">
                                             {lead?.name || "Activity lead"} · {shortDate(log.activityDate)} · {log.location || "Venue to be added"}
                                         </small>

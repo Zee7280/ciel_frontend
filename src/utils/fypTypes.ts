@@ -147,6 +147,8 @@ export interface FypMeritRibbon extends FypRankRibbon {
 
 export interface FypEntry {
     id?: string;
+    /** Public record id (CIEL-BNU-2026-0421), issued when Section 1 is first saved. */
+    publicId?: string | null;
     projectTitle: string | null;
     projectInfo: FypProjectInfo | null;
     background: FypBackgroundInfo | null;

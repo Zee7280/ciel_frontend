@@ -38,3 +38,15 @@ export function formatOpportunityCode(row: {
     if (code) return code;
     return formatDisplayId(row.id, "CS");
 }
+
+/**
+ * The id to show for a record: its public id (CIEL-BNU-2026-0421) when one has been issued,
+ * otherwise the older short label built from the internal id.
+ */
+export function displayRecordId(
+    row: { publicId?: string | null; public_id?: string | null; id?: unknown },
+    prefix = "ID",
+): string {
+    const pub = (row.publicId ?? row.public_id ?? "").toString().trim();
+    return pub || formatDisplayId(row.id, prefix);
+}
