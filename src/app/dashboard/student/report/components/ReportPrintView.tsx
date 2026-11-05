@@ -13,6 +13,8 @@ import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7Paki
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 import { dataSectionUiMark } from "../utils/reportWizardNav";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
+import { consentLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from "../utils/riskSafeguarding";
+import { followupSummaryRows } from "../utils/sustainabilityFollowup";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
@@ -1359,6 +1361,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         <QandA q="Baseline evidence other" a={data.section2.baseline_evidence_other} fullWidth />
                         <QandA q="Baseline other entries" a={data.section2.baseline_other_entries} fullWidth />
                         <QandA q="Section summary" a={data.section2.summary_text} fullWidth />
+                        {hasRiskBlockContent(data.section2) ? (
+                            <>
+                                <QandA q="Risks identified" a={riskFactorIds(data.section2.risk_factors).map(riskFactorLabel).join(", ")} fullWidth />
+                                <QandA q="Risk mitigation" a={data.section2.risk_mitigation} fullWidth />
+                                <QandA q="Consent for photos and data" a={consentLabel(data.section2.risk_consent)} />
+                                <QandA q="Safeguarding lead on site" a={data.section2.risk_safeguarding_lead} />
+                                <QandA q="Unresolved risks" a={data.section2.risk_unresolved || "None reported"} fullWidth />
+                            </>
+                        ) : null}
                     </div>
                 </div>
 
@@ -1841,6 +1852,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                     <QandA q="Detailed roadmap for future continuity" a={data.section10.continuation_details} fullWidth />
                     <QandA q="Section summary" a={data.section10.summary_text} fullWidth />
+                    {followupSummaryRows(data.section10).map((row) => (
+                        <QandA key={row.label} q={row.label} a={row.value} fullWidth={row.fullWidth} />
+                    ))}
                 </div>
 
                 {/* Section 11: Impact Intelligence breakdown */}

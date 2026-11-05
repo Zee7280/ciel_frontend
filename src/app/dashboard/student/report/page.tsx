@@ -1232,7 +1232,7 @@ function ReportFormContent() {
                     {activeStep === 6 && <Section7Partnerships projectData={projectDetails} />}
                     {activeStep === 7 && <Section8Evidence />}
                     {activeStep === 8 && <Section9Reflection />}
-                    {activeStep === 9 && <Section10Sustainability />}
+                    {activeStep === 9 && <Section10Sustainability projectData={projectDetails} />}
                     {isFlashCardStep(activeStep) && (
                         <>
                             <ReportFlashCard

@@ -134,6 +134,42 @@ assert.equal(
     true,
 );
 
+// 2.3 Risk, safeguarding & consent: optional until a real risk is chosen, so older drafts still pass.
+const RISK_FIELDS = ["risk_mitigation", "risk_consent", "risk_safeguarding_lead"];
+const riskErrors = (extra: Record<string, unknown>) =>
+    validateSection2({ ...COMPLETE.section2, ...extra }).errors.filter((e) => e.field.startsWith("risk_"));
+assert.equal(riskErrors({}).length, 0, "no risk answers (older report) is never blocked");
+assert.equal(riskErrors({ risk_factors: [] }).length, 0, "empty chip list is not blocked");
+assert.equal(riskErrors({ risk_factors: ["none"] }).length, 0, "None identified is not blocked");
+assert.deepEqual(
+    riskErrors({ risk_factors: ["children_present"] }).map((e) => e.field),
+    RISK_FIELDS,
+    "a real risk requires mitigation, consent and the on-site lead",
+);
+assert.equal(
+    riskErrors({
+        risk_factors: ["children_present"],
+        risk_mitigation: "Staff present",
+        risk_consent: "written",
+        risk_safeguarding_lead: "Village Director",
+    }).length,
+    0,
+    "fully answered risk block passes",
+);
+
+// 9.5 Follow-up check: optional until a plan is chosen, so older drafts still pass.
+const followupErrors = (extra: Record<string, unknown>) =>
+    validateSection10({ ...COMPLETE.section10, ...extra }).errors.filter((e) => e.field.startsWith("followup_"));
+assert.equal(followupErrors({}).length, 0, "no follow-up answer (older report) is never blocked");
+assert.equal(followupErrors({ followup_plan: "later" }).length, 0, "not decided yet is not blocked");
+assert.equal(followupErrors({ followup_plan: "no" }).length, 1, "no needs a reason");
+assert.equal(followupErrors({ followup_plan: "yes" }).length, 4, "yes needs role, name, email and due date");
+assert.equal(
+    validateSection10({ ...COMPLETE.section10, followup_plan: "no", followup_no_reason: "Follow-up is not feasible" }).isValid,
+    true,
+    "a complete section 10 with a reasoned No still passes",
+);
+
 assert.equal(validateSection3({ contribution_intent_statement: "we solved it" }).isValid, false);
 assert.equal(validateSection3(COMPLETE.section3).isValid, true);
 

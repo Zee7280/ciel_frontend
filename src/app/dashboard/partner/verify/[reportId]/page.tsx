@@ -5,6 +5,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
+import { consentLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from '@/app/dashboard/student/report/utils/riskSafeguarding';
+import { followupSummaryRows } from '@/app/dashboard/student/report/utils/sustainabilityFollowup';
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
@@ -899,6 +901,15 @@ function ReportDetailPage() {
                                         <LabelValue label="Baseline Evidence Other" value={report.section2?.baseline_evidence_other} fullWidth />
                                         <LabelValue label="Baseline Other Entries" value={report.section2?.baseline_other_entries} fullWidth />
                                         <LabelValue label="Section Summary" value={report.section2?.summary_text} fullWidth />
+                                        {hasRiskBlockContent(report.section2) ? (
+                                            <>
+                                                <LabelValue label="Risks Identified" value={riskFactorIds(report.section2?.risk_factors).map(riskFactorLabel).join(", ")} fullWidth />
+                                                <LabelValue label="Risk Mitigation" value={report.section2?.risk_mitigation} fullWidth />
+                                                <LabelValue label="Consent For Photos And Data" value={consentLabel(report.section2?.risk_consent)} />
+                                                <LabelValue label="Safeguarding Lead On Site" value={report.section2?.risk_safeguarding_lead} />
+                                                <LabelValue label="Unresolved Risks" value={report.section2?.risk_unresolved} fullWidth />
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
@@ -1328,6 +1339,9 @@ function ReportDetailPage() {
                                     <LabelValue label="Scaling Potential" value={report.section10?.scaling_potential} fullWidth />
                                     <LabelValue label="Policy Influence" value={report.section10?.policy_influence} fullWidth />
                                     <LabelValue label="Section Summary" value={report.section10?.summary_text} fullWidth />
+                                    {followupSummaryRows(report.section10).map((row) => (
+                                        <LabelValue key={row.label} label={row.label} value={row.value} fullWidth={row.fullWidth} />
+                                    ))}
                                 </div>
                             </div>
                         </div>

@@ -4,6 +4,7 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { countWords } from "../utils/validation";
+import SustainabilityFollowUp from "./SustainabilityFollowUp";
 
 const NO_MECHANISM = "No continuation mechanism";
 const OTHER_MECHANISM = "Other";
@@ -55,7 +56,7 @@ function choiceOn(selected: string | string[] | undefined, id: string, label: st
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
-export default function Section10Sustainability() {
+export default function Section10Sustainability({ projectData }: { projectData?: unknown } = {}) {
     const { data, updateSection, getFieldError, incompleteSectionsSummary } = useReportForm();
     const { section10 } = data;
     const {
@@ -274,6 +275,8 @@ export default function Section10Sustainability() {
                     <FieldError message={getFieldError("policy_influence")} />
                 </div>
             </section>
+
+            <SustainabilityFollowUp projectData={projectData} />
 
             <ConsistencyReview gaps={incompleteSectionsSummary} />
             <ReportTravelCard />

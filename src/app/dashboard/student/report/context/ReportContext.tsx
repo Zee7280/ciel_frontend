@@ -174,6 +174,16 @@ export interface ReportData {
         system_gaps_other?: string;
         /** Multiple custom "Other" gap texts when Add another is used. */
         system_gaps_other_entries?: string[];
+        /** 2.3 Risk, safeguarding & consent — chip ids from utils/riskSafeguarding.ts. Absent on reports saved before 2.3 existed. */
+        risk_factors?: string[];
+        /** What the student did about the risks selected. */
+        risk_mitigation?: string;
+        /** 'written' | 'verbal' | 'not_obtained' | 'not_applicable' ('' = not answered). */
+        risk_consent?: string;
+        /** "Name and role" of the person responsible for safeguarding on site. */
+        risk_safeguarding_lead?: string;
+        /** Risks flagged but not fully mitigated (optional, blank if none). */
+        risk_unresolved?: string;
     };
     // Section 3: SDG Contribution Mapping
     section3: {
@@ -402,6 +412,21 @@ export interface ReportData {
         /** Guided two-line inputs that compose continuation_details — kept alongside it so the blanks survive navigation. */
         continuation_keep_going?: string;
         continuation_risk?: string;
+        /** 9.5 Follow-up check (all optional; absent on reports saved before 9.5 existed) — see utils/sustainabilityFollowup.ts. */
+        followup_plan?: 'yes' | 'no' | 'later' | '';
+        followup_no_reason?: string;
+        followup_no_reason_other?: string;
+        followup_decision_owner?: string;
+        followup_owner_role?: string;
+        followup_owner_name?: string;
+        followup_owner_email?: string;
+        /** Months after project end ('1' | '3' | '6' | '12') or 'custom'. */
+        followup_interval?: string;
+        followup_custom_date?: string;
+        /** yyyy-mm-dd, computed from the opportunity end date + interval (or the custom date). */
+        followup_due_date?: string;
+        followup_check?: string;
+        followup_check_notes?: string;
     };
     // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
     section11: {
@@ -476,6 +501,11 @@ export const defaultReportData: ReportData = {
         system_gaps: [],
         system_gaps_other: '',
         system_gaps_other_entries: [],
+        risk_factors: [],
+        risk_mitigation: '',
+        risk_consent: '',
+        risk_safeguarding_lead: '',
+        risk_unresolved: '',
     },
     section3: {
         primary_sdg: {
@@ -595,7 +625,19 @@ export const defaultReportData: ReportData = {
         policy_influence: '',
         summary_text: '',
         continuation_keep_going: '',
-        continuation_risk: ''
+        continuation_risk: '',
+        followup_plan: '',
+        followup_no_reason: '',
+        followup_no_reason_other: '',
+        followup_decision_owner: '',
+        followup_owner_role: '',
+        followup_owner_name: '',
+        followup_owner_email: '',
+        followup_interval: '',
+        followup_custom_date: '',
+        followup_due_date: '',
+        followup_check: '',
+        followup_check_notes: ''
     },
     section11: {
         summary_text: '',

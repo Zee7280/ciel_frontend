@@ -5,6 +5,8 @@
 
 import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
+import { riskBlockErrors } from './riskSafeguarding';
+import { followupBlockErrors } from './sustainabilityFollowup';
 
 export interface ValidationError {
     field: string;
@@ -247,6 +249,10 @@ export function validateSection2(data: any): ValidationResult {
             }
         }
     }
+
+    // 2.3 Risk, safeguarding & consent — only enforced once a real risk is selected, so reports
+    // saved before this block existed (no risk_* keys) keep validating exactly as before.
+    errors.push(...riskBlockErrors(data));
 
     return { isValid: errors.length === 0, errors };
 }
@@ -582,6 +588,9 @@ export function validateSection10(data: any): ValidationResult {
     if (!data.policy_influence) {
         errors.push({ field: 'policy_influence', message: 'Select whether this project influenced a long-term system' });
     }
+    // 9.5 Follow-up check — optional; only enforced once a plan is chosen, so reports saved before
+    // 9.5 existed (no followup_* keys) keep validating exactly as before.
+    errors.push(...followupBlockErrors(data));
     return { isValid: errors.length === 0, errors };
 }
 

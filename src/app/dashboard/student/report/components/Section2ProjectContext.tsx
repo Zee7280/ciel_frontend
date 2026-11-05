@@ -8,6 +8,13 @@ import { FieldError } from "./ui/FieldError";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
 import { FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
+import {
+    CONSENT_OPTIONS,
+    RISK_FACTOR_OPTIONS,
+    RISK_TEXT_LIMITS,
+    riskFactorIds,
+    toggleRiskFactor,
+} from "../utils/riskSafeguarding";
 
 const PROBLEM_WORD_RANGE = FIELD_WORD_POLICY.problem_statement;
 const DISCIPLINE_WORD_RANGE = FIELD_WORD_POLICY.discipline_contribution;
@@ -807,6 +814,132 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         {sectionData.baseline_smart_draft}
                     </div>
                 ) : null}
+            </section>
+
+            {/* ── 2.3 Risk, safeguarding & consent ──────────────────────── */}
+            <section className="cer-card space-y-4" id="section2-risk">
+                <div className="cer-secl">
+                    <span className="cer-secn">2.3</span>
+                    <h2>Risk, safeguarding &amp; consent</h2>
+                    <span className="cer-tag">If any risk applies</span>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-xs leading-relaxed text-slate-700">
+                    <p className="grid grid-cols-[84px_1fr] gap-x-3">
+                        <span className="font-bold text-amber-800">Why we ask</span>
+                        <span>
+                            Working with children, patients or people at risk is a privilege that comes with a duty of care.
+                            Reviewers look for this block first; if it is missing, nothing else is read with confidence.
+                        </span>
+                    </p>
+                    <p className="grid grid-cols-[84px_1fr] gap-x-3">
+                        <span className="font-bold text-amber-800">Example</span>
+                        <span className="italic">
+                            Risks: children present, electrical work, photos · Done: SOS staff in every session, contractor worked while
+                            rooms were empty, no child alone with a student · Consent: written, from SOS as guardian · Responsible: Village Director
+                        </span>
+                    </p>
+                    <p className="grid grid-cols-[84px_1fr] gap-x-3">
+                        <span className="font-bold text-amber-800">Where it goes</span>
+                        <span>
+                            Evidence &amp; ethics review (the 15 admin points) · Safeguarding register the university must keep for every
+                            child-facing project.
+                        </span>
+                    </p>
+                    <details className="border-t border-amber-200/70 pt-2">
+                        <summary className="cursor-pointer text-[11px] font-semibold text-[#0e7d74]">
+                            Answers 3 university questions · tap to see them
+                        </summary>
+                        <ol className="mt-1.5 list-decimal space-y-0.5 pl-5 text-slate-600">
+                            <li>Were children, patients or other people at risk involved in the project?</li>
+                            <li>What was done to keep them, and the student team, safe?</li>
+                            <li>Was consent taken for photos and personal data, and who was responsible on site?</li>
+                        </ol>
+                    </details>
+                </div>
+
+                <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                        Who could be harmed, and how? <span className="font-semibold normal-case tracking-normal text-slate-400">· tap all that apply</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {RISK_FACTOR_OPTIONS.map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                disabled={isReadOnly}
+                                aria-pressed={riskFactorIds(sectionData.risk_factors).includes(opt.id)}
+                                onClick={() =>
+                                    updateSection("section2", { risk_factors: toggleRiskFactor(sectionData.risk_factors, opt.id) })
+                                }
+                                className={chipClass(riskFactorIds(sectionData.risk_factors).includes(opt.id))}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">What did you do about it?</p>
+                    <Textarea
+                        placeholder="e.g. all sessions supervised by partner staff; no child alone with a student; electrical work by contractor while rooms were empty"
+                        readOnly={isReadOnly}
+                        disabled={isReadOnly}
+                        maxLength={RISK_TEXT_LIMITS.mitigation}
+                        className={clsx(fieldClass, "min-h-[90px]", getFieldError("risk_mitigation") && "border-red-400 bg-red-50/30")}
+                        value={sectionData.risk_mitigation || ""}
+                        onChange={(e) => updateSection("section2", { risk_mitigation: e.target.value })}
+                    />
+                    <FieldError message={getFieldError("risk_mitigation")} />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Consent for photos and data</p>
+                        <SingleSelect
+                            options={CONSENT_OPTIONS.map((o) => o.label)}
+                            value={CONSENT_OPTIONS.find((o) => o.value === sectionData.risk_consent)?.label || ""}
+                            onChange={(label) =>
+                                updateSection("section2", {
+                                    risk_consent: CONSENT_OPTIONS.find((o) => o.label === label)?.value || "",
+                                })
+                            }
+                            placeholder="Select consent status…"
+                            disabled={isReadOnly}
+                        />
+                        <FieldError message={getFieldError("risk_consent")} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Responsible for safeguarding on site</p>
+                        <Input
+                            placeholder="Name and role"
+                            readOnly={isReadOnly}
+                            disabled={isReadOnly}
+                            maxLength={RISK_TEXT_LIMITS.lead}
+                            className={clsx(
+                                "h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#4285f4] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#4285f4]/20",
+                                getFieldError("risk_safeguarding_lead") && "border-red-400 bg-red-50/30",
+                            )}
+                            value={sectionData.risk_safeguarding_lead || ""}
+                            onChange={(e) => updateSection("section2", { risk_safeguarding_lead: e.target.value })}
+                        />
+                        <FieldError message={getFieldError("risk_safeguarding_lead")} />
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Anything unresolved?</p>
+                    <Input
+                        placeholder="Risks you flagged but could not fully mitigate. Blank if none."
+                        readOnly={isReadOnly}
+                        disabled={isReadOnly}
+                        maxLength={RISK_TEXT_LIMITS.unresolved}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-[#4285f4] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#4285f4]/20"
+                        value={sectionData.risk_unresolved || ""}
+                        onChange={(e) => updateSection("section2", { risk_unresolved: e.target.value })}
+                    />
+                </div>
             </section>
         </div>
     );
