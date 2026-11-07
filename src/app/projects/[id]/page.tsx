@@ -422,10 +422,33 @@ export default function ProjectDetailsPage() {
                                         : null,
                                 )}
                             </div>
-                            <p className="text-[11px] text-center text-amber-800 font-semibold mt-6 leading-relaxed">
-                                {applyBlockedMessageFromPayload(projectRecord) ||
-                                    "This listing is not accepting new student applications."}
-                            </p>
+                            {(() => {
+                                // The creator of a private team is the one who adds members, so "ask them to add you" is wrong for them.
+                                const me = readStoredCurrentUser();
+                                const creatorId = asRecord(projectRecord.creator).id;
+                                const isOwnPrivateTeam =
+                                    projectRecord.apply_blocked_reason === "private_team" &&
+                                    Boolean(me?.id && creatorId && String(me.id) === String(creatorId));
+                                if (isOwnPrivateTeam) {
+                                    return (
+                                        <p className="text-[11px] text-center text-amber-800 font-semibold mt-6 leading-relaxed">
+                                            This is your private team. Nobody applies — start your report and add your members in Section 1.{" "}
+                                            <Link
+                                                href={`/dashboard/student/report?projectId=${encodeURIComponent(String(project.id))}`}
+                                                className="underline"
+                                            >
+                                                Open my report
+                                            </Link>
+                                        </p>
+                                    );
+                                }
+                                return (
+                                    <p className="text-[11px] text-center text-amber-800 font-semibold mt-6 leading-relaxed">
+                                        {applyBlockedMessageFromPayload(projectRecord) ||
+                                            "This listing is not accepting new student applications."}
+                                    </p>
+                                );
+                            })()}
                         </>
                     )}
                     {/* Visitors reach CIEL PK admin; signed-in viewers also get the creator's and the partner organisation's WhatsApp. */}

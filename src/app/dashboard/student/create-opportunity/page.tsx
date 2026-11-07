@@ -42,6 +42,7 @@ import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInst
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 import {
+    focusFieldError,
     incompleteWizardSteps,
     OpportunitySubmitBlockedDialog,
     type OpportunityIncompleteStep,
@@ -312,6 +313,7 @@ function StudentOpportunityCreationPageInner() {
                 new URLSearchParams(window.location.search).get("draft") === "1"),
     );
     const [showSubmittedReviewModal, setShowSubmittedReviewModal] = useState(false);
+    const [submittedWasResubmit, setSubmittedWasResubmit] = useState(false);
     const [submittedOpportunityTitle, setSubmittedOpportunityTitle] = useState("");
     const [submittedOpportunityId, setSubmittedOpportunityId] = useState("");
     /** One lead per project: show notice before the create form (skipped when ?edit= is present). */
@@ -1050,8 +1052,17 @@ function StudentOpportunityCreationPageInner() {
                     /* ignore */
                 }
                 if (isEdit) {
-                    toast.success("Opportunity updated successfully!");
-                    router.push("/dashboard/student/paths/community-service?view=create");
+                    const sentBackForReview = /resubmitted/i.test(String((data as { message?: unknown }).message ?? ""));
+                    if (sentBackForReview) {
+                        // Same approval-steps message as a first submission; closing it opens My Opportunities.
+                        setSubmittedOpportunityId(editId);
+                        setSubmittedOpportunityTitle(formData.title.trim());
+                        setSubmittedWasResubmit(true);
+                        setShowSubmittedReviewModal(true);
+                    } else {
+                        toast.success("Opportunity updated successfully!");
+                        router.push("/dashboard/student/paths/community-service?view=create");
+                    }
                 } else {
                     if (isDraftMode && editingOpportunityId) {
                         // Best-effort cleanup of the now-superseded draft row; the real submission above already succeeded.
@@ -3921,10 +3932,17 @@ function StudentOpportunityCreationPageInner() {
                     goToStep(key);
                     setBlockedSubmitOpen(false);
                 }}
+                onOpenError={(key, message) => {
+                    applyStepErrors(key, collectStepErrors(key));
+                    setActiveStep(key);
+                    setBlockedSubmitOpen(false);
+                    focusFieldError(message);
+                }}
             />
             <OpportunitySubmittedReviewModal
                 open={showSubmittedReviewModal}
                 opportunityTitle={submittedOpportunityTitle}
+                resubmitted={submittedWasResubmit}
                 onClose={() => {
                     setShowSubmittedReviewModal(false);
                     const qs = new URLSearchParams({ view: "create", filter: "review" });

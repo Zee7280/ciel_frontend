@@ -8,7 +8,7 @@
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, XCircle, Loader2, Home, PenLine } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Home, PenLine, Handshake } from "lucide-react";
 import Link from "next/link";
 import {
     buildOpportunityRecordFlashcard,
@@ -25,6 +25,43 @@ type Preview = {
 function backendBaseUrl(): string {
     const raw = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "http://localhost:3000/api/v1";
     return raw.endsWith("/api/v1") ? raw.replace(/\/api\/v1$/, "") : raw;
+}
+
+/** Shown once the partner has acted (approved / asked for changes / declined) or finds it already approved. */
+function JoinAsPartnerCard({ email }: { email: string }) {
+    const qs = new URLSearchParams({ role: "ngo" });
+    if (email) qs.set("email", email);
+    return (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
+            <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <Handshake className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                    <h2 className="text-base font-bold text-slate-900">Join CIEL PK as a Community Partner</h2>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
+                        Thank you for reviewing this opportunity. Whether you approved it, requested changes, or declined it, we’d love
+                        to welcome your organisation to CIEL PK.
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                        Register to build your community engagement record and keep track of the impact you’re making with students and
+                        universities.
+                    </p>
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Link
+                            href={`/signup?${qs.toString()}`}
+                            className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                        >
+                            Register as a Community Partner
+                        </Link>
+                        <Link href="/login" className="text-center text-sm font-semibold text-emerald-800 underline underline-offset-2">
+                            Already registered? Sign in
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function PartnerVerifyContent() {
@@ -281,6 +318,10 @@ function PartnerVerifyContent() {
                             </button>
                         </div>
                     </div>
+                )}
+
+                {(status === "verified" || status === "already" || status === "decided") && (
+                    <JoinAsPartnerCard email={built?.partnerEmail || ""} />
                 )}
 
                 {status !== "loading" && status !== "verifying" && status !== "deciding" && (

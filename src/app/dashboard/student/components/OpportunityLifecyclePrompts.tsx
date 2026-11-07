@@ -5,18 +5,16 @@ import type { ReactNode } from "react";
 import {
     Bell,
     CheckCircle2,
-    Clock3,
     FileText,
     FolderOpen,
     Grid2X2,
-    Info,
     Megaphone,
     ShieldCheck,
     UserCheck,
     Users,
     X,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/app/dashboard/student/report/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/app/dashboard/student/report/components/ui/dialog";
 import { isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { mergeHasAppliedFields } from "@/utils/studentJoinApplication";
 
@@ -178,10 +176,13 @@ function ActionLink({
 export function OpportunitySubmittedReviewModal({
     open,
     opportunityTitle,
+    resubmitted = false,
     onClose,
 }: {
     open: boolean;
     opportunityTitle?: string;
+    /** True after "Save changes" sent an existing opportunity back for review. */
+    resubmitted?: boolean;
     onClose: () => void;
 }) {
     return (
@@ -198,8 +199,9 @@ export function OpportunitySubmittedReviewModal({
                             <FileText className="h-12 w-12" />
                         </div>
                         <div className="min-w-0 pt-2">
-                            <p className="text-xs font-black uppercase tracking-widest text-blue-600">Opportunity Submitted</p>
-                            <h2 className="mt-1 text-2xl font-black leading-tight text-slate-900">Under Review</h2>
+                            <DialogTitle className="text-2xl font-black leading-tight text-slate-900">
+                                {resubmitted ? "Opportunity resubmitted" : "New opportunity submitted"}
+                            </DialogTitle>
                             {opportunityTitle ? (
                                 <p className="mt-2 text-sm font-semibold text-slate-500">{opportunityTitle}</p>
                             ) : null}
@@ -208,30 +210,16 @@ export function OpportunitySubmittedReviewModal({
 
                     <div className="my-5 h-px bg-slate-200" />
 
-                    <div className="space-y-4">
-                        <PromptRow icon={<Info className="h-4 w-4" />} iconClass="bg-blue-50 text-blue-600">
-                            Your project is currently under approval. If a partner is involved, they will review it first, followed by the CIEL PK Admin.
-                        </PromptRow>
-                        <PromptRow icon={<Clock3 className="h-4 w-4" />} iconClass="bg-amber-50 text-amber-600">
-                            Once approved, the project will go <strong className="text-amber-800">live</strong>.
-                        </PromptRow>
-                        <PromptRow icon={<FolderOpen className="h-4 w-4" />} iconClass="bg-emerald-50 text-emerald-600">
-                            You can check your opportunity&apos;s status by clicking{" "}
-                            <Link href="/dashboard/student/paths/community-service?view=create&filter=review" className="font-black text-emerald-700 underline underline-offset-2">
-                                My Opportunities
-                            </Link>
-                            .
-                        </PromptRow>
-                        <PromptRow icon={<FileText className="h-4 w-4" />} iconClass="bg-violet-50 text-violet-600">
-                            After your project is live, go to{" "}
-                            <Link
-                                href="/dashboard/student/paths/community-service?view=workspace"
-                                className="font-black text-violet-700 underline underline-offset-2"
-                            >
-                                My Reports
-                            </Link>{" "}
-                            to start and submit your report.
-                        </PromptRow>
+                    <div className="space-y-4 text-sm leading-relaxed text-slate-700">
+                        <p>
+                            Your opportunity has been submitted for approval. You&apos;ll receive an update as it moves through these steps:
+                        </p>
+                        <ol className="list-decimal space-y-1.5 pl-5 font-semibold text-slate-800">
+                            <li>Faculty supervisor approval</li>
+                            <li>Partner organization approval — only if a partner organization is involved</li>
+                            <li>CIEL PK Admin approval</li>
+                        </ol>
+                        <p>Once all required approvals are complete, you can apply to the opportunity or start your report.</p>
                     </div>
 
                     <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row">
