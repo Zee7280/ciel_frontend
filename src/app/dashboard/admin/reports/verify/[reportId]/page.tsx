@@ -965,6 +965,26 @@ function AdminReportDetailPage() {
     const isReportClosed = (r: ReportDetail | null): boolean =>
         String(r?.status || '').trim().toLowerCase() === 'closed';
 
+    /**
+     * Why Approve cannot be used right now — mirrors the server's verifyReport guards so the button
+     * explains itself instead of failing with a toast after the click. null = approvable.
+     */
+    const approveBlockedReason = (r: ReportDetail | null): string | null => {
+        if (!r) return 'Loading…';
+        const st = String(r.status || '').trim().toLowerCase();
+        if (isReportClosed(r)) return 'This report was closed. Reopen it and wait for the student to resubmit.';
+        if (r.admin_status === 'approved') return 'Already approved.';
+        if (isReportReturnedForRevision(r) || st === 'rejected') {
+            return 'Sent back to the student. You can approve it after they resubmit.';
+        }
+        if (st === '' || st === 'draft' || st === 'continue') return 'The student has not submitted this report yet.';
+        const facultyOk = String(r.faculty_status || '').trim().toLowerCase() === 'approved';
+        if (r.ciiV45Lock?.locked !== true && !facultyOk) {
+            return 'Run and confirm the CII analysis first — the score must be locked before publishing.';
+        }
+        return null;
+    };
+
     const handleVerify = (action: 'approve' | 'reject' | 'unlock' | 'close', intent: 'decision' | 'editable' = 'decision') => {
         const apiAction: 'approve' | 'reject' | 'unlock' | 'close' =
             intent === 'editable' ? 'unlock' : action;
@@ -1007,7 +1027,9 @@ function AdminReportDetailPage() {
                         ? 'Report returned to student for edits.'
                         : apiAction === 'close'
                             ? 'Report closed and removed from published results.'
-                            : `Report ${apiAction === 'approve' ? 'approved' : 'rejected'} successfully!`,
+                            : apiAction === 'reject'
+                                ? 'Report sent back to the student for revision.'
+                                : 'Report approved successfully!',
                 );
                 setPendingDecision(null);
                 const nextId = queueNav.next;
@@ -2414,12 +2436,8 @@ function AdminReportDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("approve")}
-                                    disabled={
-                                        isVerifying ||
-                                        report.admin_status === "approved" ||
-                                        ((report.private_candidate || report.review_route === "ciel_pk") &&
-                                            report.ciiV45Lock?.locked !== true)
-                                    }
+                                    disabled={isVerifying || approveBlockedReason(report) !== null}
+                                    title={approveBlockedReason(report) ?? "Publish this report and release the package."}
                                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
                                 >
                                     <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />

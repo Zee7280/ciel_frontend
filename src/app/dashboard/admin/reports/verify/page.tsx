@@ -11,6 +11,15 @@ import DataTable from 'react-data-table-component';
 import type { TableColumn } from 'react-data-table-component';
 import { normalizeReportPartnerStatus } from '@/utils/reportPartnerApprovalDisplay';
 import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
+import {
+    countReportQueues,
+    isReportAdminVerified,
+    isReportClosed,
+    isReportTerminallyRejected,
+    reportBadgeKey,
+    reportMatchesTab,
+    type QueueCounts,
+} from '@/utils/adminReportQueue';
 import { saveReviewQueue } from '../../_shared/reviewQueue';
 
 function formatDisplayName(name: string) {
@@ -35,6 +44,7 @@ interface Report {
     organization_name?: string;
     university?: string | null;
     submission_date: string;
+    faculty_status?: string | null;
     submitted_at?: string;
     report_submitted_at?: string;
     created_at: string;
@@ -106,7 +116,6 @@ type DuplicateGroup = {
     projectTitle: string;
 };
 
-type QueueCounts = { needsReview: number; verified: number; revision: number; all: number };
 
 function parseMetaCounts(meta: unknown): QueueCounts | null {
     if (!meta || typeof meta !== 'object') return null;
@@ -165,51 +174,12 @@ function reportPaymentQueueStatus(report: Report): string {
     return ps || 'not_applicable';
 }
 
-function isReportAdminVerified(report: Report): boolean {
-    const overall = reportOverallStatus(report);
-    const admin = reportAdminStatus(report);
-    // partner_verified means the NGO signed off; the admin still has to approve it.
-    return admin === 'approved' || overall === 'verified' || overall === 'paid';
-}
-
 /** Whole days a report has been waiting for admin review (null when already verified/unknown). */
 function reportWaitingDays(report: Report): number | null {
     if (isReportAdminVerified(report)) return null;
     const ms = reportSubmittedMs(report);
     if (ms <= 0) return null;
     return Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
-}
-
-/** Overall status tab — uses lifecycle fields only (NGO has its own filter). */
-function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
-    if (tab === 'all') return true;
-
-    if (isReportReturnedForRevision(report)) {
-        return tab === 'rejected';
-    }
-
-    const overall = reportOverallStatus(report);
-
-    if (tab === 'verified') {
-        return isReportAdminVerified(report);
-    }
-
-    if (tab === 'rejected') {
-        return false;
-    }
-
-    if (tab === 'submitted') {
-        return overall === 'submitted' || overall.includes('under_review');
-    }
-
-    if (tab === 'pending') {
-        // Needs review = anything submitted whose admin decision is not "approved" yet
-        // (includes partner_verified reports).
-        if (isReportAdminVerified(report)) return false;
-        return !(overall === 'draft' || overall === '' || overall === 'continue');
-    }
-
-    return true;
 }
 
 function reportMatchesPartnerFilter(report: Report, filter: PartnerStatusFilter): boolean {
@@ -463,6 +433,12 @@ export default function AdminReportsVerificationPage() {
             partner_verified: { color: 'bg-indigo-50 text-indigo-800 ring-indigo-200/60', icon: CheckCircle2, label: 'NGO Verified' },
             verified: { color: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60', icon: CheckCircle2, label: 'Verified' },
             rejected: { color: 'bg-red-50 text-red-700 ring-red-200/60', icon: XCircle, label: 'Rejected' },
+            revision: { color: 'bg-orange-50 text-orange-800 ring-orange-200/60', icon: XCircle, label: 'Revision' },
+            closed: { color: 'bg-slate-200 text-slate-700 ring-slate-300/60', icon: XCircle, label: 'Closed' },
+            payment_pending: { color: 'bg-orange-50 text-orange-800 ring-orange-200/60', icon: Clock, label: 'Fee due' },
+            pending_payment: { color: 'bg-orange-50 text-orange-800 ring-orange-200/60', icon: Clock, label: 'Fee due' },
+            payment_under_review: { color: 'bg-sky-50 text-sky-800 ring-sky-200/60', icon: Clock, label: 'Fee in review' },
+            continue: { color: 'bg-slate-100 text-slate-600 ring-slate-200/80', icon: FileText, label: 'In progress' },
             draft: { color: 'bg-slate-100 text-slate-600 ring-slate-200/80', icon: FileText, label: 'Draft' },
             pending: { color: 'bg-amber-50 text-amber-800 ring-amber-200/60', icon: Clock, label: 'Pending' },
             approved: { color: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60', icon: CheckCircle2, label: 'Approved' },
@@ -612,17 +588,7 @@ export default function AdminReportsVerificationPage() {
         return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
     }, [reports]);
 
-    const computedCounts = useMemo<QueueCounts>(() => {
-        let needsReview = 0;
-        let verified = 0;
-        let revision = 0;
-        for (const r of reports) {
-            if (isReportReturnedForRevision(r)) revision += 1;
-            else if (reportMatchesTab(r, 'verified')) verified += 1;
-            else if (reportMatchesTab(r, 'pending')) needsReview += 1;
-        }
-        return { needsReview, verified, revision, all: reports.length };
-    }, [reports]);
+    const computedCounts = useMemo<QueueCounts>(() => countReportQueues(reports), [reports]);
 
     // Server counts only describe the org-scoped full set; use them while no client-side filter narrows the rows.
     const clientNarrowing =
@@ -638,7 +604,14 @@ export default function AdminReportsVerificationPage() {
     const reviewQueueIds = useMemo(
         () =>
             filteredReports
-                .filter((r) => !isReportAdminVerified(r) && !isReportReturnedForRevision(r) && reportOverallStatus(r) !== 'draft')
+                .filter(
+                    (r) =>
+                        !isReportAdminVerified(r) &&
+                        !isReportClosed(r) &&
+                        !isReportReturnedForRevision(r) &&
+                        !isReportTerminallyRejected(r) &&
+                        reportOverallStatus(r) !== 'draft',
+                )
                 .map((r) => r.id),
         [filteredReports],
     );
@@ -1083,7 +1056,7 @@ export default function AdminReportsVerificationPage() {
                 name: 'Overall',
                 width: '108px',
                 minWidth: '108px',
-                cell: (report) => getStatusBadge(report.status, true),
+                cell: (report) => getStatusBadge(reportBadgeKey(report), true),
             },
             {
                 name: '',
@@ -1524,7 +1497,7 @@ export default function AdminReportsVerificationPage() {
                                             </p>
                                             <p className="truncate text-xs text-slate-500">{report.student_email}</p>
                                         </div>
-                                        {getStatusBadge(report.status, true)}
+                                        {getStatusBadge(reportBadgeKey(report), true)}
                                     </div>
                                     <p className="mt-2 line-clamp-2 break-words text-sm font-medium text-slate-800">{report.project_title}</p>
                                     <p className="mt-0.5 truncate text-xs text-slate-500">{formatOrganizationLabel(report.organization_name).short}</p>

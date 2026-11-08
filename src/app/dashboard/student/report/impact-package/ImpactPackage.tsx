@@ -29,6 +29,8 @@ import {
     type ImpactPackageEvidenceFile,
     type ImpactPackageEvidenceKind,
 } from "./buildImpactPackageModel";
+import OpenPackageViewerButton from "./OpenPackageViewerButton";
+import GenerateMyPackage, { type GenerateMyPackageSubmitMode } from "./GenerateMyPackage";
 import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
@@ -164,6 +166,17 @@ function ImpactAnalysisPanel({
     );
 }
 
+/**
+ * Student-only submit controls, passed by the report page's flashcard step. `onSend` opens the same
+ * "Submit Report?" confirmation as the footer button; it is undefined once the report is read-only
+ * (submitted / awaiting review / approved) or for attendance-only team members.
+ */
+export type ImpactPackageSubmitControls = {
+    canSend: boolean;
+    onSend?: () => void;
+    sending?: boolean;
+};
+
 export default function ImpactPackage({
     data,
     projectData,
@@ -171,6 +184,7 @@ export default function ImpactPackage({
     initialTab,
     extraFiles,
     analyserHref,
+    submit,
 }: {
     data: ReportData;
     projectData?: unknown;
@@ -178,8 +192,17 @@ export default function ImpactPackage({
     initialTab?: ImpactPackageTab;
     extraFiles?: Array<{ url?: string; name?: string; source?: string }>;
     analyserHref?: string;
+    submit?: ImpactPackageSubmitControls;
 }) {
     const model = useMemo(() => buildImpactPackageModel(data, projectData, extraFiles), [data, projectData, extraFiles]);
+    const studentSubmitMode: GenerateMyPackageSubmitMode | null =
+        audience !== "student" || !submit
+            ? null
+            : model.adminApproved || typeof submit.onSend !== "function"
+              ? "none"
+              : submit.canSend
+                ? "ready"
+                : "blocked";
     const showAnalysis = shouldShowImpactPackageAnalysis(audience, data);
     const showDetailedReport = shouldShowImpactPackageDetailedReport(audience, model.adminApproved);
     const showCertificate = shouldShowImpactPackageCertificate(audience, model.adminApproved);
@@ -365,6 +388,17 @@ export default function ImpactPackage({
                     )}
                 </div>
                 <div className="right">
+                    {studentSubmitMode ? (
+                        <GenerateMyPackage
+                            data={data}
+                            projectData={projectData}
+                            model={model}
+                            submitMode={studentSubmitMode}
+                            submitting={submit?.sending}
+                            onSubmit={submit?.onSend}
+                        />
+                    ) : null}
+                    <OpenPackageViewerButton data={data} projectData={projectData} audience={audience} model={model} />
                     <button
                         type="button"
                         disabled={studentExportsLocked}

@@ -635,6 +635,20 @@ export default function CommunityCiiAnalyser({
                         <Link href={packageHref} style={{ color: "#d9ed93" }}>
                             Open Impact Package
                         </Link>
+                        {isCielPk ? (
+                            <>
+                                {" · "}
+                                <a
+                                    href="/ciel-analyzer.html"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: "#d9ed93" }}
+                                    title="Local review tool (offline): load the Analyzer packet exported from the package viewer. Official approval stays here."
+                                >
+                                    Analyser R2 local review tool ↗
+                                </a>
+                            </>
+                        ) : null}
                     </div>
                 </div>
             </header>

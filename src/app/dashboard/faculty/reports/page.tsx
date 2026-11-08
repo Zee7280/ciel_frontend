@@ -8,6 +8,7 @@ import { CheckCircle2, Clock, Eye, FileText, Loader2, Search } from "lucide-reac
 import { toast } from "sonner";
 import clsx from "clsx";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
+import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
@@ -105,6 +106,12 @@ export default function FacultyStudentReportsPage() {
                 icon: CheckCircle2,
                 label: "Verified",
             },
+            revision: { color: "bg-orange-50 text-orange-800 ring-1 ring-orange-200/80", icon: Clock, label: "Revision" },
+            closed: { color: "bg-slate-200 text-slate-700 ring-1 ring-slate-300/80", icon: FileText, label: "Closed" },
+            rejected: { color: "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80", icon: FileText, label: "Rejected" },
+            payment_pending: { color: "bg-orange-50 text-orange-800 ring-1 ring-orange-200/80", icon: Clock, label: "Fee due" },
+            pending_payment: { color: "bg-orange-50 text-orange-800 ring-1 ring-orange-200/80", icon: Clock, label: "Fee due" },
+            payment_under_review: { color: "bg-sky-50 text-sky-800 ring-1 ring-sky-200/80", icon: Clock, label: "Fee in review" },
             pending: { color: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80", icon: Clock, label: "Pending" },
             draft: { color: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80", icon: FileText, label: "Draft" },
         };
@@ -122,26 +129,22 @@ export default function FacultyStudentReportsPage() {
         );
     };
 
-    const getFacultyBadge = (status: string | undefined) => {
-        const key = normalizeStatus(status) || "pending";
-        const config: Record<string, { color: string; icon: typeof Clock; label: string }> = {
-            approved: {
-                color: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80",
-                icon: CheckCircle2,
-                label: "Approved",
-            },
-            rejected: {
-                color: "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80",
-                icon: Clock,
-                label: "Admin review",
-            },
-            pending: {
-                color: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
-                icon: Clock,
-                label: "Your decision",
-            },
-        };
-        const { color, icon: Icon, label } = config[key] || config.pending;
+    /** Faculty is read-only for reports: this column says where the report is, not "your decision". */
+    const getReviewBadge = (report: FacultyReportRow) => {
+        const st = normalizeStatus(report.status);
+        let state: { color: string; icon: typeof Clock; label: string };
+        if (st === "closed") {
+            state = { color: "bg-slate-200 text-slate-700 ring-1 ring-slate-300/80", icon: FileText, label: "Closed by CIEL PK" };
+        } else if (isFacultyCommunityLiveCard(report)) {
+            state = { color: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80", icon: CheckCircle2, label: "Approved by CIEL PK" };
+        } else if (isReportReturnedForRevision(report)) {
+            state = { color: "bg-orange-50 text-orange-800 ring-1 ring-orange-200/80", icon: Clock, label: "With student" };
+        } else if (st === "rejected" || normalizeStatus(report.faculty_status) === "rejected") {
+            state = { color: "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80", icon: FileText, label: "Rejected" };
+        } else {
+            state = { color: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80", icon: Clock, label: "With CIEL PK" };
+        }
+        const { color, icon: Icon, label } = state;
         return (
             <span
                 className={clsx(
@@ -166,9 +169,9 @@ export default function FacultyStudentReportsPage() {
     });
 
     const statusOptions = [
-        { id: "waiting", label: "Waiting for approval" },
+        { id: "waiting", label: "Waiting for CIEL PK" },
         { id: "approved", label: "Approved" },
-        { id: "all", label: "All admin-verified" },
+        { id: "all", label: "All reports" },
     ] as const;
 
     return (
@@ -181,8 +184,8 @@ export default function FacultyStudentReportsPage() {
                         Student impact reports
                     </h1>
                     <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
-                        Submitted reports from students you supervise. Review the report and lock the flash-card
-                        score here — that confirms attendance hours. CIEL Admin signs off after your decision.
+                        Submitted reports from students you supervise. This view is read-only: CIEL PK Admin reviews
+                        each report and publishes it. Open a report to follow its progress and see the approved package.
                     </p>
                 </div>
 
@@ -240,7 +243,7 @@ export default function FacultyStudentReportsPage() {
                                         <th className={TABLE_HEAD}>Organization</th>
                                         <th className={TABLE_HEAD}>Submitted</th>
                                         <th className={TABLE_HEAD}>Status</th>
-                                        <th className={TABLE_HEAD}>Faculty</th>
+                                        <th className={TABLE_HEAD}>Review</th>
                                         <th className={clsx(TABLE_HEAD, "text-right")}>View</th>
                                     </tr>
                                 </thead>
@@ -295,7 +298,7 @@ export default function FacultyStudentReportsPage() {
                                                         : "—"}
                                                 </td>
                                                 <td className="px-4 py-3 align-top">{getStatusBadge(report.status)}</td>
-                                                <td className="px-4 py-3 align-top">{getFacultyBadge(report.faculty_status)}</td>
+                                                <td className="px-4 py-3 align-top">{getReviewBadge(report)}</td>
                                                 <td className="px-4 py-3 text-right align-top">
                                                     <button
                                                         type="button"

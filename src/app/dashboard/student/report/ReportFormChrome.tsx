@@ -1750,9 +1750,14 @@ export function ReportFlashCard({
 }) {
     void sectionsComplete;
     void missingLabels;
-    void canSend;
-    void onSend;
-    void sending;
     void paymentHref;
-    return <ImpactPackage data={data} projectData={projectData} audience="student" />;
+    return (
+        <ImpactPackage
+            data={data}
+            projectData={projectData}
+            audience="student"
+            // "Generate my Package" → "Submit package" uses the footer's own gate and confirmation.
+            submit={{ canSend: canSend === true, onSend, sending: sending === true }}
+        />
+    );
 }
