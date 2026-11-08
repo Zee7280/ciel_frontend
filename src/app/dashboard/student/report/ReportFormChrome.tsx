@@ -845,11 +845,12 @@ function SectionSummaryStats({
         const gaps = data.section2?.system_gaps || [];
         const sources = data.section2?.baseline_evidence || [];
         const who = pickString(data.section2?.affected_group);
+        const count = pickString(data.section2?.affected_count);
         return (
             <StatChart
                 title="📊 Baseline at a glance"
                 tiles={[
-                    who ? `👥 ${who}` : "",
+                    who ? `👥 ${count ? `≈${count} · ` : ""}${who}` : "",
                     ...gaps.map((gap) => `⛔ ${gapLabel(gap, data.section2)}`),
                     ...sources.map((source) => `🔎 ${baselineSourceLabel(source, data.section2)}`),
                 ].filter(Boolean)}

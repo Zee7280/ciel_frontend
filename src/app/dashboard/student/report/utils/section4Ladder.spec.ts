@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { UNIVERSAL_UNITS } from "./section4Constants";
-import { metricPickPatch, outcomeLadderOk, step1Ok, step3Ok, unitForOutputType } from "./section4Ladder";
+import { isPercentOutcome, metricPickPatch, outcomeLadderOk, step1Ok, step3Ok, unitForOutputType } from "./section4Ladder";
 import { validateSection4 } from "./validation";
 
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
@@ -59,6 +59,15 @@ test("metric picks follow the metric, not a hard-coded Access-to-Education defau
     assert.equal(income.unit, "PKR");
     assert.equal(metricPickPatch("Attendance rate (%)", "📚 Education & Learning").unit, "%");
     assert.notEqual(metricPickPatch("My own metric").unit, "");
+});
+
+test("only percentage metrics get a % after the absolute change", () => {
+    assert.equal(isPercentOutcome(metricPickPatch("Attendance rate (%)", "📚 Education & Learning")), true);
+    assert.equal(isPercentOutcome({ metric: "Other", metric_other: "Student satisfaction (%)", unit: "Count" }), true);
+    assert.equal(isPercentOutcome({ metric: "Percentage Improvement (%)", metric_other: "Pass rate" }), true);
+    assert.equal(isPercentOutcome(metricPickPatch("Patients treated", "🩺 Health & Clinical Outreach")), false);
+    assert.equal(isPercentOutcome({ metric: "Other", metric_other: "Student satisfaction", unit: "Count" }), false);
+    assert.equal(isPercentOutcome(null), false);
 });
 
 test("every mapped output unit exists in the unit list", () => {

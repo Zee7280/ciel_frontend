@@ -334,6 +334,19 @@ export function metricPickPatch(label: string, family = ""): Record<string, unkn
     };
 }
 
+/**
+ * True when the before/after numbers are themselves percentages (unit "%", the
+ * "Percentage Improvement (%)" metric, or a metric name that says % / rate / percent),
+ * so the absolute change is shown as "+20%" rather than a bare "+20".
+ */
+export function isPercentOutcome(o: LadderOutcome | Record<string, unknown> | null | undefined): boolean {
+    if (!o) return false;
+    const row = o as LadderOutcome;
+    if (String(row.unit || "").trim() === "%") return true;
+    if (/percentage/i.test(String(row.metric_category || ""))) return true;
+    return /%|\brate\b|percent/i.test(`${row.metric || ""} ${row.metric_other || ""}`);
+}
+
 export function isBlankUnattachedOutcome(o: LadderOutcome | Record<string, unknown> | null | undefined): boolean {
     if (!o) return false;
     const row = o as LadderOutcome;

@@ -46,6 +46,7 @@ import {
     metricPickPatch,
     isBlankUnattachedOutcome,
     isOtherLike,
+    isPercentOutcome,
     type LadderOutcome,
 } from '../utils/section4Ladder';
 
@@ -1171,6 +1172,8 @@ function ActivityLadderCard({
                                                 const e = numValue(o.endline);
                                                 const d = (b !== null && e !== null) ? e - b : null;
                                                 const pct = (d !== null && b && b > 0) ? ` (${d >= 0 ? '+' : ''}${Math.round((d / b) * 100)}%)` : '';
+                                                // Percentage metrics (attendance rate, satisfaction %) show "+20%"; counts stay "+20".
+                                                const absUnit = isPercentOutcome(o) ? '%' : '';
                                                 const chosen = outcomeDisplayName(o);
                                                 const hints = FAM_METRIC_HINTS[activity.primary_category] || FAM_METRIC_HINTS['📚 Education & Learning'];
                                                 return (
@@ -1232,7 +1235,7 @@ function ActivityLadderCard({
                                                         </div>
                                                         <div className="changeBox">
                                                             {d === null ? '📈 Change computes itself' : (d < 0 ? '📉 Change' : '📈 Change')}
-                                                            <span style={{ marginLeft: 'auto' }}>{d === null ? '—' : `${d >= 0 ? '+' : ''}${d}${pct}`}</span>
+                                                            <span style={{ marginLeft: 'auto' }}>{d === null ? '—' : `${d >= 0 ? '+' : ''}${d}${absUnit}${pct}`}</span>
                                                         </div>
                                                         <div className="ladQ">
                                                             How sure are we? <span className="reqstar">*</span>
