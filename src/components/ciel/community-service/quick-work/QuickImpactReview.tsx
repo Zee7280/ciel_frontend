@@ -291,7 +291,8 @@ function SlidePreview({ ev, index }: { ev: QuickWorkEvidence; index: number }) {
     );
 }
 
-function EvidencePanel({ evidence }: { evidence: QuickWorkEvidence[] }) {
+/** The evidence files (grid + slideshow); also used by the published flashcard. */
+export function EvidencePanel({ evidence }: { evidence: QuickWorkEvidence[] }) {
     const [show, setShow] = useState(false);
     const [slide, setSlide] = useState(0);
     const n = evidence.length;
@@ -359,7 +360,7 @@ function EvidencePanel({ evidence }: { evidence: QuickWorkEvidence[] }) {
 }
 
 /** Print-only: every evidence file on its own tile, 2 per row. */
-function EvidenceSheet({ log }: { log: QuickWorkLog }) {
+export function EvidenceSheet({ log }: { log: QuickWorkLog }) {
     return (
         <section className="qcr-sheet">
             <h2>Quick Community Impact · Evidence Sheet</h2>

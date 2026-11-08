@@ -177,6 +177,15 @@
     }
 }
 
+/* Viewer tabs: the inactive one is hidden on screen; the evidence sheet exists only for print. */
+.qif-tab-off {
+    display: none;
+}
+
+.qif-print-only {
+    display: none;
+}
+
 /* "Print / Save PDF": only the open flashcard prints (see QuickImpactViewer). */
 @media print {
     body.qif-printing > *:not(.qif-print-root) {
@@ -193,6 +202,15 @@
 
     body.qif-printing .qif-print-root .qif-noprint {
         display: none !important;
+    }
+
+    /* The card prints even while the Evidence tab is showing, followed by the evidence sheet. */
+    body.qif-printing .qif-print-root .qif-keep-print {
+        display: block !important;
+    }
+
+    body.qif-printing .qif-print-root .qif-print-only {
+        display: block !important;
     }
 
     body.qif-printing .qif-card {

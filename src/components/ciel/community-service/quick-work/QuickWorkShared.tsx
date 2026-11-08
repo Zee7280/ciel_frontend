@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
-import { mailtoHref, whatsappHrefForPhone, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappDigits, whatsappHrefForPhone, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
 import type { ReminderMessage } from "@/utils/quickWorkReminders";
 import {
     activityLabel,
@@ -68,7 +68,33 @@ export function QuickWorkReminder({
 }) {
     const text = `${message.subject}\n\n${message.body}`;
     const direct = whatsappHrefForPhone(phone, text);
+    // Without JavaScript the link still works as before; with it, the click opens the link made for this device.
     const whatsapp = direct ?? whatsappShareHref(text);
+    const [copied, setCopied] = useState(false);
+    const copyMessage = async () => {
+        try {
+            // A clipboard call that is never answered (blocked or unfocused page) must not leave the button stuck.
+            await Promise.race([
+                navigator.clipboard.writeText(text),
+                new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("clipboard timeout")), 1000)),
+            ]);
+        } catch {
+            // Older browsers / blocked clipboard: select the text in a hidden field and copy it.
+            const field = document.createElement("textarea");
+            field.value = text;
+            field.style.position = "fixed";
+            field.style.opacity = "0";
+            document.body.appendChild(field);
+            field.select();
+            try {
+                document.execCommand("copy");
+            } finally {
+                field.remove();
+            }
+        }
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2500);
+    };
     return (
         <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold text-[#6b7c86]">{label}</span>
@@ -84,11 +110,23 @@ export function QuickWorkReminder({
                 href={whatsapp}
                 target="_blank"
                 rel="noreferrer"
+                onClick={(e) => {
+                    e.preventDefault();
+                    window.open(whatsappOpenHref(text, whatsappDigits(phone)), "_blank", "noopener,noreferrer");
+                }}
                 title={direct ? undefined : "No WhatsApp number on file: WhatsApp opens with the message so you can pick the contact"}
                 className="rounded-md bg-[#e8f8ee] px-2 py-1 text-[11px] font-bold text-[#1f7a46] hover:bg-[#d6f1e0]"
             >
                 {direct ? "WhatsApp" : "WhatsApp (pick contact)"}
             </a>
+            <button
+                type="button"
+                onClick={() => void copyMessage()}
+                title="Copy the message to paste it anywhere (WhatsApp, SMS, email)"
+                className="rounded-md bg-[#f1f4f6] px-2 py-1 text-[11px] font-bold text-[#516772] hover:bg-[#e4eaee]"
+            >
+                {copied ? "Copied ✓" : "Copy message"}
+            </button>
         </span>
     );
 }

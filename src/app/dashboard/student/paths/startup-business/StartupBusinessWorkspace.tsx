@@ -375,6 +375,7 @@ export default function StartupBusinessWorkspace() {
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showIssues, setShowIssues] = useState(false);
     const [sdgCheck, setSdgCheck] = useState("");
     const [sdgSuggest, setSdgSuggest] = useState<number[]>([]);
     const [repoAck, setRepoAck] = useState(false);
@@ -773,17 +774,44 @@ export default function StartupBusinessWorkspace() {
         else if (picked.length < 3) patchGroup("sdgMapping", { entries: [...picked, { goalNumber: n, targets: [] }], mode: "map" });
     };
 
+    /** Every required item still missing, tagged with the step that holds it. Recomputed live so the list shrinks as the student fixes things. */
+    const submitIssues = (): { step: number; text: string }[] => {
+        const issues: { step: number; text: string }[] = [];
+        const add = (stepIdx: number, ok: unknown, text: string) => { if (!ok) issues.push({ step: stepIdx, text }); };
+        const emailOk = (v?: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v || "").trim());
+        add(0, snap.stage, "Venture stage — pick where your idea stands today");
+        add(0, snap.name.trim(), "Venture / business name");
+        add(0, snap.uni.trim(), "University");
+        add(0, snap.founder.trim(), "Primary student / founder name");
+        add(0, snap.facultyName.trim(), "Faculty / supervisor name");
+        if (!(as.supervisorEmail || "").trim()) add(0, false, "Faculty university email");
+        else add(0, emailOk(as.supervisorEmail), "Faculty university email looks invalid — check the format");
+        add(0, snap.facultyRole, "Faculty role");
+        entry.team.forEach((m, idx) => {
+            const filled = !!(m.name?.trim() || m.role?.trim() || m.email?.trim() || m.whatsappNumber?.trim());
+            if (!filled) return;
+            add(0, m.name?.trim(), `Team member ${idx + 1}: name is missing`);
+            if ((m.email || "").trim()) add(0, emailOk(m.email), `Team member ${idx + 1}: email looks invalid`);
+        });
+        add(1, snap.problem.trim(), "The problem / unmet need");
+        add(3, snap.solution.trim(), "Your solution — what are you offering?");
+        if (investorOn) add(7, entry.reviewPipeline?.declarationConsent, "Investor opt-in is on — confirm the investor-sharing consent");
+        add(8, REVIEW_BLOCKS.filter((b) => review[b.key]?.accepted).length >= 5, "Accept or edit all five AI summaries");
+        add(8, repoAck, "Confirm the mandatory university repository record checkbox");
+        return issues;
+    };
+
     const submitVenture = async () => {
-        if (!snap.stage || !snap.name || !snap.uni || !snap.founder || !snap.problem || !snap.solution || !snap.facultyName || !as.supervisorEmail || !snap.facultyRole) {
-            setError("Please complete the core fields: stage, venture name, university, founder, problem, solution, and faculty name / email / role.");
-            return;
-        }
-        if (REVIEW_BLOCKS.filter((b) => review[b.key]?.accepted).length < 5) {
-            setError("Please accept or edit all five AI summaries before submitting.");
-            return;
-        }
-        if (!repoAck) {
-            setError("Please confirm that this Venture Profile is a mandatory university repository record.");
+        setShowIssues(true);
+        const issues = submitIssues();
+        if (issues.length) {
+            const first = issues[0];
+            setError(`Please fix ${issues.length} item${issues.length === 1 ? "" : "s"} before submitting.`);
+            if (first.step !== 8) {
+                setStep(first.step);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                toast.error(first.text);
+            }
             return;
         }
         const ok = await save({
@@ -949,8 +977,7 @@ export default function StartupBusinessWorkspace() {
                         <button
                             key={s.key}
                             type="button"
-                            onClick={() => i <= unlocked && setStep(i)}
-                            disabled={i > unlocked}
+                            onClick={() => { setStep(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                             className={clsx(
                                 "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[10.5px] font-extrabold",
                                 step === i ? "border-white bg-white text-[#7d2b4d]" : i < unlocked ? "border-[rgba(120,220,170,.3)] bg-[rgba(120,220,170,.18)] text-[#d8f5e6]" : "border-white/14 bg-white/8 text-[#e6d6de]",
@@ -1066,16 +1093,16 @@ export default function StartupBusinessWorkspace() {
                                 </div>
                                 <VsField label="Mentors / advisors supporting the venture" optional><input className={vsField} maxLength={220} value={as.advisors || ""} onChange={(e) => patchGroup("academicSetup", { advisors: e.target.value })} placeholder="e.g. Dr. Ali (faculty), Ms. Khan (industry mentor)" /></VsField>
                                 {teamRows.map((m, i) => (
-                                    <div key={i} className="mb-2 grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_.85fr_1.1fr_1.1fr_.85fr_auto]">
-                                        <input className={vsField} placeholder="Team member name" value={m.name} onChange={(e) => updateTeam(entry, i, { name: e.target.value }, setEntry)} />
-                                        <input className={vsField} placeholder="Role / responsibility" value={m.role} onChange={(e) => updateTeam(entry, i, { role: e.target.value }, setEntry)} />
-                                        <input className={vsField} type="email" placeholder="University email" value={m.email || ""} onChange={(e) => updateTeam(entry, i, { email: e.target.value }, setEntry)} />
-                                        <PhonePair code={m.whatsappCode || "+92"} number={m.whatsappNumber} onCode={(v) => updateTeam(entry, i, { whatsappCode: v }, setEntry)} onNumber={(v) => updateTeam(entry, i, { whatsappNumber: v }, setEntry)} />
-                                        <select className={vsField} value={m.commitment || ""} onChange={(e) => updateTeam(entry, i, { commitment: e.target.value }, setEntry)} aria-label="Commitment">
+                                    <div key={i} className="mb-3 grid grid-cols-1 items-start gap-2 rounded-[14px] border border-[#eadfe6] bg-white/60 p-3 md:grid-cols-6">
+                                        <input className={clsx(vsField, "md:col-span-2")} placeholder="Team member name" value={m.name} onChange={(e) => updateTeam(entry, i, { name: e.target.value }, setEntry)} />
+                                        <input className={clsx(vsField, "md:col-span-2")} placeholder="Role / responsibility" value={m.role} onChange={(e) => updateTeam(entry, i, { role: e.target.value }, setEntry)} />
+                                        <input className={clsx(vsField, "md:col-span-2")} type="email" placeholder="University email" value={m.email || ""} onChange={(e) => updateTeam(entry, i, { email: e.target.value }, setEntry)} />
+                                        <div className="md:col-span-3"><PhonePair code={m.whatsappCode || "+92"} number={m.whatsappNumber} onCode={(v) => updateTeam(entry, i, { whatsappCode: v }, setEntry)} onNumber={(v) => updateTeam(entry, i, { whatsappNumber: v }, setEntry)} /></div>
+                                        <select className={clsx(vsField, "md:col-span-2")} value={m.commitment || ""} onChange={(e) => updateTeam(entry, i, { commitment: e.target.value }, setEntry)} aria-label="Commitment">
                                             <option value="">Commitment…</option>
                                             {TEAM_TIME.map((o) => <option key={o}>{o}</option>)}
                                         </select>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center justify-end gap-1 md:col-span-1 md:h-full">
                                             <TeamInviteBadge kind="venture" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                             <button type="button" className="text-lg text-[#b83b4d]" onClick={() => setEntry((s) => ({ ...s, team: s.team.filter((_, idx) => idx !== i) }))} title="Remove">×</button>
                                         </div>
@@ -1719,6 +1746,19 @@ export default function StartupBusinessWorkspace() {
                                 <button type="button" disabled={saving} onClick={() => void submitVenture()} className="mt-4 rounded-xl bg-[#32133a] px-4 py-3 text-[13px] font-extrabold text-white disabled:opacity-50">{saving ? "Submitting…" : "Submit Venture Record"}</button>
                             </div>
                             {error ? <p className="mt-3 text-xs font-semibold text-[#b83b4d]">{error}</p> : null}
+                            {showIssues && submitIssues().length > 0 ? (
+                                <div className="mt-3 rounded-[14px] border border-[#f0c4cc] bg-[#fff5f6] p-3.5 text-left" role="alert">
+                                    <b className="text-[12.5px] text-[#b83b4d]">Complete these before you can submit:</b>
+                                    <ul className="mt-2 space-y-1.5">
+                                        {submitIssues().map((it) => (
+                                            <li key={`${it.step}-${it.text}`} className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5b4a55]">
+                                                <span>• {it.text}</span>
+                                                {it.step !== 8 ? <button type="button" className="rounded-full border border-[#e2c7d7] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#a63d65]" onClick={() => { setStep(it.step); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Go to step {it.step + 1} →</button> : null}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
                             <div className="mt-4"><button type="button" onClick={() => setStep(7)} className="rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 text-[13px] font-extrabold text-[#6b7280]">← Back</button></div>
                         </>
                     )}

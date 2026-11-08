@@ -13,6 +13,7 @@ import {
     type QuickWorkLog,
 } from "@/utils/quickWorkRules";
 import QuickImpactCertificate from "./QuickImpactCertificate";
+import { EvidencePanel, EvidenceSheet } from "./QuickImpactReview";
 import "./quick-impact-flashcard.css";
 
 /** Names shown before "+N more" (a log may have hundreds of students). */
@@ -127,6 +128,8 @@ function applyCertificatePrintScale() {
  */
 export function QuickImpactViewer({ log, onClose }: { log: QuickWorkLog; onClose: () => void }) {
     const [view, setView] = useState<"flash" | "certificate">("flash");
+    const [tab, setTab] = useState<"card" | "evidence">("card");
+    const evidenceCount = log.evidence.length;
     const [mounted, setMounted] = useState(false);
     const panel = useRef<HTMLDivElement>(null);
     const holder = viewerRow(log);
@@ -259,7 +262,32 @@ export function QuickImpactViewer({ log, onClose }: { log: QuickWorkLog; onClose
                         </button>
                     </div>
                 </div>
-                <QuickImpactFlashcard log={log} />
+                {evidenceCount ? (
+                    <div className="qif-noprint mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Flashcard sections">
+                        <button type="button" role="tab" aria-selected={tab === "card"} onClick={() => setTab("card")} className={tab === "card" ? toolbarPrimary : toolbarBtn}>
+                            Flashcard
+                        </button>
+                        <button type="button" role="tab" aria-selected={tab === "evidence"} onClick={() => setTab("evidence")} className={tab === "evidence" ? toolbarPrimary : toolbarBtn}>
+                            Evidence ({evidenceCount})
+                        </button>
+                    </div>
+                ) : null}
+                {/* The card always prints; on screen it gives way to the evidence tab. */}
+                <div className={tab === "card" ? undefined : "qif-tab-off qif-keep-print"}>
+                    <QuickImpactFlashcard log={log} />
+                </div>
+                {evidenceCount ? (
+                    <>
+                        <div className={`qif-noprint qcr rounded-2xl bg-white p-4 ${tab === "evidence" ? "" : "qif-tab-off"}`}>
+                            <h3 className="mb-3 text-sm font-extrabold text-[#155a8b]">Evidence · {log.title || "Quick Community Impact"}</h3>
+                            <EvidencePanel evidence={log.evidence} />
+                        </div>
+                        {/* Printed after the card: every evidence file with its caption. */}
+                        <div className="qif-print-only qcr">
+                            <EvidenceSheet log={log} />
+                        </div>
+                    </>
+                ) : null}
                 {canCertify && code ? (
                     <p className="qif-noprint mt-3 rounded-xl bg-white/90 px-4 py-2.5 text-xs text-[#55758f]">
                         CIEL PK Verified Impact Certificate · ID <b className="font-mono text-[#155a8b]">{code}</b> · Student · Activity · Verified
