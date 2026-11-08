@@ -467,6 +467,23 @@ export function suggestFypSdgs(text: string): FypSdgSuggestion[] {
         .slice(0, 3);
 }
 
+/** Section summaries are stored as light HTML (`<b>Title</b> is recorded as…`); plain-text cards
+ * show the text, not the tags. */
+export function stripInlineHtml(value: string | null | undefined): string {
+    if (!value) return "";
+    return String(value)
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
 /** Deliverables always append a new version rather than replace — group by label so re-uploads
  * show as "current" + a collapsed history instead of a flat, confusing list of every version. */
 export function groupFypDeliverablesByLabel(deliverables: FypDeliverable[]) {

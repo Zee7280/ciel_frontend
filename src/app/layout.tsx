@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import FloatingSupportButton from "@/components/FloatingSupportButton";
 import WhatsAppLinkBridge from "@/components/WhatsAppLinkBridge";
+import MailtoLinkBridge from "@/components/MailtoLinkBridge";
 
 /** Self-hosted so `next build` does not fetch Google Fonts (Vercel module-not-found on Outfit CSS). */
 const outfit = localFont({
@@ -32,6 +33,7 @@ export default function RootLayout({
         {children}
         <FloatingSupportButton />
         <WhatsAppLinkBridge />
+        <MailtoLinkBridge />
         <Toaster position="top-center" richColors />
       </body>
     </html>

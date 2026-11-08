@@ -20,13 +20,13 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { fypStatusLabel } from "@/utils/pathReviewStatus";
 import {
+    type FypDeliverable,
     type FypEntry,
     type FypSectionSummaries,
     type FypTeamMember,
     EMPTY_FYP,
     mergeFypEntry,
     normalizeFypTeamMembers,
-    groupFypDeliverablesByLabel,
 } from "@/utils/fypTypes";
 import {
     type FypV9FormState,
@@ -108,6 +108,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
     );
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [removingVersion, setRemovingVersion] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [flashOpen, setFlashOpen] = useState(false);
     const [declarationChecked, setDeclarationChecked] = useState(false);
@@ -427,6 +428,43 @@ export default function FypV9Workspace({ id }: { id: string }) {
         }
     };
 
+    /** Lead author removes a file added by mistake (draft records only; the server enforces the same rule). */
+    const removeDeliverable = async (version: number, label: string) => {
+        if (entry.isOwner === false) {
+            toast.error("Only the lead author can remove files from this FYP record.");
+            return;
+        }
+        if (entry.status === "submitted" && !editing) {
+            toast.error("This record is with your supervisor. Files can be removed again if it is returned for revision.");
+            return;
+        }
+        if (!window.confirm(`Remove "${label}" from this FYP record?`)) return;
+        setRemovingVersion(version);
+        setError(null);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/paths/fyp-theses/${id}/deliverables/${version}`,
+                { method: "DELETE" },
+                { redirectToLogin: true },
+            );
+            if (!res) throw new Error("Your session expired before the file was removed. Sign in and try again.");
+            const result = (await res.json().catch(() => null)) as { data?: { deliverables?: FypDeliverable[] }; message?: string | string[] } | null;
+            if (!res.ok) {
+                const msg = Array.isArray(result?.message) ? result?.message.join(" ") : result?.message;
+                throw new Error(msg || `Could not remove the file (HTTP ${res.status}).`);
+            }
+            if (!result?.data?.deliverables) throw new Error("The file was removed but the record response was unexpected. Refresh to check.");
+            setEntry((e) => ({ ...e, deliverables: result.data!.deliverables! }));
+            toast.success(`${label} removed`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Could not remove the file.";
+            setError(message);
+            toast.error(message);
+        } finally {
+            setRemovingVersion(null);
+        }
+    };
+
     if (loading) return <WorkspaceSkeleton />;
 
     if (notFound) {
@@ -444,7 +482,6 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const suggested = suggestFypV9Routes(v9.academicAreaKey, effectiveSelect(v9.discipline, v9.disciplineOther));
     const sustainRelevant = v9.sustain && v9.sustain !== "No defensible sustainability link" && v9.sustain !== "Not sure — request guidance";
     const acceptedCount = review.filter((r) => r.accepted).length;
-    const groupedFiles = groupFypDeliverablesByLabel(entry.deliverables);
     const connectionReady = !!(
         entry.projectInfo?.university &&
         entry.projectInfo?.supervisorName &&
@@ -1302,11 +1339,37 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </label>
                             <p className="mt-2 rounded-[11px] bg-ciel-purple-soft/40 px-3 py-2 text-[11px] leading-relaxed text-ciel-text-mid">💡 <b>Why add evidence?</b> Evidence does not automatically increase academic merit, but it makes the project easier to verify and gives faculty stronger support for the findings, output and contribution recorded on the flashcard.</p>
                             {error ? <p className="mt-2 text-center text-[11px] font-bold text-ciel-amber">{error}</p> : null}
-                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {groupedFiles.map((g) => (
-                                    <a key={g.label} href={g.latest.fileUrl} target="_blank" rel="noreferrer" className="rounded-[13px] border border-ciel-border bg-white p-2.5 text-[10.8px] font-black">{g.label}</a>
-                                ))}
-                            </div>
+                            {/* Every uploaded file, each openable and (on a draft) removable — a wrong upload is never stuck on the record. */}
+                            {(entry.deliverables ?? []).length ? (
+                                <ul className="mt-3 grid gap-2 sm:grid-cols-2" data-testid="fyp-evidence-list">
+                                    {[...(entry.deliverables ?? [])]
+                                        .sort((a, b) => Number(b.version) - Number(a.version))
+                                        .map((d) => {
+                                            const canRemove = isOwner && (entry.status !== "submitted" || editing);
+                                            const busy = removingVersion === d.version;
+                                            return (
+                                                <li key={`${d.version}-${d.fileUrl}`} className="flex items-center justify-between gap-2 rounded-[13px] border border-ciel-border bg-white p-2.5">
+                                                    <a href={d.fileUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-[10.8px] font-black hover:underline" title={d.label}>
+                                                        📎 {d.label}
+                                                    </a>
+                                                    {canRemove ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void removeDeliverable(Number(d.version), d.label)}
+                                                            disabled={busy || uploading}
+                                                            aria-label={`Remove ${d.label}`}
+                                                            title="Remove this file from the record"
+                                                            className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black text-ciel-text-soft hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                                            data-testid="fyp-evidence-remove"
+                                                        >
+                                                            {busy ? "…" : "✕ Remove"}
+                                                        </button>
+                                                    ) : null}
+                                                </li>
+                                            );
+                                        })}
+                                </ul>
+                            ) : null}
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field label="External link(s) (optional)"><input value={v9.links} onChange={(e) => patchV9({ links: e.target.value })} placeholder="GitHub, portfolio, demo, film…" className={fieldClass} /></Field>

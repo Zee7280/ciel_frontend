@@ -98,6 +98,11 @@ contract['scoring']['weights_source'] = 'ciel_backend/src/reports/cii-v4-5.const
 contract['framework_version'] = '5.0'
 s = s[:cm.start()] + cm.group(1) + _json.dumps(contract, separators=(',', ':'), ensure_ascii=False) + cm.group(3) + s[cm.end():]
 
+# 7b. favicon for the rare case the viewer is opened directly in a tab (it normally sits in an iframe)
+once('<meta charset="utf-8">',
+     '<meta charset="utf-8"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/icons/ciel-192.png">',
+     'favicon')
+
 # 8. leftover references must be gone
 for dead in ['source-frame','load-dialog','source-dialog','load-form','json-file','empty-button','openLoad','decodeSource','captureSource','DEMO']:
     assert dead not in s, f'leftover reference: {dead}'

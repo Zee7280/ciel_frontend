@@ -9,10 +9,11 @@ import { sdgData } from "@/utils/sdgData";
 import { SDG_COLORS } from "@/utils/ventureStudioV11";
 import { fypStatusLabel, reviewStatusLabel } from "@/utils/pathReviewStatus";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
-import { fypRankRibbons, normalizeFypTeamMembers } from "@/utils/fypTypes";
+import { fypRankRibbons, normalizeFypTeamMembers, stripInlineHtml } from "@/utils/fypTypes";
 import { computeFypMeritScorecard } from "@/utils/fypMeritModel";
 import { FYP_V9_STEP_NAMES } from "@/utils/fypV9Catalog";
 import { toast } from "sonner";
+import FypFilesButton from "@/components/ciel/FypFilesButton";
 
 export function displayFypId(entry: FypMeritEntry) {
     if (entry.publicId) return entry.publicId;
@@ -23,10 +24,10 @@ export function displayFypId(entry: FypMeritEntry) {
 
 export function fypHeadline(entry: FypMeritEntry) {
     return (
-        entry.sectionSummaries?.project?.trim() ||
-        entry.sectionSummaries?.findings?.trim() ||
-        entry.findings?.findings?.filter(Boolean)[0] ||
-        entry.background?.problem?.trim() ||
+        stripInlineHtml(entry.sectionSummaries?.project) ||
+        stripInlineHtml(entry.sectionSummaries?.findings) ||
+        stripInlineHtml(entry.findings?.findings?.filter(Boolean)[0]) ||
+        stripInlineHtml(entry.background?.problem) ||
         "Submitted FYP flashcard."
     );
 }
@@ -193,6 +194,8 @@ export function FacultyFypReviewCard({
                 <button type="button" onClick={onOpenFlashcard} className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-3.5 py-2 text-[10px] font-black text-[#29454f]">
                     🃏 FLASHCARD
                 </button>
+                {/* The student's attached files, every one openable — reviewers read them before deciding. */}
+                <FypFilesButton files={entry.deliverables} title={title} />
                 {waiting ? (
                     <>
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -496,9 +499,16 @@ export default function FacultyFypFlashcardModal({
                             </button>
                         ) : null}
                         {latestFile?.fileUrl ? (
-                            <a href={latestFile.fileUrl} target="_blank" rel="noreferrer" className="rounded-[9px] bg-[#eef2f3] px-3 py-2 text-[10px] font-black text-[#29454f]">
-                                ⬇️ DOWNLOAD APPROVED FILE
-                            </a>
+                            <FypFilesButton
+                                files={entry.deliverables}
+                                title={entry.projectInfo?.title || entry.projectTitle}
+                                label={
+                                    (entry.deliverables?.length ?? 0) > 1
+                                        ? `⬇️ ${entry.deliverables?.length} APPROVED FILES`
+                                        : "⬇️ DOWNLOAD APPROVED FILE"
+                                }
+                                className="rounded-[9px] bg-[#eef2f3] px-3 py-2 text-[10px] font-black text-[#29454f]"
+                            />
                         ) : null}
                     </div>
                 ) : null}
@@ -739,9 +749,11 @@ export function FacultyFypApprovedCard({
                     </button>
                 ) : null}
                 {latestFile?.fileUrl ? (
-                    <a href={latestFile.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
-                        ⬇️ FILE
-                    </a>
+                    <FypFilesButton
+                        files={files}
+                        title={entry.projectInfo?.title || entry.projectTitle}
+                        label={files.length > 1 ? `⬇️ ${files.length} FILES` : "⬇️ FILE"}
+                    />
                 ) : (
                     <button
                         type="button"
@@ -870,10 +882,8 @@ export function UniversityFypReviewCard({
                     🃏 VIEW FYP FLASHCARD
                 </button>
                 {files ? (
-                    entry.deliverables?.[files - 1]?.fileUrl ? (
-                        <a href={entry.deliverables[files - 1].fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
-                            📎 {files} FILE{files === 1 ? "" : "S"}
-                        </a>
+                    entry.deliverables?.some((f) => f.fileUrl) ? (
+                        <FypFilesButton files={entry.deliverables} title={entry.projectInfo?.title || entry.projectTitle} />
                     ) : (
                         <button
                             type="button"
@@ -1130,9 +1140,12 @@ export function AdminFypFacultyWorkPanel({
                                                     </button>
                                                 ) : null}
                                                 {latestFile?.fileUrl ? (
-                                                    <a href={latestFile.fileUrl} target="_blank" rel="noreferrer" className="rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-center text-[10px] font-black text-[#29454f]">
-                                                        📎 {fileList.length}
-                                                    </a>
+                                                    <FypFilesButton
+                                                        files={fileList}
+                                                        title={title}
+                                                        label={`📎 ${fileList.length}`}
+                                                        className="rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-center text-[10px] font-black text-[#29454f]"
+                                                    />
                                                 ) : fileList.length ? (
                                                     <button type="button" onClick={() => toast.message(`${fileList.length} file(s) attached.`)} className="rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]">
                                                         📎 {fileList.length}

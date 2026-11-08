@@ -57,6 +57,51 @@ export function rewriteWhatsAppHrefForDevice(href: string, nav?: NavigatorLike |
     return whatsappOpenHref(text, digits, nav);
 }
 
+export type MailtoParts = { to: string; cc: string; bcc: string; subject: string; body: string };
+
+/** Pull recipient / subject / body back out of a `mailto:` href (null for any other link). */
+export function parseMailtoHref(href: string): MailtoParts | null {
+    if (!/^mailto:/i.test(href || "")) return null;
+    const rest = href.slice(7);
+    const q = rest.indexOf("?");
+    const dec = (v: string) => {
+        try {
+            return decodeURIComponent(v.replace(/\+/g, "%2B"));
+        } catch {
+            return v;
+        }
+    };
+    const params = new URLSearchParams(q >= 0 ? rest.slice(q + 1) : "");
+    return {
+        to: dec(q >= 0 ? rest.slice(0, q) : rest).trim(),
+        cc: (params.get("cc") || "").trim(),
+        bcc: (params.get("bcc") || "").trim(),
+        subject: params.get("subject") || "",
+        body: params.get("body") || "",
+    };
+}
+
+/** Gmail's web compose window, prefilled — the fallback when no desktop mail app answers `mailto:`. */
+export function gmailComposeHref(p: Pick<MailtoParts, "to" | "subject" | "body"> & Partial<MailtoParts>): string {
+    const u = new URLSearchParams({ view: "cm", fs: "1" });
+    if (p.to) u.set("to", p.to);
+    if (p.cc) u.set("cc", p.cc);
+    if (p.bcc) u.set("bcc", p.bcc);
+    if (p.subject) u.set("su", p.subject);
+    if (p.body) u.set("body", p.body);
+    return `https://mail.google.com/mail/?${u.toString()}`;
+}
+
+/** Outlook.com / Microsoft 365 web compose, prefilled. */
+export function outlookComposeHref(p: Pick<MailtoParts, "to" | "subject" | "body"> & Partial<MailtoParts>): string {
+    const u = new URLSearchParams({ path: "/mail/action/compose" });
+    if (p.to) u.set("to", p.to);
+    if (p.cc) u.set("cc", p.cc);
+    if (p.subject) u.set("subject", p.subject);
+    if (p.body) u.set("body", p.body);
+    return `https://outlook.office.com/mail/deeplink/compose?${u.toString()}`;
+}
+
 export function formatSentWaiting(iso?: string | null): string {
     if (!iso) return "";
     const date = new Date(iso);

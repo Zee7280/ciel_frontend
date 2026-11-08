@@ -12,7 +12,7 @@ import FacultyFypFlashcardModal from "@/components/ciel/FacultyFypFlashcard";
 import FacultyFypDetailedReview from "@/components/ciel/FacultyFypDetailedReview";
 import type { FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import PathHubGuide from "@/components/ciel/PathHubGuide";
-import { fypRankContext, fypRankRibbons, type FypEntry, normalizeFypTeamMembers } from "@/utils/fypTypes";
+import { fypRankContext, fypRankRibbons, type FypEntry, normalizeFypTeamMembers, stripInlineHtml } from "@/utils/fypTypes";
 import { createStudentFyp, listStudentFyps } from "@/utils/fypStudentApi";
 import { setPathSessionCache, usePathSessionCache } from "@/utils/student-path-session-cache";
 import { isPathEntryApproved } from "@/utils/reviewQueue";
@@ -24,6 +24,7 @@ import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import { rankMovement } from "@/utils/courseProjectTypes";
+import FypFilesButton from "@/components/ciel/FypFilesButton";
 
 const BASE = "/dashboard/student/paths/fyp-thesis";
 const GUIDE_HREF = `${BASE}?view=guide`;
@@ -146,10 +147,10 @@ function relativeUpdated(value?: string | null) {
 
 function headline(entry: FypEntry) {
     return (
-        entry.sectionSummaries?.project?.trim() ||
-        entry.sectionSummaries?.findings?.trim() ||
-        entry.findings?.findings?.filter(Boolean)[0] ||
-        entry.background?.problem?.trim() ||
+        stripInlineHtml(entry.sectionSummaries?.project) ||
+        stripInlineHtml(entry.sectionSummaries?.findings) ||
+        stripInlineHtml(entry.findings?.findings?.filter(Boolean)[0]) ||
+        stripInlineHtml(entry.background?.problem) ||
         "Submitted FYP flashcard."
     );
 }
@@ -531,18 +532,6 @@ function ReviewCard({ entry, onOpenFlashcard, onOpenForm }: { entry: FypEntry; o
     const who = names.length ? `Team — ${names.join(", ")}` : studentOf(entry);
     const facultyLabel = facultyRemindLabel(faculty);
 
-    const openFiles = () => {
-        const withUrl = files.filter((f) => f.fileUrl);
-        if (withUrl.length === 1) {
-            window.open(withUrl[0].fileUrl, "_blank", "noopener,noreferrer");
-            return;
-        }
-        toast.message(`${files.length} evidence file(s)`, {
-            description: files.map((f) => f.label || "Attachment").join(", ") || "Open the flashcard to download.",
-        });
-        if (withUrl[0]) window.open(withUrl[0].fileUrl, "_blank", "noopener,noreferrer");
-    };
-
     return (
         <div className="grid grid-cols-1 items-start gap-4 rounded-2xl border border-[#dde5ea] bg-white p-[15px] md:grid-cols-[minmax(0,1fr)_290px]">
             <div>
@@ -628,15 +617,7 @@ function ReviewCard({ entry, onOpenFlashcard, onOpenForm }: { entry: FypEntry; o
                 <button type="button" onClick={onOpenFlashcard} className="inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#174b43] px-3.5 py-[11px] text-[11px] font-black text-white">
                     🃏 VIEW FYP FLASHCARD
                 </button>
-                {files.length ? (
-                    <button
-                        type="button"
-                        onClick={openFiles}
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
-                    >
-                        📎 {files.length} FILE{files.length > 1 ? "S" : ""}
-                    </button>
-                ) : null}
+                <FypFilesButton files={files} title={title} />
             </div>
         </div>
     );
@@ -707,14 +688,7 @@ function ApprovedCard({
                     </button>
                 ) : null}
                 {latestFile?.fileUrl ? (
-                    <a
-                        href={latestFile.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-[9px] bg-[#eef2f3] px-2.5 py-2 text-[10px] font-black text-[#29454f]"
-                    >
-                        ⬇️ FILE
-                    </a>
+                    <FypFilesButton files={files} title={title} label={files.length > 1 ? `⬇️ ${files.length} FILES` : "⬇️ FILE"} />
                 ) : (
                     <button
                         type="button"

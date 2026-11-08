@@ -10,6 +10,7 @@ import { isCommunityReportOnLiveDeck, isCommunityReportRejected, isPathEntryAppr
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { type CourseProjectEntry, courseworkRibbons } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { stripInlineHtml } from "@/utils/fypTypes";
 import { sdgData } from "@/utils/sdgData";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
 import CourseworkImpactListCard from "@/components/ciel/coursework/CourseworkImpactListCard";
@@ -372,8 +373,8 @@ export default function StudentImpactPortfolioTable() {
                             ["Impact Area", "FYP"],
                         ],
                         summary:
-                            fypEntry.sectionSummaries?.project ||
-                            fypEntry.sectionSummaries?.findings ||
+                            stripInlineHtml(fypEntry.sectionSummaries?.project) ||
+                            stripInlineHtml(fypEntry.sectionSummaries?.findings) ||
                             "Final Year Project verified by faculty / supervisor and added to My Impact Portfolio.",
                         impact: sdgLine(sdgs),
                         verify: "Faculty / supervisor verified and added to My Impact Portfolio.",

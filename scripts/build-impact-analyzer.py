@@ -143,6 +143,11 @@ once("Measured Change ≥12/15, Sustainability ≥8/10, evidence ≥12/15,",
      "Measured Change ≥12/15, Sustainability ≥3.5/5, evidence ≥12.75/15,", 'l6 guide text')
 assert 'Sustainability ≥8/10' not in s
 
+# 4c. the tool opens in its own tab: same CIEL PK favicon as the app
+once('<meta charset="utf-8">',
+     '<meta charset="utf-8"><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/icons/ciel-192.png">',
+     'favicon')
+
 # 5. sanity: no large embedded images remain (pdf.js gzip blobs are allowed)
 for mm in re.finditer(r'[A-Za-z0-9+/=]{20000,}', s):
     before = s[max(0, mm.start() - 120):mm.start()]
