@@ -30,6 +30,16 @@ export interface Participant {
     facultySupervisorEmail?: string;
     /** Community-service report only (see `showSemester`) — not stored on the backend Participant record. */
     semester?: string;
+    /** The CIEL account this seat belongs to. Null means the seat is email-only and will NOT show in that person's dashboard. */
+    studentId?: string | null;
+    student_id?: string | null;
+}
+
+/** True when a saved seat is not tied to any CIEL account (it never appears in that teammate's own dashboard). */
+export function participantSeatIsUnlinked(p: { studentId?: unknown; student_id?: unknown } | null | undefined): boolean {
+    if (!p) return false;
+    const sid = p.studentId ?? p.student_id;
+    return !(typeof sid === "string" && sid.trim().length > 0);
 }
 
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
@@ -209,6 +219,9 @@ export default function IdentityVerification({
                     email: formData.email,
                     projectId,
                     blockIfOnRoster: enforceUniqueOnProject,
+                    // A teammate added by the lead must be a registered CIEL account — that is what
+                    // puts this project in their own dashboard. Self / lead verification is exempt.
+                    requireRegisteredAccount: participationMode === 'team' && !isTeamLead,
                 }),
             });
             if (res && res.ok) {

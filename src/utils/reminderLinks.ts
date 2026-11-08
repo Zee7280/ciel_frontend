@@ -9,6 +9,54 @@ export function whatsappShareHref(text: string): string {
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
+/** Phones and tablets (where the WhatsApp app handles `api.whatsapp.com`), as opposed to a desktop browser. */
+type NavigatorLike = { userAgent?: string; maxTouchPoints?: number; userAgentData?: { mobile?: boolean } };
+
+export function isMobileBrowser(nav?: NavigatorLike | null): boolean {
+    const n: NavigatorLike | null = nav === undefined ? (typeof navigator === "undefined" ? null : (navigator as NavigatorLike)) : nav;
+    if (!n) return false;
+    // Either signal is enough: the Client Hints flag, or a phone / tablet in the user agent.
+    if (n.userAgentData?.mobile === true) return true;
+    const ua = n.userAgent ?? "";
+    // iPadOS reports itself as a Mac but has a touch screen.
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (n.maxTouchPoints ?? 0) > 1);
+}
+
+/**
+ * The WhatsApp link to open on THIS device. A bare `wa.me/?text=` link is unreliable on a desktop browser
+ * (it needs WhatsApp's landing page and often ends on a blank or error page), so a desktop opens WhatsApp Web
+ * directly (into the person's chat when the number is known, else to pick a contact) and a phone opens the app.
+ */
+export function whatsappOpenHref(text: string, digits = "", nav?: NavigatorLike | null): string {
+    const encoded = encodeURIComponent(text);
+    if (isMobileBrowser(nav)) {
+        return digits ? `https://wa.me/${digits}?text=${encoded}` : `https://api.whatsapp.com/send?text=${encoded}`;
+    }
+    return digits ? `https://web.whatsapp.com/send?phone=${digits}&text=${encoded}` : `https://web.whatsapp.com/send?text=${encoded}`;
+}
+
+/**
+ * Rewrites any WhatsApp link (`wa.me/…`, `api.whatsapp.com/send…`, `web.whatsapp.com/send…`) to the
+ * form that works on THIS device — see `whatsappOpenHref`. Returns null for a non-WhatsApp link, and the
+ * same string when nothing needs to change. Pure, so the page can keep its static `href` (no hydration
+ * mismatch) and only swap at click time.
+ */
+export function rewriteWhatsAppHrefForDevice(href: string, nav?: NavigatorLike | null): string | null {
+    let url: URL;
+    try {
+        url = new URL(href);
+    } catch {
+        return null;
+    }
+    const host = url.hostname.toLowerCase();
+    if (!["wa.me", "www.wa.me", "api.whatsapp.com", "web.whatsapp.com", "whatsapp.com", "www.whatsapp.com"].includes(host)) return null;
+    const text = url.searchParams.get("text") ?? "";
+    let digits = (url.searchParams.get("phone") ?? "").replace(/\D/g, "");
+    if (!digits && host.endsWith("wa.me")) digits = url.pathname.replace(/\D/g, "");
+    if (!digits && !text) return href; // e.g. the bare support link: nothing to prefill, leave it alone
+    return whatsappOpenHref(text, digits, nav);
+}
+
 export function formatSentWaiting(iso?: string | null): string {
     if (!iso) return "";
     const date = new Date(iso);

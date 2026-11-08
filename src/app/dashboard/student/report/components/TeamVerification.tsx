@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Users, UserPlus, CheckCircle2, Shield, Trash2, Info } from "lucide-react";
-import IdentityVerification, { Participant } from "../../engagement/components/IdentityVerification";
+import IdentityVerification, { Participant, participantSeatIsUnlinked } from "../../engagement/components/IdentityVerification";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 
@@ -39,14 +39,28 @@ export default function TeamVerification({
     // (which used to flip the report to "team" with nobody actually verified).
     const [draftOpen, setDraftOpen] = useState(false);
 
+    /**
+     * The backend refuses a new teammate seat without a CIEL account, so this fires only for an
+     * older seat that was saved by email alone. Say so right here — a green chip the teammate
+     * cannot see from their side is exactly the confusion this guards against.
+     */
+    const warnIfUnlinked = (participant: Participant) => {
+        if (!participantSeatIsUnlinked(participant)) return;
+        alert(
+            `${participant.fullName || participant.email || "This teammate"} is verified, but this seat is not linked to a CIEL account, so it will not appear in their dashboard. Remove them and add them again with the email they registered on CIEL with.`,
+        );
+    };
+
     const handleMemberSuccess = (index: number, participant: Participant) => {
         const newMembers = [...members];
         newMembers[index] = { ...newMembers[index], ...participant, verified: true };
         onUpdateMembers(newMembers);
         setExpandedIndex(null);
+        warnIfUnlinked(participant);
     };
 
     const handleDraftSuccess = (participant: Participant) => {
+        warnIfUnlinked(participant);
         onUpdateMembers([
             ...members,
             {
@@ -136,6 +150,8 @@ export default function TeamVerification({
                         const mayRemove = canRemoveMember ? canRemoveMember(member, idx) : !lockAddMembers;
                         const isOpen = expandedIndex === idx;
                         const displayName = member.fullName || member.name || `Team Member ${idx + 1}`;
+                        // Roster rows carry the seat's account id; a verified seat without one is invisible to that teammate.
+                        const unlinked = Boolean(member.verified) && participantSeatIsUnlinked(member);
                         return (
                             <div key={idx} className="inline-flex items-center gap-1">
                                 <button
@@ -144,7 +160,11 @@ export default function TeamVerification({
                                         setDraftOpen(false);
                                         setExpandedIndex(isOpen ? null : idx);
                                     }}
-                                    title={`${member.role || "Member"} · ${member.university || "Pending university"}`}
+                                    title={
+                                        unlinked
+                                            ? `${displayName}: not linked to a CIEL account — they will not see this project. Remove and re-add with their registered email.`
+                                            : `${member.role || "Member"} · ${member.university || "Pending university"}${member.email ? ` · ${member.email}` : ""}`
+                                    }
                                     className={clsx(
                                         "inline-flex items-center gap-2 rounded-full border bg-white py-1.5 pl-1.5 pr-3.5 text-sm font-semibold transition-colors",
                                         member.verified ? "border-[var(--teal)]/40" : "border-[var(--line)]",
@@ -162,7 +182,14 @@ export default function TeamVerification({
                                         {displayName.charAt(0).toUpperCase()}
                                     </span>
                                     <span className="text-[var(--ink)]">{displayName}</span>
-                                    {member.verified ? (
+                                    {unlinked ? (
+                                        <span
+                                            className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800"
+                                            data-testid="teammate-unlinked"
+                                        >
+                                            Not linked
+                                        </span>
+                                    ) : member.verified ? (
                                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
                                     ) : (
                                         <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[var(--gold)]">
@@ -186,12 +213,28 @@ export default function TeamVerification({
                 </div>
             )}
 
-            {members.length === 0 && (
+            {members.length === 0 ? (
                 <div className="cer-hint !mb-0 flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 shrink-0" />
                     No teammates yet — this report stays individual until you add members.
                 </div>
-            )}
+            ) : members.some((m) => m?.verified && participantSeatIsUnlinked(m)) ? (
+                <div className="cer-hint !mb-0 flex items-start gap-1.5 text-amber-800" data-testid="teammate-unlinked-hint" role="alert">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                        {members
+                            .filter((m) => m?.verified && participantSeatIsUnlinked(m))
+                            .map((m) => m.fullName || m.name || m.email)
+                            .join(", ")}{" "}
+                        — verified, but not linked to a CIEL account, so this project will not appear in their dashboard. Remove and add them again with the email they registered on CIEL with.
+                    </span>
+                </div>
+            ) : members.some((m) => m?.verified) ? (
+                <div className="cer-hint !mb-0 flex items-center gap-1.5" data-testid="teammate-visibility-hint">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--teal)]" />
+                    Verified teammates see this project under My Reports in their own CIEL account (they may need to refresh an open dashboard).
+                </div>
+            ) : null}
 
             {!lockAddMembers && !atCapacity && !draftOpen ? (
                 <button

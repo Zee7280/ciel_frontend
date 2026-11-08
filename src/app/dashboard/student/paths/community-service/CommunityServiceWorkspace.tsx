@@ -25,6 +25,8 @@ import {
 } from "@/utils/reviewQueue";
 import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
+import { mailtoHref, whatsappHrefFromE164, whatsappShareHref } from "@/utils/reminderLinks";
+import { CIEL_PK_ADMIN_WHATSAPP } from "@/components/opportunities/OpportunityWhatsAppLinks";
 
 const HUB = "/dashboard/student/paths/community-service";
 const GUIDE = `${HUB}?view=guide`;
@@ -85,6 +87,63 @@ type ReportRow = {
 
 type JourneyNode = { title: string; detail: string; state: NodeState };
 
+/** The Email / WhatsApp chips on a "notify" note: real prefilled links, opened on the student's own device. */
+type NoteChannels = { email: string; whatsapp: string; emailTitle: string; whatsappTitle: string };
+
+const CIEL_PK_SUPPORT_EMAIL = "support@cielpk.com";
+
+function siteOrigin(): string {
+    return typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://www.cielpk.com";
+}
+
+/**
+ * Prefilled Email / WhatsApp messages for a report card. CIEL PK sends nothing here: the student's
+ * own mail app / WhatsApp opens with the text, addressed to CIEL PK support when the report is with
+ * CIEL PK, or left for the student to pick a teammate while the report is still theirs.
+ */
+function reportNoteChannels(
+    stage: "draft" | "fee" | "review",
+    report: Pick<ReportRow, "id" | "project_title">,
+    path: string,
+): NoteChannels {
+    const title = report.project_title?.trim() || "Community Service report";
+    const link = `${siteOrigin()}${path}`;
+    if (stage === "draft") {
+        const subject = `Community Service report — ${title}`;
+        const body =
+            `Reminder: our Community Service report “${title}” on CIEL PK is still a draft. ` +
+            `Please add your attendance / evidence so we can submit it. Open it here (sign in first): ${link}`;
+        return {
+            email: mailtoHref("", subject, body),
+            whatsapp: whatsappShareHref(`${subject}\n\n${body}`),
+            emailTitle: "Email a teammate the link to this draft report",
+            whatsappTitle: "WhatsApp a teammate the link to this draft report",
+        };
+    }
+    if (stage === "fee") {
+        const subject = `Reporting fee — ${title} (${report.id})`;
+        const body =
+            `Hi CIEL PK,\n\nI have a question about the reporting fee for my Community Service report “${title}” (report ${report.id}). ` +
+            `Payment page: ${link}\n\nThank you.`;
+        return {
+            email: mailtoHref(CIEL_PK_SUPPORT_EMAIL, subject, body),
+            whatsapp: whatsappHrefFromE164(CIEL_PK_ADMIN_WHATSAPP, `${subject}\n\n${body}`) ?? whatsappShareHref(`${subject}\n\n${body}`),
+            emailTitle: "Email CIEL PK about the reporting fee",
+            whatsappTitle: "WhatsApp CIEL PK about the reporting fee",
+        };
+    }
+    const subject = `Report under review — ${title} (${report.id})`;
+    const body =
+        `Hi CIEL PK,\n\nMy Community Service report “${title}” (report ${report.id}) is submitted and waiting for your decision. ` +
+        `Could you share an update? Report: ${link}\n\nThank you.`;
+    return {
+        email: mailtoHref(CIEL_PK_SUPPORT_EMAIL, subject, body),
+        whatsapp: whatsappHrefFromE164(CIEL_PK_ADMIN_WHATSAPP, `${subject}\n\n${body}`) ?? whatsappShareHref(`${subject}\n\n${body}`),
+        emailTitle: "Email CIEL PK about this report",
+        whatsappTitle: "WhatsApp CIEL PK about this report",
+    };
+}
+
 type WorkCard = {
     id: string;
     filter: WsFilter;
@@ -94,7 +153,7 @@ type WorkCard = {
     journeyHead?: string;
     journeySub?: string;
     nodes?: JourneyNode[];
-    note?: { kind: "notify" | "success" | "comment"; title?: string; body: string };
+    note?: { kind: "notify" | "success" | "comment"; title?: string; body: string; channels?: NoteChannels };
     pills?: { label: string; kind: "ok" | "wait" | "rev" }[];
     sideTitle: string;
     sideDetail: string;
@@ -373,6 +432,7 @@ export default function CommunityServiceWorkspace({
                         body: underReview
                             ? "Your payment proof is with CIEL PK. Partner and CIEL PK verification continues once it is approved."
                             : "Your report is submitted. The reporting fee must be submitted and approved before Partner and CIEL PK can verify this report.",
+                        channels: reportNoteChannels("fee", report, reportPaymentHref(report)),
                     },
                     sideTitle: underReview ? "Current Status" : "Your Next Action",
                     sideDetail: underReview ? "Payment proof under review" : "Submit the reporting fee",
@@ -400,6 +460,7 @@ export default function CommunityServiceWorkspace({
                         kind: "notify",
                         title: "Draft Status",
                         body: `Your unfinished report stays editable. Nothing is sent to ${communityReportReviewerName(report)} until you press Submit Report.`,
+                        channels: reportNoteChannels("draft", report, href),
                     },
                     sideTitle: "Your Next Action",
                     sideDetail: "Continue your report",
@@ -428,6 +489,7 @@ export default function CommunityServiceWorkspace({
                         kind: "notify",
                         title: `${reviewer} Options`,
                         body: `${reviewer} may Approve, Request Revision, or Reject. Your submitted version is locked while under review.`,
+                        channels: reportNoteChannels("review", report, href),
                     },
                     sideTitle: "Current Status",
                     sideDetail: `Pending ${reviewer} Approval`,
@@ -692,14 +754,24 @@ export default function CommunityServiceWorkspace({
                                         }`}
                                     >
                                         {card.note.title ? <b className="block text-[10px] text-[#16313d]">{card.note.title}</b> : null}
-                                        {card.note.kind === "notify" ? (
-                                            <div className="mt-1">
-                                                <span className="mr-1 rounded-xl bg-[#edf4fb] px-1.5 py-0.5 text-[9px] font-black text-[#376d9f]">
-                                                    Email
-                                                </span>
-                                                <span className="mr-1 rounded-xl bg-[#f8f2e7] px-1.5 py-0.5 text-[9px] font-black text-[#765b25]">
-                                                    WhatsApp
-                                                </span>
+                                        {card.note.kind === "notify" && card.note.channels ? (
+                                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                                                <a
+                                                    href={card.note.channels.email}
+                                                    title={card.note.channels.emailTitle}
+                                                    className="rounded-xl bg-[#edf4fb] px-1.5 py-0.5 text-[9px] font-black text-[#376d9f] hover:bg-[#dbe8f5]"
+                                                >
+                                                    ✉ Email
+                                                </a>
+                                                <a
+                                                    href={card.note.channels.whatsapp}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title={card.note.channels.whatsappTitle}
+                                                    className="rounded-xl bg-[#f8f2e7] px-1.5 py-0.5 text-[9px] font-black text-[#765b25] hover:bg-[#f0e4cf]"
+                                                >
+                                                    💬 WhatsApp
+                                                </a>
                                             </div>
                                         ) : null}
                                         <p className="mt-1">{card.note.body}</p>
