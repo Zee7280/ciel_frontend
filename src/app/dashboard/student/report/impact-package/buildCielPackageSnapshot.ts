@@ -250,6 +250,15 @@ function buildData(input: CielPackageInput): Rec {
         out.section1 = s1;
     }
 
+    // The viewer's "2.2 · Baseline statement" card reads `section2.baseline_statement`; the app keeps
+    // that statement in `summary_text` (the AI context summary, or the composed baseline before it runs).
+    const s2 = asRec(out.section2);
+    if (Object.keys(s2).length && !firstStr(s2.baseline_statement)) {
+        const statement = firstStr(s2.summary_text, s2.baseline_smart_draft);
+        if (statement) s2.baseline_statement = statement;
+        out.section2 = s2;
+    }
+
     return out;
 }
 

@@ -290,6 +290,23 @@ test("inventory source and name match the data placeholder so the viewer shows e
     );
 });
 
+test("the Section 2 statement travels under the viewer's `baseline_statement` name", () => {
+    const r = report() as Record<string, unknown>;
+    r.section2 = { problem_statement: "No lights.", summary_text: "AI paragraph about the context." };
+    const s2 = (buildCielPackageSnapshot(base({ report: r })).data.section2 || {}) as Record<string, unknown>;
+    assert.equal(s2.baseline_statement, "AI paragraph about the context.");
+    assert.equal(s2.summary_text, "AI paragraph about the context.");
+
+    r.section2 = { problem_statement: "No lights.", baseline_smart_draft: "Smart draft." };
+    assert.equal(((buildCielPackageSnapshot(base({ report: r })).data.section2 || {}) as Record<string, unknown>).baseline_statement, "Smart draft.");
+
+    r.section2 = { problem_statement: "No lights.", baseline_statement: "Already set.", summary_text: "AI paragraph." };
+    assert.equal(((buildCielPackageSnapshot(base({ report: r })).data.section2 || {}) as Record<string, unknown>).baseline_statement, "Already set.");
+
+    r.section2 = { problem_statement: "No lights." };
+    assert.equal(((buildCielPackageSnapshot(base({ report: r })).data.section2 || {}) as Record<string, unknown>).baseline_statement, undefined);
+});
+
 test("snapshot never mutates the live report", () => {
     const input = base();
     const before = JSON.stringify(input.report);
