@@ -1602,6 +1602,38 @@
     border: 1px solid #bfe6e2;
 }
 
+/* Reviewer sent the report back: the one state the student must act on. */
+.cer .cer-life-rev {
+    background: #fff1f0;
+    border: 1px solid #f5c2bd;
+}
+
+.cer .cer-life-note {
+    margin-top: 10px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #f5c2bd;
+    padding: 10px 12px;
+    max-width: 720px;
+}
+
+.cer .cer-life-note b {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b42318;
+    margin-bottom: 4px;
+}
+
+.cer .cer-life-note p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+    white-space: pre-wrap;
+}
+
 .cer .cer-life-row {
     display: flex;
     gap: 12px;

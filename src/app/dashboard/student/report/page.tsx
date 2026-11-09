@@ -64,7 +64,7 @@ import {
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote } from './ReportFormChrome';
+import { ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
@@ -1185,6 +1185,13 @@ function ReportFormContent() {
                         />
                     ) : null}
                 </div>
+
+                <ReportRevisionNotice
+                    data={data}
+                    onFlash={onFlash}
+                    teamMemberOnly={isTeamMemberAttendanceOnly}
+                    onGoFlash={() => goJourney(FLASH_CARD_STEP)}
+                />
 
                 {isTeamMemberAttendanceOnly ? (
                     <div className="cer-note">

@@ -203,3 +203,29 @@ test("sectionsComplete reflects real content instead of always reading 0 / 9", (
     assert.equal(full.sectionsTotal, 9);
     assert.equal(full.sectionsComplete, 9);
 });
+
+test("a report sent back by CIEL PK reads as CHANGES REQUESTED, not as awaiting review", () => {
+    // Admin "request revision": status=revision + admin_status=rejected + the admin's note.
+    const returned = buildImpactPackageModel({
+        project_id: "p1",
+        status: "revision",
+        admin_status: "rejected",
+        feedback: "Section 4 reach is not supported by the attendance sheet. Fix and resubmit.",
+    } as never);
+    assert.equal(returned.returnedForRevision, true);
+    assert.equal(returned.submitted, true);
+    assert.match(returned.statusTitle, /^CHANGES REQUESTED/);
+    assert.match(returned.statusDetail, /Section 4 reach is not supported/);
+
+    const waiting = buildImpactPackageModel({ project_id: "p1", status: "submitted", admin_status: "pending" } as never);
+    assert.equal(waiting.returnedForRevision, false);
+    assert.match(waiting.statusTitle, /Awaiting CIEL PK review/);
+
+    const published = buildImpactPackageModel({ project_id: "p1", status: "verified", admin_status: "approved" } as never);
+    assert.equal(published.returnedForRevision, false);
+    assert.match(published.statusTitle, /^PUBLISHED/);
+
+    // Faculty "reject" ends the process; it is not a revision the student can act on.
+    const ended = buildImpactPackageModel({ project_id: "p1", status: "rejected", faculty_status: "rejected" } as never);
+    assert.equal(ended.returnedForRevision, false);
+});

@@ -17,6 +17,7 @@ import {
 } from "../utils/mediaVisibility";
 import { resolveReportCii } from "../utils/resolveReportCii";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { classifyEvidenceGalleryKind } from "@/components/ciel/community-service/ReportEvidenceGallery";
 
 export type ImpactPackageAudience = "student" | "faculty" | "university" | "admin" | "partner" | "public";
@@ -79,6 +80,8 @@ export type ImpactPackageModel = {
     effectiveVisibility: MediaVisibility;
     files: ImpactPackageEvidenceFile[];
     adminApproved: boolean;
+    /** A reviewer sent the report back; the student must edit and resubmit. */
+    returnedForRevision: boolean;
     submitted: boolean;
     ciiLabel: string;
     ciiPending: boolean;
@@ -414,12 +417,24 @@ export function buildImpactPackageModel(
         if (row.hours < row.required) holdBits.push(`${row.name} ${hoursLabel(row.hours)} / ${row.required} h`);
     });
     if (!files.length) holdBits.push("no evidence files attached");
+    // Admin "request revision" keeps status=revision (still "submitted" for isSubmitted), so without
+    // this the student's package kept saying "Awaiting CIEL PK review" after it was sent back.
+    const returnedForRevision = !adminApproved && isReportReturnedForRevision(data);
+    const revisionNote = firstSentence(pickString(data.feedback, data.admin_feedback, data.faculty_remarks));
     const statusTitle = adminApproved
         ? "PUBLISHED · CIEL PK accepted"
-        : submitted
-          ? "INTEGRITY HOLD · Awaiting CIEL PK review"
-          : "DRAFT · Not yet submitted";
-    const statusDetail = holdBits.length ? holdBits.join(" · ") : submitted ? "Student source record locked for review" : "Complete remaining fields, then submit";
+        : returnedForRevision
+          ? "CHANGES REQUESTED · Sent back by CIEL PK"
+          : submitted
+            ? "INTEGRITY HOLD · Awaiting CIEL PK review"
+            : "DRAFT · Not yet submitted";
+    const statusDetail = returnedForRevision
+        ? revisionNote || "Update the report and resubmit it for review"
+        : holdBits.length
+          ? holdBits.join(" · ")
+          : submitted
+            ? "Student source record locked for review"
+            : "Complete remaining fields, then submit";
 
     const firstOutput = outputRows[0];
     const metrics: ImpactPackageMetric[] = [
@@ -632,6 +647,7 @@ export function buildImpactPackageModel(
         effectiveVisibility,
         files,
         adminApproved,
+        returnedForRevision,
         submitted,
         ciiLabel,
         ciiPending,

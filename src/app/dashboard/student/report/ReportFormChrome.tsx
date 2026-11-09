@@ -11,6 +11,7 @@ import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedL
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import ImpactPackage from "./impact-package/ImpactPackage";
 import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
+import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "./utils/mediaVisibility";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
@@ -1728,6 +1729,76 @@ function flashStatus(data: ReportData): "draft" | "fee" | "pending" | "live" {
     if (reportFeeHold && data.payment_verified !== true) return "fee";
     if (isStudentReportAwaitingReview(data)) return "pending";
     return "draft";
+}
+
+/**
+ * Who sent the report back. Admin "request revision" stores status=revision + admin_status=rejected;
+ * a partner reject sets partner_status=rejected; faculty uses faculty_status revision_requested.
+ */
+export function reportRevisionReviewer(data: Pick<ReportData, "faculty_status" | "admin_status" | "admin_approval_status" | "partner_status">): string {
+    const fac = String(data.faculty_status || "").toLowerCase();
+    const adm = String(data.admin_status || data.admin_approval_status || "").toLowerCase();
+    const partner = String(data.partner_status || "").toLowerCase();
+    if (fac.includes("revision") || fac.includes("changes")) return "Your faculty supervisor";
+    if (adm === "rejected") return "CIEL PK";
+    if (partner === "rejected") return "The partner organisation";
+    return "CIEL PK";
+}
+
+/** The reviewer's written comments that came back with the revision request. */
+export function reportRevisionNote(data: Pick<ReportData, "feedback" | "admin_feedback" | "faculty_remarks">): string {
+    return String(data.feedback || data.admin_feedback || data.faculty_remarks || "").trim();
+}
+
+/**
+ * Shown on every step of the report (sections and flash card) while a reviewer has sent the report
+ * back. Before this, the only trace of a revision request on the report page was that the form was
+ * editable again — the student could not see that CIEL PK had returned it, or why.
+ */
+export function ReportRevisionNotice({
+    data,
+    onFlash,
+    teamMemberOnly,
+    onGoFlash,
+}: {
+    data: ReportData;
+    /** True on the flash-card step, where the Resubmit button sits below. */
+    onFlash?: boolean;
+    /** Attendance-only team members read the notice but cannot resubmit. */
+    teamMemberOnly?: boolean;
+    onGoFlash?: () => void;
+}) {
+    if (!isReportReturnedForRevision(data)) return null;
+    const reviewer = reportRevisionReviewer(data);
+    const note = reportRevisionNote(data);
+    const next = teamMemberOnly
+        ? "Only the Team Lead can update the report and resubmit it."
+        : onFlash
+          ? "Update the parts mentioned below, then press Resubmit report on this flash card."
+          : "Update the parts mentioned below, then open the flash card and press Resubmit report.";
+    return (
+        <div className="cer-life cer-life-rev" role="status" data-testid="report-revision-notice">
+            <div className="cer-life-row">
+                <div>
+                    <p className="cer-life-k">✏️ {reviewer} sent this report back for changes</p>
+                    <p className="cer-life-t">Your earlier submission is no longer under review. {next}</p>
+                    {note ? (
+                        <div className="cer-life-note">
+                            <b>Comments from {reviewer === "CIEL PK" ? "CIEL PK" : reviewer.replace(/^(Your|The) /, "").toLowerCase()}</b>
+                            <p>{note}</p>
+                        </div>
+                    ) : (
+                        <p className="cer-life-t">No written comments were attached. Check your notifications or email for the details.</p>
+                    )}
+                </div>
+                {!onFlash && !teamMemberOnly && onGoFlash ? (
+                    <button type="button" className="cer-pay" onClick={onGoFlash}>
+                        Go to flash card to resubmit
+                    </button>
+                ) : null}
+            </div>
+        </div>
+    );
 }
 
 export function ReportFlashCard({

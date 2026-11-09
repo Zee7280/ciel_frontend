@@ -381,7 +381,13 @@ export default function ImpactPackage({
                     {model.submitted ? (
                         <>
                             <span className="dot" />
-                            <span>{model.adminApproved ? "Published record" : "Awaiting CIEL PK approval · downloads locked"}</span>
+                            <span>
+                                {model.adminApproved
+                                    ? "Published record"
+                                    : model.returnedForRevision
+                                      ? "Sent back for changes · resubmit to continue review"
+                                      : "Awaiting CIEL PK approval · downloads locked"}
+                            </span>
                         </>
                     ) : (
                         <span>Draft package · not submitted · downloads after Super Admin approval</span>
