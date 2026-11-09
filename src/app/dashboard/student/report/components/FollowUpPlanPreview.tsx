@@ -105,7 +105,12 @@ export default function FollowUpPlanPreview({ data, projectData, projectEndDate,
     const remove = (id: string) => save(shown.filter((q) => q.id !== id));
     const addOwn = () => {
         if (shown.length >= MAX_QUESTIONS) return;
-        save([...shown, { id: `own-${Date.now()}`, activityId: null, activityTitle: "", questionText: "", countLabel: null, include: true, source: "student" }]);
+        // Deterministic id: one past the highest "own-N" already in the list (stable across re-renders).
+        const nextOwn = shown.reduce((max, q) => {
+            const m = /^own-(\d+)$/.exec(q.id);
+            return m ? Math.max(max, Number(m[1])) : max;
+        }, 0) + 1;
+        save([...shown, { id: `own-${nextOwn}`, activityId: null, activityTitle: "", questionText: "", countLabel: null, include: true, source: "student" }]);
     };
     const resetToSuggested = () => updateSection("section10", { followup_questions: [] });
 
