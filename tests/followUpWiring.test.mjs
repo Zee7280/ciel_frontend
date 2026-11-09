@@ -64,8 +64,12 @@ test("the student 9.5 block shows the status note for every plan (CIEL PK may st
     assert.match(preview, /updateSection\("section10", \{ followup_questions: next \}\)/);
     assert.match(preview, /Open Follow-up Studio/);
     const studio = read("src/app/dashboard/student/report/components/FollowUpStudio.tsx");
-    for (const tab of ["1 · Source report", "2 · Questions", "3 · Email & schedule", "4 · Partner view", "5 · Tracking"]) {
+    for (const tab of ["1 · Source report", "2 · Questions", "3 · Immediate notice", "4 · Email & schedule", "5 · Partner view", "6 · Tracking"]) {
         assert.ok(studio.includes(tab), tab);
+    }
+    // the immediate-notice tab is a preview: subject/body/blockers/calendar come from the pure helpers, nothing is sent
+    for (const piece of ["noticeSubject(", "noticeBlockers(", "buildNoticeIcs(", "googleCalendarUrl(", "Preview only", "What the automatic flow must do"]) {
+        assert.ok(studio.includes(piece), piece);
     }
     assert.match(studio, /\+ Add custom question/);
     assert.match(studio, /↻ Regenerate/);

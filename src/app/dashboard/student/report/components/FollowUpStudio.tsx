@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import FollowUpStatusNote from "./FollowUpStatusNote";
 import type { ReportData } from "../context/ReportContext";
+import { buildNoticeIcs, googleCalendarUrl, noticeBlockers, noticeQuestions, noticeSubject, noticeText, type NoticeInput } from "../utils/followupNotice";
 
 /**
  * The "Impact Follow-up Studio" that opens under 9.5 once the student picks Yes. Mirrors the
@@ -86,9 +87,10 @@ export function studioReference(data: ReportData, projectData: unknown) {
 const TABS = [
     ["source", "1 · Source report"],
     ["questions", "2 · Questions"],
-    ["email", "3 · Email & schedule"],
-    ["partner", "4 · Partner view"],
-    ["tracking", "5 · Tracking"],
+    ["notice", "3 · Immediate notice"],
+    ["email", "4 · Email & schedule"],
+    ["partner", "5 · Partner view"],
+    ["tracking", "6 · Tracking"],
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
@@ -161,6 +163,48 @@ export default function FollowUpStudio({ open, onClose, data, projectData, proje
         );
     };
     const inputCls = "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 disabled:bg-slate-50 disabled:text-slate-500";
+
+    // "3 · Immediate notice": the advance nomination email as the partner would receive it (preview only).
+    const notice: NoticeInput = {
+        projectTitle: ref.title,
+        projectId: ref.projectId,
+        reportId: "",
+        organization: ref.host === "Self-initiated" ? "" : ref.host,
+        location: ref.location,
+        university: ref.university,
+        periodStart: ref.periodStart,
+        periodEnd: projectEndDate || ref.periodEnd,
+        objective: ref.objective,
+        partnerName: str(s10.followup_owner_name),
+        partnerEmail: str(s10.followup_owner_email),
+        dueDate: preview?.dueDate || "",
+        intervalLabel: preview?.intervalLabel || "",
+        questions: noticeQuestions(questions),
+    };
+    const noticeIssues = noticeBlockers(notice);
+    const calendarUrl = googleCalendarUrl(notice);
+    const [noticeCopied, setNoticeCopied] = useState(false);
+    const downloadIcs = () => {
+        const ics = buildNoticeIcs(notice, new Date());
+        if (!ics) return;
+        const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `CIEL_PK_followup_reminder_${(notice.projectId || "project").replace(/[^a-zA-Z0-9_.-]/g, "_")}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const copyNotice = async () => {
+        try {
+            await navigator.clipboard.writeText(`Subject: ${noticeSubject(notice)}\n\n${noticeText(notice)}`);
+            setNoticeCopied(true);
+            setTimeout(() => setNoticeCopied(false), 2500);
+        } catch {
+            setNoticeCopied(false);
+        }
+    };
 
     const refRows: Array<[string, string]> = [
         ["Project", ref.title],
@@ -379,6 +423,110 @@ export default function FollowUpStudio({ open, onClose, data, projectData, proje
                                     ))}
                                 </div>
                                 <p className="mt-2 text-[11px] text-slate-500">Three related but different outcomes may have three different answers. One blanket “Is impact sustained?” would hide that distinction.</p>
+                            </section>
+                        </div>
+                    ) : null}
+
+                    {tab === "notice" ? (
+                        <div className="space-y-4" data-testid="studio-notice">
+                            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">3. Immediate email when you nominate a partner</h3>
+                                        <p className="text-xs text-slate-500">
+                                            An advance heads-up only, not the verification questionnaire. In production CIEL PK sends it once, right after Section 9.5 is formally submitted and the organization contact is verified. The outcome questionnaire still needs report approval.
+                                        </p>
+                                    </div>
+                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${noticeIssues.length ? "border-[#edd6b4] bg-[#fff7e9] text-[#8a590d]" : "border-[#b6d8d4] bg-[#eefaf7] text-[#006d61]"}`}>
+                                        {noticeIssues.length ? "Nomination needs validation" : "Nomination fields complete"}
+                                    </span>
+                                </div>
+                                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                    {([
+                                        ["Trigger", "Section 9.5 submitted"],
+                                        ["Advance notice", "Immediately after submission"],
+                                        ["Expected follow-up", notice.dueDate ? pretty(notice.dueDate) : "Needs a project end date"],
+                                    ] as Array<[string, string]>).map(([k, v]) => (
+                                        <div key={k} className="rounded-xl border border-[#d9e8e5] bg-[#f5fbfa] px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{k}</p>
+                                            <p className="text-sm font-extrabold text-slate-900">{v}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-3 rounded-xl border border-[#edd6b4] bg-[#fff7e9] px-3 py-2 text-[11px] leading-relaxed text-[#8a590d]">
+                                    <b>Preview only.</b> The automatic advance email is not switched on yet; nothing is sent from this screen. Your 9.5 answers, the questions and the later questionnaire work exactly as before.
+                                </div>
+                                {noticeIssues.length ? (
+                                    <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+                                        <b>Production validation required:</b> {noticeIssues.join(" · ")}. Fix these in Section 1 / 9.5 or the opportunity; the preview stays available.
+                                    </div>
+                                ) : null}
+                                <div className="mt-2 rounded-xl bg-[#f5fbfa] px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+                                    <b>Two distinct events.</b> <b>Now:</b> explain that the student team nominated the organization, show the project reference and the planned contact date, and ask for a reply confirming the right representative. <b>Later:</b> after approved completion, send the precise S4 / S5 / S9 outcome questions with conditional reminders.
+                                </div>
+                            </section>
+
+                            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                <div className="border-b border-slate-100 px-4 py-3 text-xs text-slate-600">
+                                    <p><b>From:</b> CIEL PK Partner Engagement <span className="text-slate-400">· monitored mailbox, replies go to CIEL PK</span></p>
+                                    <p><b>To:</b> {notice.partnerName || "Partner Representative"} &lt;{notice.partnerEmail || "verified.contact@partner.org"}&gt;</p>
+                                    <p><b>Subject:</b> {noticeSubject(notice)}</p>
+                                </div>
+                                <div className="bg-[#0c746e] px-5 py-4 text-white">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#d9f2ee]">CIEL PK · Advance partner notification</p>
+                                    <p className="text-lg font-extrabold">You&apos;ve been nominated for an impact follow-up</p>
+                                    <p className="text-xs text-[#e4f5f0]">The questionnaire comes later · Expected {notice.dueDate ? pretty(notice.dueDate) : "date pending"}</p>
+                                </div>
+                                <div className="space-y-3 px-5 py-4 text-sm text-slate-800">
+                                    <p>Dear {notice.partnerName || "Partner Representative"},</p>
+                                    <p>Thank you for partnering with students to create meaningful community impact!</p>
+                                    <p>A student team from <b>{notice.university || "the university"}</b> has listed <b>{notice.organization || "the partner organization"}</b> and nominated you as the partner contact for a future sustainability follow-up through CIEL PK.</p>
+                                    <ReferenceBlock rows={refRows} />
+                                    {notice.objective ? <p><b>Project objective:</b> {notice.objective}</p> : null}
+                                    <div className="rounded-xl bg-[#f5fbfa] px-3 py-2 text-xs text-slate-700">
+                                        <b>What happens next?</b> {notice.intervalLabel ? `${notice.intervalLabel[0].toUpperCase()}${notice.intervalLabel.slice(1)}` : "After the planned project end date"}, CIEL PK expects to email you a brief, project-specific questionnaire to understand whether benefits are continuing. The follow-up is contingent on the final report being approved.
+                                    </div>
+                                    <p><b>Based on the listed activities, we may ask:</b></p>
+                                    {notice.questions.length ? (
+                                        notice.questions.map((q, i) => (
+                                            <div key={q} className="rounded-xl border border-[#d9e8e5] px-3 py-2 text-sm">{i + 1}. {q}</div>
+                                        ))
+                                    ) : (
+                                        <div className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-sm text-slate-500">Specific questions will be extracted from the approved report.</div>
+                                    )}
+                                    <p className="text-xs text-slate-500">Questions are tentative; activities are not assumed completed. The questions and due date can change after report review.</p>
+                                    <p><b>No impact answers are required today.</b> Please <b>reply to this email</b> to confirm that you are the correct contact for the future request. If not, please let us know by replying.</p>
+                                    <p>You can add the expected date to your own calendar as a reminder. This is <b>not a meeting invitation.</b></p>
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {calendarUrl ? <a className={btn} href={calendarUrl} target="_blank" rel="noopener noreferrer">Add to Google Calendar ↗</a> : <span className={`${btn} opacity-50`}>Add to Google Calendar ↗</span>}
+                                        <button type="button" className={btn} onClick={downloadIcs} disabled={!notice.dueDate}>Download calendar (.ics)</button>
+                                    </div>
+                                    <p>Warm regards,<br /><b>CIEL PK – Community Impact Education Lab</b><br /><span className="text-xs text-slate-500">www.cielpk.com</span></p>
+                                </div>
+                            </section>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button type="button" className={btn} onClick={() => void copyNotice()}>{noticeCopied ? "Copied ✓" : "Copy notice email"}</button>
+                                <button type="button" className={btn} onClick={downloadIcs} disabled={!notice.dueDate}>Download reminder .ics</button>
+                                <button type="button" className={btnPrimary} onClick={() => setTab("email")}>Continue to later questionnaire & reminders →</button>
+                            </div>
+
+                            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                                <h3 className="text-sm font-bold text-slate-900">What the automatic flow must do</h3>
+                                <ol className="mt-2 space-y-2 text-xs text-slate-700">
+                                    {([
+                                        ["Student formally submits Section 9.5", "Use the stored Project ID, organization, verified partner contact, declared activities and planned end date. Never notify on a draft save."],
+                                        ["Immediately · one advance email queued", "Sent from a monitored CIEL PK mailbox with a reply-to address and an optional .ics reminder. A nomination ID prevents duplicate notifications."],
+                                        ["After report approval · final questions locked", "S4 delivered activities + S5 outcomes + S9 continuation; cancelled activities excluded. Proposed impact is never presented as completed impact."],
+                                        [`${notice.dueDate ? pretty(notice.dueDate) : "Due date"} · later verification request`, "The separate questionnaire goes out only if the report and the partner contact pass the dispatch gates. Reminders follow only if unanswered."],
+                                        ["If the end date or contact changes", "The backend re-evaluates the due date and tells the right contact about a meaningful schedule change. A personal calendar reminder does not update itself."],
+                                    ] as Array<[string, string]>).map(([t, d], i) => (
+                                        <li key={t} className="flex gap-3 rounded-xl border border-slate-100 bg-[#f8fbfb] px-3 py-2">
+                                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#0c746e] text-[11px] font-bold text-white">{i + 1}</span>
+                                            <span><b className="block text-slate-900">{t}</b>{d}</span>
+                                        </li>
+                                    ))}
+                                </ol>
                             </section>
                         </div>
                     ) : null}
