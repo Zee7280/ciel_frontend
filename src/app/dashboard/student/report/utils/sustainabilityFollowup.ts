@@ -88,7 +88,26 @@ export type FollowupShape = {
     followup_due_date?: unknown;
     followup_check?: unknown;
     followup_check_notes?: unknown;
+    /** The student's reviewed partner question set (Follow-up Studio); used at publication. */
+    followup_questions?: unknown;
 };
+
+/** Included questions from the student's reviewed set, numbered and with the activity named ("" when none). */
+export function followupQuestionsText(block: FollowupShape | null | undefined): string {
+    const raw = block?.followup_questions;
+    if (!Array.isArray(raw)) return "";
+    const lines: string[] = [];
+    for (const item of raw) {
+        const q = (item && typeof item === "object" ? item : {}) as { include?: unknown; questionText?: unknown; activityTitle?: unknown; countLabel?: unknown };
+        if (q.include === false) continue;
+        const question = text(q.questionText);
+        if (!question) continue;
+        const activity = text(q.activityTitle);
+        const count = text(q.countLabel);
+        lines.push(`${lines.length + 1}. ${activity ? `${activity} — ` : ""}${question}${count ? ` (optional number: ${count})` : ""}`);
+    }
+    return lines.join("\n");
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -223,6 +242,8 @@ export function followupSummaryRows(
         rows.push({ label: "What to check", value: text(block.followup_check), fullWidth: true });
         const notes = text(block.followup_check_notes);
         if (notes) rows.push({ label: "Specific instruction", value: notes, fullWidth: true });
+        const questions = followupQuestionsText(block);
+        if (questions) rows.push({ label: "Partner questions (reviewed by the student)", value: questions, fullWidth: true });
     }
     return rows;
 }

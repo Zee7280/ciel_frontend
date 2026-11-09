@@ -609,7 +609,7 @@ function AdminFieldBody({ value }: { value: unknown }): ReactNode {
                 </span>
             );
         }
-        return <span className="text-sm font-medium leading-relaxed text-slate-800">{t}</span>;
+        return <span className="whitespace-pre-line text-sm font-medium leading-relaxed text-slate-800">{t}</span>;
     }
     if (typeof value === "number" && !Number.isNaN(value)) {
         return <span className="text-sm font-medium tabular-nums text-slate-800">{value}</span>;

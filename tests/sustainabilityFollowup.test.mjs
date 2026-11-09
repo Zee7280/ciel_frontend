@@ -114,3 +114,22 @@ test("read-only rows follow the plan, hide stale contact data, and only show the
     assert.equal(followupSummaryRows(yes)[0].value, "Planned — awaiting report approval");
     assert.equal(followupSummaryRows({ followup_plan: "later" })[1].value, "Assigned faculty supervisor (from opportunity)");
 });
+
+test("the student's reviewed partner questions appear as one read-only row (included, non-blank only; never for No/later)", () => {
+    const questions = [
+        { id: "a", activityTitle: "Tree plantation", questionText: "Are the trees still alive?", countLabel: "Trees surviving", include: true },
+        { id: "b", activityTitle: "Workshop", questionText: "Skipped one", include: false },
+        { id: "c", activityTitle: "", questionText: "   ", include: true },
+        { id: "d", activityTitle: "", questionText: "Is the water filter still in use?", countLabel: null, include: true },
+    ];
+    const yes = { followup_plan: "yes", followup_owner_role: "Faculty supervisor", followup_owner_name: "Dr Khan", followup_due_date: "2027-02-05", followup_check: "x", followup_questions: questions };
+    const row = followupSummaryRows(yes).find((r) => r.label.startsWith("Partner questions"));
+    assert.ok(row && row.fullWidth);
+    assert.equal(row.value, "1. Tree plantation — Are the trees still alive? (optional number: Trees surviving)\n2. Is the water filter still in use?");
+    assert.ok(!row.value.includes("Skipped one"));
+    // nothing when the set is absent / empty / malformed, or the plan is not Yes
+    assert.ok(!followupSummaryRows({ ...yes, followup_questions: undefined }).some((r) => r.label.startsWith("Partner questions")));
+    assert.ok(!followupSummaryRows({ ...yes, followup_questions: "garbage" }).some((r) => r.label.startsWith("Partner questions")));
+    assert.ok(!followupSummaryRows({ followup_plan: "no", followup_no_reason: "Other", followup_no_reason_other: "x", followup_questions: questions }).some((r) => r.label.startsWith("Partner questions")));
+    assert.ok(!followupSummaryRows({ followup_plan: "later", followup_questions: questions }).some((r) => r.label.startsWith("Partner questions")));
+});
