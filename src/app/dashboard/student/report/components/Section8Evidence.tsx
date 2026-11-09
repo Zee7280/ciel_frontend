@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { FileText, Image as ImageIcon, Trash2 } from "lucide-react";
+import { FileText, Image as ImageIcon, Music as MusicIcon, Trash2, Video as VideoIcon } from "lucide-react";
+import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
+import { evidencePreviewKind } from "../utils/evidencePreviewKind";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useReportForm } from "../context/ReportContext";
@@ -143,11 +145,11 @@ const getNativeFile = (file: EvidenceFileItem): File | Blob | undefined => {
     return undefined;
 };
 
-function useEvidencePreviewUrl(file: EvidenceFileItem, isImage: boolean): string | null {
+function useEvidencePreviewUrl(file: EvidenceFileItem, wanted: boolean): string | null {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!isImage) {
+        if (!wanted) {
             setPreviewUrl(null);
             return;
         }
@@ -166,7 +168,7 @@ function useEvidencePreviewUrl(file: EvidenceFileItem, isImage: boolean): string
             return;
         }
         setPreviewUrl(null);
-    }, [file, isImage]);
+    }, [file, wanted]);
 
     return previewUrl;
 }
@@ -174,37 +176,34 @@ function useEvidencePreviewUrl(file: EvidenceFileItem, isImage: boolean): string
 /** Renders the contents of a `.cer-ph` tile: the real image thumbnail when one is available,
  *  otherwise a generic icon — evidence is always shown as a picture tile, never a file-list row. */
 function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
-    const isImage = getFileType(file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
-    const previewUrl = useEvidencePreviewUrl(file, isImage);
+    const kind = evidencePreviewKind(getFileType(file), name);
+    const previewUrl = useEvidencePreviewUrl(file, kind === "image");
 
-    if (isImage && previewUrl) {
+    if (kind === "image" && previewUrl) {
         return <img src={previewUrl} alt={name} />;
     }
 
-    if (isImage) {
+    if (kind === "image") {
         return <ImageIcon className="h-7 w-7 text-[var(--teal)]" />;
+    }
+
+    if (kind === "video") {
+        return <VideoIcon className="h-7 w-7 text-[var(--teal)]" />;
+    }
+
+    if (kind === "audio") {
+        return <MusicIcon className="h-7 w-7 text-[var(--teal)]" />;
     }
 
     return <FileText className="h-7 w-7 text-[var(--teal)]" />;
 }
 
 function EvidenceFullFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
-    const isImage = getFileType(file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
-    const previewUrl = useEvidencePreviewUrl(file, isImage);
-
-    if (isImage && previewUrl) {
-        return (
-            <img src={previewUrl} alt={name} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
-        );
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center space-y-4 p-12 text-slate-400">
-            <FileText className="h-16 w-16 text-slate-200" />
-            <p className="text-sm font-semibold">Preview not available for this file type</p>
-            <p className="text-xs text-slate-400">({name})</p>
-        </div>
-    );
+    const mimeType = getFileType(file);
+    const kind = evidencePreviewKind(mimeType, name);
+    // Images, video and audio play inline; other files still get their open link.
+    const previewUrl = useEvidencePreviewUrl(file, kind !== "file" || !isNativeFile(file));
+    return <EvidenceMediaPreview url={previewUrl} name={name} mimeType={mimeType} />;
 }
 
 function evidenceTypeOn(selected: string[], id: string) {

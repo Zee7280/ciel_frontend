@@ -10,6 +10,7 @@ import React, { useMemo, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
@@ -162,39 +163,28 @@ function FilePreview({ file }: { file: any }) {
 }
 
 function FullFilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    const name: string = typeof file === "string" ? file.split(/[?#]/)[0].split("/").pop() || file : file?.name || "Preview";
+    const mimeType: string = typeof file === "string" ? "" : file?.type || "";
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
         if (!file) return;
-        if (isImage) {
-            if (file instanceof File || file instanceof Blob) {
-                const url = URL.createObjectURL(file);
-                setPreviewUrl(url);
-                return () => URL.revokeObjectURL(url);
-            } else if (typeof file === "string") {
-                setPreviewUrl(file);
-            } else if (file?.url) {
-                setPreviewUrl(file.url);
-            }
+        if (file instanceof File || file instanceof Blob) {
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
+            return () => URL.revokeObjectURL(url);
+        } else if (typeof file === "string") {
+            setPreviewUrl(file);
+        } else if (file?.url) {
+            setPreviewUrl(file.url);
+        } else {
+            setPreviewUrl(null);
         }
-    }, [file, isImage]);
+    }, [file]);
 
     if (!file) return null;
 
-    if (isImage && previewUrl) {
-        return (
-            <img src={previewUrl} alt={file?.name || "Preview"} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
-        );
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center space-y-4 p-12 text-slate-400">
-            <FileText className="h-16 w-16 text-slate-200" />
-            <p className="text-sm font-semibold">Preview not available for this file type</p>
-            <p className="text-xs text-slate-400">({file?.name})</p>
-        </div>
-    );
+    return <EvidenceMediaPreview url={previewUrl} name={name} mimeType={mimeType} />;
 }
 
 function PartnerCard({
