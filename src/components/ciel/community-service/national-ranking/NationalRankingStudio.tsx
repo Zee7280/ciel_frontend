@@ -29,8 +29,9 @@ import {
 } from "./studio-types";
 import { PackageDrawer, GroupDrawer, PublishModal, FilterChips } from "./StudioParts";
 import { AllProjectsPanel, HistoryScreen, PackagesScreen, PublishedScreen, ReviewScreen, RulesScreen } from "./StudioScreens";
+import { AwardsScreen, CrosswalkScreen, ShortlistScreen } from "./StudioExcellence";
 
-type Tab = "analyzer" | "review" | "packages" | "published" | "history" | "rules";
+type Tab = "analyzer" | "review" | "packages" | "published" | "history" | "shortlist" | "awards" | "crosswalk" | "rules";
 
 const PAGE_SIZE = 12;
 const DEFAULT_WEIGHTS: CustomWeights = { impact: 35, sustain: 20, learning: 25, cii: 20 };
@@ -109,6 +110,8 @@ export default function NationalRankingStudio({
     const studioBase = packagesEndpoint.replace(/\/packages$/, "/studio");
 
     const [tab, setTab] = useState<Tab>("analyzer");
+    /** Search prefilled in the 440-question crosswalk (from an award's "Related questions" link). */
+    const [crosswalkQuery, setCrosswalkQuery] = useState("");
     const [busy, setBusy] = useState(false);
     const [previewBusy, setPreviewBusy] = useState(false);
     /** The Studio endpoints answered 404: this frontend is newer than the backend it talks to. */
@@ -557,6 +560,9 @@ export default function NationalRankingStudio({
                         ["packages", "Combined packages"],
                         ["published", "Published rankings"],
                         ["history", "Ranking history"],
+                        ["shortlist", "Excellence shortlist"],
+                        ["awards", "Specialist awards"],
+                        ...(role === "ciel_admin" ? ([["crosswalk", "440-question crosswalk"]] as Array<[Tab, string]>) : []),
                         ["rules", "Ranking rules"],
                     ] as Array<[Tab, string]>
                 ).map(([key, label]) => (
@@ -1025,6 +1031,25 @@ export default function NationalRankingStudio({
                     onCreate={() => setTab("analyzer")}
                 />
             )}
+            {tab === "shortlist" && (
+                <ShortlistScreen
+                    run={run}
+                    criteria={preview?.criteria ?? run?.criteria ?? []}
+                    role={role}
+                    onOpen={(id) => setDrawer({ kind: "project", id })}
+                    onAnalyze={() => setTab("analyzer")}
+                />
+            )}
+            {tab === "awards" && (
+                <AwardsScreen
+                    run={run}
+                    criteria={preview?.criteria ?? run?.criteria ?? []}
+                    onOpen={(id) => setDrawer({ kind: "project", id })}
+                    onAnalyze={() => setTab("analyzer")}
+                    onShowQuestions={role === "ciel_admin" ? (ids) => { setCrosswalkQuery(ids.join(" ")); setTab("crosswalk"); } : undefined}
+                />
+            )}
+            {tab === "crosswalk" && role === "ciel_admin" && <CrosswalkScreen key={crosswalkQuery} initialQuery={crosswalkQuery} />}
             {tab === "rules" && <RulesScreen criteria={preview?.criteria ?? run?.criteria ?? []} rubric={rubric} />}
 
             {drawer?.kind === "project" ? (
