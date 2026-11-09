@@ -40,10 +40,7 @@ export default function FollowUpPlanPreview({ data, projectData, projectEndDate,
     const [failed, setFailed] = useState(false);
     const [studioOpen, setStudioOpen] = useState(false);
 
-    const saved = useMemo(
-        () => (Array.isArray(data.section10?.followup_questions) ? data.section10.followup_questions : []),
-        [data.section10?.followup_questions],
-    );
+    const saved: StudioQuestion[] = Array.isArray(data.section10?.followup_questions) ? data.section10.followup_questions : [];
     const customised = saved.length > 0;
 
     // Only the fields the generator reads; re-fetch when they change (debounced).
@@ -121,47 +118,95 @@ export default function FollowUpPlanPreview({ data, projectData, projectEndDate,
         [preview ? `${pretty(preview.reminder1)} · ${pretty(preview.reminder2)}` : "+7 · +14 days", "Reminders only if there is no reply. They stop on a reply, a decline or a cancellation."],
     ];
 
+    const facts: Array<[string, string]> = [
+        ["Partner email", preview ? pretty(preview.dueDate) : "Needs end date"],
+        ["Interval", preview?.intervalLabel || "After project end"],
+        ["Questions", `${includedCount} ${customised ? "reviewed by you" : "suggested"}`],
+        ["Link valid", preview ? `${preview.linkValidDays} days` : "—"],
+    ];
+
     return (
-        <div className="space-y-3 rounded-xl border border-[#cbe7e3] bg-[#f5fbfa] px-4 py-3" data-testid="followup-plan-preview">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0c746e]">Impact Follow-up Studio</p>
-                    <p className="text-xs text-slate-600">
-                        Source report, questions, the exact email and schedule, the partner&apos;s page and tracking, all filled from your report. Only the questions are yours to edit.
-                    </p>
+        <div className="overflow-hidden rounded-2xl border border-[#cbe7e3] bg-white shadow-[0_10px_30px_rgba(12,116,110,0.08)]" data-testid="followup-plan-preview">
+            {/* header band */}
+            <div className="relative overflow-hidden bg-[linear-gradient(118deg,#083b4a_0%,#0c746e_62%,#159d89_100%)] px-5 py-5 text-white">
+                <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/15" aria-hidden />
+                <div className="pointer-events-none absolute -right-6 -top-14 h-40 w-40 rounded-full border border-white/10" aria-hidden />
+                <div className="relative flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 max-w-2xl">
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#abf8e7]">Impact Follow-up Studio</p>
+                        <h4 className="mt-1 text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">Partner verification, planned from your report</h4>
+                        <p className="mt-1.5 text-xs leading-relaxed text-[#dcf2ef] sm:text-sm">
+                            Source report, questions, the exact email and schedule, the partner&apos;s page and tracking, all filled from your report. Only the questions are yours to edit.
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                        <button
+                            type="button"
+                            onClick={() => setStudioOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-extrabold text-[#0c746e] shadow-md transition hover:bg-[#eefaf7] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                            data-testid="open-followup-studio"
+                        >
+                            Open Follow-up Studio →
+                        </button>
+                        <span className="rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#dcf2ef]">Preview · nothing is sent</span>
+                    </div>
                 </div>
-                <button type="button" onClick={() => setStudioOpen(true)} className="rounded-full bg-[#0c746e] px-4 py-2 text-xs font-bold text-white shadow-sm" data-testid="open-followup-studio">
-                    Open Follow-up Studio →
-                </button>
+                <dl className="relative mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {facts.map(([k, v]) => (
+                        <div key={k} className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 backdrop-blur-[2px]">
+                            <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#abf8e7]">{k}</dt>
+                            <dd className="truncate text-sm font-extrabold text-white">{v}</dd>
+                        </div>
+                    ))}
+                </dl>
             </div>
 
-            <ol className="grid gap-2 sm:grid-cols-4">
-                {steps.map(([when, what], i) => (
-                    <li key={when} className="rounded-lg border border-white bg-white/80 px-3 py-2">
-                        <p className="text-[11px] font-bold text-slate-900">{i + 1} · {when}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">{what}</p>
-                    </li>
-                ))}
-            </ol>
+            <div className="space-y-5 px-5 py-5">
+                {/* timeline */}
+                <section>
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0c746e]">How it unfolds</p>
+                    <ol className="relative mt-3 grid gap-3 sm:grid-cols-4">
+                        <span className="pointer-events-none absolute left-[12%] right-[12%] top-[18px] hidden h-px bg-[#cbe7e3] sm:block" aria-hidden />
+                        {steps.map(([when, what], i) => (
+                            <li key={when} className="relative rounded-xl border border-[#e3efed] bg-[#f8fcfb] px-3 pb-3 pt-2.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#0c746e] text-[11px] font-extrabold text-white shadow-sm ring-4 ring-white">{i + 1}</span>
+                                    <p className="truncate text-xs font-extrabold text-slate-900">{when}</p>
+                                </div>
+                                <p className="mt-2 text-[11px] leading-relaxed text-slate-600">{what}</p>
+                            </li>
+                        ))}
+                    </ol>
+                </section>
 
-            <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0c746e]">
-                    Questions the partner will be asked · {includedCount}{customised ? " · reviewed by you" : " · suggested"}
-                </p>
-                {!preview && !customised ? <p className="mt-1 text-xs text-slate-400">Preparing suggestions…</p> : null}
-                <ul className="mt-1.5 space-y-1.5">
-                    {shown.filter((q) => q.include).map((q, i) => (
-                        <li key={q.id} className="rounded-lg border border-white bg-white/80 px-3 py-2 text-xs text-slate-800">
-                            <span className="font-bold text-[#0c746e]">{i + 1}. {q.activityTitle || "Project activity"}</span>
-                            <span className="block">{q.questionText || <em className="text-slate-400">(write the question in the studio)</em>}</span>
-                            {q.countLabel ? <span className="block text-[11px] text-slate-500">Optional number: {q.countLabel}</span> : null}
-                        </li>
-                    ))}
-                </ul>
-                <p className="mt-2 text-[11px] text-slate-500">
-                    Edit, untick or add questions in the studio{customised ? "" : " (suggested from your Section 4 activities, Section 5 outcomes and the instruction above)"}.
-                    {preview ? ` Link valid ${preview.linkValidDays} days after the email.` : ""}
-                </p>
+                {/* questions */}
+                <section>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#0c746e]">Questions the partner will be asked</p>
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${customised ? "bg-[#fff1d6] text-[#84611c]" : "bg-[#e6f6f4] text-[#0c746e]"}`}>
+                            {includedCount} · {customised ? "reviewed by you" : "suggested"}
+                        </span>
+                    </div>
+                    {!preview && !customised ? <p className="mt-2 text-xs text-slate-400">Preparing suggestions…</p> : null}
+                    <ol className="mt-2.5 space-y-2">
+                        {shown.filter((q) => q.include).map((q, i) => (
+                            <li key={q.id} className="flex gap-3 rounded-xl border border-[#e3efed] bg-white px-3.5 py-3 shadow-[0_1px_0_rgba(12,116,110,0.06)]">
+                                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#e6f6f4] text-[11px] font-extrabold text-[#0c746e]">{i + 1}</span>
+                                <div className="min-w-0 flex-1">
+                                    <span className="inline-block rounded-md bg-[#f0f6f8] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#52707e]">{q.activityTitle || "Project activity"}</span>
+                                    <p className="mt-1 text-sm font-semibold leading-snug text-slate-900">
+                                        {q.questionText || <em className="font-normal text-slate-400">(write the question in the studio)</em>}
+                                    </p>
+                                    {q.countLabel ? <p className="mt-1 text-[11px] text-slate-500">Optional number · {q.countLabel}</p> : null}
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
+                    <p className="mt-2.5 text-[11px] text-slate-500">
+                        Edit, untick or add questions in the studio{customised ? "" : " (suggested from your Section 4 activities, Section 5 outcomes and the instruction above)"}.
+                        {preview ? ` Link valid ${preview.linkValidDays} days after the email.` : ""}
+                    </p>
+                </section>
             </div>
 
             <FollowUpStudio
