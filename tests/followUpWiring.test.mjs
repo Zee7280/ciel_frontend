@@ -54,6 +54,12 @@ test("the student 9.5 block shows the status note for every plan (CIEL PK may st
     const afterPlans = section95.slice(section95.lastIndexOf(") : null}"));
     assert.match(afterPlans, /<FollowUpStatusNote reportId=\{data\.id\} \/>/);
     assert.match(section95, /Saving this does not send any email\./);
+    // choosing Yes shows the schedule + draft questions preview right there, from the stateless preview route
+    const yesBlock = section95.slice(section95.indexOf('{plan === "yes" ? ('), section95.lastIndexOf(") : null}"));
+    assert.match(yesBlock, /<FollowUpPlanPreview data=\{data\} projectEndDate=\{projectEnd\}/);
+    const preview = read("src/app/dashboard/student/report/components/FollowUpPlanPreview.tsx");
+    assert.match(preview, /"\/api\/v1\/students\/followups\/preview"/);
+    assert.match(preview, /method: "POST"/);
     assert.match(studentNote, /\/api\/v1\/students\/reports\/\$\{encodeURIComponent\(reportId\)\}\/followup/);
     assert.match(studentNote, /if \(!fu\) return null;/);
 });

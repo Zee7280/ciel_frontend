@@ -4,6 +4,13 @@ import clsx from "clsx";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import FollowUpStatusNote from "./FollowUpStatusNote";
+import FollowUpPlanPreview from "./FollowUpPlanPreview";
+
+function projectTitleOf(projectData: unknown): string {
+    const p = projectData && typeof projectData === "object" ? (projectData as Record<string, unknown>) : null;
+    const t = p?.title ?? p?.name ?? p?.project_title;
+    return typeof t === "string" ? t.trim() : "";
+}
 import {
     FOLLOWUP_CHECKS,
     FOLLOWUP_DECISION_OWNERS,
@@ -285,6 +292,7 @@ export default function SustainabilityFollowUp({ projectData }: { projectData?: 
                         Saving this does not send any email. The person you name is only approached after your report is approved, and
                         they can decline or opt out.
                     </div>
+                    <FollowUpPlanPreview data={data} projectEndDate={projectEnd} projectTitle={projectTitleOf(projectData)} />
                 </div>
             ) : null}
 
