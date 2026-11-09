@@ -430,6 +430,16 @@ export interface ReportData {
         followup_due_date?: string;
         followup_check?: string;
         followup_check_notes?: string;
+        /** Questions reviewed / edited by the student on 9.5 (optional; empty = use the suggested set). */
+        followup_questions?: Array<{
+            id: string;
+            activityId?: string | null;
+            activityTitle: string;
+            questionText: string;
+            countLabel?: string | null;
+            include: boolean;
+            source: 'suggested' | 'student';
+        }>;
     };
     // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
     section11: {

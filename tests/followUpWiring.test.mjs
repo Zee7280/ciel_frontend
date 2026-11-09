@@ -60,6 +60,10 @@ test("the student 9.5 block shows the status note for every plan (CIEL PK may st
     const preview = read("src/app/dashboard/student/report/components/FollowUpPlanPreview.tsx");
     assert.match(preview, /"\/api\/v1\/students\/followups\/preview"/);
     assert.match(preview, /method: "POST"/);
+    // the student can review / edit / add questions; the set is saved on the report under followup_questions
+    assert.match(preview, /updateSection\("section10", \{ followup_questions: next \}\)/);
+    assert.match(preview, /\+ Add my own question/);
+    assert.match(preview, /Reset to suggested/);
     assert.match(studentNote, /\/api\/v1\/students\/reports\/\$\{encodeURIComponent\(reportId\)\}\/followup/);
     assert.match(studentNote, /if \(!fu\) return null;/);
 });
