@@ -292,7 +292,7 @@ export default function SustainabilityFollowUp({ projectData }: { projectData?: 
                         Saving this does not send any email. The person you name is only approached after your report is approved, and
                         they can decline or opt out.
                     </div>
-                    <FollowUpPlanPreview data={data} projectEndDate={projectEnd} projectTitle={projectTitleOf(projectData)} />
+                    <FollowUpPlanPreview data={data} projectData={projectData} projectEndDate={projectEnd} projectTitle={projectTitleOf(projectData)} />
                 </div>
             ) : null}
 

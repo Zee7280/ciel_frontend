@@ -56,14 +56,22 @@ test("the student 9.5 block shows the status note for every plan (CIEL PK may st
     assert.match(section95, /Saving this does not send any email\./);
     // choosing Yes shows the schedule + draft questions preview right there, from the stateless preview route
     const yesBlock = section95.slice(section95.indexOf('{plan === "yes" ? ('), section95.lastIndexOf(") : null}"));
-    assert.match(yesBlock, /<FollowUpPlanPreview data=\{data\} projectEndDate=\{projectEnd\}/);
+    assert.match(yesBlock, /<FollowUpPlanPreview data=\{data\} projectData=\{projectData\} projectEndDate=\{projectEnd\}/);
     const preview = read("src/app/dashboard/student/report/components/FollowUpPlanPreview.tsx");
     assert.match(preview, /"\/api\/v1\/students\/followups\/preview"/);
     assert.match(preview, /method: "POST"/);
-    // the student can review / edit / add questions; the set is saved on the report under followup_questions
+    // the student can review / edit / add questions in the studio; the set is saved on the report under followup_questions
     assert.match(preview, /updateSection\("section10", \{ followup_questions: next \}\)/);
-    assert.match(preview, /\+ Add my own question/);
-    assert.match(preview, /Reset to suggested/);
+    assert.match(preview, /Open Follow-up Studio/);
+    const studio = read("src/app/dashboard/student/report/components/FollowUpStudio.tsx");
+    for (const tab of ["1 · Source report", "2 · Questions", "3 · Email & schedule", "4 · Partner view", "5 · Tracking"]) {
+        assert.ok(studio.includes(tab), tab);
+    }
+    assert.match(studio, /\+ Add custom question/);
+    assert.match(studio, /Regenerate suggestions/);
+    assert.match(studio, /<FollowUpStatusNote reportId=\{data\.id\} \/>/);
+    // nothing in the studio talks to the backend except through the preview / status components
+    assert.doesNotMatch(studio, /authenticatedFetch|fetch\(/);
     assert.match(studentNote, /\/api\/v1\/students\/reports\/\$\{encodeURIComponent\(reportId\)\}\/followup/);
     assert.match(studentNote, /if \(!fu\) return null;/);
 });
