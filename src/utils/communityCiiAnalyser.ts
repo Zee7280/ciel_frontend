@@ -352,12 +352,11 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
     {
         id: "6",
         name: "Partnership & Collaboration",
-        maxPoints: 10,
+        maxPoints: 5,
         criteria: [
-            { key: "relevance", weight: 2.5, label: "Right stakeholders" },
-            { key: "roleClarity", weight: 2.5, label: "Partner's actual contribution" },
-            { key: "collaboration", weight: 2.5, label: "Co-design / co-delivery" },
-            { key: "ownership", weight: 2.5, label: "Community ownership" },
+            { key: "activeRole", weight: 2, label: "Partner's active role" },
+            { key: "reciprocity", weight: 2, label: "Reciprocity & shared influence" },
+            { key: "feedbackLearning", weight: 1, label: "Partner feedback & joint learning" },
         ],
     },
     {
@@ -388,15 +387,38 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
     {
         id: "9",
         name: "Sustainability & Handover",
-        maxPoints: 5,
+        maxPoints: 10,
         criteria: [
-            { key: "continuation", weight: 1.5, label: "Continuation plan" },
-            { key: "owner", weight: 1.5, label: "Named responsibility" },
-            { key: "handover", weight: 1.5, label: "Handover / closure" },
-            { key: "realism", weight: 0.5, label: "Scaling realism" },
+            { key: "retainedBenefits", weight: 2, label: "Realistic retained benefits" },
+            { key: "ownershipHandover", weight: 2, label: "Ownership, capacity & handover" },
+            { key: "maintenanceFeasibility", weight: 1, label: "Maintenance & resource feasibility" },
+            { key: "followUpRetention", weight: 3, label: "Follow-up & observed retention" },
+            { key: "adaptationReplication", weight: 2, label: "Adaptation, replication & learning" },
         ],
     },
 ];
+
+/**
+ * Rubric revision the table above follows. R2 (CIEL-CII-2026.11-R2) moved five points from
+ * Partnership (10 → 5) to Sustainability (5 → 10) and re-cut those two dimensions' criteria.
+ * Analyses stored before R2 carry the R1 keys below; their section `maximumPoints` travel with
+ * the stored result, so only display labels are needed here.
+ */
+export const CII_V45_RUBRIC_VERSION = "CIEL-CII-2026.11-R2";
+const LEGACY_CRITERION_LABELS: Record<string, Record<string, string>> = {
+    "6": {
+        relevance: "Right stakeholders",
+        roleClarity: "Partner's actual contribution",
+        collaboration: "Co-design / co-delivery",
+        ownership: "Community ownership",
+    },
+    "9": {
+        continuation: "Continuation plan",
+        owner: "Named responsibility",
+        handover: "Handover / closure",
+        realism: "Scaling realism",
+    },
+};
 
 export const CII_V45_BASE_MAX = CII_V45_DIMENSIONS.reduce((sum, d) => sum + d.maxPoints, 0); // 100
 export const CII_V45_BONUS_MAX = 5;
@@ -423,7 +445,11 @@ export function dimensionById(id: CiiV45Dimension): CiiV45DimensionDef | undefin
 
 export function criterionLabel(dimensionId: CiiV45Dimension, key: string): string {
     const resolved = dimensionId === "1" && key === "hoursConsistency" ? "hoursCompletion" : key;
-    return dimensionById(dimensionId)?.criteria.find((c) => c.key === resolved)?.label || key;
+    return (
+        dimensionById(dimensionId)?.criteria.find((c) => c.key === resolved)?.label ||
+        LEGACY_CRITERION_LABELS[dimensionId]?.[key] ||
+        key
+    );
 }
 
 /**
