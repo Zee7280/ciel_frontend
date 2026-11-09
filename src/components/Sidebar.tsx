@@ -794,6 +794,7 @@ export default function Sidebar() {
                     { label: "Community service reporting", href: "/dashboard/admin/cs-reporting", icon: FileBarChart },
                     { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
                     { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
+                    { label: "Follow-up tracker", href: "/dashboard/admin/followups", icon: FileBarChart },
                     { label: "Integration Hub · university export", href: "/dashboard/admin/integrations", icon: Link2 },
                 ]),
             },

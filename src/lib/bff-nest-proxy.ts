@@ -104,6 +104,10 @@ export async function proxyToNest(
     if (contentType) headers.set("content-type", contentType);
     const accept = req.headers.get("accept");
     if (accept) headers.set("accept", accept);
+    // Nest's rate limits key on the caller's IP (`x-forwarded-for`). Without this every browser
+    // request would arrive from the Vercel function's egress address and share one bucket.
+    const forwardedFor = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip");
+    if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
 
     const method = req.method.toUpperCase();
     // Only the authorization header carries identity to Nest (cookies are not forwarded), so a

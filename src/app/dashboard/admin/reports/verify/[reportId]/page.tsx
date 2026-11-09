@@ -7,6 +7,7 @@ import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
 import { consentLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from '@/app/dashboard/student/report/utils/riskSafeguarding';
 import { followupSummaryRows } from '@/app/dashboard/student/report/utils/sustainabilityFollowup';
+import AdminReportFollowUpCard from './AdminReportFollowUpCard';
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
 import {
     ArrowLeft,
@@ -2290,6 +2291,7 @@ function AdminReportDetailPage() {
                                         <LabelValue key={row.label} label={row.label} value={row.value} fullWidth={row.fullWidth} />
                                     ))}
                                 </div>
+                                <AdminReportFollowUpCard reportId={String(report.id)} />
                             </div>
                             ) : null}
                         </div>

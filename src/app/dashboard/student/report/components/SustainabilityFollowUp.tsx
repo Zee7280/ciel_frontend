@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import clsx from "clsx";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
+import FollowUpStatusNote from "./FollowUpStatusNote";
 import {
     FOLLOWUP_CHECKS,
     FOLLOWUP_DECISION_OWNERS,
@@ -286,6 +287,9 @@ export default function SustainabilityFollowUp({ projectData }: { projectData?: 
                     </div>
                 </div>
             ) : null}
+
+            {/* Any plan: once CIEL PK publishes (and, for "Not decided yet", names a contact) the status appears here. */}
+            <FollowUpStatusNote reportId={data.id} />
         </section>
     );
 }
