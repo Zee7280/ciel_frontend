@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
+import { CorrectionPanel } from "./StudioGovernance";
 import {
     FILTER_TITLES,
     fmtDate,
@@ -49,6 +50,7 @@ export function PackageDrawer({
     previewName,
     studioBase,
     onClose,
+    onOverrideChanged,
 }: {
     projectId: string;
     row: RunRow | null;
@@ -60,6 +62,8 @@ export function PackageDrawer({
     previewName?: string;
     studioBase: string;
     onClose: () => void;
+    /** NPE-1.3: called after an Admin criterion correction was saved or revoked (rows must be reloaded). */
+    onOverrideChanged?: () => Promise<void> | void;
 }) {
     const [tab, setTab] = useState<"package" | "assessment" | "rankings">("package");
     const [published, setPublished] = useState<ProjectRanking[] | null>(null);
@@ -176,12 +180,18 @@ export function PackageDrawer({
                                 <div className="criteriongroup">
                                     {(criteria.length ? criteria : Object.keys(row.scoreBreakdown.criteria).map((k) => ({ key: k, title: k, weight: 0 }))).map((c) => {
                                         const j = row.evaluation?.criteria?.[c.key];
+                                        const eff = row.effectiveCriteria?.[c.key]?.anchor;
+                                        const shown = eff != null && Number.isFinite(eff) ? Number(eff) : j?.anchor;
+                                        const corrected = j != null && shown != null && Number(j.anchor) !== shown;
                                         const pts = row.scoreBreakdown!.criteria[c.key] ?? 0;
                                         return (
                                             <div className="criteria" key={c.key}>
                                                 <span style={{ minWidth: 190 }}>{c.title} {c.weight ? <small className="muted">({c.weight}%)</small> : null}</span>
-                                                <span className="track"><i style={{ width: `${((j?.anchor ?? 0) / 5) * 100}%` }} /></span>
-                                                <strong>{j ? `${fmtNum(j.anchor)}/5` : "—"}</strong>
+                                                <span className="track"><i style={{ width: `${((shown ?? 0) / 5) * 100}%` }} /></span>
+                                                <strong title={corrected ? `AI ${fmtNum(j!.anchor)}/5 · Admin correction ${fmtNum(shown!)}/5` : undefined}>
+                                                    {shown != null ? `${fmtNum(shown)}/5` : "—"}
+                                                    {corrected ? <small className="labelchip gold" style={{ marginLeft: 4 }}>AI {fmtNum(j!.anchor)} → corrected</small> : null}
+                                                </strong>
                                                 <span className="muted">{j?.confidence ?? ""}</span>
                                                 <strong>{pts.toFixed(2)}</strong>
                                             </div>
@@ -207,11 +217,15 @@ export function PackageDrawer({
                                     </ul>
                                 </div>
                             ) : null}
+                            {onOverrideChanged ? <CorrectionPanel studioBase={studioBase} row={row} criteria={criteria} onChanged={onOverrideChanged} /> : null}
                         </>
                     ) : (
-                        <div className="callout">
-                            {row?.reason || "This package has not been read by the AI evaluator yet. Run the Ranking Analyzer to create its evidence-based assessment."}
-                        </div>
+                        <>
+                            <div className="callout">
+                                {row?.reason || "This package has not been read by the AI evaluator yet. Run the Ranking Analyzer to create its evidence-based assessment."}
+                            </div>
+                            {onOverrideChanged && row?.evaluation ? <CorrectionPanel studioBase={studioBase} row={row} criteria={criteria} onChanged={onOverrideChanged} /> : null}
+                        </>
                     )}
                 </div>
             </div>

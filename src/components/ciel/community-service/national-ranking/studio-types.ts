@@ -41,6 +41,114 @@ export type RunRow = {
         inspected: Array<{ id: string; name: string }>;
         notInspected: Array<{ id: string; name: string; reason: string }>;
     } | null;
+    /** NPE-1.3: AI anchors with active Admin corrections applied (the score was computed from these). */
+    effectiveCriteria?: Record<string, { anchor: number; confidence: string; reason?: string }> | null;
+    /** NPE-1.3: active Admin corrections applied to this package version. */
+    overrides?: AppliedOverride[];
+    /** NPE-1.3: corrections made for an earlier package version (shown, never applied). */
+    staleOverrides?: string[];
+};
+
+export type AppliedOverride = {
+    id: string;
+    criterion: string;
+    anchor: number;
+    aiAnchor: number;
+    locator: string;
+    reason: string;
+    createdAt: string | null;
+    createdByUserId: string | null;
+    role: string | null;
+};
+
+/** One stored correction, as `GET studio/overrides` returns it. */
+export type CriterionOverride = {
+    id: string;
+    scope: string;
+    reportId: string;
+    packageVersion: string;
+    criterion: string;
+    anchor: number;
+    originalAnchor: number | null;
+    originalConfidence: string | null;
+    locator: string;
+    reason: string;
+    role: string;
+    createdByUserId: string;
+    createdAt: string;
+    active: boolean;
+    revokedAt: string | null;
+    revokeReason: string | null;
+};
+
+export type AdminAction = {
+    id: string;
+    action: string;
+    role: string;
+    actorUserId: string;
+    reportId: string | null;
+    targetId: string | null;
+    details: Record<string, unknown>;
+    at: string;
+};
+
+export type RankingChallenge = {
+    id: string;
+    scope: string;
+    publicationId: string;
+    reportId: string;
+    raisedByRole: string;
+    raisedByScope: string;
+    raisedByUserId: string;
+    locator: string;
+    reason: string;
+    status: "open" | "upheld" | "dismissed";
+    resolution: string | null;
+    resolvedAt: string | null;
+    createdAt: string;
+    canResolve: boolean;
+    publication: { name: string; revision: number; lensTitle: string; publishedAt: string; rank: number | null; label: string | null; of: number } | null;
+};
+
+export type FeedStatus = {
+    connected: boolean;
+    packageSource: string;
+    approvedCIIFieldsReady: boolean;
+    canRun: boolean;
+    scope: string;
+    rubricVersion: string;
+    checkedAt: string;
+    counts: {
+        discovered: number;
+        eligible: number;
+        held: number;
+        evaluated: number;
+        awaitingRead: number;
+        pendingReviews: number;
+        corrections: number;
+        openChallenges: number;
+    };
+    run: { id: string; status: string; createdAt: string; rubricVersion: string } | null;
+    lastPublication: { id: string; name: string; revision: number; publishedAt: string } | null;
+};
+
+/** One published revision that placed a project (`GET studio/project/:id/history`). */
+export type RankHistoryPoint = {
+    publicationId: string;
+    signature: string;
+    name: string;
+    lens: string;
+    lensTitle: string;
+    groupBy: string;
+    scope: "national" | "university";
+    revision: number;
+    cohortComparable: boolean;
+    publishedAt: string;
+    rank: number;
+    of: number;
+    label: string;
+    movement: "up" | "down" | "same" | "new" | "cohort" | null;
+    previousRank: number | null;
 };
 
 export type ReviewItem = { id: string; title: string; reason: string; type: string; cleared: boolean };

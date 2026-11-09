@@ -30,6 +30,7 @@ import {
 import { PackageDrawer, GroupDrawer, PublishModal, FilterChips } from "./StudioParts";
 import { AllProjectsPanel, HistoryScreen, PackagesScreen, PublishedScreen, ReviewScreen, RulesScreen } from "./StudioScreens";
 import { AwardsScreen, CrosswalkScreen, ShortlistScreen } from "./StudioExcellence";
+import { FeedStrip } from "./StudioGovernance";
 
 type Tab = "analyzer" | "review" | "packages" | "published" | "history" | "shortlist" | "awards" | "crosswalk" | "rules";
 
@@ -150,6 +151,9 @@ export default function NationalRankingStudio({
     const [history, setHistory] = useState<PublicationSummary[]>([]);
     const [wallProject, setWallProject] = useState("");
     const [wallRankings, setWallRankings] = useState<ProjectRanking[]>([]);
+    /** Bumped after every governance write (publish, correction, challenge) so feed, audit and history panels refetch. */
+    const [govKey, setGovKey] = useState(0);
+    const governanceChanged = () => setGovKey((k) => k + 1);
 
     const appendLog = (line: string) => setLog((prev) => `${prev}\n${new Date().toLocaleTimeString()} · ${line}`);
 
@@ -326,6 +330,7 @@ export default function NationalRankingStudio({
             });
             setPublishOpen(false);
             await loadHistory();
+            governanceChanged();
             toast.success(
                 out.status === "unchanged"
                     ? "This ranking is already published with identical results."
@@ -350,6 +355,7 @@ export default function NationalRankingStudio({
                 body: JSON.stringify({ runId: run.runId }),
             });
             setRun((prev) => (prev ? { ...prev, published: true } : prev));
+            governanceChanged();
             toast.success(`Published snapshot ${data?.snapshotId || ""}`.trim());
             appendLog(`Published official snapshot ${data?.snapshotId}`);
         } catch (err) {
@@ -533,7 +539,7 @@ export default function NationalRankingStudio({
     const rankedCount = run?.rows?.filter((r) => r.status === "Ranked").length ?? 0;
     const reviewItems = run?.reviewItems ?? [];
     const openReviews = reviewItems.filter((i) => !i.cleared).length;
-    const rubric = preview?.rubricVersion ?? run?.rubricVersion ?? "NPE-1.2";
+    const rubric = preview?.rubricVersion ?? run?.rubricVersion ?? "NPE-1.3";
 
     // ---------------------------------------------------------------------------------- render
     const filterRow = (key: keyof StudioFilters, label: string, plural: string) => (
@@ -626,6 +632,8 @@ export default function NationalRankingStudio({
                         <div className="stat"><small>Current comparison</small><b>{counts ? counts.inRanking : "—"}</b><span>Selected eligible projects</span></div>
                         <div className="stat"><small>Published ranking views</small><b>{history.length >= 200 ? "200+" : history.length}</b><span>Retained separately</span></div>
                     </div>
+
+                    <FeedStrip studioBase={studioBase} busy={busy || previewBusy} refreshKey={govKey} onRunAll={() => void runAnalyzer()} />
 
                     <div className="sectiontitle">
                         <div>
@@ -1020,6 +1028,11 @@ export default function NationalRankingStudio({
                     onOpen={(id) => setDrawer({ kind: "project", id })}
                     onCreate={() => setTab("analyzer")}
                     role={role}
+                    studioBase={studioBase}
+                    run={run}
+                    criteria={preview?.criteria ?? run?.criteria ?? []}
+                    refreshKey={govKey}
+                    onGovernanceChanged={governanceChanged}
                 />
             )}
             {tab === "history" && (
@@ -1029,6 +1042,8 @@ export default function NationalRankingStudio({
                     lenses={lenses}
                     onShowProject={(id) => { setWallProject(id); setTab("published"); }}
                     onCreate={() => setTab("analyzer")}
+                    refreshKey={govKey}
+                    onGovernanceChanged={governanceChanged}
                 />
             )}
             {tab === "shortlist" && (
@@ -1064,6 +1079,16 @@ export default function NationalRankingStudio({
                     previewName={dirty ? undefined : nameInput || result?.name}
                     studioBase={studioBase}
                     onClose={() => setDrawer(null)}
+                    onOverrideChanged={async () => {
+                        // A correction changes the comparator: reload the run rows and the preview on screen.
+                        governanceChanged();
+                        try {
+                            await loadPackages();
+                            await fetchPreview();
+                        } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Could not refresh the ranking.");
+                        }
+                    }}
                 />
             ) : null}
             {drawer?.kind === "group" && result ? (

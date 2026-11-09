@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { recordIdLabel } from "@/utils/recordId";
 import { FilterChips } from "./StudioParts";
+import { AuditPanel, ChallengesPanel, FlashcardProjection, RaiseChallengeForm } from "./StudioGovernance";
+import { TREND_LEGEND } from "./studio-governance";
 import {
     fmtDate,
     fmtNum,
@@ -296,6 +298,11 @@ export function PublishedScreen({
     onOpen,
     onCreate,
     role,
+    studioBase,
+    run,
+    criteria,
+    refreshKey,
+    onGovernanceChanged,
 }: {
     packages: LibraryPackage[];
     projectId: string;
@@ -304,6 +311,12 @@ export function PublishedScreen({
     onOpen: (id: string) => void;
     onCreate: () => void;
     role: StudioRole;
+    /** NPE-1.3 flashcard projection + challenge process (rank history and challenges come from the server). */
+    studioBase?: string;
+    run?: RunPayload | null;
+    criteria?: CriterionMeta[];
+    refreshKey?: number;
+    onGovernanceChanged?: () => void;
 }) {
     const [viewer, setViewer] = useState<(typeof VIEWERS)[number]>(role === "ciel_admin" ? "CIEL PK Super Admin" : "University Admin");
     const selected = packages.find((p) => p.id === projectId);
@@ -389,10 +402,14 @@ export function PublishedScreen({
                             ) : (
                                 <p className="smallnote">No ranking has been published for this project yet. Use the Ranking Analyzer to create one.</p>
                             )}
+                            {studioBase && onGovernanceChanged ? <RaiseChallengeForm studioBase={studioBase} projectId={project.id} rankings={rankings} onRaised={onGovernanceChanged} /> : null}
                         </div>
                         <div className="smallnote" style={{ marginTop: 11 }}>Each ranking preserves its own label, comparison filters, result, method and publication date.</div>
                     </div>
                 </article>
+                {studioBase ? (
+                    <FlashcardProjection key={project.id} studioBase={studioBase} project={project} run={run ?? null} criteria={criteria ?? []} role={role} refreshKey={refreshKey ?? 0} />
+                ) : null}
                 <article className="flashcard">
                     <div className="flashhead">
                         <small>STAKEHOLDER PERMISSIONS</small>
@@ -434,12 +451,17 @@ export function HistoryScreen({
     lenses,
     onShowProject,
     onCreate,
+    refreshKey,
+    onGovernanceChanged,
 }: {
     items: PublicationSummary[];
     studioBase: string;
     lenses: LensMeta[];
     onShowProject: (projectId: string) => void;
     onCreate: () => void;
+    /** NPE-1.3: administrator action log and challenge process. */
+    refreshKey?: number;
+    onGovernanceChanged?: () => void;
 }) {
     const kindOf = (lens: string) => lenses.find((l) => l.key === lens)?.kind;
     const [openId, setOpenId] = useState<string | null>(null);
@@ -520,8 +542,17 @@ export function HistoryScreen({
                 )}
             </section>
             <section className="panel">
-                <div className="paneltitle">What the movement symbols mean</div>
-                {MOVEMENT_LEGEND.map(([t, d]) => (
+                <div className="paneltitle">Trend interpretation</div>
+                <p className="smallnote">Valid trend comparisons avoid presenting a changed cohort as a rank improvement.</p>
+                {TREND_LEGEND.map(([t, d]) => (
+                    <div className="audititem" key={t}>
+                        <div>
+                            <b>{t}</b>
+                            <small>{d}</small>
+                        </div>
+                    </div>
+                ))}
+                {MOVEMENT_LEGEND.slice(4).map(([t, d]) => (
                     <div className="audititem" key={t}>
                         <div>
                             <b>{t}</b>
@@ -531,6 +562,12 @@ export function HistoryScreen({
                 ))}
             </section>
             </div>
+            {onGovernanceChanged ? (
+                <div className="two" style={{ marginTop: 14 }}>
+                    <AuditPanel studioBase={studioBase} refreshKey={refreshKey ?? 0} />
+                    <ChallengesPanel studioBase={studioBase} refreshKey={refreshKey ?? 0} onChanged={onGovernanceChanged} />
+                </div>
+            ) : null}
         </>
     );
 }
