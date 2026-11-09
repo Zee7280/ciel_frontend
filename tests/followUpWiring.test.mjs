@@ -68,7 +68,13 @@ test("the student 9.5 block shows the status note for every plan (CIEL PK may st
         assert.ok(studio.includes(tab), tab);
     }
     assert.match(studio, /\+ Add custom question/);
-    assert.match(studio, /Regenerate suggestions/);
+    assert.match(studio, /↻ Regenerate/);
+    // the Questions tab mirrors the prototype's "2. Question extraction & editorial approval" panel
+    for (const piece of ["2. Question extraction & editorial approval", "Maximum questions per email", "Extraction logic:", "Editable verification question", "Optional measurable count", "If counted, what exactly?", "Review partner email →", "Why this is better than one generic question"]) {
+        assert.ok(studio.includes(piece), piece);
+    }
+    assert.match(studio, /onReplace\(/);
+    assert.match(preview, /onReplace=\{save\}/);
     assert.match(studio, /<FollowUpStatusNote reportId=\{data\.id\} \/>/);
     // nothing in the studio talks to the backend except through the preview / status components
     assert.doesNotMatch(studio, /authenticatedFetch|fetch\(/);

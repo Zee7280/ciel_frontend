@@ -40,7 +40,12 @@ type Props = {
     onAddOwn: () => void;
     onStartEditing: () => void;
     onReset: () => void;
+    /** Replace the whole saved set in one write (used by "Maximum questions per email"). */
+    onReplace: (next: StudioQuestion[]) => void;
 };
+
+const MAX_QUESTIONS_DEFAULT = 5;
+const MAX_QUESTION_OPTIONS = [2, 3, 4, 5, 6, 8, 10];
 
 type Rec = Record<string, unknown>;
 const rec = (v: unknown): Rec => (v && typeof v === "object" && !Array.isArray(v) ? (v as Rec) : {});
@@ -102,15 +107,60 @@ function ReferenceBlock({ rows }: { rows: Array<[string, string]> }) {
     );
 }
 
-export default function FollowUpStudio({ open, onClose, data, projectData, projectEndDate, preview, questions, customised, readOnly, onPatch, onRemove, onAddOwn, onStartEditing, onReset }: Props) {
+export default function FollowUpStudio({ open, onClose, data, projectData, projectEndDate, preview, questions, customised, readOnly, onPatch, onRemove, onAddOwn, onStartEditing, onReset, onReplace }: Props) {
     const [tab, setTab] = useState<TabKey>("questions");
-    const [editing, setEditing] = useState(false);
+    const [maxQuestions, setMaxQuestions] = useState(MAX_QUESTIONS_DEFAULT);
     const ref = useMemo(() => studioReference(data, projectData), [data, projectData]);
     const s10 = data.section10 || ({} as ReportData["section10"]);
     const included = questions.filter((q) => q.include);
     const blocks = Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : [];
     const outcomes = Array.isArray(data.section5?.measurable_outcomes) ? data.section5.measurable_outcomes : [];
     const subject = (preview?.subject || `CIEL PK | Impact follow-up | PROJECT-ID | ${ref.title}`).replace("PROJECT-ID", ref.projectId || "Project ID");
+
+    /** S4 / S5 / S9 facts for one activity (what the generator read), keyed by the Section 4 block id. */
+    const activityFacts = (activityId: string | null | undefined) => {
+        const idx = blocks.findIndex((b, i) => (str(rec(b).id) || `activity-${i + 1}`) === str(activityId));
+        if (idx < 0) return null;
+        const block = rec(blocks[idx]);
+        const status = str(block.status);
+        const outs = (Array.isArray(block.outputs) ? block.outputs : []).map((o) => `${str(rec(o).quantity)} ${first(rec(o).title, rec(o).type_other, rec(o).type)}`.trim()).filter(Boolean);
+        const linked = outcomes.filter((o) => str(rec(o).activity_id) === (str(block.id) || `activity-${idx + 1}`));
+        return {
+            title: first(block.title, block.sub_category, `Activity ${idx + 1}`),
+            status,
+            delivered: !status || !NOT_DELIVERED.test(status),
+            s4: `${status || "status not set"}${outs.length ? ` · outputs: ${outs.join(", ")}` : " · no outputs recorded"}`,
+            s5: linked.length ? linked.map((o) => `${first(rec(o).metric_other, rec(o).metric)} ${str(rec(o).baseline) || "—"} → ${str(rec(o).endline) || "—"}`).join("; ") : "Not mapped",
+        };
+    };
+    const s9Fact = str(s10.continuation_details) ? `${str(s10.continuation_details).slice(0, 160)}${str(s10.continuation_details).length > 160 ? "…" : ""}` : "Not mapped";
+    const skipped = blocks
+        .map((b, i) => ({ title: first(rec(b).title, rec(b).sub_category, `Activity ${i + 1}`), status: str(rec(b).status) }))
+        .filter((a) => a.status && NOT_DELIVERED.test(a.status))
+        .map((a) => a.title);
+    const reasonFor = (q: StudioQuestion) => {
+        if (q.source === "student") return "Added by you";
+        const hit = (preview?.questions || []).find((p) => (q.activityId ? p.activityId === q.activityId : !p.activityId && p.activityTitle === q.activityTitle));
+        return hit?.reason || "Verify continuing benefit";
+    };
+    // Every change goes through the saved set; the first edit copies the suggestions onto the report.
+    const edit = (id: string, fields: Partial<StudioQuestion>) => {
+        if (!customised) onStartEditing();
+        onPatch(id, fields);
+    };
+    // "Maximum questions per email": keep the first n in the email, untick the rest (one save, not n patches).
+    const applyMax = (n: number) => {
+        setMaxQuestions(n);
+        let kept = 0;
+        onReplace(
+            questions.map((q) => {
+                const keep = kept < n;
+                if (keep) kept += 1;
+                return q.include === keep ? q : { ...q, include: keep };
+            }),
+        );
+    };
+    const inputCls = "w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 disabled:bg-slate-50 disabled:text-slate-500";
 
     const refRows: Array<[string, string]> = [
         ["Project", ref.title],
@@ -205,58 +255,132 @@ export default function FollowUpStudio({ open, onClose, data, projectData, proje
                     ) : null}
 
                     {tab === "questions" ? (
-                        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-900">Question extraction & your review · {included.length} in the email</h3>
-                                    <p className="text-xs text-slate-500">One distinct, answerable question per activity or benefit. Keep, reword, untick or add your own. Answers: Yes / Partially / No / Unable to verify.</p>
-                                </div>
-                                {!readOnly ? (
+                        <div className="space-y-4">
+                            <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4" data-testid="studio-questions">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">2. Question extraction & editorial approval</h3>
+                                        <p className="text-xs text-slate-500">Generate one distinct, answerable sustainability question per meaningful project activity or outcome. Combine only if they measure the same thing.</p>
+                                    </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {editing ? (
-                                            <>
-                                                <button type="button" className={btn} onClick={onAddOwn} disabled={questions.length >= 10}>+ Add custom question</button>
-                                                <button type="button" className={btnPrimary} onClick={() => setEditing(false)} disabled={included.length === 0}>Done</button>
-                                            </>
-                                        ) : (
-                                            <button type="button" className={btnPrimary} onClick={() => { onStartEditing(); setEditing(true); }} disabled={!preview && !customised} data-testid="studio-edit-questions">
-                                                {customised ? "Edit questions" : "Review & edit questions"}
-                                            </button>
-                                        )}
-                                        {customised ? <button type="button" className="text-[11px] font-bold text-slate-500 underline" onClick={() => { onReset(); setEditing(false); }}>↻ Regenerate suggestions</button> : null}
+                                        <button type="button" className={btn} onClick={() => setTab("source")}>Edit source</button>
+                                        {!readOnly ? <button type="button" className={btnPrimary} onClick={onReset} disabled={!customised} title={customised ? "Rebuild the suggestions from Sections 4, 5 and 9 (your edits are discarded)" : "Already showing the fresh suggestions"}>↻ Regenerate</button> : null}
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    {([
+                                        ["Source interventions", String(blocks.length)],
+                                        ["Selected questions", String(included.length)],
+                                        ["Recipient effort", `${Math.max(1, included.length)}–${Math.max(1, included.length) + 1} min`],
+                                    ] as Array<[string, string]>).map(([k, v]) => (
+                                        <div key={k} className="rounded-xl border border-[#d9e8e5] bg-[#f5fbfa] px-3 py-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{k}</p>
+                                            <p className="text-lg font-extrabold text-slate-900">{v}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <label className="block max-w-[280px] text-xs">
+                                    <span className="mb-1 block font-semibold text-slate-700">Maximum questions per email</span>
+                                    <select value={MAX_QUESTION_OPTIONS.find((n) => n >= Math.max(maxQuestions, included.length)) ?? 10} disabled={readOnly || questions.length === 0} onChange={(e) => applyMax(Number(e.target.value))} className={inputCls} data-testid="studio-max-questions">
+                                        {MAX_QUESTION_OPTIONS.map((n) => <option key={n} value={n}>{n} questions</option>)}
+                                    </select>
+                                </label>
+
+                                <div className="rounded-xl bg-[#fffaf0] px-3 py-2 text-[11px] leading-relaxed text-[#775620]">
+                                    <b>Extraction logic:</b> detect durable outcomes from S4/S5/S9 → match each to a precise verification question → remove duplicates → flag planned/unverified activities → allow human review. Never claim a result happened when source data only shows a plan.
+                                </div>
+
+                                {!preview && !customised ? <p className="text-xs text-slate-400">Preparing suggestions…</p> : null}
+                                {preview && questions.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500">No questions yet. Use ↻ Regenerate to extract them from your activities, or add a custom question.</p> : null}
+
+                                <ol className="space-y-3">
+                                    {questions.map((q, i) => {
+                                        const facts = activityFacts(q.activityId);
+                                        const counted = q.countLabel !== null && q.countLabel !== undefined;
+                                        const statusText = q.source === "student" ? "Your question" : facts ? (facts.delivered ? facts.status || "Delivered" : `${facts.status} · verify`) : "Overall project";
+                                        const statusOk = q.source === "student" || !facts || facts.delivered;
+                                        return (
+                                            <li key={q.id} className={`rounded-2xl border p-3 text-xs ${q.include ? "border-[#9fd3cb] bg-[#f5fbfa]" : "border-dashed border-slate-200 bg-white"}`}>
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    {q.source === "student" ? (
+                                                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                            <span className="shrink-0 text-[11px] font-extrabold text-slate-900">Question {i + 1} ·</span>
+                                                            <input value={q.activityTitle} maxLength={240} disabled={readOnly} onChange={(e) => edit(q.id, { activityTitle: e.target.value })} placeholder="Which activity / result is this about?" className={`${inputCls} max-w-xs font-bold`} />
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[11px] font-extrabold text-slate-900">Question {i + 1} · {q.activityTitle || "Project activity"}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                                                            <input type="checkbox" checked={q.include} disabled={readOnly} onChange={(e) => edit(q.id, { include: e.target.checked })} /> Include in email
+                                                        </label>
+                                                        {q.source === "student" && !readOnly ? <button type="button" className="text-[11px] font-bold text-rose-600" onClick={() => onRemove(q.id)}>Remove</button> : null}
+                                                    </div>
+                                                </div>
+
+                                                <label className="mt-2 block">
+                                                    <span className="mb-1 block text-[11px] font-semibold text-slate-700">Editable verification question</span>
+                                                    <textarea value={q.questionText} maxLength={600} disabled={readOnly} onChange={(e) => edit(q.id, { questionText: e.target.value })} placeholder="Write a question the partner can answer with Yes / Partially / No" className={`${inputCls} min-h-[66px]`} />
+                                                </label>
+
+                                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                    <span className="rounded-full border border-[#dce9eb] bg-[#f0f6f8] px-2 py-0.5 text-[10px] font-semibold text-[#52707e]">Source: {q.source === "student" ? "Written by you" : "S4 · S5 outcome · S9 sustainability"}</span>
+                                                    <span className="rounded-full border border-[#dce9eb] bg-[#f0f6f8] px-2 py-0.5 text-[10px] font-semibold text-[#52707e]">Reason: {reasonFor(q)}</span>
+                                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusOk ? "border-[#b6d8d4] bg-[#eefaf7] text-[#006d61]" : "border-[#edd6b4] bg-[#fff7e9] text-[#8a590d]"}`}>{statusText}</span>
+                                                </div>
+
+                                                <div className="mt-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+                                                    <b>Source S4:</b> {q.source === "student" ? "Manual question" : facts ? facts.s4 : "Whole project (no single activity)"}<br />
+                                                    <b>Source S5:</b> {q.source === "student" ? "Not mapped" : facts ? facts.s5 : "Not mapped"}<br />
+                                                    <b>Source S9:</b> {q.source === "student" ? "Not mapped" : s9Fact}
+                                                </div>
+
+                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                                                        <input type="checkbox" checked={counted} disabled={readOnly} onChange={(e) => edit(q.id, { countLabel: e.target.checked ? q.countLabel || "" : null })} /> Optional measurable count
+                                                    </label>
+                                                    <label className="block">
+                                                        <span className="mb-1 block text-[11px] font-semibold text-slate-700">If counted, what exactly?</span>
+                                                        <input value={q.countLabel || ""} maxLength={160} disabled={readOnly || !counted} onChange={(e) => edit(q.id, { countLabel: e.target.value })} placeholder="e.g. number of classrooms in use" className={inputCls} />
+                                                    </label>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+
+                                {skipped.length ? (
+                                    <div className="rounded-xl border border-[#edd6b4] bg-[#fff7e9] px-3 py-2 text-[11px] leading-relaxed text-[#8a590d]">
+                                        <b>Excluded:</b> {skipped.join("; ")}. Planned or not-delivered activities do not produce partner follow-ups.
                                     </div>
                                 ) : null}
-                            </div>
-                            {!preview && !customised ? <p className="text-xs text-slate-400">Preparing suggestions…</p> : null}
-                            <ol className="space-y-2">
-                                {questions.map((q, i) => (
-                                    <li key={q.id} className={`rounded-xl border p-3 text-xs ${q.include ? "border-[#cbe7e3] bg-[#f5fbfa]" : "border-dashed border-slate-200 opacity-60"}`}>
-                                        {editing ? (
-                                            <div className="space-y-1.5">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#0c746e]">Question {i + 1}</span>
-                                                    <input value={q.activityTitle} maxLength={240} onChange={(e) => onPatch(q.id, { activityTitle: e.target.value })} placeholder="Which activity / result is this about?" className="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-bold" />
-                                                    <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={q.include} onChange={(e) => onPatch(q.id, { include: e.target.checked })} /> Include in email</label>
-                                                    {q.source === "student" ? <button type="button" className="text-[11px] font-bold text-rose-600" onClick={() => onRemove(q.id)}>Remove</button> : null}
-                                                </div>
-                                                <textarea value={q.questionText} maxLength={600} onChange={(e) => onPatch(q.id, { questionText: e.target.value })} placeholder="Write a question the partner can answer with Yes / Partially / No" className="min-h-[56px] w-full rounded-lg border border-slate-200 px-2 py-1 text-xs" />
-                                                <input value={q.countLabel || ""} maxLength={160} onChange={(e) => onPatch(q.id, { countLabel: e.target.value || null })} placeholder="Optional measurable count (e.g. number of classrooms in use)" className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px]" />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#0c746e]">Question {i + 1} · {q.activityTitle || "Project activity"}{q.include ? "" : " · not in email"}</p>
-                                                <p className="mt-0.5 text-sm font-semibold text-slate-900">{q.questionText || <em className="font-normal text-slate-400">(write the question)</em>}</p>
-                                                {q.countLabel ? <p className="text-[11px] text-slate-500">Optional count: {q.countLabel}</p> : null}
-                                                <p className="text-[11px] text-slate-400">Source: {q.source === "student" ? "written by you" : "Section 4 activity · Section 5 outcome · Section 9"}</p>
-                                            </>
-                                        )}
-                                    </li>
-                                ))}
-                            </ol>
-                            <div className="rounded-xl bg-[#fffaf0] px-3 py-2 text-[11px] text-[#775620]">
-                                <b>Why separate questions:</b> a classroom still in use, artwork still intact and teachers actually using it can have three different answers. One blanket “Is impact sustained?” would hide that.
-                            </div>
-                        </section>
+
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    {!readOnly ? <button type="button" className={btn} onClick={onAddOwn} disabled={questions.length >= 10}>+ Add custom question</button> : <span />}
+                                    <button type="button" className={btnPrimary} onClick={() => setTab("email")}>Review partner email →</button>
+                                </div>
+                                {customised ? <p className="text-[11px] text-slate-500">This reviewed set is saved with your report and used when CIEL PK publishes it. Blank questions block submission; untick or remove them instead.</p> : null}
+                            </section>
+
+                            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                                <h3 className="text-sm font-bold text-slate-900">Why this is better than one generic question</h3>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                                    {([
+                                        ["1 · Physical change", "Is the upgraded classroom still usable?"],
+                                        ["2 · Asset condition", "Is the educational artwork still intact?"],
+                                        ["3 · Actual adoption", "Are teachers actively using it?"],
+                                    ] as Array<[string, string]>).map(([k, v]) => (
+                                        <div key={k} className="rounded-xl border border-slate-100 bg-[#f8fbfb] px-3 py-2">
+                                            <p className="text-xs font-bold text-slate-900">{k}</p>
+                                            <p className="text-[11px] text-slate-600">{v}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="mt-2 text-[11px] text-slate-500">Three related but different outcomes may have three different answers. One blanket “Is impact sustained?” would hide that distinction.</p>
+                            </section>
+                        </div>
                     ) : null}
 
                     {tab === "email" ? (

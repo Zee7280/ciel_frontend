@@ -179,6 +179,7 @@ export default function FollowUpPlanPreview({ data, projectData, projectEndDate,
                 onAddOwn={addOwn}
                 onStartEditing={startEditing}
                 onReset={resetToSuggested}
+                onReplace={save}
             />
         </div>
     );
