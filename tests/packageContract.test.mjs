@@ -44,3 +44,7 @@ test("the shipped viewer carries no demo data, form importer or original-form co
     assert.ok(html.includes("setTab,setAllowedTabs,setActions"));
     assert.ok(html.includes('id="analyzer-export-button" hidden'));
 });
+
+test("the embedded rubric version is the current one (R3)", () => {
+    assert.equal(contract.rubric_version, "CIEL-CII-2026.11-R3");
+});

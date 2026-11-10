@@ -10,6 +10,7 @@ import {
     CII_V45_ANCHOR_FACTORS,
     CII_V45_ANCHOR_NAMES,
     CII_V45_DIMENSIONS,
+    CII_V45_RUBRIC_VERSION,
     assessL6,
     criterionLabel,
     isR3Analysis,
@@ -188,7 +189,7 @@ function approveWarningMessage(stored: CiiV45Result | null, locked: boolean): st
 
 function badgeLabel(badge: CiiV45Badge | null, status?: CiiV45BadgeStatus | null, candidate?: CiiV45Badge | null): string {
     // R3: a 90+ CII whose L6 is still pending has no badge; say so instead of a bare "Pending".
-    if (!badge && status === "L6_PENDING_QUALIFICATION") return `${candidate?.name || "Transformative Impact Contributor"} · L6 pending qualification`;
+    if (!badge && status === "L6_PENDING_QUALIFICATION") return "L6 pending qualification";
     if (!badge) return "Pending";
     const base = `${badge.code} · ${badge.name}`;
     return badge.gateCapped ? `${base} (capped from L${badge.numericLevel} — quality gate not met)` : base;
@@ -323,6 +324,25 @@ export default function CommunityCiiAnalyser({
         return () => clearInterval(id);
     }, [analysing]);
 
+    // A locked R3 report hides the supplemental panel (nothing can change any more), but the review
+    // record and the evidence gallery must still list the files attached before approval.
+    useEffect(() => {
+        if (!isCielPk || readOnly || !reportId || !locked) return;
+        if ((report?.ciiV45 as { rubricVersion?: string } | null | undefined)?.rubricVersion !== CII_V45_RUBRIC_VERSION) return;
+        let cancelled = false;
+        authenticatedFetch(supplementalPath)
+            .then(async (res) => {
+                if (cancelled || !res?.ok) return;
+                const json = (await res.json().catch(() => ({}))) as { data?: SupplementalEvidenceItem[] };
+                if (!cancelled && Array.isArray(json.data)) setSupplemental(json.data);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reportId, locked, isCielPk, readOnly, report]);
+
     const runAnalysis = async () => {
         if (readOnly || !reportId || analysing) return;
         if (packetHold) {
@@ -426,6 +446,14 @@ export default function CommunityCiiAnalyser({
         setMarkSources((prev) => ({ ...prev, [dimension]: "" }));
     };
 
+    // Typed reviewed marks that differ from the saved ones are not part of the stored score: Approve
+    // locks what is stored, so unsaved edits must be saved (or cleared) first.
+    const hasUnsavedMarks =
+        canReviewMarks &&
+        Boolean(ciiV45) &&
+        (ciiV45?.sectionScores ?? []).some((section) => diffCriterionEdits(markRowsFor(section), dirtyFor(section.dimension)).changed.length > 0);
+    const UNSAVED_MESSAGE = "Save or clear your reviewed-mark edits before approving.";
+
     const saveSectionMarks = async (dimension: string) => {
         if (!canReviewMarks || !ciiV45 || savingDim) return;
         const section = ciiV45.sectionScores.find((s) => s.dimension === dimension);
@@ -525,6 +553,10 @@ export default function CommunityCiiAnalyser({
         }
         if (analysisStale) {
             toast.error(STALE_MESSAGE);
+            return;
+        }
+        if (hasUnsavedMarks) {
+            toast.error(UNSAVED_MESSAGE);
             return;
         }
         if (!dim7Complete) {
@@ -794,6 +826,7 @@ export default function CommunityCiiAnalyser({
         finalCII: previewComposite,
         badgeName: currentBadge?.name || null,
         badgeLevel: currentBadge?.numericLevel ?? null,
+        badgeStatus: ciiV45Lock?.badgeStatus ?? ciiV45?.badgeStatus ?? null,
         approvalHash: ciiV45Lock?.hash || null,
         approvedAt: ciiV45Lock?.lockedAt || null,
         sections: sheetSections,
@@ -1150,7 +1183,7 @@ export default function CommunityCiiAnalyser({
                                             {describeLogEntry(entry, (d, c) => `${dimensionNames[d] || `Dimension ${d}`} · ${criterionLabel(d as CiiV45Dimension, c)}`)}
                                             <span className="optional">
                                                 {" "}
-                                                · {entry.actorId.slice(0, 8)} · {new Date(entry.at).toLocaleString()}
+                                                · {String(entry.actorId ?? "").slice(0, 8)} · {new Date(entry.at).toLocaleString()}
                                             </span>
                                         </li>
                                     ))}
@@ -1205,7 +1238,7 @@ export default function CommunityCiiAnalyser({
                             />
                         </div>
 
-                        {isCielPk && !readOnly && !locked ? (
+                        {isCielPk && !readOnly && !locked && r3 ? (
                             <CiiSupplementalEvidencePanel
                                 basePath={supplementalPath}
                                 onItemsChange={setSupplemental}
@@ -1501,7 +1534,7 @@ export default function CommunityCiiAnalyser({
                                         <button
                                             type="button"
                                             className="primary"
-                                            disabled={approving || Boolean(hardBlock) || analysisStale || !dim7Complete || (!confirmAuthority && !locked)}
+                                            disabled={approving || Boolean(hardBlock) || analysisStale || hasUnsavedMarks || !dim7Complete || (!confirmAuthority && !locked)}
                                             onClick={approveAndLock}
                                         >
                                             {approving ? "Locking…" : "Approve Score & Generate Final Report"}

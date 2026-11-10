@@ -261,5 +261,5 @@ test("the analyser wires the R3 review UI behind R3, Admin and unlocked checks, 
     const supp = read("src/components/ciel/community-service/CiiSupplementalEvidencePanel.tsx");
     assert.match(supp, /uploadFileViaPresign\(`\$\{basePath\}\/presign`/);
     assert.match(supp, /Supplemental · \{item\.label\}/);
-    assert.match(analyser, /isCielPk && !readOnly && !locked \? \(\s*<CiiSupplementalEvidencePanel/);
+    assert.match(analyser, /isCielPk && !readOnly && !locked && r3 \? \(\s*<CiiSupplementalEvidencePanel/);
 });

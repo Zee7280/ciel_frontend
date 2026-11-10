@@ -304,7 +304,7 @@ export function buildReviewRecord(input: ReviewRecordInput) {
             name: s.name ?? null,
             maximum: s.maximumPoints ?? null,
             reviewedScore: s.score,
-            criteria: s.criterionScores.map((c) => ({
+            criteria: (s.criterionScores ?? []).map((c) => ({
                 criterion: c.criterion,
                 anchor: c.anchor,
                 maximum: c.maximumPoints ?? null,

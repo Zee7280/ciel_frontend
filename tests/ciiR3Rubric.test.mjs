@@ -245,3 +245,23 @@ test("every surface that showed a score-derived or fallback badge now respects a
     assert.match(read("src/app/dashboard/faculty/community-service/useFacultyCommunityServiceData.ts"), /cii_badge_status: pickStr\(item, "cii_badge_status"/);
     assert.match(read("src/app/dashboard/admin/community-service/page.tsx"), /cii_badge_status: pickReportStr\(item, "cii_badge_status"/);
 });
+
+test("review-driven guards: unsaved marks block Approve, the supplemental panel is R3-only, locked R3 still lists its files", () => {
+    const analyser = read("src/components/ciel/community-service/CommunityCiiAnalyser.tsx");
+    // unsaved reviewed marks are never silently dropped by Approve
+    assert.match(analyser, /const hasUnsavedMarks =/);
+    assert.match(analyser, /if \(hasUnsavedMarks\) \{\s*toast\.error\(UNSAVED_MESSAGE\)/);
+    assert.match(analyser, /analysisStale \|\| hasUnsavedMarks \|\| !dim7Complete/);
+    // older analyses do not gain the supplemental-evidence behaviour
+    assert.match(analyser, /isCielPk && !readOnly && !locked && r3 \? \(\s*<CiiSupplementalEvidencePanel/);
+    // a locked R3 report loads its supplemental files for the review record and the gallery
+    assert.match(analyser, /rubricVersion !== CII_V45_RUBRIC_VERSION\) return;/);
+    assert.match(analyser, /authenticatedFetch\(supplementalPath\)/);
+    // a pending L6 never names the L6 band in exported text; log rows tolerate a missing actor
+    assert.match(analyser, /return "L6 pending qualification";/);
+    assert.match(analyser, /String\(entry\.actorId \?\? ""\)\.slice\(0, 8\)/);
+    assert.match(analyser, /badgeStatus: ciiV45Lock\?\.badgeStatus \?\? ciiV45\?\.badgeStatus \?\? null/);
+    const view = read("src/utils/ciiModerationView.ts");
+    assert.match(view, /\(s\.criterionScores \?\? \[\]\)\.map/);
+    assert.doesNotMatch(view, /[^(]s\.criterionScores\.map/);
+});

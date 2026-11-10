@@ -23,6 +23,8 @@ export interface StudentAnalysisInput {
     finalCII: number | null;
     badgeName: string | null;
     badgeLevel?: number | null;
+    /** R3: `L6_PENDING_QUALIFICATION` when a locked 90+ CII has no awarded badge yet. */
+    badgeStatus?: string | null;
     approvalHash?: string | null;
     approvedAt?: string | null;
     sections: StudentAnalysisSection[];
@@ -49,6 +51,7 @@ export function buildStudentAnalysisRecord(input: StudentAnalysisInput) {
         approvedAt: input.approvedAt || null,
         finalCII: round1(input.finalCII),
         badge: input.badgeName ? { name: input.badgeName, level: input.badgeLevel ?? null } : null,
+        badgeStatus: input.badgeStatus ?? null,
         sectionScores: input.sections
             .filter((s) => s.dimension || s.name)
             .map((s) => ({
