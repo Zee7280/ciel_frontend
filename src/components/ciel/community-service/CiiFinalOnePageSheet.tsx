@@ -122,7 +122,7 @@ export function CiiFinalOnePageSheet({
                     <p className="analysis-copy">{analysis || "—"}</p>
                     <div className="sheet-cols">
                         <div>
-                            <h3>What Went Well</h3>
+                            <h3>Strengths</h3>
                             <ul>
                                 {(strengths.length ? strengths : ["—"]).map((item) => (
                                     <li key={item}>{item}</li>
@@ -130,7 +130,7 @@ export function CiiFinalOnePageSheet({
                             </ul>
                         </div>
                         <div>
-                            <h3>Limitations &amp; Next Learning</h3>
+                            <h3>Areas to Grow &amp; Next Steps</h3>
                             <ul>
                                 {(limitations.length ? limitations : ["—"]).map((item) => (
                                     <li key={item}>{item}</li>

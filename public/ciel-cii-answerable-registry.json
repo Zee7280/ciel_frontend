@@ -1,0 +1,279 @@
+{
+ "version": "CIEL-ANSWERABLE-2026.11-R3",
+ "questionBankVersion": "CIEL-440-2026-11-03",
+ "note": "Curated project/portfolio candidates drawn from the internal 440-question bank. Reference only: not a claim of official recognition readiness, and never a CII mark.",
+ "items": [
+  {
+   "id": "M03-Q01",
+   "scope": "project",
+   "dimension": "2",
+   "question": "What community problem does each initiative address?",
+   "minimumData": "Project ID; location; problem statement; affected population",
+   "answerRule": "Specific need rather than an SDG label alone"
+  },
+  {
+   "id": "M03-Q02",
+   "scope": "project",
+   "dimension": "2",
+   "question": "What evidence establishes the need?",
+   "minimumData": "Needs assessment; source date; community consultation; baseline",
+   "answerRule": "Evidence quality and recency"
+  },
+  {
+   "id": "M03-Q03",
+   "scope": "project",
+   "dimension": "2",
+   "question": "Who identified and prioritized the problem?",
+   "minimumData": "Community representatives; selection method; consultation dates",
+   "answerRule": "Community-defined versus university-defined needs"
+  },
+  {
+   "id": "M03-Q04",
+   "scope": "project",
+   "dimension": "2",
+   "question": "Who is intended to benefit?",
+   "minimumData": "Eligibility; target population; geography; barriers; planned reach",
+   "answerRule": "Defined target denominator and inclusion criteria"
+  },
+  {
+   "id": "M03-Q06",
+   "scope": "project",
+   "dimension": "2",
+   "question": "What change is the initiative intended to produce?",
+   "minimumData": "Theory of change; inputs; outputs; outcomes; assumptions",
+   "answerRule": "Explicit causal pathway; assumptions separately recorded"
+  },
+  {
+   "id": "M03-Q07",
+   "scope": "project",
+   "dimension": "2",
+   "question": "What are the project's measurable objectives?",
+   "minimumData": "Indicator; baseline; target; deadline; measurement source",
+   "answerRule": "Target register with unique indicator IDs"
+  },
+  {
+   "id": "M03-Q08",
+   "scope": "project",
+   "dimension": "3",
+   "question": "Which SDG targets are substantively relevant?",
+   "minimumData": "SDG goal; target code; rationale; evidence; reviewer",
+   "answerRule": "Many-to-many mapping; do not infer impact from tagging"
+  },
+  {
+   "id": "M03-Q14",
+   "scope": "project",
+   "dimension": "9",
+   "question": "How will benefits continue after the project ends?",
+   "minimumData": "Handover; local capacity; maintenance; funding; responsible partner",
+   "answerRule": "Sustainability plan and post-exit follow-up"
+  },
+  {
+   "id": "M04-Q01",
+   "scope": "portfolio",
+   "dimension": "1",
+   "question": "How many students participate in community engagement?",
+   "minimumData": "Pseudonymous student ID; activity ID; dates; approval",
+   "answerRule": "Distinct active students; sum of event attendance is separate"
+  },
+  {
+   "id": "M04-Q04",
+   "scope": "portfolio",
+   "dimension": "1",
+   "question": "How much verified service time is contributed?",
+   "minimumData": "Person; event; start/end; breaks; verifier; approved hours",
+   "answerRule": "Sum nonoverlapping approved hours"
+  },
+  {
+   "id": "M04-Q06",
+   "scope": "portfolio",
+   "dimension": "1",
+   "question": "How many activities are student-led?",
+   "minimumData": "Student role; decision authority; design/delivery responsibility",
+   "answerRule": "Substantive leadership criteria; not attendance alone"
+  },
+  {
+   "id": "M05-Q01",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How many unique community members receive services?",
+   "minimumData": "Pseudonymous beneficiary ID; project; service date",
+   "answerRule": "Distinct people within stated scope; document deduplication limits"
+  },
+  {
+   "id": "M05-Q02",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How many service encounters are delivered?",
+   "minimumData": "Encounter ID; beneficiary ID; service type; date",
+   "answerRule": "Count encounters separately from unique beneficiaries"
+  },
+  {
+   "id": "M05-Q03",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How many households benefit?",
+   "minimumData": "Household ID; member linkage; eligibility",
+   "answerRule": "Distinct households; do not treat household estimates as measured people"
+  },
+  {
+   "id": "M05-Q05",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How many people are reached indirectly?",
+   "minimumData": "Estimation model; source population; assumptions",
+   "answerRule": "Label modelled reach; never add to verified reach without explanation"
+  },
+  {
+   "id": "M05-Q10",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How many intended beneficiaries complete the intervention?",
+   "minimumData": "Intake cohort; completion criteria; exit date",
+   "answerRule": "Completion / eligible starters; record attrition reasons"
+  },
+  {
+   "id": "M06-Q01",
+   "scope": "project",
+   "dimension": "4B",
+   "question": "What changed from baseline for participants?",
+   "minimumData": "Indicator; person/cohort ID; baseline; endline; dates",
+   "answerRule": "Paired change for comparable records; report missing matches"
+  },
+  {
+   "id": "M06-Q02",
+   "scope": "project",
+   "dimension": "4B",
+   "question": "How many participants achieve a meaningful outcome?",
+   "minimumData": "Outcome threshold defined in advance; observed result; eligible cohort",
+   "answerRule": "Achievers / evaluated cohort; show evaluable coverage"
+  },
+  {
+   "id": "M06-Q03",
+   "scope": "project",
+   "dimension": "9",
+   "question": "Are improvements sustained after support ends?",
+   "minimumData": "Follow-up window; repeat measure; contact attempts",
+   "answerRule": "Outcome retention at stated follow-up intervals"
+  },
+  {
+   "id": "M06-Q11",
+   "scope": "project",
+   "dimension": "4B",
+   "question": "How strong is the evidence for each impact claim?",
+   "minimumData": "Source type; design; sample; validation; limitations",
+   "answerRule": "Transparent evidence tier; no automatic causal score"
+  },
+  {
+   "id": "M06-Q16",
+   "scope": "project",
+   "dimension": "7",
+   "question": "Which results have been independently validated?",
+   "minimumData": "Evaluator independence; scope; report; findings",
+   "answerRule": "Assured claims versus internally verified claims"
+  },
+  {
+   "id": "M07-Q01",
+   "scope": "project",
+   "dimension": "6",
+   "question": "Which partnerships are active and delivering work?",
+   "minimumData": "Partner ID; agreement; start/end; joint activity",
+   "answerRule": "Active partnerships; separate dormant agreements"
+  },
+  {
+   "id": "M07-Q04",
+   "scope": "project",
+   "dimension": "6",
+   "question": "How do partners share decisions and resources?",
+   "minimumData": "Governance; voting/approval rights; funding; work allocation",
+   "answerRule": "Reciprocity and decision influence"
+  },
+  {
+   "id": "M07-Q11",
+   "scope": "project",
+   "dimension": "5",
+   "question": "What resources do external partners contribute?",
+   "minimumData": "Cash; staff time; facilities; equipment; valuation basis",
+   "answerRule": "Cash and in-kind separately; prevent double counting"
+  },
+  {
+   "id": "M08-Q09",
+   "scope": "project",
+   "dimension": "8",
+   "question": "What student learning follows community engagement?",
+   "minimumData": "Reflection; civic/ethical/technical competencies; rubric",
+   "answerRule": "Assessed learning change and supporting work"
+  },
+  {
+   "id": "M25-Q03",
+   "scope": "project",
+   "dimension": "4A",
+   "question": "How was the initiative implemented?",
+   "minimumData": "Timeline; milestones; decisions; partners; delivery methods",
+   "answerRule": "Coherent implementation account linked to records"
+  },
+  {
+   "id": "M25-Q05",
+   "scope": "project",
+   "dimension": "4B",
+   "question": "What measurable progress occurred in the eligible period?",
+   "minimumData": "Baseline; outputs; outcomes; dates; verification",
+   "answerRule": "Isolate award-period results from lifetime totals"
+  },
+  {
+   "id": "M25-Q09",
+   "scope": "project",
+   "dimension": "6",
+   "question": "What evidence demonstrates community ownership?",
+   "minimumData": "Co-design; co-delivery; governance; partner endorsement",
+   "answerRule": "Community role and independently expressed benefit"
+  },
+  {
+   "id": "M25-Q10",
+   "scope": "project",
+   "dimension": "9",
+   "question": "Can another institution replicate or scale the approach?",
+   "minimumData": "Required resources; conditions; costs; limitations; adaptations",
+   "answerRule": "Transferability assessment and actual replications"
+  },
+  {
+   "id": "M26-Q01",
+   "scope": "portfolio",
+   "dimension": "7",
+   "question": "Can every reported value be traced to source records?",
+   "minimumData": "Metric ID; source system; query; records; transformation version",
+   "answerRule": "Complete lineage from source to submitted value"
+  },
+  {
+   "id": "M26-Q02",
+   "scope": "project",
+   "dimension": "7",
+   "question": "Does every claim have relevant dated evidence?",
+   "minimumData": "Claim ID; evidence; period; page/section; verifier",
+   "answerRule": "Supported claims / eligible claims; zero is not missing"
+  },
+  {
+   "id": "M26-Q06",
+   "scope": "project",
+   "dimension": "7",
+   "question": "Are repeated people, projects and outputs deduplicated?",
+   "minimumData": "Stable IDs; match rules; aliases; duplicate log",
+   "answerRule": "Deduplication within each aggregation scope"
+  },
+  {
+   "id": "M26-Q08",
+   "scope": "project",
+   "dimension": "4B",
+   "question": "Are estimates clearly separated from measured values?",
+   "minimumData": "Measurement method; estimation formula; assumptions; uncertainty",
+   "answerRule": "Measured/estimated/self-reported classifications"
+  },
+  {
+   "id": "M26-Q17",
+   "scope": "project",
+   "dimension": "7",
+   "question": "Are personal and sensitive data appropriately protected?",
+   "minimumData": "Access role; consent; purpose; retention; anonymization",
+   "answerRule": "Publish aggregates; restricted evidence under controlled access"
+  }
+ ]
+}

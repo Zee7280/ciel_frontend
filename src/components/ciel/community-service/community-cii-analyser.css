@@ -1102,3 +1102,44 @@
         box-shadow: none;
     }
 }
+
+/* R3 answerable-question reference panel (read-only, loaded on first open) */
+.cii-final .registry-panel {
+    margin-top: 14px;
+    padding: 12px 16px;
+}
+.cii-final .registry-panel > summary {
+    cursor: pointer;
+    color: var(--ink);
+}
+.cii-final .registry-note {
+    margin: 10px 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.cii-final .registry-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin: 8px 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+}
+.cii-final .registry-group h4 {
+    margin: 12px 0 4px;
+    color: var(--ink);
+}
+.cii-final .registry-group ul {
+    margin: 0;
+    padding-left: 18px;
+}
+.cii-final .registry-group li {
+    margin: 6px 0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+.cii-final .registry-detail {
+    color: var(--muted);
+    font-size: 12px;
+}

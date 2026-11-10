@@ -32,6 +32,8 @@ import ReportEvidenceGallery from "@/components/ciel/community-service/ReportEvi
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/report/impact-package/impactPackagePacket";
 import { CiiFinalOnePageSheet, CII_FINAL_BADGE_SRC, CII_FINAL_LOGO_SRC } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
+import { CiiAnswerableRegistryPanel } from "@/components/ciel/community-service/CiiAnswerableRegistryPanel";
+import { buildStudentAnalysisRecord, studentAnalysisFileName } from "@/utils/ciiStudentAnalysis";
 import "./community-cii-analyser.css";
 
 /** Nest CII OpenAI call is 120s, plus one empty-content retry (120s). BFF maxDuration is 300s. */
@@ -599,6 +601,43 @@ export default function CommunityCiiAnalyser({
         window.print();
         window.setTimeout(cleanup, 2000);
     };
+    // R3 student report analysis: only a locked (approved) review can be exported.
+    const sheetSections = aiSections.concat(
+        ciiV45?.sectionScores?.find((s) => s.dimension === "7") ? [ciiV45.sectionScores.find((s) => s.dimension === "7")!] : [],
+    );
+    const studentAnalysisRecord = buildStudentAnalysisRecord({
+        locked,
+        reportId,
+        projectTitle,
+        studentName,
+        university,
+        finalCII: previewComposite,
+        badgeName: currentBadge?.name || null,
+        badgeLevel: currentBadge?.numericLevel ?? null,
+        approvalHash: ciiV45Lock?.hash || null,
+        approvedAt: ciiV45Lock?.lockedAt || null,
+        sections: sheetSections,
+        overallAnalysis: ciiV45?.studentFeedback || ciiV45?.analysisSummary || "",
+        strengths: ciiV45?.strengths || [],
+        areasToGrow: ciiV45?.developmentPriorities || [],
+        adminComment: note || ciiV45Lock?.adminNote || "",
+    });
+    const exportStudentAnalysis = () => {
+        if (!studentAnalysisRecord) {
+            toast.error("Approve the score before exporting the student analysis.");
+            return;
+        }
+        const blob = new Blob([JSON.stringify(studentAnalysisRecord, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = studentAnalysisFileName(reportId);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const dimensionNames: Record<string, string> = Object.fromEntries(sheetSections.map((s) => [String(s.dimension), String(s.name)]));
     const packetFlashLabel = flashOk ? "Read" : "Waiting";
     const packetDetailLabel = detailOk ? `${packet.content_sections}/9` : "HOLD";
     const packetInventoryLabel = `${evidenceFiles.length}`;
@@ -863,6 +902,8 @@ export default function CommunityCiiAnalyser({
                             );
                         })}
 
+                        <CiiAnswerableRegistryPanel dimensionNames={dimensionNames} />
+
                         <div className="section-title">
                             <div>
                                 <div className="eyebrow">ADMIN MANUAL LAYER</div>
@@ -972,6 +1013,11 @@ export default function CommunityCiiAnalyser({
                                     <button type="button" className="secondary" onClick={printFeedback}>
                                         Print feedback
                                     </button>
+                                    {locked ? (
+                                        <button type="button" className="secondary" onClick={exportStudentAnalysis}>
+                                            Export student analysis
+                                        </button>
+                                    ) : null}
                                 </div>
                                 <div className="feedback-overall">
                                     <div className="feedback-scores">
@@ -1153,11 +1199,7 @@ export default function CommunityCiiAnalyser({
                         badgeName={currentBadge?.name || null}
                         badgeLevel={currentBadge?.numericLevel ?? null}
                         lockedAt={ciiV45Lock?.lockedAt || null}
-                        sections={aiSections.concat(
-                            ciiV45?.sectionScores?.find((s) => s.dimension === "7")
-                                ? [ciiV45.sectionScores.find((s) => s.dimension === "7")!]
-                                : [],
-                        )}
+                        sections={sheetSections}
                         analysis={ciiV45?.studentFeedback || ciiV45?.analysisSummary || ""}
                         strengths={ciiV45?.strengths || []}
                         limitations={ciiV45?.developmentPriorities || []}
