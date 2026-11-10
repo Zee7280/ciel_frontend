@@ -1219,7 +1219,7 @@ function AdminReportDetailPage() {
                         ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
+                        <span className="rounded-xl border border-[#c9deb9] bg-[#eaf2df] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#0c312d]">
                             Admin report review
                         </span>
                         <span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
@@ -1227,8 +1227,10 @@ function AdminReportDetailPage() {
                         </span>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <span className={clsx(adminDossier.microLabel, "shrink-0")}>Preview package as</span>
+                {/* One card: preview strip, the Impact Package, review notices and the final decision */}
+                <div className="mb-20 overflow-hidden rounded-3xl border border-[#ced6ca] bg-[#f0efe8] shadow-sm">
+                <div className="flex flex-wrap items-center gap-2 border-b border-[#d9dfd4] bg-[#fffef9] px-5 py-3 sm:px-7">
+                    <span className={clsx(adminDossier.microLabel, "shrink-0 text-[#61716c]")}>Preview package as</span>
                     <div className="flex flex-wrap gap-1.5">
                         {(
                             [
@@ -1247,8 +1249,8 @@ function AdminReportDetailPage() {
                                 className={clsx(
                                     "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
                                     previewAudience === value
-                                        ? "bg-indigo-600 text-white shadow-sm"
-                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                                        ? "bg-[#0c312d] text-white shadow-sm"
+                                        : "bg-[#f0efe8] text-[#61716c] hover:bg-[#e6ebdf]",
                                 )}
                             >
                                 {label}
@@ -1267,6 +1269,7 @@ function AdminReportDetailPage() {
                     fallbackFiles={evidenceFiles}
                     highlight={packageView}
                     audience={previewAudience}
+                    embedded
                     initialDoc={
                         packageDoc === "flashcard" ||
                         packageDoc === "report" ||
@@ -1277,7 +1280,7 @@ function AdminReportDetailPage() {
                     }
                 />
                 {(report.private_candidate || report.review_route === "ciel_pk") ? (
-                    <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
+                    <div className="mx-5 mb-5 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 sm:mx-7">
                         <p className="font-semibold">Private candidate route — CIEL PK reviews this report.</p>
                         <p className="mt-1 text-violet-800">
                             Run the AI analyzer, confirm the final score, then publish. Faculty does not review this listing.
@@ -1293,7 +1296,7 @@ function AdminReportDetailPage() {
 
                 {/* Quality Insight Banner */}
                 {qualityAlerts.length > 0 && (
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm">
+                    <div className="mx-5 mb-5 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 sm:mx-7">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
                                 <AlertTriangle className="w-5 h-5" />
@@ -2255,32 +2258,32 @@ function AdminReportDetailPage() {
 
                 <div
                     id="actions"
-                    className={clsx(adminDossier.cardLg, "relative mb-20 mt-10 overflow-hidden shadow-md")}
+                    className="relative scroll-mt-8 border-t border-[#d9dfd4] bg-[#fffef9]"
                 >
                     {/* Student, opportunity and status: one header for the decision below */}
-                    <div className="flex flex-col gap-6 border-b border-slate-100 p-6 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex flex-col gap-6 border-b border-[#d9dfd4] p-6 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-xl font-bold text-white">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-[#e6ebdf] bg-[#0c312d] font-serif text-xl font-bold text-[#d9ed93]">
                                 {report.student.name.charAt(0)}
                             </div>
                             <div className="min-w-0">
-                                <h2 className="text-2xl font-bold tracking-tight text-slate-900">{report.student.name}</h2>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm font-medium text-slate-600">
+                                <h2 className="text-2xl font-bold tracking-tight text-[#143f3b]">{report.student.name}</h2>
+                                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm font-medium text-[#61716c]">
                                     {report.student.email ? (
                                         <span className="flex min-w-0 items-center gap-2">
-                                            <User className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            <User className="h-4 w-4 shrink-0 text-[#8c9f94]" aria-hidden />
                                             <span className="break-all">{report.student.email}</span>
                                         </span>
                                     ) : null}
                                     {report.student.university ? (
                                         <span className="flex items-center gap-2">
-                                            <Building2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            <Building2 className="h-4 w-4 shrink-0 text-[#8c9f94]" aria-hidden />
                                             {report.student.university}
                                         </span>
                                     ) : null}
                                     {report.submission_date ? (
                                         <span className="flex items-center gap-2">
-                                            <Calendar className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            <Calendar className="h-4 w-4 shrink-0 text-[#8c9f94]" aria-hidden />
                                             Submitted{" "}
                                             {new Date(report.submission_date).toLocaleDateString("en-US", {
                                                 month: "long",
@@ -2291,11 +2294,11 @@ function AdminReportDetailPage() {
                                     ) : null}
                                 </div>
                                 {report.opportunity?.title ? (
-                                    <div className="mt-4 inline-flex max-w-full flex-col rounded-xl bg-slate-50 px-4 py-2.5">
-                                        <span className={clsx(adminDossier.microLabel, "text-slate-400")}>Opportunity</span>
-                                        <span className="truncate text-base font-bold text-slate-900">{report.opportunity.title}</span>
+                                    <div className="mt-4 inline-flex max-w-full flex-col rounded-xl border border-[#d9dfd4] bg-[#f6f7ee] px-4 py-2.5">
+                                        <span className={clsx(adminDossier.microLabel, "text-[#61716c]")}>Opportunity</span>
+                                        <span className="truncate text-base font-bold text-[#143f3b]">{report.opportunity.title}</span>
                                         {report.opportunity.organization ? (
-                                            <span className="truncate text-xs font-medium text-slate-500">{report.opportunity.organization}</span>
+                                            <span className="truncate text-xs font-medium text-[#61716c]">{report.opportunity.organization}</span>
                                         ) : null}
                                     </div>
                                 ) : null}
@@ -2304,17 +2307,17 @@ function AdminReportDetailPage() {
 
                         <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
                             {ciiSnapshot ? (
-                                <div className="flex items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 lg:min-w-[14rem] lg:flex-col lg:items-end lg:gap-1">
-                                    <span className={clsx(adminDossier.microLabel, "flex items-center gap-2 text-indigo-700")}>
+                                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#d6e4c7] bg-[#eaf2df] px-4 py-3 lg:min-w-[14rem] lg:flex-col lg:items-end lg:gap-1">
+                                    <span className={clsx(adminDossier.microLabel, "flex items-center gap-2 text-[#286b60]")}>
                                         <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                                         CII index
                                     </span>
                                     <div className="text-right">
-                                        <p className="text-3xl font-bold tabular-nums tracking-tight text-slate-900">
+                                        <p className="text-3xl font-bold tabular-nums tracking-tight text-[#143f3b]">
                                             {ciiSnapshot.totalScore}
-                                            <span className="text-base font-semibold text-slate-500">/{ciiScoreMax}</span>
+                                            <span className="text-base font-semibold text-[#61716c]">/{ciiScoreMax}</span>
                                         </p>
-                                        <p className="max-w-[14rem] text-xs font-medium leading-snug text-slate-600">{ciiSnapshot.level}</p>
+                                        <p className="max-w-[14rem] text-xs font-medium leading-snug text-[#286b60]">{ciiSnapshot.level}</p>
                                     </div>
                                 </div>
                             ) : null}
@@ -2323,14 +2326,14 @@ function AdminReportDetailPage() {
                                     className={clsx(
                                         "rounded-lg border px-3 py-1.5 text-xs font-bold uppercase tracking-wide",
                                         report.status === "verified" && "border-green-200 bg-green-50 text-green-700",
-                                        report.status === "submitted" && "border-yellow-200 bg-yellow-50 text-yellow-700",
+                                        report.status === "submitted" && "border-[#e8d5ad] bg-[#fff1d8] text-[#744c10]",
                                         report.status === "partner_verified" && "border-indigo-200 bg-indigo-50 text-indigo-700",
                                         isReportReturnedForRevision(report) && "border-red-200 bg-red-50 text-red-700",
                                     )}
                                 >
                                     {reportRevisionStatusLabel(report)}
                                 </span>
-                                <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                <span className="rounded-lg border border-[#d9dfd4] bg-[#fffef9] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#61716c]">
                                     {reportPartnerGateDisabled(report) ? "NGO review" : "NGO decision"}{" "}
                                     <span
                                         className={clsx(
@@ -2352,9 +2355,9 @@ function AdminReportDetailPage() {
                     <div className="p-6 sm:p-8">
                         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                             <div>
-                                <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
-                                <h3 className="mb-1 text-2xl font-bold tracking-tight text-slate-900">Student report approval</h3>
-                                <p className="text-sm font-medium text-slate-600">
+                                <p className={clsx(adminDossier.microLabel, "mb-2 text-[#286b60]")}>Final decision</p>
+                                <h3 className="mb-1 text-2xl font-bold tracking-tight text-[#143f3b]">Student report approval</h3>
+                                <p className="text-sm font-medium text-[#61716c]">
                                     Review the Impact Package above before making a final determination on this impact report.
                                 </p>
                             </div>
@@ -2363,7 +2366,7 @@ function AdminReportDetailPage() {
                                     type="button"
                                     onClick={handleOpenAiAnalyzer}
                                     disabled={isVerifying}
-                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-[#c9deb9] bg-[#eaf2df] px-4 py-2.5 text-sm font-semibold text-[#0c312d] shadow-sm transition-colors hover:bg-[#d9eece] disabled:cursor-not-allowed disabled:opacity-60"
                                     title="Open the CIEL PK Community Impact Analyzer (CII rubric R3) for this report"
                                 >
                                     <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
@@ -2373,7 +2376,7 @@ function AdminReportDetailPage() {
                                     type="button"
                                     onClick={handleDownloadAiPayload}
                                     disabled={isDownloadingAiPayload || isVerifying}
-                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-[#d9dfd4] bg-[#fffef9] px-4 py-2.5 text-sm font-semibold text-[#143f3b] shadow-sm transition-colors hover:bg-[#e6ebdf] disabled:cursor-not-allowed disabled:opacity-60"
                                     title="Download JSON payload sent to the AI Analyzer"
                                 >
                                     {isDownloadingAiPayload ? (
@@ -2388,26 +2391,26 @@ function AdminReportDetailPage() {
 
                         <div className="space-y-6">
                             <div>
-                                <label className={clsx(adminDossier.microLabel, "mb-3 block text-slate-400")}>
+                                <label className={clsx(adminDossier.microLabel, "mb-3 block text-[#61716c]")}>
                                     Decision feedback / notes
                                 </label>
                                 <textarea spellCheck={true}
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
                                     placeholder="Provide detailed feedback for the student..."
-                                    className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-sm font-medium text-slate-900 transition-all focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:rounded-3xl sm:p-6"
+                                    className="min-h-[120px] w-full rounded-2xl border border-[#d9dfd4] bg-[#f6f7ee] p-5 text-sm font-medium text-[#143f3b] transition-all focus:border-[#286b60] focus:outline-none focus:ring-4 focus:ring-[#d9eece] sm:rounded-3xl sm:p-6"
                                 />
-                                <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-[#61716c]">
                                     Required for rejection or edit return; shared with the student upon decision.
                                 </p>
                             </div>
 
-                            <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                            <div className="flex flex-col gap-3 border-t border-[#d9dfd4] pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("reject", "editable")}
                                     disabled={isVerifying || isReportReturnedForRevision(report)}
-                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 sm:w-auto"
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-[#e8d5ad] bg-[#fff1d8] px-5 py-2.5 text-sm font-semibold text-[#744c10] shadow-sm transition-colors hover:bg-[#fbe6bf] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 sm:w-auto"
                                     title="Return this report so the student can revise and resubmit it."
                                 >
                                     <PencilLine className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
@@ -2418,7 +2421,7 @@ function AdminReportDetailPage() {
                                     onClick={() => handleVerify("approve")}
                                     disabled={isVerifying || approveBlockedReason(report) !== null}
                                     title={approveBlockedReason(report) ?? "Publish this report and release the package."}
-                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-[#0c312d] bg-[#0c312d] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#286b60] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
                                 >
                                     <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                                     {report.admin_status === "approved" ? "Approved" : "Approve"}
@@ -2427,7 +2430,7 @@ function AdminReportDetailPage() {
                                     type="button"
                                     onClick={() => handleVerify("reject")}
                                     disabled={isVerifying || isReportReturnedForRevision(report)}
-                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 sm:w-auto"
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-[#e3c3bd] bg-[#fffef9] px-5 py-2.5 text-sm font-semibold text-[#a64237] shadow-sm transition-colors hover:bg-[#f7ece5] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 sm:w-auto"
                                 >
                                     <XCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                                     {isReportReturnedForRevision(report) ? "Revision requested" : "Reject"}
@@ -2453,6 +2456,7 @@ function AdminReportDetailPage() {
                             </div>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -2513,13 +2517,13 @@ function AdminReportDetailPage() {
             {/* Sticky Action Bar for quick access while scrolling */}
             {showStickyActions && !decisionCardInView && !isVerifying && report.admin_status !== "approved" && (
                 <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-3 duration-500 animate-in fade-in slide-in-from-bottom-10 sm:px-6 lg:bottom-8">
-                    <div className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-slate-900/90 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-4">
+                    <div className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-[#0c312d]/95 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-4">
                         <div className="ml-1 flex items-center gap-3 sm:ml-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-indigo-600 text-sm font-bold text-white">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-[#286b60] text-sm font-bold text-[#d9ed93]">
                                 {report.student.name.charAt(0)}
                             </div>
                             <div className="hidden min-w-0 md:block">
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-indigo-300">Approval context</p>
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#d9eece]">Approval context</p>
                                 <p className="max-w-[200px] truncate text-sm font-semibold text-white">{report.student.name}</p>
                             </div>
                         </div>
@@ -2532,7 +2536,7 @@ function AdminReportDetailPage() {
                                     (report.private_candidate || report.review_route === "ciel_pk") &&
                                     report.ciiV45Lock?.locked !== true
                                 }
-                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
+                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-[#d9ed93] px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#0c312d] shadow-lg shadow-black/20 transition-transform hover:bg-[#e6f4b0] disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                             >
                                 <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> Approve
                             </button>

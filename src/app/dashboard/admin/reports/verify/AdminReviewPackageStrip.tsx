@@ -16,6 +16,7 @@ export default function AdminReviewPackageStrip({
     variant = "admin",
     audience: audienceProp,
     loading = false,
+    embedded = false,
 }: {
     reportId: string;
     report: Record<string, unknown>;
@@ -25,6 +26,8 @@ export default function AdminReviewPackageStrip({
     variant?: "admin" | "published";
     audience?: ImpactPackageAudience;
     loading?: boolean;
+    /** Inside the Admin verify page's single review card: no border, radius or shadow of its own. */
+    embedded?: boolean;
 }) {
     const data = coerceFlashReportData(report);
     const initialTab: ImpactPackageTab =
@@ -39,7 +42,10 @@ export default function AdminReviewPackageStrip({
 
     if (loading) {
         return (
-            <section id="admin-review-package" className="scroll-mt-8 rounded-3xl border border-[#b7ddd8] bg-white p-5 shadow-sm sm:p-7">
+            <section
+                id="admin-review-package"
+                className={embedded ? "scroll-mt-8 bg-[#f0efe8] p-5 sm:p-7" : "scroll-mt-8 rounded-3xl border border-[#b7ddd8] bg-white p-5 shadow-sm sm:p-7"}
+            >
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm font-medium text-slate-500" role="status">
                     Loading review package...
                 </div>
@@ -48,7 +54,14 @@ export default function AdminReviewPackageStrip({
     }
 
     return (
-        <section id="admin-review-package" className="scroll-mt-8 overflow-hidden rounded-3xl border border-[#ced6ca] bg-[#f0efe8] shadow-sm">
+        <section
+            id="admin-review-package"
+            className={
+                embedded
+                    ? "scroll-mt-8 overflow-hidden bg-[#f0efe8]"
+                    : "scroll-mt-8 overflow-hidden rounded-3xl border border-[#ced6ca] bg-[#f0efe8] shadow-sm"
+            }
+        >
             <ImpactPackage
                 data={data}
                 projectData={report.opportunity ?? report}
