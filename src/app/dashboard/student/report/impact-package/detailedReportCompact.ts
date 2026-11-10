@@ -1,5 +1,5 @@
 /**
- * Compact layout for the Detailed report tab (Admin, student and faculty). The full dossier prints every session, evidence
+ * Compact layout for the Detailed report tab (every viewer). The full dossier prints every session, evidence
  * file and activity as a stacked block of fields, which runs to many pages. In compact mode the same
  * answers are laid out densely: repeated entries become one table row each, short answers share a
  * grid, unanswered questions fold into one line, and long tables show their first rows with a
@@ -8,7 +8,7 @@
 import type { DetailedReportRow, DetailedReportValue } from "./buildImpactPackageDetailedReport";
 
 /** Who reads the compact layout. Layout only: what each viewer may see is decided by the report builder. */
-export const COMPACT_DETAILED_REPORT_AUDIENCES = ["admin", "student", "faculty"] as const;
+export const COMPACT_DETAILED_REPORT_AUDIENCES = ["admin", "student", "faculty", "university", "partner", "public"] as const;
 
 export function isCompactDetailedReportAudience(audience: string | null | undefined): boolean {
     return (COMPACT_DETAILED_REPORT_AUDIENCES as readonly string[]).includes(String(audience || ""));

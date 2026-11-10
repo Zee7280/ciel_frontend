@@ -56,10 +56,12 @@ test("unanswered questions fold into one line; answered rows keep their order", 
     assert.deepEqual(unanswered, ["Semester", "Skills"]);
 });
 
-test("long tables preview a few rows; admin, student and faculty read the compact layout", () => {
+test("long tables preview a few rows; every viewer reads the compact layout", () => {
     assert.ok(COMPACT_TABLE_PREVIEW_ROWS >= 5 && COMPACT_TABLE_PREVIEW_ROWS <= 10);
-    for (const a of ["admin", "student", "faculty"]) assert.equal(isCompactDetailedReportAudience(a), true, a);
-    for (const a of ["university", "partner", "public", "", undefined]) assert.equal(isCompactDetailedReportAudience(a), false, String(a));
+    for (const a of ["admin", "student", "faculty", "university", "partner", "public"]) {
+        assert.equal(isCompactDetailedReportAudience(a), true, a);
+    }
+    for (const a of ["", undefined, "other"]) assert.equal(isCompactDetailedReportAudience(a), false, String(a));
     const src = readFileSync(path.join(root, dir, "ImpactPackageDetailedReport.tsx"), "utf8");
     assert.match(src, /const compact = isCompactDetailedReportAudience\(audience\);/);
     assert.match(src, /!compact && rows\.map/, "other viewers keep the full dossier rows");

@@ -169,7 +169,7 @@ export default function ImpactPackageDetailedReport({
         () => buildImpactPackageDetailedReport(data, projectData, extraFiles, audience),
         [data, projectData, extraFiles, audience],
     );
-    /** Admin, student and faculty read the compact layout (about 3–4 pages); other viewers keep the full dossier. */
+    /** Every viewer reads the compact layout (about 3–4 pages); what each may see is decided by the builder. */
     const compact = isCompactDetailedReportAudience(audience);
     const [query, setQuery] = useState("");
     const [openIds, setOpenIds] = useState<string[]>(() => dossier.sections.map((section) => section.id));
