@@ -5,6 +5,7 @@ import { authenticatedFetch } from '@/utils/api';
 import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge, Copy, Filter, X, Sparkles, Trash2, ArrowRight, GraduationCap } from 'lucide-react';
 import { downloadAdminReportAiPayload } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
+import { ADMIN_REPORTS_TABLE_HREF, rememberAdminReviewReturn } from '@/utils/adminReviewReturn';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import DataTable from 'react-data-table-component';
@@ -417,6 +418,11 @@ export default function AdminReportsVerificationPage() {
 
     useEffect(() => {
         void fetchOrganizations();
+    }, []);
+
+    // A report opened from this table returns here on Back.
+    useEffect(() => {
+        rememberAdminReviewReturn(ADMIN_REPORTS_TABLE_HREF);
     }, []);
 
     useEffect(() => {

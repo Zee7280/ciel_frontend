@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { rememberAdminReviewReturn } from "@/utils/adminReviewReturn";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import {
@@ -386,6 +387,11 @@ export function AdminCommunityServiceHub() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const tabParam = searchParams.get("tab") || "";
+    const searchKey = searchParams.toString();
+    // A report opened from this hub (e.g. Reports for review) returns here on Back, not to the table.
+    useEffect(() => {
+        rememberAdminReviewReturn(`/dashboard/admin/community-service${searchKey ? `?${searchKey}` : ""}`);
+    }, [searchKey]);
     const [innerTab, setInnerTab] = useState("");
     const [query, setQuery] = useState("");
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);

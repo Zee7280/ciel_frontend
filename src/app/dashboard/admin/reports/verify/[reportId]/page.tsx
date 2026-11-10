@@ -77,6 +77,7 @@ import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import { ADMIN_REPORTS_TABLE_HREF, adminReviewReturnLabel, readAdminReviewReturn } from "@/utils/adminReviewReturn";
 import type { ImpactPackageAudience } from "@/app/dashboard/student/report/impact-package/buildImpactPackageModel";
 import ConfirmModal from "../../../_shared/ConfirmModal";
 import { loadReviewQueue, neighbourInQueue } from "../../../_shared/reviewQueue";
@@ -702,6 +703,9 @@ function AdminReportDetailPage() {
     const [showStickyActions, setShowStickyActions] = useState(false);
     /** The floating bar hides while the decision card itself is on screen, so it never covers its buttons. */
     const [decisionCardInView, setDecisionCardInView] = useState(false);
+    /** Back returns to the list this report was opened from (Reports for review board or the table). */
+    // Read once on the client; the first render is the loading screen, so there is no hydration mismatch.
+    const [returnHref] = useState(() => (typeof window === "undefined" ? ADMIN_REPORTS_TABLE_HREF : readAdminReviewReturn()));
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
     const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
     const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>(() =>
@@ -1046,9 +1050,10 @@ function AdminReportDetailPage() {
                                 : 'Report approved successfully!',
                 );
                 setPendingDecision(null);
-                const nextId = queueNav.next;
+                // The table's queue only drives "next" when the report was opened from the table.
+                const nextId = returnHref === ADMIN_REPORTS_TABLE_HREF ? queueNav.next : null;
                 setTimeout(
-                    () => router.push(nextId ? `/dashboard/admin/reports/verify/${nextId}` : '/dashboard/admin/reports/verify'),
+                    () => router.push(nextId ? `/dashboard/admin/reports/verify/${nextId}` : returnHref),
                     1200,
                 );
             } else {
@@ -1144,7 +1149,7 @@ function AdminReportDetailPage() {
                     <h2 className="mb-2 text-2xl font-bold text-slate-900">Report Not Found</h2>
                     <button
                         type="button"
-                        onClick={() => router.push("/dashboard/admin/reports/verify")}
+                        onClick={() => router.push(returnHref)}
                         className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
                     >
                         Go Back
@@ -1166,11 +1171,12 @@ function AdminReportDetailPage() {
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => router.push("/dashboard/admin/reports/verify")}
+                            onClick={() => router.push(returnHref)}
                             className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
                         >
                             <ArrowLeft className="w-4 h-4" />
                             Back
+                            <span className="hidden text-xs font-normal text-slate-500 sm:inline">to {adminReviewReturnLabel(returnHref)}</span>
                         </button>
                         <Link
                             href="/dashboard/admin/community-service"

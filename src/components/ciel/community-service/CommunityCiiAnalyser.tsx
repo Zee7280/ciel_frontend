@@ -35,6 +35,7 @@ import {
 } from "@/utils/ciiAnalyserView";
 import ReportEvidenceGallery from "@/components/ciel/community-service/ReportEvidenceGallery";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { ADMIN_REPORTS_TABLE_HREF, adminReviewReturnLabel, readAdminReviewReturn } from "@/utils/adminReviewReturn";
 import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/report/impact-package/impactPackagePacket";
 import { CiiFinalOnePageSheet, CII_FINAL_BADGE_SRC, CII_FINAL_LOGO_SRC } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { CiiAnswerableRegistryPanel } from "@/components/ciel/community-service/CiiAnswerableRegistryPanel";
@@ -219,10 +220,14 @@ export default function CommunityCiiAnalyser({
     const approvePath = isCielPk
         ? `/api/v1/admin/community-service/reports/${reportId}/cii-v4-5/approve`
         : `/api/v1/faculty/reports/${reportId}/cii-v4-5/approve`;
-    const inboxHref = isCielPk
-        ? "/dashboard/admin/reports/verify"
-        : "/dashboard/faculty/community-service";
-    const inboxLabel = isCielPk ? "← Back to student reports" : "← Back to Community Service";
+    // CIEL PK: back to the list the report was opened from (Reports for review board or the table).
+    const [cielReturnHref] = useState(() =>
+        typeof window === "undefined" ? ADMIN_REPORTS_TABLE_HREF : readAdminReviewReturn(),
+    );
+    const inboxHref = isCielPk ? cielReturnHref : "/dashboard/faculty/community-service";
+    const inboxLabel = isCielPk
+        ? `← Back to ${adminReviewReturnLabel(cielReturnHref).toLowerCase()}`
+        : "← Back to Community Service";
     const packageHref = isCielPk
         ? `/dashboard/admin/reports/verify/${encodeURIComponent(reportId)}?package=1`
         : `/dashboard/faculty/reports/${encodeURIComponent(reportId)}?view=dossier`;
