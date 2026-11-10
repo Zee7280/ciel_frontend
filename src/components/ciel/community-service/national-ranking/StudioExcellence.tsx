@@ -32,8 +32,8 @@ export function ShortlistScreen({ run, criteria, role, onOpen, onAnalyze }: { ru
                 <section className="panel">
                     <div className="empty">
                         <b>No ranked run yet</b>
-                        Run the AI Ranking Analyzer first; the shortlist and its explanations are built from that run.
-                        <div style={{ marginTop: 12 }}><button type="button" className="btn primary" onClick={onAnalyze}>Open the analyzer →</button></div>
+                        Run the Ranking Analyzer on the Overview &amp; Run tab first; the shortlist and its explanations are built from that run.
+                        <div style={{ marginTop: 12 }}><button type="button" className="btn primary" onClick={onAnalyze}>Open Overview &amp; Run →</button></div>
                     </div>
                 </section>
             </>
@@ -134,7 +134,7 @@ export function AwardsScreen({ run, criteria, onOpen, onAnalyze, onShowQuestions
             </div>
 
             {!run ? (
-                <section className="panel"><div className="empty"><b>No analyzer run yet</b>Awards are read from the criterion anchors of the current run.<div style={{ marginTop: 12 }}><button type="button" className="btn primary" onClick={onAnalyze}>Open the analyzer →</button></div></div></section>
+                <section className="panel"><div className="empty"><b>No analyzer run yet</b>Awards are read from the criterion anchors of the current run.<div style={{ marginTop: 12 }}><button type="button" className="btn primary" onClick={onAnalyze}>Open Overview &amp; Run →</button></div></div></section>
             ) : null}
 
             <div className="wallgrid">

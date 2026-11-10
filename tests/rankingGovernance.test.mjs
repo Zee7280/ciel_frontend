@@ -169,6 +169,6 @@ test("the studio wires the governance routes and both controllers expose them", 
     assert.match(screens, /<FlashcardProjection key=\{project\.id\} studioBase=\{studioBase\}/);
     assert.match(screens, /<RaiseChallengeForm studioBase=\{studioBase\}/);
     // the existing tabs and their order are untouched
-    assert.ok(studio.indexOf('["analyzer", "AI Ranking Analyzer"]') < studio.indexOf('["review",'));
-    assert.ok(studio.indexOf('["published", "Published rankings"]') < studio.indexOf('["history", "Ranking history"]'));
+    assert.ok(studio.indexOf('["analyzer", "Overview & Run"]') < studio.indexOf('["review",'));
+    assert.ok(studio.indexOf('["published", "My Impact Wall"]') < studio.indexOf('["history", "Ranking History"]'));
 });

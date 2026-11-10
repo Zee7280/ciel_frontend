@@ -561,15 +561,17 @@ export default function NationalRankingStudio({
             <nav className="rsnav" aria-label="Ranking studio sections">
                 {(
                     [
-                        ["analyzer", "AI Ranking Analyzer"],
+                        // Labels follow the "National Ranking Analyzer v2" navigation; the tab keys (and so every
+                        // screen, deep link and behaviour behind them) are unchanged.
+                        ["analyzer", "Overview & Run"],
                         ["review", `Review queue${openReviews ? ` (${openReviews})` : ""}`],
                         ["packages", "Combined packages"],
-                        ["published", "Published rankings"],
-                        ["history", "Ranking history"],
-                        ["shortlist", "Excellence shortlist"],
-                        ["awards", "Specialist awards"],
-                        ...(role === "ciel_admin" ? ([["crosswalk", "440-question crosswalk"]] as Array<[Tab, string]>) : []),
-                        ["rules", "Ranking rules"],
+                        ["published", "My Impact Wall"],
+                        ["history", "Ranking History"],
+                        ["shortlist", "Excellence Shortlist"],
+                        ["awards", "Specialist Awards"],
+                        ...(role === "ciel_admin" ? ([["crosswalk", "440-Question Crosswalk"]] as Array<[Tab, string]>) : []),
+                        ["rules", "Auto-Sync & Method"],
                     ] as Array<[Tab, string]>
                 ).map(([key, label]) => (
                     <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => setTab(key)}>

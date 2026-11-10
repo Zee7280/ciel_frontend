@@ -161,13 +161,13 @@ test("the 440-question reference file ships without demo answers and the studio 
     for (const a of SPECIALIST_AWARDS) for (const q of a.questions) assert.ok(ids.has(q), `${a.id}: ${q}`);
 
     const studio = readFileSync(path.join(root, "src/components/ciel/community-service/national-ranking/NationalRankingStudio.tsx"), "utf8");
-    for (const tab of ['["shortlist", "Excellence shortlist"]', '["awards", "Specialist awards"]', '["crosswalk", "440-question crosswalk"]', '["rules", "Ranking rules"]']) {
+    for (const tab of ['["shortlist", "Excellence Shortlist"]', '["awards", "Specialist Awards"]', '["crosswalk", "440-Question Crosswalk"]', '["rules", "Auto-Sync & Method"]']) {
         assert.ok(studio.includes(tab), tab);
     }
     // the crosswalk is admin-only; the existing tabs keep their order ahead of the new ones
     assert.match(studio, /role === "ciel_admin" \? \(\[\["crosswalk"/);
     assert.match(studio, /tab === "crosswalk" && role === "ciel_admin"/);
-    assert.ok(studio.indexOf('["history", "Ranking history"]') < studio.indexOf('["shortlist", "Excellence shortlist"]'));
+    assert.ok(studio.indexOf('["history", "Ranking History"]') < studio.indexOf('["shortlist", "Excellence Shortlist"]'));
     // the new screens never call the ranking API
     const screens = readFileSync(path.join(root, "src/components/ciel/community-service/national-ranking/StudioExcellence.tsx"), "utf8");
     assert.doesNotMatch(screens, /authenticatedFetch|\/api\/v1\//);
