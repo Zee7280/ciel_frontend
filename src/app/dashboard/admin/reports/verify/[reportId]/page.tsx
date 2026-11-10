@@ -750,7 +750,7 @@ function AdminReportDetailPage() {
         if (!report) return null;
         try {
             const persisted = readPersistedCiiSnapshot(report);
-            if (persisted?.evaluation_framework_version === "v4.5") {
+            if (persisted?.evaluation_framework_version === "v4.5" || persisted?.evaluation_framework_version === "v5.0") {
                 return persisted;
             }
             const reqH =
@@ -2326,7 +2326,7 @@ function AdminReportDetailPage() {
                                     <FileText className="h-48 w-48 text-slate-900 sm:h-64 sm:w-64" />
                                 </div>
                                 <div className="text-left">
-                                    <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
+                                    <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} showCiiSections />
                                 </div>
                             </div>
                             ) : (

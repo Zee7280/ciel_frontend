@@ -348,3 +348,43 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
 
     return adjustedSnapshot ?? parseCiiFromSummaryText(section11.summary_text, maxScore);
 }
+
+/** One CII v4.5 / v5 dimension as stored on the analysis (Admin evidence and reviewed marks included). */
+export type CiiV45SectionRow = { dimension: string; name: string; score: number | null; max: number };
+
+const CII_V45_DIMENSION_ORDER = ["1", "2", "3", "4A", "4B", "5", "6", "7", "8", "9"];
+
+/**
+ * The stored dimension scores of a CII v4.5 / v5 analysis, in rubric order. These already carry the
+ * Admin's Dimension 7 evidence marks and any reviewed criterion marks (the server recomputes every
+ * section), so a report that shows them reflects the Admin's manual marking. Null when the report has
+ * no v4.5 analysis (legacy reports keep their own breakdown).
+ */
+export function readCiiV45SectionRows(ciiV45: unknown): CiiV45SectionRow[] | null {
+    const list = asCiiRecord(ciiV45)?.sectionScores;
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const rows: CiiV45SectionRow[] = [];
+    for (const raw of list) {
+        const r = asCiiRecord(raw);
+        if (!r) continue;
+        const dimension = String(r.dimension ?? "").trim();
+        const max = finiteCii(r.maximumPoints);
+        if (!dimension || max == null || max <= 0) continue;
+        const name = typeof r.name === "string" && r.name.trim() ? r.name.trim() : `Dimension ${dimension}`;
+        rows.push({ dimension, name, score: finiteCii(r.score), max });
+    }
+    if (!rows.length) return null;
+    const rank = (d: string) => {
+        const i = CII_V45_DIMENSION_ORDER.indexOf(d);
+        return i < 0 ? CII_V45_DIMENSION_ORDER.length : i;
+    };
+    return rows.sort((a, b) => rank(a.dimension) - rank(b.dimension));
+}
+
+/** Percent of a dimension's maximum (0-100, whole number), or null while that dimension is pending. */
+export function ciiV45DimensionPercent(rows: CiiV45SectionRow[], dimension: string): number | null {
+    const row = rows.find((r) => r.dimension === dimension);
+    if (!row || row.score == null) return null;
+    return Math.round((row.score / row.max) * 100);
+}
+

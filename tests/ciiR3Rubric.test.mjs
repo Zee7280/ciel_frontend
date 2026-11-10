@@ -32,7 +32,7 @@ const {
     resolveBadgeForScore,
     resolveBadgeForScoreR3,
 } = await import("../src/utils/communityCiiAnalyser.ts");
-const { CII_L6_PENDING_LABEL, isCiiL6Pending, pickCiiV45DisplayBadgeName, readCiiV45DisplayFromReport } = await import("../src/utils/reportCiiSnapshot.ts");
+const { CII_L6_PENDING_LABEL, ciiV45DimensionPercent, isCiiL6Pending, pickCiiV45DisplayBadgeName, readCiiV45DisplayFromReport, readCiiV45SectionRows } = await import("../src/utils/reportCiiSnapshot.ts");
 const { resolveCiiLevelRecognition, resolveCiiLevelTitle } = await import("../src/utils/ciiLevelBadge.ts");
 const { buildFeedbackSections, feedbackPlainText, finalChecklist, gatePills } = await import("../src/utils/ciiAnalyserView.ts");
 
@@ -265,3 +265,38 @@ test("review-driven guards: unsaved marks block Approve, the supplemental panel 
     assert.match(view, /\(s\.criterionScores \?\? \[\]\)\.map/);
     assert.doesNotMatch(view, /[^(]s\.criterionScores\.map/);
 });
+
+test("the detailed report reads the analysis' own dimension scores, so Admin evidence and reviewed marks show", () => {
+    const rows = readCiiV45SectionRows({
+        sectionScores: [
+            { dimension: "7", name: "Evidence, Ethics & Verification", maximumPoints: 15, score: 12.75 },
+            { dimension: "1", name: "Participation & Individual Effort", maximumPoints: 10, score: 8.2 },
+            { dimension: "4B", name: "Measured Change", maximumPoints: 15, score: null },
+            { dimension: "", name: "broken", maximumPoints: 5, score: 1 },
+            { dimension: "9", maximumPoints: 0, score: 1 },
+        ],
+    });
+    assert.deepEqual(rows.map((r) => r.dimension), ["1", "4B", "7"], "rubric order, malformed rows dropped");
+    assert.equal(rows[0].score, 8.2);
+    assert.equal(rows[1].score, null, "a pending dimension stays pending");
+    assert.equal(ciiV45DimensionPercent(rows, "7"), 85);
+    assert.equal(ciiV45DimensionPercent(rows, "1"), 82);
+    assert.equal(ciiV45DimensionPercent(rows, "4B"), null);
+    assert.equal(ciiV45DimensionPercent(rows, "5"), null);
+    assert.equal(readCiiV45SectionRows(null), null, "legacy reports keep their own breakdown");
+    assert.equal(readCiiV45SectionRows({ sectionScores: [] }), null);
+
+    const print = read("src/app/dashboard/student/report/components/ReportPrintView.tsx");
+    assert.match(print, /const ciiV45Rows = readCiiV45SectionRows\(data\.ciiV45\);/);
+    assert.match(print, /ciiV45Rows\s*\?\s*showCiiSections/, "dimension rows only for institutional reviewers");
+    assert.match(print, /!ciiV45Rows && typeof persistedCii\?\.penaltyApplied/, "no legacy penalty row beside a v4.5 score");
+    assert.match(print, /ciiV45DimensionPercent\(ciiV45Rows, "7"\)/);
+    assert.match(print, /item\.score == null \? "Pending"/);
+    // Admin and partner/university reviewers see the dimension scores; the student page does not
+    for (const page of ["src/app/dashboard/admin/reports/verify/[reportId]/page.tsx", "src/app/dashboard/partner/verify/[reportId]/page.tsx"]) {
+        assert.match(read(page), /<ReportPrintView projectData=\{report\.opportunity\} reportData=\{\{ \.\.\.report \}\} showCiiSections \/>/);
+    }
+    assert.doesNotMatch(read("src/app/dashboard/student/report/components/Section11Summary.tsx"), /showCiiSections/);
+    assert.match(read("src/app/dashboard/admin/reports/verify/[reportId]/page.tsx"), /evaluation_framework_version === "v5\.0"/);
+});
+

@@ -30,7 +30,7 @@ import {
     isInstitutionallyVerifiedReport,
 } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { isCiiL6Pending, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { ciiV45DimensionPercent, isCiiL6Pending, readCiiV45SectionRows, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 import { summarizeAuditIssueText, summarizeEngagementRedFlags } from "@/lib/summarizeRedFlagDetails";
 import {
@@ -50,6 +50,9 @@ import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle
 interface Props {
     projectData?: unknown;
     reportData?: unknown;
+    /** Institutional reviewers (Admin, partner/university) see the CII dimension scores; a student
+     * sees the overall CII only, as on the wall and the one-page analysis. */
+    showCiiSections?: boolean;
 }
 
 /** Section-wise academic report rhythm: compact, print-friendly blocks. */
@@ -432,7 +435,7 @@ function buildPrintableBlueprintRows(reportData: unknown, projectData: unknown):
     ].filter((row) => row.value);
 }
 
-export default function ReportPrintView({ projectData, reportData }: Props) {
+export default function ReportPrintView({ projectData, reportData, showCiiSections = false }: Props) {
     let data = reportData as ReportData | undefined;
     try {
         const contextData = useReportForm().data;
@@ -600,8 +603,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     // R3: a locked 90+ CII with L6 pending has no awarded badge image or Level 6 title.
     const ciiL6Pending = isCiiL6Pending(data.ciiV45, data.ciiV45Lock);
     const ciiBadge = ciiL6Pending ? null : getCiiCertificateBadge(Math.round(totalScore));
+    // CII v4.5 / v5: the analysis' own dimension scores (Admin evidence /15 and reviewed criterion
+    // marks included) replace the legacy formula's breakdown, which never reflected them and did not
+    // add up to the CII shown beside it. Legacy reports keep their breakdown.
+    const ciiV45Rows = readCiiV45SectionRows(data.ciiV45);
     const penaltyApplied =
-        typeof persistedCii?.penaltyApplied === "number" && Number.isFinite(persistedCii.penaltyApplied)
+        !ciiV45Rows && typeof persistedCii?.penaltyApplied === "number" && Number.isFinite(persistedCii.penaltyApplied)
             ? persistedCii.penaltyApplied
             : 0;
     const showCiiPenaltyRow = penaltyApplied > 0;
@@ -773,7 +780,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             : totalScore >= 70
               ? "The student has demonstrated credible community contribution with structured evidence and clear learning outcomes."
               : "The student report documents emerging community contribution with opportunities for stronger evidence, continuity, and outcome measurement.";
-    const finalReportCardRows = [
+    const legacyReportCardRows: Array<{ label: string; score: number | null; note: string }> = [
         {
             label: "Engagement & Participation",
             score: scorePercent(breakdown.participation, 10),
@@ -795,6 +802,16 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             note: "Verification, ethics, and professional reporting standards.",
         },
     ];
+    const finalReportCardRows: Array<{ label: string; score: number | null; note: string }> = !ciiV45Rows
+        ? legacyReportCardRows
+        : showCiiSections
+          ? [
+                { label: "Engagement & Participation", score: ciiV45DimensionPercent(ciiV45Rows, "1"), note: "Individual hours, attendance and contribution (Dimension 1)." },
+                { label: "Quality of Work & Outputs", score: ciiV45DimensionPercent(ciiV45Rows, "4A"), note: "Delivered activities and outputs (Dimension 4A)." },
+                { label: "Impact & Outcomes", score: ciiV45DimensionPercent(ciiV45Rows, "4B"), note: "Measured change for the community (Dimension 4B)." },
+                { label: "Compliance & Professionalism", score: ciiV45DimensionPercent(ciiV45Rows, "7"), note: "Evidence, ethics and verification, marked by CIEL PK Admin (Dimension 7)." },
+            ]
+          : [{ label: "Composite Impact Index", score: Math.round(totalScore), note: "Overall CII on the CIEL PK rubric (AI report quality /85 + Admin evidence /15)." }];
 
     const SectionHeader = ({ title, number, question }: { title: string; number: number; question?: string }) => (
         <div className="dossier-section-header mt-12 mb-6 break-inside-avoid rounded-t-xl border-b-4 pb-0 first:mt-0 md:mt-14" style={{ borderBottomColor: sectionInk }}>
@@ -931,12 +948,21 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         </div>
     );
 
-    const scoreTableItems = CII_BREAKDOWN_ORDER.map((key) => ({
-        label: CII_SECTION_LABELS[key],
-        score: breakdown[key],
-        max: CII_SECTION_MAX[key],
-        weight: ciiSectionWeightLabel(CII_SECTION_MAX[key]),
-    }));
+    const scoreTableItems: Array<{ label: string; score: number | null; max: number; weight: string }> = ciiV45Rows
+        ? showCiiSections
+            ? ciiV45Rows.map((row) => ({
+                  label: `${row.dimension} · ${row.name}`,
+                  score: row.score,
+                  max: row.max,
+                  weight: ciiSectionWeightLabel(row.max),
+              }))
+            : []
+        : CII_BREAKDOWN_ORDER.map((key) => ({
+              label: CII_SECTION_LABELS[key],
+              score: breakdown[key],
+              max: CII_SECTION_MAX[key],
+              weight: ciiSectionWeightLabel(CII_SECTION_MAX[key]),
+          }));
     const formatCiiScore = (score: number) => Number.isInteger(score) ? String(score) : score.toFixed(1);
 
     return (
@@ -1890,7 +1916,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <td className="px-3 py-3 text-center align-middle font-bold tabular-nums text-slate-500">{item.max}</td>
                                     <td className="px-4 py-3 text-right align-middle">
                                         <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black tabular-nums text-slate-900">
-                                            {formatCiiScore(item.score)}
+                                            {item.score == null ? "Pending" : formatCiiScore(item.score)}
                                         </span>
                                     </td>
                                 </tr>
@@ -2088,7 +2114,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <tr key={row.label}>
                                         <td className="px-4 py-4 align-top text-[13px] font-semibold text-slate-800">{row.label}</td>
                                         <td className="px-4 py-4 align-top text-[13px] font-black tabular-nums text-slate-900">
-                                            {row.score} / 100
+                                            {row.score == null ? "Pending" : `${row.score} / 100`}
                                         </td>
                                         <td className="px-4 py-4 align-top text-[13px] font-medium leading-relaxed text-slate-700">
                                             {row.note}

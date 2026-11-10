@@ -1358,7 +1358,7 @@ function ReportDetailPage() {
                                 </div>
                                 <h2 className="text-4xl font-black mb-12 text-slate-900 leading-tight text-center">Executive Impact Dossier</h2>
                                 <div className="text-left">
-                                    <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
+                                    <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} showCiiSections />
                                 </div>
                             </div>
                         </div>
