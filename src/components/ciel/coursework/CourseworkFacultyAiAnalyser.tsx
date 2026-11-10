@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
+import { CourseworkNudgeButtons } from "@/components/ciel/coursework/CourseworkNudgeButtons";
 import type { MeritEntry } from "@/components/ciel/MeritModelPanel";
+import { courseworkStudentNudge } from "@/utils/courseworkNudge";
+import { contactWhatsappDigits } from "@/utils/reminderLinks";
 import {
     PERFORMANCE_ANCHORS,
     bandForScore,
@@ -66,6 +69,10 @@ export default function CourseworkFacultyAiAnalyser({
     const missingNote = !note.trim();
     const busy = reviewingId === entry.id;
     const fileCount = (model.primaryFile ? 1 : 0) + model.evidenceCount;
+    // Reach the student about this record from the review screen itself (question, revision, result).
+    const studentEmail = entry.student?.email || entry.studentInfo?.studentEmail;
+    const studentWhatsapp = contactWhatsappDigits(entry.student?.countryCode, entry.student?.phone);
+    const nudge = courseworkStudentNudge(entry, entry.student?.name || entry.studentInfo?.studentName);
 
     const approve = async () => {
         if (!entry.id || locked || busy) return;
@@ -118,6 +125,14 @@ export default function CourseworkFacultyAiAnalyser({
                 >
                     {locked ? "🔒 COURSEWORK SCORE LOCKED" : "🔓 FACULTY REVIEW OPEN"}
                 </span>
+                <CourseworkNudgeButtons
+                    className="basis-full"
+                    label="Contact student:"
+                    email={studentEmail}
+                    whatsappDigits={studentWhatsapp}
+                    subject={nudge.subject}
+                    body={nudge.body}
+                />
             </div>
 
             <article className="rounded-[18px] border border-[#e4e9ef] bg-white p-4">

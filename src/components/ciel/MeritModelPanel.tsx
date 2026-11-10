@@ -27,7 +27,16 @@ import {
 } from "@/utils/courseworkMeritModel";
 
 export interface MeritEntry extends CourseProjectEntry {
-    student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
+    student?: {
+        id: string;
+        name: string;
+        email: string;
+        institution?: string;
+        department?: string;
+        /** Only on the supervising teacher's own decks (faculty nudges); absent for every other audience. */
+        countryCode?: string | null;
+        phone?: string | null;
+    } | null;
 }
 
 interface BackendMeritCard {

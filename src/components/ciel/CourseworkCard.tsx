@@ -22,6 +22,8 @@ import {
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import { mailtoHref, whatsappShareHref, whatsappTargetedHref } from "@/utils/reminderLinks";
 import { courseworkApprovedFiles, fileNameFromUrl } from "@/utils/courseworkFlashCard";
+import { courseworkStudentNudge } from "@/utils/courseworkNudge";
+import { CourseworkNudgeButtons } from "@/components/ciel/coursework/CourseworkNudgeButtons";
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
 
@@ -43,6 +45,7 @@ export default function CourseworkCard({
     studentEmail,
     hideScore = true,
     onRemindFaculty,
+    contactStudent,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -66,6 +69,10 @@ export default function CourseworkCard({
      * Defaults to hidden (safe-by-default) — pass false explicitly on every faculty/university/CIEL
      * render where the score should show. */
     hideScore?: boolean;
+    /** Faculty/admin viewer: renders Email / WhatsApp / Copy to reach the student about this record at
+     * any stage (the message follows the record's status). WhatsApp opens the student's own chat when
+     * `whatsappDigits` is known. Supersedes `remindDraftOwner` when both are given. */
+    contactStudent?: { email?: string | null; whatsappDigits?: string } | null;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [shareOpen, setShareOpen] = useState(false);
@@ -131,8 +138,9 @@ export default function CourseworkCard({
                   };
               })
         : [];
+    const studentNudge = contactStudent ? courseworkStudentNudge(entry, displayName) : null;
     const remindOwnerReminder: { to: string; subject: string; body: string } | null =
-        remindDraftOwner && studentEmail
+        !contactStudent && remindDraftOwner && studentEmail
             ? {
                   to: studentEmail,
                   subject: `Reminder: continue "${entry.projectTitle || "your coursework"}" on CIEL PK`,
@@ -405,8 +413,18 @@ export default function CourseworkCard({
                         Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
                     </p>
                 </div>
-                {(facultyReminder || remindOwnerReminder || canShareBadge || (onFacultyReview && entry.status === "submitted" && approval !== "approved")) && (
+                {(facultyReminder || remindOwnerReminder || studentNudge || canShareBadge || (onFacultyReview && entry.status === "submitted" && approval !== "approved")) && (
                     <div className="flex flex-wrap gap-2">
+                        {studentNudge ? (
+                            <CourseworkNudgeButtons
+                                label={null}
+                                variant="card"
+                                email={contactStudent?.email}
+                                whatsappDigits={contactStudent?.whatsappDigits}
+                                subject={studentNudge.subject}
+                                body={studentNudge.body}
+                            />
+                        ) : null}
                         {facultyReminder ? (
                             <>
                                 {onRemindFaculty ? (

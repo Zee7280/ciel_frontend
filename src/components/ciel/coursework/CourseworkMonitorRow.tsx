@@ -2,7 +2,7 @@
 
 import { Loader2, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { courseworkStatusLabel, type CourseworkStatusTone } from "@/utils/courseworkSectionReview";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
 
 /** The minimal shape a "Live Monitor" / "Command Monitor" row needs — deliberately loose so any
  * coursework list row (MeritEntry, AdminCourseProjectRow, …) can be passed straight through. */
@@ -71,7 +71,7 @@ export function CourseworkMonitorRow({
     entry: CourseworkMonitorEntry;
     /** Presence alone renders the Email/WhatsApp "reach in one tap" pair — omit for a strictly
      * read-only row (the University's Live Monitor must show no action buttons at all). */
-    contact?: { name: string; to: string; subject: string; body: string } | null;
+    contact?: { name: string; to: string; subject: string; body: string; whatsappDigits?: string } | null;
     showStalled?: boolean;
     /** CIEL PK admin only: remove the record (Command Monitor clean-up). Omit everywhere else. */
     onDelete?: () => void;
@@ -117,10 +117,21 @@ export function CourseworkMonitorRow({
                             <Mail className="h-3.5 w-3.5" />
                         </a>
                         <a
-                            href={whatsappShareHref(`${contact.subject}\n\n${contact.body}`)}
+                            href={
+                                contact.whatsappDigits
+                                    ? `https://wa.me/${contact.whatsappDigits}?text=${encodeURIComponent(`${contact.subject}\n\n${contact.body}`)}`
+                                    : whatsappShareHref(`${contact.subject}\n\n${contact.body}`)
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`WhatsApp ${contact.name}`}
+                            onClick={(e) => {
+                                // Open the form that works on this device (WhatsApp Web on a desktop, the app on a phone).
+                                e.preventDefault();
+                                const href = whatsappOpenHref(`${contact.subject}\n\n${contact.body}`, contact.whatsappDigits || "");
+                                const opened = window.open(href, "_blank", "noopener,noreferrer");
+                                if (!opened) window.location.href = href;
+                            }}
+                            title={contact.whatsappDigits ? `WhatsApp ${contact.name}` : `WhatsApp ${contact.name} (pick the contact)`}
                             className="rounded-full border border-[#dde5ea] bg-white p-1.5 text-[#1d765d] hover:border-[#1d765d]"
                         >
                             <MessageCircle className="h-3.5 w-3.5" />

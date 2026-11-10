@@ -27,7 +27,9 @@ import CourseworkFacultyReviewInbox from "@/components/ciel/coursework/Coursewor
 import { currentAcademicYear } from "@/components/ciel/FypRankingStudio";
 import { isFacultyApproved, pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
 import { mergeCourseProjectEntry } from "@/utils/courseProjectTypes";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { contactWhatsappDigits } from "@/utils/reminderLinks";
+import { courseworkStudentNudge } from "@/utils/courseworkNudge";
+import { CourseworkNudgeButtons } from "@/components/ciel/coursework/CourseworkNudgeButtons";
 import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { normalizeReviewStatus } from "@/utils/reviewQueue";
@@ -403,7 +405,16 @@ function FacultyCourseworkHub() {
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {filteredApproved.map((entry) => (
-                                <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} hideScore={false} />
+                                <CourseworkCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    studentName={entry.student?.name}
+                                    hideScore={false}
+                                    contactStudent={{
+                                        email: entry.student?.email || entry.studentInfo?.studentEmail,
+                                        whatsappDigits: contactWhatsappDigits(entry.student?.countryCode, entry.student?.phone),
+                                    }}
+                                />
                             ))}
                         </div>
                     )}
@@ -454,10 +465,10 @@ function LiveDraftCard({ entry }: { entry: MeritEntry }) {
     const studentName = entry.student?.name || entry.studentInfo?.studentName || "Student";
     const programme = entry.studentInfo?.programme || entry.studentInfo?.disciplineName || entry.course || "Programme not set";
     const email = entry.student?.email || entry.studentInfo?.studentEmail;
+    const whatsapp = contactWhatsappDigits(entry.student?.countryCode, entry.student?.phone);
     const updated = entry.updatedAt ?? entry.createdAt;
     const isRevision = entry.status === "submitted";
-    const subject = `Reminder: continue "${entry.projectTitle || "your coursework"}" on CIEL PK`;
-    const body = `Hi ${studentName.split(" ")[0]},\n\nYour coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) is ${pct}% complete on CIEL PK. Please continue and submit it for faculty review when it's ready.\n\nThanks`;
+    const nudge = courseworkStudentNudge(entry, studentName);
 
     return (
         <div className="rounded-[17px] border border-[#dde5ea] bg-white p-4">
@@ -501,22 +512,7 @@ function LiveDraftCard({ entry }: { entry: MeritEntry }) {
                 </div>
             </div>
 
-            {email ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold text-[#70808a]">Nudge student:</span>
-                    <a
-                        href={whatsappShareHref(`${subject}\n\n${body}`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-[9px] bg-[#f8f2e7] px-2.5 py-1.5 text-[10px] font-black text-[#765b25]"
-                    >
-                        💬 WhatsApp
-                    </a>
-                    <a href={mailtoHref(email, subject, body)} className="rounded-[9px] bg-[#edf4fb] px-2.5 py-1.5 text-[10px] font-black text-[#376d9f]">
-                        ✉️ Email
-                    </a>
-                </div>
-            ) : null}
+            <CourseworkNudgeButtons className="mt-3" email={email} whatsappDigits={whatsapp} subject={nudge.subject} body={nudge.body} />
         </div>
     );
 }

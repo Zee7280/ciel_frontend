@@ -155,6 +155,23 @@ export function whatsappDigits(value: unknown): string {
     return digits.length >= 10 && digits.length <= 15 ? digits : "";
 }
 
+/**
+ * wa.me digits for a user account's stored contact: the signup form keeps a dial code (`+92`) and a
+ * national number (`3001234567` / `03001234567`) in two columns, while older rows hold one
+ * international string. "" when nothing usable is on file.
+ */
+export function contactWhatsappDigits(countryCode: unknown, phone: unknown): string {
+    const raw = typeof phone === "string" ? phone.trim() : "";
+    if (!raw) return "";
+    const cc = typeof countryCode === "string" ? countryCode.replace(/\D/g, "") : "";
+    if (raw.startsWith("+") || raw.startsWith("00") || !cc) return whatsappDigits(raw);
+    const national = raw.replace(/\D/g, "").replace(/^0+/, "");
+    if (!national) return "";
+    // A national number that already repeats the dial code ("923001234567" under +92).
+    const digits = national.startsWith(cc) && national.length > cc.length + 6 ? national : `${cc}${national}`;
+    return digits.length >= 10 && digits.length <= 15 ? digits : "";
+}
+
 /** Like whatsappHrefFromE164, but also accepts Pakistani local formats (03…). Null when unusable. */
 export function whatsappHrefForPhone(phone: string | null | undefined, text: string): string | null {
     const digits = whatsappDigits(phone);
