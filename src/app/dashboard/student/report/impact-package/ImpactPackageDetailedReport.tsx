@@ -7,8 +7,99 @@ import {
     buildImpactPackageDetailedReport,
     detailedReportMatchesQuery,
     niceDetailedReportKey,
+    type DetailedReportRow,
     type DetailedReportValue,
 } from "./buildImpactPackageDetailedReport";
+import {
+    COMPACT_TABLE_PREVIEW_ROWS,
+    compactTable,
+    isCompactShortAnswer,
+    splitCompactRows,
+    type CompactTable,
+} from "./detailedReportCompact";
+
+function CompactTableView({ table, showAll }: { table: CompactTable; showAll: boolean }) {
+    const [expanded, setExpanded] = useState(false);
+    const limit = showAll || expanded ? table.rows.length : COMPACT_TABLE_PREVIEW_ROWS;
+    const hidden = table.rows.length - limit;
+    return (
+        <div className="dr-table-wrap">
+            <table className={`dr-table${showAll || expanded ? " expanded" : ""}`}>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        {table.columns.map((column) => (
+                            <th scope="col" key={column.key}>
+                                {column.label}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {table.rows.slice(0, limit).map((cells, index) => (
+                        <tr key={index}>
+                            <td className="dr-n">{index + 1}</td>
+                            {cells.map((cell, cellIndex) => (
+                                <td key={table.columns[cellIndex].key} title={cell.length > 60 ? cell : undefined}>
+                                    <span className="dr-clip">{cell}</span>
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {hidden > 0 || expanded ? (
+                <button type="button" className="btn-link dr-more no-print" onClick={() => setExpanded((open) => !open)}>
+                    {expanded ? "Show fewer" : `Show all ${table.rows.length} (${hidden} more)`}
+                </button>
+            ) : null}
+            {hidden > 0 ? <div className="dr-print-more">+{hidden} more entries in the online record</div> : null}
+        </div>
+    );
+}
+
+/** Admin compact layout: entry lists as tables, short answers in a grid, blanks folded into one line. */
+function CompactRows({
+    rows,
+    showAll,
+    originLabel,
+}: {
+    rows: DetailedReportRow[];
+    showAll: boolean;
+    originLabel: (origin: string) => string;
+}) {
+    const { answered, unanswered } = splitCompactRows(rows);
+    return (
+        <>
+            {answered.length ? (
+                <div className="dr-grid">
+                    {answered.map((item, index) => {
+                        const table = compactTable(item.answer);
+                        const short = !table && isCompactShortAnswer(item.answer);
+                        const origin = originLabel(item.origin);
+                        return (
+                            <div className={`dr-qa${short ? "" : " wide"}`} key={`${index}-${item.question}`}>
+                                <div className="question">
+                                    {item.question}
+                                    {table ? <span className="dr-count"> · {table.rows.length}</span> : null}
+                                    {origin ? <span className="origin">{origin}</span> : null}
+                                </div>
+                                <div className="answer">
+                                    {table ? <CompactTableView table={table} showAll={showAll} /> : <AnswerView value={item.answer} />}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : null}
+            {unanswered.length ? (
+                <div className="dr-unanswered">
+                    <b>Not supplied:</b> {unanswered.join(" · ")}
+                </div>
+            ) : null}
+        </>
+    );
+}
 
 function AnswerView({ value }: { value: DetailedReportValue }) {
     if (value == null || value === "") {
@@ -77,6 +168,8 @@ export default function ImpactPackageDetailedReport({
         () => buildImpactPackageDetailedReport(data, projectData, extraFiles, audience),
         [data, projectData, extraFiles, audience],
     );
+    /** The Admin review reads a compact layout (about 3–4 pages); every other viewer keeps the full dossier. */
+    const compact = audience === "admin";
     const [query, setQuery] = useState("");
     const [openIds, setOpenIds] = useState<string[]>(() => dossier.sections.map((section) => section.id));
 
@@ -109,7 +202,7 @@ export default function ImpactPackageDetailedReport({
     let visibleFields = 0;
 
     return (
-        <div id="report" className="view">
+        <div id="report" className={`view${compact ? " dr-compact" : ""}`}>
             <header className="page-head">
                 <div className="page-head-top">
                     <div className="eyebrow">02 / The complete record</div>
@@ -156,7 +249,7 @@ export default function ImpactPackageDetailedReport({
                             Collapse all
                         </button>
                     </div>
-                    <div className="coverage">{dossier.coverage}</div>
+                    {compact ? null : <div className="coverage">{dossier.coverage}</div>}
                     <div id="report-sections">
                         {dossier.sections.map((section) => {
                             const subs = section.subsections.map((sub) => {
@@ -194,7 +287,10 @@ export default function ImpactPackageDetailedReport({
                                                 <span>{sub.id}</span>
                                                 {sub.title}
                                             </h3>
-                                            {rows.map((item) => (
+                                            {compact ? (
+                                                <CompactRows rows={rows} showAll={Boolean(query.trim())} originLabel={originLabel} />
+                                            ) : null}
+                                            {!compact && rows.map((item) => (
                                                 <div className="qa" key={`${sub.id}-${item.question}`}>
                                                     <div className="question">
                                                         {item.question}
