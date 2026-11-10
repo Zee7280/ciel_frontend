@@ -700,6 +700,8 @@ function AdminReportDetailPage() {
     const [isVerifying, setIsVerifying] = useState(false);
     const [isDownloadingAiPayload, setIsDownloadingAiPayload] = useState(false);
     const [showStickyActions, setShowStickyActions] = useState(false);
+    /** The floating bar hides while the decision card itself is on screen, so it never covers its buttons. */
+    const [decisionCardInView, setDecisionCardInView] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
     const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
     const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>(() =>
@@ -841,6 +843,17 @@ function AdminReportDetailPage() {
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, [params.reportId]);
+
+    const hasReport = Boolean(report);
+    useEffect(() => {
+        const el = hasReport && !loading ? document.getElementById("actions") : null;
+        if (!el || typeof IntersectionObserver === "undefined") return;
+        const observer = new IntersectionObserver(([entry]) => setDecisionCardInView(entry.isIntersecting), {
+            rootMargin: "0px 0px -120px 0px",
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasReport, loading]);
 
     useEffect(() => {
         if (!report) return;
@@ -1302,121 +1315,6 @@ function AdminReportDetailPage() {
                         </div>
                     </div>
                 )}
-
-                {/* Student & Opportunity Info */}
-                <div className={clsx(adminDossier.cardLg, "p-6 sm:p-8")}>
-                    <div className="flex flex-col items-stretch justify-between gap-5 lg:flex-row lg:items-start">
-                        <div className="flex min-w-0 items-start gap-4 sm:gap-6">
-                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-2xl font-bold text-white">
-                                {report.student.name.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">{report.student.name}</h1>
-                                <div className="space-y-1 text-sm font-medium text-slate-600">
-                                    <div className="flex items-center gap-2">
-                                        <User className="h-4 w-4 shrink-0 text-slate-400" />
-                                        <span className="break-all">{report.student.email}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
-                                        <span>{report.student.university}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-                                        <span>
-                                            Submitted: {new Date(report.submission_date).toLocaleDateString('en-US', {
-                                                month: 'long',
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                            })}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:items-end">
-                            {ciiSnapshot ? (
-                                <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 sm:max-w-xs sm:flex-col sm:items-end sm:py-4">
-                                    <div className="flex items-center gap-2 text-indigo-800">
-                                        <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                        <span className={clsx(adminDossier.microLabel, "text-indigo-700")}>CII index</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
-                                            {ciiSnapshot.totalScore}
-                                            <span className="text-base font-semibold text-slate-500 sm:text-lg">/{ciiScoreMax}</span>
-                                        </p>
-                                        <p className="mt-0.5 max-w-[16rem] text-right text-xs font-medium leading-snug text-slate-600 sm:max-w-[14rem]">
-                                            {ciiSnapshot.level}
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : null}
-                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
-                            <button
-                                type="button"
-                                onClick={handleOpenAiAnalyzer}
-                                disabled={isVerifying}
-                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Run the CIEL PK AI Analyzer (Balanced CII v3.1) and save the updated score to this report"
-                            >
-                                <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                Run AI Analyzer (CII v3.1)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleDownloadAiPayload}
-                                disabled={isDownloadingAiPayload || isVerifying}
-                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Download JSON payload sent to the AI Analyzer"
-                            >
-                                {isDownloadingAiPayload ? (
-                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                                ) : (
-                                    <Download className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                )}
-                                Download AI JSON
-                            </button>
-                            </div>
-                            <span
-                                className={clsx(
-                                    "rounded-xl border px-4 py-2 text-sm font-bold uppercase tracking-wide",
-                                    report.status === "verified" && "border-green-200 bg-green-50 text-green-700",
-                                    report.status === "submitted" && "border-yellow-200 bg-yellow-50 text-yellow-700",
-                                    report.status === "partner_verified" && "border-indigo-200 bg-indigo-50 text-indigo-700",
-                                    isReportReturnedForRevision(report) && "border-red-200 bg-red-50 text-red-700",
-                                )}
-                            >
-                                {reportRevisionStatusLabel(report)}
-                            </span>
-                            <div className="flex items-center justify-end gap-2">
-                                <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                    {reportPartnerGateDisabled(report) ? "NGO review" : "NGO decision"}
-                                </span>
-                                <span
-                                    className={clsx(
-                                        "mt-1 text-[10px] font-semibold uppercase",
-                                        reportPartnerStatusTone(report.partner_status) === "approved" && "text-green-600",
-                                        reportPartnerStatusTone(report.partner_status) === "rejected" && "text-red-600",
-                                        reportPartnerStatusTone(report.partner_status) === "muted" && "text-slate-500",
-                                        reportPartnerStatusTone(report.partner_status) === "pending" && "text-slate-400",
-                                    )}
-                                >
-                                    {reportPartnerGateDisabled(report)
-                                        ? "Not required"
-                                        : formatReportPartnerStatusLabel(report.partner_status)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Opportunity</p>
-                        <p className="text-lg font-bold text-slate-900">{report.opportunity.title}</p>
-                        <p className="text-sm text-slate-600 mt-1">{report.opportunity.organization}</p>
-                    </div>
-                </div>
 
                 {/* Report sections (form tabs 1–9) + flash/print (10) */}
                 {SHOW_ADMIN_LEGACY_DOSSIER ? (
@@ -2351,61 +2249,135 @@ function AdminReportDetailPage() {
 
                 <div
                     id="actions"
-                    className={clsx(adminDossier.cardLg, "relative mb-20 mt-10 overflow-hidden p-8 shadow-md sm:p-10 md:p-12")}
+                    className={clsx(adminDossier.cardLg, "relative mb-20 mt-10 overflow-hidden shadow-md")}
                 >
-                    <div className="pointer-events-none absolute right-0 top-0 p-8 opacity-[0.06]">
-                        <CheckCircle2 className="h-32 w-32 text-slate-900" />
-                    </div>
-                    <div className="relative z-10">
-                        <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
-                        <h3 className="mb-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student report approval</h3>
-                        <p className="mb-5 text-sm font-medium text-slate-600">
-                            Review the Impact Package above before making a final determination on this impact report.
-                        </p>
-                        {ciiSnapshot ? (
-                            <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
-                                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-800">
-                                    <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                    CII index
+                    {/* Student, opportunity and status: one header for the decision below */}
+                    <div className="flex flex-col gap-6 border-b border-slate-100 p-6 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-xl font-bold text-white">
+                                {report.student.name.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="text-2xl font-bold tracking-tight text-slate-900">{report.student.name}</h2>
+                                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm font-medium text-slate-600">
+                                    {report.student.email ? (
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <User className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            <span className="break-all">{report.student.email}</span>
+                                        </span>
+                                    ) : null}
+                                    {report.student.university ? (
+                                        <span className="flex items-center gap-2">
+                                            <Building2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            {report.student.university}
+                                        </span>
+                                    ) : null}
+                                    {report.submission_date ? (
+                                        <span className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                            Submitted{" "}
+                                            {new Date(report.submission_date).toLocaleDateString("en-US", {
+                                                month: "long",
+                                                day: "numeric",
+                                                year: "numeric",
+                                            })}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {report.opportunity?.title ? (
+                                    <div className="mt-4 inline-flex max-w-full flex-col rounded-xl bg-slate-50 px-4 py-2.5">
+                                        <span className={clsx(adminDossier.microLabel, "text-slate-400")}>Opportunity</span>
+                                        <span className="truncate text-base font-bold text-slate-900">{report.opportunity.title}</span>
+                                        {report.opportunity.organization ? (
+                                            <span className="truncate text-xs font-medium text-slate-500">{report.opportunity.organization}</span>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+                            {ciiSnapshot ? (
+                                <div className="flex items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 lg:min-w-[14rem] lg:flex-col lg:items-end lg:gap-1">
+                                    <span className={clsx(adminDossier.microLabel, "flex items-center gap-2 text-indigo-700")}>
+                                        <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                        CII index
+                                    </span>
+                                    <div className="text-right">
+                                        <p className="text-3xl font-bold tabular-nums tracking-tight text-slate-900">
+                                            {ciiSnapshot.totalScore}
+                                            <span className="text-base font-semibold text-slate-500">/{ciiScoreMax}</span>
+                                        </p>
+                                        <p className="max-w-[14rem] text-xs font-medium leading-snug text-slate-600">{ciiSnapshot.level}</p>
+                                    </div>
+                                </div>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <span
+                                    className={clsx(
+                                        "rounded-lg border px-3 py-1.5 text-xs font-bold uppercase tracking-wide",
+                                        report.status === "verified" && "border-green-200 bg-green-50 text-green-700",
+                                        report.status === "submitted" && "border-yellow-200 bg-yellow-50 text-yellow-700",
+                                        report.status === "partner_verified" && "border-indigo-200 bg-indigo-50 text-indigo-700",
+                                        isReportReturnedForRevision(report) && "border-red-200 bg-red-50 text-red-700",
+                                    )}
+                                >
+                                    {reportRevisionStatusLabel(report)}
                                 </span>
-                                <span className="text-xl font-bold tabular-nums text-slate-900">
-                                    {ciiSnapshot.totalScore}
-                                    <span className="text-sm font-semibold text-slate-500">/{ciiScoreMax}</span>
-                                </span>
-                                <span className="hidden text-slate-300 sm:inline" aria-hidden>
-                                    ·
-                                </span>
-                                <span className="w-full text-sm font-medium leading-snug text-slate-700 sm:w-auto sm:max-w-xl">
-                                    {ciiSnapshot.level}
+                                <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                    {reportPartnerGateDisabled(report) ? "NGO review" : "NGO decision"}{" "}
+                                    <span
+                                        className={clsx(
+                                            reportPartnerStatusTone(report.partner_status) === "approved" && "text-green-600",
+                                            reportPartnerStatusTone(report.partner_status) === "rejected" && "text-red-600",
+                                            reportPartnerStatusTone(report.partner_status) === "muted" && "text-slate-500",
+                                            reportPartnerStatusTone(report.partner_status) === "pending" && "text-slate-500",
+                                        )}
+                                    >
+                                        {reportPartnerGateDisabled(report)
+                                            ? "Not required"
+                                            : formatReportPartnerStatusLabel(report.partner_status)}
+                                    </span>
                                 </span>
                             </div>
-                        ) : null}
+                        </div>
+                    </div>
 
-                        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <button
-                            type="button"
-                            onClick={handleOpenAiAnalyzer}
-                            disabled={isVerifying}
-                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Run the CIEL PK AI Analyzer (Balanced CII v3.1) and save the updated score to this report"
-                        >
-                            <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                            Run AI Analyzer (CII v3.1)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDownloadAiPayload}
-                            disabled={isDownloadingAiPayload || isVerifying}
-                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Download JSON payload sent to the AI Analyzer"
-                        >
-                            {isDownloadingAiPayload ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                            ) : (
-                                <Download className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                            )}
-                            Download AI JSON
-                        </button>
+                    <div className="p-6 sm:p-8">
+                        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
+                                <h3 className="mb-1 text-2xl font-bold tracking-tight text-slate-900">Student report approval</h3>
+                                <p className="text-sm font-medium text-slate-600">
+                                    Review the Impact Package above before making a final determination on this impact report.
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                                <button
+                                    type="button"
+                                    onClick={handleOpenAiAnalyzer}
+                                    disabled={isVerifying}
+                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    title="Open the CIEL PK Community Impact Analyzer (CII rubric R3) for this report"
+                                >
+                                    <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    Run AI Analyzer
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadAiPayload}
+                                    disabled={isDownloadingAiPayload || isVerifying}
+                                    className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    title="Download JSON payload sent to the AI Analyzer"
+                                >
+                                    {isDownloadingAiPayload ? (
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                                    ) : (
+                                        <Download className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    )}
+                                    Download AI JSON
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-6">
@@ -2417,7 +2389,7 @@ function AdminReportDetailPage() {
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
                                     placeholder="Provide detailed feedback for the student..."
-                                    className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-sm font-medium text-slate-900 transition-all focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:rounded-3xl sm:p-6"
+                                    className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-sm font-medium text-slate-900 transition-all focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:rounded-3xl sm:p-6"
                                 />
                                 <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
                                     Required for rejection or edit return; shared with the student upon decision.
@@ -2533,7 +2505,7 @@ function AdminReportDetailPage() {
             ) : null}
 
             {/* Sticky Action Bar for quick access while scrolling */}
-            {showStickyActions && !isVerifying && report.admin_status !== "approved" && (
+            {showStickyActions && !decisionCardInView && !isVerifying && report.admin_status !== "approved" && (
                 <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-3 duration-500 animate-in fade-in slide-in-from-bottom-10 sm:px-6 lg:bottom-8">
                     <div className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-slate-900/90 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-4">
                         <div className="ml-1 flex items-center gap-3 sm:ml-3">
