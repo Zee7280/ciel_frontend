@@ -338,6 +338,24 @@ export default function ImpactPackage({
         return kindOk && textOk;
     });
 
+    // Evidence slideshow: previous / next over the files currently listed (search and format filter).
+    const slideFiles = preview && filteredFiles.some((file) => file.id === preview.id) ? filteredFiles : model.files;
+    const slideIndex = preview ? slideFiles.findIndex((file) => file.id === preview.id) : -1;
+    const stepSlide = (delta: number) => {
+        if (slideIndex < 0 || !slideFiles.length) return;
+        setPreview(slideFiles[(slideIndex + delta + slideFiles.length) % slideFiles.length]);
+    };
+    useEffect(() => {
+        if (!preview) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setPreview(null);
+            else if (event.key === "ArrowLeft") stepSlide(-1);
+            else if (event.key === "ArrowRight") stepSlide(1);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
+
     const whoLabel = visibility === "public" ? "Public" : "Internal";
     const publicDisplay = visibility === "public" ? "Allowed" : "Hidden";
     const studentExportsLocked = audience === "student" && !model.adminApproved;
@@ -711,6 +729,16 @@ export default function ImpactPackage({
                                 <option value="file">Documents / other</option>
                                 <option value="archive">Archives</option>
                             </select>
+                            <button
+                                type="button"
+                                className="primary"
+                                disabled={!filesVisible || filteredFiles.length === 0}
+                                onClick={() => setPreview(filteredFiles[0] ?? null)}
+                            >
+                                <span className="button-content">
+                                    <Icon name="eye" /> Open slideshow
+                                </span>
+                            </button>
                         </div>
                         {filteredFiles.length === 0 ? (
                             <p className="banner">No matching visible evidence.</p>
@@ -841,17 +869,32 @@ export default function ImpactPackage({
             </main>
 
             {preview && filesVisible ? (
-                <div className="ipkg-modal" role="dialog" aria-modal="true" aria-label={preview.name}>
-                    <div className="modal-head">
-                        <div>
+                <div className="ipkg-modal" role="dialog" aria-modal="true" aria-label={preview.name} onClick={() => setPreview(null)}>
+                    <div className="modal-head" onClick={(event) => event.stopPropagation()}>
+                        <div className="ipkg-slide-title">
                             <h2>{preview.name}</h2>
-                            <div className="small">{model.visibilityLabel} · {preview.kind}</div>
+                            <div className="small">
+                                {slideIndex >= 0 ? `${slideIndex + 1} of ${slideFiles.length} · ` : ""}
+                                {model.visibilityLabel} · {preview.kind}
+                            </div>
                         </div>
-                        <button type="button" onClick={() => setPreview(null)}>
-                            Close
-                        </button>
+                        <div className="ipkg-slide-nav">
+                            {slideFiles.length > 1 ? (
+                                <>
+                                    <button type="button" onClick={() => stepSlide(-1)} aria-label="Previous file" title="Previous (←)">
+                                        ‹ Prev
+                                    </button>
+                                    <button type="button" onClick={() => stepSlide(1)} aria-label="Next file" title="Next (→)">
+                                        Next ›
+                                    </button>
+                                </>
+                            ) : null}
+                            <button type="button" onClick={() => setPreview(null)} title="Close (Esc)">
+                                Close
+                            </button>
+                        </div>
                     </div>
-                    <div className="modal-body">
+                    <div className="modal-body" onClick={(event) => event.stopPropagation()}>
                         {preview.kind === "image" ? (
                             <img src={preview.url} alt={preview.claim || preview.name} />
                         ) : preview.kind === "video" ? (

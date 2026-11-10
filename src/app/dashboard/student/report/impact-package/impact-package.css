@@ -221,3 +221,13 @@
 }
 .ipkg .dr-table .dr-clip{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
 .ipkg .dr-table.expanded .dr-clip{display:block;-webkit-line-clamp:unset;line-clamp:unset}
+/* Evidence slideshow (Evidence gallery tab): counter + previous / next in the viewer head. */
+.ipkg-modal .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ipkg-modal .ipkg-slide-title{min-width:0}
+.ipkg-modal .ipkg-slide-title h2{font-size:14px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ipkg-modal .ipkg-slide-nav{display:flex;gap:6px;flex:none}
+.ipkg-modal .ipkg-slide-nav button{border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);padding:7px 11px;font-weight:700;font-size:12px;cursor:pointer}
+.ipkg-modal .ipkg-slide-nav button:hover{background:#e6ebdf}
+.ipkg-modal .modal-body{padding:16px;overflow:auto;display:flex;justify-content:center}
+.ipkg-modal .modal-body img,.ipkg-modal .modal-body video{max-width:100%;max-height:62vh;display:block;margin:auto}
+.ipkg-modal .modal-body iframe{width:100%;height:62vh;border:0}
