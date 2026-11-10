@@ -16,7 +16,7 @@ import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/report
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { pickCiiV45DisplayScore, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { isCiiL6Pending, pickCiiV45DisplayScore, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 
 type TeamMember = ReportData["section1"]["team_members"][number];
@@ -235,7 +235,12 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         return Math.min(100, Math.max(0, Math.round(totalScore)));
     }, [data, reportForCii]);
 
-    const ciiRecognition = useMemo(() => resolveCiiLevelRecognition(ciiScore), [ciiScore]);
+    // R3: a 90+ CII with L6 pending is approved and kept, but its Level 6 badge is withheld.
+    const ciiL6Pending = isCiiL6Pending(data.ciiV45, data.ciiV45Lock);
+    const ciiRecognition = useMemo(
+        () => resolveCiiLevelRecognition(ciiScore, { l6Pending: ciiL6Pending }),
+        [ciiScore, ciiL6Pending],
+    );
     const { badge: ciiBadge } = ciiRecognition;
     const ciiLevelRangeDisplay = ciiRecognition.rangeLabel.replace(/–/g, "-");
 
@@ -364,17 +369,21 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         <div className="cert-impact-recognition" role="note">
                             <p className="cert-impact-recognition-heading">Community Impact Recognition</p>
                             <div className="cert-impact-recognition-body">
-                                <img
-                                    src={ciiBadge.src}
-                                    alt={ciiBadge.alt}
-                                    className="cert-impact-recognition-badge"
-                                    width={240}
-                                    height={240}
-                                />
+                                {ciiBadge.src ? (
+                                    <img
+                                        src={ciiBadge.src}
+                                        alt={ciiBadge.alt}
+                                        className="cert-impact-recognition-badge"
+                                        width={240}
+                                        height={240}
+                                    />
+                                ) : null}
                                 <div className="cert-impact-recognition-copy">
                                     <p className="cert-impact-recognition-title">{ciiRecognition.title}</p>
                                     <p className="cert-impact-recognition-level">
-                                        LEVEL {ciiRecognition.level} ({ciiLevelRangeDisplay})
+                                        {ciiRecognition.pending
+                                            ? `LEVEL ${ciiRecognition.level} · PENDING QUALIFICATION`
+                                            : `LEVEL ${ciiRecognition.level} (${ciiLevelRangeDisplay})`}
                                     </p>
                                     <p className="cert-impact-recognition-tagline">{ciiRecognition.tagline}</p>
                                 </div>

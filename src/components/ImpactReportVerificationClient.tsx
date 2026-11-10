@@ -19,6 +19,8 @@ type VerifyJson = {
     partner_name?: string | null;
     cii_score?: number | null;
     level?: { level?: number; name?: string } | null;
+    /** R3: `L6_PENDING_QUALIFICATION` = a 90+ CII retained without an L6 award yet. */
+    badge_status?: string | null;
     status?: string;
     report_status?: string;
     verification_status?: string;
@@ -181,6 +183,12 @@ export default function ImpactReportVerificationClient({ verificationKey }: Prop
                                     <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
                                         <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Impact Score</p>
                                         <p className="text-xs font-semibold text-slate-700">{body.cii_score} / 100</p>
+                                    </div>
+                                ) : null}
+                                {!body?.level?.name && body?.badge_status === "L6_PENDING_QUALIFICATION" ? (
+                                    <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Badge</p>
+                                        <p className="text-xs font-semibold text-slate-700">L6 pending qualification</p>
                                     </div>
                                 ) : null}
                                 {body?.level?.name ? (

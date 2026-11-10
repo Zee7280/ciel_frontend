@@ -31,7 +31,7 @@ import {
 } from "./buildImpactPackageModel";
 import OpenPackageViewerButton from "./OpenPackageViewerButton";
 import GenerateMyPackage, { type GenerateMyPackageSubmitMode } from "./GenerateMyPackage";
-import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { CII_L6_PENDING_LABEL, isCiiL6Pending, pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
@@ -138,7 +138,11 @@ function ImpactAnalysisPanel({
         data.ciiV45Lock && typeof data.ciiV45Lock === "object"
             ? (data.ciiV45Lock as { adminNote?: unknown; lockedAt?: unknown })
             : null;
-    const badgeLevelRaw = Number((cii.finalBadge as { numericLevel?: unknown } | undefined)?.numericLevel ?? cii.finalBadge?.level);
+    // R3: a locked 90+ CII with L6 pending is approved and kept, but carries no awarded badge.
+    const l6Pending = isCiiL6Pending(data.ciiV45, data.ciiV45Lock);
+    const badgeLevelRaw = l6Pending
+        ? Number.NaN
+        : Number((cii.finalBadge as { numericLevel?: unknown } | undefined)?.numericLevel ?? cii.finalBadge?.level);
     return (
         <div>
             <CiiFinalOnePageSheet
@@ -147,7 +151,7 @@ function ImpactAnalysisPanel({
                 university={lead?.university}
                 reportId={reportId || data.report_id || data.id}
                 score={score}
-                badgeName={badgeName || cii.finalBadge?.name || null}
+                badgeName={l6Pending ? CII_L6_PENDING_LABEL : badgeName || cii.finalBadge?.name || null}
                 badgeLevel={Number.isFinite(badgeLevelRaw) ? badgeLevelRaw : null}
                 lockedAt={typeof lock?.lockedAt === "string" ? lock.lockedAt : null}
                 sections={sections}

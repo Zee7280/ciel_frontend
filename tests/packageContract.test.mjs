@@ -10,7 +10,7 @@ const html = readFileSync(new URL("../public/ciel-impact-package.html", import.m
 const m = /<script id="ciel-analyzer-contract" type="application\/json">(.*?)<\/script>/s.exec(html);
 const contract = JSON.parse(m[1]);
 
-// Mirrors CII_V45_DIMENSIONS maxPoints in the backend (rubric CIEL-CII-2026.11-R2: Partnership 5, Sustainability 10).
+// Mirrors CII_V45_DIMENSIONS maxPoints in the backend (rubric CIEL-CII-2026.11-R3: 45 criteria, Partnership 5, Sustainability 10).
 const BACKEND_SECTION_MAX = { 1: 10, 2: 10, 3: 5, 4: 30, 5: 10, 6: 5, 7: 15, 8: 5, 9: 10 };
 const BACKEND_AI_DIMENSION_MAX = { 1: 10, 2: 10, 3: 5, "4A": 15, "4B": 15, 5: 10, 6: 5, 8: 5, 9: 10 };
 

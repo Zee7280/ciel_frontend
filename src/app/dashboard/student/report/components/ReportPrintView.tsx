@@ -30,7 +30,7 @@ import {
     isInstitutionallyVerifiedReport,
 } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { isCiiL6Pending, readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 import { summarizeAuditIssueText, summarizeEngagementRedFlags } from "@/lib/summarizeRedFlagDetails";
 import {
@@ -597,7 +597,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const ciiResult = resolveReportCii(data);
     const persistedCii = readPersistedCiiSnapshot(data);
     const { totalScore, breakdown } = ciiResult;
-    const ciiBadge = getCiiCertificateBadge(Math.round(totalScore));
+    // R3: a locked 90+ CII with L6 pending has no awarded badge image or Level 6 title.
+    const ciiL6Pending = isCiiL6Pending(data.ciiV45, data.ciiV45Lock);
+    const ciiBadge = ciiL6Pending ? null : getCiiCertificateBadge(Math.round(totalScore));
     const penaltyApplied =
         typeof persistedCii?.penaltyApplied === "number" && Number.isFinite(persistedCii.penaltyApplied)
             ? persistedCii.penaltyApplied
@@ -764,7 +766,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const sectionInk = "#071A33";
     const tealInk = "#0F8F83";
     const scorePercent = (score: number, max: number) => Math.round((score / max) * 100);
-    const finalScoreLevel = resolveCiiLevelTitle(totalScore);
+    const finalScoreLevel = resolveCiiLevelTitle(totalScore, { l6Pending: ciiL6Pending });
     const finalScoreNarrative =
         totalScore >= 85
             ? "The student has demonstrated strong commitment, consistent engagement, quality reporting, and meaningful community contribution through verified experiential learning."

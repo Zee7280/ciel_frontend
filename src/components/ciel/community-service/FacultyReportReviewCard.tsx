@@ -79,7 +79,9 @@ export default function FacultyReportReviewCard({
     const packageHref = viewer === "faculty" ? `${recordHref}?view=dossier` : recordHref;
     const analyserHref = `${recordHref}?view=cii-v4-5`;
     const score = typeof row.cii_provisional === "number" ? Math.round(row.cii_provisional * 10) / 10 : null;
-    const levelLabel = row.cii_level_name
+    const levelLabel = row.cii_badge_status === "L6_PENDING_QUALIFICATION"
+        ? "L6 pending qualification"
+        : row.cii_level_name
         ? row.cii_numeric_level
             ? `L${row.cii_numeric_level} ${row.cii_level_name}`
             : row.cii_level_name

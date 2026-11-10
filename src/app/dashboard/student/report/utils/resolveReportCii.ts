@@ -1,4 +1,6 @@
 import {
+    CII_L6_PENDING_LABEL,
+    isCiiL6Pending,
     pickCiiV45DisplayBadgeName,
     pickCiiV45DisplayScore,
     readPersistedCiiSnapshot,
@@ -88,7 +90,10 @@ export function resolveReportCii(data: ReportData): ResolvedReportCii {
         const persisted = readPersistedCiiSnapshot(data);
         // The locked v4.5 reading owns the badge name; the legacy snapshot level belongs to a
         // different number and would contradict the score shown beside it.
-        const v45Level = pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
+        // R3: a pending L6 has no awarded badge name; show the pending status, never a legacy level name.
+        const v45Level = isCiiL6Pending(data.ciiV45, data.ciiV45Lock)
+            ? CII_L6_PENDING_LABEL
+            : pickCiiV45DisplayBadgeName(data.ciiV45, data.ciiV45Lock);
         return {
             ...live,
             level: v45Level || persisted?.level || live.level,

@@ -17,10 +17,12 @@ type Props = {
 };
 
 function lockedScore(data: ReportData): { score: number | null; badge: string | null } {
-    const lock = data.ciiV45Lock as { locked?: unknown } | null | undefined;
+    const lock = data.ciiV45Lock as { locked?: unknown; badgeStatus?: unknown } | null | undefined;
     const locked = lock?.locked === true || lock?.locked === "true";
     const cii = data.ciiV45 as { finalCII?: number | null; finalBadge?: { name?: string } | null } | null | undefined;
     if (!locked || typeof cii?.finalCII !== "number" || !Number.isFinite(cii.finalCII)) return { score: null, badge: null };
+    // R3: a locked 90+ CII with L6 pending is approved and kept; the badge is the pending status.
+    if (lock?.badgeStatus === "L6_PENDING_QUALIFICATION") return { score: cii.finalCII, badge: "L6 pending qualification" };
     return { score: cii.finalCII, badge: cii.finalBadge?.name || null };
 }
 

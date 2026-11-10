@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { CII_L6_PENDING_LABEL, isCiiL6Pending, pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 
 type CiiSection = {
@@ -83,7 +83,9 @@ export default function CommunityCiiBreakdownModal({
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
 
-    const badge = data?.finalBadge || data?.recommendedBadge || data?.diagnosticBadge;
+    // R3: a locked pending L6 has no awarded badge, so never fall back to a recommended/diagnostic one.
+    const l6Pending = isCiiL6Pending(data, lock);
+    const badge = l6Pending ? null : data?.finalBadge || data?.recommendedBadge || data?.diagnosticBadge;
     const badgeLevelRaw = Number(badge?.numericLevel ?? badge?.level);
 
     return (
@@ -120,7 +122,7 @@ export default function CommunityCiiBreakdownModal({
                             studentName="Student"
                             reportId={undefined}
                             score={pickCiiV45DisplayScore(data, lock)}
-                            badgeName={pickCiiV45DisplayBadgeName(data, lock) || badge?.name || null}
+                            badgeName={l6Pending ? CII_L6_PENDING_LABEL : pickCiiV45DisplayBadgeName(data, lock) || badge?.name || null}
                             badgeLevel={Number.isFinite(badgeLevelRaw) ? badgeLevelRaw : null}
                             lockedAt={lock?.lockedAt || null}
                             sections={data.sectionScores || []}

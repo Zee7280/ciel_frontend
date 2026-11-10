@@ -14,6 +14,8 @@ export type CiiLevelRecognition = {
     title: string;
     tagline: string;
     badge: CiiLevelBadge;
+    /** R3: a 90+ CII whose L6 award is withheld pending qualification. The badge image is empty. */
+    pending?: boolean;
 };
 
 /** CII v4.5 badge ladder — 6 levels, thresholds 0/50/60/70/80/90. Single source of truth for
@@ -50,8 +52,21 @@ function clampCiiScore(score: number): number {
 /**
  * Full level recognition for certificate UI (Levels 1–6). All levels include a badge image.
  */
-export function resolveCiiLevelRecognition(score: number): CiiLevelRecognition {
+export function resolveCiiLevelRecognition(score: number, opts: { l6Pending?: boolean } = {}): CiiLevelRecognition {
     const badge = resolveCiiLevelBadge(score);
+    if (opts.l6Pending) {
+        // The CII is approved and kept; the Level 6 badge is withheld until the sustained-impact
+        // qualification is confirmed. Never show the L6 image or substitute another level.
+        return {
+            level: 6,
+            rangeLabel: badge.rangeLabel,
+            title: "Level 6 — pending qualification",
+            tagline:
+                "The Community Impact Index is approved and retained. The Level 6 badge is awarded once sustained impact is confirmed.",
+            badge: { ...badge, src: "", alt: "" },
+            pending: true,
+        };
+    }
     return {
         level: badge.level,
         rangeLabel: badge.rangeLabel,
@@ -134,6 +149,6 @@ export function resolveCiiLevelBadge(score: number): CiiLevelBadge {
     };
 }
 
-export function resolveCiiLevelTitle(score: number): string {
-    return resolveCiiLevelRecognition(score).title;
+export function resolveCiiLevelTitle(score: number, opts: { l6Pending?: boolean } = {}): string {
+    return resolveCiiLevelRecognition(score, opts).title;
 }

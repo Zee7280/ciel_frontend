@@ -10,14 +10,18 @@ import {
     CII_V45_ANCHOR_FACTORS,
     CII_V45_ANCHOR_NAMES,
     CII_V45_DIMENSIONS,
+    assessL6,
     criterionLabel,
+    isR3Analysis,
+    resolveBadgeForScoreR3,
     type CiiV45Badge,
+    type CiiV45BadgeStatus,
+    type CiiV45Dimension,
     type CiiV45Lock,
     type CiiV45Result,
 } from "@/utils/communityCiiAnalyser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import {
-    anchorName,
     anchorOptionLabel,
     anchorPoints,
     badgeCapNote,
@@ -34,6 +38,26 @@ import { resolveImpactPackagePacketIntegrity } from "@/app/dashboard/student/rep
 import { CiiFinalOnePageSheet, CII_FINAL_BADGE_SRC, CII_FINAL_LOGO_SRC } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { CiiAnswerableRegistryPanel } from "@/components/ciel/community-service/CiiAnswerableRegistryPanel";
 import { buildStudentAnalysisRecord, studentAnalysisFileName } from "@/utils/ciiStudentAnalysis";
+import { CiiCriterionMarks } from "@/components/ciel/community-service/CiiCriterionMarks";
+import { CiiL6QualificationPanel } from "@/components/ciel/community-service/CiiL6QualificationPanel";
+import { CiiSupplementalEvidencePanel, type SupplementalEvidenceItem } from "@/components/ciel/community-service/CiiSupplementalEvidencePanel";
+import {
+    EMPTY_L6_FORM,
+    approveToast,
+    buildModeratePayload,
+    buildReviewRecord,
+    describeLogEntry,
+    diffCriterionEdits,
+    l6ApprovePayload,
+    markRowsFor,
+    moderationRevision,
+    pendingCriteria,
+    reviewRecordFileName,
+    sectionOptionLabel,
+    sectionTotalFromInputs,
+    showL6Panel,
+    type L6Form,
+} from "@/utils/ciiModerationView";
 import "./community-cii-analyser.css";
 
 /** Nest CII OpenAI call is 120s, plus one empty-content retry (120s). BFF maxDuration is 300s. */
@@ -162,7 +186,9 @@ function approveWarningMessage(stored: CiiV45Result | null, locked: boolean): st
     return null;
 }
 
-function badgeLabel(badge: CiiV45Badge | null): string {
+function badgeLabel(badge: CiiV45Badge | null, status?: CiiV45BadgeStatus | null, candidate?: CiiV45Badge | null): string {
+    // R3: a 90+ CII whose L6 is still pending has no badge; say so instead of a bare "Pending".
+    if (!badge && status === "L6_PENDING_QUALIFICATION") return `${candidate?.name || "Transformative Impact Contributor"} · L6 pending qualification`;
     if (!badge) return "Pending";
     const base = `${badge.code} · ${badge.name}`;
     return badge.gateCapped ? `${base} (capped from L${badge.numericLevel} — quality gate not met)` : base;
@@ -185,6 +211,10 @@ export default function CommunityCiiAnalyser({
     const analysePath = isCielPk
         ? `/api/v1/admin/community-service/reports/${reportId}/cii-v4-5/analyse`
         : `/api/v1/faculty/reports/${reportId}/cii-v4-5/analyse`;
+    const cielBase = `/api/v1/admin/community-service/reports/${reportId}`;
+    const moderatePath = `${cielBase}/cii-v4-5/moderate`;
+    const l6Path = `${cielBase}/cii-v4-5/l6-qualification`;
+    const supplementalPath = `${cielBase}/supplemental-evidence`;
     const approvePath = isCielPk
         ? `/api/v1/admin/community-service/reports/${reportId}/cii-v4-5/approve`
         : `/api/v1/faculty/reports/${reportId}/cii-v4-5/approve`;
@@ -205,8 +235,18 @@ export default function CommunityCiiAnalyser({
     const [note, setNote] = useState("");
     const [dim7Anchors, setDim7Anchors] = useState<Record<string, string>>({});
     const [dim7Reasons, setDim7Reasons] = useState<Record<string, string>>({});
-    const [openSection, setOpenSection] = useState<string>("1");
+    // null = the default for this analysis (legacy opens section 1; R3 starts collapsed).
+    const [openSection, setOpenSection] = useState<string | null>(null);
     const [confirmAuthority, setConfirmAuthority] = useState(false);
+    // R3 review state: only the inputs the Admin touched (key "<dimension>.<criterion>"), per-section reason/source.
+    const [dirtyMarks, setDirtyMarks] = useState<Record<string, string>>({});
+    const [markReasons, setMarkReasons] = useState<Record<string, string>>({});
+    const [markSources, setMarkSources] = useState<Record<string, string>>({});
+    const [savingDim, setSavingDim] = useState<string | null>(null);
+    const [analysisStale, setAnalysisStale] = useState(false);
+    const [l6Form, setL6Form] = useState<L6Form>(EMPTY_L6_FORM);
+    const [l6Busy, setL6Busy] = useState(false);
+    const [supplemental, setSupplemental] = useState<SupplementalEvidenceItem[]>([]);
 
     const ciiV45 = (report?.ciiV45 as unknown as CiiV45Result | undefined) || null;
     const ciiV45Lock = (report?.ciiV45Lock as unknown as CiiV45Lock | undefined) || null;
@@ -227,6 +267,9 @@ export default function CommunityCiiAnalyser({
             const data = await res.json();
             const next = (data.data || data) as Record<string, unknown>;
             setReport(next);
+            setDirtyMarks({});
+            setMarkReasons({});
+            setMarkSources({});
             const nextCii = next.ciiV45 as unknown as CiiV45Result | undefined;
             if (nextCii) {
                 const d7 = nextCii.sectionScores?.find((s) => s.dimension === "7");
@@ -307,6 +350,8 @@ export default function CommunityCiiAnalyser({
                 const nextCii = next?.ciiV45 as unknown as CiiV45Result | undefined;
                 if (nextCii?.computedAt && String(nextCii.computedAt) !== previousAt) {
                     setReport(next);
+                    setDirtyMarks({});
+                    setAnalysisStale(false);
                     return true;
                 }
             }
@@ -343,6 +388,7 @@ export default function CommunityCiiAnalyser({
                 return;
             }
             toast.success("CII v5.0 analysis complete");
+            setAnalysisStale(false);
             await loadReport();
         } catch {
             toast.error("CII analysis failed");
@@ -362,12 +408,123 @@ export default function CommunityCiiAnalyser({
     }, 0);
     const hardBlock = approveHardBlock(ciiV45, ciiV45Lock, locked, dim7Complete);
     const warningMessage = approveWarningMessage(ciiV45, locked);
-    const bannerMessage = hardBlock || warningMessage;
+    // R3: the score is reviewed per criterion and may carry an L6 qualification. R1/R2 analyses keep their flow.
+    const r3 = isR3Analysis(ciiV45);
+    const canReviewMarks = isCielPk && !readOnly && r3 && !locked;
+    const STALE_MESSAGE = "Evidence changed. Re-run the analysis before approving.";
+    const staleMessage = analysisStale && !locked ? STALE_MESSAGE : null;
+    const bannerMessage = hardBlock || staleMessage || warningMessage;
+    const dirtyFor = (dimension: string): Record<string, string> =>
+        Object.fromEntries(
+            Object.entries(dirtyMarks)
+                .filter(([k]) => k.startsWith(`${dimension}.`))
+                .map(([k, v]) => [k.slice(dimension.length + 1), v]),
+        );
+    const clearDirtyFor = (dimension: string) => {
+        setDirtyMarks((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(`${dimension}.`))));
+        setMarkReasons((prev) => ({ ...prev, [dimension]: "" }));
+        setMarkSources((prev) => ({ ...prev, [dimension]: "" }));
+    };
+
+    const saveSectionMarks = async (dimension: string) => {
+        if (!canReviewMarks || !ciiV45 || savingDim) return;
+        const section = ciiV45.sectionScores.find((s) => s.dimension === dimension);
+        if (!section) return;
+        const diff = diffCriterionEdits(markRowsFor(section), dirtyFor(dimension));
+        const built = buildModeratePayload({
+            dimension,
+            diff,
+            reason: markReasons[dimension] ?? "",
+            sourceRef: markSources[dimension],
+            revision: moderationRevision(ciiV45),
+        });
+        if (!built.ok) {
+            toast.error(built.error);
+            return;
+        }
+        try {
+            setSavingDim(dimension);
+            const res = await authenticatedFetch(moderatePath, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(built.payload),
+            });
+            const json = res ? ((await res.json().catch(() => ({}))) as { data?: CiiV45Result; unchanged?: boolean; message?: string | string[] }) : {};
+            if (!res?.ok) {
+                const message = Array.isArray(json.message) ? json.message.join(" ") : json.message;
+                toast.error(message || "Could not save the reviewed marks");
+                if (res?.status === 409) {
+                    toast.error("The marks changed elsewhere. Reloading the report; review them again.");
+                    await loadReport();
+                }
+                return;
+            }
+            if (json.unchanged || !json.data) {
+                toast.info("No mark changed.");
+                clearDirtyFor(dimension);
+                return;
+            }
+            const next = json.data;
+            setReport((prev) => (prev ? { ...prev, ciiV45: next as unknown as Record<string, unknown> } : prev));
+            clearDirtyFor(dimension);
+            toast.success("Reviewed marks saved. The section total and CII were recomputed.");
+        } catch {
+            toast.error("Could not save the reviewed marks");
+        } finally {
+            setSavingDim(null);
+        }
+    };
+
+    const confirmL6 = async () => {
+        if (!isCielPk || readOnly || !locked || l6Busy) return;
+        const body = { ...l6Form, sourceRef: l6Form.sourceRef.trim() };
+        try {
+            setL6Busy(true);
+            const res = await authenticatedFetch(l6Path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const json = res
+                ? ((await res.json().catch(() => ({}))) as { data?: { badge?: CiiV45Badge | null; l6Assessment?: unknown }; message?: string | string[] })
+                : {};
+            if (!res?.ok) {
+                const message = Array.isArray(json.message) ? json.message.join(" ") : json.message;
+                toast.error(message || "Could not record the L6 qualification");
+                return;
+            }
+            const badge = json.data?.badge ?? null;
+            setReport((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          ciiV45: {
+                              ...asRecord(prev.ciiV45),
+                              finalBadge: badge,
+                              badgeStatus: "AWARDED",
+                              l6Assessment: json.data?.l6Assessment,
+                              l6Qualification: body,
+                          },
+                          ciiV45Lock: { ...asRecord(prev.ciiV45Lock), finalBadge: badge, badgeStatus: "AWARDED", l6Qualification: body },
+                      }
+                    : prev,
+            );
+            toast.success("L6 awarded. The CII and the approval are unchanged.");
+        } catch {
+            toast.error("Could not record the L6 qualification");
+        } finally {
+            setL6Busy(false);
+        }
+    };
 
     const approveAndLock = async () => {
         if (readOnly || !reportId || approving || locked || !ciiV45) return;
         if (hardBlock) {
             toast.error(hardBlock);
+            return;
+        }
+        if (analysisStale) {
+            toast.error(STALE_MESSAGE);
             return;
         }
         if (!dim7Complete) {
@@ -388,6 +545,8 @@ export default function CommunityCiiAnalyser({
                 reasoningSummary: (dim7Reasons[c.key] || "").trim() || undefined,
                 evidenceIds: [],
             }));
+            const l6Body = l6ApprovePayload(r3, l6Form);
+            if (l6Body) body.l6Qualification = l6Body;
             const res = await authenticatedFetch(approvePath, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -402,7 +561,8 @@ export default function CommunityCiiAnalyser({
                 );
                 return;
             }
-            toast.success("CII v5.0 approved and locked — badge issued");
+            const approved = (await res.json().catch(() => null)) as { data?: { ciiV45Lock?: { badgeStatus?: string | null } } } | null;
+            toast.success(approveToast(approved?.data?.ciiV45Lock?.badgeStatus, r3));
             await loadReport();
         } catch {
             toast.error("Could not approve CII");
@@ -537,11 +697,6 @@ export default function CommunityCiiAnalyser({
         dim7Complete && evidenceAssessmentPending(ciiV45)
             ? Math.round((rawAiPts + dim7PreviewPts + 1e-9) * 10) / 10
             : currentScore;
-    const currentBadge = locked
-        ? ciiV45?.finalBadge ?? null
-        : currentScore != null
-          ? ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null
-          : null;
     const aiPts = ciiV45?.aiReportScore != null ? ciiV45.aiReportScore : rawAiPts || null;
     const evPts = locked
         ? ciiV45?.adminEvidenceScore ?? null
@@ -549,6 +704,31 @@ export default function CommunityCiiAnalyser({
           ? dim7PreviewPts
           : ciiV45?.adminEvidenceScore ?? null;
     const aiSections = (ciiV45?.sectionScores ?? []).filter((s) => s.dimension !== "7");
+    // Badge: R1/R2 keep the gate-capped badge from the server. R3: the band follows the CII, and a 90+
+    // candidate without the sourced L6 qualification has no badge (status L6_PENDING_QUALIFICATION).
+    const lockBadgeStatus = (ciiV45Lock?.badgeStatus ?? ciiV45?.badgeStatus ?? null) as CiiV45BadgeStatus | null;
+    const l6Assessment = r3
+        ? assessL6(
+              locked ? (ciiV45Lock?.adminApprovedScore ?? currentScore) : previewComposite,
+              [...aiSections.map((s) => ({ dimension: s.dimension as string, score: s.score })), { dimension: "7", score: evPts }],
+              l6Form,
+          )
+        : null;
+    const r3Preview = r3 && !locked && previewComposite != null ? resolveBadgeForScoreR3(previewComposite, l6Assessment?.status === "QUALIFIED") : null;
+    const currentBadge: CiiV45Badge | null = locked
+        ? r3
+            ? (ciiV45Lock?.finalBadge ?? ciiV45?.finalBadge ?? null)
+            : (ciiV45?.finalBadge ?? null)
+        : r3
+          ? (r3Preview?.badge ?? null)
+          : currentScore != null
+            ? (ciiV45?.recommendedBadge ?? ciiV45?.diagnosticBadge ?? null)
+            : null;
+    const badgeStatus: CiiV45BadgeStatus | null = locked ? lockBadgeStatus : (r3Preview?.status ?? null);
+    const candidateBadge: CiiV45Badge | null = locked ? (ciiV45Lock?.candidateBadge ?? ciiV45?.candidateBadge ?? null) : (r3Preview?.candidate ?? null);
+    const l6Pending = badgeStatus === "L6_PENDING_QUALIFICATION";
+    const l6PanelMode = showL6Panel({ r3, locked, composite: previewComposite, badgeStatus: lockBadgeStatus });
+    const pendingList = r3 && !locked ? pendingCriteria(ciiV45?.sectionScores ?? []) : [];
     const badgeSrc = currentBadge?.numericLevel ? BADGE_SRC[currentBadge.numericLevel] : undefined;
     const analysisByDim = new Map((ciiV45?.sectionAnalyses ?? []).map((row) => [row.dimension, row]));
     const dim7RatedCount = DIM7.criteria.filter((c) => anchorPoints(c.weight, dim7Anchors[c.key]) != null).length;
@@ -569,7 +749,7 @@ export default function CommunityCiiAnalyser({
             aiScore: aiPts,
             evidenceScore: evPts,
             compositeScore: previewComposite,
-            badgeLabel: badgeLabel(currentBadge),
+            badgeLabel: badgeLabel(currentBadge, badgeStatus, candidateBadge),
             locked,
             overallSummary: ciiV45?.analysisSummary || "",
             overallStrengths: ciiV45?.strengths || [],
@@ -638,6 +818,29 @@ export default function CommunityCiiAnalyser({
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
     const dimensionNames: Record<string, string> = Object.fromEntries(sheetSections.map((s) => [String(s.dimension), String(s.name)]));
+    const downloadReviewRecord = () => {
+        const record = buildReviewRecord({
+            reportId,
+            projectTitle,
+            result: ciiV45,
+            lock: ciiV45Lock as unknown as Record<string, unknown> | null,
+            evidenceMarks: dim7Anchors,
+            evidenceComments: dim7Reasons,
+            adminComment: note || ciiV45Lock?.adminNote || "",
+            supplemental: supplemental as unknown as Record<string, unknown>[],
+            exportedAt: new Date().toISOString(),
+        });
+        const blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = reviewRecordFileName(reportId);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const effectiveOpenSection = openSection ?? (r3 ? "" : "1");
     const packetFlashLabel = flashOk ? "Read" : "Waiting";
     const packetDetailLabel = detailOk ? `${packet.content_sections}/9` : "HOLD";
     const packetInventoryLabel = `${evidenceFiles.length}`;
@@ -780,7 +983,7 @@ export default function CommunityCiiAnalyser({
                     ) : (
                         <div className="banner" style={{ marginTop: 12 }}>
                             <strong>100% Packet Read Gate:</strong> Run AI Analyser will not proceed until the submitted packet passes
-                            the connectivity checks. Locked final scoring: Section maxima 10, 10, 5, 30, 10, 10, 15, 5, 5 = 100. AI
+                            the connectivity checks. Locked final scoring: Section maxima 10, 10, 5, 30, 10, 5, 15, 5, 10 = 100. AI
                             scores 85 points; CIEL PK Admin manually scores Evidence /15.
                         </div>
                     )}
@@ -788,6 +991,45 @@ export default function CommunityCiiAnalyser({
 
                 {ciiV45 ? (
                     <section className="analyser-work">
+                        {r3 ? (
+                            <div className="card decision-strip" data-testid="decision-strip">
+                                <div className="decision-head">
+                                    <div>
+                                        <div className="eyebrow">DECISION SUMMARY · {locked ? "APPROVED" : "PROVISIONAL"}</div>
+                                        <strong>{projectTitle}</strong>
+                                        <div className="optional">{[university, `Report ${String(report.project_id || reportId)}`].filter(Boolean).join(" · ")}</div>
+                                    </div>
+                                    <span className={locked ? "tag" : "tag warn"}>{locked ? "Approved" : "Provisional"}</span>
+                                </div>
+                                <div className="decision-figures">
+                                    <div>
+                                        <small>AI proposal /85</small>
+                                        <b>{ciiV45.aiProposalScore != null ? ciiV45.aiProposalScore.toFixed(1) : "—"}</b>
+                                    </div>
+                                    <div>
+                                        <small>Reviewed /85</small>
+                                        <b>{aiPts != null ? aiPts.toFixed(1) : "—"}</b>
+                                        {ciiV45.moderated ? <span className="optional"> Admin-reviewed</span> : null}
+                                    </div>
+                                    <div>
+                                        <small>Admin evidence /15</small>
+                                        <b>{evPts != null ? evPts.toFixed(1) : "Pending"}</b>
+                                    </div>
+                                    <div>
+                                        <small>CII /100</small>
+                                        <b>{previewComposite != null ? previewComposite.toFixed(1) : "Pending"}</b>
+                                    </div>
+                                    <div>
+                                        <small>Candidate band</small>
+                                        <b>{candidateBadge?.name || currentBadge?.name || "—"}</b>
+                                        <span className="optional">
+                                            {" "}
+                                            {l6Pending ? "L6 pending qualification" : locked ? (currentBadge ? "Awarded" : "—") : "Awaiting approval"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
                         <div className="banner green">
                             <strong>Student Source Packet:</strong> Flashcard {flashOk ? "read" : "missing"} · Detailed report{" "}
                             {packet.content_sections}/9 · Evidence files {evidenceFiles.length}. AI scored report quality /85. Admin
@@ -813,7 +1055,7 @@ export default function CommunityCiiAnalyser({
                             </div>
                             <div className="card kpi">
                                 <small>Final Badge</small>
-                                <b style={{ fontSize: 16 }}>{locked ? currentBadge?.name || "Pending" : "Pending"}</b>
+                                <b style={{ fontSize: 16 }}>{locked ? currentBadge?.name || (l6Pending ? "L6 pending qualification" : "Pending") : "Pending"}</b>
                                 <p>Locked only after Approve Score.</p>
                             </div>
                         </div>
@@ -826,12 +1068,18 @@ export default function CommunityCiiAnalyser({
                             <p>Admin sees the detailed strengths, limitations and internal inconsistencies. The student does not receive this full technical view.</p>
                         </div>
 
+                        {isCielPk && !readOnly && !locked && !r3 ? (
+                            <div className="banner">Re-run the analysis to review criterion marks (this analysis used an earlier rubric).</div>
+                        ) : null}
+
                         {aiSections.map((section) => {
+                            const marksMode = canReviewMarks ? "r3-edit" : r3 ? "r3-readonly" : "legacy";
+                            const live = marksMode === "r3-edit" ? sectionTotalFromInputs(markRowsFor(section), dirtyFor(section.dimension)) : null;
                             const analysis = analysisByDim.get(section.dimension as "1" | "2" | "3" | "4A" | "4B" | "5" | "6" | "8" | "9");
                             const max = section.maximumPoints || 1;
-                            const score = section.score;
+                            const score = live?.unsaved ? live.total : section.score;
                             const pct = score != null ? Math.max(0, Math.min(100, (score / max) * 100)) : 0;
-                            const open = openSection === section.dimension;
+                            const open = effectiveOpenSection === section.dimension;
                             return (
                                 <article key={section.dimension} className={`section-card${open ? " open" : ""}`}>
                                     <button type="button" className="section-head" onClick={() => setOpenSection(open ? "" : section.dimension)}>
@@ -843,7 +1091,10 @@ export default function CommunityCiiAnalyser({
                                                 <i style={{ width: `${pct}%` }} />
                                             </div>
                                         </div>
-                                        <div className="score">{score != null ? `${score.toFixed(1)}/${max}` : `—/${max}`}</div>
+                                        <div className="score">
+                                            {score != null ? `${score.toFixed(1)}/${max}` : `—/${max}`}
+                                            {live?.unsaved ? <small className="optional"> unsaved</small> : null}
+                                        </div>
                                         <div className={score != null && score / max < 0.7 ? "tag warn" : "tag"}>
                                             {score == null ? "Pending" : score / max >= 0.85 ? "Strong" : score / max >= 0.7 ? "Sound" : "Review"}
                                         </div>
@@ -867,40 +1118,45 @@ export default function CommunityCiiAnalyser({
                                                 </ul>
                                             </div>
                                         </div>
-                                        <div className="crit-table-wrap">
-                                            <table className="crit-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Locked criterion</th>
-                                                        <th>Anchor</th>
-                                                        <th>Marks</th>
-                                                        <th>AI reasoning</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {section.criterionScores.map((criterion) => {
-                                                        const weight = criterion.maximumPoints || 0;
-                                                        const pts = typeof criterion.score === "number" ? criterion.score : anchorPoints(weight, criterion.anchor);
-                                                        return (
-                                                            <tr key={criterion.criterion}>
-                                                                <td>
-                                                                    <strong>{criterionLabel(section.dimension, criterion.criterion)}</strong>
-                                                                </td>
-                                                                <td>{criterion.anchor === "P" ? "Pending" : `${criterion.anchor} · ${anchorName(criterion.anchor)}`}</td>
-                                                                <td className="crit-pts">
-                                                                    {formatPts(pts)} / {weight}
-                                                                </td>
-                                                                <td>{criterion.reasoningSummary?.trim() ? criterion.reasoningSummary : <em>No reasoning supplied by the AI</em>}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <CiiCriterionMarks
+                                            section={section}
+                                            mode={marksMode}
+                                            dirty={dirtyFor(section.dimension)}
+                                            onDirty={(criterion, value) => setDirtyMarks((prev) => ({ ...prev, [`${section.dimension}.${criterion}`]: value }))}
+                                            onRestore={(criterion, aiScore) =>
+                                                setDirtyMarks((prev) => ({ ...prev, [`${section.dimension}.${criterion}`]: aiScore == null ? "" : String(aiScore) }))
+                                            }
+                                            reason={markReasons[section.dimension] ?? ""}
+                                            onReason={(value) => setMarkReasons((prev) => ({ ...prev, [section.dimension]: value }))}
+                                            sourceRef={markSources[section.dimension] ?? ""}
+                                            onSourceRef={(value) => setMarkSources((prev) => ({ ...prev, [section.dimension]: value }))}
+                                            saving={savingDim === section.dimension}
+                                            onSave={() => void saveSectionMarks(section.dimension)}
+                                            onDiscard={() => clearDirtyFor(section.dimension)}
+                                        />
                                     </div>
                                 </article>
                             );
                         })}
+
+                        {r3 && (ciiV45.adminModeration?.log?.length ?? 0) > 0 ? (
+                            <details className="card review-log" data-testid="review-log">
+                                <summary>
+                                    <b>Review log</b> · {ciiV45.adminModeration!.log.length} change{ciiV45.adminModeration!.log.length === 1 ? "" : "s"} to AI criterion marks
+                                </summary>
+                                <ul>
+                                    {[...ciiV45.adminModeration!.log].reverse().map((entry, i) => (
+                                        <li key={`${entry.at}-${entry.dimension}-${entry.criterion}-${i}`}>
+                                            {describeLogEntry(entry, (d, c) => `${dimensionNames[d] || `Dimension ${d}`} · ${criterionLabel(d as CiiV45Dimension, c)}`)}
+                                            <span className="optional">
+                                                {" "}
+                                                · {entry.actorId.slice(0, 8)} · {new Date(entry.at).toLocaleString()}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                        ) : null}
 
                         <CiiAnswerableRegistryPanel dimensionNames={dimensionNames} />
 
@@ -919,7 +1175,7 @@ export default function CommunityCiiAnalyser({
                         <div className="evidence-summary">
                             <div className="evs">
                                 <b>{evidenceFiles.length}</b>
-                                <small>evidence files</small>
+                                <small>evidence files{supplemental.length ? ` (+${supplemental.length} supplemental)` : ""}</small>
                             </div>
                             <div className="evs">
                                 <b>ALL</b>
@@ -937,10 +1193,27 @@ export default function CommunityCiiAnalyser({
 
                         <div className="evidence-gallery">
                             <ReportEvidenceGallery
-                                files={evidenceFiles.map((file) => ({ url: file.url, name: file.name, meta: `${file.section} · ${file.visibility}` }))}
+                                files={[
+                                    ...evidenceFiles.map((file) => ({ url: file.url, name: file.name, meta: `${file.section} · ${file.visibility}` })),
+                                    ...supplemental.map((item) => ({
+                                        url: item.url,
+                                        name: item.name,
+                                        meta: `Supplemental · ${item.label} · ${sectionOptionLabel(item.section)} · ${item.visibility}`,
+                                    })),
+                                ]}
                                 emptyLabel="No evidence files listed. Admin can still complete the seven evidence marks from the written report."
                             />
                         </div>
+
+                        {isCielPk && !readOnly && !locked ? (
+                            <CiiSupplementalEvidencePanel
+                                basePath={supplementalPath}
+                                onItemsChange={setSupplemental}
+                                onChanged={(requiresReanalysis) => {
+                                    if (requiresReanalysis) setAnalysisStale(true);
+                                }}
+                            />
+                        ) : null}
 
                         <div className={`evidence-form${locked || readOnly ? " locked-form" : ""}`}>
                             {DIM7.criteria.map((c) => {
@@ -1013,6 +1286,9 @@ export default function CommunityCiiAnalyser({
                                     <button type="button" className="secondary" onClick={printFeedback}>
                                         Print feedback
                                     </button>
+                                    <button type="button" className="secondary" onClick={downloadReviewRecord}>
+                                        Download review record
+                                    </button>
                                     {locked ? (
                                         <button type="button" className="secondary" onClick={exportStudentAnalysis}>
                                             Export student analysis
@@ -1031,7 +1307,7 @@ export default function CommunityCiiAnalyser({
                                             Composite CII <b>{formatPts(previewComposite)} / 100</b>
                                         </span>
                                         <span>
-                                            Badge <b>{badgeLabel(currentBadge)}</b>
+                                            Badge <b>{badgeLabel(currentBadge, badgeStatus, candidateBadge)}</b>
                                         </span>
                                     </div>
                                     <p>{ciiV45.analysisSummary || "Overall analysis not supplied by the AI."}</p>
@@ -1080,7 +1356,11 @@ export default function CommunityCiiAnalyser({
                                 <div className="eyebrow">CIEL PK FINAL AUTHORITY</div>
                                 <h2>Approve Score</h2>
                             </div>
-                            <p>Once approved, evidence marks are locked, the Composite CII becomes final, the badge is awarded, and the student one-page analysis is generated.</p>
+                            <p>
+                                {r3
+                                    ? "Once approved, evidence marks are locked, the Composite CII becomes final and the band badge is awarded (a 90+ CII is kept and L6 stays pending until the sourced qualification is confirmed), and the student one-page analysis is generated."
+                                    : "Once approved, evidence marks are locked, the Composite CII becomes final, the badge is awarded, and the student one-page analysis is generated."}
+                            </p>
                         </div>
 
                         <div className="card approve-wrap">
@@ -1099,7 +1379,7 @@ export default function CommunityCiiAnalyser({
                                 </div>
                                 <div className="calc">
                                     <small>Badge Preview</small>
-                                    <b style={{ fontSize: 16 }}>{badgeLabel(currentBadge)}</b>
+                                    <b style={{ fontSize: 16 }}>{badgeLabel(currentBadge, badgeStatus, candidateBadge)}</b>
                                 </div>
                             </div>
                             <div className="full badge-preview">
@@ -1109,20 +1389,52 @@ export default function CommunityCiiAnalyser({
                                     <div className="badge-placeholder">BADGE</div>
                                 )}
                                 <div>
-                                    <div className="eyebrow">{locked ? "AWARDED BADGE" : "AWAITING APPROVE SCORE"}</div>
-                                    <h3>{currentBadge?.name || "Badge will appear here"}</h3>
+                                    <div className="eyebrow">{locked ? (l6Pending ? "APPROVED · NO BADGE AWARDED YET" : "AWARDED BADGE") : "AWAITING APPROVE SCORE"}</div>
+                                    <h3>{currentBadge?.name || (l6Pending ? "L6 pending qualification" : "Badge will appear here")}</h3>
                                     <div className="final-status">The backend-approved CII is the authoritative score. The client preview cannot override it.</div>
                                 </div>
                             </div>
-                            <div className="full gate-row">
-                                {gateRow.map((g) => (
-                                    <span key={g.code} className={`gate-pill${g.passed ? " ok" : ""}`} title={g.note}>
-                                        {g.code} gate · {g.passed ? "passed" : "not met"}
+                            {r3 ? (
+                                <div className="full gate-row">
+                                    <span
+                                        className={`gate-pill${l6Assessment?.status === "QUALIFIED" || (locked && !l6Pending && currentBadge?.code === "L6") ? " ok" : ""}`}
+                                        title="A 90+ CII is awarded L6 only with the minima and the sourced confirmations; below 90 the band follows the CII."
+                                    >
+                                        L6 qualification ·{" "}
+                                        {locked && currentBadge?.code === "L6"
+                                            ? "awarded"
+                                            : l6Assessment?.status === "NOT_REQUIRED"
+                                              ? "not required (CII below 90)"
+                                              : l6Assessment?.status === "QUALIFIED"
+                                                ? "qualified"
+                                                : "pending"}
                                     </span>
-                                ))}
-                                {capNote ? <span className="gate-cap">{capNote}</span> : null}
-                                {!capNote && currentBadge ? <span className="gate-cap muted">Badge level matches the score band</span> : null}
-                            </div>
+                                    <span className="gate-cap muted">
+                                        {l6Pending ? "CII kept; L6 pending, never replaced by L5" : currentBadge ? "Badge level matches the score band" : "Band follows the CII"}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="full gate-row">
+                                    {gateRow.map((g) => (
+                                        <span key={g.code} className={`gate-pill${g.passed ? " ok" : ""}`} title={g.note}>
+                                            {g.code} gate · {g.passed ? "passed" : "not met"}
+                                        </span>
+                                    ))}
+                                    {capNote ? <span className="gate-cap">{capNote}</span> : null}
+                                    {!capNote && currentBadge ? <span className="gate-cap muted">Badge level matches the score band</span> : null}
+                                </div>
+                            )}
+                            {l6PanelMode ? (
+                                <CiiL6QualificationPanel
+                                    mode={l6PanelMode}
+                                    form={l6Form}
+                                    onChange={setL6Form}
+                                    assessment={l6Assessment}
+                                    disabled={readOnly || !isCielPk}
+                                    busy={l6Busy}
+                                    onConfirm={() => void confirmL6()}
+                                />
+                            ) : null}
                             <div className="full checklist">
                                 <div className="checklist-head">
                                     <strong>Readiness check</strong>
@@ -1133,6 +1445,22 @@ export default function CommunityCiiAnalyser({
                                         <span className="checklist-mark">{item.ok ? "✓" : "•"}</span>
                                         <span className="checklist-label">{item.label}</span>
                                         <span className="checklist-detail">{item.detail}</span>
+                                    </div>
+                                ))}
+                                {staleMessage ? (
+                                    <div className="checklist-row">
+                                        <span className="checklist-mark">•</span>
+                                        <span className="checklist-label">Evidence changed</span>
+                                        <span className="checklist-detail">{staleMessage} Approve stays disabled until then.</span>
+                                    </div>
+                                ) : null}
+                                {pendingList.map((p) => (
+                                    <div key={`${p.dimension}.${p.criterion}`} className="checklist-row">
+                                        <span className="checklist-mark">•</span>
+                                        <span className="checklist-label">
+                                            {dimensionNames[p.dimension] || `Dimension ${p.dimension}`} · {criterionLabel(p.dimension as CiiV45Dimension, p.criterion)} is pending
+                                        </span>
+                                        <span className="checklist-detail">The AI left this criterion pending. Fill its Reviewed mark in the section above, or the score stays provisional.</span>
                                     </div>
                                 ))}
                             </div>
@@ -1173,7 +1501,7 @@ export default function CommunityCiiAnalyser({
                                         <button
                                             type="button"
                                             className="primary"
-                                            disabled={approving || Boolean(hardBlock) || !dim7Complete || (!confirmAuthority && !locked)}
+                                            disabled={approving || Boolean(hardBlock) || analysisStale || !dim7Complete || (!confirmAuthority && !locked)}
                                             onClick={approveAndLock}
                                         >
                                             {approving ? "Locking…" : "Approve Score & Generate Final Report"}

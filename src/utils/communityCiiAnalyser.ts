@@ -203,7 +203,49 @@ export interface CiiV45Badge extends CiiV45Band {
 export interface CiiV45CriterionResult extends CiiV45CriterionScore {
     maximumPoints: number;
     score: number | null;
+    /** R3: the mark the AI anchor earns, kept as the baseline when an Admin edit replaces `score`. */
+    aiScore?: number | null;
+    /** R3: true when `score` is an Admin-reviewed mark. */
+    adminEdited?: boolean;
+    adminEdit?: { reason: string; sourceRef?: string | null; actorId: string; at: string };
 }
+
+/** R3 Admin review of AI criterion marks (stored on the analysis; absent on a fresh AI run). */
+export interface CiiV45AdminModeration {
+    revision: number;
+    edits: Record<string, { points: number; reason: string; sourceRef?: string | null; actorId: string; at: string }>;
+    log: Array<{
+        dimension: string;
+        criterion: string;
+        from: number | null;
+        to: number | null;
+        aiScore: number | null;
+        reason: string;
+        sourceRef?: string | null;
+        actorId: string;
+        at: string;
+    }>;
+}
+
+/** The Admin's sourced confirmations behind a published L6 (sustained impact). */
+export interface CiiV45L6Confirmations {
+    observedRetention: boolean;
+    communityOwnership: boolean;
+    externalCorroboration: boolean;
+    sourceRef: string;
+    confirmedByAdminId?: string;
+    confirmedAt?: string;
+}
+
+export type CiiV45L6Status = "NOT_REQUIRED" | "PENDING_QUALIFICATION" | "QUALIFIED";
+
+export interface CiiV45L6Assessment {
+    status: CiiV45L6Status;
+    reasons: string[];
+    minimums: { cii: number; measuredChange: number; sustainability: number; manualEvidence: number };
+}
+
+export type CiiV45BadgeStatus = "AWARDED" | "L6_PENDING_QUALIFICATION";
 
 export interface CiiV45SectionResult {
     dimension: CiiV45Dimension;
@@ -233,6 +275,17 @@ export interface CiiV45Result extends Omit<CiiV45EvaluatorPayload, "sectionScore
     finalBadge: CiiV45Badge | null;
     qualityGates: { L4: boolean; L5: boolean; L6: boolean };
     publicationEligible: boolean;
+    /** Rubric the analysis was scored under (R3 current; R2/R1 on older analyses; absent before R2). */
+    rubricVersion?: string;
+    /** R3: the band the CII lands in, whether or not it is awarded yet. */
+    candidateBadge?: CiiV45Badge | null;
+    badgeStatus?: CiiV45BadgeStatus | null;
+    l6Assessment?: CiiV45L6Assessment;
+    l6Qualification?: CiiV45L6Confirmations;
+    /** R3: the AI's own total before any Admin criterion edit (null while a criterion is pending). */
+    aiProposalScore?: number | null;
+    moderated?: boolean;
+    adminModeration?: CiiV45AdminModeration;
     rounding: string;
     evidenceInspection?: { inspected: unknown[]; notInspected: unknown[] } | null;
     computedAt?: string;
@@ -260,6 +313,11 @@ export interface CiiV45Lock {
     scoreWasModerated?: boolean;
     scoreModerationReason?: string;
     finalBadge?: CiiV45Badge | null;
+    /** R3 fields (absent on pre-R3 locks). */
+    rubricVersion?: string;
+    candidateBadge?: CiiV45Badge | null;
+    badgeStatus?: CiiV45BadgeStatus | null;
+    l6Qualification?: CiiV45L6Confirmations | null;
 }
 
 // --- Fixed dimensions / criteria / weights (base 100) ---
@@ -278,17 +336,17 @@ export interface CiiV45DimensionDef {
     criteria: CiiV45CriterionDef[];
 }
 
-/** Fixed dimensions/criteria/weights — base 100. Criterion IDs are exact and immutable. */
+/** Fixed dimensions/criteria/weights — base 100 (rubric R3: 38 AI criteria + 7 Admin criteria). Criterion IDs are exact and immutable. */
 export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
     {
         id: "1",
         name: "Participation & Individual Effort",
         maxPoints: 10,
         criteria: [
-            { key: "role", weight: 2.5, label: "Individual responsibility" },
-            { key: "quality", weight: 2.5, label: "Meaningful involvement" },
-            { key: "hoursCompletion", weight: 2.5, label: "Hours requirement met" },
-            { key: "continuity", weight: 2.5, label: "Regularity & follow-through" },
+            { key: "hoursRequirement", weight: 4, label: "Individual hours requirement" },
+            { key: "attendanceValidity", weight: 2, label: "Attendance validity & traceability" },
+            { key: "contributionAgency", weight: 2, label: "Individual contribution & agency" },
+            { key: "participationAccount", weight: 2, label: "Meaningful participation account" },
         ],
     },
     {
@@ -296,11 +354,10 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "Community Need & Starting Point",
         maxPoints: 10,
         criteria: [
-            { key: "specificity", weight: 2, label: "Problem specificity" },
-            { key: "communityGrounding", weight: 2, label: "Beneficiary identification" },
-            { key: "baseline", weight: 2, label: "Starting condition / baseline" },
-            { key: "context", weight: 2, label: "Contextual understanding" },
-            { key: "discipline", weight: 2, label: "Academic / disciplinary link" },
+            { key: "needAndVoice", weight: 3, label: "Community-defined need & voice" },
+            { key: "startingPosition", weight: 2, label: "Starting position & target population" },
+            { key: "objectivesPathway", weight: 3, label: "Objectives & change pathway" },
+            { key: "inclusionSafeguarding", weight: 2, label: "Inclusion & safeguarding" },
         ],
     },
     {
@@ -308,10 +365,9 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "SDG Contribution",
         maxPoints: 5,
         criteria: [
-            { key: "alignment", weight: 2.5, label: "Primary SDG fit" },
-            { key: "logic", weight: 1.5, label: "Need-to-SDG logic chain" },
-            { key: "coherence", weight: 0.5, label: "Consistency with report" },
-            { key: "focus", weight: 0.5, label: "SDG selectivity" },
+            { key: "sdgConnection", weight: 2, label: "Substantive SDG connection" },
+            { key: "outcomeLinkedContribution", weight: 2, label: "Outcome-linked contribution" },
+            { key: "boundedClaims", weight: 1, label: "Bounded & consistent claims" },
         ],
     },
     {
@@ -319,23 +375,23 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "Activities & Outputs",
         maxPoints: 15,
         criteria: [
-            { key: "delivery", weight: 3, label: "Planned vs actual delivery" },
-            { key: "rigor", weight: 3, label: "Method and care" },
-            { key: "ownership", weight: 3, label: "Individual contribution" },
-            { key: "outputQuality", weight: 3, label: "Output quality" },
-            { key: "appropriateScale", weight: 3, label: "Scale and depth" },
+            { key: "completedDelivery", weight: 4, label: "Completed delivery" },
+            { key: "outputsUnits", weight: 4, label: "Outputs with correct units" },
+            { key: "reachDeduplication", weight: 4, label: "Reach & deduplication" },
+            { key: "equitableAccess", weight: 3, label: "Equitable access & completion" },
         ],
     },
     {
         id: "4B",
-        name: "Outcomes & Measured Change",
+        name: "Measured Change",
         maxPoints: 15,
         criteria: [
-            { key: "clarity", weight: 3, label: "Outcome vs output clarity" },
-            { key: "change", weight: 4, label: "Credible change" },
-            { key: "measurement", weight: 3, label: "Measurement source/method" },
-            { key: "communityValue", weight: 3, label: "Value to beneficiaries" },
-            { key: "attribution", weight: 2, label: "Attribution honesty" },
+            { key: "observedChange", weight: 4, label: "Observed change from a comparable start" },
+            { key: "objectiveAttainment", weight: 2, label: "Objective attainment" },
+            { key: "measurementQuality", weight: 3, label: "Measurement quality & uncertainty" },
+            { key: "credibleContribution", weight: 2, label: "Credible contribution" },
+            { key: "communityConfirmation", weight: 2, label: "Community confirmation & unintended effects" },
+            { key: "evaluationImprovement", weight: 2, label: "Evaluation-led improvement" },
         ],
     },
     {
@@ -343,10 +399,11 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "Resources & Stewardship",
         maxPoints: 10,
         criteria: [
-            { key: "stewardship", weight: 2.5, label: "Resource mobilisation & use" },
-            { key: "traceability", weight: 2.5, label: "Resource traceability" },
-            { key: "appropriateness", weight: 2.5, label: "Fit to need" },
-            { key: "deliveryContribution", weight: 2.5, label: "What resources enabled" },
+            { key: "resourceAccount", weight: 3, label: "Complete relevant resource account" },
+            { key: "arithmeticTraceability", weight: 2, label: "Arithmetic & traceability" },
+            { key: "proportionateAllocation", weight: 2, label: "Proportionate allocation & accountability" },
+            { key: "resourceEfficiency", weight: 2, label: "Resource efficiency & value judgement" },
+            { key: "responsibleMaterials", weight: 1, label: "Responsible material use" },
         ],
     },
     {
@@ -378,10 +435,10 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
         name: "Reflection & Academic Growth",
         maxPoints: 5,
         criteria: [
-            { key: "learning", weight: 1.5, label: "Personal learning" },
-            { key: "academicApplication", weight: 1, label: "Discipline applied" },
-            { key: "ethicalUnderstanding", weight: 1, label: "Ethics & community awareness" },
-            { key: "improvement", weight: 1.5, label: "Concrete next steps" },
+            { key: "personalCivicLearning", weight: 2, label: "Specific personal & civic learning" },
+            { key: "academicApplication", weight: 1, label: "Academic application" },
+            { key: "competencyDevelopment", weight: 1, label: "Supported competency development" },
+            { key: "ethicalJudgement", weight: 1, label: "Ethical judgement & improvement" },
         ],
     },
     {
@@ -399,18 +456,63 @@ export const CII_V45_DIMENSIONS: CiiV45DimensionDef[] = [
 ];
 
 /**
- * Rubric revision the table above follows. R2 (CIEL-CII-2026.11-R2) moved five points from
- * Partnership (10 → 5) to Sustainability (5 → 10) and re-cut those two dimensions' criteria.
- * Analyses stored before R2 carry the R1 keys below; their section `maximumPoints` travel with
- * the stored result, so only display labels are needed here.
+ * Rubric revisions. R3 (CIEL-CII-2026.11-R3, current) is the table above. R2 re-cut Dimensions 6 and
+ * 9 only; R1 is the original. Analyses stored under an older rubric keep their criterion keys and
+ * their section `maximumPoints` travel with the stored result, so only display labels are needed
+ * for them here.
  */
-export const CII_V45_RUBRIC_VERSION = "CIEL-CII-2026.11-R2";
+export const CII_V45_RUBRIC_VERSION = "CIEL-CII-2026.11-R3";
+export const CII_V45_R2_RUBRIC_VERSION = "CIEL-CII-2026.11-R2";
 const LEGACY_CRITERION_LABELS: Record<string, Record<string, string>> = {
+    "1": {
+        role: "Individual responsibility",
+        quality: "Meaningful involvement",
+        hoursCompletion: "Hours requirement met",
+        continuity: "Regularity & follow-through",
+    },
+    "2": {
+        specificity: "Problem specificity",
+        communityGrounding: "Beneficiary identification",
+        baseline: "Starting condition / baseline",
+        context: "Contextual understanding",
+        discipline: "Academic / disciplinary link",
+    },
+    "3": {
+        alignment: "Primary SDG fit",
+        logic: "Need-to-SDG logic chain",
+        coherence: "Consistency with report",
+        focus: "SDG selectivity",
+    },
+    "4A": {
+        delivery: "Planned vs actual delivery",
+        rigor: "Method and care",
+        ownership: "Individual contribution",
+        outputQuality: "Output quality",
+        appropriateScale: "Scale and depth",
+    },
+    "4B": {
+        clarity: "Outcome vs output clarity",
+        change: "Credible change",
+        measurement: "Measurement source/method",
+        communityValue: "Value to beneficiaries",
+        attribution: "Attribution honesty",
+    },
+    "5": {
+        stewardship: "Resource mobilisation & use",
+        traceability: "Resource traceability",
+        appropriateness: "Fit to need",
+        deliveryContribution: "What resources enabled",
+    },
     "6": {
         relevance: "Right stakeholders",
         roleClarity: "Partner's actual contribution",
         collaboration: "Co-design / co-delivery",
         ownership: "Community ownership",
+    },
+    "8": {
+        learning: "Personal learning",
+        ethicalUnderstanding: "Ethics & community awareness",
+        improvement: "Concrete next steps",
     },
     "9": {
         continuation: "Continuation plan",
@@ -419,6 +521,22 @@ const LEGACY_CRITERION_LABELS: Record<string, Record<string, string>> = {
         realism: "Scaling realism",
     },
 };
+
+/** R3 badge policy (mirrors the backend `CII_V45_L6_POLICY`): the CII alone picks the band; a 90+
+ * candidate is awarded L6 only with these minima and the Admin's three sourced confirmations. */
+export const CII_V45_L6_POLICY = {
+    version: "CIEL-BADGES-2026.11-R2",
+    minimumCii: 90,
+    minimumMeasuredChange: 12,
+    minimumSustainability: 8,
+    minimumManualEvidence: 12,
+} as const;
+
+/** True when a stored analysis was scored under the current (R3) rubric: criterion marks can be
+ * reviewed and the L6 qualification applies. Older analyses keep the rules they were approved under. */
+export function isR3Analysis(result: { rubricVersion?: string | null } | null | undefined): boolean {
+    return result?.rubricVersion === CII_V45_RUBRIC_VERSION;
+}
 
 export const CII_V45_BASE_MAX = CII_V45_DIMENSIONS.reduce((sum, d) => sum + d.maxPoints, 0); // 100
 export const CII_V45_BONUS_MAX = 5;
@@ -444,10 +562,11 @@ export function dimensionById(id: CiiV45Dimension): CiiV45DimensionDef | undefin
 }
 
 export function criterionLabel(dimensionId: CiiV45Dimension, key: string): string {
-    const resolved = dimensionId === "1" && key === "hoursConsistency" ? "hoursCompletion" : key;
+    const resolved = dimensionId === "1" && (key === "hoursConsistency" || key === "hoursCompletion") ? "hoursRequirement" : key;
     return (
-        dimensionById(dimensionId)?.criteria.find((c) => c.key === resolved)?.label ||
+        dimensionById(dimensionId)?.criteria.find((c) => c.key === key)?.label ||
         LEGACY_CRITERION_LABELS[dimensionId]?.[key] ||
+        dimensionById(dimensionId)?.criteria.find((c) => c.key === resolved)?.label ||
         key
     );
 }
@@ -485,3 +604,54 @@ export function badgeForScore(score: number | null): CiiV45Band | null {
     if (score === null) return null;
     return [...CII_V45_BANDS].reverse().find((b) => score >= b.min) || null;
 }
+
+/** R3: the numeric band is the candidate; L6 is only awarded when qualified. A 90+ candidate without
+ * qualification has no badge, only the status `L6_PENDING_QUALIFICATION` (never replaced by L5).
+ * Mirrors the backend `resolveCiiV45BadgeR3`. */
+export function resolveBadgeForScoreR3(
+    score: number | null,
+    l6Qualified: boolean,
+): { badge: CiiV45Badge | null; candidate: CiiV45Badge | null; status: CiiV45BadgeStatus | null } {
+    const numeric = score === null ? null : [...CII_V45_BANDS].reverse().find((b) => score >= b.min) || null;
+    if (!numeric) return { badge: null, candidate: null, status: null };
+    const candidate: CiiV45Badge = { ...numeric, code: `L${numeric.level}`, numericLevel: numeric.level, gateCapped: false };
+    if (numeric.level === 6 && !l6Qualified) return { badge: null, candidate, status: "L6_PENDING_QUALIFICATION" };
+    return { badge: candidate, candidate, status: "AWARDED" };
+}
+
+/** R3 L6 qualification check (mirrors the backend `assessCiiV45L6`) for the live approval preview. */
+export function assessL6(
+    score: number | null,
+    sections: ReadonlyArray<{ dimension: string; score: number | null }>,
+    confirmations?: Partial<CiiV45L6Confirmations> | null,
+): CiiV45L6Assessment {
+    const P = CII_V45_L6_POLICY;
+    const minimums = {
+        cii: P.minimumCii,
+        measuredChange: P.minimumMeasuredChange,
+        sustainability: P.minimumSustainability,
+        manualEvidence: P.minimumManualEvidence,
+    };
+    if (score === null || score < P.minimumCii) return { status: "NOT_REQUIRED", reasons: [], minimums };
+    const pts = (id: string) => sections.find((s) => s.dimension === id)?.score ?? 0;
+    const reasons: string[] = [];
+    if (pts("4B") < P.minimumMeasuredChange) reasons.push(`Measured Change below ${P.minimumMeasuredChange}/15`);
+    if (pts("9") < P.minimumSustainability) reasons.push(`Sustainability below ${P.minimumSustainability}/10`);
+    if (pts("7") < P.minimumManualEvidence) reasons.push(`Manual evidence below ${P.minimumManualEvidence}/15`);
+    if (confirmations?.observedRetention !== true) reasons.push("Observed retained benefits not confirmed");
+    if (confirmations?.communityOwnership !== true) reasons.push("Community ownership or adoption not confirmed");
+    if (confirmations?.externalCorroboration !== true) reasons.push("Corroboration outside the student team not confirmed");
+    if (!String(confirmations?.sourceRef ?? "").trim()) reasons.push("Qualification source reference missing");
+    return { status: reasons.length ? "PENDING_QUALIFICATION" : "QUALIFIED", reasons, minimums };
+}
+
+/** Plain-language badge line that never invents a badge: the awarded name, or the pending status. */
+export function badgeStatusLabel(
+    status: CiiV45BadgeStatus | null | undefined,
+    awardedName?: string | null,
+    candidateName?: string | null,
+): string {
+    if (status === "L6_PENDING_QUALIFICATION") return `${candidateName || "L6"} · L6 pending qualification`;
+    return awardedName || "Pending";
+}
+

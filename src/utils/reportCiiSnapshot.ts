@@ -82,9 +82,21 @@ export function pickCiiV45DisplayScore(ciiV45: unknown, lock?: unknown): number 
     );
 }
 
+/** Wording for a locked 90+ CII whose L6 award is still pending (R3): the CII stands, no badge is awarded. */
+export const CII_L6_PENDING_LABEL = "L6 pending qualification";
+
+/** R3: a locked CII whose status is `L6_PENDING_QUALIFICATION`. Looks at the lock first, then the result. */
+export function isCiiL6Pending(ciiV45: unknown, lock?: unknown): boolean {
+    if (!isCiiV45Locked(lock)) return false;
+    const status = asCiiRecord(lock)?.badgeStatus ?? asCiiRecord(ciiV45)?.badgeStatus;
+    return status === "L6_PENDING_QUALIFICATION";
+}
+
 export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): string | null {
     const cii = asCiiRecord(ciiV45);
     if (!cii) return null;
+    // A pending L6 has no awarded badge: never fall back to a recommended/diagnostic L6 name.
+    if (isCiiL6Pending(ciiV45, lock)) return null;
     const nameOf = (raw: unknown) => {
         const b = asCiiRecord(raw);
         return typeof b?.name === "string" && b.name.trim() ? b.name.trim() : null;
@@ -95,17 +107,21 @@ export function pickCiiV45DisplayBadgeName(ciiV45: unknown, lock?: unknown): str
     return nameOf(cii.recommendedBadge) || nameOf(cii.diagnosticBadge) || nameOf(cii.finalBadge);
 }
 
-export function readCiiV45DisplayFromReport(report: unknown): { score: number; level: string; locked: boolean } | null {
+export function readCiiV45DisplayFromReport(
+    report: unknown,
+): { score: number; level: string; locked: boolean; badgePending?: boolean } | null {
     if (!report || typeof report !== "object") return null;
     const record = report as Record<string, unknown>;
     const cii = record.ciiV45 ?? record.cii_v45;
     const lock = record.ciiV45Lock ?? record.cii_v45_lock;
     const score = pickCiiV45DisplayScore(cii, lock);
     if (score == null) return null;
+    const pending = isCiiL6Pending(cii, lock);
     return {
         score,
-        level: pickCiiV45DisplayBadgeName(cii, lock) || deriveCiiLevel(score),
+        level: pending ? CII_L6_PENDING_LABEL : pickCiiV45DisplayBadgeName(cii, lock) || deriveCiiLevel(score),
         locked: isCiiV45Locked(lock),
+        ...(pending ? { badgePending: true } : {}),
     };
 }
 

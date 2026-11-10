@@ -12,7 +12,7 @@ import { isCommunityReportOnLiveDeck, isCommunityReportRejected } from "@/utils/
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import { studentImpactPackageHref } from "@/utils/studentImpactPackageHref";
-import { pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
+import { CII_L6_PENDING_LABEL, isCiiL6Pending, pickCiiV45DisplayBadgeName, pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import ImpactWallCiiRing from "@/components/ciel/community-service/ImpactWallCiiRing";
 import QuickImpactWallSection from "@/components/ciel/community-service/quick-work/QuickImpactWallSection";
@@ -240,6 +240,8 @@ function wallCiiScore(r: WallRow): number | null {
 }
 
 function wallBadgeName(r: WallRow, score: number | null): string {
+    // R3: a locked 90+ CII with L6 pending has no awarded badge; never derive "Transformative" from the score.
+    if (isCiiL6Pending(r.ciiV45, r.ciiV45Lock)) return CII_L6_PENDING_LABEL;
     return (
         pickCiiV45DisplayBadgeName(r.ciiV45, r.ciiV45Lock) ||
         r.ciiV45?.finalBadge?.name ||
@@ -299,6 +301,7 @@ function buildFlashcardExtras(
     hours: number,
     facultyScore: number | null,
 ): NonNullable<FlashState["flashcard"]> {
+    const l6Pending = isCiiL6Pending(cii, r.ciiV45Lock);
     const badge = resolveCiiLevelBadge(facultyScore ?? cii.finalCII ?? 0);
     const reach = r.section4?.project_summary?.distinct_total_beneficiaries;
     const sdgCount = sdgNumbers(r.sdgs).length;
@@ -331,9 +334,9 @@ function buildFlashcardExtras(
     const nextStep = (cii.developmentPriorities || [])[0];
 
     return {
-        badgeSrc: badge.src,
-        badgeAlt: badge.alt,
-        badgeTitle: badge.title,
+        badgeSrc: l6Pending ? "" : badge.src,
+        badgeAlt: l6Pending ? "" : badge.alt,
+        badgeTitle: l6Pending ? CII_L6_PENDING_LABEL : badge.title,
         checklist,
         metrics,
         oneLiner: cii.studentFeedback || r.story,
@@ -519,7 +522,9 @@ function CommunityFlashModal({ flash, onClose }: { flash: FlashState; onClose: (
                 {fc && ai && (
                     <div className="border-t border-[#dde5ea] px-5 py-5 sm:px-[26px]">
                         <div className="flex flex-col items-center gap-3 rounded-[18px] bg-[linear-gradient(125deg,#052c37,#0b4850,#0d7c72)] p-5 text-center text-white sm:flex-row sm:text-left">
-                            <img src={fc.badgeSrc} alt={fc.badgeAlt} className="h-20 w-20 rounded-full bg-white object-contain shadow-[0_10px_24px_rgba(0,0,0,.2)]" />
+                            {fc.badgeSrc ? (
+                                <img src={fc.badgeSrc} alt={fc.badgeAlt} className="h-20 w-20 rounded-full bg-white object-contain shadow-[0_10px_24px_rgba(0,0,0,.2)]" />
+                            ) : null}
                             <div>
                                 <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#b8f2e8]">Verified Impact Badge</span>
                                 <div className="mt-1 text-lg font-semibold">{fc.badgeTitle}</div>
@@ -745,7 +750,7 @@ export default function CommunityImpactWall(_props: {
                   aiScore: lock?.aiRecommendedScore ?? facultyScore ?? cii.finalCII ?? cii.diagnosticCII ?? null,
                   facultyScore,
                   scoreWasAdjusted: lock?.scoreWasModerated ?? false,
-                  levelName: cii.finalBadge?.name || r.level || "Approved",
+                  levelName: isCiiL6Pending(cii, lock) ? CII_L6_PENDING_LABEL : cii.finalBadge?.name || r.level || "Approved",
                   sections: cii.sectionScores || [],
                   upliftTotal: cii.extraMileUplift?.total || 0,
                   integrityPenalty: cii.integrityPenalty?.points || 0,

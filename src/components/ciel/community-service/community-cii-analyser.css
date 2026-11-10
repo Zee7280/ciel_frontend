@@ -1143,3 +1143,116 @@
     color: var(--muted);
     font-size: 12px;
 }
+
+/* R3 Admin review: criterion mark editing, decision summary, L6 qualification, supplemental evidence */
+.cii-final .crit-input {
+    width: 76px;
+    padding: 4px 6px;
+    font-weight: 900;
+}
+.cii-final .crit-edited td {
+    background: #fffbea;
+}
+.cii-final .crit-tag {
+    margin-left: 6px;
+    background: var(--goldbg);
+    color: var(--gold);
+}
+.cii-final .crit-restore {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 10.5px;
+    cursor: pointer;
+}
+.cii-final .crit-restore:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.cii-final .crit-error {
+    margin-top: 3px;
+    color: var(--red);
+    font-size: 10.5px;
+    font-weight: 700;
+}
+.cii-final .crit-save {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--line);
+    background: #f7f9f4;
+}
+.cii-final .crit-save textarea {
+    width: 100%;
+    min-height: 64px;
+}
+.cii-final .crit-save input[type="text"] {
+    width: 100%;
+}
+.cii-final .crit-save-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+.cii-final .decision-strip {
+    margin-bottom: 14px;
+}
+.cii-final .decision-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+.cii-final .decision-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+.cii-final .decision-figures small {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+.cii-final .decision-figures b {
+    font-size: 17px;
+}
+.cii-final .review-log,
+.cii-final .supplemental-panel,
+.cii-final .l6-panel {
+    margin-top: 14px;
+    padding: 12px 16px;
+}
+.cii-final .review-log summary {
+    cursor: pointer;
+}
+.cii-final .review-log ul,
+.cii-final .supp-list {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    font-size: 12.5px;
+}
+.cii-final .review-log li,
+.cii-final .supp-list li {
+    margin: 6px 0;
+}
+.cii-final .supp-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+.cii-final .l6-source {
+    width: 100%;
+    margin-top: 8px;
+}
+.cii-final .l6-checklist {
+    margin-top: 10px;
+}

@@ -53,6 +53,8 @@ export type FacultyCsReportRow = {
     cii_locked?: boolean;
     cii_level_name?: string | null;
     cii_numeric_level?: number | null;
+    /** R3: `L6_PENDING_QUALIFICATION` = a locked 90+ CII with no L6 award yet (no level name is sent). */
+    cii_badge_status?: string | null;
     report_id?: string | null;
     hours_progress_pct?: number;
     progress_pct?: number;
@@ -253,6 +255,7 @@ export function useFacultyCommunityServiceData() {
                                     item.ciiLocked === true ||
                                     item.ciiLocked === "true",
                                 cii_level_name: pickStr(item, "cii_level_name", "ciiLevelName") || null,
+                                cii_badge_status: pickStr(item, "cii_badge_status", "ciiBadgeStatus") || null,
                                 cii_numeric_level:
                                     typeof levelRaw === "number" && Number.isFinite(levelRaw)
                                         ? levelRaw

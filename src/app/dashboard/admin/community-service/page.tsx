@@ -268,6 +268,7 @@ function mapAdminCsReportRow(
             (item.ciiV45 != null && typeof item.ciiV45 === "object"),
         cii_provisional: ciiProvisional,
         cii_locked: lockedFromPayload,
+        cii_badge_status: pickReportStr(item, "cii_badge_status", "ciiBadgeStatus") || null,
         cii_level_name:
             pickReportStr(item, "cii_level_name", "ciiLevelName") ||
             (typeof item.level === "string" ? item.level : null) ||

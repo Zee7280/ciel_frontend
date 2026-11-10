@@ -10,6 +10,7 @@ import {
     CII_V45_ANCHOR_NAMES,
     CII_V45_DIMENSIONS,
     criterionLabel,
+    isR3Analysis,
     type CiiV45Badge,
     type CiiV45Dimension,
     type CiiV45Result,
@@ -52,10 +53,31 @@ const GATE_NOTE: Record<GatePill["code"], string> = {
     L6: "L5 + 4B ≥ 80%, evidence ≥ 85%, 9 ≥ 70%, Admin-verified exceptional feature",
 };
 
-export function gatePills(result: Pick<CiiV45Result, "qualityGates"> | null | undefined): GatePill[] {
+export function gatePills(
+    result: (Pick<CiiV45Result, "qualityGates"> & Partial<Pick<CiiV45Result, "rubricVersion" | "l6Assessment">>) | null | undefined,
+): GatePill[] {
     const gates = result?.qualityGates ?? { L4: false, L5: false, L6: false };
+    if (isR3Analysis(result)) {
+        // R3: no L4/L5 quality gate (the CII alone picks the band); L6 needs the sourced qualification.
+        const l6 = result?.l6Assessment;
+        return [
+            { code: "L4", passed: Boolean(gates.L4), note: R3_GATE_NOTE.L4 },
+            { code: "L5", passed: Boolean(gates.L5), note: R3_GATE_NOTE.L5 },
+            {
+                code: "L6",
+                passed: l6?.status === "QUALIFIED",
+                note: l6?.status === "PENDING_QUALIFICATION" && l6.reasons.length ? `${R3_GATE_NOTE.L6} Missing: ${l6.reasons.join("; ")}.` : R3_GATE_NOTE.L6,
+            },
+        ];
+    }
     return (["L4", "L5", "L6"] as const).map((code) => ({ code, passed: Boolean(gates[code]), note: GATE_NOTE[code] }));
 }
+
+const R3_GATE_NOTE: Record<GatePill["code"], string> = {
+    L4: "No quality gate: the CII band decides",
+    L5: "No quality gate: the CII band decides",
+    L6: "CII ≥ 90, Measured Change ≥ 12/15, Sustainability ≥ 8/10, evidence ≥ 12/15 and three sourced confirmations. Otherwise L6 stays pending (never L5).",
+};
 
 /** "Score band L5 · capped to L4 by quality gate" or null when nothing is capped. */
 export function badgeCapNote(badge: CiiV45Badge | null | undefined): string | null {
@@ -78,7 +100,9 @@ export function finalChecklist(args: {
     const { result, dim7Complete, packetOk, locked } = args;
     const aiSections = (result?.sectionScores ?? []).filter((s) => s.dimension !== "7");
     const aiCriteria = aiSections.flatMap((s) => s.criterionScores ?? []);
-    const aiScored = aiSections.length > 0 && aiCriteria.every((c) => c.anchor !== "P");
+    // An Admin-reviewed mark resolves a criterion the AI left pending.
+    const isScored = (c: (typeof aiCriteria)[number]) => c.anchor !== "P" || Boolean(c.adminEdited);
+    const aiScored = aiSections.length > 0 && aiCriteria.every(isScored);
     const reasoningCount = aiCriteria.filter((c) => String(c.reasoningSummary || "").trim()).length;
     const inputs = result?.inputCompleteness;
     const hours = inputs?.individualHours ?? [];
@@ -89,6 +113,17 @@ export function finalChecklist(args: {
     const status = result?.scoreStatus;
     const flagsClear = Boolean(result) && (status === "FINAL" || (status === "ADMIN_EVIDENCE_REQUIRED" && flags.length === 0));
     const evidenceOk = locked ? result?.adminEvidenceAssessment?.status === "ASSESSED" : dim7Complete;
+    const l6 = isR3Analysis(result) ? result?.l6Assessment : undefined;
+    const l6Items: ChecklistItem[] =
+        l6 && l6.status !== "NOT_REQUIRED"
+            ? [
+                  {
+                      label: "L6 sustained-impact qualification",
+                      ok: l6.status === "QUALIFIED",
+                      detail: l6.status === "QUALIFIED" ? "Confirmed with a source" : `Pending: ${l6.reasons.join("; ")}`,
+                  },
+              ]
+            : [];
     return [
         {
             label: "Student packet complete",
@@ -98,7 +133,7 @@ export function finalChecklist(args: {
         {
             label: "AI scored every criterion",
             ok: aiScored,
-            detail: result ? `${aiCriteria.filter((c) => c.anchor !== "P").length} of ${aiCriteria.length} criteria scored` : "Analyser not run",
+            detail: result ? `${aiCriteria.filter(isScored).length} of ${aiCriteria.length} criteria scored` : "Analyser not run",
         },
         {
             label: "AI reasoning supplied for every criterion",
@@ -128,6 +163,7 @@ export function finalChecklist(args: {
             ok: flagsClear,
             detail: flags.length ? flags.join("; ") : status === "RESUBMISSION_REQUIRED" ? "Resubmission flagged" : "Nothing flagged",
         },
+        ...l6Items,
     ];
 }
 
@@ -142,6 +178,8 @@ export type FeedbackSection = {
     recommendation: string;
     /** Only on Dimension 7 — the Admin's own ratings. */
     evidenceNotes: string[];
+    /** R3: criterion marks the Admin reviewed in this section ("Label: AI 2.8 → 4 / 4 — reason"). */
+    reviewedMarks?: string[];
 };
 
 export type Dim7Draft = {
@@ -200,7 +238,15 @@ export function buildFeedbackSections(result: CiiV45Result | null | undefined, d
         const analysis = analyses.get(section.dimension);
         const strengths = (analysis?.strengths ?? []).filter(Boolean);
         const limitations = (analysis?.limitations ?? []).filter(Boolean);
-        const pendingCriteria = (section.criterionScores ?? []).filter((c) => c.anchor === "P").map((c) => criterionLabel(section.dimension, c.criterion));
+        const pendingCriteria = (section.criterionScores ?? [])
+            .filter((c) => c.anchor === "P" && !c.adminEdited)
+            .map((c) => criterionLabel(section.dimension, c.criterion));
+        const reviewedMarks = (section.criterionScores ?? [])
+            .filter((c) => c.adminEdited)
+            .map(
+                (c) =>
+                    `${criterionLabel(section.dimension, c.criterion)}: AI ${formatPts(c.aiScore ?? null)} → ${formatPts(c.score)} / ${c.maximumPoints}${c.adminEdit?.reason ? ` — ${c.adminEdit.reason}` : ""}`,
+            );
         return {
             dimension: section.dimension,
             name: section.name || def?.name || `Dimension ${section.dimension}`,
@@ -215,6 +261,7 @@ export function buildFeedbackSections(result: CiiV45Result | null | undefined, d
                   ? "Maintain this standard in future projects."
                   : "Review the criterion reasoning for improvement opportunities.",
             evidenceNotes: [],
+            ...(reviewedMarks.length ? { reviewedMarks } : {}),
         };
     });
 }
@@ -258,6 +305,7 @@ export function feedbackPlainText(header: FeedbackHeader, sections: FeedbackSect
         lines.push(`Strengths: ${s.strengths.join("; ") || "Not specified"}`);
         lines.push(`Limitations: ${s.limitations.join("; ") || "Not specified"}`);
         if (s.evidenceNotes.length) lines.push(`Evidence ratings: ${s.evidenceNotes.join("; ")}`);
+        if (s.reviewedMarks?.length) lines.push(`Admin-reviewed marks: ${s.reviewedMarks.join("; ")}`);
         lines.push(`Recommendation: ${s.recommendation}`, "");
     });
     if (header.adminComment?.trim()) lines.push(`Admin comment: ${header.adminComment.trim()}`);
