@@ -13,6 +13,7 @@ import {
 import {
     COMPACT_TABLE_PREVIEW_ROWS,
     compactTable,
+    isCompactDetailedReportAudience,
     isCompactShortAnswer,
     splitCompactRows,
     type CompactTable,
@@ -168,8 +169,8 @@ export default function ImpactPackageDetailedReport({
         () => buildImpactPackageDetailedReport(data, projectData, extraFiles, audience),
         [data, projectData, extraFiles, audience],
     );
-    /** The Admin review reads a compact layout (about 3–4 pages); every other viewer keeps the full dossier. */
-    const compact = audience === "admin";
+    /** Admin, student and faculty read the compact layout (about 3–4 pages); other viewers keep the full dossier. */
+    const compact = isCompactDetailedReportAudience(audience);
     const [query, setQuery] = useState("");
     const [openIds, setOpenIds] = useState<string[]>(() => dossier.sections.map((section) => section.id));
 

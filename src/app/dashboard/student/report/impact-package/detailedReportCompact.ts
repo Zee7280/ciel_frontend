@@ -1,11 +1,18 @@
 /**
- * Compact layout for the Admin's Detailed report tab. The full dossier prints every session, evidence
+ * Compact layout for the Detailed report tab (Admin, student and faculty). The full dossier prints every session, evidence
  * file and activity as a stacked block of fields, which runs to many pages. In compact mode the same
  * answers are laid out densely: repeated entries become one table row each, short answers share a
  * grid, unanswered questions fold into one line, and long tables show their first rows with a
  * "show all" toggle. Pure module (type-only import), so the node:test suite can load it directly.
  */
 import type { DetailedReportRow, DetailedReportValue } from "./buildImpactPackageDetailedReport";
+
+/** Who reads the compact layout. Layout only: what each viewer may see is decided by the report builder. */
+export const COMPACT_DETAILED_REPORT_AUDIENCES = ["admin", "student", "faculty"] as const;
+
+export function isCompactDetailedReportAudience(audience: string | null | undefined): boolean {
+    return (COMPACT_DETAILED_REPORT_AUDIENCES as readonly string[]).includes(String(audience || ""));
+}
 
 /** Rows a long table shows before the "show all" toggle. */
 export const COMPACT_TABLE_PREVIEW_ROWS = 6;

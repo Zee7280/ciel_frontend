@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = "src/app/dashboard/student/report/impact-package";
-const { COMPACT_TABLE_PREVIEW_ROWS, compactCellText, compactTable, isCompactShortAnswer, splitCompactRows } = await import(
+const { COMPACT_TABLE_PREVIEW_ROWS, compactCellText, isCompactDetailedReportAudience, compactTable, isCompactShortAnswer, splitCompactRows } = await import(
     path.join(root, dir, "detailedReportCompact.ts")
 );
 
@@ -56,10 +56,12 @@ test("unanswered questions fold into one line; answered rows keep their order", 
     assert.deepEqual(unanswered, ["Semester", "Skills"]);
 });
 
-test("long tables preview a few rows; the component is wired for the Admin audience only", () => {
+test("long tables preview a few rows; admin, student and faculty read the compact layout", () => {
     assert.ok(COMPACT_TABLE_PREVIEW_ROWS >= 5 && COMPACT_TABLE_PREVIEW_ROWS <= 10);
+    for (const a of ["admin", "student", "faculty"]) assert.equal(isCompactDetailedReportAudience(a), true, a);
+    for (const a of ["university", "partner", "public", "", undefined]) assert.equal(isCompactDetailedReportAudience(a), false, String(a));
     const src = readFileSync(path.join(root, dir, "ImpactPackageDetailedReport.tsx"), "utf8");
-    assert.match(src, /const compact = audience === "admin";/);
+    assert.match(src, /const compact = isCompactDetailedReportAudience\(audience\);/);
     assert.match(src, /!compact && rows\.map/, "other viewers keep the full dossier rows");
     assert.match(src, /showAll=\{Boolean\(query\.trim\(\)\)\}/, "a search shows every matching table row");
 });
