@@ -665,19 +665,23 @@ function ReportFormContent() {
                 setAiStatus('Analyzing Data & Writing Summary...');
                 try {
                     const { generateAISummary, isOptionalAiSummaryUnavailable } = await import('./utils/aiSummarizer');
+                    const { sectionSummarySource } = await import('./utils/sectionSummarySync');
                     for (const stepNum of stepsForAi) {
                         const sectionKey = `section${stepNum}` as Exclude<keyof typeof data, 'project_id'>;
                         try {
+                            // Fingerprint of the exact answers the summary is written from (live banner sync check).
+                            const summarySource = sectionSummarySource(data[sectionKey]);
                             const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
                             if (summaryRes.summary) {
                                 updatedData = {
                                     ...updatedData,
                                     [sectionKey]: {
                                         ...(updatedData[sectionKey] as Record<string, unknown>),
-                                        summary_text: summaryRes.summary
+                                        summary_text: summaryRes.summary,
+                                        summary_source: summarySource,
                                     }
                                 };
-                                updateSection(sectionKey, { summary_text: summaryRes.summary });
+                                updateSection(sectionKey, { summary_text: summaryRes.summary, summary_source: summarySource });
                             } else if (summaryRes.skipped) {
                                 skipOptionalAiToast = true;
                             } else if (summaryRes.error) {

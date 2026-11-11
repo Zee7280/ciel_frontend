@@ -13,6 +13,7 @@ import ImpactPackage from "./impact-package/ImpactPackage";
 import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
 import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "./utils/mediaVisibility";
+import { combinedSummarySync, sectionSummarySync, type SectionSummarySync } from "./utils/sectionSummarySync";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -102,6 +103,12 @@ function firstSentence(text: string): string {
     if (!trimmed) return "";
     const match = trimmed.match(/^[^.!?]*[.!?]/);
     return (match ? match[0] : trimmed).trim();
+}
+
+/** The opportunity's linked partner, or "" when the context only has its "N/A" placeholder. */
+function linkedPartnerName(context: { partnerOrganization?: string }): string {
+    const name = String(context.partnerOrganization || "").trim();
+    return /^(n\/?a|none|—|-)$/i.test(name) ? "" : name;
 }
 
 function displayName(person: { name?: string; fullName?: string } | undefined): string {
@@ -240,7 +247,7 @@ export function ReportMissionHero({
                 <div className="ey">YOUR COMMUNITY IMPACT MISSION</div>
                 <h1>{a.title}</h1>
                 <p>
-                    {[a.context.partnerOrganization, a.context.projectLocation !== "N/A" ? a.context.projectLocation : "", a.context.timelineLabel !== "—" ? a.context.timelineLabel : ""]
+                    {[linkedPartnerName(a.context), a.context.projectLocation !== "N/A" ? a.context.projectLocation : "", a.context.timelineLabel !== "—" ? a.context.timelineLabel : ""]
                         .filter(Boolean)
                         .join(" · ")}
                     <br />
@@ -391,11 +398,11 @@ const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>, require
     },
     7: (a, _hours, data) => {
         const partners = (data.section7?.partners || []).filter((partner) => partner.name);
-        const count = Math.max(partners.length, a.context.partnerOrganization ? 1 : 0);
+        const count = Math.max(partners.length, linkedPartnerName(a.context) ? 1 : 0);
         return {
             headline: "PARTNERSHIP STORY BUILT",
             body: `${count} partner relationship${count === 1 ? "" : "s"} documented.`,
-            badges: [`🤝 ${a.context.partnerOrganization || "Partner"}`, "🔗 roles recorded"],
+            badges: [`🤝 ${linkedPartnerName(a.context) || "Partner"}`, "🔗 roles recorded"],
         };
     },
     8: (a) => ({
@@ -891,7 +898,7 @@ function SectionSummaryStats({
                         color: "#ff766f",
                         suffix: " reached",
                     }))}
-                    tiles={[`📦 ${agg.outputs} countable outputs`, `🙋 ${agg.reach || 0} unique people`]}
+                    tiles={[`📦 ${agg.outputs} countable outputs`, `🙋 ${sectionFourReach(data)} unique people`]}
                 />
                 {agg.measured.length ? (
                     <StatChart
@@ -947,7 +954,7 @@ function SectionSummaryStats({
                 tiles={[
                     ...new Set(
                         [
-                            agg.context.partnerOrganization ? `🤝 ${agg.context.partnerOrganization}` : "",
+                            linkedPartnerName(agg.context) ? `🤝 ${linkedPartnerName(agg.context)}` : "",
                             ...partners.map((partner) => `🤝 ${partner.name}`),
                             ...roles.map((role) => `🔧 ${role}`),
                         ].filter(Boolean),
@@ -1011,19 +1018,55 @@ function SectionSummaryStats({
     return null;
 }
 
+/** How the saved AI summary relates to the answers now on screen ("server": rewritten by CIEL PK on every save). */
+type BannerAiSync = SectionSummarySync | "server";
+
+const AI_SYNC_NOTE: Record<Exclude<BannerAiSync, "none">, { tag: string; note: string; color: string; background: string }> = {
+    fresh: {
+        tag: "✓ MATCHES YOUR CURRENT ANSWERS",
+        note: "",
+        color: "#0e7d74",
+        background: "#e3f5f1",
+    },
+    server: {
+        tag: "↻ REWRITTEN FROM YOUR ANSWERS ON EVERY SAVE",
+        note: "",
+        color: "#0e7d74",
+        background: "#e3f5f1",
+    },
+    stale: {
+        tag: "⚠ WRITTEN FROM EARLIER ANSWERS",
+        note: "You changed this section after the AI summary was written. The live summary above is current; the AI summary is rewritten from your answers when you press Next on this step.",
+        color: "#9a6700",
+        background: "#fff6e8",
+    },
+    unchecked: {
+        tag: "SAVED SUMMARY · NOT YET RE-CHECKED",
+        note: "Saved before summaries were checked against the answers. Compare it with the live summary above; pressing Next on this step rewrites it from your current answers.",
+        color: "#5c6672",
+        background: "#eef1f4",
+    },
+};
+
 function BannerShell({
     step,
     title,
     children,
     ai,
+    aiSync = "unchecked",
+    live,
     stats,
 }: {
     step: number;
     title: string;
     children?: ReactNode;
     ai?: string;
+    aiSync?: BannerAiSync;
+    /** Plain-language summary built from the answers on screen (always current). */
+    live?: string;
     stats?: ReactNode;
 }) {
+    const sync = aiSync === "none" ? null : AI_SYNC_NOTE[aiSync];
     return (
         <div className="cer-ban">
             <div className="cer-bh">
@@ -1034,13 +1077,32 @@ function BannerShell({
                 <div className="cer-bt">{title}</div>
             </div>
             <div className="cer-bb">
+                {live ? (
+                    <>
+                        <div className="cer-bsec">LIVE SUMMARY — FROM YOUR CURRENT ANSWERS</div>
+                        <p style={{ margin: "0 0 11px", fontSize: 11.5, lineHeight: 1.65, color: "#1d3a3d" }}>{live}</p>
+                    </>
+                ) : null}
                 {children}
                 {ai ? (
                     <>
-                        <div className="cer-bsec" style={{ marginTop: 11 }}>
+                        <div
+                            className="cer-bsec"
+                            style={{ marginTop: 11, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}
+                        >
                             AI SUMMARY — WHAT THE RUBRIC WILL READ
+                            {sync ? (
+                                <span className="cer-mtag" style={{ color: sync.color, background: sync.background }}>
+                                    {sync.tag}
+                                </span>
+                            ) : null}
                         </div>
-                        <div className="cer-quote tl">{ai}</div>
+                        <div className="cer-quote tl" style={aiSync === "stale" ? { opacity: 0.7 } : undefined}>
+                            {ai}
+                        </div>
+                        {sync?.note ? (
+                            <p style={{ margin: "-4px 0 10px", fontSize: 10, lineHeight: 1.55, color: sync.color }}>{sync.note}</p>
+                        ) : null}
                     </>
                 ) : null}
                 {stats}
@@ -1185,6 +1247,130 @@ function Section1ExecutiveSummary({ data }: { data: ReportData }) {
     );
 }
 
+function plural(n: number, one: string, many = `${one}s`): string {
+    return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Reach counted in Section 4 itself (the baseline's affected count is not "reached"). */
+function sectionFourReach(data: ReportData): number {
+    return distinctBeneficiaryTotal(data.section4) || 0;
+}
+
+/**
+ * Plain-language summary of a wizard step, built only from the answers on screen — the same
+ * figures the banner tiles show — so it can never drift from the data the way a saved AI text can.
+ */
+export function liveSectionSummary(uiStep: number, data: ReportData, a: ReturnType<typeof chromeAgg>): string {
+    if (uiStep === 2) {
+        const who = pickString(data.section2?.affected_group);
+        const count = pickString(data.section2?.affected_count);
+        const gaps = (data.section2?.system_gaps || []).filter(Boolean).length;
+        const sources = (data.section2?.baseline_evidence || []).filter(Boolean).length;
+        const problem = firstSentence(data.section2?.problem_statement || "");
+        if (!problem && !who && !gaps && !sources) return "No baseline has been written yet.";
+        return [
+            who ? `Affected group: ${count ? `about ${count} ` : ""}${who}.` : "Affected group not named yet.",
+            `${plural(gaps, "system gap")} and ${plural(sources, "baseline evidence source")} recorded.`,
+            problem ? `Baseline: ${problem}` : "Baseline statement not written yet.",
+        ].join(" ");
+    }
+    if (uiStep === 3) {
+        const primary = a.sdgs.filter((s) => s.role === "primary");
+        const added = a.sdgs.filter((s) => s.role !== "primary");
+        const words = (data.section3?.contribution_intent_statement || "").trim().split(/\s+/).filter(Boolean).length;
+        const label = (rows: typeof a.sdgs) =>
+            rows.map((row) => `SDG ${row.goalNumber}${row.targetId ? ` (${row.targetId})` : ""}`).join(", ");
+        if (!a.sdgs.length && !words) return "No SDG mapping saved yet.";
+        return [
+            primary.length ? `Registered goal: ${label(primary)}.` : "No registered goal on the opportunity.",
+            added.length ? `Student-mapped: ${label(added)}.` : "No student-mapped goals added.",
+            words ? `Contribution logic: ${plural(words, "word")}.` : "Contribution logic not written yet.",
+        ].join(" ");
+    }
+    if (uiStep === 4) {
+        const reach = sectionFourReach(data);
+        const challenges = (Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : []).filter(
+            (tag) => !isSummaryOtherChoice(tag),
+        ).length;
+        if (!a.acts.length && !a.measured.length) return "No activities or measured outcomes saved yet.";
+        return [
+            `${plural(a.acts.length, "activity", "activities")} with ${plural(a.outputs, "countable output")}, reaching ${reach ? `${reach} unique ${reach === 1 ? "person" : "people"}` : "no recorded beneficiaries yet"}.`,
+            a.measured.length
+                ? `${plural(a.measured.length, "measured change")}${a.bestPct != null ? `, best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}.`
+                : "No baseline → endline measurement yet.",
+            challenges ? `${plural(challenges, "limitation")} named.` : "",
+        ]
+            .filter(Boolean)
+            .join(" ");
+    }
+    if (uiStep === 5) {
+        if (data.section6?.use_resources === "no") return "Declared as a zero-budget project: it ran on time and effort alone.";
+        const resources = (data.section6?.resources || []).filter((row) => pickString(row.type));
+        if (!resources.length) return "No resources recorded yet.";
+        const verified = resources.filter((row) => resourceVerifications(row).length > 0).length;
+        return `${plural(resources.length, "resource entry", "resource entries")}${a.pkr ? `, PKR ${a.pkr.toLocaleString()} in cash` : ""}; ${verified} with verification on record.`;
+    }
+    if (uiStep === 6) {
+        if (data.section7?.has_partners === "no") return "No external partners declared for this project.";
+        const partners = (data.section7?.partners || []).filter((partner) => pickString(partner.name));
+        const linked = linkedPartnerName(a.context);
+        const roles = [...new Set(partners.flatMap((partner) => partnerRoleLabels(partner)))];
+        if (!partners.length) return linked ? `Linked partner: ${linked}. No partner roles recorded yet.` : "No partners recorded yet.";
+        return `${plural(partners.length, "partner")} named (${partners.map((p) => p.name).join(", ")})${linked ? `; linked partner ${linked}` : ""}; ${plural(roles.length, "role")} confirmed.`;
+    }
+    if (uiStep === 7) {
+        if (data.section8?.has_evidence === "no") return "No extra evidence files declared for this section.";
+        const types = cleanedList(data.section8?.evidence_types, data.section8?.evidence_type_other);
+        const visibility = mediaVisibilityTitle(data.section8?.media_visible) || "Restricted";
+        const share = isPublicMediaVisibility(data.section8?.media_visible)
+            ? a.ethicsOk
+                ? "public share permission confirmed"
+                : "public share permission still pending"
+            : "not shown publicly";
+        return `${plural(a.evidence, "evidence file")} on record${types.length ? ` (${types.join(", ")})` : ""}; visibility ${visibility}, ${share}.`;
+    }
+    if (uiStep === 8) {
+        const skills = cleanedList(data.section9?.skills_grown, data.section9?.skills_grown_other);
+        const integration =
+            INTEGRATION_TITLES[data.section9?.academic_integration || ""] || stripChoiceLabel(data.section9?.academic_integration);
+        if (!skills.length && !a.competency && !integration) return "No reflection saved yet.";
+        return [
+            skills.length ? `${plural(skills.length, "skill")} grown: ${skills.join(", ")}.` : "No skills selected yet.",
+            a.competency ? `Average self-rating ${a.competency}/5.` : "Competency ratings pending.",
+            integration ? `Academic integration: ${integration}.` : "",
+        ]
+            .filter(Boolean)
+            .join(" ");
+    }
+    if (uiStep === 9) {
+        const status = CONTINUATION_TITLES[String(data.section10?.continuation_status || "").toLowerCase()] || "";
+        const mechs = cleanedList(data.section10?.mechanisms, data.section10?.mechanism_other);
+        const scaling = pickString(data.section10?.scaling_potential);
+        if (!status && !mechs.length) return "Continuation not answered yet.";
+        return [
+            status ? `Continuation: ${status}.` : "Continuation status pending.",
+            mechs.length ? `${plural(mechs.length, "mechanism")}: ${mechs.join(", ")}.` : "No continuity mechanisms named.",
+            scaling ? `Scaling: ${scaling}.` : "",
+        ]
+            .filter(Boolean)
+            .join(" ");
+    }
+    return "";
+}
+
+/** Steps whose AI summary CIEL PK rewrites on every save (Context, SDG mapping). */
+const SERVER_SUMMARY_STEPS = new Set([2, 3]);
+/** Steps that still have an AI summary writer on Next (data sections 4+5, 8, 9, 10). */
+const CLIENT_SUMMARY_STEPS = new Set([4, 7, 8, 9]);
+
+function bannerAiSync(uiStep: number, data: ReportData): BannerAiSync {
+    if (SERVER_SUMMARY_STEPS.has(uiStep)) return "server";
+    const sections = wizardStepToDataSections(uiStep).map(
+        (n) => (data as unknown as Record<string, unknown>)[`section${n}`],
+    );
+    return combinedSummarySync(sections.map(sectionSummarySync));
+}
+
 export function ReportLiveBanner({
     step,
     data,
@@ -1210,6 +1396,11 @@ export function ReportLiveBanner({
             : undefined,
     );
     const baseline = firstSentence(data.section2?.problem_statement || "");
+    const aiSync = bannerAiSync(uiStep, data);
+    // Resources / Partnerships no longer get an AI summary on Next: an old saved one is shown only if it still matches.
+    const aiShown = CLIENT_SUMMARY_STEPS.has(uiStep) || SERVER_SUMMARY_STEPS.has(uiStep) || aiSync === "fresh" ? ai : "";
+    const live = liveSectionSummary(uiStep, data, a);
+    const reach4 = sectionFourReach(data);
 
     if (step === 1) {
         return <Section1ExecutiveSummary data={data} />;
@@ -1217,7 +1408,7 @@ export function ReportLiveBanner({
 
     if (step === 2) {
         return (
-            <BannerShell step={2} title={baseline ? `“${baseline}”` : "Your baseline, in your words"} ai={ai} stats={<SectionSummaryStats uiStep={2} data={data} agg={a} />}>
+            <BannerShell step={2} title={baseline ? `“${baseline}”` : "Your baseline, in your words"} ai={aiShown} aiSync={aiSync} live={live} stats={<SectionSummaryStats uiStep={2} data={data} agg={a} />}>
                 {data.section2?.problem_statement ? (
                     <>
                         <div className="cer-bsec">BASELINE STATEMENT</div>
@@ -1233,7 +1424,7 @@ export function ReportLiveBanner({
             <BannerShell
                 step={3}
                 title={`${a.sdgs.filter((s) => s.role === "primary").length} registered goal · ${a.sdgs.filter((s) => s.role !== "primary").length} student-mapped`}
-                ai={ai}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={3} data={data} agg={a} />}
             >
                 {a.sdgs.length ? (
@@ -1280,15 +1471,15 @@ export function ReportLiveBanner({
         return (
             <BannerShell
                 step={4}
-                title={`${a.acts.length} activities · ${a.outputs} outputs · ${a.reach || "—"} reached${a.measured.length ? ` → ${a.measured.length} measured change${a.measured.length === 1 ? "" : "s"}${a.bestPct != null ? ` · best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}` : ""}`}
-                ai={ai}
+                title={`${a.acts.length} activities · ${a.outputs} outputs · ${reach4 || "—"} reached${a.measured.length ? ` → ${a.measured.length} measured change${a.measured.length === 1 ? "" : "s"}${a.bestPct != null ? ` · best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}` : ""}`}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={4} data={data} agg={a} />}
             >
                 <div className="cer-scale">
                     {[
                         ["🛠️", String(a.acts.length), "ACTIVITIES"],
                         ["📦", String(a.outputs), "OUTPUTS"],
-                        ["🫶", a.reach || "—", "REACHED"],
+                        ["🫶", reach4 ? String(reach4) : "—", "REACHED"],
                         ["🗺️", broadest, "BROADEST REACH"],
                     ].map(([icon, value, label]) => (
                         <div key={label}>
@@ -1362,7 +1553,7 @@ export function ReportLiveBanner({
                 <div className="cer-mrow">
                     <span className="cer-mtag">🛠 {a.acts.length} ACTIVITIES</span>
                     <span className="cer-mtag">📦 {a.outputs} OUTPUTS</span>
-                    <span className="cer-mtag">🫶 {a.reach || 0} REACHED</span>
+                    <span className="cer-mtag">🫶 {reach4} REACHED</span>
                     <span className="cer-mtag">
                         📊 {a.measured.length} MEASURED{directMeasured ? " · DIRECT" : ""}
                     </span>
@@ -1390,7 +1581,7 @@ export function ReportLiveBanner({
                         ? "Ran on time & effort alone 💪"
                         : `${resources.length} resource entr${resources.length === 1 ? "y" : "ies"}${a.pkr ? ` · PKR ${a.pkr.toLocaleString()}` : ""}`
                 }
-                ai={ai}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={5} data={data} agg={a} />}
             >
                 {timeOnly ? (
@@ -1428,7 +1619,7 @@ export function ReportLiveBanner({
     }
 
     if (uiStep === 6) {
-        const linked = a.context.partnerOrganization;
+        const linked = linkedPartnerName(a.context);
         const partners =
             data.section7?.has_partners === "no"
                 ? []
@@ -1440,7 +1631,7 @@ export function ReportLiveBanner({
             <BannerShell
                 step={6}
                 title={`${linked || partners[0]?.name || "Your partner"}${roles.length ? ` · ${roles.length} roles` : ""}`}
-                ai={ai}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={6} data={data} agg={a} />}
             >
                 {roles.length ? (
@@ -1484,7 +1675,7 @@ export function ReportLiveBanner({
                         ? "No extra evidence files"
                         : `${a.evidence} evidence file${a.evidence === 1 ? "" : "s"} on record`
                 }
-                ai={ai}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={7} data={data} agg={a} />}
             >
                 {types.length ? (
@@ -1520,7 +1711,7 @@ export function ReportLiveBanner({
             <BannerShell
                 step={8}
                 title={`${skills.length ? `${skills.length} skills grown` : "Your reflection"}${a.competency ? ` · ${a.competency}/5 self-rated` : ""}`}
-                ai={ai}
+                ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={8} data={data} agg={a} />}
             >
                 {skills.length ? (
@@ -1553,7 +1744,7 @@ export function ReportLiveBanner({
         <BannerShell
             step={9}
             title={statusTitle ? `Continues: ${statusTitle}${mechs.length ? ` · ${mechs.length} mechanisms` : ""}` : "The last question"}
-            ai={ai}
+            ai={aiShown} aiSync={aiSync} live={live}
             stats={<SectionSummaryStats uiStep={9} data={data} agg={a} />}
         >
             {data.section10?.continuation_details ? <div className="cer-quote">{data.section10.continuation_details}</div> : null}
