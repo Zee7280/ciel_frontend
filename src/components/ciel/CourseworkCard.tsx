@@ -172,13 +172,13 @@ export default function CourseworkCard({
     const displayTitle = entry.projectTitle || (entry.status === "draft" ? "New coursework report — tap to continue" : "Untitled coursework");
 
     return (
-        <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
+        <div className="overflow-hidden rounded-ciel-lg border border-[#dde8e5] bg-white shadow-[0_6px_20px_rgba(20,63,59,.06)]">
             {ribbons.length > 0 && entry.status === "submitted" && approval === "approved" ? (
-                <div className="divide-y divide-black/10">
+                <div className="divide-y divide-[#f0e3c4] border-b border-[#ead8b8]">
                     {ribbons.map(({ level, ribbon }) => {
                         const movement = rankMovement(ribbon);
                         return (
-                            <div key={level} className="bg-[linear-gradient(90deg,#f59e0b,#fbbf24)] px-4 py-2 text-[10px] font-black uppercase tracking-wide text-[#3b2202]">
+                            <div key={level} className="bg-[#fff8ec] px-5 py-2 text-[10px] font-bold uppercase tracking-wide text-[#715a2d]">
                                 {ribbon.rank === 1 ? "🥇" : ribbon.rank === 2 ? "🥈" : ribbon.rank === 3 ? "🥉" : "🏅"}{" "}
                                 Ranked #{ribbon.rank} of {ribbon.of}
                                 {ribbon.scope ? ` · ${ribbon.scope}` : ""}
@@ -191,10 +191,10 @@ export default function CourseworkCard({
                 </div>
             ) : null}
             {/* Ribbon */}
-            <div className="border-b border-ciel-border bg-ciel-page/60 p-5">
+            <div className="border-b border-[#e6efed] bg-[#f7fbfa] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-navy text-lg text-white">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-ciel-sm border border-[#d5eee8] bg-[#eef8f6] text-lg text-[#087c75]">
                             {formatBadgeEmoji(primaryFormat)}
                         </span>
                         <div className="min-w-0">
@@ -236,8 +236,8 @@ export default function CourseworkCard({
                             <span>{sectionsDone} of 7 sections complete</span>
                             <span>{completionPct}%</span>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-page">
-                            <div className="h-full rounded-full bg-ciel-gold" style={{ width: `${completionPct}%` }} />
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e6efed]">
+                            <div className="h-full rounded-full bg-[#087c75]" style={{ width: `${completionPct}%` }} />
                         </div>
                     </div>
                 )}
@@ -278,7 +278,7 @@ export default function CourseworkCard({
             <div className="p-5">
                 <p className="text-sm leading-relaxed text-ciel-text">{story}</p>
                 {proof ? (
-                    <p className="mt-2.5 rounded-ciel-xs border border-dashed border-ciel-border bg-ciel-page/60 px-3 py-2 text-xs font-semibold text-ciel-text-mid">
+                    <p className="mt-2.5 rounded-ciel-xs border border-dashed border-[#d5eee8] bg-[#f7fbfa] px-3 py-2 text-xs font-semibold text-ciel-text-mid">
                         📎 Strongest proof: {proof}
                     </p>
                 ) : null}
@@ -315,12 +315,12 @@ export default function CourseworkCard({
                         </a>
                     ))}
                     {isTeam && groupSize > 1 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#eef8f6] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#4b6f68]">
                             <Users className="h-3 w-3" /> {si.teamMode} of {groupSize}
                         </span>
                     )}
                     {integration ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#eef8f6] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#4b6f68]">
                             {stripEmoji(integration)}
                         </span>
                     ) : null}
@@ -332,7 +332,7 @@ export default function CourseworkCard({
                         e.stopPropagation();
                         setOpen((o) => !o);
                     }}
-                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40 hover:text-ciel-navy"
+                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-[#dde8e5] py-2.5 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                 >
                     <span>📖</span>
                     <span>{open ? "Close" : "View all — summary of every section"}</span>
@@ -392,9 +392,9 @@ export default function CourseworkCard({
             </div>
 
             {/* Footer */}
-            <div className="flex flex-col gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-t border-[#e6efed] bg-[#f7fbfa] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d5eee8] bg-[#eef8f6] text-[10px] font-black text-[#087c75]">
                         {initials || "?"}
                     </span>
                     <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
@@ -444,7 +444,7 @@ export default function CourseworkCard({
                                                 setRemindingFaculty(false);
                                             }
                                         }}
-                                        className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40 disabled:opacity-60"
+                                        className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa] disabled:opacity-60"
                                     >
                                         <Mail className="h-3.5 w-3.5" /> {remindingFaculty ? "Sending…" : `Email ${facultyReminder.name}`}
                                     </button>
@@ -454,7 +454,7 @@ export default function CourseworkCard({
                                     onClick={(e) => e.stopPropagation()}
                                     title={onRemindFaculty ? "Open a prefilled email in your own mail app instead" : `Email ${facultyReminder.to}`}
                                     className={clsx(
-                                        "ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40",
+                                        "ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]",
                                         onRemindFaculty && "border-dashed",
                                     )}
                                 >
@@ -470,7 +470,7 @@ export default function CourseworkCard({
                                             ? `Opens a WhatsApp chat with ${facultyReminder.name}`
                                             : "No instructor WhatsApp number saved — this opens WhatsApp so you can pick the contact. Add the number in Step 1 for a direct chat."
                                     }
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                                 >
                                     <MessageCircle className="h-3.5 w-3.5" /> {facultyWhatsappDirect ? `WhatsApp ${facultyReminder.name}` : "Share on WhatsApp"}
                                 </a>
@@ -481,7 +481,7 @@ export default function CourseworkCard({
                                 <a
                                     href={mailtoHref(remindOwnerReminder.to, remindOwnerReminder.subject, remindOwnerReminder.body)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                                 >
                                     <Mail className="h-3.5 w-3.5" /> Email
                                 </a>
@@ -490,7 +490,7 @@ export default function CourseworkCard({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                                 >
                                     <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                                 </a>
@@ -500,7 +500,7 @@ export default function CourseworkCard({
                             <button
                                 type="button"
                                 onClick={() => setShareOpen((o) => !o)}
-                                className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                             >
                                 <Share2 className="h-3.5 w-3.5" /> Share badge
                             </button>
@@ -511,7 +511,7 @@ export default function CourseworkCard({
                                     type="button"
                                     onClick={() => onFacultyReview("reject")}
                                     disabled={reviewing}
-                                    className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                    className="ciel-transition rounded-ciel-xs border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
                                 >
                                     Reject
                                 </button>
@@ -519,7 +519,7 @@ export default function CourseworkCard({
                                     type="button"
                                     onClick={() => onFacultyReview("revision")}
                                     disabled={reviewing}
-                                    className="ciel-transition rounded-ciel-xs border-2 border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                                    className="ciel-transition rounded-ciel-xs border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                                 >
                                     Request revision
                                 </button>
@@ -527,7 +527,7 @@ export default function CourseworkCard({
                                     type="button"
                                     onClick={() => onFacultyReview("approve")}
                                     disabled={reviewing}
-                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-green bg-ciel-green px-3 py-2 text-xs font-bold text-white hover:bg-ciel-green-deep disabled:opacity-50"
+                                    className="ciel-transition rounded-ciel-xs border border-[#087c75] bg-[#087c75] px-3 py-2 text-xs font-bold text-white hover:bg-[#0e4d4e] disabled:opacity-50"
                                 >
                                     ✓ Approve — make live
                                 </button>
@@ -538,7 +538,7 @@ export default function CourseworkCard({
             </div>
 
             {teamReminders.length > 0 && (
-                <div className="space-y-2 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
+                <div className="space-y-2 border-t border-[#e6efed] bg-[#f7fbfa] px-5 py-3.5">
                     <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">Remind your team — each button names its recipient</span>
                     <div className="flex flex-wrap gap-2">
                         {teamReminders.map((r) => (
@@ -546,7 +546,7 @@ export default function CourseworkCard({
                                 <a
                                     href={mailtoHref(r.to, r.subject, r.body)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                                 >
                                     <Mail className="h-3.5 w-3.5" /> Email {r.name}
                                 </a>
@@ -555,7 +555,7 @@ export default function CourseworkCard({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                                 >
                                     <MessageCircle className="h-3.5 w-3.5" /> WhatsApp {r.name}
                                 </a>
@@ -571,7 +571,7 @@ export default function CourseworkCard({
                     <button
                         type="button"
                         onClick={() => void shareBadge()}
-                        className="ciel-transition rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                        className="ciel-transition rounded-ciel-xs border border-[#d7e4e1] bg-white px-3 py-2 text-xs font-bold text-[#174b43] hover:border-[#087c75]/40 hover:bg-[#f7fbfa]"
                     >
                         🔗 Copy / share link
                     </button>
