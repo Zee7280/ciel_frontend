@@ -69,6 +69,7 @@ export default function AdminReviewPackageStrip({
                 initialTab={initialTab}
                 extraFiles={fallbackFiles}
                 analyserHref={analyserHref}
+                reportId={reportId}
             />
         </section>
     );

@@ -35,6 +35,8 @@ import { CII_L6_PENDING_LABEL, isCiiL6Pending, pickCiiV45DisplayBadgeName, pickC
 import { CiiFinalOnePageSheet } from "@/components/ciel/community-service/CiiFinalOnePageSheet";
 import { readImpactPackagePacketIntegrity } from "./impactPackagePacket";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { toast } from "sonner";
+import { authenticatedFetch } from "@/utils/api";
 import "./impact-package.css";
 
 const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: string }> = {
@@ -181,6 +183,18 @@ export type ImpactPackageSubmitControls = {
     sending?: boolean;
 };
 
+function evidenceZipFilename(header: string | null): string | null {
+    if (!header) return null;
+    const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(header);
+    if (!match?.[1]) return null;
+    const raw = match[1].replace(/"/g, "").trim();
+    try {
+        return decodeURIComponent(raw);
+    } catch {
+        return raw;
+    }
+}
+
 export default function ImpactPackage({
     data,
     projectData,
@@ -189,6 +203,7 @@ export default function ImpactPackage({
     extraFiles,
     analyserHref,
     submit,
+    reportId,
 }: {
     data: ReportData;
     projectData?: unknown;
@@ -197,6 +212,8 @@ export default function ImpactPackage({
     extraFiles?: Array<{ url?: string; name?: string; source?: string }>;
     analyserHref?: string;
     submit?: ImpactPackageSubmitControls;
+    /** Report id for the Super Admin evidence ZIP (falls back to `data.id` / `data.report_id`). */
+    reportId?: string;
 }) {
     const model = useMemo(() => buildImpactPackageModel(data, projectData, extraFiles), [data, projectData, extraFiles]);
     const studentSubmitMode: GenerateMyPackageSubmitMode | null =
@@ -236,6 +253,54 @@ export default function ImpactPackage({
     const publicLocked = audience === "public" && visibility !== "public";
     const filesVisible = partnerLocked || publicLocked ? false : canView;
     const canDownload = impactPackageCanDownload(audience, visibility, model.publicConsent);
+    const [zipBusy, setZipBusy] = useState(false);
+    const downloadReportId = String(reportId || data.id || data.report_id || "").trim();
+    /** Super Admin: every evidence original in one ZIP. Other viewers keep opening the first original. */
+    const downloadAllEvidence = async () => {
+        if (!canDownload || zipBusy || model.files.length === 0) return;
+        if (audience !== "admin" || !downloadReportId) {
+            window.open(model.files[0]?.url, "_blank", "noopener,noreferrer");
+            return;
+        }
+        setZipBusy(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/reports/${encodeURIComponent(downloadReportId)}/evidence/download`,
+                { method: "POST", body: JSON.stringify({ urls: model.files.map((file) => file.url) }) },
+                { redirectToLogin: true },
+            );
+            if (!res) return;
+            if (!res.ok) {
+                const body = (await res.json().catch(() => ({}))) as { message?: unknown; error?: unknown };
+                toast.error(
+                    (typeof body.message === "string" && body.message) || (typeof body.error === "string" && body.error) || "Download failed",
+                );
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download =
+                evidenceZipFilename(res.headers.get("Content-Disposition")) ||
+                `${model.title.replace(/[/\\?%*:|"<>]/g, "-").slice(0, 40) || "report"}-evidence.zip`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            const missing =
+                (Number(res.headers.get("X-Evidence-Skipped")) || 0) + (Number(res.headers.get("X-Evidence-Not-In-Record")) || 0);
+            if (missing > 0) {
+                toast.warning("Evidence ZIP downloaded", { description: `${missing} file(s) could not be included.` });
+            } else {
+                toast.success("Evidence ZIP downloaded", { description: `${model.files.length} file(s)` });
+            }
+        } catch {
+            toast.error("Could not download the evidence ZIP");
+        } finally {
+            setZipBusy(false);
+        }
+    };
     const lockLine = impactPackageLockLine(previewStage === "approved" || model.adminApproved);
     const accessText = impactPackageAccessText(audience, visibility, previewStage === "approved" || model.adminApproved);
     const packetIntegrity = readImpactPackagePacketIntegrity(data);
@@ -674,9 +739,15 @@ export default function ImpactPackage({
                         <header className="page-head">
                             <div className="page-head-top">
                                 <div className="eyebrow">03 / The evidence behind the claims</div>
-                                <button type="button" className="primary" disabled={!canDownload} onClick={() => window.open(model.files[0]?.url, "_blank", "noopener,noreferrer")}>
+                                <button
+                                    type="button"
+                                    className="primary"
+                                    disabled={!canDownload || zipBusy || model.files.length === 0}
+                                    aria-busy={zipBusy}
+                                    onClick={() => void downloadAllEvidence()}
+                                >
                                     <span className="button-content">
-                                        <Icon name="download" /> Download all evidence
+                                        <Icon name="download" /> {zipBusy ? "Preparing ZIP…" : "Download all evidence"}
                                     </span>
                                 </button>
                             </div>
@@ -824,15 +895,15 @@ export default function ImpactPackage({
                                         </tr>
                                         <tr>
                                             <td>Restricted · Default</td>
-                                            <td>Student, Super Admin, Faculty, University · view only. Partner / NGO never.</td>
+                                            <td>Student, Super Admin, Faculty, University can view. Partner / NGO never.</td>
                                             <td>Not allowed</td>
-                                            <td className="block">Blocked for all roles, including Super Admin</td>
+                                            <td className="block">Super Admin only · blocked for every other role</td>
                                         </tr>
                                         <tr>
                                             <td>Private</td>
-                                            <td>Student, Super Admin, Faculty, University · view only. Internal verification only. Partner / NGO never.</td>
+                                            <td>Student, Super Admin, Faculty, University can view. Internal verification only. Partner / NGO never.</td>
                                             <td>Never</td>
-                                            <td className="block">Blocked for all roles, including Super Admin</td>
+                                            <td className="block">Super Admin only · blocked for every other role</td>
                                         </tr>
                                     </tbody>
                                 </table>

@@ -47,12 +47,12 @@ const visibilityOptions: Array<{
         id: "restricted",
         label: "Restricted",
         recommended: true,
-        desc: "Student and CIEL PK can view it now; Faculty and University unlock after super-admin approval. Partner / NGO never. Not shown publicly. Downloads are blocked.",
+        desc: "Student and CIEL PK can view it now; Faculty and University unlock after super-admin approval. Partner / NGO never. Not shown publicly. Only CIEL PK Super Admin can download the originals.",
     },
     {
         id: "private",
         label: "Private",
-        desc: "Internal verification only: Student and CIEL PK now, Faculty and University after super-admin approval. Partner / NGO never. Never published. Downloads are blocked.",
+        desc: "Internal verification only: Student and CIEL PK now, Faculty and University after super-admin approval. Partner / NGO never. Never published. Only CIEL PK Super Admin can download the originals.",
     },
 ];
 

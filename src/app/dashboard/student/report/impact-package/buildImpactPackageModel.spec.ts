@@ -43,14 +43,15 @@ test("evidence matrix matches backend: restricted is view-only for student/admin
     for (const role of ["student", "admin", "faculty", "university"] as const) {
         assert.equal(impactPackageCanViewEvidence(role, "restricted" as never, false), true, role);
         assert.equal(impactPackageCanViewEvidence(role, "restricted" as never, true), true, role);
-        assert.equal(impactPackageCanDownload(role, "restricted" as never, true), false, role);
+        assert.equal(impactPackageCanDownload(role, "restricted" as never, true), role === "admin", role);
+        assert.equal(impactPackageCanDownload(role, "private" as never, true), role === "admin", role);
     }
     assert.equal(impactPackageCanViewEvidence("partner", "restricted" as never, true), false);
     assert.equal(impactPackageCanViewEvidence("public", "restricted" as never, true), false);
     for (const role of ["student", "admin", "faculty", "university", "partner", "public"] as const) {
         assert.equal(impactPackageCanViewEvidence(role, "public" as never, false), true, role);
         assert.equal(impactPackageCanDownload(role, "public" as never, true), true, role);
-        assert.equal(impactPackageCanDownload(role, "public" as never, false), false, `${role} needs consent`);
+        assert.equal(impactPackageCanDownload(role, "public" as never, false), role === "admin", `${role} needs consent`);
     }
 });
 

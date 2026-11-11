@@ -668,15 +668,17 @@ export function impactPackageCanViewEvidence(
     return false;
 }
 
+/** Public (with consent): every viewer. Restricted / private: Super Admin only (matches backend). */
 export function impactPackageCanDownload(audience: ImpactPackageAudience, visibility: MediaVisibility, publicConsent: boolean): boolean {
+    if (audience === "admin") return true;
     return visibility === "public" && publicConsent && impactPackageCanViewEvidence(audience, visibility, true);
 }
 
 export function impactPackageAccessText(audience: ImpactPackageAudience, visibility: MediaVisibility, _adminApproved: boolean): string {
     if (visibility === "public") return "Anyone viewing the published project can see the evidence.";
-    const internal = "Student, Super Admin, Faculty and University · view only. Partner / NGO never";
-    if (visibility === "private") return `${internal}. Internal verification only; never published. Downloads are blocked for everyone.`;
-    return `${internal}. Not shown publicly. Downloads are blocked for everyone.`;
+    const internal = "Student, Super Admin, Faculty and University can view. Partner / NGO never";
+    if (visibility === "private") return `${internal}. Internal verification only; never published. Only Super Admin can download originals.`;
+    return `${internal}. Not shown publicly. Only Super Admin can download originals.`;
 }
 
 export function impactPackageLockLine(adminApproved: boolean): string {
