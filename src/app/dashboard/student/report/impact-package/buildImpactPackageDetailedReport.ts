@@ -227,7 +227,7 @@ export function buildImpactPackageDetailedReport(
                     row("Student / registration ID", text((lead as { student_id?: string } | undefined)?.student_id)),
                     row("Programme", text(lead?.degree)),
                     row("Department / discipline", text(data.section2?.discipline_other, data.section2?.discipline, lead?.degree)),
-                    row("Semester", text(lead?.year)),
+                    row("Semester", text((lead as { semester?: string } | undefined)?.semester, lead?.year)),
                     row("Academic integration", text(data.section9?.academic_integration)),
                     row(
                         "Identity confirmation status",

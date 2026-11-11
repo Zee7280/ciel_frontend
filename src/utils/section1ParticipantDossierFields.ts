@@ -1,5 +1,6 @@
 import { buildParticipationProgramLine, normalizeParticipationRowForDossier } from "@/utils/reportTeamScope";
 import { isSchoolOrInstituteAcademicLabel, sanitizeReportAcademicDepartment } from "@/utils/universityData";
+import { composeProgramLine, participantStudyPeriod } from "@/utils/studyPeriod";
 
 export type Section1DossierField = {
     label: string;
@@ -177,7 +178,7 @@ export function normalizeSection1ParticipantRow(row: unknown): Record<string, un
         participationMode: firstNonBlank(r.participationMode, r.participation_mode),
         registrationNumber: rollNumber,
         program: degreeProgram
-            ? [degreeProgram, firstNonBlank(base.year, r.yearOfStudy)].filter(Boolean).join(" · ")
+            ? composeProgramLine(degreeProgram, participantStudyPeriod({ ...r, ...base }))
             : buildParticipationProgramLine({ ...base, ...r, student: student ?? undefined }),
         cnicDisplay: formatPakistaniCnicDisplay(r.cnic ?? base.cnic),
     };
@@ -206,7 +207,10 @@ export function buildSection1ParticipantDossierFields(
     pushField(academic, "Student ID / roll number", row.studentRollNumber ?? row.registrationNumber);
     pushField(academic, "Degree program", row.academicProgram ?? row.academic_program);
     pushField(academic, "Department", row.department);
-    pushField(academic, "Year of study", firstNonBlank(row.yearOfStudy, row.year, row.year_of_study));
+    // Community Service asks for Semester and hides Year of study (its saved value is only the form default).
+    if (!firstNonBlank(row.semester)) {
+        pushField(academic, "Year of study", firstNonBlank(row.yearOfStudy, row.year, row.year_of_study));
+    }
     pushField(academic, "Semester", row.semester);
     pushField(academic, "Academic integration type", firstNonBlank(row.academicIntegrationType, row.academic_integration_type));
 

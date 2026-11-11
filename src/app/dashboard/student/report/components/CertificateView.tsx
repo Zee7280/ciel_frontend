@@ -5,7 +5,8 @@ import { BarChart3, Calendar, Clock, Globe, Lock, Target, Users } from "lucide-r
 import "./certificate-print.css";
 import CertificateScaleShell from "./CertificateScaleShell";
 import { calculateCII } from "../utils/calculateCII";
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1, sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
+import { composeProgramLine, participantStudyPeriod } from "@/utils/studyPeriod";
 import {
     deriveCertificateProjectDisplay,
     formatCertificateDate,
@@ -100,9 +101,11 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         const leadLabel = section1?.participation_type === "team" ? "Team Lead" : "Participant";
         const leadDegree = lead.degree?.trim() || "";
         const discipline = section2?.discipline?.trim() || "";
-        const leadProgram = [leadDegree, discipline && leadDegree !== discipline ? discipline : ""]
-            .filter(Boolean)
-            .join(" · ");
+        // Semester shows when the lead gave one (Community Service); the year default is not shown here.
+        const leadProgram = composeProgramLine(
+            [leadDegree, discipline && leadDegree !== discipline ? discipline : ""].filter(Boolean).join(" · "),
+            (lead as { semester?: unknown }).semester,
+        );
 
         if (
             section1?.participation_type !== "team" ||
@@ -137,7 +140,10 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                 name: displayPersonName(m) || "Team member",
                 label: (m.role || "Team member").trim(),
                 university: m.university?.trim() || "",
-                program: m.program?.trim() || "",
+                // One study period, semester first: stored lines can already end in "· 3rd Year".
+                program: m.program?.trim()
+                    ? composeProgramLine(m.program, participantStudyPeriod(m as unknown as Record<string, unknown>))
+                    : "",
             });
         });
 
@@ -171,7 +177,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         return calculateEngagementMetrics(logs, req, teamSize, section1?.team_lead, rosterIds);
     }, [section1, data.required_hours]);
 
-    const verifiedHours = useMemo(() => {
+    /** Approved, roster-attributed hours: the CII fallback input (unchanged). */
+    const ciiVerifiedHours = useMemo(() => {
         const stored = Number(section1?.metrics?.total_verified_hours);
         if (Number.isFinite(stored) && stored > 0) {
             return Math.round(stored);
@@ -189,6 +196,18 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         return Math.round(leadH + membersH);
     }, [section1?.metrics?.total_verified_hours, section1?.team_lead?.hours, section1?.team_members, engagementRecalc.total_verified_hours]);
 
+    /**
+     * Verified Hours tile: same basis as the package Overview, report header and lists — stored
+     * total first, then every logged session that faculty has not rejected.
+     */
+    const verifiedHours = useMemo(() => {
+        const stored = Number(section1?.metrics?.total_verified_hours);
+        if (Number.isFinite(stored) && stored > 0) return ciiVerifiedHours;
+        const logs = Array.isArray(section1?.attendance_logs) ? section1.attendance_logs : [];
+        const logged = sumNonRejectedLoggedHours(logs);
+        return logged > 0 ? Math.round(logged) : ciiVerifiedHours;
+    }, [section1, ciiVerifiedHours]);
+
     const engagementSpanDays = useMemo(() => {
         const stored = Number(section1?.metrics?.engagement_span);
         if (Number.isFinite(stored) && stored > 0) return Math.round(stored);
@@ -204,7 +223,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                 ...section1,
                 metrics: {
                     ...m,
-                    total_verified_hours: verifiedHours,
+                    total_verified_hours: ciiVerifiedHours,
                     total_active_days: m?.total_active_days || engagementRecalc.total_active_days,
                     engagement_span: engagementSpanDays || m?.engagement_span || engagementRecalc.engagement_span,
                     attendance_frequency: m?.attendance_frequency || engagementRecalc.attendance_frequency,
@@ -215,7 +234,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                 },
             },
         };
-    }, [data, section1, verifiedHours, engagementSpanDays, engagementRecalc]);
+    }, [data, section1, ciiVerifiedHours, engagementSpanDays, engagementRecalc]);
 
     const ciiScore = useMemo(() => {
         // Community Service reports carry an admin-locked CII v4.5 score, which is stricter and

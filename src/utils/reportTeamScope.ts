@@ -17,6 +17,7 @@ export {
     type ScopedTeamResult,
 } from "./reportTeamScopeCore";
 import { pickTeamIdFromRecord, resolveScopedTeamMembers, type ReportTeamRow, type ScopedTeamResult } from "./reportTeamScopeCore";
+import { composeProgramLine, participantStudyPeriod } from "./studyPeriod";
 
 /** Full team roster for certificates — includes the viewer and uses live lead from enrollment. */
 export function resolveScopedTeamRosterForCertificate(
@@ -188,10 +189,8 @@ export function buildParticipationProgramLine(row: Record<string, unknown>): str
             ? progRaw
             : "";
     const base = dossierFirstNonBlank(row.program, prog, dept);
-    const year = dossierFirstNonBlank(row.year, row.yearOfStudy, row.year_of_study);
-    if (base && year) return `${base} · ${year}`;
-    if (base) return base;
-    return year;
+    // Semester (Community Service) wins over the hidden year default; never repeats a period already in `program`.
+    return composeProgramLine(base, participantStudyPeriod(row));
 }
 
 /** Map engagement `Participation` rows (or stored section1 rows) to verify-dossier field names. */
