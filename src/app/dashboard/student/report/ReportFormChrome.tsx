@@ -1018,18 +1018,12 @@ function SectionSummaryStats({
     return null;
 }
 
-/** How the saved AI summary relates to the answers now on screen ("server": rewritten by CIEL PK on every save). */
-type BannerAiSync = SectionSummarySync | "server";
+/** How the saved AI summary relates to the answers now on screen. */
+type BannerAiSync = SectionSummarySync;
 
 const AI_SYNC_NOTE: Record<Exclude<BannerAiSync, "none">, { tag: string; note: string; color: string; background: string }> = {
     fresh: {
         tag: "✓ MATCHES YOUR CURRENT ANSWERS",
-        note: "",
-        color: "#0e7d74",
-        background: "#e3f5f1",
-    },
-    server: {
-        tag: "↻ REWRITTEN FROM YOUR ANSWERS ON EVERY SAVE",
         note: "",
         color: "#0e7d74",
         background: "#e3f5f1",
@@ -1358,13 +1352,13 @@ export function liveSectionSummary(uiStep: number, data: ReportData, a: ReturnTy
     return "";
 }
 
-/** Steps whose AI summary CIEL PK rewrites on every save (Context, SDG mapping). */
-const SERVER_SUMMARY_STEPS = new Set([2, 3]);
-/** Steps that still have an AI summary writer on Next (data sections 4+5, 8, 9, 10). */
-const CLIENT_SUMMARY_STEPS = new Set([4, 7, 8, 9]);
+/**
+ * Steps whose AI summary is written on Next (data sections 2, 3, 4+5, 8, 9, 10). The wizard saves
+ * drafts without reading the server's copy back, so Context / SDG summaries are checked the same way.
+ */
+const CLIENT_SUMMARY_STEPS = new Set([2, 3, 4, 7, 8, 9]);
 
 function bannerAiSync(uiStep: number, data: ReportData): BannerAiSync {
-    if (SERVER_SUMMARY_STEPS.has(uiStep)) return "server";
     const sections = wizardStepToDataSections(uiStep).map(
         (n) => (data as unknown as Record<string, unknown>)[`section${n}`],
     );
@@ -1398,7 +1392,7 @@ export function ReportLiveBanner({
     const baseline = firstSentence(data.section2?.problem_statement || "");
     const aiSync = bannerAiSync(uiStep, data);
     // Resources / Partnerships no longer get an AI summary on Next: an old saved one is shown only if it still matches.
-    const aiShown = CLIENT_SUMMARY_STEPS.has(uiStep) || SERVER_SUMMARY_STEPS.has(uiStep) || aiSync === "fresh" ? ai : "";
+    const aiShown = CLIENT_SUMMARY_STEPS.has(uiStep) || aiSync === "fresh" ? ai : "";
     const live = liveSectionSummary(uiStep, data, a);
     const reach4 = sectionFourReach(data);
 

@@ -77,8 +77,9 @@ test("Next stores the fingerprint with the summary; the banner shows sync state 
     assert.equal((chrome.match(/ai=\{aiShown\} aiSync=\{aiSync\} live=\{live\}/g) || []).length, 8, "steps 2–9");
     assert.match(chrome, /LIVE SUMMARY — FROM YOUR CURRENT ANSWERS/);
     assert.match(chrome, /⚠ WRITTEN FROM EARLIER ANSWERS/);
-    assert.match(chrome, /const SERVER_SUMMARY_STEPS = new Set\(\[2, 3\]\);/);
-    assert.match(chrome, /const CLIENT_SUMMARY_STEPS = new Set\(\[4, 7, 8, 9\]\);/);
+    // Every step with an AI writer on Next is checked (drafts are saved without reading the server copy back).
+    assert.match(chrome, /const CLIENT_SUMMARY_STEPS = new Set\(\[2, 3, 4, 7, 8, 9\]\);/);
+    assert.doesNotMatch(chrome, /REWRITTEN FROM YOUR ANSWERS ON EVERY SAVE/);
     // Section 4's "reached" is Section 4's own count, not the baseline's affected count.
     assert.match(chrome, /🫶 \{reach4\} REACHED/);
     assert.doesNotMatch(chrome, /🫶 \{a\.reach \|\| 0\} REACHED/);
