@@ -71,7 +71,7 @@ export function QuickImpactFlashcard({ log, compact = false }: { log: QuickWorkL
                     <p>SDG not selected.</p>
                 )}
                 <h4>Contribution</h4>
-                <p>{log.summary || "Summary not completed yet."}</p>
+                <p className={compact ? "qif-clamp" : undefined}>{log.summary || "Summary not completed yet."}</p>
                 <h4>People &amp; partnerships</h4>
                 <p>
                     {names}

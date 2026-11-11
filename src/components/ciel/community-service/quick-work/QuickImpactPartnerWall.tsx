@@ -64,7 +64,7 @@ export default function QuickImpactPartnerWall() {
                     const hosts = [r.host, ...r.partners].filter(Boolean).join(" · ");
                     const goals = r.sdgs ?? (r.sdg ? [{ n: r.sdg, name: r.sdgName ?? "", color: r.sdgColor ?? "#607d8b", main: true }] : []);
                     return (
-                        <article key={r.id} className="qif-card">
+                        <article key={r.id} className="qif-card qif-card--fill">
                             <div className="qif-top">
                                 <div className="qif-eyebrow">CIEL PK · Quick Community Impact · Published &amp; Verified</div>
                                 <h4 className="qif-title">{r.title}</h4>

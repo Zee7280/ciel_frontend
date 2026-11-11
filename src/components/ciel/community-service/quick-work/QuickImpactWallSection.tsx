@@ -45,12 +45,14 @@ export default function QuickImpactWallSection() {
             {logs.length ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
                     {logs.map((log) => (
-                        <div key={log.id} className="min-w-0">
-                            <QuickImpactFlashcard log={log} compact />
+                        <div key={log.id} className="flex min-w-0 flex-col">
+                            <div className="flex flex-1 flex-col">
+                                <QuickImpactFlashcard log={log} compact />
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setOpen(log)}
-                                className="mt-2.5 rounded-[10px] bg-[#287db8] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#1f6ca3]"
+                                className="mt-2.5 self-start rounded-[10px] bg-[#287db8] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#1f6ca3]"
                             >
                                 View Quick Impact Flashcard
                             </button>

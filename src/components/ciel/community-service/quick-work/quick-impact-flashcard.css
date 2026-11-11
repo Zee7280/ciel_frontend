@@ -163,6 +163,45 @@
     font-size: 9px;
 }
 
+/* Equal-height cards on a wall grid: the card fills its row, the footer sits at the bottom. */
+.qif-card--compact,
+.qif-card--fill {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+.qif-card--compact .qif-body,
+.qif-card--fill .qif-body {
+    flex: 1 1 auto;
+}
+
+/* Compact header: fixed lines for title (2) and place · date · type (3), so the metrics line up across a row. */
+.qif-card--compact .qif-title,
+.qif-card--compact .qif-sub {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.qif-card--compact .qif-title {
+    -webkit-line-clamp: 2;
+    min-height: 2.4em;
+}
+
+.qif-card--compact .qif-sub {
+    -webkit-line-clamp: 3;
+    min-height: 4.5em;
+}
+
+/* Long contribution text is shortened on the wall; the full text is in "View Quick Impact Flashcard". */
+.qif-card--compact .qif-clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
+}
+
 @media (max-width: 640px) {
     .qif-metrics {
         grid-template-columns: repeat(2, minmax(0, 1fr));
